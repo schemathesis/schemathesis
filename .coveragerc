@@ -1,0 +1,15 @@
+[run]
+branch = true
+parallel = true
+source = schemathesis
+
+[paths]
+source =
+   src/schemathesis
+   .tox/*/lib/python*/site-packages/schemathesis
+
+[report]
+show_missing = true
+precision = 2
+exclude_lines =
+   raise NotImplementedError

@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "schemathesis"
+version = "0.1.0"
+description = ""
+authors = ["Dmitry Dygalo <dmitry.dygalo@kiwi.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+attrs = "^19.1"
+hypothesis = "^4.32"
+hypothesis_jsonschema = "^0.9.7"
+pytest = ">4.6.4"
+pyyaml = "^5.1"
+
+[tool.poetry.dev-dependencies]
+coverage = "^4.5"
+pytest = ">4.6.4"
+
+[tool.poetry.plugins]
+pytest11 = {schemathesis = "schemathesis.extra.pytest_plugin"}
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"

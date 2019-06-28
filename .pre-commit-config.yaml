@@ -1,0 +1,22 @@
+default_language_version:
+  python: python3.7
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.3.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+  - repo: https://github.com/ambv/black
+    rev: stable
+    hooks:
+      - id: black
+        args: [-l 120]
+        types: [python]
+
+  - repo: https://github.com/pre-commit/mirrors-isort
+    rev: v4.3.15
+    hooks:
+      - id: isort
+        args: [--line-width=120, --multi-line=3, --project=schemathesis, --section-default=THIRDPARTY, --trailing-comma]
