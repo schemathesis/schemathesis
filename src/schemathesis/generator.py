@@ -13,6 +13,8 @@ from .types import Body, ParametersList, PathParameters, Query
 
 @attr.s(slots=True)
 class Case:
+    """A single test case parameters."""
+
     path: str = attr.ib()
     path_parameters: PathParameters = attr.ib()
     method: str = attr.ib()
@@ -44,4 +46,5 @@ def get_parameters_strategy(parameters: ParametersList) -> st.SearchStrategy:
 def get_strategy(item: Dict[str, Any]) -> st.SearchStrategy:
     if "schema" in item:
         item = item["schema"]
+    item.pop("required", None)
     return from_schema(item)
