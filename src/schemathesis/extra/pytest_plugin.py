@@ -1,6 +1,8 @@
 from typing import Any, Callable, Generator, List, Optional
 
 import hypothesis
+import hypothesis.errors
+import pytest
 from _pytest import nodes
 from _pytest.python import Function, PyCollector  # type: ignore
 
@@ -40,6 +42,8 @@ class SchemathesisCase(PyCollector):
         name = self.name + f"[{endpoint.method}:{endpoint.path}]"
         items = self.ihook.pytest_pycollect_makeitem(collector=self.parent, name=name, obj=hypothesis_item)
         for item in items:
+            # Move to collect hook?
+            item.__class__ = CustomFunc
             item.obj = hypothesis_item
             yield item
 
@@ -53,3 +57,12 @@ class SchemathesisCase(PyCollector):
             )
             for item in self._gen_items(endpoint)
         ]
+
+
+class CustomFunc(Function):
+    def runtest(self):
+        try:
+            super().runtest()
+        except hypothesis.errors.InvalidArgument as exc:
+            # Make it more visible? Maybe suppress logging upper?
+            pytest.skip(exc.args[0])

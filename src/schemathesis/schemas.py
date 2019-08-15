@@ -6,6 +6,8 @@ Their responsibilities:
 
 They give only static definitions of endpoints.
 """
+import itertools
+from copy import deepcopy
 from fnmatch import fnmatch
 from functools import lru_cache
 from typing import Any, Dict, Generator, List, Optional, Set, Tuple, Union
@@ -68,18 +70,38 @@ class SwaggerV20(BaseSchema):
             full_path = self.get_full_path(path)
             if should_skip_endpoint(full_path, filter_endpoint):
                 continue
+            common_parameters = methods.pop("parameters", [])
             for method, definition in methods.items():
                 if should_skip_method(method, filter_method):
                     continue
                 # Maybe decompose definition into smaller parts? something is not needed probably
-                parameters = definition.get("parameters", [])
+                parameters = itertools.chain(definition.get("parameters", []), common_parameters)
+                # a parameter could be either Parameter Object or Reference Object.
+                # references should be resolved here to know where to put the parameter - body / query / etc
                 parameters = [self.prepare_item(item) for item in parameters]
                 yield Endpoint(path=full_path, method=method.upper(), parameters=parameters)
 
     def prepare_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
         if is_reference(item):
-            item = self.dereference(item["$ref"])
+            item = self.resolve_reference(item["$ref"])
+        elif item["in"] == "body" and is_reference(item["schema"]):
+            # TODO. is it ok to modify it? or better to copy it?
+            item.update(self.resolve_reference(item["schema"]["$ref"]))
+            del item["schema"]
         return item
+
+    @lru_cache()
+    def resolve_reference(self, reference):
+        dereferenced = self.dereference(reference)
+        dereferenced = deepcopy(dereferenced)  # modifications are going to happen
+        for key, value in traverse_schema(dereferenced):
+            if key[-1] == "$ref":
+                data = self.resolve_reference(value)
+                current = dereferenced
+                for k in key[:-2]:
+                    current = current[k]
+                current[key[-2]] = data
+        return dereferenced
 
     @lru_cache()
     def dereference(self, path: str) -> Dict[str, Any]:
@@ -122,3 +144,13 @@ def is_reference(item: Dict[str, Any]) -> bool:
 
 def filter_parameters(parameters: ParametersList, place: str) -> ParametersList:
     return [parameter for parameter in parameters if parameter["in"] == place]
+
+
+def traverse_schema(schema):
+    """Iterate over dict levels with producing [k_1, k_2, ...], value where the first list is a path to the value."""
+    for key, value in schema.items():
+        if isinstance(value, dict) and value:
+            for sub_key, sub_value in traverse_schema(value):
+                yield [key] + sub_key, sub_value
+        else:
+            yield [key], value
