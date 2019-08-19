@@ -1,0 +1,36 @@
+# Config file for automatic testing at travis-ci.org
+
+sudo: false
+language: python
+cache: pip
+
+stages:
+  - linters
+  - tests
+
+matrix:
+  include:
+    - stage: linters
+      python: 3.7
+      env: TOX_ENV=pylint
+    - stage: linters
+      python: 3.7
+      env: TOX_ENV=mypy
+    - stage: tests
+      python: 3.6
+      env: TOX_ENV=py36
+    - stage: tests
+      python: 3.7
+      env: TOX_ENV=py37
+
+install:
+  - pip install tox codecov
+
+script:
+  - tox -e $TOX_ENV
+
+before_cache:
+  - rm -rf $HOME/.cache/pip/log
+
+after_success:
+  - codecov
