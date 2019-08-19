@@ -1,0 +1,79 @@
+stages:
+  - build
+  - test
+  - post-test
+  - release
+
+variables:
+  GIT_DEPTH: "3"
+  SAST_TARGET: schemathesis
+  SONARQUBE_TARGET: schemathesis,test
+  PYLINT_TARGET: schemathesis test
+  PYTEST_COVERAGE_TARGET: schemathesis
+
+include:
+  - 'https://ci-files.skypicker.com/templates/build/black.yml'
+  - 'https://ci-files.skypicker.com/templates/build/zoo.yml'
+  - 'https://ci-files.skypicker.com/templates/build/tox_init.yml'
+  - 'https://ci-files.skypicker.com/templates/test/tox_pylint.yml'
+  - 'https://ci-files.skypicker.com/templates/test/dependency_scanning.yml'
+  - 'https://ci-files.skypicker.com/templates/test/license_management.yml'
+  - 'https://ci-files.skypicker.com/templates/test/sast.yml'
+  - 'https://ci-files.skypicker.com/templates/release/sonarqube_scan.yml'
+  - 'https://ci-files.skypicker.com/templates/release/sonarqube_preview.yml'
+
+.tox:
+  stage: test
+  image: kiwicom/tox
+  dependencies:
+    - tox_init
+
+.tox_tests:
+  extends: .tox
+  coverage: '/^TOTAL\s+\d+\s+\d+\s+\d+\s+\d+\s+(\d+\.\d+%)$/'
+  artifacts:
+    paths:
+      - reports/
+      - .coverage*
+
+black:
+  stage: build
+  image: kiwicom/black:19.3b0
+  dependencies: []  # skip downloading artifacts unnecessarily
+  script:
+    - black --check . --diff -l 120
+
+mypy:
+  extends: .tox
+  script:
+    - tox -e mypy
+
+pylint:
+  extends: .tox
+  script:
+    - tox -e pylint
+
+py36-tests:
+  extends: .tox_tests
+  script:
+    - tox -e py36
+
+py37-tests:
+  extends: .tox_tests
+  script:
+    - tox -e py37
+
+tox_tests_coverage:
+  extends: .tox_tests
+  stage: post-test
+  dependencies:
+    - tox_init
+    - py36-tests
+    - py37-tests
+  before_script:
+    - mkdir -p $CI_PROJECT_DIR/coverage-reports
+  artifacts:
+    paths:
+      - coverage-reports/
+  script:
+    - tox -e coverage-report -- -o $CI_PROJECT_DIR/coverage-reports/coverage-integration.xml
