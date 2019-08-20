@@ -13,14 +13,10 @@ variables:
 
 include:
   - 'https://ci-files.skypicker.com/templates/build/black.yml'
-  - 'https://ci-files.skypicker.com/templates/build/zoo.yml'
   - 'https://ci-files.skypicker.com/templates/build/tox_init.yml'
   - 'https://ci-files.skypicker.com/templates/test/tox_pylint.yml'
   - 'https://ci-files.skypicker.com/templates/test/dependency_scanning.yml'
   - 'https://ci-files.skypicker.com/templates/test/license_management.yml'
-  - 'https://ci-files.skypicker.com/templates/test/sast.yml'
-  - 'https://ci-files.skypicker.com/templates/release/sonarqube_scan.yml'
-  - 'https://ci-files.skypicker.com/templates/release/sonarqube_preview.yml'
 
 .tox:
   stage: test
