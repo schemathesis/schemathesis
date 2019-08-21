@@ -66,8 +66,7 @@ class SchemaParametrizer:
         """A cached schema abstraction to use in parametrization."""
         if self._schema is None:
             schema = self.raw_schema.get()
-            # TODO. it could be another schema type
-            self._schema = schemas.SwaggerV20(schema)
+            self._schema = schemas.wrap_schema(schema)
         return self._schema
 
     def parametrize(

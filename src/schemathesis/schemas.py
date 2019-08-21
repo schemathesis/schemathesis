@@ -93,6 +93,13 @@ class SwaggerV20(BaseSchema):
         return current
 
 
+def wrap_schema(raw_schema: Dict[str, Any]) -> BaseSchema:
+    """Get a proper abstraction for the given raw schema."""
+    if "swagger" in raw_schema:
+        return SwaggerV20(raw_schema)
+    raise ValueError("Unsupported schema type")
+
+
 def force_tuple(item: Filter) -> Union[List, Set, Tuple]:
     if not isinstance(item, (list, set, tuple)):
         return (item,)
