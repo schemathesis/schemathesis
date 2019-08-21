@@ -50,6 +50,7 @@ class BaseSchema:
 class SwaggerV20(BaseSchema):
     @property
     def base_path(self) -> str:
+        """Base path for the schema."""
         # pylint: disable=unsubscriptable-object
         path: str = self.raw_schema["basePath"]
         if not path.endswith("/"):
@@ -57,7 +58,7 @@ class SwaggerV20(BaseSchema):
         return path
 
     def get_full_path(self, path: str) -> str:
-        # TODO check leading / trailing slashes
+        """Compute full path for the given path."""
         return urljoin(self.base_path, path.lstrip("/"))
 
     def get_all_endpoints(

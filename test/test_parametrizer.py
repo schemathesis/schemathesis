@@ -20,11 +20,11 @@ def test_parametrize_hypothesis_settings():
     parametrizer = SchemaParametrizer({}, max_examples=10)
 
     @parametrizer.parametrize()
-    def test_():
+    def test():
         pass
 
     # Then they should be in the parametrized test as well
-    assert test_._schema_parametrizer.hypothesis_settings == {"max_examples": 10}
+    assert test._schema_parametrizer.hypothesis_settings == {"max_examples": 10}
 
 
 def test_parametrize_extend_hypothesis_settings():
@@ -32,12 +32,12 @@ def test_parametrize_extend_hypothesis_settings():
     parametrizer = SchemaParametrizer({}, max_examples=10)
 
     @parametrizer.parametrize(deadline=timedelta(seconds=1))
-    def test_():
+    def test():
         pass
 
     # Then they should be extended with values passed to `parametrize`
 
-    assert test_._schema_parametrizer.hypothesis_settings == {"max_examples": 10, "deadline": timedelta(seconds=1)}
+    assert test._schema_parametrizer.hypothesis_settings == {"max_examples": 10, "deadline": timedelta(seconds=1)}
 
 
 def test_is_schemathesis_test():
