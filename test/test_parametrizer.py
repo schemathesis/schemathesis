@@ -1,18 +1,17 @@
 from datetime import timedelta
 
+import pytest
+
 from schemathesis.parametrizer import SchemaParametrizer, is_schemathesis_test
 
+MINIMAL_SCHEMA = {"swagger": "2.0"}
 
-def test_raw_schema():
-    # When schema is passed as a dictionary directly
+
+@pytest.mark.parametrize("schema", (MINIMAL_SCHEMA, lambda: MINIMAL_SCHEMA), ids=("raw_schema", "lazy_callable"))
+def test_raw_schema(schema):
+    # When schema is passed as a dictionary or a callable
     # Then it should be used for schema wrapper
-    assert SchemaParametrizer({}).schema.raw_schema == {}
-
-
-def test_lazy_callable():
-    # When schema is passed as a callable
-    # Then the evaluation result should be used for schema wrapper
-    assert SchemaParametrizer(lambda: {}).schema.raw_schema == {}
+    assert SchemaParametrizer(schema).schema.raw_schema == MINIMAL_SCHEMA
 
 
 def test_parametrize_hypothesis_settings():
@@ -59,7 +58,7 @@ def test_callable_schema_cache():
     def load_schema():
         nonlocal counter
         counter += 1
-        return {}
+        return MINIMAL_SCHEMA
 
     parametrizer = SchemaParametrizer(load_schema)
 

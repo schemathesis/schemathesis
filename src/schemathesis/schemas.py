@@ -113,6 +113,13 @@ class SwaggerV20(BaseSchema):
         return current
 
 
+def wrap_schema(raw_schema: Dict[str, Any]) -> BaseSchema:
+    """Get a proper abstraction for the given raw schema."""
+    if "swagger" in raw_schema:
+        return SwaggerV20(raw_schema)
+    raise ValueError("Unsupported schema type")
+
+
 def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Common parameters are deep copied from the methods definitions.
 

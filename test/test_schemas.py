@@ -1,7 +1,7 @@
 import pytest
 
 from schemathesis import SwaggerV20
-from schemathesis.schemas import traverse_schema
+from schemathesis.schemas import traverse_schema, wrap_schema
 
 
 @pytest.fixture()
@@ -15,6 +15,11 @@ def test_base_path_suffix(swagger_20, base_path):
     swagger_20.raw_schema["basePath"] = base_path
     # Then base path ends with "/" anyway in the swagger instance
     assert swagger_20.base_path == "/v1/"
+
+
+def test_wrap_schema_unsupported_type():
+    with pytest.raises(ValueError, match="Unsupported schema type"):
+        wrap_schema({})
 
 
 def test_traverse_schema(simple_schema):
