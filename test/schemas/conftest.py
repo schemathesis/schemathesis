@@ -12,9 +12,9 @@ def testdir(testdir):
         preparation = dedent(
             """
         import pytest
-        from schemathesis import SchemaParametrizer
+        from schemathesis import Parametrizer
         from test.schemas.utils import *
-        schema = SchemaParametrizer({schema})
+        schema = Parametrizer({schema})
         """.format(
                 schema=schema
             )
