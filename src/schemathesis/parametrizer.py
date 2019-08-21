@@ -35,7 +35,7 @@ def prepare_schema(schema: RawSchema) -> Holder:
     return Holder(value=schema)
 
 
-class SchemaParametrizer:
+class Parametrizer:
     """An entry point for test parametrization.
 
     Store parametrization config and mark test functions for further processing.
@@ -57,7 +57,7 @@ class SchemaParametrizer:
         self._schema: Optional[schemas.BaseSchema] = None
 
     @classmethod
-    def from_path(cls, path: str) -> "SchemaParametrizer":
+    def from_path(cls, path: str) -> "Parametrizer":
         """Create a parametrizer from the given OS path."""
         return cls(lambda: readers.from_path(path))
 

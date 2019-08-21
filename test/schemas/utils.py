@@ -2,14 +2,14 @@ import datetime
 
 import yaml
 
-from schemathesis import SchemaParametrizer
+from schemathesis import Parametrizer
 
 from ..utils import get_schema_path
 
 
 def get_schema(schema_name="simple.yaml", **kwargs):
     schema = make_schema(schema_name, **kwargs)
-    return SchemaParametrizer(schema)
+    return Parametrizer(schema)
 
 
 def make_schema(schema_name="simple.yaml", **kwargs):

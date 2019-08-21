@@ -12,7 +12,7 @@ from ..schemas import Endpoint
 
 
 def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> Optional["SchemathesisCase"]:
-    """Switch to a different collector if the test is wrapped with `SchemaParametrizer.parametrize()`."""
+    """Switch to a different collector if the test is wrapped with `Parametrizer.parametrize()`."""
     if is_schemathesis_test(obj):
         return SchemathesisCase(obj, name, collector)
     return None
