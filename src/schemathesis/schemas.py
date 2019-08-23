@@ -64,29 +64,29 @@ class SwaggerV20(BaseSchema):
     def get_all_endpoints(
         self, filter_method: Optional[Filter] = None, filter_endpoint: Optional[Filter] = None
     ) -> Generator[Endpoint, None, None]:
-        schema = deepcopy(self.raw_schema)  # modifications are going to happen
-        paths = schema["paths"]  # pylint: disable=unsubscriptable-object
+        paths = self.raw_schema["paths"]  # pylint: disable=unsubscriptable-object
         for path, methods in paths.items():
             full_path = self.get_full_path(path)
             if should_skip_endpoint(full_path, filter_endpoint):
                 continue
-            common_parameters = methods.pop("parameters", [])
+            common_parameters = get_common_parameters(methods)
             for method, definition in methods.items():
-                if should_skip_method(method, filter_method):
+                if method == "parameters" or should_skip_method(method, filter_method):
                     continue
-                parameters = itertools.chain(definition.get("parameters", []), common_parameters)
+                parameters = itertools.chain(definition.get("parameters", ()), common_parameters)
                 # a parameter could be either Parameter Object or Reference Object.
                 # references should be resolved here to know where to put the parameter - body / query / etc
                 prepared_parameters = [self.prepare_item(item) for item in parameters]
                 yield Endpoint(path=full_path, method=method.upper(), parameters=prepared_parameters)
 
     def prepare_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
-        if is_reference(item):
-            item = self.resolve_reference(item["$ref"])
-        elif item["in"] == "body" and is_reference(item["schema"]):
-            item.update(self.resolve_reference(item["schema"]["$ref"]))
-            del item["schema"]
-        return item
+        new_item = deepcopy(item)
+        if is_reference(new_item):
+            new_item = self.resolve_reference(new_item["$ref"])
+        elif new_item["in"] == "body" and is_reference(new_item["schema"]):
+            new_item.update(self.resolve_reference(new_item["schema"]["$ref"]))
+            del new_item["schema"]
+        return new_item
 
     @lru_cache()
     def resolve_reference(self, reference: str) -> Dict[str, Any]:
@@ -109,6 +109,17 @@ class SwaggerV20(BaseSchema):
             # Support arrays in JSON pointers?
             current = current[part]  # pylint: disable=unsubscriptable-object
         return current
+
+
+def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Common parameters are deep copied from the methods definitions.
+
+    Copying is needed because of further modifications.
+    """
+    common_parameters = methods.get("parameters")
+    if common_parameters is not None:
+        return deepcopy(common_parameters)
+    return []
 
 
 def force_tuple(item: Filter) -> Union[List, Set, Tuple]:

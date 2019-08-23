@@ -217,7 +217,7 @@ def impl(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
     assert case.method in ["GET", "POST"]
-    assert_int(case.query["id"])
+    assert_int(case.body["id"])
     assert_int(case.query["not_common_id"])
 
 @schema.parametrize(max_examples=1)
@@ -235,7 +235,7 @@ def test_b(request, case):
                 "post": {"parameters": [integer(name="not_common_id")]},
             }
         },
-        definitions={"SimpleIntRef": integer(name="id")},
+        definitions={"SimpleIntRef": integer(name="id", **{"in": "body"})},
     )
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used in all generated tests
