@@ -1,10 +1,12 @@
 from typing import Any, Callable, Generator, List, Optional
 
 import hypothesis
+import pytest
 from _pytest import nodes
+from _pytest.config import hookimpl
 from _pytest.mark import MARK_GEN
 from _pytest.python import Function, PyCollector  # type: ignore
-from hypothesis.errors import InvalidArgument
+from hypothesis.errors import InvalidArgument  # pylint: disable=ungrouped-imports
 
 from ..generator import get_case_strategy
 from ..parametrizer import is_schemathesis_test
@@ -73,3 +75,17 @@ class SchemathesisCase(PyCollector):
             )
             for item in self._gen_items(endpoint)
         ]
+
+
+@hookimpl(hookwrapper=True)
+def pytest_pyfunc_call(pyfuncitem):  # type:ignore
+    """It is possible to have a Hypothesis exception in runtime.
+
+    For example - object type is `deferred` strategy in `hypothesis_jsonschema` and is evaluated after
+    test collection phase.
+    """
+    outcome = yield
+    try:
+        outcome.get_result()
+    except InvalidArgument as exc:
+        pytest.skip(exc.args[0])

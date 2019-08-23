@@ -168,7 +168,7 @@ def test_custom_format(testdir):
     testdir.make_test(
         """
 @schema.parametrize(max_examples=1)
-def test_x(request, case):
+def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.query["id"])
 """,
@@ -181,7 +181,45 @@ def test_x(request, case):
             }
         },
     )
-    result = testdir.runpytest("-v", "-rs", "-s")
+    result = testdir.runpytest("-v", "-rs")
+    # Then the relevant test case should be skipped
+    # And the case that doesn't require a parameter should pass
+    result.assert_outcomes(passed=1, skipped=1)
+    # And a proper message is written to the output
+    result.stdout.re_match_lines([".* Unsupported string format=custom_format"])
+    # And the relevant passed test case should have 1 hypothesis call
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+
+
+def test_custom_format_in_reference(testdir):
+    # When the given parameter is an object in body
+    # And it references an object definition, that has a string key with a custom format
+    testdir.make_test(
+        """
+@schema.parametrize(max_examples=10)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    if "key" in case.body:
+        assert_str(case.body["key"])
+""",
+        paths={
+            "/users": {
+                "post": {
+                    "parameters": [
+                        {"name": "attributes", "in": "body", "schema": {"$ref": "#/definitions/SimpleStringRef"}}
+                    ]
+                }
+            }
+        },
+        definitions={
+            "SimpleStringRef": {
+                "type": "object",
+                "required": ["key"],
+                "properties": {"key": {"type": "string", "format": "custom_format"}},
+            }
+        },
+    )
+    result = testdir.runpytest("-v", "-rs")
     # Then the relevant test case should be skipped
     # And the case that doesn't require a parameter should pass
     result.assert_outcomes(passed=1, skipped=1)
