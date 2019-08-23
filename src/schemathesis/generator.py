@@ -46,5 +46,6 @@ def get_parameters_strategy(parameters: ParametersList) -> st.SearchStrategy:
 def get_strategy(item: Dict[str, Any]) -> st.SearchStrategy:
     if "schema" in item:
         item = item["schema"]
-    item.pop("required", None)
+    if not isinstance(item.get("required"), list):
+        item.pop("required", None)
     return from_schema(item)
