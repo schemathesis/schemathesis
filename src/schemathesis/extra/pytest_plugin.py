@@ -1,10 +1,10 @@
 from typing import Any, Callable, Generator, List, Optional
 
 import hypothesis
-import hypothesis.errors
-import pytest
 from _pytest import nodes
+from _pytest.mark import MARK_GEN
 from _pytest.python import Function, PyCollector  # type: ignore
+from hypothesis.errors import InvalidArgument
 
 from ..generator import get_case_strategy
 from ..parametrizer import is_schemathesis_test
@@ -26,12 +26,28 @@ class SchemathesisCase(PyCollector):
 
     def make_hypothesis_item(self, endpoint: Endpoint) -> Callable:
         """Create a Hypothesis test."""
-        try:
-            strategy = get_case_strategy(endpoint)
-        except hypothesis.errors.InvalidArgument as exc:
-            pytest.skip(exc.args[0])
+        strategy = get_case_strategy(endpoint)
         item = hypothesis.given(case=strategy)(self.test_function)
         return hypothesis.settings(**self.schemathesis_case.hypothesis_settings)(item)
+
+    def _get_test_name(self, endpoint: Endpoint) -> str:
+        return self.name + f"[{endpoint.method}:{endpoint.path}]"
+
+    def _get_hypothesis_items(self, endpoint: Endpoint) -> Generator[Function, None, None]:
+        hypothesis_item = self.make_hypothesis_item(endpoint)
+        items = self.ihook.pytest_pycollect_makeitem(
+            collector=self.parent, name=self._get_test_name(endpoint), obj=hypothesis_item
+        )
+        for item in items:
+            item.obj = hypothesis_item
+            yield item
+
+    def _get_skipped_items(self, endpoint: Endpoint, exception: InvalidArgument) -> Generator[Function, None, None]:
+        """Make all tests skipped because of the given exception"""
+        items = self.parent._genfunctions(self._get_test_name(endpoint), self.test_function)
+        for item in items:
+            item.add_marker(MARK_GEN.skip(exception.args[0]))
+            yield item
 
     def _gen_items(self, endpoint: Endpoint) -> Generator[Function, None, None]:
         """Generate all items for the given endpoint.
@@ -41,12 +57,11 @@ class SchemathesisCase(PyCollector):
         """
         # TODO. exclude it early, if tests are deselected, then hypothesis strategies will not be used anyway
         # But, it is important to know the total number of tests for all method/endpoint combos
-        hypothesis_item = self.make_hypothesis_item(endpoint)
-        name = self.name + f"[{endpoint.method}:{endpoint.path}]"
-        items = self.ihook.pytest_pycollect_makeitem(collector=self.parent, name=name, obj=hypothesis_item)
-        for item in items:
-            item.obj = hypothesis_item
-            yield item
+        try:
+            yield from self._get_hypothesis_items(endpoint)
+        except InvalidArgument as exc:
+            # skip all tests that we can't make a strategy for
+            yield from self._get_skipped_items(endpoint, exc)
 
     def collect(self) -> List[Function]:
         """Generate different test items for all endpoints available in the given schema."""

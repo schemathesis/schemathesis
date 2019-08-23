@@ -168,17 +168,27 @@ def test_custom_format(testdir):
     testdir.make_test(
         """
 @schema.parametrize(max_examples=1)
-def test_(request, case):
+def test_x(request, case):
     request.config.HYPOTHESIS_CASES += 1
+    assert_int(case.query["id"])
 """,
-        **as_param({"name": "parameter", "type": "string", "format": "custom_format", "in": "query"}),
+        paths={
+            "/users": {
+                "get": {
+                    "parameters": [{"name": "parameter", "type": "string", "format": "custom_format", "in": "query"}]
+                },
+                "post": {"parameters": [integer(name="id")]},
+            }
+        },
     )
-    result = testdir.runpytest("-v", "-rs")
+    result = testdir.runpytest("-v", "-rs", "-s")
     # Then the relevant test case should be skipped
-    result.assert_outcomes(skipped=1)
+    # And the case that doesn't require a parameter should pass
+    result.assert_outcomes(passed=1, skipped=1)
     # And a proper message is written to the output
     result.stdout.re_match_lines([".* Unsupported string format=custom_format"])
-    result.stdout.re_match_lines([r"Hypothesis calls: 0"])
+    # And the relevant passed test case should have 1 hypothesis call
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
 
 
 def test_common_parameters(testdir):
