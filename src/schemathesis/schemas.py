@@ -59,7 +59,6 @@ class SwaggerV20(BaseSchema):
         return path
 
     def get_full_path(self, path: str) -> str:
-        # TODO check leading / trailing slashes
         return urljoin(self.base_path, path.lstrip("/"))
 
     def get_all_endpoints(
@@ -75,7 +74,6 @@ class SwaggerV20(BaseSchema):
             for method, definition in methods.items():
                 if should_skip_method(method, filter_method):
                     continue
-                # Maybe decompose definition into smaller parts? something is not needed probably
                 parameters = itertools.chain(definition.get("parameters", []), common_parameters)
                 # a parameter could be either Parameter Object or Reference Object.
                 # references should be resolved here to know where to put the parameter - body / query / etc
