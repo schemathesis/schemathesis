@@ -14,19 +14,11 @@ variables:
 include:
   - 'https://ci-files.skypicker.com/templates/build/black.yml'
   - 'https://ci-files.skypicker.com/templates/build/tox_init.yml'
-  - 'https://ci-files.skypicker.com/templates/test/tox_pylint.yml'
+  - 'https://ci-files.skypicker.com/templates/test/.tox.yaml'
   - 'https://ci-files.skypicker.com/templates/test/dependency_scanning.yml'
-  - 'https://ci-files.skypicker.com/templates/test/license_management.yml'
-
-.tox:
-  stage: test
-  image: kiwicom/tox
-  dependencies:
-    - tox_init
 
 .tox_tests:
   extends: .tox
-  coverage: '/^TOTAL\s+\d+\s+\d+\s+\d+\s+\d+\s+(\d+\.\d+%)$/'
   artifacts:
     paths:
       - reports/
@@ -41,28 +33,32 @@ black:
 
 mypy:
   extends: .tox
-  script:
-    - tox -e mypy
+  variables:
+    TOX_ENVIRONMENT: mypy
 
 pylint:
   extends: .tox
-  script:
-    - tox -e pylint
+  variables:
+    TOX_ENVIRONMENT: pylint
 
 py36-tests:
   extends: .tox_tests
-  script:
-    - tox -e py36
+  variables:
+    TOX_ENVIRONMENT: py36
 
 py37-tests:
   extends: .tox_tests
-  script:
-    - tox -e py37
+  variables:
+    TOX_ENVIRONMENT: py37
 
 tox_tests_coverage:
   extends: .tox_tests
   stage: post-test
   dependencies:
+    - tox_init
+    - py36-tests
+    - py37-tests
+  needs:
     - tox_init
     - py36-tests
     - py37-tests
