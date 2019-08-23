@@ -91,7 +91,7 @@ class SwaggerV20(BaseSchema):
         return item
 
     @lru_cache()
-    def resolve_reference(self, reference: Dict[str, Any]) -> Dict[str, Any]:
+    def resolve_reference(self, reference: str) -> Dict[str, Any]:
         dereferenced = self.dereference(reference)
         for key, value in traverse_schema(dereferenced):
             if key[-1] == "$ref":
