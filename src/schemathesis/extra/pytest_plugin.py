@@ -38,12 +38,14 @@ class SchemathesisCase(PyCollector):
         """
         # TODO. exclude it early, if tests are deselected, then hypothesis strategies will not be used anyway
         # But, it is important to know the total number of tests for all method/endpoint combos
-        hypothesis_item = self.make_hypothesis_item(endpoint)
+        try:
+            hypothesis_item = self.make_hypothesis_item(endpoint)
+        except hypothesis.errors.InvalidArgument as exc:
+            # Make it more visible? Maybe suppress logging upper?
+            pytest.skip(exc.args[0])
         name = self.name + f"[{endpoint.method}:{endpoint.path}]"
         items = self.ihook.pytest_pycollect_makeitem(collector=self.parent, name=name, obj=hypothesis_item)
         for item in items:
-            # Move to collect hook?
-            item.__class__ = CustomFunc
             item.obj = hypothesis_item
             yield item
 
@@ -57,12 +59,3 @@ class SchemathesisCase(PyCollector):
             )
             for item in self._gen_items(endpoint)
         ]
-
-
-class CustomFunc(Function):
-    def runtest(self):
-        try:
-            super().runtest()
-        except hypothesis.errors.InvalidArgument as exc:
-            # Make it more visible? Maybe suppress logging upper?
-            pytest.skip(exc.args[0])

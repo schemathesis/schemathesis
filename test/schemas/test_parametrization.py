@@ -133,3 +133,96 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+
+
+def test_recursive_dereference(testdir):
+    # When a given parameter contains a JSON reference, that reference an object with another reference"
+    testdir.make_test(
+        """
+@schema.parametrize(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/users"
+    assert case.method == "GET"
+    assert_int(case.body["object"]["id"])
+""",
+        **as_param({"schema": {"$ref": "#/definitions/ObjectRef"}, "in": "body", "name": "object"}),
+        definitions={
+            "ObjectRef": {
+                "required": ["id"],
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {"id": {"$ref": "#/definitions/SimpleIntRef"}},
+            },
+            "SimpleIntRef": integer(name="id"),
+        },
+    )
+    # Then it should be correctly resolved and used in the generated case
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+
+
+def test_custom_format(testdir):
+    # When the given string parameter has a custom format value
+    testdir.make_test(
+        """
+@schema.parametrize(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+""",
+        **as_param({"name": "parameter", "type": "string", "format": "custom_format", "in": "query"}),
+    )
+    result = testdir.runpytest("-v", "-rs")
+    # Then the relevant test case should be skipped
+    result.assert_outcomes(skipped=1)
+    # And a proper message is written to the output
+    result.stdout.re_match_lines([".* Unsupported string format=custom_format"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 0"])
+
+
+def test_common_parameters(testdir):
+    testdir.make_test(
+        """
+@schema.parametrize(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/users"
+    assert case.method in ["GET", "POST"]
+    assert_int(case.query["common_id"])
+    assert_int(case.query["not_common_id"])
+""",
+        paths={
+            "/users": {
+                "parameters": [integer(name="common_id")],
+                "get": {"parameters": [integer(name="not_common_id")]},
+                "post": {"parameters": [integer(name="not_common_id")]},
+            }
+        },
+    )
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=2)
+    result.stdout.re_match_lines([r"Hypothesis calls: 2"])
+
+
+def test_required_parameters(testdir):
+    testdir.make_test(
+        """
+@schema.parametrize(max_examples=20)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/users"
+    assert case.method == "GET"
+    assert "id" in case.body["object"]
+""",
+        **as_param(
+            {
+                "in": "body",
+                "name": "object",
+                "schema": {"type": "object", "required": ["id"], "properties": {"id": integer(name="id")}},
+            }
+        ),
+    )
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 20"])
