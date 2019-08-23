@@ -26,7 +26,10 @@ class SchemathesisCase(PyCollector):
 
     def make_hypothesis_item(self, endpoint: Endpoint) -> Callable:
         """Create a Hypothesis test."""
-        strategy = get_case_strategy(endpoint)
+        try:
+            strategy = get_case_strategy(endpoint)
+        except hypothesis.errors.InvalidArgument as exc:
+            pytest.skip(exc.args[0])
         item = hypothesis.given(case=strategy)(self.test_function)
         return hypothesis.settings(**self.schemathesis_case.hypothesis_settings)(item)
 
@@ -38,11 +41,7 @@ class SchemathesisCase(PyCollector):
         """
         # TODO. exclude it early, if tests are deselected, then hypothesis strategies will not be used anyway
         # But, it is important to know the total number of tests for all method/endpoint combos
-        try:
-            hypothesis_item = self.make_hypothesis_item(endpoint)
-        except hypothesis.errors.InvalidArgument as exc:
-            # Make it more visible? Maybe suppress logging upper?
-            pytest.skip(exc.args[0])
+        hypothesis_item = self.make_hypothesis_item(endpoint)
         name = self.name + f"[{endpoint.method}:{endpoint.path}]"
         items = self.ihook.pytest_pycollect_makeitem(collector=self.parent, name=name, obj=hypothesis_item)
         for item in items:
