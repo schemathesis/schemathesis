@@ -1,28 +1,49 @@
-# schemathesis
+# Schemathesis
+
+Schemathesis is a tool that generates test cases for your Open API / Swagger schemas.
+
+The main goal is to verify if all values allowed by the schema are processed correctly
+by the application.
+
+Empowered with `Hypothesis`, `hypothesis_jsonschema` and `pytest`.
+
+**NOTE**: The library is WIP, the API is a subject to change.
 
 ## Usage
 
-*TODO!*
+To generate test cases for your schema you need:
 
-## Code formatting
+- Create a parametrizer;
+- Wrap a test with `Parametrizer.parametrize` method
 
-In order to maintain code formatting consistency we use [black](https://github.com/ambv/black/)
-to format the python files. A pre-commit hook that formats the code is provided but it needs to be
-installed on your local git repo, so...
+```python
+from schemathesis import Parametrizer
 
-In order to install the pre-commit framework run `pip install pre-commit`
-or if you prefer homebrew `brew install pre-commit`
 
-Once you have installed pre-commit just run `pre-commit install` on your repo folder
+schema = Parametrizer.from_path("path/to/schema.yaml")
 
-## Testing
 
-To run all tests:
-
+@schema.parametrize()
+def test_users_endpoint(client, case):
+    response = client.request(
+        case.method, 
+        case.formatted_path,
+        params=case.query,
+        json=case.body
+    )
+    assert response.status_code == 200
 ```
-tox
-```
 
-Note that tox doesn't know when you change the `requirements.txt`
-and won't automatically install new dependencies for test runs.
-Run `pip install tox-battery` to install a plugin which fixes this silliness.
+Each wrapped test will have the `case` fixture, that represents a hypothesis test case.
+
+Case consists of:
+
+- `method`
+- `formatted_path`
+- `query`
+- `body`
+
+This data could be used to verify that your application works in the way as described in the schema.
+For example the data could be send against running app container via `requests` and response is checked
+for an expected status code or error message.
+

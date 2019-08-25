@@ -1,8 +1,25 @@
 [tool.poetry]
 name = "schemathesis"
 version = "0.1.0"
-description = ""
+description = "Hypothesis strategies for Open API"
+keywords = ["pytest", "hypothesis", "openapi", "swagger", "testing"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Framework :: Pytest",
+    "Framework :: Hypothesis",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Software Development :: Testing",
+]
 authors = ["Dmitry Dygalo <dmitry.dygalo@kiwi.com>"]
+readme = "README.md"
+repository = "https://github.com/kiwicom/schemathesis"
 license = "MIT"
 
 [tool.poetry.dependencies]
