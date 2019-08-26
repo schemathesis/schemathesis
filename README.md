@@ -47,3 +47,10 @@ This data could be used to verify that your application works in the way as desc
 For example the data could be send against running app container via `requests` and response is checked
 for an expected status code or error message.
 
+## Python support
+
+Schemathesis supports Python 3.6, 3.7 and 3.8.
+
+## License
+
+The code in this project is licensed under `MIT license`_. By contributing to `schemathesis`, you agree that your contributions will be licensed under its MIT license.
