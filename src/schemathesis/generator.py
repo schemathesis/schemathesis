@@ -6,7 +6,7 @@ import hypothesis.strategies as st
 from hypothesis_jsonschema import from_schema
 
 from .schemas import Endpoint
-from .types import Body, ParametersList, PathParameters, Query
+from .types import Body, PathParameters, Query
 
 # TODO. Better naming
 
@@ -32,15 +32,10 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
         Case,
         path=st.just(endpoint.path),
         method=st.just(endpoint.method),
-        path_parameters=get_parameters_strategy(endpoint.path_parameters),
-        query=get_parameters_strategy(endpoint.query),
-        body=get_parameters_strategy(endpoint.body),
+        path_parameters=get_strategy(endpoint.path_parameters),
+        query=get_strategy(endpoint.query),
+        body=get_strategy(endpoint.body),
     )
-
-
-def get_parameters_strategy(parameters: ParametersList) -> st.SearchStrategy:
-    # TODO. Fixed dicts? what about optional parameters?
-    return st.fixed_dictionaries({item["name"]: get_strategy(item) for item in parameters})
 
 
 def get_strategy(item: Dict[str, Any]) -> st.SearchStrategy:

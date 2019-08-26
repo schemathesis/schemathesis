@@ -52,7 +52,7 @@ def test_(request, param, case):
 
 def test_max_examples(testdir):
     # When `max_examples` is specified
-    parameters = {"parameters": [integer(name="id")]}
+    parameters = {"parameters": [integer(name="id", required=True)]}
     testdir.make_test(
         """
 @schema.parametrize(max_examples=5)
@@ -72,7 +72,7 @@ def test_(request, case):
 @pytest.mark.parametrize("endpoint", ("'/foo'", "'/v1/foo'", ["/foo"], "'/*oo'"))
 def test_endpoint_filter(testdir, endpoint):
     # When `endpoint` is specified
-    parameters = {"parameters": [integer(name="id")]}
+    parameters = {"parameters": [integer(name="id", required=True)]}
     testdir.make_test(
         """
 @schema.parametrize(filter_endpoint={}, max_examples=1)
@@ -94,7 +94,7 @@ def test_(request, case):
 @pytest.mark.parametrize("method", ("'get'", "'GET'", ["GET"], ["get"]))
 def test_method_filter(testdir, method):
     # When `method` is specified
-    parameters = {"parameters": [integer(name="id")]}
+    parameters = {"parameters": [integer(name="id", required=True)]}
     testdir.make_test(
         """
 @schema.parametrize(filter_method={}, max_examples=1)
@@ -127,7 +127,7 @@ def test_(request, case):
     assert_int(case.query["id"])
 """,
         **as_param({"$ref": "#/definitions/SimpleIntRef"}),
-        definitions={"SimpleIntRef": integer(name="id")},
+        definitions={"SimpleIntRef": integer(name="id", required=True)},
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
@@ -178,8 +178,8 @@ def test_(request, case):
         paths={
             "/users": {
                 "parameters": [integer(name="common_id")],
-                "get": {"parameters": [integer(name="not_common_id")]},
-                "post": {"parameters": [integer(name="not_common_id")]},
+                "get": {"parameters": [integer(name="not_common_id", required=True)]},
+                "post": {"parameters": [integer(name="not_common_id", required=True)]},
             }
         },
     )
@@ -213,8 +213,8 @@ def test_b(request, case):
         paths={
             "/users": {
                 "parameters": [{"schema": {"$ref": "#/definitions/SimpleIntRef"}, "in": "body", "name": "id"}],
-                "get": {"parameters": [integer(name="not_common_id")]},
-                "post": {"parameters": [integer(name="not_common_id")]},
+                "get": {"parameters": [integer(name="not_common_id", required=True)]},
+                "post": {"parameters": [integer(name="not_common_id", required=True)]},
             }
         },
         definitions={"SimpleIntRef": integer(name="id", **{"in": "body"})},
@@ -244,7 +244,7 @@ def test_a(request, case):
 def test_b(request, case):
     impl(request, case)
 """,
-        paths={"/users": {"parameters": [integer(name="common_id")], "post": {}}},
+        paths={"/users": {"parameters": [integer(name="common_id", required=True)], "post": {}}},
     )
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used in all test functions

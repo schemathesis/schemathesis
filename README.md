@@ -26,7 +26,7 @@ schema = Parametrizer.from_path("path/to/schema.yaml")
 @schema.parametrize()
 def test_users_endpoint(client, case):
     response = client.request(
-        case.method, 
+        case.method,
         case.formatted_path,
         params=case.query,
         json=case.body

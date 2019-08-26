@@ -27,16 +27,16 @@ class Endpoint:
     parameters: ParametersList = attr.ib()
 
     @property
-    def path_parameters(self) -> ParametersList:
-        return filter_parameters(self.parameters, "path")
+    def path_parameters(self) -> Dict[str, Any]:
+        return convert_parameters(self.parameters, "path")
 
     @property
-    def query(self) -> ParametersList:
-        return filter_parameters(self.parameters, "query")
+    def query(self) -> Dict[str, Any]:
+        return convert_parameters(self.parameters, "query")
 
     @property
-    def body(self) -> ParametersList:
-        return filter_parameters(self.parameters, "body")
+    def body(self) -> Dict[str, Any]:
+        return convert_parameters(self.parameters, "body")
 
 
 @attr.s(hash=False)
@@ -159,8 +159,25 @@ def is_reference(item: Dict[str, Any]) -> bool:
     return "$ref" in item
 
 
-def filter_parameters(parameters: ParametersList, place: str) -> ParametersList:
-    return [parameter for parameter in parameters if parameter["in"] == place]
+def convert_parameters(parameters: List[Dict[str, Any]], place: str) -> Dict[str, Any]:
+    """Convert list of parameters to valid JSON schema."""
+    new: Dict[str, Any] = {"properties": {}, "additionalProperties": False, "type": "object"}
+    for parameter in parameters:
+        if parameter["in"] == place:
+            if parameter.get("required", False):
+                new.setdefault("required", [])
+                new["required"].append(parameter["name"])
+            new["properties"][parameter["name"]] = convert_property(parameter)
+    return new
+
+
+def convert_property(data: Dict[str, Any]) -> Dict[str, Any]:
+    new_property = {}
+    for key, value in data.items():
+        # Drop keys not supported by JSON schema
+        if key not in ("required", "name", "in"):
+            new_property[key] = value
+    return new_property
 
 
 def traverse_schema(schema: Dict[str, Any]) -> Iterator[Tuple[List[str], Any]]:
