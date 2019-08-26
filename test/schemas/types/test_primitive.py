@@ -1,19 +1,18 @@
 import pytest
 
-from ..utils import as_param, integer
-from .fixtures import PARAMETRIZE_STRINGS
+from ..utils import as_param, integer, string
 
 
 @pytest.mark.parametrize(
     "parameter",
     (
-        integer(name="id1"),
-        integer(name="id2", maximum=5),
-        integer(name="id3", maximum=5, exclusiveMaximum=True),
-        integer(name="id4", maximum=5, multipleOf=4),
-        integer(name="id5", minimum=5),
-        integer(name="id6", minimum=5, exclusiveMinimum=True),
-        integer(name="id7", minimum=5, multipleOf=4),
+        integer(name="id1", required=True),
+        integer(name="id2", maximum=5, required=True),
+        integer(name="id3", maximum=5, exclusiveMaximum=True, required=True),
+        integer(name="id4", maximum=5, multipleOf=4, required=True),
+        integer(name="id5", minimum=5, required=True),
+        integer(name="id6", minimum=5, exclusiveMinimum=True, required=True),
+        integer(name="id7", minimum=5, multipleOf=4, required=True),
     ),
 )
 def test_integer(testdir, parameter):
@@ -41,7 +40,18 @@ def test_(case):
     testdir.run_and_assert(passed=1)
 
 
-@PARAMETRIZE_STRINGS
+@pytest.mark.parametrize(
+    "parameter",
+    (
+        string(name="key1", required=True),
+        string(name="key2", maxLength=5, required=True),
+        string(name="key3", minLength=5, required=True),
+        string(name="key4", pattern="ab{2}", required=True),
+        string(name="key5", minLength=3, maxLength=6, pattern="ab{2}", required=True),
+        string(name="key6", format="date", required=True),
+        string(name="key7", format="date-time", required=True),
+    ),
+)
 def test_string(testdir, parameter):
     testdir.make_test(
         """
