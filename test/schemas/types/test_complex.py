@@ -1,8 +1,20 @@
-from ..utils import as_array
-from .fixtures import PARAMETRIZE_STRINGS
+import pytest
+
+from ..utils import as_array, string
 
 
-@PARAMETRIZE_STRINGS
+@pytest.mark.parametrize(
+    "parameter",
+    (
+        string(name="key1"),
+        string(name="key2", maxLength=5),
+        string(name="key3", minLength=5),
+        string(name="key4", pattern="ab{2}"),
+        string(name="key5", minLength=3, maxLength=6, pattern="ab{2}"),
+        string(name="key6", format="date"),
+        string(name="key7", format="date-time"),
+    ),
+)
 def test_array_of_strings(testdir, parameter):
     testdir.make_test(
         """
@@ -23,7 +35,7 @@ def test_(case):
         """.format(
             name=parameter["name"]
         ),
-        **as_array(items=parameter),
+        **as_array(items=parameter, required=True),
     )
     testdir.run_and_assert(passed=1)
 
@@ -35,7 +47,7 @@ def test_array_number_of_items(testdir):
 def test_(case):
     assert_list(case.query["values"], lambda x: len(x) == 3)
 """,
-        **as_array(items={"type": "string"}, minItems=3, maxItems=3),
+        **as_array(items={"type": "string"}, minItems=3, maxItems=3, required=True),
     )
     testdir.run_and_assert(passed=1)
 
@@ -47,7 +59,7 @@ def test_array_unique_items(testdir):
 def test_(case):
     assert_list(case.query["values"], lambda x: len(x) == len(set(x)))
 """,
-        **as_array(items={"type": "string"}, minItems=3, maxItems=3, uniqueItems=True),
+        **as_array(items={"type": "string"}, minItems=3, maxItems=3, uniqueItems=True, required=True),
     )
     testdir.run_and_assert(passed=1)
 
@@ -64,7 +76,7 @@ def test_(case):
     if len(values) > 1:
         assert_int(values[1])
 """,
-        **as_array(items=[{"type": "string"}, {"type": "integer"}]),
+        **as_array(items=[{"type": "string"}, {"type": "integer"}], required=True),
     )
     testdir.run_and_assert(passed=1)
 
@@ -81,7 +93,7 @@ def test_(case):
     if len(values) > 1:
         assert_int(values[1])
 """,
-        **as_array(items=[{"type": "string"}, {"type": "integer"}], additionalItems=False),
+        **as_array(items=[{"type": "string"}, {"type": "integer"}], additionalItems=False, required=True),
     )
     testdir.run_and_assert(passed=1)
 
@@ -100,6 +112,6 @@ def test_(case):
     if len(values) > 2:
         assert_str(values[2])
 """,
-        **as_array(items=[{"type": "string"}, {"type": "integer"}], additionalItems={"type": "string"}),
+        **as_array(items=[{"type": "string"}, {"type": "integer"}], additionalItems={"type": "string"}, required=True),
     )
     testdir.run_and_assert(passed=1)
