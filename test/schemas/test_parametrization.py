@@ -146,7 +146,7 @@ def test_(request, case):
     assert case.method == "GET"
     assert_int(case.body["object"]["id"])
 """,
-        **as_param({"schema": {"$ref": "#/definitions/ObjectRef"}, "in": "body", "name": "object"}),
+        **as_param({"schema": {"$ref": "#/definitions/ObjectRef"}, "in": "body", "name": "object", "required": True}),
         definitions={
             "ObjectRef": {
                 "required": ["id"],
@@ -154,7 +154,7 @@ def test_(request, case):
                 "additionalProperties": False,
                 "properties": {"id": {"$ref": "#/definitions/SimpleIntRef"}},
             },
-            "SimpleIntRef": integer(name="id"),
+            "SimpleIntRef": {"type": "integer"},
         },
     )
     # Then it should be correctly resolved and used in the generated case
@@ -177,7 +177,7 @@ def test_(request, case):
 """,
         paths={
             "/users": {
-                "parameters": [integer(name="common_id")],
+                "parameters": [integer(name="common_id", required=True)],
                 "get": {"parameters": [integer(name="not_common_id", required=True)]},
                 "post": {"parameters": [integer(name="not_common_id", required=True)]},
             }
@@ -212,7 +212,9 @@ def test_b(request, case):
 """,
         paths={
             "/users": {
-                "parameters": [{"schema": {"$ref": "#/definitions/SimpleIntRef"}, "in": "body", "name": "id"}],
+                "parameters": [
+                    {"schema": {"$ref": "#/definitions/SimpleIntRef"}, "in": "body", "name": "id", "required": True}
+                ],
                 "get": {"parameters": [integer(name="not_common_id", required=True)]},
                 "post": {"parameters": [integer(name="not_common_id", required=True)]},
             }
@@ -267,6 +269,7 @@ def test_(request, case):
             {
                 "in": "body",
                 "name": "object",
+                "required": True,
                 "schema": {"type": "object", "required": ["id"], "properties": {"id": integer(name="id")}},
             }
         ),
