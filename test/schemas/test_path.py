@@ -8,7 +8,7 @@ def test_(case):
         """,
         paths={
             "/users/{user_id}": {
-                "get": {"parameters": [{"name": "user_id", "in": "path", "schema": {"type": "integer"}}]}
+                "get": {"parameters": [{"name": "user_id", "required": True, "in": "path", "type": "integer"}]}
             }
         },
     )
