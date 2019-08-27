@@ -86,8 +86,7 @@ class SwaggerV20(BaseSchema):
         if is_reference(new_item):
             new_item = self.resolve_reference(new_item["$ref"])
         elif new_item["in"] == "body" and is_reference(new_item["schema"]):
-            new_item.update(self.resolve_reference(new_item["schema"]["$ref"]))
-            del new_item["schema"]
+            new_item["schema"] = self.resolve_reference(new_item["schema"]["$ref"])
         return new_item
 
     @lru_cache()
@@ -164,19 +163,25 @@ def convert_parameters(parameters: List[Dict[str, Any]], place: str) -> Dict[str
     new: Dict[str, Any] = {"properties": {}, "additionalProperties": False, "type": "object"}
     for parameter in parameters:
         if parameter["in"] == place:
+            name = parameter["name"]
+            if place == "body":
+                definition = parameter["schema"]
+            else:
+                definition = parameter
             if parameter.get("required", False):
                 new.setdefault("required", [])
-                new["required"].append(parameter["name"])
-            new["properties"][parameter["name"]] = convert_property(parameter)
+                new["required"].append(name)
+            new["properties"][name] = convert_property(definition)
     return new
 
 
 def convert_property(data: Dict[str, Any]) -> Dict[str, Any]:
     new_property = {}
     for key, value in data.items():
-        # Drop keys not supported by JSON schema
-        if key not in ("required", "name", "in"):
-            new_property[key] = value
+        # Do not include keys not supported by JSON schema
+        if key in ("name", "in") or (key == "required" and not isinstance(value, list)):
+            continue
+        new_property[key] = value
     return new_property
 
 

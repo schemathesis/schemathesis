@@ -1,6 +1,4 @@
 """Provide strategies for given endpoint(s) definition."""
-from typing import Any, Dict
-
 import attr
 import hypothesis.strategies as st
 from hypothesis_jsonschema import from_schema
@@ -32,15 +30,7 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
         Case,
         path=st.just(endpoint.path),
         method=st.just(endpoint.method),
-        path_parameters=get_strategy(endpoint.path_parameters),
-        query=get_strategy(endpoint.query),
-        body=get_strategy(endpoint.body),
+        path_parameters=from_schema(endpoint.path_parameters),
+        query=from_schema(endpoint.query),
+        body=from_schema(endpoint.body),
     )
-
-
-def get_strategy(item: Dict[str, Any]) -> st.SearchStrategy:
-    if "schema" in item:
-        item = item["schema"]
-    if not isinstance(item.get("required"), list):
-        item.pop("required", None)
-    return from_schema(item)
