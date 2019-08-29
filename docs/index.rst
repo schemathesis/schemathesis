@@ -4,11 +4,17 @@
    contain the root `toctree` directive.
 
 Welcome to schemathesis's documentation!
-===================================
+========================================
+
+.. automodule:: schemathesis
+   :members:
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+
+   changelog
+   sources/schemathesis
 
 
 Indices and tables
