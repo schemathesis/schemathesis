@@ -1,6 +1,6 @@
 import pytest
 
-from .utils import as_param, integer
+from .utils import as_param, integer, string
 
 
 def test_parametrization(testdir):
@@ -277,3 +277,53 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"Hypothesis calls: 20"])
+
+
+def test_invalid_schema(testdir):
+    # When the given schema is not valid
+    testdir.makepyfile(
+        """
+from schemathesis import Parametrizer
+
+schema = Parametrizer({"swagger": "2.0", "paths": 1})
+
+@schema.parametrize()
+def test_(request, case):
+    pass
+"""
+    )
+    result = testdir.runpytest()
+    # Then collection phase should fail with error
+    result.assert_outcomes(error=1)
+    result.stdout.re_match_lines([r".*Error during collection"])
+
+
+def test_invalid_hypothesis_settings(testdir):
+    # When invalid hypothesis settings are passed to `parametrize`
+    testdir.make_test(
+        """
+@schema.parametrize(something_invalid=5)
+def test_(request, case):
+    pass
+"""
+    )
+    result = testdir.runpytest()
+    # Then collection phase should fail with error
+    result.assert_outcomes(error=1)
+    result.stdout.re_match_lines([r".*Error during collection"])
+
+
+def test_exception_during_test(testdir):
+    # When the given schema has logical errors
+    testdir.make_test(
+        """
+@schema.parametrize()
+def test_(request, case):
+    pass
+""",
+        paths={"/users": {"get": {"parameters": [string(name="key5", minLength=10, maxLength=6, required=True)]}}},
+    )
+    result = testdir.runpytest("-v", "-rf")
+    # Then the tests should fail with the relevant error message
+    result.assert_outcomes(failed=1)
+    result.stdout.re_match_lines([r".*Cannot have max_size=6 < min_size=10"])
