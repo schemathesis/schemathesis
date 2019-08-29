@@ -4,7 +4,6 @@ import hypothesis
 import pytest
 from _pytest import nodes
 from _pytest.config import hookimpl
-from _pytest.mark import MARK_GEN
 from _pytest.python import Function, PyCollector  # type: ignore
 from hypothesis.errors import InvalidArgument  # pylint: disable=ungrouped-imports
 
@@ -35,22 +34,6 @@ class SchemathesisCase(PyCollector):
     def _get_test_name(self, endpoint: Endpoint) -> str:
         return self.name + f"[{endpoint.method}:{endpoint.path}]"
 
-    def _get_hypothesis_items(self, endpoint: Endpoint) -> Generator[Function, None, None]:
-        hypothesis_item = self.make_hypothesis_item(endpoint)
-        items = self.ihook.pytest_pycollect_makeitem(
-            collector=self.parent, name=self._get_test_name(endpoint), obj=hypothesis_item
-        )
-        for item in items:
-            item.obj = hypothesis_item
-            yield item
-
-    def _get_skipped_items(self, endpoint: Endpoint, exception: InvalidArgument) -> Generator[Function, None, None]:
-        """Make all tests skipped because of the given exception"""
-        items = self.parent._genfunctions(self._get_test_name(endpoint), self.test_function)
-        for item in items:
-            item.add_marker(MARK_GEN.skip(exception.args[0]))
-            yield item
-
     def _gen_items(self, endpoint: Endpoint) -> Generator[Function, None, None]:
         """Generate all items for the given endpoint.
 
@@ -59,33 +42,37 @@ class SchemathesisCase(PyCollector):
         """
         # TODO. exclude it early, if tests are deselected, then hypothesis strategies will not be used anyway
         # But, it is important to know the total number of tests for all method/endpoint combos
-        try:
-            yield from self._get_hypothesis_items(endpoint)
-        except InvalidArgument as exc:
-            # skip all tests that we can't make a strategy for
-            yield from self._get_skipped_items(endpoint, exc)
+        hypothesis_item = self.make_hypothesis_item(endpoint)
+        items = self.ihook.pytest_pycollect_makeitem(
+            collector=self.parent, name=self._get_test_name(endpoint), obj=hypothesis_item
+        )
+        for item in items:
+            item.obj = hypothesis_item
+            yield item
 
-    def collect(self) -> List[Function]:
+    def collect(self) -> List[Function]:  # type: ignore
         """Generate different test items for all endpoints available in the given schema."""
-        return [
-            item
-            for endpoint in self.schemathesis_case.schema.get_all_endpoints(
-                filter_method=self.schemathesis_case.filter_method,
-                filter_endpoint=self.schemathesis_case.filter_endpoint,
-            )
-            for item in self._gen_items(endpoint)
-        ]
+        try:
+            return [
+                item
+                for endpoint in self.schemathesis_case.schema.get_all_endpoints(
+                    filter_method=self.schemathesis_case.filter_method,
+                    filter_endpoint=self.schemathesis_case.filter_endpoint,
+                )
+                for item in self._gen_items(endpoint)
+            ]
+        except Exception:
+            pytest.fail("Error during collection")
 
 
 @hookimpl(hookwrapper=True)
 def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     """It is possible to have a Hypothesis exception in runtime.
 
-    For example - object type is `deferred` strategy in `hypothesis_jsonschema` and is evaluated after
-    test collection phase.
+    For example - kwargs validation is failed for some strategy.
     """
     outcome = yield
     try:
         outcome.get_result()
     except InvalidArgument as exc:
-        pytest.skip(exc.args[0])
+        pytest.fail(exc.args[0])
