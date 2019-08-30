@@ -29,7 +29,8 @@ schema = Parametrizer.from_path("path/to/schema.yaml")
 
 @pytest.fixture(scope="session")
 def client():
-    return requests.Session()
+    with requests.Session() as session:
+        yield session
 
 @schema.parametrize()
 def test_users_endpoint(client, case):
