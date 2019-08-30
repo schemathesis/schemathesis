@@ -327,3 +327,20 @@ def test_(request, case):
     # Then the tests should fail with the relevant error message
     result.assert_outcomes(failed=1)
     result.stdout.re_match_lines([r".*Cannot have max_size=6 < min_size=10"])
+
+
+def test_no_base_path(testdir):
+    # When the given schema has no "basePath"
+    testdir.make_test(
+        """
+del raw_schema["basePath"]
+
+@schema.parametrize()
+def test_(request, case):
+    pass
+"""
+    )
+    result = testdir.runpytest("-v")
+    # Then the base path is "/"
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r".*\[GET:/users\]"])
