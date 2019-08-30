@@ -14,7 +14,8 @@ def testdir(testdir):
         import pytest
         from schemathesis import Parametrizer
         from test.schemas.utils import *
-        schema = Parametrizer({schema})
+        raw_schema = {schema}
+        schema = Parametrizer(raw_schema)
         """.format(
                 schema=schema
             )

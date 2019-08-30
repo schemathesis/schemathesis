@@ -53,8 +53,7 @@ class SwaggerV20(BaseSchema):
     @property
     def base_path(self) -> str:
         """Base path for the schema."""
-        # pylint: disable=unsubscriptable-object
-        path: str = self.raw_schema["basePath"]
+        path: str = self.raw_schema.get("basePath", "/")
         if not path.endswith("/"):
             path += "/"
         return path
