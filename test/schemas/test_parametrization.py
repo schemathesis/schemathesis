@@ -69,7 +69,7 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 10"])
 
 
-@pytest.mark.parametrize("endpoint", ("'/foo'", "'/v1/foo'", ["/foo"], "'/*oo'"))
+@pytest.mark.parametrize("endpoint", ("'/foo'", "'/v1/foo'", ["/foo"], "'/.*oo'"))
 def test_endpoint_filter(testdir, endpoint):
     # When `endpoint` is specified
     parameters = {"parameters": [integer(name="id", required=True)]}

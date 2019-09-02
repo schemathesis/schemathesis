@@ -7,8 +7,8 @@ Their responsibilities:
 They give only static definitions of endpoints.
 """
 import itertools
+import re
 from copy import deepcopy
-from fnmatch import fnmatch
 from functools import lru_cache
 from typing import Any, Dict, Generator, Iterator, List, Optional, Set, Tuple, Union
 from urllib.parse import urljoin
@@ -150,7 +150,7 @@ def should_skip_endpoint(endpoint: str, pattern: Optional[Filter]) -> bool:
 
 
 def is_match(endpoint: str, pattern: str) -> bool:
-    return pattern in endpoint or fnmatch(endpoint, pattern)
+    return pattern in endpoint or re.search(pattern, endpoint)
 
 
 def is_reference(item: Dict[str, Any]) -> bool:
