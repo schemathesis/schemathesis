@@ -175,13 +175,12 @@ def convert_parameters(parameters: List[Dict[str, Any]], place: str) -> Dict[str
 
 
 def convert_property(data: Dict[str, Any]) -> Dict[str, Any]:
-    new_property = {}
-    for key, value in data.items():
+    return {
+        key: value
+        for key, value in data.items()
         # Do not include keys not supported by JSON schema
-        if key in ("name", "in") or (key == "required" and not isinstance(value, list)):
-            continue
-        new_property[key] = value
-    return new_property
+        if key not in ("name", "in") and (key != "required" or isinstance(value, list))
+    }
 
 
 def traverse_schema(schema: Dict[str, Any]) -> Iterator[Tuple[List[str], Any]]:
