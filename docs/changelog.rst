@@ -11,6 +11,7 @@ Changed
 
 - Handle errors during collection / executions as failures.
 - Use ``re.search`` for pattern matching in ``filter_method``/``filter_endpoint`` instead of ``fnmatch``. `#18`_
+- ``Case.body`` contains properties from the target schema, without extra level of nesting.
 
 Fixed
 ~~~~~
