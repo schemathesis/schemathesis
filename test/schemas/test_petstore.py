@@ -1,16 +1,16 @@
 import pytest
 
 
-@pytest.fixture
-def testdir(testdir):
+@pytest.fixture(params=["petstore_v2.yaml", "petstore_v3.yaml"])
+def testdir(request, testdir):
     def make_petstore_test(*args, **kwargs):
-        kwargs["schema_name"] = "petstore.yaml"
+        kwargs["schema_name"] = request.param
         testdir.make_test(*args, **kwargs)
 
     testdir.make_petstore_test = make_petstore_test
 
     def assert_petstore(passed=1, tests_num=5):
-        result = testdir.runpytest("-v")
+        result = testdir.runpytest("-v", "-s")
         result.assert_outcomes(passed=passed)
         result.stdout.re_match_lines([rf"Hypothesis calls: {tests_num}"])
 

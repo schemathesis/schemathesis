@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Open API 3.0 support. `#10`_
+
 Changed
 ~~~~~~~
 
@@ -27,3 +32,4 @@ Fixed
 
 .. _#18: https://github.com/kiwicom/schemathesis/issues/18
 .. _#16: https://github.com/kiwicom/schemathesis/issues/16
+.. _#10: https://github.com/kiwicom/schemathesis/issues/10
