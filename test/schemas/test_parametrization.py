@@ -189,6 +189,33 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 2"])
 
 
+def test_direct_schema(testdir):
+    # When body has schema specified directly, not via $ref
+    testdir.make_test(
+        """
+@schema.parametrize(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/users"
+    assert case.method == "GET"
+    assert_list(case.body)
+    assert_str(case.body[0])
+""",
+        **as_param(
+            {
+                "schema": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+                "in": "body",
+                "name": "object",
+                "required": True,
+            }
+        ),
+    )
+    # Then it should be correctly used in the generated case
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+
+
 def test_common_parameters_with_references(testdir):
     # When common parameter that is shared on an endpoint level contains a reference
     # And this parameter is in `body`
@@ -277,6 +304,22 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"Hypothesis calls: 20"])
+
+
+def test_not_required_parameters(testdir):
+    testdir.make_test(
+        """
+@schema.parametrize(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/users"
+    assert case.method == "GET"
+""",
+        **as_param({"in": "query", "name": "key", "required": False, "type": "string"}),
+    )
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
 
 
 def test_invalid_schema(testdir):
