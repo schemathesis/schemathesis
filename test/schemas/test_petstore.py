@@ -25,8 +25,8 @@ def test_pet(testdir):
 @schema.parametrize(filter_endpoint="/pet$", max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert_str(case.body["body"]["name"])
-    assert_list(case.body["body"]["photoUrls"])
+    assert_str(case.body["name"])
+    assert_list(case.body["photoUrls"])
 """
     )
     testdir.assert_petstore(2, 10)
@@ -166,7 +166,7 @@ def test_create_user(testdir):
 @schema.parametrize(filter_endpoint="/user$", max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert isinstance(case.body["body"], dict)
+    assert isinstance(case.body, dict)
 """
     )
     testdir.assert_petstore()
@@ -178,7 +178,7 @@ def test_create_multiple_users(testdir):
 @schema.parametrize(filter_endpoint="/user/createWith", max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert_list(case.body["body"])
+    assert_list(case.body)
 """
     )
     testdir.assert_petstore(2, 10)
@@ -230,7 +230,7 @@ def test_update_user(testdir):
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_str(case.path_parameters["username"])
-    assert isinstance(case.body["body"], dict)
+    assert isinstance(case.body, dict)
 """
     )
     testdir.assert_petstore()

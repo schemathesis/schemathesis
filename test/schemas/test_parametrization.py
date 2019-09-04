@@ -144,7 +144,7 @@ def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
     assert case.method == "GET"
-    assert_int(case.body["object"]["id"])
+    assert_int(case.body["id"])
 """,
         **as_param({"schema": {"$ref": "#/definitions/ObjectRef"}, "in": "body", "name": "object", "required": True}),
         definitions={
@@ -199,7 +199,7 @@ def impl(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
     assert case.method in ["GET", "POST"]
-    assert_int(case.body["id"])
+    assert_int(case.body)
     assert_int(case.query["not_common_id"])
 
 @schema.parametrize(max_examples=1)
@@ -219,7 +219,7 @@ def test_b(request, case):
                 "post": {"parameters": [integer(name="not_common_id", required=True)]},
             }
         },
-        definitions={"SimpleIntRef": integer(name="id", **{"in": "body"})},
+        definitions={"SimpleIntRef": {"type": "integer", "name": "id"}},
     )
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used in all generated tests
@@ -263,7 +263,7 @@ def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
     assert case.method == "GET"
-    assert "id" in case.body["object"]
+    assert "id" in case.body
 """,
         **as_param(
             {
