@@ -2,7 +2,7 @@ import pytest
 
 from .utils import get_schema
 
-petstore = get_schema("petstore.yaml")
+petstore = get_schema("petstore_v2.yaml")
 
 
 @pytest.mark.parametrize(

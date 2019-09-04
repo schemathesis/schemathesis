@@ -29,6 +29,17 @@ class Endpoint:
     body: Dict[str, Any] = attr.ib()
 
 
+def empty_object() -> Dict[str, Any]:
+    return {"properties": {}, "additionalProperties": False, "type": "object", "required": []}
+
+
+@attr.s(slots=True)
+class PreparedParameters:
+    path_parameters: Dict[str, Any] = attr.ib(init=False, factory=empty_object)
+    query: Dict[str, Any] = attr.ib(init=False, factory=empty_object)
+    body: Dict[str, Any] = attr.ib(init=False, factory=empty_object)
+
+
 @attr.s(hash=False)
 class BaseSchema:
     raw_schema: Dict[str, Any] = attr.ib()
@@ -64,46 +75,67 @@ class SwaggerV20(BaseSchema):
             for method, definition in methods.items():
                 if method == "parameters" or should_skip_method(method, filter_method):
                     continue
-                path, query, body = self.get_parameters(common_parameters, definition)
-                yield Endpoint(path=full_path, method=method.upper(), path_parameters=path, query=query, body=body)
+                parameters = itertools.chain(definition.get("parameters", ()), common_parameters)
+                prepared_parameters = self.get_parameters(parameters, definition)
+                yield Endpoint(
+                    path=full_path,
+                    method=method.upper(),
+                    path_parameters=prepared_parameters.path_parameters,
+                    query=prepared_parameters.query,
+                    body=prepared_parameters.body,
+                )
 
-    def get_parameters(
-        self, common_parameters: List[Dict[str, Any]], definition: Dict[str, Any]
-    ) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+    def get_parameters(self, parameters: Iterator[Dict[str, Any]], definition: Dict[str, Any]) -> PreparedParameters:
         """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
-        parameters = itertools.chain(definition.get("parameters", ()), common_parameters)
-        path = empty_object()
-        # Should these parts be always objects?
-        # E.g. body could be empty since "required" could be false for the whole body
-        # Generated object: {} - empty body or JSON "{}" ?
-        query = empty_object()
-        body = empty_object()
-
+        result = PreparedParameters()
         for parameter in parameters:
-            parameter = self.prepare_item(parameter)
-            if parameter["in"] == "path":
-                add_parameter(path, parameter)
-            elif parameter["in"] == "query":
-                add_parameter(query, parameter)
-            elif parameter["in"] == "body":
-                # Could be only one parameter with "in=body"
-                body = self.prepare_body(parameter)
-        return path, query, body
+            self.process_parameter(result, parameter)
+        return result
 
-    def prepare_body(self, parameter: Dict[str, Any]) -> Dict[str, Any]:
-        """Body is different - we don't need an extra nesting level in the output result.
+    def process_parameter(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
+        """Convert each Parameter object to a JSON schema."""
+        parameter = deepcopy(parameter)
+        # Any parameter could be a reference object
+        parameter = self.maybe_expand(parameter)
+        if parameter["in"] == "path":
+            self.process_path(result, parameter)
+        elif parameter["in"] == "query":
+            self.process_query(result, parameter)
+        elif parameter["in"] == "body":
+            # Could be only one parameter with "in=body"
+            self.process_body(result, parameter)
 
-        E.g. the output will contain only properties from the target object, not {parameter_name: <properties>}
-        """
-        return convert_property(parameter["schema"])
+    def maybe_expand(self, parameter: Dict[str, Any]) -> Dict[str, Any]:
+        """Resolve the reference if the given parameter is a reference object"""
+        if is_reference(parameter):
+            parameter = self.resolve_reference(parameter["$ref"])
+        return parameter
 
-    def prepare_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
-        new_item = deepcopy(item)
-        if is_reference(new_item):
-            new_item = self.resolve_reference(new_item["$ref"])
-        elif new_item["in"] == "body" and is_reference(new_item["schema"]):
-            new_item["schema"] = self.resolve_reference(new_item["schema"]["$ref"])
-        return new_item
+    def process_path(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
+        self.add_parameter(result.path_parameters, parameter)
+
+    def process_query(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
+        self.add_parameter(result.query, parameter)
+
+    def process_body(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
+        # "schema" is a required field
+        result.body = self.maybe_expand(parameter["schema"])
+
+    def add_parameter(self, container: Dict[str, Any], parameter: Dict[str, Any]) -> None:
+        """Add parameter object to a container."""
+        name = parameter["name"]
+        container["properties"][name] = self.parameter_to_json_schema(parameter)
+        if parameter.get("required", False):
+            container["required"].append(name)
+
+    def parameter_to_json_schema(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert Parameter object to JSON schema"""
+        return {
+            key: value
+            for key, value in data.items()
+            # Do not include keys not supported by JSON schema
+            if key not in ("name", "in") and (key != "required" or isinstance(value, list))
+        }
 
     @lru_cache()
     def resolve_reference(self, reference: str) -> Dict[str, Any]:
@@ -128,21 +160,34 @@ class SwaggerV20(BaseSchema):
         return current
 
 
-def empty_object() -> Dict[str, Any]:
-    return {"properties": {}, "additionalProperties": False, "type": "object", "required": []}
+class OpenApi30(SwaggerV20):
+    def get_parameters(self, parameters: Iterator[Dict[str, Any]], definition: Dict[str, Any]) -> PreparedParameters:
+        """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
+        result = super().get_parameters(parameters, definition)
+        if "requestBody" in definition:
+            self.process_body(result, definition["requestBody"])
+        return result
 
+    def process_body(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
+        parameter = deepcopy(parameter)
+        # Could be a reference object
+        parameter = self.maybe_expand(parameter)
+        # Take the first media type object
+        options = iter(parameter["content"].values())
+        parameter = next(options)
+        super().process_body(result, parameter)
 
-def add_parameter(container: Dict[str, Any], parameter: Dict[str, Any]) -> None:
-    name = parameter["name"]
-    container["properties"][name] = convert_property(parameter)
-    if parameter.get("required", False):
-        container["required"].append(name)
+    def parameter_to_json_schema(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        # "schema" field is required for all parameters in Open API 3.0
+        return super().parameter_to_json_schema(data["schema"])
 
 
 def wrap_schema(raw_schema: Dict[str, Any]) -> BaseSchema:
     """Get a proper abstraction for the given raw schema."""
     if "swagger" in raw_schema:
         return SwaggerV20(raw_schema)
+    if "openapi" in raw_schema:
+        return OpenApi30(raw_schema)
     raise ValueError("Unsupported schema type")
 
 
@@ -183,15 +228,6 @@ def is_match(endpoint: str, pattern: str) -> bool:
 
 def is_reference(item: Dict[str, Any]) -> bool:
     return "$ref" in item
-
-
-def convert_property(data: Dict[str, Any]) -> Dict[str, Any]:
-    return {
-        key: value
-        for key, value in data.items()
-        # Do not include keys not supported by JSON schema
-        if key not in ("name", "in") and (key != "required" or isinstance(value, list))
-    }
 
 
 def traverse_schema(schema: Dict[str, Any]) -> Iterator[Tuple[List[str], Any]]:
