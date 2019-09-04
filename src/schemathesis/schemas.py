@@ -25,6 +25,7 @@ class Endpoint:
     path: str = attr.ib()
     method: str = attr.ib()
     path_parameters: Dict[str, Any] = attr.ib()
+    headers: Dict[str, Any] = attr.ib()
     query: Dict[str, Any] = attr.ib()
     body: Dict[str, Any] = attr.ib()
 
@@ -36,6 +37,7 @@ def empty_object() -> Dict[str, Any]:
 @attr.s(slots=True)
 class PreparedParameters:
     path_parameters: Dict[str, Any] = attr.ib(init=False, factory=empty_object)
+    headers: Dict[str, Any] = attr.ib(init=False, factory=empty_object)
     query: Dict[str, Any] = attr.ib(init=False, factory=empty_object)
     body: Dict[str, Any] = attr.ib(init=False, factory=empty_object)
 
@@ -81,6 +83,7 @@ class SwaggerV20(BaseSchema):
                     path=full_path,
                     method=method.upper(),
                     path_parameters=prepared_parameters.path_parameters,
+                    headers=prepared_parameters.headers,
                     query=prepared_parameters.query,
                     body=prepared_parameters.body,
                 )
@@ -101,6 +104,8 @@ class SwaggerV20(BaseSchema):
             self.process_path(result, parameter)
         elif parameter["in"] == "query":
             self.process_query(result, parameter)
+        elif parameter["in"] == "header":
+            self.process_header(result, parameter)
         elif parameter["in"] == "body":
             # Could be only one parameter with "in=body"
             self.process_body(result, parameter)
@@ -113,6 +118,9 @@ class SwaggerV20(BaseSchema):
 
     def process_path(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
         self.add_parameter(result.path_parameters, parameter)
+
+    def process_header(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
+        self.add_parameter(result.headers, parameter)
 
     def process_query(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
         self.add_parameter(result.query, parameter)

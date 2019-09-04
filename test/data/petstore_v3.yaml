@@ -154,7 +154,7 @@ paths:
       parameters:
         - in: header
           name: api_key
-          required: false
+          required: true
           schema:
             type: string
         - description: Pet id to delete
