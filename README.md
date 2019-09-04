@@ -51,6 +51,7 @@ Case consists of:
 
 - `method`
 - `formatted_path`
+- `headers`
 - `query`
 - `body`
 

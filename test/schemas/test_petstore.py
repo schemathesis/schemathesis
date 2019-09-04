@@ -90,9 +90,9 @@ def test_delete_pet(testdir):
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["petId"])
+    assert_str(case.headers["api_key"])
 """
     )
-    # TODO. verify header value once it is implemented
     testdir.assert_petstore()
 
 

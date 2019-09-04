@@ -4,7 +4,7 @@ import hypothesis.strategies as st
 from hypothesis_jsonschema import from_schema
 
 from .schemas import Endpoint
-from .types import Body, PathParameters, Query
+from .types import Body, Headers, PathParameters, Query
 
 # TODO. Better naming
 
@@ -14,8 +14,9 @@ class Case:
     """A single test case parameters."""
 
     path: str = attr.ib()
-    path_parameters: PathParameters = attr.ib()
     method: str = attr.ib()
+    path_parameters: PathParameters = attr.ib()
+    headers: Headers = attr.ib()
     query: Query = attr.ib()
     body: Body = attr.ib()
 
@@ -31,6 +32,7 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
         path=st.just(endpoint.path),
         method=st.just(endpoint.method),
         path_parameters=from_schema(endpoint.path_parameters),
+        headers=from_schema(endpoint.headers),
         query=from_schema(endpoint.query),
         body=from_schema(endpoint.body),
     )
