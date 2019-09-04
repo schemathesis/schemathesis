@@ -7,7 +7,7 @@ def test_default(testdir):
         """
 @schema.parametrize(max_examples=3)
 def test_(case):
-    assert_int(case.body["id"])
+    assert_int(case.body)
         """,
         **as_param({"name": "id", "in": "body", "required": True, "schema": {"type": "integer"}})
     )

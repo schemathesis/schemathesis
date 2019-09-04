@@ -15,7 +15,7 @@ from urllib.parse import urljoin
 
 import attr
 
-from .types import Filter, ParametersList
+from .types import Filter
 
 
 @attr.s(slots=True)
@@ -24,19 +24,9 @@ class Endpoint:
 
     path: str = attr.ib()
     method: str = attr.ib()
-    parameters: ParametersList = attr.ib()
-
-    @property
-    def path_parameters(self) -> Dict[str, Any]:
-        return convert_parameters(self.parameters, "path")
-
-    @property
-    def query(self) -> Dict[str, Any]:
-        return convert_parameters(self.parameters, "query")
-
-    @property
-    def body(self) -> Dict[str, Any]:
-        return convert_parameters(self.parameters, "body")
+    path_parameters: Dict[str, Any] = attr.ib()
+    query: Dict[str, Any] = attr.ib()
+    body: Dict[str, Any] = attr.ib()
 
 
 @attr.s(hash=False)
@@ -74,11 +64,38 @@ class SwaggerV20(BaseSchema):
             for method, definition in methods.items():
                 if method == "parameters" or should_skip_method(method, filter_method):
                     continue
-                parameters = itertools.chain(definition.get("parameters", ()), common_parameters)
-                # a parameter could be either Parameter Object or Reference Object.
-                # references should be resolved here to know where to put the parameter - body / query / etc
-                prepared_parameters = [self.prepare_item(item) for item in parameters]
-                yield Endpoint(path=full_path, method=method.upper(), parameters=prepared_parameters)
+                path, query, body = self.get_parameters(common_parameters, definition)
+                yield Endpoint(path=full_path, method=method.upper(), path_parameters=path, query=query, body=body)
+
+    def get_parameters(
+        self, common_parameters: List[Dict[str, Any]], definition: Dict[str, Any]
+    ) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+        """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
+        parameters = itertools.chain(definition.get("parameters", ()), common_parameters)
+        path = empty_object()
+        # Should these parts be always objects?
+        # E.g. body could be empty since "required" could be false for the whole body
+        # Generated object: {} - empty body or JSON "{}" ?
+        query = empty_object()
+        body = empty_object()
+
+        for parameter in parameters:
+            parameter = self.prepare_item(parameter)
+            if parameter["in"] == "path":
+                add_parameter(path, parameter)
+            elif parameter["in"] == "query":
+                add_parameter(query, parameter)
+            elif parameter["in"] == "body":
+                # Could be only one parameter with "in=body"
+                body = self.prepare_body(parameter)
+        return path, query, body
+
+    def prepare_body(self, parameter: Dict[str, Any]) -> Dict[str, Any]:
+        """Body is different - we don't need an extra nesting level in the output result.
+
+        E.g. the output will contain only properties from the target object, not {parameter_name: <properties>}
+        """
+        return convert_property(parameter["schema"])
 
     def prepare_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
         new_item = deepcopy(item)
@@ -109,6 +126,17 @@ class SwaggerV20(BaseSchema):
             # Support arrays in JSON pointers?
             current = current[part]  # pylint: disable=unsubscriptable-object
         return current
+
+
+def empty_object() -> Dict[str, Any]:
+    return {"properties": {}, "additionalProperties": False, "type": "object", "required": []}
+
+
+def add_parameter(container: Dict[str, Any], parameter: Dict[str, Any]) -> None:
+    name = parameter["name"]
+    container["properties"][name] = convert_property(parameter)
+    if parameter.get("required", False):
+        container["required"].append(name)
 
 
 def wrap_schema(raw_schema: Dict[str, Any]) -> BaseSchema:
@@ -150,28 +178,11 @@ def should_skip_endpoint(endpoint: str, pattern: Optional[Filter]) -> bool:
 
 
 def is_match(endpoint: str, pattern: str) -> bool:
-    return pattern in endpoint or re.search(pattern, endpoint)
+    return pattern in endpoint or bool(re.search(pattern, endpoint))
 
 
 def is_reference(item: Dict[str, Any]) -> bool:
     return "$ref" in item
-
-
-def convert_parameters(parameters: List[Dict[str, Any]], place: str) -> Dict[str, Any]:
-    """Convert list of parameters to valid JSON schema."""
-    new: Dict[str, Any] = {"properties": {}, "additionalProperties": False, "type": "object"}
-    for parameter in parameters:
-        if parameter["in"] == place:
-            name = parameter["name"]
-            if place == "body":
-                definition = parameter["schema"]
-            else:
-                definition = parameter
-            if parameter.get("required", False):
-                new.setdefault("required", [])
-                new["required"].append(name)
-            new["properties"][name] = convert_property(definition)
-    return new
 
 
 def convert_property(data: Dict[str, Any]) -> Dict[str, Any]:
