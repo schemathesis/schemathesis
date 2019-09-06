@@ -6,6 +6,9 @@ Changelog
 `Unreleased`_
 -------------
 
+`0.3.0`_ - 2019-09-06
+---------------------
+
 Added
 ~~~~~
 
@@ -18,7 +21,7 @@ Removed
   to ``hypothesis.settings``. Use ``hypothesis.settings`` decorators on tests instead.
 
 `0.2.0`_ - 2019-09-05
-------------------
+---------------------
 
 Added
 ~~~~~
@@ -43,7 +46,8 @@ Fixed
 
 - Initial public release
 
-.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.2.0...HEAD
+.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.3.0...HEAD
+.. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#24: https://github.com/kiwicom/schemathesis/issues/24
