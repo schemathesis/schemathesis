@@ -51,6 +51,11 @@ py37-tests:
   variables:
     TOX_ENVIRONMENT: py37
 
+py38-tests:
+  extends: .tox_tests
+  variables:
+    TOX_ENVIRONMENT: py38
+
 tox_tests_coverage:
   extends: .tox_tests
   stage: post-test
@@ -58,10 +63,12 @@ tox_tests_coverage:
     - tox_init
     - py36-tests
     - py37-tests
+    - py38-tests
   needs:
     - tox_init
     - py36-tests
     - py37-tests
+    - py38-tests
   before_script:
     - mkdir -p $CI_PROJECT_DIR/coverage-reports
   artifacts:
