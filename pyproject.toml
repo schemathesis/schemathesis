@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "schemathesis"
-version = "0.2.0"
+version = "0.3.0"
 description = "Hypothesis strategies for Open API"
 keywords = ["pytest", "hypothesis", "openapi", "swagger", "testing"]
 classifiers = [
