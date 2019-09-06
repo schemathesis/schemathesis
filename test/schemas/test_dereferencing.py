@@ -1,8 +1,14 @@
 import pytest
 
-from .utils import get_schema
+from schemathesis.schemas import wrap_schema
 
-petstore = get_schema("petstore_v2.yaml")
+from .utils import make_schema
+
+
+@pytest.fixture()
+def petstore():
+    raw_schema = make_schema("petstore_v2.yaml")
+    return wrap_schema(raw_schema)
 
 
 @pytest.mark.parametrize(
@@ -54,5 +60,5 @@ petstore = get_schema("petstore_v2.yaml")
         ),
     ),
 )
-def test_resolve_reference(path, expected):
-    assert petstore.schema.resolve_reference(path) == expected
+def test_resolve_reference(petstore, path, expected):
+    assert petstore.resolve_reference(path) == expected

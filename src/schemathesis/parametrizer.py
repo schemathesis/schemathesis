@@ -35,24 +35,14 @@ def prepare_schema(schema: RawSchema) -> Holder:
     return Holder(value=schema)
 
 
+@attr.s(slots=True)
 class Parametrizer:
     """An entry point for test parametrization.
 
     Store parametrization config and mark test functions for further processing.
     """
 
-    __slots__ = ("raw_schema", "filter_method", "filter_endpoint", "_schema")
-
-    def __init__(
-        self,
-        raw_schema: RawSchema,
-        filter_method: Optional[types.Filter] = None,
-        filter_endpoint: Optional[types.Filter] = None,
-    ) -> None:
-        self.raw_schema = prepare_schema(raw_schema)
-        self.filter_method = filter_method
-        self.filter_endpoint = filter_endpoint
-        self._schema: Optional[schemas.BaseSchema] = None
+    raw_schema: RawSchema = attr.ib(converter=prepare_schema)
 
     @classmethod
     def from_path(cls, path: types.PathLike) -> "Parametrizer":
@@ -64,13 +54,8 @@ class Parametrizer:
         """Create a parametrizer from the given URI."""
         return cls(lambda: readers.from_uri(uri))
 
-    @property
-    def schema(self) -> schemas.BaseSchema:
-        """A cached schema abstraction to use in parametrization."""
-        if self._schema is None:
-            schema = self.raw_schema.get()
-            self._schema = schemas.wrap_schema(schema)
-        return self._schema
+    def into_wrapper(self, **kwargs: Any) -> "SchemaWrapper":
+        return SchemaWrapper(raw_schema=self.raw_schema, **kwargs)
 
     def parametrize(
         self, filter_method: Optional[types.Filter] = None, filter_endpoint: Optional[types.Filter] = None
@@ -81,12 +66,28 @@ class Parametrizer:
         """
 
         def wrapper(func: Callable) -> Callable:
-            func._schema_parametrizer = self.__class__(  # type: ignore
-                raw_schema=self.raw_schema, filter_method=filter_method, filter_endpoint=filter_endpoint
+            func._schema_parametrizer = self.into_wrapper(  # type: ignore
+                filter_method=filter_method, filter_endpoint=filter_endpoint
             )
             return func
 
         return wrapper
+
+
+@attr.s(slots=True)
+class SchemaWrapper:
+    raw_schema: Holder = attr.ib(converter=prepare_schema)
+    filter_method: Optional[types.Filter] = attr.ib(default=None)
+    filter_endpoint: Optional[types.Filter] = attr.ib(default=None)
+    _schema: Optional[schemas.BaseSchema] = attr.ib(init=False, default=None)
+
+    @property
+    def schema(self) -> schemas.BaseSchema:
+        """A cached schema abstraction to use in parametrization."""
+        if self._schema is None:
+            schema = self.raw_schema.get()
+            self._schema = schemas.wrap_schema(schema)
+        return self._schema
 
 
 def is_schemathesis_test(func: Callable) -> bool:

@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 import pytest
 
 from schemathesis.parametrizer import Parametrizer, is_schemathesis_test
@@ -13,14 +11,14 @@ MINIMAL_SCHEMA = {"swagger": "2.0"}
 def test_raw_schema(schema):
     # When schema is passed as a dictionary or a callable
     # Then it should be used for schema wrapper
-    assert Parametrizer(schema).schema.raw_schema == MINIMAL_SCHEMA
+    assert Parametrizer(schema).raw_schema.get() == MINIMAL_SCHEMA
 
 
 @pytest.mark.parametrize(
     "method, path", ((Parametrizer.from_path, SIMPLE_PATH), (Parametrizer.from_uri, f"file://{SIMPLE_PATH}"))
 )
 def test_alternative_constructors(simple_schema, method, path):
-    assert method(path).schema.raw_schema == simple_schema
+    assert method(path).raw_schema.get() == simple_schema
 
 
 def test_is_schemathesis_test():
