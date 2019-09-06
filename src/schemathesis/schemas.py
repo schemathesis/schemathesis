@@ -15,7 +15,7 @@ from urllib.parse import urljoin
 
 import attr
 
-from .types import Filter
+from .types import Body, Filter, Headers, PathParameters, Query
 
 
 @attr.s(slots=True)
@@ -24,10 +24,10 @@ class Endpoint:
 
     path: str = attr.ib()
     method: str = attr.ib()
-    path_parameters: Dict[str, Any] = attr.ib()
-    headers: Dict[str, Any] = attr.ib()
-    query: Dict[str, Any] = attr.ib()
-    body: Dict[str, Any] = attr.ib()
+    path_parameters: PathParameters = attr.ib()
+    headers: Headers = attr.ib()
+    query: Query = attr.ib()
+    body: Body = attr.ib()
 
 
 def empty_object() -> Dict[str, Any]:
@@ -36,10 +36,10 @@ def empty_object() -> Dict[str, Any]:
 
 @attr.s(slots=True)
 class PreparedParameters:
-    path_parameters: Dict[str, Any] = attr.ib(init=False, factory=empty_object)
-    headers: Dict[str, Any] = attr.ib(init=False, factory=empty_object)
-    query: Dict[str, Any] = attr.ib(init=False, factory=empty_object)
-    body: Dict[str, Any] = attr.ib(init=False, factory=empty_object)
+    path_parameters: PathParameters = attr.ib(init=False, factory=empty_object)
+    headers: Headers = attr.ib(init=False, factory=empty_object)
+    query: Query = attr.ib(init=False, factory=empty_object)
+    body: Body = attr.ib(init=False, factory=empty_object)
 
 
 @attr.s(hash=False)
