@@ -1,6 +1,9 @@
 """Provide strategies for given endpoint(s) definition."""
+from typing import Callable
+
 import attr
 import hypothesis.strategies as st
+from hypothesis import given
 from hypothesis_jsonschema import from_schema
 
 from .schemas import Endpoint
@@ -24,6 +27,12 @@ class Case:
     def formatted_path(self) -> str:
         # pylint: disable=not-a-mapping
         return self.path.format(**self.path_parameters)
+
+
+def create_hypothesis_test(endpoint: Endpoint, test: Callable) -> Callable:
+    """Create a Hypothesis test."""
+    strategy = get_case_strategy(endpoint)
+    return given(case=strategy)(test)
 
 
 def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
