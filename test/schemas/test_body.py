@@ -5,7 +5,8 @@ def test_default(testdir):
     # When parameter is specified for "body"
     testdir.make_test(
         """
-@schema.parametrize(max_examples=3)
+@schema.parametrize()
+@settings(max_examples=3)
 def test_(case):
     assert_int(case.body)
         """,

@@ -22,7 +22,8 @@ def testdir(request, testdir):
 def test_pet(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_endpoint="/pet$", max_examples=5)
+@schema.parametrize(filter_endpoint="/pet$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_str(case.body["name"])
@@ -35,7 +36,8 @@ def test_(request, case):
 def test_find_by_status(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_endpoint="/pet/findByStatus$", max_examples=5)
+@schema.parametrize(filter_endpoint="/pet/findByStatus$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_list(case.query["status"])
@@ -49,7 +51,8 @@ def test_(request, case):
 def test_find_by_tag(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_endpoint="/pet/findByTags$", max_examples=5)
+@schema.parametrize(filter_endpoint="/pet/findByTags$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_list(case.query["tags"])
@@ -61,7 +64,8 @@ def test_(request, case):
 def test_get_pet(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_method="GET", filter_endpoint="/pet/{petId}$", max_examples=5)
+@schema.parametrize(filter_method="GET", filter_endpoint="/pet/{petId}$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["petId"])
@@ -74,7 +78,8 @@ def test_(request, case):
 def test_update_pet(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_method="POST", filter_endpoint="/pet/{petId}$", max_examples=5)
+@schema.parametrize(filter_method="POST", filter_endpoint="/pet/{petId}$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.form_data["petId"])  # TODO. Or save it in body?
@@ -86,7 +91,8 @@ def test_(request, case):
 def test_delete_pet(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_method="DELETE", filter_endpoint="/pet/{petId}$", max_examples=5)
+@schema.parametrize(filter_method="DELETE", filter_endpoint="/pet/{petId}$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["petId"])
@@ -100,7 +106,8 @@ def test_(request, case):
 def test_upload_image(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_endpoint="/pet/{petId}/uploadImage$", max_examples=5)
+@schema.parametrize(filter_endpoint="/pet/{petId}/uploadImage$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["petId"])
@@ -112,7 +119,8 @@ def test_(request, case):
 def test_get_inventory(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_endpoint="/store/inventory$", max_examples=5)
+@schema.parametrize(filter_endpoint="/store/inventory$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert not case.path_parameters
@@ -126,7 +134,8 @@ def test_(request, case):
 def test_create_order(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_endpoint="/store/order$", max_examples=5)
+@schema.parametrize(filter_endpoint="/store/order$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
 """
@@ -137,7 +146,8 @@ def test_(request, case):
 def test_get_order(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_method="GET", filter_endpoint="/store/order/{orderId}$", max_examples=5)
+@schema.parametrize(filter_method="GET", filter_endpoint="/store/order/{orderId}$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["orderId"])
@@ -150,7 +160,8 @@ def test_(request, case):
 def test_delete_order(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_method="DELETE", filter_endpoint="/store/order/{orderId}$", max_examples=5)
+@schema.parametrize(filter_method="DELETE", filter_endpoint="/store/order/{orderId}$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["orderId"])
@@ -163,7 +174,8 @@ def test_(request, case):
 def test_create_user(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_endpoint="/user$", max_examples=5)
+@schema.parametrize(filter_endpoint="/user$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert isinstance(case.body, dict)
@@ -175,7 +187,8 @@ def test_(request, case):
 def test_create_multiple_users(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_endpoint="/user/createWith", max_examples=5)
+@schema.parametrize(filter_endpoint="/user/createWith")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_list(case.body)
@@ -187,7 +200,8 @@ def test_(request, case):
 def test_login(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_endpoint="/user/login", max_examples=5)
+@schema.parametrize(filter_endpoint="/user/login")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_str(case.query["username"])
@@ -200,7 +214,8 @@ def test_(request, case):
 def test_logout(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_endpoint="/user/logout", max_examples=5)
+@schema.parametrize(filter_endpoint="/user/logout")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert not case.path_parameters
@@ -214,7 +229,8 @@ def test_(request, case):
 def test_get_user(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_method="GET", filter_endpoint="/user/{username}$", max_examples=5)
+@schema.parametrize(filter_method="GET", filter_endpoint="/user/{username}$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_str(case.path_parameters["username"])
@@ -226,7 +242,8 @@ def test_(request, case):
 def test_update_user(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_method="PUT", filter_endpoint="/user/{username}$", max_examples=5)
+@schema.parametrize(filter_method="PUT", filter_endpoint="/user/{username}$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_str(case.path_parameters["username"])
@@ -239,7 +256,8 @@ def test_(request, case):
 def test_delete_user(testdir):
     testdir.make_petstore_test(
         """
-@schema.parametrize(filter_method="DELETE", filter_endpoint="/user/{username}$", max_examples=5)
+@schema.parametrize(filter_method="DELETE", filter_endpoint="/user/{username}$")
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_str(case.path_parameters["username"])

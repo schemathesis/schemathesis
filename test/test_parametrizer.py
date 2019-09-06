@@ -16,36 +16,11 @@ def test_raw_schema(schema):
     assert Parametrizer(schema).schema.raw_schema == MINIMAL_SCHEMA
 
 
-def test_parametrize_hypothesis_settings():
-    # When parametrizer already have some hypothesis-related attributes
-    parametrizer = Parametrizer({}, max_examples=10)
-
-    @parametrizer.parametrize()
-    def test():
-        pass
-
-    # Then they should be in the parametrized test as well
-    assert test._schema_parametrizer.hypothesis_settings == {"max_examples": 10}
-
-
 @pytest.mark.parametrize(
     "method, path", ((Parametrizer.from_path, SIMPLE_PATH), (Parametrizer.from_uri, f"file://{SIMPLE_PATH}"))
 )
 def test_alternative_constructors(simple_schema, method, path):
     assert method(path).schema.raw_schema == simple_schema
-
-
-def test_parametrize_extend_hypothesis_settings():
-    # When parametrizer already have some hypothesis-related attributes
-    parametrizer = Parametrizer({}, max_examples=10)
-
-    @parametrizer.parametrize(deadline=timedelta(seconds=1))
-    def test():
-        pass
-
-    # Then they should be extended with values passed to `parametrize`
-
-    assert test._schema_parametrizer.hypothesis_settings == {"max_examples": 10, "deadline": timedelta(seconds=1)}
 
 
 def test_is_schemathesis_test():

@@ -2,7 +2,8 @@ def test_default(testdir):
     # When parameter is specified for "path"
     testdir.make_test(
         """
-@schema.parametrize(filter_endpoint="/users/{user_id}", max_examples=3)
+@schema.parametrize(filter_endpoint="/users/{user_id}")
+@settings(max_examples=3)
 def test_(case):
     assert_int(case.path_parameters["user_id"])
         """,
