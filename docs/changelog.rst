@@ -11,6 +11,12 @@ Added
 
 - ``Parametrizer.from_uri`` method to construct parametrizer instances from URIs. `#24`_
 
+Removed
+~~~~~~~
+
+- Possibility to use ``Parametrizer.parametrize`` and custom ``Parametrizer`` kwargs for passing config options
+  to ``hypothesis.settings``. Use ``hypothesis.settings`` decorators on tests instead.
+
 `0.2.0`_ - 2019-09-05
 ------------------
 

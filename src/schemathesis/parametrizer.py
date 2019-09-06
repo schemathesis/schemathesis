@@ -41,19 +41,17 @@ class Parametrizer:
     Store parametrization config and mark test functions for further processing.
     """
 
-    __slots__ = ("raw_schema", "filter_method", "filter_endpoint", "hypothesis_settings", "_schema")
+    __slots__ = ("raw_schema", "filter_method", "filter_endpoint", "_schema")
 
     def __init__(
         self,
         raw_schema: RawSchema,
         filter_method: Optional[types.Filter] = None,
         filter_endpoint: Optional[types.Filter] = None,
-        **kwargs: Any
     ) -> None:
         self.raw_schema = prepare_schema(raw_schema)
         self.filter_method = filter_method
         self.filter_endpoint = filter_endpoint
-        self.hypothesis_settings = kwargs
         self._schema: Optional[schemas.BaseSchema] = None
 
     @classmethod
@@ -75,10 +73,7 @@ class Parametrizer:
         return self._schema
 
     def parametrize(
-        self,
-        filter_method: Optional[types.Filter] = None,
-        filter_endpoint: Optional[types.Filter] = None,
-        **kwargs: Any
+        self, filter_method: Optional[types.Filter] = None, filter_endpoint: Optional[types.Filter] = None
     ) -> Callable:
         """Mark a test function as a parametrized one.
 
@@ -87,10 +82,7 @@ class Parametrizer:
 
         def wrapper(func: Callable) -> Callable:
             func._schema_parametrizer = self.__class__(  # type: ignore
-                raw_schema=self.raw_schema,
-                filter_method=filter_method,
-                filter_endpoint=filter_endpoint,
-                **{**self.hypothesis_settings, **kwargs}
+                raw_schema=self.raw_schema, filter_method=filter_method, filter_endpoint=filter_endpoint
             )
             return func
 

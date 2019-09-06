@@ -28,8 +28,7 @@ class SchemathesisCase(PyCollector):
     def make_hypothesis_item(self, endpoint: Endpoint) -> Callable:
         """Create a Hypothesis test."""
         strategy = get_case_strategy(endpoint)
-        item = hypothesis.given(case=strategy)(self.test_function)
-        return hypothesis.settings(**self.schemathesis_case.hypothesis_settings)(item)
+        return hypothesis.given(case=strategy)(self.test_function)
 
     def _get_test_name(self, endpoint: Endpoint) -> str:
         return self.name + f"[{endpoint.method}:{endpoint.path}]"

@@ -27,7 +27,8 @@ validator = {{
     "id6": lambda x: x > 5,
     "id7": lambda x: x % 4 == 0,
 }}["{name}"]
-@schema.parametrize(max_examples=3)
+@schema.parametrize()
+@settings(max_examples=3)
 def test_(case):
     assert case.path == "/v1/users"
     assert case.method in ("GET", "POST")
@@ -64,7 +65,8 @@ validator = {{
     "key6": assert_date,
     "key7": assert_datetime,
 }}["{name}"]
-@schema.parametrize(max_examples=3)
+@schema.parametrize()
+@settings(max_examples=3)
 def test_(case):
     assert case.path == "/v1/users"
     assert case.method in ("GET", "POST")

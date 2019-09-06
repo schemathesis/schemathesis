@@ -27,7 +27,8 @@ validator = {{
     "key6": assert_date,
     "key7": assert_datetime,
 }}["{name}"]
-@schema.parametrize(max_examples=3)
+@schema.parametrize()
+@settings(max_examples=3)
 def test_(case):
     assert_list(case.query["values"])
     for item in case.query["values"]:
@@ -43,7 +44,8 @@ def test_(case):
 def test_array_number_of_items(testdir):
     testdir.make_test(
         """
-@schema.parametrize(max_examples=3)
+@schema.parametrize()
+@settings(max_examples=3)
 def test_(case):
     assert_list(case.query["values"], lambda x: len(x) == 3)
 """,
@@ -67,7 +69,8 @@ def test_(case):
 def test_array_items_list(testdir):
     testdir.make_test(
         """
-@schema.parametrize(max_examples=3)
+@schema.parametrize()
+@settings(max_examples=3)
 def test_(case):
     values = case.query["values"]
     assert_list(values)

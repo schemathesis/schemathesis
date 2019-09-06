@@ -64,6 +64,16 @@ For example the data could be send against running app container via
 `requests` and response is checked for an expected status code or error
 message.
 
+To limit the number of examples you could use `hypothesis.settings` decorator on your test functions:
+
+```python
+from hypothesis import settings
+
+@settings(max_examples=5)
+def test_something(client, case):
+    ...
+```
+
 ## Documentation
 
 For full documentation, please see [https://schemathesis.readthedocs.io/en/latest/]

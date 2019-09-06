@@ -55,7 +55,8 @@ def test_max_examples(testdir):
     parameters = {"parameters": [integer(name="id", required=True)]}
     testdir.make_test(
         """
-@schema.parametrize(max_examples=5)
+@schema.parametrize()
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
@@ -75,7 +76,8 @@ def test_endpoint_filter(testdir, endpoint):
     parameters = {"parameters": [integer(name="id", required=True)]}
     testdir.make_test(
         """
-@schema.parametrize(filter_endpoint={}, max_examples=1)
+@schema.parametrize(filter_endpoint={})
+@settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/foo"
@@ -97,7 +99,8 @@ def test_method_filter(testdir, method):
     parameters = {"parameters": [integer(name="id", required=True)]}
     testdir.make_test(
         """
-@schema.parametrize(filter_method={}, max_examples=1)
+@schema.parametrize(filter_method={})
+@settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path in ("/v1/foo", "/v1/users")
@@ -119,7 +122,8 @@ def test_simple_dereference(testdir):
     # When a given parameter contains a JSON reference
     testdir.make_test(
         """
-@schema.parametrize(max_examples=1)
+@schema.parametrize()
+@settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
@@ -139,7 +143,8 @@ def test_recursive_dereference(testdir):
     # When a given parameter contains a JSON reference, that reference an object with another reference"
     testdir.make_test(
         """
-@schema.parametrize(max_examples=1)
+@schema.parametrize()
+@settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
@@ -167,7 +172,8 @@ def test_common_parameters(testdir):
     # When common parameter is shared on an endpoint level
     testdir.make_test(
         """
-@schema.parametrize(max_examples=1)
+@schema.parametrize()
+@settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
@@ -193,7 +199,8 @@ def test_direct_schema(testdir):
     # When body has schema specified directly, not via $ref
     testdir.make_test(
         """
-@schema.parametrize(max_examples=1)
+@schema.parametrize()
+@settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
@@ -229,11 +236,13 @@ def impl(request, case):
     assert_int(case.body)
     assert_int(case.query["not_common_id"])
 
-@schema.parametrize(max_examples=1)
+@schema.parametrize()
+@settings(max_examples=1)
 def test_a(request, case):
     impl(request, case)
 
-@schema.parametrize(max_examples=1)
+@schema.parametrize()
+@settings(max_examples=1)
 def test_b(request, case):
     impl(request, case)
 """,
@@ -265,11 +274,13 @@ def impl(request, case):
     assert case.method in ["GET", "POST"]
     assert_int(case.query["common_id"])
 
-@schema.parametrize(max_examples=1)
+@schema.parametrize()
+@settings(max_examples=1)
 def test_a(request, case):
     impl(request, case)
 
-@schema.parametrize(max_examples=1)
+@schema.parametrize()
+@settings(max_examples=1)
 def test_b(request, case):
     impl(request, case)
 """,
@@ -285,7 +296,8 @@ def test_b(request, case):
 def test_required_parameters(testdir):
     testdir.make_test(
         """
-@schema.parametrize(max_examples=20)
+@schema.parametrize()
+@settings(max_examples=20)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
@@ -309,7 +321,8 @@ def test_(request, case):
 def test_not_required_parameters(testdir):
     testdir.make_test(
         """
-@schema.parametrize(max_examples=1)
+@schema.parametrize()
+@settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
@@ -331,21 +344,6 @@ from schemathesis import Parametrizer
 schema = Parametrizer({"swagger": "2.0", "paths": 1})
 
 @schema.parametrize()
-def test_(request, case):
-    pass
-"""
-    )
-    result = testdir.runpytest()
-    # Then collection phase should fail with error
-    result.assert_outcomes(error=1)
-    result.stdout.re_match_lines([r".*Error during collection"])
-
-
-def test_invalid_hypothesis_settings(testdir):
-    # When invalid hypothesis settings are passed to `parametrize`
-    testdir.make_test(
-        """
-@schema.parametrize(something_invalid=5)
 def test_(request, case):
     pass
 """
