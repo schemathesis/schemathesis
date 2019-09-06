@@ -1,13 +1,12 @@
 from typing import Any, Callable, Generator, List, Optional
 
-import hypothesis
 import pytest
 from _pytest import nodes
 from _pytest.config import hookimpl
 from _pytest.python import Function, PyCollector  # type: ignore
 from hypothesis.errors import InvalidArgument  # pylint: disable=ungrouped-imports
 
-from ..generator import get_case_strategy
+from ..generator import create_hypothesis_test
 from ..parametrizer import is_schemathesis_test
 from ..schemas import Endpoint
 
@@ -25,11 +24,6 @@ class SchemathesisCase(PyCollector):
         self.schemathesis_case = test_function._schema_parametrizer  # type: ignore
         super().__init__(*args, **kwargs)
 
-    def make_hypothesis_item(self, endpoint: Endpoint) -> Callable:
-        """Create a Hypothesis test."""
-        strategy = get_case_strategy(endpoint)
-        return hypothesis.given(case=strategy)(self.test_function)
-
     def _get_test_name(self, endpoint: Endpoint) -> str:
         return self.name + f"[{endpoint.method}:{endpoint.path}]"
 
@@ -41,7 +35,7 @@ class SchemathesisCase(PyCollector):
         """
         # TODO. exclude it early, if tests are deselected, then hypothesis strategies will not be used anyway
         # But, it is important to know the total number of tests for all method/endpoint combos
-        hypothesis_item = self.make_hypothesis_item(endpoint)
+        hypothesis_item = create_hypothesis_test(endpoint, self.test_function)
         items = self.ihook.pytest_pycollect_makeitem(
             collector=self.parent, name=self._get_test_name(endpoint), obj=hypothesis_item
         )
