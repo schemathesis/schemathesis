@@ -57,9 +57,14 @@ class Parametrizer:
         self._schema: Optional[schemas.BaseSchema] = None
 
     @classmethod
-    def from_path(cls, path: str) -> "Parametrizer":
+    def from_path(cls, path: types.PathLike) -> "Parametrizer":
         """Create a parametrizer from the given OS path."""
         return cls(lambda: readers.from_path(path))
+
+    @classmethod
+    def from_uri(cls, uri: str) -> "Parametrizer":
+        """Create a parametrizer from the given URI."""
+        return cls(lambda: readers.from_uri(uri))
 
     @property
     def schema(self) -> schemas.BaseSchema:

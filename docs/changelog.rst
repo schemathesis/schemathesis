@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- ``Parametrizer.from_uri`` method to construct parametrizer instances from URIs. `#24`_
+
 `0.2.0`_ - 2019-09-05
 ------------------
 
@@ -35,6 +40,7 @@ Fixed
 .. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.2.0...HEAD
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#24: https://github.com/kiwicom/schemathesis/issues/24
 .. _#18: https://github.com/kiwicom/schemathesis/issues/18
 .. _#16: https://github.com/kiwicom/schemathesis/issues/16
 .. _#10: https://github.com/kiwicom/schemathesis/issues/10
