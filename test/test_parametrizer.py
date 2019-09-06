@@ -4,6 +4,8 @@ import pytest
 
 from schemathesis.parametrizer import Parametrizer, is_schemathesis_test
 
+from .utils import SIMPLE_PATH
+
 MINIMAL_SCHEMA = {"swagger": "2.0"}
 
 
@@ -24,6 +26,13 @@ def test_parametrize_hypothesis_settings():
 
     # Then they should be in the parametrized test as well
     assert test._schema_parametrizer.hypothesis_settings == {"max_examples": 10}
+
+
+@pytest.mark.parametrize(
+    "method, path", ((Parametrizer.from_path, SIMPLE_PATH), (Parametrizer.from_uri, f"file://{SIMPLE_PATH}"))
+)
+def test_alternative_constructors(simple_schema, method, path):
+    assert method(path).schema.raw_schema == simple_schema
 
 
 def test_parametrize_extend_hypothesis_settings():
