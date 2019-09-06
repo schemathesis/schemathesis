@@ -1,7 +1,6 @@
 import pytest
 
 from schemathesis.generator import Case
-from schemathesis.types import Body, Headers, Query
 
 pytest_plugins = ["pytester"]
 
@@ -30,7 +29,7 @@ def simple_schema():
 @pytest.fixture()
 def case_factory():
 
-    defaults = {"method": "GET", "headers": Headers({}), "query": Query([]), "body": Body({})}
+    defaults = {"method": "GET", "headers": {}, "query": [], "body": {}}
 
     def maker(**kwargs):
         return Case(**{**defaults, **kwargs})
