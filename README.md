@@ -9,6 +9,11 @@ by the application.
 
 Empowered by `Hypothesis`, `hypothesis_jsonschema` and `pytest`.
 
+Supported specification versions:
+
+- Swagger 2.0
+- Open API 3.0.x
+
 **NOTE**: The library is WIP, the API is a subject to change.
 
 ## Usage
