@@ -7,12 +7,12 @@ from schemathesis import Parametrizer
 from ..utils import get_schema_path
 
 
-def get_schema(schema_name="simple.yaml", **kwargs):
+def get_schema(schema_name="simple_swagger.yaml", **kwargs):
     schema = make_schema(schema_name, **kwargs)
     return Parametrizer(schema)
 
 
-def make_schema(schema_name="simple.yaml", **kwargs):
+def make_schema(schema_name="simple_swagger.yaml", **kwargs):
     path = get_schema_path(schema_name)
     with open(path) as fd:
         schema = yaml.safe_load(fd)

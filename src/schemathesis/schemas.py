@@ -9,8 +9,7 @@ They give only static definitions of endpoints.
 import itertools
 import re
 from copy import deepcopy
-from functools import lru_cache
-from typing import Any, Dict, Generator, Iterator, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Generator, Iterator, List, Optional, Set, Tuple, Union, overload
 from urllib.parse import urljoin
 
 import attr
@@ -50,6 +49,7 @@ class BaseSchema:
     @property
     def resolver(self) -> jsonschema.RefResolver:
         if not hasattr(self, "_resolver"):
+            # pylint: disable=attribute-defined-outside-init
             self._resolver = jsonschema.RefResolver("", self.raw_schema)
         return self._resolver
 
@@ -105,8 +105,7 @@ class SwaggerV20(BaseSchema):
     def process_parameter(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
         """Convert each Parameter object to a JSON schema."""
         parameter = deepcopy(parameter)
-        # Any parameter could be a reference object
-        parameter = self.maybe_expand(parameter)
+        parameter = self.resolve(parameter)
         if parameter["in"] == "path":
             self.process_path(result, parameter)
         elif parameter["in"] == "query":
@@ -116,12 +115,6 @@ class SwaggerV20(BaseSchema):
         elif parameter["in"] == "body":
             # Could be only one parameter with "in=body"
             self.process_body(result, parameter)
-
-    def maybe_expand(self, parameter: Dict[str, Any]) -> Dict[str, Any]:
-        """Resolve the reference if the given parameter is a reference object"""
-        if is_reference(parameter):
-            parameter = self.resolve_reference(parameter["$ref"])
-        return parameter
 
     def process_path(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
         self.add_parameter(result.path_parameters, parameter)
@@ -134,7 +127,11 @@ class SwaggerV20(BaseSchema):
 
     def process_body(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
         # "schema" is a required field
-        result.body = self.maybe_expand(parameter["schema"])
+        body = self.resolve(parameter["schema"])
+        if body["type"] == "object":
+            # Objects could contain references inside
+            body = self.resolve(body)
+        result.body = body
 
     def add_parameter(self, container: Dict[str, Any], parameter: Dict[str, Any]) -> None:
         """Add parameter object to a container."""
@@ -152,17 +149,27 @@ class SwaggerV20(BaseSchema):
             if key not in ("name", "in") and (key != "required" or isinstance(value, list))
         }
 
-    @lru_cache()
-    def resolve_reference(self, reference: str) -> Dict[str, Any]:
-        _, dereferenced = self.resolver.resolve(reference)
-        for key, value in traverse_schema(dereferenced):
-            if key[-1] == "$ref":
-                data = self.resolve_reference(value)
-                current = dereferenced
-                for k in key[:-2]:
-                    current = current[k]
-                current[key[-2]] = data
-        return dereferenced
+    @overload
+    def resolve(self, item: Dict[str, Any]) -> Dict[str, Any]:  # pylint: disable=function-redefined
+        ...
+
+    @overload
+    def resolve(self, item: List) -> List:  # pylint: disable=function-redefined
+        ...
+
+    # pylint: disable=function-redefined
+    def resolve(self, item: Union[Dict[str, Any], List]) -> Union[Dict[str, Any], List]:
+        """Recursively resolve all references in the given object."""
+        if isinstance(item, dict):
+            if "$ref" in item:
+                with self.resolver.resolving(item["$ref"]) as resolved:
+                    return self.resolve(resolved)
+            for key, sub_item in item.items():
+                item[key] = self.resolve(sub_item)
+        elif isinstance(item, list):
+            for idx, sub_item in enumerate(item):
+                item[idx] = self.resolve(sub_item)
+        return item
 
 
 class OpenApi30(SwaggerV20):
@@ -174,9 +181,7 @@ class OpenApi30(SwaggerV20):
         return result
 
     def process_body(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
-        parameter = deepcopy(parameter)
-        # Could be a reference object
-        parameter = self.maybe_expand(parameter)
+        parameter = self.resolve(parameter)
         # Take the first media type object
         options = iter(parameter["content"].values())
         parameter = next(options)
@@ -229,17 +234,3 @@ def should_skip_endpoint(endpoint: str, pattern: Optional[Filter]) -> bool:
 
 def is_match(endpoint: str, pattern: str) -> bool:
     return pattern in endpoint or bool(re.search(pattern, endpoint))
-
-
-def is_reference(item: Dict[str, Any]) -> bool:
-    return "$ref" in item
-
-
-def traverse_schema(schema: Dict[str, Any]) -> Iterator[Tuple[List[str], Any]]:
-    """Iterate over dict levels with producing [k_1, k_2, ...], value where the first list is a path to the value."""
-    for key, value in schema.items():
-        if isinstance(value, dict) and value:
-            for sub_key, sub_value in traverse_schema(value):
-                yield [key] + sub_key, sub_value
-        else:
-            yield [key], value

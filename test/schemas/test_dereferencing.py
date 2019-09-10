@@ -12,10 +12,10 @@ def petstore():
 
 
 @pytest.mark.parametrize(
-    "path, expected",
+    "ref, expected",
     (
         (
-            "#/definitions/Category",
+            {"$ref": "#/definitions/Category"},
             {
                 "properties": {"id": {"format": "int64", "type": "integer"}, "name": {"type": "string"}},
                 "type": "object",
@@ -23,7 +23,7 @@ def petstore():
             },
         ),
         (
-            "#/definitions/Pet",
+            {"$ref": "#/definitions/Pet"},
             {
                 "properties": {
                     "category": {
@@ -60,5 +60,5 @@ def petstore():
         ),
     ),
 )
-def test_resolve_reference(petstore, path, expected):
-    assert petstore.resolve_reference(path) == expected
+def test_resolve(petstore, ref, expected):
+    assert petstore.resolve(ref) == expected

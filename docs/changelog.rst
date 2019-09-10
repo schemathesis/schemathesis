@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Resolving all inner references in objects. `#34`_
+
 Changed
 
 - `jsonschema.RefResolver` is now used for reference resolving. `#35`_
@@ -55,6 +60,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#35: https://github.com/kiwicom/schemathesis/issues/35
+.. _#34: https://github.com/kiwicom/schemathesis/issues/34
 .. _#24: https://github.com/kiwicom/schemathesis/issues/24
 .. _#18: https://github.com/kiwicom/schemathesis/issues/18
 .. _#16: https://github.com/kiwicom/schemathesis/issues/16
