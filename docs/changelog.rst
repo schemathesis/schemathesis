@@ -6,14 +6,18 @@ Changelog
 `Unreleased`_
 -------------
 
+`0.4.0`_ - 2019-09-10
+---------------------
+
 Fixed
 ~~~~~
 
 - Resolving all inner references in objects. `#34`_
 
 Changed
+~~~~~~~
 
-- `jsonschema.RefResolver` is now used for reference resolving. `#35`_
+- ``jsonschema.RefResolver`` is now used for reference resolving. `#35`_
 
 `0.3.0`_ - 2019-09-06
 ---------------------
@@ -55,7 +59,8 @@ Fixed
 
 - Initial public release
 
-.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.3.0...HEAD
+.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.4.0...HEAD
+.. _0.4.0: https://github.com/kiwicom/schemathesis/compare/v0.3.0...v0.4.0
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
