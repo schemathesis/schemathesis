@@ -6,6 +6,10 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+
+- `jsonschema.RefResolver` is now used for reference resolving. `#35`_
+
 `0.3.0`_ - 2019-09-06
 ---------------------
 
@@ -50,6 +54,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#35: https://github.com/kiwicom/schemathesis/issues/35
 .. _#24: https://github.com/kiwicom/schemathesis/issues/24
 .. _#18: https://github.com/kiwicom/schemathesis/issues/18
 .. _#16: https://github.com/kiwicom/schemathesis/issues/16

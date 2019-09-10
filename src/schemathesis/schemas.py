@@ -14,6 +14,7 @@ from typing import Any, Dict, Generator, Iterator, List, Optional, Set, Tuple, U
 from urllib.parse import urljoin
 
 import attr
+import jsonschema
 
 from .types import Body, Filter, Headers, PathParameters, Query
 
@@ -45,6 +46,12 @@ class PreparedParameters:
 @attr.s(hash=False)
 class BaseSchema:
     raw_schema: Dict[str, Any] = attr.ib()
+
+    @property
+    def resolver(self) -> jsonschema.RefResolver:
+        if not hasattr(self, "_resolver"):
+            self._resolver = jsonschema.RefResolver("", self.raw_schema)
+        return self._resolver
 
     def get_all_endpoints(
         self, filter_method: Optional[Filter] = None, filter_endpoint: Optional[Filter] = None
@@ -147,7 +154,7 @@ class SwaggerV20(BaseSchema):
 
     @lru_cache()
     def resolve_reference(self, reference: str) -> Dict[str, Any]:
-        dereferenced = self.dereference(reference)
+        _, dereferenced = self.resolver.resolve(reference)
         for key, value in traverse_schema(dereferenced):
             if key[-1] == "$ref":
                 data = self.resolve_reference(value)
@@ -156,16 +163,6 @@ class SwaggerV20(BaseSchema):
                     current = current[k]
                 current[key[-2]] = data
         return dereferenced
-
-    @lru_cache()
-    def dereference(self, path: str) -> Dict[str, Any]:
-        # assume URI fragment
-        current: Dict[str, Any] = self.raw_schema
-        for part in path[2:].split("/"):
-            # Reference not found?
-            # Support arrays in JSON pointers?
-            current = current[part]  # pylint: disable=unsubscriptable-object
-        return current
 
 
 class OpenApi30(SwaggerV20):
