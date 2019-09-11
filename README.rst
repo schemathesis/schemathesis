@@ -64,7 +64,7 @@ look like this:
     def test_no_server_errors(case):
         response = requests.request(
             case.method,
-            f"{BASE_URL}case.formatted_path",
+            f"{BASE_URL}{case.formatted_path}",
             headers=case.headers,
             params=case.query,
             json=case.body
