@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Possibly unhandled exception during `hasattr` check in `is_schemathesis_test`
+
 `0.4.0`_ - 2019-09-10
 ---------------------
 

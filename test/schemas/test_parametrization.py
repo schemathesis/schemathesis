@@ -453,3 +453,27 @@ def test_(request, case):
     # Then the base path is "/"
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r".*\[GET:/users\]"])
+
+
+def test_exceptions_on_collect(testdir):
+    # When collected item raises an exception during `hasattr` in `is_schemathesis_test`
+    testdir.make_test(
+        """
+@schema.parametrize()
+def test_(request, case):
+    pass
+"""
+    )
+    testdir.makepyfile(
+        test_b="""
+    class NotInitialized:
+        def __getattr__(self, item):
+            raise RuntimeError
+
+    app = NotInitialized()
+    """
+    )
+    result = testdir.runpytest("-v")
+    # Then it should not be propagated & collection should be continued
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r".*\[GET:/v1/users\]"])
