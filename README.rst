@@ -1,0 +1,112 @@
+Schemathesis
+============
+
+|Version| |Python versions| |License|
+
+Schemathesis is a tool that generates test cases for your
+Open API / Swagger schemas.
+
+The main goal is to bring property-based testing to web applications and
+verify if all values allowed by the schema are processed correctly
+by the application.
+
+Empowered by ``Hypothesis``, ``hypothesis_jsonschema`` and ``pytest``.
+
+Supported specification versions:
+
+- Swagger 2.0
+- Open API 3.0.x
+
+**NOTE**: The library is WIP, the API is a subject to change.
+
+Usage
+-----
+
+To generate test cases for your schema you need:
+
+- Create a parametrizer;
+- Wrap a test with ``Parametrizer.parametrize`` method
+- Provide a client and url of a running application instance
+
+.. code:: python
+
+    import pytest
+    import requests
+    from schemathesis import Parametrizer
+
+
+    schema = Parametrizer.from_path("path/to/schema.yaml")
+
+    @pytest.fixture(scope="session")
+    def client():
+        with requests.Session() as session:
+            yield session
+
+    @schema.parametrize()
+    def test_users_endpoint(client, case):
+        url = "http://0.0.0.0:8080" + case.formatted_path
+        response = client.request(
+            case.method,
+            url,
+            params=case.query,
+            json=case.body
+        )
+        assert response.status_code == 200
+
+Each wrapped test will have the ``case`` fixture, that represents a
+hypothesis test case.
+
+Case consists of:
+
+- ``method``
+- ``formatted_path``
+- ``headers``
+- ``query``
+- ``body``
+
+For each ``schemathesis`` will create ``hypothesis`` strategies which will
+generate bunch of random inputs acceptable by schema.
+This data could be used to verify that your application works in the way
+as described in the schema or that schema describes expected behaviour.
+
+For example the data could be send against running app container via
+``requests`` and response is checked for an expected status code or error
+message.
+
+To limit the number of examples you could use ``hypothesis.settings`` decorator on your test functions:
+
+.. code:: python
+
+    from hypothesis import settings
+
+    @settings(max_examples=5)
+    def test_something(client, case):
+        ...
+
+Documentation
+-------------
+
+For full documentation, please see https://schemathesis.readthedocs.io/en/latest/
+
+Or you can look at the ``docs/`` directory in the repository.
+
+Python support
+--------------
+
+Schemathesis supports Python 3.6, 3.7 and 3.8.
+
+License
+-------
+
+The code in this project is licensed under `MIT license`_.
+By contributing to ``schemathesis``, you agree that your contributions
+will be licensed under its MIT license.
+
+.. |Version| image:: https://img.shields.io/pypi/v/schemathesis.svg
+   :target: https://pypi.org/project/schemathesis/
+.. |Python versions| image:: https://img.shields.io/pypi/pyversions/schemathesis.svg
+   :target: https://pypi.org/project/schemathesis/
+.. |License| image:: https://img.shields.io/pypi/l/schemathesis.svg
+   :target: https://opensource.org/licenses/MIT
+
+.. _MIT license: https://opensource.org/licenses/MIT
