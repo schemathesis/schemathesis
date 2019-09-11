@@ -92,4 +92,7 @@ class SchemaWrapper:
 
 def is_schemathesis_test(func: Callable) -> bool:
     """Check whether test is parametrized with schemathesis."""
-    return hasattr(func, "_schema_parametrizer")
+    try:
+        return hasattr(func, "_schema_parametrizer")
+    except Exception:
+        return False
