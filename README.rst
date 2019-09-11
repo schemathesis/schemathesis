@@ -52,6 +52,7 @@ look like this:
 
 .. code:: python
 
+    # test_api.py
     import pytest
     import requests
     from schemathesis import Parametrizer
@@ -80,6 +81,12 @@ It consists of four main parts:
 3. A network call to the running application; ``requests`` will do the job, for example.
 
 4. Verifying a property you'd like to test; In the example, we verify that any app response will not indicate a server-side error (HTTP codes 5xx).
+
+Run the tests:
+
+.. code:: bash
+
+    pytest test_api.py
 
 **Other properties that could be tested**:
 
