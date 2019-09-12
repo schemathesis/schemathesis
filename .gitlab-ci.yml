@@ -24,13 +24,6 @@ include:
       - reports/
       - .coverage*
 
-black:
-  stage: build
-  image: kiwicom/black:19.3b0
-  dependencies: []  # skip downloading artifacts unnecessarily
-  script:
-    - black --check . --diff -l 120
-
 mypy:
   extends: .tox
   variables:

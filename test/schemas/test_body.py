@@ -10,7 +10,7 @@ def test_default(testdir):
 def test_(case):
     assert_int(case.body)
         """,
-        **as_param({"name": "id", "in": "body", "required": True, "schema": {"type": "integer"}})
+        **as_param({"name": "id", "in": "body", "required": True, "schema": {"type": "integer"}}),
     )
     # Then the generated test case should contain it in its `body` attribute
     testdir.run_and_assert("-s", passed=1)
