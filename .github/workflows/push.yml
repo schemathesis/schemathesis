@@ -1,0 +1,39 @@
+name: Push
+
+on: [push]
+
+jobs:
+  black:
+    name: black
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - uses: actions/setup-python@v1
+      with:
+        python-version: '3.7'
+    - run: pip install black
+    - run: black --check --diff -l 120 .
+
+  pylint:
+    name: pylint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - uses: actions/setup-python@v1
+      with:
+        python-version: '3.7'
+    - run: pip install poetry
+    - run: poetry add pylint
+    - run: poetry install
+    - run: poetry run pylint src/schemathesis
+
+  mypy:
+    name: mypy
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - uses: actions/setup-python@v1
+      with:
+        python-version: '3.7'
+    - run: pip install mypy
+    - run: mypy src/schemathesis
