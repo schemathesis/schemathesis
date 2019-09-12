@@ -37,3 +37,25 @@ jobs:
         python-version: '3.7'
     - run: pip install mypy
     - run: mypy src/schemathesis
+
+  py36:
+    name: py36
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - uses: actions/setup-python@v1
+      with:
+        python-version: '3.6'
+    - run: pip install tox
+    - run: tox -e py36
+
+  py37:
+    name: py37
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - uses: actions/setup-python@v1
+      with:
+        python-version: '3.7'
+    - run: pip install tox
+    - run: tox -e py37
