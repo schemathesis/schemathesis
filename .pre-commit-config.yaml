@@ -12,7 +12,6 @@ repos:
     rev: stable
     hooks:
       - id: black
-        args: [-l 120]
         types: [python]
 
   - repo: https://github.com/pre-commit/mirrors-isort

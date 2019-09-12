@@ -10,7 +10,7 @@ def test_default(testdir):
 def test_(case):
     assert_str(case.headers["api_key"])
         """,
-        **as_param({"name": "api_key", "in": "header", "required": True, "type": "string"})
+        **as_param({"name": "api_key", "in": "header", "required": True, "type": "string"}),
     )
     # Then the generated test case should contain it in its `headers` attribute
     testdir.run_and_assert("-s", passed=1)

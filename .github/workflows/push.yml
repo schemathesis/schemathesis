@@ -12,7 +12,7 @@ jobs:
       with:
         python-version: '3.7'
     - run: pip install black
-    - run: black --check --diff -l 120 .
+    - run: black --check --diff .
 
   pylint:
     name: pylint
