@@ -8,11 +8,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@master
-    - uses: actions/setup-python@v1
+    - uses: docker://kiwicom/black
       with:
-        python-version: '3.7'
-    - run: pip install black
-    - run: black --check --diff .
+        args: black --check --diff .
 
   pylint:
     name: pylint
