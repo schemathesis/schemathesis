@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Generator, Optional, Union
 
 import attr
 
@@ -88,6 +88,9 @@ class SchemaWrapper:
             schema = self.raw_schema.get()
             self._schema = schemas.wrap_schema(schema)
         return self._schema
+
+    def get_all_endpoints(self) -> Generator[schemas.Endpoint, None, None]:
+        return self.schema.get_all_endpoints(filter_method=self.filter_method, filter_endpoint=self.filter_endpoint)
 
 
 def is_schemathesis_test(func: Callable) -> bool:

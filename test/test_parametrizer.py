@@ -56,6 +56,3 @@ def test_callable_schema_cache():
 
     # Then this callable should be evaluated only once and reused
     assert counter == 1
-
-
-# TODO. respect hypothesis-profile
