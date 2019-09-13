@@ -42,7 +42,7 @@ class PreparedParameters:
     body: Body = attr.ib(init=False, factory=empty_object)
 
 
-@attr.s(hash=False)
+@attr.s(slots=True)
 class BaseSchema:
     raw_schema: Dict[str, Any] = attr.ib()
 
@@ -127,11 +127,7 @@ class SwaggerV20(BaseSchema):
 
     def process_body(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
         # "schema" is a required field
-        body = self.resolve(parameter["schema"])
-        if body["type"] == "object":
-            # Objects could contain references inside
-            body = self.resolve(body)
-        result.body = body
+        result.body = self.resolve(parameter["schema"])
 
     def add_parameter(self, container: Dict[str, Any], parameter: Dict[str, Any]) -> None:
         """Add parameter object to a container."""
@@ -146,7 +142,7 @@ class SwaggerV20(BaseSchema):
             key: value
             for key, value in data.items()
             # Do not include keys not supported by JSON schema
-            if key not in ("name", "in") and (key != "required" or isinstance(value, list))
+            if not (key == "required" and not isinstance(value, list))
         }
 
     @overload
