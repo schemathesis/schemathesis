@@ -361,6 +361,35 @@ def test_b(request, case):
     # NOTE: current implementation requires a deepcopy of the whole schema
 
 
+def test_specified_example(testdir):
+    # When the given parameter contains an example
+    testdir.make_test(
+        """
+from hypothesis import Phase
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.explicit])
+def test(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.body == {"name": "John"}
+""",
+        **as_param({"schema": {"$ref": "#/definitions/ObjectRef"}, "in": "body", "name": "object", "required": True}),
+        definitions={
+            "ObjectRef": {
+                "required": ["name"],
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {"name": {"type": "string"}},
+                "example": {"name": "John"},
+            }
+        },
+    )
+    result = testdir.runpytest("-v", "-s")
+    # Then this example should be used in tests
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+
+
 def test_required_parameters(testdir):
     testdir.make_test(
         """

@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Add
+~~~
+
+- Generating explicit examples from schema. `#17`_
+
 `0.4.1`_ - 2019-09-11
 ---------------------
 
@@ -77,6 +82,7 @@ Fixed
 .. _#34: https://github.com/kiwicom/schemathesis/issues/34
 .. _#24: https://github.com/kiwicom/schemathesis/issues/24
 .. _#18: https://github.com/kiwicom/schemathesis/issues/18
+.. _#17: https://github.com/kiwicom/schemathesis/issues/17
 .. _#16: https://github.com/kiwicom/schemathesis/issues/16
 .. _#10: https://github.com/kiwicom/schemathesis/issues/10
 .. _#7: https://github.com/kiwicom/schemathesis/issues/7

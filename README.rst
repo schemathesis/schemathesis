@@ -117,6 +117,39 @@ To limit the number of examples you could use ``hypothesis.settings`` decorator 
     def test_something(client, case):
         ...
 
+Explicit examples
+~~~~~~~~~~~~~~~~~
+
+If the schema contains parameters examples, then they will be additionally included in the generated cases.
+
+.. code:: yaml
+
+    paths:
+      get:
+        parameters:
+        - in: body
+          name: body
+          required: true
+          schema: '#/definitions/Pet'
+
+    definitions:
+      Pet:
+        additionalProperties: false
+        example:
+          name: Doggo
+        properties:
+          name:
+            type: string
+        required:
+        - name
+        type: object
+
+
+With this Swagger schema example, there will be a case with body ``{"name": "Doggo"}``.  Examples handled with
+``example`` decorator from Hypothesis, more info about its behavior is `here`_.
+
+NOTE. Schemathesis supports only examples in ``parameters`` at the moment, examples of individual properties are not supported.
+
 Documentation
 -------------
 
@@ -148,4 +181,5 @@ will be licensed under its MIT license.
 .. _hypothesis: https://hypothesis.works/
 .. _hypothesis_jsonschema: https://github.com/Zac-HD/hypothesis-jsonschema
 .. _pytest: http://pytest.org/en/latest/
+.. _here: https://hypothesis.readthedocs.io/en/latest/reproducing.html#providing-explicit-examples
 .. _MIT license: https://opensource.org/licenses/MIT
