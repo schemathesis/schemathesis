@@ -390,6 +390,29 @@ def test(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 1"])
 
 
+def test_deselecting(testdir):
+    # When pytest selecting is applied via "-k" option
+    testdir.make_test(
+        """
+@schema.parametrize()
+@settings(max_examples=1)
+def test_a(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+
+@schema.parametrize(filter_endpoint="pets")
+@settings(max_examples=1)
+def test_b(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    """,
+        paths={"/pets": {"post": {}}},
+    )
+    result = testdir.runpytest("-v", "-s", "-k", "pets")
+    # Then only relevant tests should be selected for running
+    result.assert_outcomes(passed=2)
+    # "/users" endpoint is excluded in the first test function
+    result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST:/v1/pets\]", r"Hypothesis calls: 2"])
+
+
 def test_required_parameters(testdir):
     testdir.make_test(
         """
