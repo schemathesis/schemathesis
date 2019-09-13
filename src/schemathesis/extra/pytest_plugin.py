@@ -33,8 +33,6 @@ class SchemathesisCase(PyCollector):
         Could produce more than one test item if
         parametrization is applied via ``pytest.mark.parametrize`` or ``pytest_generate_tests``.
         """
-        # TODO. exclude it early, if tests are deselected, then hypothesis strategies will not be used anyway
-        # But, it is important to know the total number of tests for all method/endpoint combos
         hypothesis_item = create_hypothesis_test(endpoint, self.test_function)
         items = self.ihook.pytest_pycollect_makeitem(
             collector=self.parent, name=self._get_test_name(endpoint), obj=hypothesis_item
