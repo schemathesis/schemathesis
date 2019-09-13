@@ -18,5 +18,5 @@ def test_base_path_suffix(swagger_20, base_path):
 
 
 def test_wrap_schema_unsupported_type():
-    with pytest.raises(ValueError, match="Unsupported schema type"):
+    with pytest.raises(ValueError, match="^Unsupported schema type$"):
         wrap_schema({})

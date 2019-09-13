@@ -47,12 +47,7 @@ class SchemathesisCase(PyCollector):
         """Generate different test items for all endpoints available in the given schema."""
         try:
             return [
-                item
-                for endpoint in self.schemathesis_case.schema.get_all_endpoints(
-                    filter_method=self.schemathesis_case.filter_method,
-                    filter_endpoint=self.schemathesis_case.filter_endpoint,
-                )
-                for item in self._gen_items(endpoint)
+                item for endpoint in self.schemathesis_case.get_all_endpoints() for item in self._gen_items(endpoint)
             ]
         except Exception:
             pytest.fail("Error during collection")

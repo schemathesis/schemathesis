@@ -9,8 +9,6 @@ from hypothesis_jsonschema import from_schema
 from .schemas import Endpoint
 from .types import Body, Headers, PathParameters, Query
 
-# TODO. Better naming
-
 
 @attr.s(slots=True)
 class Case:
