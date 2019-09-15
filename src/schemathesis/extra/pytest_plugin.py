@@ -6,13 +6,13 @@ from _pytest.config import hookimpl
 from _pytest.python import Function, PyCollector  # type: ignore
 from hypothesis.errors import InvalidArgument  # pylint: disable=ungrouped-imports
 
-from ..generator import create_hypothesis_test
-from ..parametrizer import is_schemathesis_test
-from ..schemas import Endpoint
+from .._hypothesis import create_test
+from ..models import Endpoint
+from ..utils import is_schemathesis_test
 
 
 def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> Optional["SchemathesisCase"]:
-    """Switch to a different collector if the test is wrapped with `Parametrizer.parametrize()`."""
+    """Switch to a different collector if the test is parametrized marked by schemathesis."""
     if is_schemathesis_test(obj):
         return SchemathesisCase(obj, name, collector)
     return None
@@ -21,7 +21,7 @@ def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -
 class SchemathesisCase(PyCollector):
     def __init__(self, test_function: Callable, *args: Any, **kwargs: Any) -> None:
         self.test_function = test_function
-        self.schemathesis_case = test_function._schema_parametrizer  # type: ignore
+        self.schemathesis_case = test_function._schemathesis_test  # type: ignore
         super().__init__(*args, **kwargs)
 
     def _get_test_name(self, endpoint: Endpoint) -> str:
@@ -33,7 +33,7 @@ class SchemathesisCase(PyCollector):
         Could produce more than one test item if
         parametrization is applied via ``pytest.mark.parametrize`` or ``pytest_generate_tests``.
         """
-        hypothesis_item = create_hypothesis_test(endpoint, self.test_function)
+        hypothesis_item = create_test(endpoint, self.test_function)
         items = self.ihook.pytest_pycollect_makeitem(
             collector=self.parent, name=self._get_test_name(endpoint), obj=hypothesis_item
         )

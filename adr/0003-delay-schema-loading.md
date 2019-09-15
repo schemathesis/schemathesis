@@ -4,7 +4,7 @@ Date: 2019-08-08
 
 ## Status
 
-Accepted
+Superseded by #6
 
 ## Context
 

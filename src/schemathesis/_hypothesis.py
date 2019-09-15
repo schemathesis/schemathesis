@@ -1,36 +1,17 @@
 """Provide strategies for given endpoint(s) definition."""
 from typing import Callable, Generator
 
-import attr
 import hypothesis.strategies as st
 from hypothesis import example, given
 from hypothesis._strategies import just
 from hypothesis_jsonschema import from_schema
 
-from .schemas import Endpoint
-from .types import Body, Headers, PathParameters, Query
+from .models import Case, Endpoint
 
-PARAMETERS = {"path_parameters", "headers", "query", "body"}
-
-
-@attr.s(slots=True)
-class Case:
-    """A single test case parameters."""
-
-    path: str = attr.ib()
-    method: str = attr.ib()
-    path_parameters: PathParameters = attr.ib()
-    headers: Headers = attr.ib()
-    query: Query = attr.ib()
-    body: Body = attr.ib()
-
-    @property
-    def formatted_path(self) -> str:
-        # pylint: disable=not-a-mapping
-        return self.path.format(**self.path_parameters)
+PARAMETERS = frozenset(("path_parameters", "headers", "query", "body"))
 
 
-def create_hypothesis_test(endpoint: Endpoint, test: Callable) -> Callable:
+def create_test(endpoint: Endpoint, test: Callable) -> Callable:
     """Create a Hypothesis test."""
     strategy = get_case_strategy(endpoint)
     wrapped_test = given(case=strategy)(test)
@@ -47,7 +28,7 @@ def get_examples(endpoint: Endpoint) -> Generator[Case, None, None]:
                 path=st.just(endpoint.path),
                 method=st.just(endpoint.method),
                 **{name: just(parameter["example"])},
-                **other_parameters
+                **other_parameters,
             ).example()
 
 

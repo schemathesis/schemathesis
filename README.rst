@@ -55,10 +55,10 @@ look like this:
     # test_api.py
     import pytest
     import requests
-    from schemathesis import Parametrizer
+    import schemathesis
 
     BASE_URL = "http://0.0.0.0:8080"
-    schema = Parametrizer.from_uri(f"{BASE_URL}/swagger.json")
+    schema = schemathesis.from_uri(f"{BASE_URL}/swagger.json")
 
     @schema.parametrize()
     def test_no_server_errors(case):
@@ -74,7 +74,7 @@ look like this:
 
 It consists of four main parts:
 
-1. Schema preparation; ``Parametrizer`` should be initialized with a valid schema location.
+1. Schema preparation; ``schemathesis`` package provides multiple ways to initialize the schema - ``from_path``, ``from_dict``, ``from_uri``, ``from_file``.
 
 2. Test parametrization; ``@schema.parametrize()`` generates separate tests for all endpoint/method combination available in the schema.
 
