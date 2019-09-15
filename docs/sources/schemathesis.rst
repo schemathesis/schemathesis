@@ -19,22 +19,6 @@ schemathesis.generator module
    :undoc-members:
    :show-inheritance:
 
-schemathesis.parametrizer module
---------------------------------
-
-.. automodule:: schemathesis.parametrizer
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-schemathesis.readers module
----------------------------
-
-.. automodule:: schemathesis.readers
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 schemathesis.schemas module
 ---------------------------
 

@@ -1,14 +1,11 @@
 import pytest
 
-from schemathesis.schemas import wrap_schema
-
-from .utils import make_schema
+from .utils import get_schema
 
 
 @pytest.fixture()
 def petstore():
-    raw_schema = make_schema("petstore_v2.yaml")
-    return wrap_schema(raw_schema)
+    return get_schema("petstore_v2.yaml")
 
 
 @pytest.mark.parametrize(

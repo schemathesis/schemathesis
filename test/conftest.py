@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis.generator import Case
+from schemathesis import Case
 
 pytest_plugins = ["pytester"]
 
