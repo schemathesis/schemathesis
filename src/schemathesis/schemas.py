@@ -147,11 +147,11 @@ class SwaggerV20(BaseSchema):
 
     @overload
     def resolve(self, item: Dict[str, Any]) -> Dict[str, Any]:  # pylint: disable=function-redefined
-        ...
+        pass
 
     @overload
     def resolve(self, item: List) -> List:  # pylint: disable=function-redefined
-        ...
+        pass
 
     # pylint: disable=function-redefined
     def resolve(self, item: Union[Dict[str, Any], List]) -> Union[Dict[str, Any], List]:
