@@ -1,5 +1,2 @@
-from .generator import Case
-from .parametrizer import Parametrizer
-from .schemas import SwaggerV20
-
-# TODO. optional schema validation?
+from .models import Case
+from .readers import Parametrizer, from_dict, from_file, from_path, from_uri

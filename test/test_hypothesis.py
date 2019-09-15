@@ -2,8 +2,9 @@ from unittest.mock import ANY
 
 import pytest
 
-from schemathesis.generator import PARAMETERS, Case, get_examples
-from schemathesis.schemas import Endpoint
+from schemathesis import Case
+from schemathesis._hypothesis import PARAMETERS, get_examples
+from schemathesis.models import Endpoint
 
 
 def test_path(case_factory):

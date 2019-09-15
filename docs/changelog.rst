@@ -6,10 +6,20 @@ Changelog
 `Unreleased`_
 -------------
 
-Add
-~~~
+Added
+~~~~~
 
 - Generating explicit examples from schema. `#17`_
+
+Changed
+~~~~~~~
+
+- Schemas are loaded eagerly from now on. Using ``schemathesis.from_uri`` implies network calls.
+
+Deprecated
+~~~~~~~~~~
+
+- Using ``Parametrizer.from_{path,uri}`` is deprecated, use ``schemathesis.from_{path,uri}`` instead
 
 `0.4.1`_ - 2019-09-11
 ---------------------

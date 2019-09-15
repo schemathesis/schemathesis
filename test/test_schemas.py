@@ -1,12 +1,11 @@
 import pytest
 
-from schemathesis import SwaggerV20
-from schemathesis.schemas import wrap_schema
+import schemathesis
 
 
 @pytest.fixture()
 def swagger_20(simple_schema):
-    return SwaggerV20(simple_schema)
+    return schemathesis.from_dict(simple_schema)
 
 
 @pytest.mark.parametrize("base_path", ("/v1", "/v1/"))
@@ -17,6 +16,6 @@ def test_base_path_suffix(swagger_20, base_path):
     assert swagger_20.base_path == "/v1/"
 
 
-def test_wrap_schema_unsupported_type():
+def test_unsupported_type():
     with pytest.raises(ValueError, match="^Unsupported schema type$"):
-        wrap_schema({})
+        schemathesis.from_dict({})

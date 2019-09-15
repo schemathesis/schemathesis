@@ -480,9 +480,9 @@ def test_invalid_schema(testdir):
     # When the given schema is not valid
     testdir.makepyfile(
         """
-from schemathesis import Parametrizer
+import schemathesis
 
-schema = Parametrizer({"swagger": "2.0", "paths": 1})
+schema = schemathesis.from_dict({"swagger": "2.0", "paths": 1})
 
 @schema.parametrize()
 def test_(request, case):

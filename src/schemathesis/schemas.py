@@ -7,44 +7,23 @@ Their responsibilities:
 They give only static definitions of endpoints.
 """
 import itertools
-import re
 from copy import deepcopy
-from typing import Any, Dict, Generator, Iterator, List, Optional, Set, Tuple, Union, overload
+from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Union, overload
 from urllib.parse import urljoin
 
 import attr
 import jsonschema
 
-from .types import Body, Filter, Headers, PathParameters, Query
-
-
-@attr.s(slots=True)
-class Endpoint:
-    """A container that could be used for test cases generation."""
-
-    path: str = attr.ib()
-    method: str = attr.ib()
-    path_parameters: PathParameters = attr.ib()
-    headers: Headers = attr.ib()
-    query: Query = attr.ib()
-    body: Body = attr.ib()
-
-
-def empty_object() -> Dict[str, Any]:
-    return {"properties": {}, "additionalProperties": False, "type": "object", "required": []}
-
-
-@attr.s(slots=True)
-class PreparedParameters:
-    path_parameters: PathParameters = attr.ib(init=False, factory=empty_object)
-    headers: Headers = attr.ib(init=False, factory=empty_object)
-    query: Query = attr.ib(init=False, factory=empty_object)
-    body: Body = attr.ib(init=False, factory=empty_object)
+from .filters import should_skip_endpoint, should_skip_method
+from .models import Endpoint
+from .types import Filter
 
 
 @attr.s(slots=True)
 class BaseSchema:
     raw_schema: Dict[str, Any] = attr.ib()
+    filter_method: Optional[Filter] = attr.ib(default=None)
+    filter_endpoint: Optional[Filter] = attr.ib(default=None)
 
     @property
     def resolver(self) -> jsonschema.RefResolver:
@@ -53,10 +32,19 @@ class BaseSchema:
             self._resolver = jsonschema.RefResolver("", self.raw_schema)
         return self._resolver
 
-    def get_all_endpoints(
-        self, filter_method: Optional[Filter] = None, filter_endpoint: Optional[Filter] = None
-    ) -> Generator[Endpoint, None, None]:
+    def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
         raise NotImplementedError
+
+    def parametrize(self, filter_method: Optional[Filter] = None, filter_endpoint: Optional[Filter] = None) -> Callable:
+        """Mark a test function as a parametrized one."""
+
+        def wrapper(func: Callable) -> Callable:
+            func._schemathesis_test = self.__class__(  # type: ignore
+                self.raw_schema, filter_method=filter_method, filter_endpoint=filter_endpoint
+            )
+            return func
+
+        return wrapper
 
 
 class SwaggerV20(BaseSchema):
@@ -72,72 +60,64 @@ class SwaggerV20(BaseSchema):
         """Compute full path for the given path."""
         return urljoin(self.base_path, path.lstrip("/"))
 
-    def get_all_endpoints(
-        self, filter_method: Optional[Filter] = None, filter_endpoint: Optional[Filter] = None
-    ) -> Generator[Endpoint, None, None]:
+    def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
         paths = self.raw_schema["paths"]  # pylint: disable=unsubscriptable-object
         for path, methods in paths.items():
             full_path = self.get_full_path(path)
-            if should_skip_endpoint(full_path, filter_endpoint):
+            if should_skip_endpoint(full_path, self.filter_endpoint):
                 continue
             common_parameters = get_common_parameters(methods)
             for method, definition in methods.items():
-                if method == "parameters" or should_skip_method(method, filter_method):
+                if method == "parameters" or should_skip_method(method, self.filter_method):
                     continue
                 parameters = itertools.chain(definition.get("parameters", ()), common_parameters)
-                prepared_parameters = self.get_parameters(parameters, definition)
-                yield Endpoint(
-                    path=full_path,
-                    method=method.upper(),
-                    path_parameters=prepared_parameters.path_parameters,
-                    headers=prepared_parameters.headers,
-                    query=prepared_parameters.query,
-                    body=prepared_parameters.body,
-                )
+                yield self.make_endpoint(full_path, method, parameters, definition)
 
-    def get_parameters(self, parameters: Iterator[Dict[str, Any]], definition: Dict[str, Any]) -> PreparedParameters:
+    def make_endpoint(
+        self, full_path: str, method: str, parameters: Iterator[Dict[str, Any]], definition: Dict[str, Any]
+    ) -> Endpoint:
         """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
-        result = PreparedParameters()
+        endpoint = Endpoint(path=full_path, method=method.upper())
         for parameter in parameters:
-            self.process_parameter(result, parameter)
-        return result
+            self.process_parameter(endpoint, parameter)
+        return endpoint
 
-    def process_parameter(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
+    def process_parameter(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         """Convert each Parameter object to a JSON schema."""
         parameter = deepcopy(parameter)
         parameter = self.resolve(parameter)
         if parameter["in"] == "path":
-            self.process_path(result, parameter)
+            self.process_path(endpoint, parameter)
         elif parameter["in"] == "query":
-            self.process_query(result, parameter)
+            self.process_query(endpoint, parameter)
         elif parameter["in"] == "header":
-            self.process_header(result, parameter)
+            self.process_header(endpoint, parameter)
         elif parameter["in"] == "body":
             # Could be only one parameter with "in=body"
-            self.process_body(result, parameter)
+            self.process_body(endpoint, parameter)
 
-    def process_path(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
-        self.add_parameter(result.path_parameters, parameter)
+    def process_path(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+        self.add_parameter(endpoint.path_parameters, parameter)
 
-    def process_header(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
-        self.add_parameter(result.headers, parameter)
+    def process_header(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+        self.add_parameter(endpoint.headers, parameter)
 
-    def process_query(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
-        self.add_parameter(result.query, parameter)
+    def process_query(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+        self.add_parameter(endpoint.query, parameter)
 
-    def process_body(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
+    def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         # "schema" is a required field
-        result.body = self.resolve(parameter["schema"])
+        endpoint.body = self.resolve(parameter["schema"])
 
     def add_parameter(self, container: Dict[str, Any], parameter: Dict[str, Any]) -> None:
-        """Add parameter object to a container."""
+        """Add parameter object to the container."""
         name = parameter["name"]
         container["properties"][name] = self.parameter_to_json_schema(parameter)
         if parameter.get("required", False):
             container["required"].append(name)
 
     def parameter_to_json_schema(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert Parameter object to JSON schema"""
+        """Convert Parameter object to a JSON schema."""
         return {
             key: value
             for key, value in data.items()
@@ -169,32 +149,25 @@ class SwaggerV20(BaseSchema):
 
 
 class OpenApi30(SwaggerV20):
-    def get_parameters(self, parameters: Iterator[Dict[str, Any]], definition: Dict[str, Any]) -> PreparedParameters:
+    def make_endpoint(
+        self, full_path: str, method: str, parameters: Iterator[Dict[str, Any]], definition: Dict[str, Any]
+    ) -> Endpoint:
         """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
-        result = super().get_parameters(parameters, definition)
+        endpoint = super().make_endpoint(full_path, method, parameters, definition)
         if "requestBody" in definition:
-            self.process_body(result, definition["requestBody"])
-        return result
+            self.process_body(endpoint, definition["requestBody"])
+        return endpoint
 
-    def process_body(self, result: PreparedParameters, parameter: Dict[str, Any]) -> None:
+    def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         parameter = self.resolve(parameter)
         # Take the first media type object
         options = iter(parameter["content"].values())
         parameter = next(options)
-        super().process_body(result, parameter)
+        super().process_body(endpoint, parameter)
 
     def parameter_to_json_schema(self, data: Dict[str, Any]) -> Dict[str, Any]:
         # "schema" field is required for all parameters in Open API 3.0
         return super().parameter_to_json_schema(data["schema"])
-
-
-def wrap_schema(raw_schema: Dict[str, Any]) -> BaseSchema:
-    """Get a proper abstraction for the given raw schema."""
-    if "swagger" in raw_schema:
-        return SwaggerV20(raw_schema)
-    if "openapi" in raw_schema:
-        return OpenApi30(raw_schema)
-    raise ValueError("Unsupported schema type")
 
 
 def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -206,27 +179,3 @@ def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
     if common_parameters is not None:
         return deepcopy(common_parameters)
     return []
-
-
-def force_tuple(item: Filter) -> Union[List, Set, Tuple]:
-    if not isinstance(item, (list, set, tuple)):
-        return (item,)
-    return item
-
-
-def should_skip_method(method: str, pattern: Optional[Filter]) -> bool:
-    if pattern is None:
-        return False
-    patterns = force_tuple(pattern)
-    return method.upper() not in map(str.upper, patterns)
-
-
-def should_skip_endpoint(endpoint: str, pattern: Optional[Filter]) -> bool:
-    if pattern is None:
-        return False
-    patterns = force_tuple(pattern)
-    return not any(is_match(endpoint, item) for item in patterns)
-
-
-def is_match(endpoint: str, pattern: str) -> bool:
-    return pattern in endpoint or bool(re.search(pattern, endpoint))

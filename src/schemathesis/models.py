@@ -1,0 +1,38 @@
+from typing import Any, Dict
+
+import attr
+
+from .types import Body, Headers, PathParameters, Query
+
+
+@attr.s(slots=True)
+class Case:
+    """A single test case parameters."""
+
+    path: str = attr.ib()
+    method: str = attr.ib()
+    path_parameters: PathParameters = attr.ib()
+    headers: Headers = attr.ib()
+    query: Query = attr.ib()
+    body: Body = attr.ib()
+
+    @property
+    def formatted_path(self) -> str:
+        # pylint: disable=not-a-mapping
+        return self.path.format(**self.path_parameters)
+
+
+def empty_object() -> Dict[str, Any]:
+    return {"properties": {}, "additionalProperties": False, "type": "object", "required": []}
+
+
+@attr.s(slots=True)
+class Endpoint:
+    """A container that could be used for test cases generation."""
+
+    path: str = attr.ib()
+    method: str = attr.ib()
+    path_parameters: PathParameters = attr.ib(factory=empty_object)
+    headers: Headers = attr.ib(factory=empty_object)
+    query: Query = attr.ib(factory=empty_object)
+    body: Body = attr.ib(factory=empty_object)
