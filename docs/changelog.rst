@@ -91,7 +91,7 @@ Fixed
 - Initial public release
 
 .. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.5.0...HEAD
-.. _0.5.0: https://github.com/kiwicom/schemathesis/compare/v0.4.0...v0.5.0
+.. _0.5.0: https://github.com/kiwicom/schemathesis/compare/v0.4.1...v0.5.0
 .. _0.4.1: https://github.com/kiwicom/schemathesis/compare/v0.4.0...v0.4.1
 .. _0.4.0: https://github.com/kiwicom/schemathesis/compare/v0.3.0...v0.4.0
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
