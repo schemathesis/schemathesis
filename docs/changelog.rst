@@ -24,6 +24,11 @@ Deprecated
 
 - Using ``Parametrizer.from_{path,uri}`` is deprecated, use ``schemathesis.from_{path,uri}`` instead
 
+Fixed
+~~~~~
+
+- Body resolving during test collection. `#55`_
+
 `0.4.1`_ - 2019-09-11
 ---------------------
 
@@ -92,6 +97,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#55: https://github.com/kiwicom/schemathesis/issues/55
 .. _#35: https://github.com/kiwicom/schemathesis/issues/35
 .. _#34: https://github.com/kiwicom/schemathesis/issues/34
 .. _#24: https://github.com/kiwicom/schemathesis/issues/24
