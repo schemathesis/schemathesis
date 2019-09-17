@@ -8,8 +8,8 @@ from .utils import SIMPLE_PATH
 @pytest.mark.parametrize(
     "method, path", ((schemathesis.from_path, SIMPLE_PATH), (schemathesis.from_uri, f"file://{SIMPLE_PATH}"))
 )
-def test_reader(simple_schema, method, path):
-    # Each reader method should read the specified schema correctly
+def test_loaders(simple_schema, method, path):
+    # Each loader method should read the specified schema correctly
     assert method(path).raw_schema == simple_schema
 
 
@@ -29,6 +29,11 @@ def test_reader(simple_schema, method, path):
     ),
 )
 def test_backward_compatibility(simple_schema, method, path, message):
-    # Each reader method should read the specified schema correctly
+    # The deprecated loaders should emit deprecation warnings
     with pytest.warns(DeprecationWarning, match=message):
         assert method(path).raw_schema == simple_schema
+
+
+def test_unsupported_type():
+    with pytest.raises(ValueError, match="^Unsupported schema type$"):
+        schemathesis.from_dict({})
