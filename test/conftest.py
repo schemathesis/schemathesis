@@ -1,6 +1,10 @@
+from textwrap import dedent
+
 import pytest
 
-from schemathesis import Case
+import schemathesis
+
+from .utils import make_schema
 
 pytest_plugins = ["pytester"]
 
@@ -27,11 +31,55 @@ def simple_schema():
 
 
 @pytest.fixture()
+def swagger_20(simple_schema):
+    return schemathesis.from_dict(simple_schema)
+
+
+@pytest.fixture()
 def case_factory():
 
     defaults = {"method": "GET", "headers": {}, "query": [], "body": {}}
 
     def maker(**kwargs):
-        return Case(**{**defaults, **kwargs})
+        return schemathesis.Case(**{**defaults, **kwargs})
 
     return maker
+
+
+@pytest.fixture()
+def testdir(testdir):
+    def maker(content, **kwargs):
+        schema = make_schema(**kwargs)
+        preparation = dedent(
+            """
+        import pytest
+        import schemathesis
+        from test.utils import *
+        from hypothesis import settings
+        raw_schema = {schema}
+        schema = schemathesis.from_dict(raw_schema)
+        """.format(
+                schema=schema
+            )
+        )
+        testdir.makepyfile(preparation, content)
+        testdir.makepyfile(
+            conftest=dedent(
+                """
+        def pytest_configure(config):
+            config.HYPOTHESIS_CASES = 0
+        def pytest_unconfigure(config):
+            print(f"Hypothesis calls: {config.HYPOTHESIS_CASES}")
+        """
+            )
+        )
+
+    testdir.make_test = maker
+
+    def run_and_assert(*args, **kwargs):
+        result = testdir.runpytest(*args)
+        result.assert_outcomes(**kwargs)
+
+    testdir.run_and_assert = run_and_assert
+
+    return testdir

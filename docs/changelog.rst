@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+~~~~~~~
+
+- Rename module `readers` to `loaders`.
+
 `0.5.0`_ - 2019-09-16
 ---------------------
 
