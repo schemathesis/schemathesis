@@ -37,6 +37,8 @@ To install Schemathesis via ``pip`` run the following command:
 
 Optionally you could install ``requests`` for convenient HTTP calls.
 
+Gitter: https://gitter.im/kiwicom/schemathesis
+
 Usage
 -----
 
