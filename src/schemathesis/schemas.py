@@ -7,6 +7,7 @@ Their responsibilities:
 They give only static definitions of endpoints.
 """
 import itertools
+from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Tuple, Union, overload
 from urllib.parse import urljoin
@@ -22,11 +23,28 @@ from .types import Filter
 from .utils import NOT_SET
 
 
-@attr.s(slots=True)
-class BaseSchema:
+@attr.s()
+class BaseSchema(Mapping):
     raw_schema: Dict[str, Any] = attr.ib()
     method: Optional[Filter] = attr.ib(default=None)
     endpoint: Optional[Filter] = attr.ib(default=None)
+
+    def __iter__(self) -> Iterator:
+        return iter(self.endpoints)
+
+    def __getitem__(self, item: str) -> Dict[str, Endpoint]:
+        return self.endpoints[item]
+
+    def __len__(self) -> int:
+        return len(self.endpoints)
+
+    @property
+    def endpoints(self) -> Dict[str, Dict[str, Endpoint]]:
+        if not hasattr(self, "_endpoints"):
+            # pylint: disable=attribute-defined-outside-init
+            endpoints = self.get_all_endpoints()
+            self._endpoints = endpoints_to_dict(endpoints)
+        return self._endpoints
 
     @property
     def resolver(self) -> jsonschema.RefResolver:
@@ -60,6 +78,10 @@ class BaseSchema:
 
 
 class SwaggerV20(BaseSchema):
+    def __repr__(self) -> str:
+        info = self.raw_schema["info"]
+        return f"{self.__class__.__name__} for {info['title']} ({info['version']})"
+
     @property
     def base_path(self) -> str:
         """Base path for the schema."""
@@ -188,7 +210,7 @@ class SwaggerV20(BaseSchema):
         return item
 
 
-class OpenApi30(SwaggerV20):
+class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     def make_endpoint(
         self, full_path: str, method: str, parameters: Iterator[Dict[str, Any]], definition: Dict[str, Any]
     ) -> Endpoint:
@@ -228,3 +250,12 @@ def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
     if common_parameters is not None:
         return deepcopy(common_parameters)
     return []
+
+
+def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, Dict[str, Endpoint]]:
+    output: Dict[str, Dict[str, Endpoint]] = {}
+    for endpoint in endpoints:
+        output.setdefault(endpoint.path, {})
+        # case insensitive dict?
+        output[endpoint.path][endpoint.method] = endpoint
+    return output
