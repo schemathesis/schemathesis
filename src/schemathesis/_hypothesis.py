@@ -13,7 +13,7 @@ PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"
 
 def create_test(endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None) -> Callable:
     """Create a Hypothesis test."""
-    strategy = get_case_strategy(endpoint)
+    strategy = endpoint.as_strategy()
     wrapped_test = hypothesis.given(case=strategy)(test)
     if settings is not None:
         wrapped_test = settings(wrapped_test)
