@@ -157,6 +157,13 @@ For the full documentation, please see https://schemathesis.readthedocs.io/en/la
 
 Or you can look at the ``docs/`` directory in the repository.
 
+Contributing
+------------
+
+Any contribution in development, testing or any other area is highly appreciated and useful to the project.
+
+Please, see the `CONTRIBUTING.rst`_ file for more details.
+
 Python support
 --------------
 
@@ -182,4 +189,5 @@ will be licensed under its MIT license.
 .. _hypothesis_jsonschema: https://github.com/Zac-HD/hypothesis-jsonschema
 .. _pytest: http://pytest.org/en/latest/
 .. _here: https://hypothesis.readthedocs.io/en/latest/reproducing.html#providing-explicit-examples
+.. _CONTRIBUTING.rst: https://github.com/kiwicom/schemathesis/blob/contributing/CONTRIBUTING.rst
 .. _MIT license: https://opensource.org/licenses/MIT
