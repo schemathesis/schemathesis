@@ -2,6 +2,7 @@
 from typing import Any, Dict
 
 import attr
+from hypothesis.searchstrategy import SearchStrategy
 
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 
@@ -41,3 +42,8 @@ class Endpoint:
     query: Query = attr.ib(factory=empty_object)
     body: Body = attr.ib(factory=empty_object)
     form_data: FormData = attr.ib(factory=empty_object)
+
+    def as_strategy(self) -> SearchStrategy:
+        from ._hypothesis import get_case_strategy
+
+        return get_case_strategy(self)

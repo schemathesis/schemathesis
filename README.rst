@@ -181,6 +181,34 @@ With this Swagger schema example, there will be a case with body ``{"name": "Dog
 
 NOTE. Schemathesis supports only examples in ``parameters`` at the moment, examples of individual properties are not supported.
 
+Direct strategies access
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+For convenience you can explore the schemas and strategies manually:
+
+.. code:: python
+
+    >>> import schemathesis
+    >>> schema = schemathesis.from_uri("http://0.0.0.0:8080/petstore.json")
+    >>> endpoint = schema["/v2/pet"]["POST"]
+    >>> strategy = endpoint.as_strategy()
+    >>> strategy.example()
+    Case(
+        path='/v2/pet',
+        method='POST',
+        path_parameters={},
+        headers={},
+        cookies={},
+        query={},
+        body={
+            'name': '\x15.\x13\U0008f42a',
+            'photoUrls': ['\x08\U0009f29a', '\U000abfd6\U000427c4', '']
+        },
+        form_data={}
+    )
+
+Schema instances implement `Mapping` protocol.
+
 Lazy loading
 ~~~~~~~~~~~~
 
