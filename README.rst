@@ -24,6 +24,8 @@ Built with:
 
 - `pytest`_
 
+Inspired by wonderful `swagger-conformance <https://github.com/olipratt/swagger-conformance>`_ project.
+
 Installation
 ------------
 
