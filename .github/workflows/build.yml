@@ -42,8 +42,18 @@ jobs:
     - uses: actions/setup-python@v1
       with:
         python-version: '3.6'
-    - run: pip install tox
+    - run: pip install tox coverage
     - run: tox -e py36
+    - run: coverage combine
+    - run: coverage report
+    - run: coverage xml -i
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1.0.2
+      with:
+        token: ${{secrets.CODECOV_TOKEN}}
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-py36
 
   py37:
     name: py37
@@ -53,5 +63,15 @@ jobs:
     - uses: actions/setup-python@v1
       with:
         python-version: '3.7'
-    - run: pip install tox
+    - run: pip install tox coverage
     - run: tox -e py37
+    - run: coverage combine
+    - run: coverage report
+    - run: coverage xml -i
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1.0.2
+      with:
+        token: ${{secrets.CODECOV_TOKEN}}
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-py37
