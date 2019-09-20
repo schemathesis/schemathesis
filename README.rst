@@ -1,7 +1,7 @@
 Schemathesis
 ============
 
-|Build| |Version| |Python versions| |License|
+|Build| |Coverage| |Version| |Python versions| |License|
 
 Schemathesis is a tool for testing your web applications built with Open API / Swagger specifications.
 
@@ -182,6 +182,9 @@ will be licensed under its MIT license.
 
 .. |Build| image:: https://github.com/kiwicom/schemathesis/workflows/build/badge.svg
    :target: https://github.com/kiwicom/schemathesis/actions
+.. |Coverage| image:: https://codecov.io/gh/kiwicom/schemathesis/branch/master/graph/badge.svg
+   :target: https://codecov.io/gh/kiwicom/schemathesis
+   :alt: codecov.io status for master branch
 .. |Version| image:: https://img.shields.io/pypi/v/schemathesis.svg
    :target: https://pypi.org/project/schemathesis/
 .. |Python versions| image:: https://img.shields.io/pypi/pyversions/schemathesis.svg
