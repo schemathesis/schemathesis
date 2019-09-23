@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Parametrizing tests from a pytest fixture via ``pytest-subtests``. `#58`_
+
 Changed
 ~~~~~~~
 
@@ -102,6 +107,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#58: https://github.com/kiwicom/schemathesis/issues/58
 .. _#55: https://github.com/kiwicom/schemathesis/issues/55
 .. _#35: https://github.com/kiwicom/schemathesis/issues/35
 .. _#34: https://github.com/kiwicom/schemathesis/issues/34
