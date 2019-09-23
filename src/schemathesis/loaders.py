@@ -3,6 +3,7 @@ from urllib.request import urlopen
 
 import yaml
 
+from .lazy import LazySchema
 from .schemas import BaseSchema, OpenApi30, SwaggerV20
 from .types import PathLike
 from .utils import deprecated
@@ -37,6 +38,11 @@ def from_dict(raw_schema: Dict[str, Any]) -> BaseSchema:
     if "openapi" in raw_schema:
         return OpenApi30(raw_schema)
     raise ValueError("Unsupported schema type")
+
+
+def from_pytest_fixture(fixture_name: str) -> LazySchema:
+    """Needed for a consistent library API."""
+    return LazySchema(fixture_name)
 
 
 # Backward compatibility
