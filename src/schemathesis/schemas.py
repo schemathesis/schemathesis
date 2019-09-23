@@ -8,12 +8,13 @@ They give only static definitions of endpoints.
 """
 import itertools
 from copy import deepcopy
-from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Union, overload
+from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Tuple, Union, overload
 from urllib.parse import urljoin
 
 import attr
 import jsonschema
 
+from ._hypothesis import create_test
 from .filters import should_skip_endpoint, should_skip_method
 from .models import Endpoint
 from .types import Filter
@@ -34,6 +35,11 @@ class BaseSchema:
 
     def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
         raise NotImplementedError
+
+    def get_all_tests(self, func: Callable) -> Generator[Tuple[Endpoint, Callable], None, None]:
+        """Generate all endpoints and Hypothesis tests for them."""
+        for endpoint in self.get_all_endpoints():
+            yield endpoint, create_test(endpoint, func)
 
     def parametrize(self, filter_method: Optional[Filter] = None, filter_endpoint: Optional[Filter] = None) -> Callable:
         """Mark a test function as a parametrized one."""

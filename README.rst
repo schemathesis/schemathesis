@@ -57,7 +57,6 @@ look like this:
 .. code:: python
 
     # test_api.py
-    import pytest
     import requests
     import schemathesis
 
@@ -153,6 +152,25 @@ With this Swagger schema example, there will be a case with body ``{"name": "Dog
 ``example`` decorator from Hypothesis, more info about its behavior is `here`_.
 
 NOTE. Schemathesis supports only examples in ``parameters`` at the moment, examples of individual properties are not supported.
+
+Lazy loading
+~~~~~~~~~~~~
+
+If you have a schema that is not available when the tests are collected, for example it is build with tools
+like ``apispec`` and requires an application instance available, then you can parametrize the tests from a pytest fixture.
+
+.. code:: python
+
+    # test_api.py
+    import schemathesis
+
+    schema = schemathesis.from_pytest_fixture("fixture_name")
+
+    @schema.parametrize()
+    def test_api(case):
+        ...
+
+In this case the test body will be used as a sub-test via ``pytest-subtests`` library.
 
 Documentation
 -------------

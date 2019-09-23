@@ -31,6 +31,7 @@ hypothesis_jsonschema = "^0.9.7"
 jsonschema = "^3.0.0"
 pytest = ">4.6.4"
 pyyaml = "^5.1"
+pytest-subtests = "^0.2.1"
 
 [tool.poetry.dev-dependencies]
 coverage = "^4.5"
@@ -39,10 +40,10 @@ pytest = ">4.6.4"
 [tool.poetry.plugins]
 pytest11 = {schemathesis = "schemathesis.extra.pytest_plugin"}
 
-[build-system]
-requires = ["poetry>=0.12"]
-build-backend = "poetry.masonry.api"
-
 [tool.black]
 line-length = 120
 target_version = ["py37"]
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
