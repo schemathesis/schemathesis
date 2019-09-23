@@ -32,6 +32,7 @@ jsonschema = "^3.0.0"
 pytest = ">4.6.4"
 pyyaml = "^5.1"
 pytest-subtests = "^0.2.1"
+requests = "^2.22"
 
 [tool.poetry.dev-dependencies]
 coverage = "^4.5"
