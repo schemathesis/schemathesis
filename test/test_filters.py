@@ -9,7 +9,7 @@ def test_endpoint_filter(testdir, endpoint):
     parameters = {"parameters": [integer(name="id", required=True)]}
     testdir.make_test(
         """
-@schema.parametrize(filter_endpoint={})
+@schema.parametrize(endpoint={})
 @settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
@@ -32,7 +32,7 @@ def test_method_filter(testdir, method):
     parameters = {"parameters": [integer(name="id", required=True)]}
     testdir.make_test(
         """
-@schema.parametrize(filter_method={})
+@schema.parametrize(method={})
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1

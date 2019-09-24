@@ -134,7 +134,7 @@ def test_deselecting(testdir):
 def test_a(request, case):
     request.config.HYPOTHESIS_CASES += 1
 
-@schema.parametrize(filter_endpoint="pets")
+@schema.parametrize(endpoint="pets")
 @settings(max_examples=1)
 def test_b(request, case):
     request.config.HYPOTHESIS_CASES += 1
