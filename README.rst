@@ -182,6 +182,9 @@ like ``apispec`` and requires an application instance available, then you can pa
 
 In this case the test body will be used as a sub-test via ``pytest-subtests`` library.
 
+**NOTE**: the used fixture should return a valid schema that could be created via ``schemathesis.from_dict`` or other
+``schemathesis.from_`` variations.
+
 Documentation
 -------------
 
