@@ -14,7 +14,12 @@ Added
 Changed
 ~~~~~~~
 
-- Rename module `readers` to `loaders`.
+- Rename module ``readers`` to ``loaders``.
+
+Removed
+~~~~~~~
+
+- Substring match for method / endpoint filters. To avoid clashing with escaped chars in endpoints keys in schemas.
 
 `0.5.0`_ - 2019-09-16
 ---------------------
