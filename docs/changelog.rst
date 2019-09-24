@@ -15,6 +15,7 @@ Changed
 ~~~~~~~
 
 - Rename module ``readers`` to ``loaders``.
+- Rename ``parametrize`` parameters. ``filter_endpoint`` to ``endpoint`` and ``filter_method`` to ``method``.
 
 Removed
 ~~~~~~~
