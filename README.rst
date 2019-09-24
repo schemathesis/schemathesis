@@ -120,6 +120,16 @@ To limit the number of examples you could use ``hypothesis.settings`` decorator 
     def test_something(client, case):
         ...
 
+To narrow down the scope of the schemathesis tests it is possible to filter by method or endpoint:
+
+.. code:: python
+
+    @schema.parametrize(method="GET", endpoint="/pet")
+    def test_no_server_errors(case):
+        ...
+
+The acceptable values are regexps or list of regexps (matched with ``re.search``).
+
 Explicit examples
 ~~~~~~~~~~~~~~~~~
 

@@ -23,8 +23,8 @@ from .types import Filter
 @attr.s(slots=True)
 class BaseSchema:
     raw_schema: Dict[str, Any] = attr.ib()
-    filter_method: Optional[Filter] = attr.ib(default=None)
-    filter_endpoint: Optional[Filter] = attr.ib(default=None)
+    method: Optional[Filter] = attr.ib(default=None)
+    endpoint: Optional[Filter] = attr.ib(default=None)
 
     @property
     def resolver(self) -> jsonschema.RefResolver:
@@ -41,13 +41,11 @@ class BaseSchema:
         for endpoint in self.get_all_endpoints():
             yield endpoint, create_test(endpoint, func)
 
-    def parametrize(self, filter_method: Optional[Filter] = None, filter_endpoint: Optional[Filter] = None) -> Callable:
+    def parametrize(self, method: Optional[Filter] = None, endpoint: Optional[Filter] = None) -> Callable:
         """Mark a test function as a parametrized one."""
 
         def wrapper(func: Callable) -> Callable:
-            func._schemathesis_test = self.__class__(  # type: ignore
-                self.raw_schema, filter_method=filter_method, filter_endpoint=filter_endpoint
-            )
+            func._schemathesis_test = self.__class__(self.raw_schema, method=method, endpoint=endpoint)  # type: ignore
             return func
 
         return wrapper
@@ -70,11 +68,11 @@ class SwaggerV20(BaseSchema):
         paths = self.raw_schema["paths"]  # pylint: disable=unsubscriptable-object
         for path, methods in paths.items():
             full_path = self.get_full_path(path)
-            if should_skip_endpoint(full_path, self.filter_endpoint):
+            if should_skip_endpoint(full_path, self.endpoint):
                 continue
             common_parameters = get_common_parameters(methods)
             for method, definition in methods.items():
-                if method == "parameters" or should_skip_method(method, self.filter_method):
+                if method == "parameters" or should_skip_method(method, self.method):
                     continue
                 parameters = itertools.chain(definition.get("parameters", ()), common_parameters)
                 yield self.make_endpoint(full_path, method, parameters, definition)
