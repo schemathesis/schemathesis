@@ -1,4 +1,4 @@
-from typing import Callable, NoReturn
+from typing import Callable
 from urllib.parse import urlsplit, urlunsplit
 
 import requests
@@ -7,11 +7,11 @@ from .loaders import from_uri
 from .models import Case
 
 
-def execute(schema_uri: str) -> NoReturn:
+def execute(schema_uri: str) -> None:
     with requests.Session() as session:
         schema = from_uri(schema_uri)
         base_url = get_base_url(schema_uri)
-        for endpoint, test in schema.get_all_tests(single_test):
+        for _, test in schema.get_all_tests(single_test):
             test(session, base_url, not_a_server_error)
 
 
@@ -20,7 +20,7 @@ def get_base_url(uri: str) -> str:
     return urlunsplit(parts)
 
 
-def single_test(case: Case, session: requests.Session, url: str, check: Callable) -> NoReturn:
+def single_test(case: Case, session: requests.Session, url: str, check: Callable) -> None:
     response = get_response(session, url, case)
     check(response)
 
@@ -31,5 +31,5 @@ def get_response(session: requests.Session, url: str, case: Case) -> requests.Re
     )
 
 
-def not_a_server_error(response: requests.Response) -> NoReturn:
+def not_a_server_error(response: requests.Response) -> None:
     assert response.status_code < 500
