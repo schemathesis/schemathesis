@@ -2,7 +2,7 @@ from typing import Any, Dict
 
 import attr
 
-from .types import Body, Headers, PathParameters, Query
+from .types import Body, Cookies, Headers, PathParameters, Query
 
 
 @attr.s(slots=True)
@@ -13,6 +13,7 @@ class Case:
     method: str = attr.ib()
     path_parameters: PathParameters = attr.ib()
     headers: Headers = attr.ib()
+    cookies: Cookies = attr.ib()
     query: Query = attr.ib()
     body: Body = attr.ib()
 
@@ -34,5 +35,6 @@ class Endpoint:
     method: str = attr.ib()
     path_parameters: PathParameters = attr.ib(factory=empty_object)
     headers: Headers = attr.ib(factory=empty_object)
+    cookies: Cookies = attr.ib(factory=empty_object)
     query: Query = attr.ib(factory=empty_object)
     body: Body = attr.ib(factory=empty_object)

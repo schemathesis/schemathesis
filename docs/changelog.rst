@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Support for ``cookie`` parameter in OpenAPI 3.0 schemas
+
 `0.6.0`_ - 2019-09-24
 ---------------------
 
