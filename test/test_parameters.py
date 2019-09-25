@@ -16,6 +16,22 @@ def test_(case):
     testdir.run_and_assert(passed=1)
 
 
+def test_cookies(testdir):
+    # When parameter is specified for "cookie"
+    testdir.make_test(
+        """
+@schema.parametrize()
+@settings(max_examples=1)
+def test_(case):
+    assert_str(case.cookies["token"])
+        """,
+        schema_name="simple_openapi.yaml",
+        **as_param({"name": "token", "in": "cookie", "required": True, "schema": {"type": "string"}}),
+    )
+    # Then the generated test case should contain it in its `cookies` attribute
+    testdir.run_and_assert(passed=1)
+
+
 def test_body(testdir):
     # When parameter is specified for "body"
     testdir.make_test(
