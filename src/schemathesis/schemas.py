@@ -90,6 +90,9 @@ class SwaggerV20(BaseSchema):
         """Convert each Parameter object to a JSON schema."""
         parameter = deepcopy(parameter)
         parameter = self.resolve(parameter)
+        self.process_by_type(endpoint, parameter)
+
+    def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         if parameter["in"] == "path":
             self.process_path(endpoint, parameter)
         elif parameter["in"] == "query":
@@ -161,6 +164,15 @@ class OpenApi30(SwaggerV20):
         if "requestBody" in definition:
             self.process_body(endpoint, definition["requestBody"])
         return endpoint
+
+    def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+        if parameter["in"] == "cookie":
+            self.process_cookie(endpoint, parameter)
+        else:
+            super().process_by_type(endpoint, parameter)
+
+    def process_cookie(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+        self.add_parameter(endpoint.cookies, parameter)
 
     def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         parameter = self.resolve(parameter)

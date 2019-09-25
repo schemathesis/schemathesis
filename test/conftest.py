@@ -38,7 +38,7 @@ def swagger_20(simple_schema):
 @pytest.fixture()
 def case_factory():
 
-    defaults = {"method": "GET", "headers": {}, "query": [], "body": {}}
+    defaults = {"method": "GET", "headers": {}, "query": [], "body": {}, "cookies": {}}
 
     def maker(**kwargs):
         return schemathesis.Case(**{**defaults, **kwargs})
