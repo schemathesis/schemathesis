@@ -6,7 +6,7 @@ import schemathesis
 
 from .utils import make_schema
 
-pytest_plugins = ["pytester"]
+pytest_plugins = ["pytester", "aiohttp.pytest_plugin"]
 
 
 @pytest.fixture
