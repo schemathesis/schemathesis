@@ -2,7 +2,7 @@ from typing import Any, Dict
 
 import attr
 
-from .types import Body, Cookies, Headers, PathParameters, Query, FormData
+from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 
 
 @attr.s(slots=True)

@@ -6,19 +6,23 @@ from time import sleep
 import pytest
 from aiohttp import web
 
-from schemathesis.runner import execute
+from schemathesis.runner import execute, get_base_url
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def app():
+    saved_requests = []
+
     async def schema(request):
         return web.FileResponse(SIMPLE_PATH)
 
-    async def hello(request):
+    async def users(request):
+        saved_requests.append(request)
         return web.Response(text="Hello, world")
 
     app = web.Application()
-    app.add_routes([web.get("/swagger.yaml", schema), web.get("/get", hello)])
+    app.add_routes([web.get("/swagger.yaml", schema), web.get("/v1/users", users)])
+    app["saved_requests"] = saved_requests
     return app
 
 
@@ -33,7 +37,7 @@ def run_server(app):
     loop.run_forever()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def server(app):
     t = threading.Thread(target=run_server, args=(app,))
     t.daemon = True
@@ -43,6 +47,20 @@ def server(app):
 
 
 @pytest.mark.usefixtures("server")
-def test_execute():
+def test_execute(app):
     execute("http://127.0.0.1:8080/swagger.yaml")
-    # TODO. add verification
+    assert len(app) == 1
+    assert app["saved_requests"][0].path == "/v1/users"
+    assert app["saved_requests"][0].method == "GET"
+
+
+@pytest.mark.parametrize(
+    "url, base_url",
+    (
+        ("http://127.0.0.1:8080/swagger.json", "http://127.0.0.1:8080"),
+        ("https://example.com/get", "https://example.com"),
+        ("https://example.com", "https://example.com"),
+    ),
+)
+def test_get_base_url(url, base_url):
+    assert get_base_url(url) == base_url

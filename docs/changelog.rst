@@ -11,6 +11,7 @@ Added
 
 - Support for ``cookie`` parameter in OpenAPI 3.0 schemas
 - Support for ``formData`` parameter in Swagger 2.0 schemas
+- Test executor `#28`_
 
 `0.6.0`_ - 2019-09-24
 ---------------------
@@ -127,6 +128,7 @@ Fixed
 .. _#55: https://github.com/kiwicom/schemathesis/issues/55
 .. _#35: https://github.com/kiwicom/schemathesis/issues/35
 .. _#34: https://github.com/kiwicom/schemathesis/issues/34
+.. _#28: https://github.com/kiwicom/schemathesis/issues/28
 .. _#24: https://github.com/kiwicom/schemathesis/issues/24
 .. _#18: https://github.com/kiwicom/schemathesis/issues/18
 .. _#17: https://github.com/kiwicom/schemathesis/issues/17
