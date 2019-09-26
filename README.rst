@@ -185,6 +185,34 @@ In this case the test body will be used as a sub-test via ``pytest-subtests`` li
 **NOTE**: the used fixture should return a valid schema that could be created via ``schemathesis.from_dict`` or other
 ``schemathesis.from_`` variations.
 
+Extending schemathesis
+~~~~~~~~~~~~~~~~~~~~~~
+
+If you're looking for a way to extend ``schemathesis`` or reuse it in your own application, then ``runner`` module might be helpful for you.
+It can run tests against the given schema URI and will do some simple checks for you.
+
+.. code:: python
+
+    from schemathesis import runner
+
+    runner.execute("http://127.0.0.1:8080/swagger.json")
+
+The built-in checks list includes the following:
+
+- Not a server error. Asserts that response's status code is less than 500;
+
+You can provide your custom checks to the execute function, the check is a callable that accepts one argument of ``requests.Response`` type.
+
+.. code:: python
+
+    from datetime import timedelta
+    from schemathesis import runner
+
+    def not_too_long(response):
+        assert response.elapsed < timedelta(milliseconds=300)
+
+    runner.execute("http://127.0.0.1:8080/swagger.json", checks=[not_too_long])
+
 Documentation
 -------------
 
