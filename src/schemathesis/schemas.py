@@ -102,6 +102,8 @@ class SwaggerV20(BaseSchema):
         elif parameter["in"] == "body":
             # Could be only one parameter with "in=body"
             self.process_body(endpoint, parameter)
+        elif parameter["in"] == "formData":
+            self.process_form_data(endpoint, parameter)
 
     def process_path(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         self.add_parameter(endpoint.path_parameters, parameter)
@@ -115,6 +117,9 @@ class SwaggerV20(BaseSchema):
     def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         # "schema" is a required field
         endpoint.body = self.resolve(parameter["schema"])
+
+    def process_form_data(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+        self.add_parameter(endpoint.form_data, parameter)
 
     def add_parameter(self, container: Dict[str, Any], parameter: Dict[str, Any]) -> None:
         """Add parameter object to the container."""

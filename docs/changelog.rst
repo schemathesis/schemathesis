@@ -10,6 +10,7 @@ Added
 ~~~~~
 
 - Support for ``cookie`` parameter in OpenAPI 3.0 schemas
+- Support for ``formData`` parameter in Swagger 2.0 schemas
 
 `0.6.0`_ - 2019-09-24
 ---------------------
