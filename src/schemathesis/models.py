@@ -2,7 +2,7 @@ from typing import Any, Dict
 
 import attr
 
-from .types import Body, Cookies, Headers, PathParameters, Query
+from .types import Body, Cookies, Headers, PathParameters, Query, FormData
 
 
 @attr.s(slots=True)
@@ -16,6 +16,7 @@ class Case:
     cookies: Cookies = attr.ib()
     query: Query = attr.ib()
     body: Body = attr.ib()
+    form_data: FormData = attr.ib()
 
     @property
     def formatted_path(self) -> str:
@@ -38,3 +39,4 @@ class Endpoint:
     cookies: Cookies = attr.ib(factory=empty_object)
     query: Query = attr.ib(factory=empty_object)
     body: Body = attr.ib(factory=empty_object)
+    form_data: FormData = attr.ib(factory=empty_object)

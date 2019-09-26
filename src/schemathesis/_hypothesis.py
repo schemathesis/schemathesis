@@ -8,7 +8,7 @@ from hypothesis_jsonschema import from_schema
 
 from .models import Case, Endpoint
 
-PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
+PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
 
 
 def create_test(endpoint: Endpoint, test: Callable) -> Callable:
@@ -53,4 +53,5 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
         cookies=from_schema(endpoint.cookies),
         query=from_schema(endpoint.query),
         body=from_schema(endpoint.body),
+        form_data=from_schema(endpoint.form_data),
     )
