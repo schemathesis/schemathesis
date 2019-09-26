@@ -1,5 +1,5 @@
 [[package]]
-category = "main"
+category = "dev"
 description = "Async http client/server framework (asyncio)"
 name = "aiohttp"
 optional = false
@@ -22,7 +22,7 @@ python = "<3.7"
 version = ">=3.6.5"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Timeout context manager for asyncio programs"
 name = "async-timeout"
 optional = false
@@ -110,7 +110,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 version = "2.8"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Patch ssl.match_hostname for Unicode(idna) domains support"
 marker = "python_version < \"3.7\""
 name = "idna-ssl"
@@ -156,7 +156,7 @@ python-versions = ">=3.4"
 version = "7.2.0"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "multidict implementation"
 name = "multidict"
 optional = false
@@ -279,7 +279,7 @@ python-versions = ">=2.6, !=3.0.*, !=3.1.*"
 version = "1.12.0"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Type Hints for Python"
 marker = "python_version < \"3.7\""
 name = "typing"
@@ -288,7 +288,7 @@ python-versions = "*"
 version = "3.7.4.1"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Backported and Experimental Type Hints for Python 3.5+"
 marker = "python_version < \"3.7\""
 name = "typing-extensions"
@@ -316,7 +316,7 @@ python-versions = "*"
 version = "0.1.7"
 
 [[package]]
-category = "main"
+category = "dev"
 description = "Yet another URL library"
 name = "yarl"
 optional = false
@@ -340,7 +340,7 @@ version = "0.6.0"
 more-itertools = "*"
 
 [metadata]
-content-hash = "4fe6151e3ed9dc570fc906c365b3003da9af64aeb415317f1597246427b327e7"
+content-hash = "958c1b3c4b594d3e5a8f8643cb758d2745917d8b197d4718ed12bc5f58c1e37c"
 python-versions = "^3.6"
 
 [metadata.hashes]

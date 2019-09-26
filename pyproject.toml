@@ -33,11 +33,11 @@ pytest = ">4.6.4"
 pyyaml = "^5.1"
 pytest-subtests = "^0.2.1"
 requests = "^2.22"
-aiohttp = "^3.6"
 
 [tool.poetry.dev-dependencies]
 coverage = "^4.5"
 pytest = ">4.6.4"
+aiohttp = "^3.6"
 
 [tool.poetry.plugins]
 pytest11 = {schemathesis = "schemathesis.extra.pytest_plugin"}
