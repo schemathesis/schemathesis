@@ -19,11 +19,15 @@ class LazySchema:
                 schema = get_schema(request, self.fixture_name, method, endpoint)
                 fixtures = get_fixtures(func, request)
                 node_id = subtests.item._nodeid
-                for _endpoint, sub_test in schema.get_all_tests(func):
+                settings = getattr(test, "_hypothesis_internal_use_settings", None)
+                for _endpoint, sub_test in schema.get_all_tests(func, settings):
                     subtests.item._nodeid = f"{node_id}[{_endpoint.method}:{_endpoint.path}]"
                     with subtests.test(method=_endpoint.method, path=_endpoint.path):
                         sub_test(**fixtures)
                 subtests.item._nodeid = node_id
+
+            # Needed to prevent a failure when settings are applied to the test function
+            test.is_hypothesis_test = True  # type: ignore
 
             return test
 

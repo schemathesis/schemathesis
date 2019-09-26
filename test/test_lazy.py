@@ -20,6 +20,30 @@ def test_(case):
     result.stdout.re_match_lines([r"test_default.py::test_ PASSED", r".*1 passed"])
 
 
+def test_with_settings(testdir):
+    # When hypothesis settings are applied to the test function
+    testdir.make_test(
+        """
+@pytest.fixture
+def simple_schema():
+    return schema
+
+lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+
+@settings(phases=[])
+@lazy_schema.parametrize()
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+
+"""
+    )
+    result = testdir.runpytest("-v", "-s")
+    # Then settings should be applied to the test
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"test_with_settings.py::test_ PASSED", r".*1 passed"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 0"])
+
+
 def test_with_fixtures(testdir):
     # When the test uses custom arguments for pytest fixtures
     testdir.make_test(

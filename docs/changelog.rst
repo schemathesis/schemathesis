@@ -13,6 +13,11 @@ Added
 - Support for ``formData`` parameter in Swagger 2.0 schemas. `#6`_
 - Test executor `#28`_
 
+Fixed
+~~~~~
+
+- Using ``hypothesis.settings`` decorator with test functions created from ``from_pytest_fixture`` loader. `#69`_
+
 `0.6.0`_ - 2019-09-24
 ---------------------
 
@@ -124,6 +129,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#69: https://github.com/kiwicom/schemathesis/issues/69
 .. _#58: https://github.com/kiwicom/schemathesis/issues/58
 .. _#55: https://github.com/kiwicom/schemathesis/issues/55
 .. _#35: https://github.com/kiwicom/schemathesis/issues/35
