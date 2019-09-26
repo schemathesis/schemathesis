@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Tup
 from urllib.parse import urljoin
 
 import attr
+import hypothesis
 import jsonschema
 
 from ._hypothesis import create_test
@@ -36,10 +37,12 @@ class BaseSchema:
     def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
         raise NotImplementedError
 
-    def get_all_tests(self, func: Callable) -> Generator[Tuple[Endpoint, Callable], None, None]:
+    def get_all_tests(
+        self, func: Callable, settings: Optional[hypothesis.settings] = None
+    ) -> Generator[Tuple[Endpoint, Callable], None, None]:
         """Generate all endpoints and Hypothesis tests for them."""
         for endpoint in self.get_all_endpoints():
-            yield endpoint, create_test(endpoint, func)
+            yield endpoint, create_test(endpoint, func, settings)
 
     def parametrize(self, method: Optional[Filter] = None, endpoint: Optional[Filter] = None) -> Callable:
         """Mark a test function as a parametrized one."""
