@@ -11,7 +11,7 @@ Added
 
 - Support for ``cookie`` parameter in OpenAPI 3.0 schemas. `#21`_
 - Support for ``formData`` parameter in Swagger 2.0 schemas. `#6`_
-- Test executor `#28`_
+- Test executor. `#28`_
 
 Fixed
 ~~~~~
