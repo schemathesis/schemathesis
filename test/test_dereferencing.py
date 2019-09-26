@@ -177,3 +177,143 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+
+
+@pytest.mark.parametrize(
+    "nullable, expected",
+    (
+        (
+            {
+                "properties": {
+                    "id": {"format": "int64", "type": "integer", "x-nullable": True},
+                    "name": {"type": "string"},
+                },
+                "type": "object",
+            },
+            {
+                "properties": {
+                    "id": {"anyOf": [{"format": "int64", "type": "integer"}, {"type": "null"}]},
+                    "name": {"type": "string"},
+                },
+                "type": "object",
+            },
+        ),
+        (
+            {
+                "parameters": [
+                    {"name": "id", "in": "query", "type": "integer", "format": "int64", "x-nullable": True},
+                    {"name": "name", "type": "string"},
+                ]
+            },
+            {
+                "parameters": [
+                    {"name": "id", "in": "query", "format": "int64", "anyOf": [{"type": "integer"}, {"type": "null"}]},
+                    {"name": "name", "type": "string"},
+                ]
+            },
+        ),
+        (
+            {
+                "properties": {
+                    "id": {"type": "string", "enum": ["a", "b"], "x-nullable": True},
+                    "name": {"type": "string"},
+                },
+                "type": "object",
+            },
+            {
+                "properties": {
+                    "id": {"anyOf": [{"type": "string", "enum": ["a", "b"]}, {"type": "null"}]},
+                    "name": {"type": "string"},
+                },
+                "type": "object",
+            },
+        ),
+    ),
+)
+def test_x_nullable(petstore, nullable, expected):
+    assert petstore.resolve(nullable) == expected
+
+
+def test_nullable_parameters(testdir):
+    testdir.make_test(
+        """
+@schema.parametrize()
+@settings(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/users"
+    assert case.method == "GET"
+    assert case.query["id"] is None
+""",
+        **as_param(integer(name="id", required=True, **{"x-nullable": True})),
+    )
+    # Then it should be correctly resolved and used in the generated case
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+
+
+def test_nullable_properties(testdir):
+    testdir.make_test(
+        """
+@schema.parametrize()
+@settings(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/users"
+    assert case.method == "GET"
+    assert case.query["attributes"]["id"] is None
+""",
+        **as_param(
+            {
+                "type": "object",
+                "in": "query",
+                "name": "attributes",
+                "properties": {"id": {"type": "integer", "format": "int64", "x-nullable": True}},
+                "required": ["id"],
+            }
+        ),
+    )
+    # Then it should be correctly resolved and used in the generated case
+    result = testdir.runpytest("-vv", "-s")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+
+
+def test_nullable_ref(testdir):
+    testdir.make_test(
+        """
+@schema.parametrize()
+@settings(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/users"
+    assert case.method == "GET"
+    assert case.query["id"] is None
+""",
+        **as_param({"$ref": "#/definitions/NullableIntRef"}),
+        definitions={"NullableIntRef": integer(name="id", required=True, **{"x-nullable": True})},
+    )
+    # Then it should be correctly resolved and used in the generated case
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+
+
+def test_nullable_enum(testdir):
+    testdir.make_test(
+        """
+@schema.parametrize()
+@settings(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/users"
+    assert case.method == "GET"
+    assert case.query["id"] is None
+""",
+        **as_param(integer(name="id", required=True, enum=[1, 2], **{"x-nullable": True})),
+    )
+    # Then it should be correctly resolved and used in the generated case
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
