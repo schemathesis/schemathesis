@@ -9,6 +9,7 @@ Body = Dict[str, Any]
 PathParameters = Dict[str, Any]
 Headers = Dict[str, Any]
 Cookies = Dict[str, Any]
+FormData = Dict[str, Any]
 
 # A filter for endpoint / method
 Filter = Union[str, List[str], Tuple[str], Set[str]]
