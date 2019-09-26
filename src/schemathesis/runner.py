@@ -1,4 +1,4 @@
-from typing import Callable, Iterator
+from typing import Callable, Iterable
 from urllib.parse import urlsplit, urlunsplit
 
 import requests
@@ -12,7 +12,7 @@ def not_a_server_error(response: requests.Response) -> None:
     assert response.status_code < 500
 
 
-def execute(schema_uri: str, checks=(not_a_server_error,)) -> None:
+def execute(schema_uri: str, checks: Iterable[Callable] = (not_a_server_error,)) -> None:
     """Generate and run test cases against the given API definition."""
     with requests.Session() as session:
         schema = from_uri(schema_uri)
@@ -27,7 +27,7 @@ def get_base_url(uri: str) -> str:
     return urlunsplit(parts)
 
 
-def single_test(case: Case, session: requests.Session, url: str, checks: Iterator[Callable]) -> None:
+def single_test(case: Case, session: requests.Session, url: str, checks: Iterable[Callable]) -> None:
     """A single test body that will be executed against the target."""
     response = get_response(session, url, case)
     for check in checks:
