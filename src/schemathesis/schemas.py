@@ -152,6 +152,7 @@ class SwaggerV20(BaseSchema):
     def resolve(self, item: Union[Dict[str, Any], List]) -> Union[Dict[str, Any], List]:
         """Recursively resolve all references in the given object."""
         if isinstance(item, dict):
+            item = self.prepare(item)
             if "$ref" in item:
                 with self.resolver.resolving(item["$ref"]) as resolved:
                     return self.resolve(resolved)
@@ -160,6 +161,22 @@ class SwaggerV20(BaseSchema):
         elif isinstance(item, list):
             for idx, sub_item in enumerate(item):
                 item[idx] = self.resolve(sub_item)
+        return item
+
+    @staticmethod
+    def prepare(item: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse schema extension, e.g. "x-nullable" field."""
+        # Add additional type "null" if parameter is nullable.
+        if item.get("x-nullable") is True:
+            del item["x-nullable"]
+            if item.get("in"):
+                initial_type = {"type": item["type"]}
+                if item.get("enum"):
+                    initial_type["enum"] = item.pop("enum")
+                item["anyOf"] = [initial_type, {"type": "null"}]
+                del item["type"]
+            else:
+                item = {"anyOf": [item, {"type": "null"}]}
         return item
 
 

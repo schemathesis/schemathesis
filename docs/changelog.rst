@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Support for ``x-nullable`` extension `#45`_
+
 `0.7.0`_ - 2019-09-26
 ---------------------
 
@@ -136,6 +141,7 @@ Fixed
 .. _#69: https://github.com/kiwicom/schemathesis/issues/69
 .. _#58: https://github.com/kiwicom/schemathesis/issues/58
 .. _#55: https://github.com/kiwicom/schemathesis/issues/55
+.. _#45: https://github.com/kiwicom/schemathesis/issues/45
 .. _#35: https://github.com/kiwicom/schemathesis/issues/35
 .. _#34: https://github.com/kiwicom/schemathesis/issues/34
 .. _#28: https://github.com/kiwicom/schemathesis/issues/28
