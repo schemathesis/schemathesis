@@ -26,30 +26,30 @@ def app():
     return app
 
 
-def run_server(app):
+def run_server(app, port):
     # Set a loop for a new thread (there is no by default for non-main threads)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     runner = web.AppRunner(app)
     loop.run_until_complete(runner.setup())
-    site = web.TCPSite(runner, "127.0.0.1", 8080)
+    site = web.TCPSite(runner, "127.0.0.1", port)
     loop.run_until_complete(site.start())
     loop.run_forever()
 
 
 @pytest.fixture()
-def server(app):
-    t = threading.Thread(target=run_server, args=(app,))
+def server(app, aiohttp_unused_port):
+    port = aiohttp_unused_port()
+    t = threading.Thread(target=run_server, args=(app, port))
     t.daemon = True
     t.start()
     sleep(0.05)  # Wait for the app startup
-    yield
+    yield {"port": port}
 
 
-@pytest.mark.usefixtures("server")
-def test_execute(app):
-    execute("http://127.0.0.1:8080/swagger.yaml")
-    assert len(app) == 1
+def test_execute(server, app):
+    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
+    assert len(app["saved_requests"]) == 1
     assert app["saved_requests"][0].path == "/v1/users"
     assert app["saved_requests"][0].method == "GET"
 
