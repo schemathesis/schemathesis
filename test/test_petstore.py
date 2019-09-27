@@ -15,6 +15,7 @@ def testdir(request, testdir):
         result.stdout.re_match_lines([rf"Hypothesis calls: {tests_num}"])
 
     testdir.assert_petstore = assert_petstore
+    testdir.param = request.param  # `request.param` is not available in test for some reason
 
     return testdir
 
@@ -74,7 +75,6 @@ def test_(request, case):
     testdir.assert_petstore()
 
 
-@pytest.mark.xfail(reason="formData generation is not implemented", run=False)
 def test_update_pet(testdir):
     testdir.make_petstore_test(
         """
@@ -82,7 +82,11 @@ def test_update_pet(testdir):
 @settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert_int(case.form_data["petId"])  # TODO. Or save it in body?
+    assert_int(case.path_parameters["petId"])
+    if "name" in case.form_data:
+        assert_str(case.form_data["name"])
+    if "status" in case.form_data:
+        assert_str(case.form_data["status"])
 """
     )
     testdir.assert_petstore()
@@ -102,8 +106,9 @@ def test_(request, case):
     testdir.assert_petstore()
 
 
-@pytest.mark.xfail(reason="formData generation is not implemented", run=False)
 def test_upload_image(testdir):
+    if testdir.param == "petstore_v2.yaml":
+        pytest.xfail("Type `file` is not supported for Swagger 2.0. See #78.")
     testdir.make_petstore_test(
         """
 @schema.parametrize(endpoint="/pet/{petId}/uploadImage$")
@@ -111,6 +116,8 @@ def test_upload_image(testdir):
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["petId"])
+    if "additionalMetadata" in case.form_data:
+        assert_str(case.form_data["additionalMetadata"])
 """
     )
     testdir.assert_petstore()
