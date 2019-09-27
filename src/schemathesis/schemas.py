@@ -19,6 +19,7 @@ from ._hypothesis import create_test
 from .filters import should_skip_endpoint, should_skip_method
 from .models import Endpoint
 from .types import Filter
+from .utils import NOT_SET
 
 
 @attr.s(slots=True)
@@ -44,8 +45,12 @@ class BaseSchema:
         for endpoint in self.get_all_endpoints():
             yield endpoint, create_test(endpoint, func, settings)
 
-    def parametrize(self, method: Optional[Filter] = None, endpoint: Optional[Filter] = None) -> Callable:
+    def parametrize(self, method: Optional[Filter] = NOT_SET, endpoint: Optional[Filter] = NOT_SET) -> Callable:
         """Mark a test function as a parametrized one."""
+        if method is NOT_SET:
+            method = self.method
+        if endpoint is NOT_SET:
+            endpoint = self.endpoint
 
         def wrapper(func: Callable) -> Callable:
             func._schemathesis_test = self.__class__(self.raw_schema, method=method, endpoint=endpoint)  # type: ignore

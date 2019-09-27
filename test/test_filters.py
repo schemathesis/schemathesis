@@ -49,3 +49,39 @@ def test_(request, case):
     result.stdout.re_match_lines(
         [r"test_method_filter.py::test_\[GET:/v1/foo\] PASSED", r"test_method_filter.py::test_\[GET:/v1/users\] PASSED"]
     )
+
+
+def test_loader_filter(testdir):
+    testdir.make_test(
+        """
+@schema.parametrize()
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/foo"
+    assert case.method == "POST"
+""",
+        paths={"/foo": {"post": {"parameters": [integer(name="id", required=True)]}}},
+        method="POST",
+        endpoint="/v1/foo",
+    )
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+
+
+def test_override_filter(testdir):
+    testdir.make_test(
+        """
+@schema.parametrize(method=None, endpoint="/v1/users")
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/users"
+    assert case.method == "GET"
+""",
+        paths={"/foo": {"post": {"parameters": [integer(name="id", required=True)]}}},
+        method="POST",
+        endpoint="/v1/foo",
+    )
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])

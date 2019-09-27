@@ -12,4 +12,4 @@ Cookies = Dict[str, Any]
 FormData = Dict[str, Any]
 
 # A filter for endpoint / method
-Filter = Union[str, List[str], Tuple[str], Set[str]]
+Filter = Union[str, List[str], Tuple[str], Set[str], object]
