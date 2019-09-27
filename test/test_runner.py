@@ -18,11 +18,14 @@ def app():
 
     async def users(request):
         saved_requests.append(request)
+        if app["config"]["raise_exception"]:
+            raise web.HTTPInternalServerError
         return web.Response(text="Hello, world")
 
     app = web.Application()
     app.add_routes([web.get("/swagger.yaml", schema), web.get("/v1/users", users)])
     app["saved_requests"] = saved_requests
+    app["config"] = {"raise_exception": False}
     return app
 
 
@@ -50,6 +53,16 @@ def server(app, aiohttp_unused_port):
 def test_execute(server, app):
     execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
     assert len(app["saved_requests"]) == 1
+    assert app["saved_requests"][0].path == "/v1/users"
+    assert app["saved_requests"][0].method == "GET"
+
+
+def test_server_error(server, app):
+    app["config"]["raise_exception"] = True
+    with pytest.raises(AssertionError):
+        # TODO. The runner output should be handled better, it shouldn't stop on the first exception.
+        execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
+    assert len(app["saved_requests"]) == 2
     assert app["saved_requests"][0].path == "/v1/users"
     assert app["saved_requests"][0].method == "GET"
 
