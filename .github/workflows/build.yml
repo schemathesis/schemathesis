@@ -75,3 +75,27 @@ jobs:
         file: ./coverage.xml
         flags: unittests
         name: codecov-py37
+
+  py38:
+    name: py38
+    runs-on: ubuntu-latest
+    steps:
+    - run: sudo add-apt-repository ppa:deadsnakes/ppa
+    - run: sudo apt-get update
+    - run: sudo apt-get install -y --no-install-recommends python3.8-dev python3.8-distutils
+    - uses: actions/checkout@master
+    - uses: actions/setup-python@v1
+      with:
+        python-version: '3.7'
+    - run: pip install tox coverage
+    - run: tox -e py38
+    - run: coverage combine
+    - run: coverage report
+    - run: coverage xml -i
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1.0.2
+      with:
+        token: ${{secrets.CODECOV_TOKEN}}
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-py38
