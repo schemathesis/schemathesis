@@ -48,7 +48,7 @@ def case_factory():
 
 @pytest.fixture()
 def testdir(testdir):
-    def maker(content, **kwargs):
+    def maker(content, method=None, endpoint=None, **kwargs):
         schema = make_schema(**kwargs)
         preparation = dedent(
             """
@@ -57,9 +57,9 @@ def testdir(testdir):
         from test.utils import *
         from hypothesis import settings
         raw_schema = {schema}
-        schema = schemathesis.from_dict(raw_schema)
+        schema = schemathesis.from_dict(raw_schema, method={method}, endpoint={endpoint})
         """.format(
-                schema=schema
+                schema=schema, method=repr(method), endpoint=repr(endpoint)
             )
         )
         testdir.makepyfile(preparation, content)

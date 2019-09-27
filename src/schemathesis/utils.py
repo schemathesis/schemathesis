@@ -4,6 +4,8 @@ from typing import Any, Callable, List, Set, Tuple, Union
 
 from .types import Filter
 
+NOT_SET = object()
+
 
 def deprecated(func: Callable, message: str) -> Callable:
     """Emit a warning if the given function is used."""
