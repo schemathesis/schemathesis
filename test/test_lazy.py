@@ -41,7 +41,7 @@ def test_(request, case):
     # Then settings should be applied to the test
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"test_with_settings.py::test_ PASSED", r".*1 passed"])
-    result.stdout.re_match_lines([r"Hypothesis calls: 0"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 0$"])
 
 
 def test_with_fixtures(testdir):
@@ -70,7 +70,7 @@ def test_(request, case, another):
     # Then the generated test should use these fixtures
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"test_with_fixtures.py::test_ PASSED", r".*1 passed"])
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
 def test_with_filters(testdir):
@@ -103,7 +103,7 @@ def test_b(request, case):
     result.stdout.re_match_lines(
         [r"test_with_filters.py::test_a PASSED", r"test_with_filters.py::test_b PASSED", r".*2 passed"]
     )
-    result.stdout.re_match_lines([r"Hypothesis calls: 2"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_invalid_fixture(testdir):

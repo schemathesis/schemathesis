@@ -79,7 +79,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
 def test_recursive_dereference(testdir):
@@ -108,7 +108,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
 def test_inner_dereference(testdir):
@@ -140,7 +140,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
 def test_inner_dereference_with_lists(testdir):
@@ -176,7 +176,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
 @pytest.mark.parametrize(
@@ -250,7 +250,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
 def test_nullable_properties(testdir):
@@ -277,7 +277,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-vv", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
 def test_nullable_ref(testdir):
@@ -297,7 +297,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
 def test_nullable_enum(testdir):
@@ -316,4 +316,4 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
