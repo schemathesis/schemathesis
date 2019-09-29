@@ -23,7 +23,7 @@ def test_(request, case):
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 20"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 20$"])
 
 
 def test_not_required_parameters(testdir):
@@ -40,7 +40,7 @@ def test_(request, case):
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
 def test_without_required(testdir):
@@ -61,4 +61,4 @@ def test_(request, case):
     # NOTE. could be flaky
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])

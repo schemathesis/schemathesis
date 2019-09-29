@@ -65,7 +65,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=2)
     # Then total number of Hypothesis calls should be `max_examples` per pytest test
-    result.stdout.re_match_lines([r"Hypothesis calls: 10"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 10$"])
 
 
 def test_direct_schema(testdir):
@@ -93,7 +93,7 @@ def test_(request, case):
     # Then it should be correctly used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
 def test_specified_example(testdir):
@@ -122,7 +122,7 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this example should be used in tests
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
 def test_deselecting(testdir):
