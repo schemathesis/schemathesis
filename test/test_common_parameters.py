@@ -25,7 +25,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used for all specified methods
     result.assert_outcomes(passed=2)
-    result.stdout.re_match_lines([r"Hypothesis calls: 2"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_common_parameters_with_references(testdir):
@@ -65,7 +65,7 @@ def test_b(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used in all generated tests
     result.assert_outcomes(passed=4)
-    result.stdout.re_match_lines([r"Hypothesis calls: 4"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
 
 
 def test_common_parameters_multiple_tests(testdir):
@@ -94,5 +94,5 @@ def test_b(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used in all test functions
     result.assert_outcomes(passed=4)
-    result.stdout.re_match_lines([r"Hypothesis calls: 4"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
     # NOTE: current implementation requires a deepcopy of the whole schema

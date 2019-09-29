@@ -55,24 +55,29 @@ def test_loader_filter(testdir):
     testdir.make_test(
         """
 @schema.parametrize()
+@settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/foo"
     assert case.method == "POST"
 """,
-        paths={"/foo": {"post": {"parameters": [integer(name="id", required=True)]}}},
+        paths={
+            "/foo": {"post": {"parameters": []}, "get": {"parameters": []}},
+            "/bar": {"post": {"parameters": []}, "get": {"parameters": []}},
+        },
         method="POST",
         endpoint="/v1/foo",
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
 def test_override_filter(testdir):
     testdir.make_test(
         """
 @schema.parametrize(method=None, endpoint="/v1/users")
+@settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
@@ -84,4 +89,4 @@ def test_(request, case):
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
