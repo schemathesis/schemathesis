@@ -8,13 +8,14 @@ from pytest_subtests import SubTests
 from .models import Endpoint
 from .schemas import BaseSchema
 from .types import Filter
+from .utils import NOT_SET
 
 
 @attr.s(slots=True)
 class LazySchema:
     fixture_name: str = attr.ib()
 
-    def parametrize(self, method: Optional[Filter] = None, endpoint: Optional[Filter] = None) -> Callable:
+    def parametrize(self, method: Optional[Filter] = NOT_SET, endpoint: Optional[Filter] = NOT_SET) -> Callable:
         def wrapper(func: Callable) -> Callable:
             def test(request: FixtureRequest, subtests: SubTests) -> None:
                 """The actual test, which is executed by pytest."""
@@ -54,9 +55,11 @@ def get_schema(
     schema = request.getfixturevalue(name)
     if not isinstance(schema, BaseSchema):
         raise ValueError(f"The given schema must be an instance of BaseSchema, got: {type(schema)}")
-    schema.method = method
-    schema.endpoint = endpoint
-    return schema
+    if method is NOT_SET:
+        method = schema.method
+    if method is not NOT_SET:
+        endpoint = schema.endpoint
+    return schema.__class__(schema.raw_schema, method=method, endpoint=endpoint)
 
 
 def get_fixtures(func: Callable, request: FixtureRequest) -> Dict[str, Any]:

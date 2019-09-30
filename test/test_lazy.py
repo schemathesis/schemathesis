@@ -106,6 +106,46 @@ def test_b(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
+def test_with_filters_override(testdir):
+    # When the test uses method / endpoint filter
+    testdir.make_test(
+        """
+@pytest.fixture
+def simple_schema():
+    return schema
+
+lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+
+@lazy_schema.parametrize(endpoint=None, method="GET")
+def test_a(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/first"
+    assert case.method == "GET"
+
+@lazy_schema.parametrize(endpoint="/second", method=None)
+def test_b(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/second"
+    assert case.method == "POST"
+
+""",
+        paths={"/first": {"post": {}, "get": {}}, "/second": {"post": {}, "get": {}}},
+        method="/first",
+        endpoint="POST",
+    )
+    result = testdir.runpytest("-v")
+    # Then the filters should be applied to the generated tests
+    result.assert_outcomes(passed=2)
+    result.stdout.re_match_lines(
+        [
+            r"test_with_filters_override.py::test_a PASSED",
+            r"test_with_filters_override.py::test_b PASSED",
+            r".*2 passed",
+        ]
+    )
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
+
+
 def test_invalid_fixture(testdir):
     # When the test uses a schema fixture that doesn't return a BaseSchema subtype
     testdir.make_test(
