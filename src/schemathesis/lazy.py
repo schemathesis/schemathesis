@@ -42,9 +42,9 @@ def _get_node_name(node_id: str, endpoint: Endpoint) -> str:
     return f"{node_id}[{endpoint.method}:{endpoint.path}]"
 
 
-def run_subtest(_endpoint: Endpoint, fixtures: Dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:
+def run_subtest(endpoint: Endpoint, fixtures: Dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:
     """Run the given subtest with pytest fixtures."""
-    with subtests.test(method=_endpoint.method, path=_endpoint.path):
+    with subtests.test(method=endpoint.method, path=endpoint.path):
         sub_test(**fixtures)
 
 
@@ -57,7 +57,7 @@ def get_schema(
         raise ValueError(f"The given schema must be an instance of BaseSchema, got: {type(schema)}")
     if method is NOT_SET:
         method = schema.method
-    if method is not NOT_SET:
+    if endpoint is NOT_SET:
         endpoint = schema.endpoint
     return schema.__class__(schema.raw_schema, method=method, endpoint=endpoint)
 

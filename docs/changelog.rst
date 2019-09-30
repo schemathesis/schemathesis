@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Filtration in lazy loaders.
+
 `0.7.2`_ - 2019-09-30
 ---------------------
 
