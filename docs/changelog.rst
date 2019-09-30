@@ -6,6 +6,9 @@ Changelog
 `Unreleased`_
 -------------
 
+`0.7.2`_ - 2019-09-30
+---------------------
+
 Added
 ~~~~~
 
@@ -14,6 +17,7 @@ Added
 
 Fixed
 ~~~~~
+
 - Conflict for lazy schema filtering `#64`_
 
 `0.7.1`_ - 2019-09-27
