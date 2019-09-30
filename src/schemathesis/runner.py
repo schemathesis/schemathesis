@@ -5,6 +5,7 @@ import requests
 
 from .loaders import from_uri
 from .models import Case
+from .schemas import BaseSchema
 
 
 def not_a_server_error(response: requests.Response) -> None:
@@ -12,13 +13,20 @@ def not_a_server_error(response: requests.Response) -> None:
     assert response.status_code < 500
 
 
-def execute(schema_uri: str, checks: Iterable[Callable] = (not_a_server_error,)) -> None:
-    """Generate and run test cases against the given API definition."""
+DEFAULT_CHECKS = (not_a_server_error,)
+
+
+def _execute_all_tests(schema: BaseSchema, base_url: str, checks: Iterable[Callable]) -> None:
     with requests.Session() as session:
-        schema = from_uri(schema_uri)
-        base_url = get_base_url(schema_uri)
         for _, test in schema.get_all_tests(single_test):
             test(session, base_url, checks)
+
+
+def execute(schema_uri: str, base_url: str = "", checks: Iterable[Callable] = DEFAULT_CHECKS) -> None:
+    """Generate and run test cases against the given API definition."""
+    schema = from_uri(schema_uri)
+    base_url = base_url or get_base_url(schema_uri)
+    _execute_all_tests(schema, base_url, checks)
 
 
 def get_base_url(uri: str) -> str:

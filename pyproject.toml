@@ -33,14 +33,19 @@ pytest = ">4.6.4"
 pyyaml = "^5.1"
 pytest-subtests = "^0.2.1"
 requests = "^2.22"
+click = "^7.0"
 
 [tool.poetry.dev-dependencies]
 coverage = "^4.5"
 pytest = ">4.6.4"
 aiohttp = "^3.6"
+pytest-mock = "^1.11.0"
 
 [tool.poetry.plugins]
 pytest11 = {schemathesis = "schemathesis.extra.pytest_plugin"}
+
+[tool.poetry.scripts]
+schemathesis = "schemathesis.commands:main"
 
 [tool.black]
 line-length = 120
