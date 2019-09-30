@@ -6,7 +6,7 @@ from time import sleep
 import pytest
 from aiohttp import web
 
-from schemathesis.runner import execute, get_base_url
+from schemathesis.runner import execute, execute_from_path, get_base_url
 
 
 @pytest.fixture()
@@ -52,6 +52,13 @@ def server(app, aiohttp_unused_port):
 
 def test_execute(server, app):
     execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
+    assert len(app["saved_requests"]) == 1
+    assert app["saved_requests"][0].path == "/v1/users"
+    assert app["saved_requests"][0].method == "GET"
+
+
+def test_execute_from_path(server, app):
+    execute_from_path(SIMPLE_PATH, base_url=f"http://127.0.0.1:{server['port']}")
     assert len(app["saved_requests"]) == 1
     assert app["saved_requests"][0].path == "/v1/users"
     assert app["saved_requests"][0].method == "GET"

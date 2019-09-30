@@ -1,3 +1,4 @@
+import pathlib
 from typing import Iterable
 from urllib.parse import urlparse
 
@@ -18,6 +19,7 @@ def main() -> None:
 
 @main.command(short_help="Perform schemathesis test.")
 @click.argument("schema", type=str)
+@click.option("--url", help="URL address of the API, required for SCHEMA if specified by file.", type=str)
 @click.option(
     "--checks",
     "-c",
@@ -26,18 +28,28 @@ def main() -> None:
     type=click.Choice(DEFAULT_CHECKS_NAMES),
     default=DEFAULT_CHECKS_NAMES,
 )
-def run(schema: str, checks: Iterable[str] = DEFAULT_CHECKS_NAMES) -> None:
+def run(schema: str, url: str = "", checks: Iterable[str] = DEFAULT_CHECKS_NAMES) -> None:
     """Perform schemathesis test against an API specified by SCHEMA.
 
-    SCHEMA must be a valid URL pointing to an Open API / Swagger specification.
+    SCHEMA must be a valid URL or file path pointing to an Open API / Swagger specification.
     """
+    is_file_path = False
+
     if not urlparse(schema).netloc:
-        raise click.UsageError("Invalid SCHEMA, must be a valid URL.")
+        is_file_path = pathlib.Path(schema).is_file()
+
+        if not is_file_path:
+            raise click.UsageError("Invalid SCHEMA, must be a valid URL or file path.")
+        if not url:
+            raise click.UsageError('Missing argument, "--url" is required for SCHEMA specified by file.')
 
     selected_checks = tuple(check for check in runner.DEFAULT_CHECKS if check.__name__ in checks)
 
     click.echo("Running schemathesis test cases ...")
 
-    runner.execute(schema, checks=selected_checks)
+    if is_file_path:
+        runner.execute_from_path(schema, base_url=url, checks=selected_checks)
+    else:
+        runner.execute(schema, base_url=url, checks=selected_checks)
 
     click.echo("Done.")

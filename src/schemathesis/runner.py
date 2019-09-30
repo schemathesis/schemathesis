@@ -3,7 +3,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
-from .loaders import from_uri
+from .loaders import from_path, from_uri
 from .models import Case
 from .schemas import BaseSchema
 
@@ -26,6 +26,12 @@ def execute(schema_uri: str, base_url: str = "", checks: Iterable[Callable] = DE
     """Generate and run test cases against the given API definition."""
     schema = from_uri(schema_uri)
     base_url = base_url or get_base_url(schema_uri)
+    _execute_all_tests(schema, base_url, checks)
+
+
+def execute_from_path(schema_path: str, base_url: str, checks: Iterable[Callable] = DEFAULT_CHECKS) -> None:
+    """Generate and run test cases against the given API definition given as a file path and an API url."""
+    schema = from_path(schema_path)
     _execute_all_tests(schema, base_url, checks)
 
 
