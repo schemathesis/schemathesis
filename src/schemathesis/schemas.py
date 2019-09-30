@@ -182,6 +182,9 @@ class SwaggerV20(BaseSchema):
                 del item["type"]
             else:
                 item = {"anyOf": [item, {"type": "null"}]}
+        if item.get("type") == "file":
+            item["type"] = "string"
+            item["format"] = "binary"
         return item
 
 
