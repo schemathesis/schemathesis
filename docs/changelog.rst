@@ -9,6 +9,7 @@ Changelog
 Added
 ~~~~~
 
+- Support for type "file" for Swagger 2.0 `#78`_
 - Support for filtering in loaders `#75`_
 
 `0.7.1`_ - 2019-09-27
@@ -147,6 +148,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#78: https://github.com/kiwicom/schemathesis/issues/78
 .. _#75: https://github.com/kiwicom/schemathesis/issues/75
 .. _#69: https://github.com/kiwicom/schemathesis/issues/69
 .. _#58: https://github.com/kiwicom/schemathesis/issues/58

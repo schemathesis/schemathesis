@@ -107,8 +107,6 @@ def test_(request, case):
 
 
 def test_upload_image(testdir):
-    if testdir.param == "petstore_v2.yaml":
-        pytest.xfail("Type `file` is not supported for Swagger 2.0. See #78.")
     testdir.make_petstore_test(
         """
 @schema.parametrize(endpoint="/pet/{petId}/uploadImage$")
