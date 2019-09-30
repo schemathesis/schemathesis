@@ -6,7 +6,7 @@ import schemathesis
 
 from .utils import make_schema
 
-pytest_plugins = ["pytester", "aiohttp.pytest_plugin"]
+pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
 
 
 @pytest.fixture
@@ -44,6 +44,11 @@ def case_factory():
         return schemathesis.Case(**{**defaults, **kwargs})
 
     return maker
+
+
+@pytest.fixture()
+def testcmd(testdir):
+    return testdir.run
 
 
 @pytest.fixture()
