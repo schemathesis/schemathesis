@@ -119,21 +119,18 @@ lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 @lazy_schema.parametrize(endpoint=None, method="GET")
 def test_a(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/first"
     assert case.method == "GET"
 
 @lazy_schema.parametrize(endpoint="/second", method=None)
 def test_b(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/second"
-    assert case.method == "POST"
-
 """,
         paths={"/first": {"post": {}, "get": {}}, "/second": {"post": {}, "get": {}}},
-        method="/first",
-        endpoint="POST",
+        method="POST",
+        endpoint="/first",
     )
-    result = testdir.runpytest("-v")
+    result = testdir.runpytest("-v", "-s")
     # Then the filters should be applied to the generated tests
     result.assert_outcomes(passed=2)
     result.stdout.re_match_lines(
@@ -143,7 +140,8 @@ def test_b(request, case):
             r".*2 passed",
         ]
     )
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
+    # 2 GET, 2 POST to /first & /second + GET /users
+    result.stdout.re_match_lines([r"Hypothesis calls: 5$"])
 
 
 def test_invalid_fixture(testdir):
@@ -155,7 +153,6 @@ def simple_schema():
     return 1
 
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
-
 
 @lazy_schema.parametrize()
 def test_(request, case):
