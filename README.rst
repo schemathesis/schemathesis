@@ -130,6 +130,21 @@ To narrow down the scope of the schemathesis tests it is possible to filter by m
 
 The acceptable values are regexps or list of regexps (matched with ``re.search``).
 
+CLI
+~~~
+
+The ``schemathesis`` command can be used to perform Schemathesis test cases::
+
+.. code:: bash
+
+    schemathesis run https://example.com/api/swagger.json
+
+For the full list of options, run::
+
+.. code:: bash
+
+    schemathesis --help
+
 Explicit examples
 ~~~~~~~~~~~~~~~~~
 

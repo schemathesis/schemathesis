@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- CLI tool invoked by the ``schemathesis`` command
+
 `0.7.3`_ - 2019-09-30
 ---------------------
 
