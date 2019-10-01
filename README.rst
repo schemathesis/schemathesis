@@ -133,13 +133,13 @@ The acceptable values are regexps or list of regexps (matched with ``re.search``
 CLI
 ~~~
 
-The ``schemathesis`` command can be used to perform Schemathesis test cases::
+The ``schemathesis`` command can be used to perform Schemathesis test cases:
 
 .. code:: bash
 
     schemathesis run https://example.com/api/swagger.json
 
-For the full list of options, run::
+For the full list of options, run:
 
 .. code:: bash
 
