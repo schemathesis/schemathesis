@@ -11,6 +11,13 @@ Added
 
 - CLI tool invoked by the ``schemathesis`` command
 
+
+Fixed
+~~~~~
+
+- Runner stopping on the first falsifying example. `#99`_
+
+
 `0.7.3`_ - 2019-09-30
 ---------------------
 
@@ -171,6 +178,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#99: https://github.com/kiwicom/schemathesis/issues/99
 .. _#78: https://github.com/kiwicom/schemathesis/issues/78
 .. _#75: https://github.com/kiwicom/schemathesis/issues/75
 .. _#69: https://github.com/kiwicom/schemathesis/issues/69

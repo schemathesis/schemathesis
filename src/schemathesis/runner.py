@@ -1,3 +1,4 @@
+from contextlib import suppress
 from typing import Callable, Iterable
 from urllib.parse import urlsplit, urlunsplit
 
@@ -17,7 +18,7 @@ DEFAULT_CHECKS = (not_a_server_error,)
 
 
 def _execute_all_tests(schema: BaseSchema, base_url: str, checks: Iterable[Callable]) -> None:
-    with requests.Session() as session:
+    with requests.Session() as session, suppress(AssertionError):
         for _, test in schema.get_all_tests(single_test):
             test(session, base_url, checks)
 
