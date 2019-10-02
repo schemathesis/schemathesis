@@ -9,14 +9,12 @@ Changelog
 Added
 ~~~~~
 
-- CLI tool invoked by the ``schemathesis`` command
-
+- CLI tool invoked by the ``schemathesis`` command. `#30`_
 
 Fixed
 ~~~~~
 
 - Runner stopping on the first falsifying example. `#99`_
-
 
 `0.7.3`_ - 2019-09-30
 ---------------------
@@ -32,13 +30,13 @@ Fixed
 Added
 ~~~~~
 
-- Support for type "file" for Swagger 2.0 `#78`_
-- Support for filtering in loaders `#75`_
+- Support for type "file" for Swagger 2.0. `#78`_
+- Support for filtering in loaders. `#75`_
 
 Fixed
 ~~~~~
 
-- Conflict for lazy schema filtering `#64`_
+- Conflict for lazy schema filtering. `#64`_
 
 `0.7.1`_ - 2019-09-27
 ---------------------
@@ -46,7 +44,7 @@ Fixed
 Added
 ~~~~~
 
-- Support for ``x-nullable`` extension `#45`_
+- Support for ``x-nullable`` extension. `#45`_
 
 `0.7.0`_ - 2019-09-26
 ---------------------
@@ -98,7 +96,7 @@ Changed
 Deprecated
 ~~~~~~~~~~
 
-- Using ``Parametrizer.from_{path,uri}`` is deprecated, use ``schemathesis.from_{path,uri}`` instead
+- Using ``Parametrizer.from_{path,uri}`` is deprecated, use ``schemathesis.from_{path,uri}`` instead.
 
 Fixed
 ~~~~~
@@ -188,6 +186,7 @@ Fixed
 .. _#45: https://github.com/kiwicom/schemathesis/issues/45
 .. _#35: https://github.com/kiwicom/schemathesis/issues/35
 .. _#34: https://github.com/kiwicom/schemathesis/issues/34
+.. _#30: https://github.com/kiwicom/schemathesis/issues/30
 .. _#28: https://github.com/kiwicom/schemathesis/issues/28
 .. _#24: https://github.com/kiwicom/schemathesis/issues/24
 .. _#21: https://github.com/kiwicom/schemathesis/issues/21
