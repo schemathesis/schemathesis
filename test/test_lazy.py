@@ -125,6 +125,10 @@ def test_a(request, case):
 def test_b(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/second"
+
+@lazy_schema.parametrize()
+def test_c(request, case):
+    request.config.HYPOTHESIS_CASES += 1
 """,
         paths={"/first": {"post": {}, "get": {}}, "/second": {"post": {}, "get": {}}},
         method="POST",
@@ -132,16 +136,17 @@ def test_b(request, case):
     )
     result = testdir.runpytest("-v", "-s")
     # Then the filters should be applied to the generated tests
-    result.assert_outcomes(passed=2)
+    result.assert_outcomes(passed=3)
     result.stdout.re_match_lines(
         [
             r"test_with_filters_override.py::test_a PASSED",
             r"test_with_filters_override.py::test_b PASSED",
-            r".*2 passed",
+            r"test_with_filters_override.py::test_c PASSED",
+            r".*3 passed",
         ]
     )
-    # 2 GET, 2 POST to /first & /second + GET /users
-    result.stdout.re_match_lines([r"Hypothesis calls: 5$"])
+    # 2 GET, 2 POST to /first & /second + GET /users + POST /first
+    result.stdout.re_match_lines([r"Hypothesis calls: 6$"])
 
 
 def test_invalid_fixture(testdir):

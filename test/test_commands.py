@@ -1,4 +1,3 @@
-import tempfile
 from functools import partial
 
 import pytest
@@ -31,16 +30,18 @@ def test_commands_version(schemathesis_cmd):
     assert "version" in result.stdout.lines[0]
 
 
-def test_commands_run_errors(schemathesis_cmd):
-    result_no_args = schemathesis_cmd("run")
+@pytest.mark.parametrize(
+    "args, error",
+    (
+        (("run",), 'Error: Missing argument "SCHEMA".'),
+        (("run", "not-url"), "Error: Invalid SCHEMA, must be a valid URL."),
+    ),
+)
+def test_commands_run_errors(schemathesis_cmd, args, error):
+    result = schemathesis_cmd(*args)
 
-    assert result_no_args.ret == 2
-    assert "Missing argument" in result_no_args.stderr.lines[-1]
-
-    result_invalid = schemathesis_cmd("run", "not-url")
-
-    assert result_invalid.ret == 2
-    assert "Invalid SCHEMA" in result_invalid.stderr.lines[-1]
+    assert result.ret == 2
+    assert result.stderr.lines[-1] == error
 
 
 def test_commands_run_help(schemathesis_cmd):
@@ -67,7 +68,8 @@ def test_commands_run_schema_uri(mocker):
     cli = CliRunner()
 
     schema_uri = "https://example.com/swagger.json"
-    result_schema_uri = cli.invoke(commands.run, [schema_uri])
+    result = cli.invoke(commands.run, [schema_uri])
 
-    assert result_schema_uri.exit_code == 0
+    assert result.exit_code == 0
     m_execute.assert_called_once_with(schema_uri, checks=runner.DEFAULT_CHECKS)
+    assert result.stdout.split("\n")[:-1] == ["Running schemathesis test cases ...", "Done."]
