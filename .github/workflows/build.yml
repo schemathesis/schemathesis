@@ -42,7 +42,7 @@ jobs:
     - uses: actions/setup-python@v1
       with:
         python-version: '3.6'
-    - run: pip install tox coverage
+    - run: pip install tox coverage poetry
     - run: tox -e py36
     - run: coverage combine
     - run: coverage report
@@ -63,7 +63,7 @@ jobs:
     - uses: actions/setup-python@v1
       with:
         python-version: '3.7'
-    - run: pip install tox coverage
+    - run: pip install tox coverage poetry
     - run: tox -e py37
     - run: coverage combine
     - run: coverage report
@@ -87,7 +87,7 @@ jobs:
     - uses: actions/setup-python@v1
       with:
         python-version: '3.7'
-    - run: pip install tox coverage
+    - run: pip install tox coverage poetry
     - run: tox -e py38
     - run: coverage combine
     - run: coverage report
