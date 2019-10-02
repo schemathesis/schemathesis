@@ -1,12 +1,14 @@
 import asyncio
 import threading
-from test.utils import SIMPLE_PATH
 from time import sleep
 
 import pytest
+import yaml
 from aiohttp import web
 
 from schemathesis.runner import execute, get_base_url
+
+from .utils import make_schema
 
 
 @pytest.fixture()
@@ -14,16 +16,22 @@ def app():
     saved_requests = []
 
     async def schema(request):
-        return web.FileResponse(SIMPLE_PATH)
+        raw = make_schema(paths={"/pets": {"get": {}}})
+        content = yaml.dump(raw)
+        return web.Response(body=content)
 
     async def users(request):
         saved_requests.append(request)
         if app["config"]["raise_exception"]:
             raise web.HTTPInternalServerError
-        return web.Response(text="Hello, world")
+        return web.Response()
+
+    async def pets(request):
+        saved_requests.append(request)
+        return web.Response()
 
     app = web.Application()
-    app.add_routes([web.get("/swagger.yaml", schema), web.get("/v1/users", users)])
+    app.add_routes([web.get("/swagger.yaml", schema), web.get("/v1/users", users), web.get("/v1/pets", pets)])
     app["saved_requests"] = saved_requests
     app["config"] = {"raise_exception": False}
     return app
@@ -50,21 +58,25 @@ def server(app, aiohttp_unused_port):
     yield {"port": port}
 
 
+def assert_request(app, idx, method, path):
+    assert app["saved_requests"][idx].method == method
+    assert app["saved_requests"][idx].path == path
+
+
 def test_execute(server, app):
     execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
-    assert len(app["saved_requests"]) == 1
-    assert app["saved_requests"][0].path == "/v1/users"
-    assert app["saved_requests"][0].method == "GET"
+    assert len(app["saved_requests"]) == 2
+    assert_request(app, 0, "GET", "/v1/pets")
+    assert_request(app, 1, "GET", "/v1/users")
 
 
 def test_server_error(server, app):
     app["config"]["raise_exception"] = True
-    with pytest.raises(AssertionError):
-        # TODO. The runner output should be handled better, it shouldn't stop on the first exception.
-        execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
-    assert len(app["saved_requests"]) == 2
-    assert app["saved_requests"][0].path == "/v1/users"
-    assert app["saved_requests"][0].method == "GET"
+    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
+    assert len(app["saved_requests"]) == 3
+    assert_request(app, 0, "GET", "/v1/pets")
+    assert_request(app, 1, "GET", "/v1/users")
+    assert_request(app, 2, "GET", "/v1/users")
 
 
 @pytest.mark.parametrize(
