@@ -35,6 +35,14 @@ def test_commands_version(schemathesis_cmd):
     (
         (("run",), 'Error: Missing argument "SCHEMA".'),
         (("run", "not-url"), "Error: Invalid SCHEMA, must be a valid URL."),
+        (
+            ("run", "http://127.0.0.1", "--auth=123"),
+            'Error: Invalid value for "--auth" / "-a": Should be in KEY:VALUE format. Got: 123',
+        ),
+        (
+            ("run", "http://127.0.0.1", "--header=123"),
+            'Error: Invalid value for "--header" / "-H": Should be in KEY:VALUE format. Got: 123',
+        ),
     ),
 )
 def test_commands_run_errors(schemathesis_cmd, args, error):
@@ -59,17 +67,40 @@ def test_commands_run_help(schemathesis_cmd):
         "Options:",
         "  -c, --checks [not_a_server_error]",
         "                                  List of checks to run.",
+        "  -a, --auth TEXT                 Server user and password. Example:",
+        "                                  USER:PASSWORD",
+        "  -H, --header TEXT               Custom header in a that will be used in all",
+        r"                                  requests to the server. Example:",
+        r"                                  Authorization: Bearer\ 123",
         "  -h, --help                      Show this message and exit.",
     ]
 
 
-def test_commands_run_schema_uri(mocker):
+SCHEMA_URI = "https://example.com/swagger.json"
+
+
+@pytest.mark.parametrize(
+    "args, expected",
+    (
+        ([SCHEMA_URI], {"checks": runner.DEFAULT_CHECKS, "auth": None, "headers": {}}),
+        ([SCHEMA_URI, "--auth=test:test"], {"checks": runner.DEFAULT_CHECKS, "auth": ("test", "test"), "headers": {}}),
+        (
+            [SCHEMA_URI, "--header=Authorization:Bearer 123"],
+            {"checks": runner.DEFAULT_CHECKS, "auth": None, "headers": {"Authorization": "Bearer 123"}},
+        ),
+        (
+            [SCHEMA_URI, "--header=Authorization:  Bearer 123 "],
+            {"checks": runner.DEFAULT_CHECKS, "auth": None, "headers": {"Authorization": "Bearer 123 "}},
+        ),
+    ),
+)
+def test_commands_run(mocker, args, expected):
     m_execute = mocker.patch("schemathesis.runner.execute")
     cli = CliRunner()
 
     schema_uri = "https://example.com/swagger.json"
-    result = cli.invoke(commands.run, [schema_uri])
+    result = cli.invoke(commands.run, args)
 
     assert result.exit_code == 0
-    m_execute.assert_called_once_with(schema_uri, checks=runner.DEFAULT_CHECKS)
+    m_execute.assert_called_once_with(schema_uri, **expected)
     assert result.stdout.split("\n")[:-1] == ["Running schemathesis test cases ...", "Done."]

@@ -58,16 +58,29 @@ def server(app, aiohttp_unused_port):
     yield {"port": port}
 
 
-def assert_request(app, idx, method, path):
-    assert app["saved_requests"][idx].method == method
-    assert app["saved_requests"][idx].path == path
+def assert_request(app, idx, method, path, headers=None):
+    request = app["saved_requests"][idx]
+    assert request.method == method
+    assert request.path == path
+    if headers:
+        for key, value in headers.items():
+            assert request.headers.get(key) == value
 
 
 def test_execute(server, app):
-    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
+    headers = {"Authorization": "Bearer 123"}
+    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", headers=headers)
     assert len(app["saved_requests"]) == 2
-    assert_request(app, 0, "GET", "/v1/pets")
-    assert_request(app, 1, "GET", "/v1/users")
+    assert_request(app, 0, "GET", "/v1/pets", headers)
+    assert_request(app, 1, "GET", "/v1/users", headers)
+
+
+def test_auth(server, app):
+    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", auth=("test", "test"))
+    assert len(app["saved_requests"]) == 2
+    headers = {"Authorization": "Basic dGVzdDp0ZXN0"}
+    assert_request(app, 0, "GET", "/v1/pets", headers)
+    assert_request(app, 1, "GET", "/v1/users", headers)
 
 
 def test_server_error(server, app):

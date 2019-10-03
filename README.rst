@@ -139,6 +139,9 @@ The ``schemathesis`` command can be used to perform Schemathesis test cases:
 
     schemathesis run https://example.com/api/swagger.json
 
+If your application requires authorization then you can use ``--auth`` option for Basic Auth and ``--header`` to specify
+custom headers to be sent with each request.
+
 For the full list of options, run:
 
 .. code:: bash
