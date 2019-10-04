@@ -27,13 +27,14 @@ def execute_from_schema(
     auth: Optional[Auth] = None,
     headers: Optional[Dict[str, Any]] = None,
 ) -> None:
-    with requests.Session() as session, suppress(AssertionError):
+    with requests.Session() as session:
         if auth is not None:
             session.auth = auth
         if headers is not None:
             session.headers.update(**headers)
         for _, test in schema.get_all_tests(single_test):
-            test(session, base_url, checks)
+            with suppress(AssertionError):
+                test(session, base_url, checks)
 
 
 def execute(

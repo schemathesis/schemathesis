@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Wrap each individual test in ``suppress` so the runner doesn't stop after the first test failure.
+
 `0.8.0`_ - 2019-10-04
 ---------------------
 
