@@ -3,7 +3,7 @@ from functools import partial
 import pytest
 from click.testing import CliRunner
 
-from schemathesis import commands, runner
+from schemathesis import cli, runner
 
 
 @pytest.fixture()
@@ -137,10 +137,10 @@ SCHEMA_URI = "https://example.com/swagger.json"
 )
 def test_commands_run(mocker, args, expected):
     m_execute = mocker.patch("schemathesis.runner.execute")
-    cli = CliRunner()
+    cli_runner = CliRunner()
 
     schema_uri = "https://example.com/swagger.json"
-    result = cli.invoke(commands.run, args)
+    result = cli_runner.invoke(cli.run, args)
 
     assert result.exit_code == 0
     m_execute.assert_called_once_with(schema_uri, **expected)
