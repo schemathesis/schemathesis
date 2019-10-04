@@ -67,20 +67,37 @@ def assert_request(app, idx, method, path, headers=None):
             assert request.headers.get(key) == value
 
 
+def assert_not_request(app, method, path):
+    for request in app["saved_requests"]:
+        assert not (request.path == path and request.method == method)
+
+
 def test_execute(server, app):
     headers = {"Authorization": "Bearer 123"}
-    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", headers=headers)
+    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", api_options=dict(headers=headers))
     assert len(app["saved_requests"]) == 2
     assert_request(app, 0, "GET", "/v1/pets", headers)
     assert_request(app, 1, "GET", "/v1/users", headers)
 
 
 def test_auth(server, app):
-    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", auth=("test", "test"))
+    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", api_options=dict(auth=("test", "test")))
     assert len(app["saved_requests"]) == 2
     headers = {"Authorization": "Basic dGVzdDp0ZXN0"}
     assert_request(app, 0, "GET", "/v1/pets", headers)
     assert_request(app, 1, "GET", "/v1/users", headers)
+
+
+def test_execute_filter_endpoint(server, app):
+    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", loader_options=dict(endpoint=["pets"]))
+    assert len(app["saved_requests"]) == 1
+    assert_request(app, 0, "GET", "/v1/pets")
+    assert_not_request(app, "GET", "/v1/users")
+
+
+def test_execute_filter_method(server, app):
+    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", loader_options=dict(method=["POST"]))
+    assert len(app["saved_requests"]) == 0
 
 
 def test_server_error(server, app):

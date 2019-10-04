@@ -20,7 +20,7 @@ def not_a_server_error(response: requests.Response) -> None:
 DEFAULT_CHECKS = (not_a_server_error,)
 
 
-def _execute_all_tests(
+def execute_from_schema(
     schema: BaseSchema,
     base_url: str,
     checks: Iterable[Callable],
@@ -38,15 +38,18 @@ def _execute_all_tests(
 
 def execute(
     schema_uri: str,
-    base_url: str = "",
     checks: Iterable[Callable] = DEFAULT_CHECKS,
-    auth: Optional[Auth] = None,
-    headers: Optional[Dict[str, Any]] = None,
+    api_options: Optional[Dict[str, Any]] = None,
+    loader_options: Optional[Dict[str, Any]] = None,
+    loader: Callable = from_uri,
 ) -> None:
     """Generate and run test cases against the given API definition."""
-    schema = from_uri(schema_uri)
-    base_url = base_url or get_base_url(schema_uri)
-    _execute_all_tests(schema, base_url, checks, auth, headers)
+    api_options = api_options or {}
+    loader_options = loader_options or {}
+
+    schema = loader(schema_uri, **loader_options)
+    base_url = api_options.pop("base_url", "") or get_base_url(schema_uri)
+    execute_from_schema(schema, base_url, checks, **api_options)
 
 
 def get_base_url(uri: str) -> str:

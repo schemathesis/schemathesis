@@ -72,6 +72,9 @@ def test_commands_run_help(schemathesis_cmd):
         "  -H, --header TEXT               Custom header in a that will be used in all",
         r"                                  requests to the server. Example:",
         r"                                  Authorization: Bearer\ 123",
+        r"  -E, --endpoint TEXT             Filter schemathesis test by endpoint",
+        r"                                  pattern. Example: users/\d+",
+        "  -M, --method TEXT               Filter schemathesis test by HTTP method.",
         "  -h, --help                      Show this message and exit.",
     ]
 
@@ -82,15 +85,53 @@ SCHEMA_URI = "https://example.com/swagger.json"
 @pytest.mark.parametrize(
     "args, expected",
     (
-        ([SCHEMA_URI], {"checks": runner.DEFAULT_CHECKS, "auth": None, "headers": {}}),
-        ([SCHEMA_URI, "--auth=test:test"], {"checks": runner.DEFAULT_CHECKS, "auth": ("test", "test"), "headers": {}}),
+        (
+            [SCHEMA_URI],
+            {
+                "checks": runner.DEFAULT_CHECKS,
+                "api_options": {"auth": None, "headers": {}},
+                "loader_options": {"endpoint": (), "method": ()},
+            },
+        ),
+        (
+            [SCHEMA_URI, "--auth=test:test"],
+            {
+                "checks": runner.DEFAULT_CHECKS,
+                "api_options": {"auth": ("test", "test"), "headers": {}},
+                "loader_options": {"endpoint": (), "method": ()},
+            },
+        ),
         (
             [SCHEMA_URI, "--header=Authorization:Bearer 123"],
-            {"checks": runner.DEFAULT_CHECKS, "auth": None, "headers": {"Authorization": "Bearer 123"}},
+            {
+                "checks": runner.DEFAULT_CHECKS,
+                "api_options": {"auth": None, "headers": {"Authorization": "Bearer 123"}},
+                "loader_options": {"endpoint": (), "method": ()},
+            },
         ),
         (
             [SCHEMA_URI, "--header=Authorization:  Bearer 123 "],
-            {"checks": runner.DEFAULT_CHECKS, "auth": None, "headers": {"Authorization": "Bearer 123 "}},
+            {
+                "checks": runner.DEFAULT_CHECKS,
+                "api_options": {"auth": None, "headers": {"Authorization": "Bearer 123 "}},
+                "loader_options": {"endpoint": (), "method": ()},
+            },
+        ),
+        (
+            [SCHEMA_URI, "--method=POST", "--method", "GET"],
+            {
+                "checks": runner.DEFAULT_CHECKS,
+                "api_options": {"auth": None, "headers": {}},
+                "loader_options": {"endpoint": (), "method": ("POST", "GET")},
+            },
+        ),
+        (
+            [SCHEMA_URI, "--endpoint=users"],
+            {
+                "checks": runner.DEFAULT_CHECKS,
+                "api_options": {"auth": None, "headers": {}},
+                "loader_options": {"endpoint": ("users",), "method": ()},
+            },
         ),
     ),
 )

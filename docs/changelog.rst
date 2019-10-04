@@ -10,6 +10,7 @@ Added
 ~~~~~
 
 - CLI tool invoked by the ``schemathesis`` command. `#30`_
+- New arguments ``api_options``, ``loader_options`` and ``loader`` for test executor
 
 Fixed
 ~~~~~
