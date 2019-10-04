@@ -1,6 +1,6 @@
 import warnings
 from functools import wraps
-from typing import Any, Callable, List, Set, Tuple, Union
+from typing import Any, Callable, List, Mapping, Set, Tuple, Union
 
 from .types import Filter
 
@@ -30,3 +30,8 @@ def force_tuple(item: Filter) -> Union[List, Set, Tuple]:
     if not isinstance(item, (list, set, tuple)):
         return (item,)
     return item
+
+
+def dict_true_values(**kwargs: Any) -> Mapping[str, Any]:
+    """Create dict with given kwargs while skipping items where bool(value) evaluates to False."""
+    return {key: value for key, value in kwargs.items() if bool(value)}
