@@ -4,6 +4,7 @@ import click
 
 from .. import runner
 from ..types import Filter
+from ..utils import dict_true_values
 from . import validators
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -68,11 +69,10 @@ def run(  # pylint: disable=too-many-arguments
 
     click.echo("Running schemathesis test cases ...")
 
-    runner.execute(
-        schema,
-        checks=selected_checks,
-        api_options=dict(auth=auth, headers=headers),
-        loader_options=dict(endpoint=endpoints, method=methods),
+    options = dict_true_values(
+        api_options=dict_true_values(auth=auth, headers=headers),
+        loader_options=dict_true_values(endpoint=endpoints, method=methods),
     )
+    runner.execute(schema, checks=selected_checks, **options)
 
     click.echo("Done.")
