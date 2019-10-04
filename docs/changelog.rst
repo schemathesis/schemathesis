@@ -10,7 +10,7 @@ Added
 ~~~~~
 
 - CLI tool invoked by the ``schemathesis`` command. `#30`_
-- New arguments ``api_options``, ``loader_options`` and ``loader`` for test executor
+- New arguments ``api_options``, ``loader_options`` and ``loader`` for test executor. `#90`_
 
 Fixed
 ~~~~~
@@ -178,6 +178,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#99: https://github.com/kiwicom/schemathesis/issues/99
+.. _#90: https://github.com/kiwicom/schemathesis/issues/90
 .. _#78: https://github.com/kiwicom/schemathesis/issues/78
 .. _#75: https://github.com/kiwicom/schemathesis/issues/75
 .. _#69: https://github.com/kiwicom/schemathesis/issues/69
