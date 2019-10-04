@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 import click
 
 from . import runner
+from .types import Filter
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
@@ -70,8 +71,22 @@ def reraise_format_error(raw_value: str) -> Generator:
     type=str,
     callback=validate_headers,  # type: ignore
 )
-def run(
-    schema: str, auth: Optional[Tuple[str, str]], headers: Dict[str, str], checks: Iterable[str] = DEFAULT_CHECKS_NAMES
+@click.option(
+    "--endpoint",
+    "-E",
+    "endpoints",
+    type=str,
+    multiple=True,
+    help=r"Filter schemathesis test by endpoint pattern. Example: users/\d+",
+)
+@click.option("--method", "-M", "methods", type=str, multiple=True, help="Filter schemathesis test by HTTP method.")
+def run(  # pylint: disable=too-many-arguments
+    schema: str,
+    auth: Optional[Tuple[str, str]],
+    headers: Dict[str, str],
+    checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
+    endpoints: Optional[Filter] = None,
+    methods: Optional[Filter] = None,
 ) -> None:
     """Perform schemathesis test against an API specified by SCHEMA.
 
@@ -84,6 +99,11 @@ def run(
 
     click.echo("Running schemathesis test cases ...")
 
-    runner.execute(schema, checks=selected_checks, auth=auth, headers=headers)
+    runner.execute(
+        schema,
+        checks=selected_checks,
+        api_options=dict(auth=auth, headers=headers),
+        loader_options=dict(endpoint=endpoints, method=methods),
+    )
 
     click.echo("Done.")
