@@ -6,7 +6,7 @@ from hypothesis import strategies as st
 from schemathesis.cli import validators
 
 
-@given(value=st.text())
+@given(value=st.text().filter(lambda x: "//" not in x))
 def test_validate_schema(value):
     with pytest.raises(click.UsageError):
         validators.validate_schema(None, None, value)
