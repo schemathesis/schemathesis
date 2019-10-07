@@ -1,6 +1,9 @@
+import io
+import sys
 import warnings
+from contextlib import contextmanager
 from functools import wraps
-from typing import Any, Callable, List, Mapping, Set, Tuple, Union
+from typing import Any, Callable, Generator, List, Mapping, Set, Tuple, Union
 
 from .types import Filter
 
@@ -35,3 +38,23 @@ def force_tuple(item: Filter) -> Union[List, Set, Tuple]:
 def dict_true_values(**kwargs: Any) -> Mapping[str, Any]:
     """Create dict with given kwargs while skipping items where bool(value) evaluates to False."""
     return {key: value for key, value in kwargs.items() if bool(value)}
+
+
+@contextmanager
+def stdout_listener() -> Generator:
+    """Replace stdout and listen for printed values (without printing them).
+
+    Usage::
+
+        with stdout_listener() as getvalue:
+            print("Hello, World")
+            captured_stdout = getvalue()  # captured_stdout == "Hello, World\n"
+    """
+    stdout = io.StringIO()
+    old_stdout = sys.stdout
+    sys.stdout = stdout
+
+    try:
+        yield stdout.getvalue
+    finally:
+        sys.stdout = old_stdout

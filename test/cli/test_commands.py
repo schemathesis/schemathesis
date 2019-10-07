@@ -117,4 +117,22 @@ def test_commands_run(mocker, args, expected):
 
     assert result.exit_code == 0
     m_execute.assert_called_once_with(schema_uri, **expected)
-    assert result.stdout.split("\n")[:-1] == ["Running schemathesis test cases ...", "Done."]
+
+
+@pytest.mark.parametrize(
+    "data,line_in_output",
+    (
+        ({"not_a_server_error": {"total": 1, "ok": 1, "error": 0}}, "Tests succeeded."),
+        ({}, "No checks were performed."),
+        ({"not_a_server_error": {"total": 3, "ok": 1, "error": 2}}, "Tests failed."),
+    ),
+)
+def test_commands_run_output(mocker, data, line_in_output):
+    m_execute = mocker.patch("schemathesis.runner.execute", return_value=mocker.Mock(data=data, is_empty=not data))
+
+    cli_runner = CliRunner()
+    result = cli_runner.invoke(cli.run, [SCHEMA_URI])
+
+    stdout_lines = result.stdout.split("\n")
+    assert "Running schemathesis test cases ..." in stdout_lines
+    assert line_in_output in stdout_lines
