@@ -53,7 +53,7 @@ def testcmd(testdir):
 
 @pytest.fixture()
 def testdir(testdir):
-    def maker(content, method=None, endpoint=None, **kwargs):
+    def maker(content, method=None, endpoint=None, pytest_plugins=("aiohttp.pytest_plugin",), **kwargs):
         schema = make_schema(**kwargs)
         preparation = dedent(
             """
@@ -70,11 +70,12 @@ def testdir(testdir):
         testdir.makepyfile(preparation, content)
         testdir.makepyfile(
             conftest=dedent(
-                """
+                f"""
+        pytest_plugins = {pytest_plugins}
         def pytest_configure(config):
             config.HYPOTHESIS_CASES = 0
         def pytest_unconfigure(config):
-            print(f"Hypothesis calls: {config.HYPOTHESIS_CASES}")
+            print(f"Hypothesis calls: {{config.HYPOTHESIS_CASES}}")
         """
             )
         )
