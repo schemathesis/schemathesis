@@ -6,6 +6,16 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Test executor collects results of execution. `29`_
+
+Changed
+~~~~~~~
+
+- CLI command `schemathesis run` prints results in a more readable way with a summary of passing checks.
+
 `0.8.1`_ - 2019-10-04
 ---------------------
 
@@ -203,6 +213,7 @@ Fixed
 .. _#35: https://github.com/kiwicom/schemathesis/issues/35
 .. _#34: https://github.com/kiwicom/schemathesis/issues/34
 .. _#30: https://github.com/kiwicom/schemathesis/issues/30
+.. _#29: https://github.com/kiwicom/schemathesis/issues/29
 .. _#28: https://github.com/kiwicom/schemathesis/issues/28
 .. _#24: https://github.com/kiwicom/schemathesis/issues/24
 .. _#21: https://github.com/kiwicom/schemathesis/issues/21
