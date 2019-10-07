@@ -40,6 +40,7 @@ coverage = "^4.5"
 pytest = ">4.6.4"
 aiohttp = "^3.6"
 pytest-mock = "^1.11.0"
+pytest-asyncio = "^0.10.0"
 
 [tool.poetry.plugins]
 pytest11 = {schemathesis = "schemathesis.extra.pytest_plugin"}

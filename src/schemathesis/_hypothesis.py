@@ -1,5 +1,6 @@
 """Provide strategies for given endpoint(s) definition."""
-from typing import Callable, Generator, Optional
+import asyncio
+from typing import Any, Callable, Generator, Optional
 
 import hypothesis
 import hypothesis.strategies as st
@@ -15,9 +16,30 @@ def create_test(endpoint: Endpoint, test: Callable, settings: Optional[hypothesi
     """Create a Hypothesis test."""
     strategy = endpoint.as_strategy()
     wrapped_test = hypothesis.given(case=strategy)(test)
+    original_test = get_original_test(test)
+    if asyncio.iscoroutinefunction(original_test):
+        wrapped_test.hypothesis.inner_test = make_async_test(original_test)  # type: ignore
     if settings is not None:
         wrapped_test = settings(wrapped_test)
     return add_examples(wrapped_test, endpoint)
+
+
+def get_original_test(test: Callable) -> Callable:
+    """Get the original test function even if it is wrapped by `hypothesis.settings` decorator."""
+    if getattr(test, "_hypothesis_internal_settings_applied", False):
+        # `settings` decorator is applied
+        return test._hypothesis_internal_test_function_without_warning  # type: ignore
+    return test
+
+
+def make_async_test(test: Callable) -> Callable:
+    def async_run(*args: Any, **kwargs: Any) -> None:
+        loop = asyncio.get_event_loop()
+        coro = test(*args, **kwargs)
+        future = asyncio.ensure_future(coro, loop=loop)
+        loop.run_until_complete(future)
+
+    return async_run
 
 
 def get_examples(endpoint: Endpoint) -> Generator[Case, None, None]:

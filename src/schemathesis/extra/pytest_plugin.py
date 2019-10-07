@@ -11,11 +11,14 @@ from ..models import Endpoint
 from ..utils import is_schemathesis_test
 
 
+@hookimpl(hookwrapper=True)  # type: ignore
 def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> Optional["SchemathesisCase"]:
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
+    outcome = yield
     if is_schemathesis_test(obj):
-        return SchemathesisCase(obj, name, collector)
-    return None
+        outcome.force_result(SchemathesisCase(obj, name, collector))
+    else:
+        outcome.get_result()
 
 
 class SchemathesisCase(PyCollector):
