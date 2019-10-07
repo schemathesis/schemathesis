@@ -80,6 +80,13 @@ def test_execute(server, app):
     assert_request(app, 1, "GET", "/v1/users", headers)
 
 
+def test_execute_stats(server, app):
+    app["config"]["raise_exception"] = True
+    stats = execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
+    assert "not_a_server_error" in stats.data
+    assert dict(stats.data["not_a_server_error"]) == {"total": 3, "ok": 1, "error": 2}
+
+
 def test_auth(server, app):
     execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", api_options=dict(auth=("test", "test")))
     assert len(app["saved_requests"]) == 2

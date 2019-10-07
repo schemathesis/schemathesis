@@ -1,11 +1,13 @@
+import shutil
+import sys
 from typing import Dict, Iterable, Optional, Tuple
 
 import click
 
-from .. import runner
+from .. import runner, utils
 from ..types import Filter
 from ..utils import dict_true_values
-from . import validators
+from . import output, validators
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
@@ -73,6 +75,16 @@ def run(  # pylint: disable=too-many-arguments
         api_options=dict_true_values(auth=auth, headers=headers),
         loader_options=dict_true_values(endpoint=endpoints, method=methods),
     )
-    runner.execute(schema, checks=selected_checks, **options)
 
-    click.echo("Done.")
+    with utils.stdout_listener() as get_stdout:
+        stats = runner.execute(schema, checks=selected_checks, **options)
+        hypothesis_out = get_stdout()
+
+    output.pretty_print_stats(stats, hypothesis_out=hypothesis_out)
+    click.echo()
+
+    if any(value.get("error") for value in stats.data.values()):
+        click.echo(click.style("Tests failed.", fg="red"))
+        raise click.exceptions.Exit(1)
+
+    click.echo(click.style("Tests succeeded.", fg="green"))
