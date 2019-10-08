@@ -1,6 +1,6 @@
 import click
 import pytest
-from hypothesis import given
+from hypothesis import assume, example, given
 from hypothesis import strategies as st
 
 from schemathesis.cli import validators
@@ -19,6 +19,7 @@ def test_validate_auth(value):
 
 
 @given(value=st.lists(st.text(), min_size=1).map(tuple))
+@example((":",))
 def test_validate_header(value):
     with pytest.raises(click.BadParameter):
         validators.validate_headers(None, None, value)
