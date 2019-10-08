@@ -6,6 +6,7 @@ import pytest
 import yaml
 from aiohttp import web
 
+from schemathesis import __version__
 from schemathesis.runner import execute, get_base_url
 
 from .utils import make_schema
@@ -125,6 +126,14 @@ def test_server_error(server, app):
     assert_request(app, 0, "GET", "/v1/pets")
     assert_request(app, 1, "GET", "/v1/users")
     assert_request(app, 2, "GET", "/v1/users")
+
+
+def test_user_agent(server, app):
+    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
+    headers = {"User-Agent": f"schemathesis/{__version__}"}
+    assert len(app["saved_requests"]) == 2
+    assert_request(app, 0, "GET", "/v1/pets", headers)
+    assert_request(app, 1, "GET", "/v1/users", headers)
 
 
 @pytest.mark.parametrize(
