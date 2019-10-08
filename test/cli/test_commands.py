@@ -1,9 +1,15 @@
+from contextlib import contextmanager
 from functools import partial
 
 import pytest
 from click.testing import CliRunner
 
 from schemathesis import cli, runner
+
+
+@pytest.fixture()
+def cli_runner():
+    return CliRunner()
 
 
 @pytest.fixture()
@@ -117,31 +123,48 @@ SCHEMA_URI = "https://example.com/swagger.json"
         ),
     ),
 )
-def test_commands_run(mocker, args, expected):
+def test_commands_run(cli_runner, mocker, args, expected):
     m_execute = mocker.patch("schemathesis.runner.execute")
-    cli_runner = CliRunner()
 
-    schema_uri = "https://example.com/swagger.json"
     result = cli_runner.invoke(cli.run, args)
 
     assert result.exit_code == 0
-    m_execute.assert_called_once_with(schema_uri, **expected)
+    m_execute.assert_called_once_with(SCHEMA_URI, **expected)
 
 
 @pytest.mark.parametrize(
-    "data,line_in_output",
+    "data,line_in_output,exit_code",
     (
-        ({"not_a_server_error": {"total": 1, "ok": 1, "error": 0}}, "Tests succeeded."),
-        ({}, "No checks were performed."),
-        ({"not_a_server_error": {"total": 3, "ok": 1, "error": 2}}, "Tests failed."),
+        ({"not_a_server_error": {"total": 1, "ok": 1, "error": 0}}, "Tests succeeded.", 0),
+        ({}, "No checks were performed.", 0),
+        ({"not_a_server_error": {"total": 3, "ok": 1, "error": 2}}, "Tests failed.", 1),
     ),
 )
-def test_commands_run_output(mocker, data, line_in_output):
-    m_execute = mocker.patch("schemathesis.runner.execute", return_value=mocker.Mock(data=data, is_empty=not data))
+def test_commands_run_output(cli_runner, mocker, data, line_in_output, exit_code):
+    mocker.patch("schemathesis.runner.execute", return_value=mocker.Mock(data=data, is_empty=not data))
 
-    cli_runner = CliRunner()
     result = cli_runner.invoke(cli.run, [SCHEMA_URI])
+    assert result.exit_code == exit_code
 
     stdout_lines = result.stdout.split("\n")
     assert "Running schemathesis test cases ..." in stdout_lines
     assert line_in_output in stdout_lines
+
+
+def test_commands_with_hypothesis_statistic(cli_runner, mocker):
+    mocker.patch(
+        "schemathesis.runner.execute",
+        return_value=mocker.Mock(data={"not_a_server_error": {"total": 3, "ok": 1, "error": 2}}, is_empty=False),
+    )
+
+    @contextmanager
+    def mocked_listener():
+        yield lambda: "Mock error"
+
+    mocker.patch("schemathesis.utils.stdout_listener", mocked_listener)
+
+    result = cli_runner.invoke(cli.run, [SCHEMA_URI])
+    assert result.exit_code == 1
+    assert " FALSIFYING EXAMPLES " in result.stdout
+    assert "Mock error" in result.stdout
+    assert " SUMMARY " in result.stdout
