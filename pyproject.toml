@@ -34,6 +34,7 @@ pyyaml = "^5.1"
 pytest-subtests = "^0.2.1"
 requests = "^2.22"
 click = "^7.0"
+importlib_metadata = "^0.23.0"
 
 [tool.poetry.dev-dependencies]
 coverage = "^4.5"
