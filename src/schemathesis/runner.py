@@ -7,6 +7,7 @@ import attr
 import requests
 from requests.auth import AuthBase
 
+from . import __version__
 from .loaders import from_uri
 from .models import Case
 from .schemas import BaseSchema
@@ -54,6 +55,7 @@ def execute_from_schema(
     with requests.Session() as session:
         if auth is not None:
             session.auth = auth
+        session.headers.update({"User-agent": f"schemathesis/{__version__}"})
         if headers is not None:
             session.headers.update(**headers)
         for _, test in schema.get_all_tests(single_test):
