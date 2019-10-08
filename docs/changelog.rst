@@ -9,7 +9,7 @@ Changelog
 Added
 ~~~~~
 
-- Test executor collects results of execution. `29`_
+- Test executor collects results of execution. `#29`_
 
 Changed
 ~~~~~~~
