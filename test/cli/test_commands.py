@@ -43,6 +43,10 @@ def test_commands_version(schemathesis_cmd):
             ("run", "http://127.0.0.1", "--header=123"),
             'Error: Invalid value for "--header" / "-H": Should be in KEY:VALUE format. Got: 123',
         ),
+        (
+            ("run", "http://127.0.0.1", "--header=:"),
+            'Error: Invalid value for "--header" / "-H": Header name should not be empty',
+        ),
     ),
 )
 def test_commands_run_errors(schemathesis_cmd, args, error):

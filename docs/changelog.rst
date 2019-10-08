@@ -15,6 +15,7 @@ Changed
 ~~~~~~~
 
 - CLI command `schemathesis run` prints results in a more readable way with a summary of passing checks.
+- Empty header names are forbidden for CLI.
 
 `0.8.1`_ - 2019-10-04
 ---------------------

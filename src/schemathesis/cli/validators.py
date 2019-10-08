@@ -26,6 +26,8 @@ def validate_headers(ctx: click.core.Context, param: click.core.Option, raw_valu
     for header in raw_value:
         with reraise_format_error(header):
             key, value = header.split(":")
+        if not key:
+            raise click.BadParameter("Header name should not be empty")
         headers[key] = value.lstrip()
     return headers
 
