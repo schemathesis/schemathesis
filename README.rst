@@ -288,7 +288,7 @@ will be licensed under its MIT license.
 .. |Build| image:: https://github.com/kiwicom/schemathesis/workflows/build/badge.svg
    :target: https://github.com/kiwicom/schemathesis/actions
 .. |Coverage| image:: https://codecov.io/gh/kiwicom/schemathesis/branch/master/graph/badge.svg
-   :target: https://codecov.io/gh/kiwicom/schemathesis
+   :target: https://codecov.io/gh/kiwicom/schemathesis/branch/master
    :alt: codecov.io status for master branch
 .. |Version| image:: https://img.shields.io/pypi/v/schemathesis.svg
    :target: https://pypi.org/project/schemathesis/
