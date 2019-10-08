@@ -80,6 +80,17 @@ def test_execute(server, app):
     assert_request(app, 1, "GET", "/v1/users", headers)
 
 
+def test_execute_base_url(server, app):
+    base_uri = f"http://127.0.0.1:{server['port']}"
+    schema_uri = f"{base_uri}/swagger.yaml"
+
+    execute(schema_uri, api_options=dict(base_url=f"{base_uri}/404"))
+    assert len(app["saved_requests"]) == 0
+
+    execute(schema_uri, api_options=dict(base_url=base_uri))
+    assert len(app["saved_requests"]) == 2
+
+
 def test_execute_stats(server, app):
     app["config"]["raise_exception"] = True
     stats = execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")

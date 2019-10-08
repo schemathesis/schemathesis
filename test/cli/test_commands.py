@@ -79,6 +79,7 @@ def test_commands_run_help(schemathesis_cmd):
         r"  -E, --endpoint TEXT             Filter schemathesis test by endpoint",
         r"                                  pattern. Example: users/\d+",
         "  -M, --method TEXT               Filter schemathesis test by HTTP method.",
+        "  -b, --base-url TEXT             Base URL address of the API.",
         "  -h, --help                      Show this message and exit.",
     ]
 
@@ -109,6 +110,10 @@ SCHEMA_URI = "https://example.com/swagger.json"
         (
             [SCHEMA_URI, "--endpoint=users"],
             {"checks": runner.DEFAULT_CHECKS, "loader_options": {"endpoint": ("users",)}},
+        ),
+        (
+            [SCHEMA_URI, "--base-url=https://example.com/api/v1test"],
+            {"checks": runner.DEFAULT_CHECKS, "api_options": {"base_url": "https://example.com/api/v1test"}},
         ),
     ),
 )
