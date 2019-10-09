@@ -19,6 +19,7 @@ Changed
 
 - CLI command ``schemathesis run`` prints results in a more readable way with a summary of passing checks.
 - Empty header names are forbidden for CLI.
+- Suppressed hypothesis exception about using `example` non-interactively `#92`_
 
 `0.8.1`_ - 2019-10-04
 ---------------------
@@ -210,6 +211,7 @@ Fixed
 .. _#118: https://github.com/kiwicom/schemathesis/issues/118
 .. _#99: https://github.com/kiwicom/schemathesis/issues/99
 .. _#98: https://github.com/kiwicom/schemathesis/issues/98
+.. _#92: https://github.com/kiwicom/schemathesis/issues/92
 .. _#90: https://github.com/kiwicom/schemathesis/issues/90
 .. _#78: https://github.com/kiwicom/schemathesis/issues/78
 .. _#75: https://github.com/kiwicom/schemathesis/issues/75

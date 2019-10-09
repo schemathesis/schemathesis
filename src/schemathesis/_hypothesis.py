@@ -7,6 +7,7 @@ import hypothesis.strategies as st
 from hypothesis._strategies import just
 from hypothesis_jsonschema import from_schema
 
+from ._compat import handle_warnings
 from .models import Case, Endpoint
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
@@ -46,14 +47,15 @@ def get_examples(endpoint: Endpoint) -> Generator[Case, None, None]:
     for name in PARAMETERS:
         parameter = getattr(endpoint, name)
         if "example" in parameter:
-            other_parameters = {other: from_schema(getattr(endpoint, other)) for other in PARAMETERS - {name}}
-            yield st.builds(
-                Case,
-                path=st.just(endpoint.path),
-                method=st.just(endpoint.method),
-                **{name: just(parameter["example"])},
-                **other_parameters,
-            ).example()
+            with handle_warnings():
+                other_parameters = {other: from_schema(getattr(endpoint, other)) for other in PARAMETERS - {name}}
+                yield st.builds(
+                    Case,
+                    path=st.just(endpoint.path),
+                    method=st.just(endpoint.method),
+                    **{name: just(parameter["example"])},
+                    **other_parameters,
+                ).example()
 
 
 def add_examples(test: Callable, endpoint: Endpoint) -> Callable:
