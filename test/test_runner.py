@@ -140,9 +140,10 @@ def test_server_error(server, app):
 def test_user_agent(server, app):
     execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
     headers = {"User-Agent": f"schemathesis/{__version__}"}
-    assert len(app["saved_requests"]) == 2
+    assert len(app["saved_requests"]) == 3
     assert_request(app, 0, "GET", "/v1/pets", headers)
     assert_request(app, 1, "GET", "/v1/users", headers)
+    assert_request(app, 2, "GET", "/v1/zerror")
 
 
 @pytest.mark.parametrize(
