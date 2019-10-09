@@ -1,6 +1,7 @@
 from typing import Dict, Iterable, Optional, Tuple
 
 import click
+from requests.auth import HTTPDigestAuth
 
 from .. import runner, utils
 from ..types import Filter
@@ -36,6 +37,13 @@ def main() -> None:
     callback=validators.validate_auth,  # type: ignore
 )
 @click.option(  # type: ignore
+    "--auth-type",
+    "-A",
+    type=click.Choice(["basic", "digest"], case_sensitive=False),
+    default="basic",
+    help="The authentication mechanism to be used. Defaults to 'basic'.",
+)
+@click.option(  # type: ignore
     "--header",
     "-H",
     "headers",
@@ -57,6 +65,7 @@ def main() -> None:
 def run(  # pylint: disable=too-many-arguments
     schema: str,
     auth: Optional[Tuple[str, str]],
+    auth_type: str,
     headers: Dict[str, str],
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
     endpoints: Optional[Filter] = None,
@@ -70,6 +79,9 @@ def run(  # pylint: disable=too-many-arguments
     selected_checks = tuple(check for check in runner.DEFAULT_CHECKS if check.__name__ in checks)
 
     click.echo("Running schemathesis test cases ...")
+
+    if auth and auth_type == "digest":
+        auth = HTTPDigestAuth(*auth)  # type: ignore
 
     options = dict_true_values(
         api_options=dict_true_values(base_url=base_url, auth=auth, headers=headers),
