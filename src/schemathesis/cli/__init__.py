@@ -1,5 +1,3 @@
-import shutil
-import sys
 from typing import Dict, Iterable, Optional, Tuple
 
 import click
