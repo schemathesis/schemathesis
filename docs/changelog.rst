@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- HTTP Digest Auth support. `#106`_
+
 `0.9.0`_ - 2019-10-09
 ---------------------
 
@@ -212,6 +217,7 @@ Fixed
 .. _#130: https://github.com/kiwicom/schemathesis/issues/130
 .. _#121: https://github.com/kiwicom/schemathesis/issues/121
 .. _#118: https://github.com/kiwicom/schemathesis/issues/118
+.. _#106: https://github.com/kiwicom/schemathesis/issues/106
 .. _#99: https://github.com/kiwicom/schemathesis/issues/99
 .. _#98: https://github.com/kiwicom/schemathesis/issues/98
 .. _#92: https://github.com/kiwicom/schemathesis/issues/92

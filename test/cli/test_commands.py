@@ -3,6 +3,7 @@ from functools import partial
 
 import pytest
 from click.testing import CliRunner
+from requests.auth import HTTPDigestAuth
 
 from schemathesis import cli, runner
 
@@ -46,6 +47,10 @@ def test_commands_version(schemathesis_cmd):
             'Error: Invalid value for "--auth" / "-a": Should be in KEY:VALUE format. Got: 123',
         ),
         (
+            ("run", "http://127.0.0.1", "--auth-type=random"),
+            'Error: Invalid value for "--auth-type" / "-A": invalid choice: random. (choose from basic, digest)',
+        ),
+        (
             ("run", "http://127.0.0.1", "--header=123"),
             'Error: Invalid value for "--header" / "-H": Should be in KEY:VALUE format. Got: 123',
         ),
@@ -79,6 +84,8 @@ def test_commands_run_help(schemathesis_cmd):
         "                                  List of checks to run.",
         "  -a, --auth TEXT                 Server user and password. Example:",
         "                                  USER:PASSWORD",
+        "  -A, --auth-type [basic|digest]  The authentication mechanism to be used.",
+        "                                  Defaults to 'basic'.",
         "  -H, --header TEXT               Custom header in a that will be used in all",
         r"                                  requests to the server. Example:",
         r"                                  Authorization: Bearer\ 123",
@@ -100,6 +107,10 @@ SCHEMA_URI = "https://example.com/swagger.json"
         (
             [SCHEMA_URI, "--auth=test:test"],
             {"checks": runner.DEFAULT_CHECKS, "api_options": {"auth": ("test", "test")}},
+        ),
+        (
+            [SCHEMA_URI, "--auth=test:test", "--auth-type=digest"],
+            {"checks": runner.DEFAULT_CHECKS, "api_options": {"auth": HTTPDigestAuth("test", "test")}},
         ),
         (
             [SCHEMA_URI, "--header=Authorization:Bearer 123"],
