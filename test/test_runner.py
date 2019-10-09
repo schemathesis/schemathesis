@@ -16,7 +16,7 @@ def app():
     saved_requests = []
 
     async def schema(request):
-        raw = make_schema(paths={"/pets": {"get": {}}})
+        raw = make_schema(paths={"/pets": {"get": {}}, "/zerror": {"get": {}}})
         content = yaml.dump(raw)
         return web.Response(body=content)
 
@@ -31,7 +31,14 @@ def app():
         return web.Response()
 
     app = web.Application()
-    app.add_routes([web.get("/swagger.yaml", schema), web.get("/v1/users", users), web.get("/v1/pets", pets)])
+    app.add_routes(
+        [
+            web.get("/swagger.yaml", schema),
+            web.get("/v1/users", users),
+            web.get("/v1/zerror", users),
+            web.get("/v1/pets", pets),
+        ]
+    )
     app["saved_requests"] = saved_requests
     app["config"] = {"raise_exception": False}
     return app
@@ -75,7 +82,7 @@ def assert_not_request(app, method, path):
 def test_execute(server, app):
     headers = {"Authorization": "Bearer 123"}
     execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", api_options=dict(headers=headers))
-    assert len(app["saved_requests"]) == 2
+    assert len(app["saved_requests"]) == 3
     assert_request(app, 0, "GET", "/v1/pets", headers)
     assert_request(app, 1, "GET", "/v1/users", headers)
 
@@ -88,19 +95,19 @@ def test_execute_base_url(server, app):
     assert len(app["saved_requests"]) == 0
 
     execute(schema_uri, api_options=dict(base_url=base_uri))
-    assert len(app["saved_requests"]) == 2
+    assert len(app["saved_requests"]) == 3
 
 
 def test_execute_stats(server, app):
     app["config"]["raise_exception"] = True
     stats = execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
     assert "not_a_server_error" in stats.data
-    assert dict(stats.data["not_a_server_error"]) == {"total": 3, "ok": 1, "error": 2}
+    assert dict(stats.data["not_a_server_error"]) == {"total": 5, "ok": 1, "error": 4}
 
 
 def test_auth(server, app):
     execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", api_options=dict(auth=("test", "test")))
-    assert len(app["saved_requests"]) == 2
+    assert len(app["saved_requests"]) == 3
     headers = {"Authorization": "Basic dGVzdDp0ZXN0"}
     assert_request(app, 0, "GET", "/v1/pets", headers)
     assert_request(app, 1, "GET", "/v1/users", headers)
@@ -121,10 +128,12 @@ def test_execute_filter_method(server, app):
 def test_server_error(server, app):
     app["config"]["raise_exception"] = True
     execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
-    assert len(app["saved_requests"]) == 3
+    assert len(app["saved_requests"]) == 5
     assert_request(app, 0, "GET", "/v1/pets")
     assert_request(app, 1, "GET", "/v1/users")
     assert_request(app, 2, "GET", "/v1/users")
+    assert_request(app, 3, "GET", "/v1/zerror")
+    assert_request(app, 4, "GET", "/v1/zerror")
 
 
 @pytest.mark.parametrize(
