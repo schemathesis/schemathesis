@@ -12,6 +12,7 @@ Added
 - Test executor collects results of execution. `#29`_
 - CLI option ``--base-url`` for specifying base URL of API. `#118`_
 - Support for coroutine-based tests. `#121`_
+- User Agent to network requests in CLI & runner. `#130`_
 
 Changed
 ~~~~~~~
@@ -204,6 +205,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#130: https://github.com/kiwicom/schemathesis/issues/130
 .. _#121: https://github.com/kiwicom/schemathesis/issues/121
 .. _#118: https://github.com/kiwicom/schemathesis/issues/118
 .. _#99: https://github.com/kiwicom/schemathesis/issues/99
