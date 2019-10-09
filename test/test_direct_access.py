@@ -1,4 +1,5 @@
 import hypothesis.strategies as st
+import pytest
 
 from schemathesis.models import Case, Endpoint
 
@@ -31,6 +32,7 @@ def test_endpoint_access(swagger_20):
     assert isinstance(swagger_20["/v1/users"]["GET"], Endpoint)
 
 
+@pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_as_strategy(swagger_20):
     strategy = swagger_20["/v1/users"]["GET"].as_strategy()
     assert isinstance(strategy, st.SearchStrategy)
