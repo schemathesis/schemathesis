@@ -92,7 +92,7 @@ def single_test(
 ) -> None:
     """A single test body that will be executed against the target."""
     response = get_response(session, url, case)
-    errors = {}
+    errors = False
 
     for check in checks:
         check_name = check.__name__
@@ -101,10 +101,12 @@ def single_test(
             stats.increment(check_name)
         except AssertionError as e:
             stats.increment(check_name, error=e)
-            errors[check_name] = e
+            errors = True
 
     if errors:
-        raise AssertionError("Assertion failed in: {}.".format(",".join(errors)))
+        # An exception needed to trigger Hypothesis shrinking & flaky tests detection logic
+        # The message doesn't matter
+        raise AssertionError
 
 
 def get_response(session: requests.Session, url: str, case: Case) -> requests.Response:
