@@ -113,6 +113,10 @@ SCHEMA_URI = "https://example.com/swagger.json"
             {"checks": runner.DEFAULT_CHECKS, "api_options": {"auth": HTTPDigestAuth("test", "test")}},
         ),
         (
+            [SCHEMA_URI, "--auth=test:test", "--auth-type=DIGEST"],
+            {"checks": runner.DEFAULT_CHECKS, "api_options": {"auth": HTTPDigestAuth("test", "test")}},
+        ),
+        (
             [SCHEMA_URI, "--header=Authorization:Bearer 123"],
             {"checks": runner.DEFAULT_CHECKS, "api_options": {"headers": {"Authorization": "Bearer 123"}}},
         ),
