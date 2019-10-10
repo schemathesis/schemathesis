@@ -79,3 +79,18 @@ def test_(case):
     )
     # Then the generated test case should contain it in its `form_data` attribute
     testdir.run_and_assert(passed=1)
+
+
+def test_unknown_data(testdir):
+    # When parameter is specified for unknown "in"
+    testdir.make_test(
+        """
+@schema.parametrize()
+@settings(max_examples=1)
+def test_(case):
+    pass
+        """,
+        **as_param({"name": "status", "in": "unknown", "required": True, "type": "string"}),
+    )
+    # Then the generated test ignores this parameter
+    testdir.run_and_assert(passed=1)
