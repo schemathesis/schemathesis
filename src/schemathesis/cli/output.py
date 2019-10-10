@@ -9,7 +9,7 @@ from .. import runner
 
 @contextmanager
 def print_in_section(
-    title: str = "", separator: str = "-", start_newline: bool = False, line_length: Optional[int] = None
+    title: str, separator: str = "-", start_newline: bool = False, line_length: Optional[int] = None
 ) -> Generator:
     """Print section in terminal with the given title nicely centered.
 
@@ -23,7 +23,7 @@ def print_in_section(
 
     line_length = line_length or shutil.get_terminal_size((100, 50)).columns
 
-    click.echo((f" {title} " if title else "").center(line_length, separator))
+    click.echo(f" {title} ".center(line_length, separator))
     yield
     click.echo(separator * line_length)
 
