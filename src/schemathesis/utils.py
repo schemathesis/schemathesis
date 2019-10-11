@@ -40,6 +40,10 @@ def dict_true_values(**kwargs: Any) -> Mapping[str, Any]:
     return {key: value for key, value in kwargs.items() if bool(value)}
 
 
+def dict_not_none_values(**kwargs: Any) -> Mapping[str, Any]:
+    return {key: value for key, value in kwargs.items() if value is not None}
+
+
 @contextmanager
 def stdout_listener() -> Generator:
     """Replace stdout and listen for printed values (without printing them).

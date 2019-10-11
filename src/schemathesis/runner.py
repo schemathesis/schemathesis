@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Union
 from urllib.parse import urlsplit, urlunsplit
 
 import attr
+import hypothesis
 import requests
 from requests.auth import AuthBase
 
@@ -47,6 +48,8 @@ def execute_from_schema(
     schema: BaseSchema,
     base_url: str,
     checks: Iterable[Callable],
+    *,
+    hypothesis_options: Optional[Dict[str, Any]] = None,
     auth: Optional[Auth] = None,
     headers: Optional[Dict[str, Any]] = None,
 ) -> StatsCollector:
@@ -58,18 +61,22 @@ def execute_from_schema(
         session.headers.update({"User-agent": f"schemathesis/{__version__}"})
         if headers is not None:
             session.headers.update(**headers)
-        for _, test in schema.get_all_tests(single_test):
+        settings: Optional[hypothesis.settings] = None
+        if hypothesis_options is not None:
+            settings = hypothesis.settings(**hypothesis_options)
+        for _, test in schema.get_all_tests(single_test, settings):
             with suppress(AssertionError):
                 test(session, base_url, checks, stats)
 
     return stats
 
 
-def execute(
+def execute(  # pylint: disable=too-many-arguments
     schema_uri: str,
     checks: Iterable[Callable] = DEFAULT_CHECKS,
     api_options: Optional[Dict[str, Any]] = None,
     loader_options: Optional[Dict[str, Any]] = None,
+    hypothesis_options: Optional[Dict[str, Any]] = None,
     loader: Callable = from_uri,
 ) -> StatsCollector:
     """Generate and run test cases against the given API definition."""
@@ -78,7 +85,7 @@ def execute(
 
     schema = loader(schema_uri, **loader_options)
     base_url = api_options.pop("base_url", "") or get_base_url(schema_uri)
-    return execute_from_schema(schema, base_url, checks, **api_options)
+    return execute_from_schema(schema, base_url, checks, hypothesis_options=hypothesis_options, **api_options)
 
 
 def get_base_url(uri: str) -> str:

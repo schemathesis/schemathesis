@@ -1,8 +1,10 @@
 from contextlib import contextmanager
 from functools import partial
 
+import hypothesis
 import pytest
 from click.testing import CliRunner
+from hypothesis import HealthCheck, Phase, Verbosity
 from requests.auth import HTTPDigestAuth
 
 from schemathesis import cli, runner
@@ -58,6 +60,11 @@ def test_commands_version(schemathesis_cmd):
             ("run", "http://127.0.0.1", "--header=:"),
             'Error: Invalid value for "--header" / "-H": Header name should not be empty',
         ),
+        (
+            ("run", "http://127.0.0.1", "--hypothesis-phases=explicit,first,second"),
+            'Error: Invalid value for "--hypothesis-phases": invalid choice(s): first, second. '
+            "Choose from explicit, reuse, generate, shrink",
+        ),
     ),
 )
 def test_commands_run_errors(schemathesis_cmd, args, error):
@@ -93,6 +100,24 @@ def test_commands_run_help(schemathesis_cmd):
         r"                                  pattern. Example: users/\d+",
         "  -M, --method TEXT               Filter schemathesis test by HTTP method.",
         "  -b, --base-url TEXT             Base URL address of the API.",
+        "  --hypothesis-deadline INTEGER   Duration in milliseconds that each",
+        "                                  individual example with a test is not",
+        "                                  allowed to exceed.",
+        "  --hypothesis-derandomize        Use Hypothesis's deterministic mode.",
+        "  --hypothesis-max-examples INTEGER",
+        "                                  Maximum number of generated examples per",
+        "                                  each method/endpoint combination.",
+        "  --hypothesis-phases [explicit|reuse|generate|shrink]",
+        "                                  Control which phases should be run.",
+        "  --hypothesis-report-multiple-bugs BOOLEAN",
+        "                                  Raise only the exception with the smallest",
+        "                                  minimal example.",
+        "  --hypothesis-suppress-health-check [data_too_large|filter_too_much|too_slow|return_value|"
+        "hung_test|large_base_example|not_a_test_method]",
+        "                                  Comma-separated list of health checks to",
+        "                                  disable.",
+        "  --hypothesis-verbosity [quiet|normal|verbose|debug]",
+        "                                  Verbosity level of Hypothesis messages",
         "  -h, --help                      Show this message and exit.",
     ]
 
@@ -136,6 +161,30 @@ SCHEMA_URI = "https://example.com/swagger.json"
             [SCHEMA_URI, "--base-url=https://example.com/api/v1test"],
             {"checks": runner.DEFAULT_CHECKS, "api_options": {"base_url": "https://example.com/api/v1test"}},
         ),
+        (
+            [
+                SCHEMA_URI,
+                "--hypothesis-deadline=1000",
+                "--hypothesis-derandomize",
+                "--hypothesis-max-examples=1000",
+                "--hypothesis-phases=explicit,generate",
+                "--hypothesis-report-multiple-bugs=0",
+                "--hypothesis-suppress-health-check=too_slow,filter_too_much",
+                "--hypothesis-verbosity=normal",
+            ],
+            {
+                "checks": runner.DEFAULT_CHECKS,
+                "hypothesis_options": {
+                    "deadline": 1000,
+                    "derandomize": True,
+                    "max_examples": 1000,
+                    "phases": [Phase.explicit, Phase.generate],
+                    "report_multiple_bugs": False,
+                    "suppress_health_check": [HealthCheck.too_slow, HealthCheck.filter_too_much],
+                    "verbosity": Verbosity.normal,
+                },
+            },
+        ),
     ),
 )
 def test_commands_run(cli_runner, mocker, args, expected):
@@ -145,6 +194,27 @@ def test_commands_run(cli_runner, mocker, args, expected):
 
     assert result.exit_code == 0
     m_execute.assert_called_once_with(SCHEMA_URI, **expected)
+
+
+def test_hypothesis_parameters(cli_runner, mocker):
+    # When Hypothesis options are passed via command line
+    args = [
+        SCHEMA_URI,
+        "--hypothesis-deadline=1000",
+        "--hypothesis-derandomize",
+        "--hypothesis-max-examples=1000",
+        "--hypothesis-phases=explicit,generate",
+        "--hypothesis-report-multiple-bugs=0",
+        "--hypothesis-suppress-health-check=too_slow,filter_too_much",
+        "--hypothesis-verbosity=normal",
+    ]
+    m_execute = mocker.patch("schemathesis.runner.execute")
+
+    result = cli_runner.invoke(cli.run, args)
+    assert result.exit_code == 0
+    # Then they should be correctly converted into arguments accepted by `hypothesis.settings`
+    # Parameters are validated in `hypothesis.settings`
+    hypothesis.settings(**m_execute.call_args[1]["hypothesis_options"])
 
 
 @pytest.mark.parametrize(
