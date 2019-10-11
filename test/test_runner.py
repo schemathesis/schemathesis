@@ -25,6 +25,8 @@ def app():
         saved_requests.append(request)
         if app["config"]["raise_exception"]:
             raise web.HTTPInternalServerError
+        if app["config"]["sleep"]:
+            await asyncio.sleep(app["config"]["sleep"])
         return web.Response()
 
     async def pets(request):
@@ -41,7 +43,7 @@ def app():
         ]
     )
     app["saved_requests"] = saved_requests
-    app["config"] = {"raise_exception": False}
+    app["config"] = {"raise_exception": False, "sleep": 0}
     return app
 
 
@@ -82,7 +84,7 @@ def assert_not_request(app, method, path):
 
 def test_execute(server, app):
     headers = {"Authorization": "Bearer 123"}
-    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", api_options=dict(headers=headers))
+    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", api_options={"headers": headers})
     assert len(app["saved_requests"]) == 3
     assert_request(app, 0, "GET", "/v1/pets", headers)
     assert_request(app, 1, "GET", "/v1/users", headers)
@@ -92,10 +94,10 @@ def test_execute_base_url(server, app):
     base_uri = f"http://127.0.0.1:{server['port']}"
     schema_uri = f"{base_uri}/swagger.yaml"
 
-    execute(schema_uri, api_options=dict(base_url=f"{base_uri}/404"))
+    execute(schema_uri, api_options={"base_url": f"{base_uri}/404"})
     assert len(app["saved_requests"]) == 0
 
-    execute(schema_uri, api_options=dict(base_url=base_uri))
+    execute(schema_uri, api_options={"base_url": base_uri})
     assert len(app["saved_requests"]) == 3
 
 
@@ -107,7 +109,7 @@ def test_execute_stats(server, app):
 
 
 def test_auth(server, app):
-    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", api_options=dict(auth=("test", "test")))
+    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", api_options={"auth": ("test", "test")})
     assert len(app["saved_requests"]) == 3
     headers = {"Authorization": "Basic dGVzdDp0ZXN0"}
     assert_request(app, 0, "GET", "/v1/pets", headers)
@@ -115,14 +117,14 @@ def test_auth(server, app):
 
 
 def test_execute_filter_endpoint(server, app):
-    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", loader_options=dict(endpoint=["pets"]))
+    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", loader_options={"endpoint": ["pets"]})
     assert len(app["saved_requests"]) == 1
     assert_request(app, 0, "GET", "/v1/pets")
     assert_not_request(app, "GET", "/v1/users")
 
 
 def test_execute_filter_method(server, app):
-    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", loader_options=dict(method=["POST"]))
+    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", loader_options={"method": ["POST"]})
     assert len(app["saved_requests"]) == 0
 
 
@@ -135,6 +137,15 @@ def test_server_error(server, app):
     assert_request(app, 2, "GET", "/v1/users")
     assert_request(app, 3, "GET", "/v1/zerror")
     assert_request(app, 4, "GET", "/v1/zerror")
+
+
+def test_hypothesis_deadline(server, app):
+    app["config"]["sleep"] = 0.25
+    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", hypothesis_options={"deadline": 500})
+    assert len(app["saved_requests"]) == 3
+    assert_request(app, 0, "GET", "/v1/pets")
+    assert_request(app, 1, "GET", "/v1/users")
+    assert_request(app, 2, "GET", "/v1/zerror")
 
 
 def test_user_agent(server, app):

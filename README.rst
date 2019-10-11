@@ -142,6 +142,12 @@ The ``schemathesis`` command can be used to perform Schemathesis test cases:
 If your application requires authorization then you can use ``--auth`` option for Basic Auth and ``--header`` to specify
 custom headers to be sent with each request.
 
+CLI supports passing options to ``hypothesis.settings``. All of them are prefixed with ``--hypothesis-``:
+
+.. code:: bash
+
+    schemathesis run --hypothesis-max-examples=1000 https://example.com/api/swagger.json
+
 For the full list of options, run:
 
 .. code:: bash
