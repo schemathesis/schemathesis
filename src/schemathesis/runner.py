@@ -19,7 +19,7 @@ def _stats_data_factory() -> defaultdict:
     return defaultdict(Counter)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, repr=False)
 class StatsCollector:
     """A container for collected data from test executor."""
 
