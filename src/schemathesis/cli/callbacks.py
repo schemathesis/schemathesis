@@ -3,16 +3,17 @@ from typing import Dict, Generator, Optional, Tuple
 from urllib.parse import urlparse
 
 import click
+import hypothesis
 
 
-def validate_schema(ctx: click.core.Context, param: click.core.Option, raw_value: str) -> str:
+def validate_schema(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
     if not urlparse(raw_value).netloc:
         raise click.UsageError("Invalid SCHEMA, must be a valid URL.")
     return raw_value
 
 
 def validate_auth(
-    ctx: click.core.Context, param: click.core.Option, raw_value: Optional[str]
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]
 ) -> Optional[Tuple[str, str]]:
     if raw_value is not None:
         with reraise_format_error(raw_value):
@@ -21,7 +22,9 @@ def validate_auth(
     return None
 
 
-def validate_headers(ctx: click.core.Context, param: click.core.Option, raw_value: Tuple[str, ...]) -> Dict[str, str]:
+def validate_headers(
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: Tuple[str, ...]
+) -> Dict[str, str]:
     headers = {}
     for header in raw_value:
         with reraise_format_error(header):
@@ -30,6 +33,14 @@ def validate_headers(ctx: click.core.Context, param: click.core.Option, raw_valu
             raise click.BadParameter("Header name should not be empty")
         headers[key] = value.lstrip()
     return headers
+
+
+def convert_verbosity(
+    ctx: click.core.Context, param: click.core.Parameter, value: Optional[str]
+) -> Optional[hypothesis.Verbosity]:
+    if value is None:
+        return value
+    return hypothesis.Verbosity[value]
 
 
 @contextmanager
