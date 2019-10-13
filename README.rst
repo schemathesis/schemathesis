@@ -116,6 +116,7 @@ To limit the number of examples you could use ``hypothesis.settings`` decorator 
 
     from hypothesis import settings
 
+    @schema.parametrize()
     @settings(max_examples=5)
     def test_something(client, case):
         ...
