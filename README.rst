@@ -67,14 +67,6 @@ look like this:
     def test_no_server_errors(case):
         # `requests` will make an appropriate call under the hood
         response = case.call(BASE_URL)
-        # or more verbose
-        response = requests.request(
-            case.method,
-            f"{BASE_URL}{case.formatted_path}",
-            headers=case.headers,
-            params=case.query,
-            json=case.body
-        )
         assert response.status_code < 500
 
 
@@ -108,6 +100,18 @@ Important ``Case`` attributes:
 - ``headers`` - HTTP headers
 - ``query`` - query parameters
 - ``body`` - request body
+
+You can use them manually in network calls or can convert to a dictionary acceptable by ``requests.request``:
+
+.. code:: python
+
+    import requests
+
+    @schema.parametrize()
+    def test_no_server_errors(case):
+        kwargs = case.as_requests_kwargs("http://0.0.0.0:8080")
+        response = requests.request(**kwargs)
+
 
 For each test, Schemathesis will generate a bunch of random inputs acceptable by the schema.
 This data could be used to verify that your application works in the way as described in the schema or that schema describes expected behavior.
