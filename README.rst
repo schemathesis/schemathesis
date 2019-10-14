@@ -65,6 +65,9 @@ look like this:
 
     @schema.parametrize()
     def test_no_server_errors(case):
+        # `requests` will make an appropriate call under the hood
+        response = case.call(BASE_URL)
+        # or more verbose
         response = requests.request(
             case.method,
             f"{BASE_URL}{case.formatted_path}",

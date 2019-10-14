@@ -96,17 +96,6 @@ def swagger_20(simple_schema):
 
 
 @pytest.fixture()
-def case_factory():
-
-    defaults = {"method": "GET", "headers": {}, "query": [], "body": {}, "cookies": {}, "form_data": {}}
-
-    def maker(**kwargs):
-        return schemathesis.Case(**{**defaults, **kwargs})
-
-    return maker
-
-
-@pytest.fixture()
 def testdir(testdir):
     def maker(content, method=None, endpoint=None, pytest_plugins=("aiohttp.pytest_plugin",), **kwargs):
         schema = make_schema(**kwargs)
