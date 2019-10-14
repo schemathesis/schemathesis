@@ -1,8 +1,9 @@
 from textwrap import dedent
 
 import pytest
+from click.testing import CliRunner
 
-import schemathesis
+import schemathesis.cli
 
 from .app import create_app, run_server
 from .utils import make_schema
@@ -48,6 +49,26 @@ def schema_url(base_url):
     return f"{base_url}/swagger.yaml"
 
 
+@pytest.fixture()
+def cli(testdir):
+    """CLI runner helper.
+
+    Provides in-process execution via `click.CliRunner` and sub-process execution via `pytest.pytester.Testdir`.
+    """
+
+    class Runner:
+        @staticmethod
+        def run_inprocess(*args, **kwargs):
+            cli_runner = CliRunner()
+            return cli_runner.invoke(schemathesis.cli.run, args, **kwargs)
+
+        @staticmethod
+        def run_subprocess(*args, **kwargs):
+            return testdir.run("schemathesis", *args, **kwargs)
+
+    return Runner()
+
+
 @pytest.fixture
 def simple_schema():
     return {
@@ -83,11 +104,6 @@ def case_factory():
         return schemathesis.Case(**{**defaults, **kwargs})
 
     return maker
-
-
-@pytest.fixture()
-def testcmd(testdir):
-    return testdir.run
 
 
 @pytest.fixture()
