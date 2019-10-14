@@ -1,75 +1,11 @@
-import asyncio
-import threading
-from time import sleep
-
 import pytest
-import yaml
-from aiohttp import web
 
 from schemathesis import __version__
 from schemathesis.runner import execute, get_base_url
 
-from .utils import make_schema
-
-
-@pytest.fixture()
-def app():
-    saved_requests = []
-
-    async def schema(request):
-        raw = make_schema(paths={"/pets": {"get": {}}, "/zerror": {"get": {}}})
-        content = yaml.dump(raw)
-        return web.Response(body=content)
-
-    async def users(request):
-        saved_requests.append(request)
-        if app["config"]["raise_exception"]:
-            raise web.HTTPInternalServerError
-        if app["config"]["sleep"]:
-            await asyncio.sleep(app["config"]["sleep"])
-        return web.Response()
-
-    async def pets(request):
-        saved_requests.append(request)
-        return web.Response()
-
-    app = web.Application()
-    app.add_routes(
-        [
-            web.get("/swagger.yaml", schema),
-            web.get("/v1/users", users),
-            web.get("/v1/zerror", users),
-            web.get("/v1/pets", pets),
-        ]
-    )
-    app["saved_requests"] = saved_requests
-    app["config"] = {"raise_exception": False, "sleep": 0}
-    return app
-
-
-def run_server(app, port):
-    # Set a loop for a new thread (there is no by default for non-main threads)
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    runner = web.AppRunner(app)
-    loop.run_until_complete(runner.setup())
-    site = web.TCPSite(runner, "127.0.0.1", port)
-    loop.run_until_complete(site.start())
-    loop.run_forever()
-
-
-@pytest.fixture()
-def server(app, aiohttp_unused_port):
-    port = aiohttp_unused_port()
-    t = threading.Thread(target=run_server, args=(app, port))
-    t.daemon = True
-    t.start()
-    sleep(0.05)  # Wait for the app startup
-    yield {"port": port}
-
 
 def assert_request(app, idx, method, path, headers=None):
-    request = app["saved_requests"][idx]
+    request = app["incoming_requests"][idx]
     assert request.method == method
     assert request.path == path
     if headers:
@@ -78,83 +14,92 @@ def assert_request(app, idx, method, path, headers=None):
 
 
 def assert_not_request(app, method, path):
-    for request in app["saved_requests"]:
+    for request in app["incoming_requests"]:
         assert not (request.path == path and request.method == method)
 
 
-def test_execute(server, app):
-    headers = {"Authorization": "Bearer 123"}
-    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", api_options={"headers": headers})
-    assert len(app["saved_requests"]) == 3
-    assert_request(app, 0, "GET", "/v1/pets", headers)
-    assert_request(app, 1, "GET", "/v1/users", headers)
+def test_execute_base_url_not_found(base_url, schema_url, app):
+    # When base URL is pointing to an unknown location
+    execute(schema_url, api_options={"base_url": f"{base_url}/404"})
+    # Then the runner should use this base
+    # And they will not reach the application
+    assert len(app["incoming_requests"]) == 0
 
 
-def test_execute_base_url(server, app):
-    base_uri = f"http://127.0.0.1:{server['port']}"
-    schema_uri = f"{base_uri}/swagger.yaml"
-
-    execute(schema_uri, api_options={"base_url": f"{base_uri}/404"})
-    assert len(app["saved_requests"]) == 0
-
-    execute(schema_uri, api_options={"base_url": base_uri})
-    assert len(app["saved_requests"]) == 3
+def test_execute_base_url_found(base_url, schema_url, app):
+    # When base_url is specified
+    execute(schema_url, api_options={"base_url": base_url})
+    # Then it should be used by the runner
+    assert len(app["incoming_requests"]) == 3
 
 
-def test_execute_stats(server, app):
-    app["config"]["raise_exception"] = True
-    stats = execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
-    assert "not_a_server_error" in stats.data
-    assert dict(stats.data["not_a_server_error"]) == {"total": 5, "ok": 1, "error": 4}
+def test_execute(schema_url, app):
+    # When the runner is executed against the default test app
+    stats = execute(schema_url)
 
-
-def test_auth(server, app):
-    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", api_options={"auth": ("test", "test")})
-    assert len(app["saved_requests"]) == 3
-    headers = {"Authorization": "Basic dGVzdDp0ZXN0"}
-    assert_request(app, 0, "GET", "/v1/pets", headers)
-    assert_request(app, 1, "GET", "/v1/users", headers)
-
-
-def test_execute_filter_endpoint(server, app):
-    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", loader_options={"endpoint": ["pets"]})
-    assert len(app["saved_requests"]) == 1
-    assert_request(app, 0, "GET", "/v1/pets")
-    assert_not_request(app, "GET", "/v1/users")
-
-
-def test_execute_filter_method(server, app):
-    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", loader_options={"method": ["POST"]})
-    assert len(app["saved_requests"]) == 0
-
-
-def test_server_error(server, app):
-    app["config"]["raise_exception"] = True
-    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
-    assert len(app["saved_requests"]) == 5
-    assert_request(app, 0, "GET", "/v1/pets")
-    assert_request(app, 1, "GET", "/v1/users")
-    assert_request(app, 2, "GET", "/v1/users")
-    assert_request(app, 3, "GET", "/v1/zerror")
-    assert_request(app, 4, "GET", "/v1/zerror")
-
-
-def test_hypothesis_deadline(server, app):
-    app["config"]["sleep"] = 0.25
-    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml", hypothesis_options={"deadline": 500})
-    assert len(app["saved_requests"]) == 3
-    assert_request(app, 0, "GET", "/v1/pets")
-    assert_request(app, 1, "GET", "/v1/users")
-    assert_request(app, 2, "GET", "/v1/zerror")
-
-
-def test_user_agent(server, app):
-    execute(f"http://127.0.0.1:{server['port']}/swagger.yaml")
+    # Then there are three executed cases
+    # Two errors - the second one is a flakiness check
     headers = {"User-Agent": f"schemathesis/{__version__}"}
-    assert len(app["saved_requests"]) == 3
-    assert_request(app, 0, "GET", "/v1/pets", headers)
-    assert_request(app, 1, "GET", "/v1/users", headers)
-    assert_request(app, 2, "GET", "/v1/zerror")
+    assert len(app["incoming_requests"]) == 3
+    assert_request(app, 0, "GET", "/api/failure", headers)
+    assert_request(app, 1, "GET", "/api/failure", headers)
+    assert_request(app, 2, "GET", "/api/success", headers)
+
+    # And statistic is showing the breakdown of cases types
+    assert "not_a_server_error" in stats.data
+    assert dict(stats.data["not_a_server_error"]) == {"total": 3, "ok": 1, "error": 2}
+
+
+def test_auth(schema_url, app):
+    # When auth is specified in `api_options` as a tuple of 2 strings
+    execute(schema_url, api_options={"auth": ("test", "test")})
+
+    # Then each request should contain corresponding basic auth header
+    assert len(app["incoming_requests"]) == 3
+    headers = {"Authorization": "Basic dGVzdDp0ZXN0"}
+    assert_request(app, 0, "GET", "/api/failure", headers)
+    assert_request(app, 1, "GET", "/api/failure", headers)
+    assert_request(app, 2, "GET", "/api/success", headers)
+
+
+def test_execute_with_headers(schema_url, app):
+    # When headers are specified for the `execute` call
+    headers = {"Authorization": "Bearer 123"}
+    execute(schema_url, api_options={"headers": headers})
+
+    # Then each request should contain these headers
+    assert len(app["incoming_requests"]) == 3
+    assert_request(app, 0, "GET", "/api/failure", headers)
+    assert_request(app, 1, "GET", "/api/failure", headers)
+    assert_request(app, 2, "GET", "/api/success", headers)
+
+
+def test_execute_filter_endpoint(schema_url, app):
+    # When `endpoint` is passed in `loader_options` in the `execute` call
+    execute(schema_url, loader_options={"endpoint": ["success"]})
+
+    # Then the runner will make calls only to the specified endpoint
+    assert len(app["incoming_requests"]) == 1
+    assert_request(app, 0, "GET", "/api/success")
+    assert_not_request(app, "GET", "/api/failure")
+
+
+def test_execute_filter_method(schema_url, app):
+    # When `method` passed in `loader_options` corresponds to a method that is not defined in the app schema
+    execute(schema_url, loader_options={"method": ["POST"]})
+    # Then runner will not make any requests
+    assert len(app["incoming_requests"]) == 0
+
+
+@pytest.mark.endpoints("slow")
+def test_hypothesis_deadline(schema_url, app):
+    # When `deadline` is passed in `hypothesis_options` in the `execute` call
+    execute(schema_url, hypothesis_options={"deadline": 500})
+
+    # Then it should be passed to `hypothesis.settings`
+    # And slow endpoint (250ms) should not be considered as breaking the deadline
+    assert len(app["incoming_requests"]) == 1
+    assert_request(app, 0, "GET", "/api/slow")
 
 
 @pytest.mark.parametrize(
