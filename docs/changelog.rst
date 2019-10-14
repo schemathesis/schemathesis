@@ -11,7 +11,9 @@ Added
 
 - HTTP Digest Auth support. `#106`_
 - Support for Hypothesis settings in CLI & Runner. `#107`_
+- ``Case.call`` and ``Case.as_requests_kwargs`` convenience methods. `#109`_
 - Local development server. `#126`_
+
 Removed
 ~~~~~~~
 
@@ -224,6 +226,7 @@ Fixed
 .. _#126: https://github.com/kiwicom/schemathesis/issues/126
 .. _#121: https://github.com/kiwicom/schemathesis/issues/121
 .. _#118: https://github.com/kiwicom/schemathesis/issues/118
+.. _#109: https://github.com/kiwicom/schemathesis/issues/109
 .. _#107: https://github.com/kiwicom/schemathesis/issues/107
 .. _#106: https://github.com/kiwicom/schemathesis/issues/106
 .. _#99: https://github.com/kiwicom/schemathesis/issues/99
