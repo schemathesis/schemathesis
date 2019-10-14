@@ -4,9 +4,48 @@ import pytest
 
 import schemathesis
 
+from .app import create_app, run_server
 from .utils import make_schema
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "endpoints(*names): add only specified endpoints to the test application.")
+
+
+@pytest.fixture()
+def app(request):
+    """AioHTTP application with configurable endpoints.
+
+    Endpoint names should be passed as positional arguments to `pytest.mark.endpoints` decorator.
+    """
+    marker = request.node.get_closest_marker("endpoints")
+    if marker:
+        endpoints = marker.args
+    else:
+        endpoints = ("success", "failure")
+    return create_app(endpoints)
+
+
+@pytest.fixture()
+def server(app, aiohttp_unused_port):
+    """Run the app on an unused port."""
+    port = aiohttp_unused_port()
+    run_server(app, port)
+    yield {"port": port}
+
+
+@pytest.fixture()
+def base_url(server):
+    """Base URL for the running application."""
+    return f"http://127.0.0.1:{server['port']}"
+
+
+@pytest.fixture()
+def schema_url(base_url):
+    """URL of the schema of the running application."""
+    return f"{base_url}/swagger.yaml"
 
 
 @pytest.fixture
