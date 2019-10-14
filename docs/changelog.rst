@@ -11,7 +11,7 @@ Added
 
 - HTTP Digest Auth support. `#106`_
 - Support for Hypothesis settings in CLI & Runner. `#107`_
-
+- Local development server. `#126`_
 Removed
 ~~~~~~~
 
@@ -221,6 +221,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#130: https://github.com/kiwicom/schemathesis/issues/130
+.. _#126: https://github.com/kiwicom/schemathesis/issues/126
 .. _#121: https://github.com/kiwicom/schemathesis/issues/121
 .. _#118: https://github.com/kiwicom/schemathesis/issues/118
 .. _#107: https://github.com/kiwicom/schemathesis/issues/107

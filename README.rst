@@ -273,6 +273,49 @@ For the full documentation, please see https://schemathesis.readthedocs.io/en/la
 
 Or you can look at the ``docs/`` directory in the repository.
 
+Local development
+-----------------
+
+First, you need to prepare a virtual environment with `poetry`_.
+Install ``poetry`` (check out the `installation guide`_) and run this command inside the project root:
+
+.. code:: bash
+
+    poetry install
+
+For simpler local development Schemathesis includes a ``aiohttp``-based server with 3 endpoints in Swagger 2.0 schema:
+
+- ``/api/success`` - always returns ``{"success": true}``
+- ``/api/failure`` - always returns 500
+- ``/api/slow`` - always returns ``{"slow": true}`` after 250 ms delay
+
+To start the server:
+
+.. code:: bash
+
+    ./test_server.sh 8081
+
+It is possible to configure available endpoints via ``--endpoints`` option.
+The value is expected to be a comma separated string with endpoint names (``success``, ``failure`` or ``slow``):
+
+.. code:: bash
+
+    ./test_server.sh 8081 --endpoints=success,slow
+
+Then you could use CLI against this server:
+
+.. code:: bash
+
+    schemathesis run http://127.0.0.1:8081/swagger.yaml
+    Running schemathesis test cases ...
+
+    -------------------------------------------------------------
+    not_a_server_error            2 / 2 passed          PASSED
+    -------------------------------------------------------------
+
+    Tests succeeded.
+
+
 Contributing
 ------------
 
@@ -307,6 +350,8 @@ will be licensed under its MIT license.
 .. _hypothesis: https://hypothesis.works/
 .. _hypothesis_jsonschema: https://github.com/Zac-HD/hypothesis-jsonschema
 .. _pytest: http://pytest.org/en/latest/
+.. _poetry: https://github.com/sdispater/poetry
+.. _installation guide: https://github.com/sdispater/poetry#installation
 .. _here: https://hypothesis.readthedocs.io/en/latest/reproducing.html#providing-explicit-examples
 .. _CONTRIBUTING.rst: https://github.com/kiwicom/schemathesis/blob/contributing/CONTRIBUTING.rst
 .. _MIT license: https://opensource.org/licenses/MIT

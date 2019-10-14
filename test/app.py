@@ -1,10 +1,35 @@
 import asyncio
+import logging
 import threading
+from enum import Enum
+from functools import wraps
 from time import sleep
 from typing import Dict, Tuple
 
+import click
 import yaml
 from aiohttp import web
+
+from schemathesis.cli import CSVOption
+
+
+async def success(request):
+    return web.json_response({"success": True})
+
+
+async def failure(request):
+    raise web.HTTPInternalServerError
+
+
+async def slow(request):
+    await asyncio.sleep(0.25)
+    return web.json_response({"slow": True})
+
+
+class Endpoint(Enum):
+    success = ("/api/success", success)
+    failure = ("/api/failure", failure)
+    slow = ("/api/slow", slow)
 
 
 def create_app(endpoints=("success", "failure")) -> web.Application:
@@ -25,24 +50,18 @@ def create_app(endpoints=("success", "failure")) -> web.Application:
         content = yaml.dump(schema_data)
         return web.Response(body=content)
 
-    async def success(request):
-        incoming_requests.append(request)
-        return web.Response()
+    def wrapper(handler):
+        @wraps(handler)
+        async def inner(request):
+            incoming_requests.append(request)
+            return await handler(request)
 
-    async def failure(request):
-        incoming_requests.append(request)
-        raise web.HTTPInternalServerError
-
-    async def slow(request):
-        incoming_requests.append(request)
-        await asyncio.sleep(0.25)
-        return web.Response()
-
-    mapping = {"success": ("/api/success", success), "slow": ("/api/slow", slow), "failure": ("/api/failure", failure)}
+        return inner
 
     app = web.Application()
     app.add_routes(
-        [web.get("/swagger.yaml", schema)] + [web.get(*value) for key, value in mapping.items() if key in endpoints]
+        [web.get("/swagger.yaml", schema)]
+        + [web.get(item.value[0], wrapper(item.value[1])) for item in Endpoint if item.name in endpoints]
     )
     app["incoming_requests"] = incoming_requests
     return app
@@ -74,6 +93,7 @@ def _run_server(app: web.Application, port: int) -> None:
     """Run the given app on the given port.
 
     Intended to be called as a target for a separate thread.
+    NOTE. `aiohttp.web.run_app` works only in the main thread and can't be used here (or maybe can we some tuning)
     """
     # Set a loop for a new thread (there is no by default for non-main threads)
     loop = asyncio.new_event_loop()
@@ -91,3 +111,16 @@ def run_server(app: web.Application, port: int, timeout: float = 0.05) -> None:
     server_thread.daemon = True
     server_thread.start()
     sleep(timeout)
+
+
+@click.command()
+@click.argument("port", type=int)
+@click.option("--endpoints", type=CSVOption(Endpoint))
+def run_app(port, endpoints):
+    app = create_app(endpoints or ("success", "failure"))
+    web.run_app(app, port=port)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
+    run_app()
