@@ -1,41 +1,27 @@
-from contextlib import contextmanager
-from functools import partial
-
-import hypothesis
 import pytest
-from click.testing import CliRunner
+from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
 from requests.auth import HTTPDigestAuth
 
-from schemathesis import cli, runner
+from schemathesis.runner import DEFAULT_CHECKS
 
 
-@pytest.fixture()
-def cli_runner():
-    return CliRunner()
+def test_commands_help(cli):
+    result = cli.run_subprocess()
 
-
-@pytest.fixture()
-def schemathesis_cmd(testcmd):
-    return partial(testcmd, "schemathesis")
-
-
-def test_commands_help(schemathesis_cmd):
-    result = schemathesis_cmd()
-
-    assert result.ret == 0
+    assert result.ret == ExitCode.OK
     assert result.stdout.get_lines_after("Commands:") == ["  run  Perform schemathesis test."]
 
-    result_help = schemathesis_cmd("--help")
-    result_h = schemathesis_cmd("-h")
+    result_help = cli.run_subprocess("--help")
+    result_h = cli.run_subprocess("-h")
 
     assert result.stdout.lines == result_h.stdout.lines == result_help.stdout.lines
 
 
-def test_commands_version(schemathesis_cmd):
-    result = schemathesis_cmd("--version")
+def test_commands_version(cli):
+    result = cli.run_subprocess("--version")
 
-    assert result.ret == 0
+    assert result.ret == ExitCode.OK
     assert "version" in result.stdout.lines[0]
 
 
@@ -67,17 +53,19 @@ def test_commands_version(schemathesis_cmd):
         ),
     ),
 )
-def test_commands_run_errors(schemathesis_cmd, args, error):
-    result = schemathesis_cmd(*args)
+def test_commands_run_errors(cli, args, error):
+    # When invalid arguments are passed to CLI
+    result = cli.run_subprocess(*args)
 
-    assert result.ret == 2
+    # Then an appropriate error should be displayed
+    assert result.ret == ExitCode.INTERRUPTED
     assert result.stderr.lines[-1] == error
 
 
-def test_commands_run_help(schemathesis_cmd):
-    result_help = schemathesis_cmd("run", "--help")
+def test_commands_run_help(cli):
+    result_help = cli.run_subprocess("run", "--help")
 
-    assert result_help.ret == 0
+    assert result_help.ret == ExitCode.OK
     assert result_help.stdout.lines == [
         "Usage: schemathesis run [OPTIONS] SCHEMA",
         "",
@@ -128,38 +116,32 @@ SCHEMA_URI = "https://example.com/swagger.json"
 @pytest.mark.parametrize(
     "args, expected",
     (
-        ([SCHEMA_URI], {"checks": runner.DEFAULT_CHECKS}),
-        (
-            [SCHEMA_URI, "--auth=test:test"],
-            {"checks": runner.DEFAULT_CHECKS, "api_options": {"auth": ("test", "test")}},
-        ),
+        ([SCHEMA_URI], {"checks": DEFAULT_CHECKS}),
+        ([SCHEMA_URI, "--auth=test:test"], {"checks": DEFAULT_CHECKS, "api_options": {"auth": ("test", "test")}}),
         (
             [SCHEMA_URI, "--auth=test:test", "--auth-type=digest"],
-            {"checks": runner.DEFAULT_CHECKS, "api_options": {"auth": HTTPDigestAuth("test", "test")}},
+            {"checks": DEFAULT_CHECKS, "api_options": {"auth": HTTPDigestAuth("test", "test")}},
         ),
         (
             [SCHEMA_URI, "--auth=test:test", "--auth-type=DIGEST"],
-            {"checks": runner.DEFAULT_CHECKS, "api_options": {"auth": HTTPDigestAuth("test", "test")}},
+            {"checks": DEFAULT_CHECKS, "api_options": {"auth": HTTPDigestAuth("test", "test")}},
         ),
         (
             [SCHEMA_URI, "--header=Authorization:Bearer 123"],
-            {"checks": runner.DEFAULT_CHECKS, "api_options": {"headers": {"Authorization": "Bearer 123"}}},
+            {"checks": DEFAULT_CHECKS, "api_options": {"headers": {"Authorization": "Bearer 123"}}},
         ),
         (
             [SCHEMA_URI, "--header=Authorization:  Bearer 123 "],
-            {"checks": runner.DEFAULT_CHECKS, "api_options": {"headers": {"Authorization": "Bearer 123 "}}},
+            {"checks": DEFAULT_CHECKS, "api_options": {"headers": {"Authorization": "Bearer 123 "}}},
         ),
         (
             [SCHEMA_URI, "--method=POST", "--method", "GET"],
-            {"checks": runner.DEFAULT_CHECKS, "loader_options": {"method": ("POST", "GET")}},
+            {"checks": DEFAULT_CHECKS, "loader_options": {"method": ("POST", "GET")}},
         ),
-        (
-            [SCHEMA_URI, "--endpoint=users"],
-            {"checks": runner.DEFAULT_CHECKS, "loader_options": {"endpoint": ("users",)}},
-        ),
+        ([SCHEMA_URI, "--endpoint=users"], {"checks": DEFAULT_CHECKS, "loader_options": {"endpoint": ("users",)}}),
         (
             [SCHEMA_URI, "--base-url=https://example.com/api/v1test"],
-            {"checks": runner.DEFAULT_CHECKS, "api_options": {"base_url": "https://example.com/api/v1test"}},
+            {"checks": DEFAULT_CHECKS, "api_options": {"base_url": "https://example.com/api/v1test"}},
         ),
         (
             [
@@ -173,7 +155,7 @@ SCHEMA_URI = "https://example.com/swagger.json"
                 "--hypothesis-verbosity=normal",
             ],
             {
-                "checks": runner.DEFAULT_CHECKS,
+                "checks": DEFAULT_CHECKS,
                 "hypothesis_options": {
                     "deadline": 1000,
                     "derandomize": True,
@@ -187,19 +169,20 @@ SCHEMA_URI = "https://example.com/swagger.json"
         ),
     ),
 )
-def test_commands_run(cli_runner, mocker, args, expected):
-    m_execute = mocker.patch("schemathesis.runner.execute")
+def test_execute_arguments(cli, mocker, args, expected):
+    m_execute = mocker.patch("schemathesis.runner.execute", autospec=True)
 
-    result = cli_runner.invoke(cli.run, args)
+    result = cli.run_inprocess(*args)
 
     assert result.exit_code == 0
     m_execute.assert_called_once_with(SCHEMA_URI, **expected)
 
 
-def test_hypothesis_parameters(cli_runner, mocker):
+@pytest.mark.endpoints()
+def test_hypothesis_parameters(cli, schema_url):
     # When Hypothesis options are passed via command line
-    args = [
-        SCHEMA_URI,
+    result = cli.run_inprocess(
+        schema_url,
         "--hypothesis-deadline=1000",
         "--hypothesis-derandomize",
         "--hypothesis-max-examples=1000",
@@ -207,49 +190,38 @@ def test_hypothesis_parameters(cli_runner, mocker):
         "--hypothesis-report-multiple-bugs=0",
         "--hypothesis-suppress-health-check=too_slow,filter_too_much",
         "--hypothesis-verbosity=normal",
-    ]
-    m_execute = mocker.patch("schemathesis.runner.execute")
-
-    result = cli_runner.invoke(cli.run, args)
-    assert result.exit_code == 0
+    )
     # Then they should be correctly converted into arguments accepted by `hypothesis.settings`
     # Parameters are validated in `hypothesis.settings`
-    hypothesis.settings(**m_execute.call_args[1]["hypothesis_options"])
+    assert result.exit_code == 0
 
 
-@pytest.mark.parametrize(
-    "data,line_in_output,exit_code",
-    (
-        ({"not_a_server_error": {"total": 1, "ok": 1, "error": 0}}, "Tests succeeded.", 0),
-        ({}, "No checks were performed.", 0),
-        ({"not_a_server_error": {"total": 3, "ok": 1, "error": 2}}, "Tests failed.", 1),
-    ),
-)
-def test_commands_run_output(cli_runner, mocker, data, line_in_output, exit_code):
-    mocker.patch("schemathesis.runner.execute", return_value=mocker.Mock(data=data, is_empty=not data))
+@pytest.mark.endpoints("success")
+def test_cli_run_output_success(cli, schema_url):
+    result = cli.run_inprocess(schema_url)
+    assert result.exit_code == 0
+    assert " FALSIFYING EXAMPLES " not in result.stdout
+    assert " SUMMARY " in result.stdout
 
-    result = cli_runner.invoke(cli.run, [SCHEMA_URI])
-    assert result.exit_code == exit_code
-
-    stdout_lines = result.stdout.split("\n")
-    assert "Running schemathesis test cases ..." in stdout_lines
-    assert line_in_output in stdout_lines
+    assert "Tests succeeded." in result.stdout
 
 
-def test_commands_with_hypothesis_statistic(cli_runner, mocker):
-    mocker.patch(
-        "schemathesis.runner.execute",
-        return_value=mocker.Mock(data={"not_a_server_error": {"total": 3, "ok": 1, "error": 2}}, is_empty=False),
-    )
-
-    @contextmanager
-    def mocked_listener():
-        yield lambda: "Mock error"
-
-    mocker.patch("schemathesis.utils.stdout_listener", mocked_listener)
-
-    result = cli_runner.invoke(cli.run, [SCHEMA_URI])
+def test_cli_run_output_with_errors(cli, schema_url):
+    result = cli.run_inprocess(schema_url)
     assert result.exit_code == 1
     assert " FALSIFYING EXAMPLES " in result.stdout
-    assert "Mock error" in result.stdout
     assert " SUMMARY " in result.stdout
+
+    assert "not_a_server_error            1 / 3 passed          FAILED" in result.stdout
+    assert "Tests failed." in result.stdout
+
+
+@pytest.mark.endpoints()
+def test_cli_run_output_empty(cli, schema_url):
+    result = cli.run_inprocess(schema_url)
+    assert result.exit_code == 0
+    assert " FALSIFYING EXAMPLES " not in result.stdout
+    assert " SUMMARY " not in result.stdout
+
+    assert "No checks were performed." in result.stdout
+    assert "Tests succeeded." in result.stdout
