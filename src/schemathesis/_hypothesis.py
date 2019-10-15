@@ -4,7 +4,6 @@ from typing import Any, Callable, Generator, Optional
 
 import hypothesis
 import hypothesis.strategies as st
-from hypothesis._strategies import just
 from hypothesis_jsonschema import from_schema
 
 from ._compat import handle_warnings
@@ -53,7 +52,7 @@ def get_examples(endpoint: Endpoint) -> Generator[Case, None, None]:
                     Case,
                     path=st.just(endpoint.path),
                     method=st.just(endpoint.method),
-                    **{name: just(parameter["example"])},
+                    **{name: st.just(parameter["example"])},
                     **other_parameters,
                 ).example()
 
