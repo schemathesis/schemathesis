@@ -273,6 +273,22 @@ You can provide your custom checks to the execute function, the check is a calla
 
     runner.execute("http://127.0.0.1:8080/swagger.json", checks=[not_too_long])
 
+Custom string strategies
+########################
+
+Some string fields could use custom format and validators,
+e.g. ``card_number`` and Luhn algorithm validator.
+
+For such cases it is possible to register custom strategies:
+
+1. Create ``hypothesis.strategies.SearchStrategy`` object
+2. Optionally provide predicate function to filter values
+3. Register it via ``schemathesis.register_string_format``
+
+.. code-block:: python
+
+    schemathesis.register_string_format("visa_cards", strategies.from_regex(r"\A4[0-9]{15}\Z").filter(luhn_validator)
+
 Documentation
 -------------
 
