@@ -65,6 +65,6 @@ class Endpoint:
     form_data: FormData = attr.ib(factory=empty_object)
 
     def as_strategy(self) -> SearchStrategy:
-        from ._hypothesis import get_case_strategy
+        from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel
 
         return get_case_strategy(self)

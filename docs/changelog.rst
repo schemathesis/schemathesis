@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Ability to register strategies for custom string formats `#94`_
+
 `0.10.0`_ - 2019-10-14
 ----------------------
 
@@ -236,6 +241,7 @@ Fixed
 .. _#106: https://github.com/kiwicom/schemathesis/issues/106
 .. _#99: https://github.com/kiwicom/schemathesis/issues/99
 .. _#98: https://github.com/kiwicom/schemathesis/issues/98
+.. _#94: https://github.com/kiwicom/schemathesis/issues/94
 .. _#92: https://github.com/kiwicom/schemathesis/issues/92
 .. _#90: https://github.com/kiwicom/schemathesis/issues/90
 .. _#78: https://github.com/kiwicom/schemathesis/issues/78
