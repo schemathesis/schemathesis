@@ -203,7 +203,9 @@ def test_cli_run_output_success(cli, schema_url):
     assert " FALSIFYING EXAMPLES " not in result.stdout
     assert " SUMMARY " in result.stdout
 
-    assert "Tests succeeded." in result.stdout
+    lines = result.stdout.split("\n")
+    assert "Running schemathesis test cases ..." in lines
+    assert "Tests succeeded." in lines
 
 
 def test_cli_run_output_with_errors(cli, schema_url):
@@ -212,8 +214,10 @@ def test_cli_run_output_with_errors(cli, schema_url):
     assert " FALSIFYING EXAMPLES " in result.stdout
     assert " SUMMARY " in result.stdout
 
-    assert "not_a_server_error            1 / 3 passed          FAILED" in result.stdout
-    assert "Tests failed." in result.stdout
+    lines = result.stdout.split("\n")
+    assert "Running schemathesis test cases ..." in lines
+    assert "not_a_server_error            1 / 3 passed          FAILED " in lines
+    assert "Tests failed." in lines
 
 
 @pytest.mark.endpoints()
@@ -223,5 +227,6 @@ def test_cli_run_output_empty(cli, schema_url):
     assert " FALSIFYING EXAMPLES " not in result.stdout
     assert " SUMMARY " not in result.stdout
 
-    assert "No checks were performed." in result.stdout
-    assert "Tests succeeded." in result.stdout
+    lines = result.stdout.split("\n")
+    assert "No checks were performed." in lines
+    assert "Tests succeeded." in lines
