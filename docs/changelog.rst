@@ -9,6 +9,7 @@ Changelog
 Added
 ~~~~~
 
+- LazySchema accepts filters. `#149`_
 - Ability to register strategies for custom string formats `#94`_
 
 `0.10.0`_ - 2019-10-14
@@ -232,6 +233,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#149: https://github.com/kiwicom/schemathesis/issues/149
 .. _#130: https://github.com/kiwicom/schemathesis/issues/130
 .. _#126: https://github.com/kiwicom/schemathesis/issues/126
 .. _#121: https://github.com/kiwicom/schemathesis/issues/121
