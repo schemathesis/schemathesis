@@ -6,7 +6,7 @@ import yaml
 from .lazy import LazySchema
 from .schemas import BaseSchema, OpenApi30, SwaggerV20
 from .types import Filter, PathLike
-from .utils import deprecated
+from .utils import NOT_SET, deprecated
 
 
 def from_path(path: PathLike, method: Optional[Filter] = None, endpoint: Optional[Filter] = None) -> BaseSchema:
@@ -45,9 +45,11 @@ def from_dict(
     raise ValueError("Unsupported schema type")
 
 
-def from_pytest_fixture(fixture_name: str) -> LazySchema:
+def from_pytest_fixture(
+    fixture_name: str, method: Optional[Filter] = NOT_SET, endpoint: Optional[Filter] = NOT_SET
+) -> LazySchema:
     """Needed for a consistent library API."""
-    return LazySchema(fixture_name)
+    return LazySchema(fixture_name, method=method, endpoint=endpoint)
 
 
 # Backward compatibility
