@@ -14,8 +14,15 @@ from .utils import NOT_SET
 @attr.s(slots=True)
 class LazySchema:
     fixture_name: str = attr.ib()
+    method: Optional[Filter] = attr.ib(default=NOT_SET)
+    endpoint: Optional[Filter] = attr.ib(default=NOT_SET)
 
     def parametrize(self, method: Optional[Filter] = NOT_SET, endpoint: Optional[Filter] = NOT_SET) -> Callable:
+        if method is NOT_SET:
+            method = self.method
+        if endpoint is NOT_SET:
+            endpoint = self.endpoint
+
         def wrapper(func: Callable) -> Callable:
             def test(request: FixtureRequest, subtests: SubTests) -> None:
                 """The actual test, which is executed by pytest."""
