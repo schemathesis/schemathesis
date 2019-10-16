@@ -20,6 +20,16 @@ Changed
   Now on, ``base_url`` argument in ``Case.call`` is optional in such cases. `#153`_
 - Hypothesis deadline is set to 500ms by default. `#138`_
 
+Fixed
+~~~~~
+
+- User agent during schema loading
+
+Removed
+~~~~~~~
+
+- Undocumented support for `file://` uri schema
+
 `0.10.0`_ - 2019-10-14
 ----------------------
 
