@@ -5,7 +5,7 @@ import hypothesis
 import requests
 from requests.auth import AuthBase
 
-from .. import __version__
+from ..constants import USER_AGENT
 from ..loaders import from_uri
 from ..models import Case, StatsCollector
 from ..schemas import BaseSchema
@@ -30,7 +30,7 @@ def get_session(
     with requests.Session() as session:
         if auth is not None:
             session.auth = auth
-        session.headers.update({"User-agent": f"schemathesis/{__version__}"})
+        session.headers.update({"User-agent": USER_AGENT})
         if headers is not None:
             session.headers.update(**headers)
         yield session

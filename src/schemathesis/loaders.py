@@ -1,8 +1,9 @@
 from typing import IO, Any, Dict, Optional, Union
-from urllib.request import urlopen
 
+import requests
 import yaml
 
+from .constants import USER_AGENT
 from .lazy import LazySchema
 from .schemas import BaseSchema, OpenApi30, SwaggerV20
 from .types import Filter, PathLike
@@ -18,14 +19,20 @@ def from_path(
 
 
 def from_uri(
-    uri: str, base_url: Optional[str] = None, method: Optional[Filter] = None, endpoint: Optional[Filter] = None
+    uri: str,
+    session: Optional[requests.Session] = None,
+    base_url: Optional[str] = None,
+    method: Optional[Filter] = None,
+    endpoint: Optional[Filter] = None,
 ) -> BaseSchema:
     """Load a remote resource and parse to schema instance."""
-    response = urlopen(uri)
-    data = response.read()
+    if not session:
+        session = requests.Session()
+    session.headers.update({"User-Agent": USER_AGENT})
+    response = session.get(uri)
     if base_url is None:
         base_url = get_base_url(uri)
-    return from_file(data, base_url=base_url, method=method, endpoint=endpoint)
+    return from_file(response.text, base_url=base_url, method=method, endpoint=endpoint)
 
 
 def from_file(

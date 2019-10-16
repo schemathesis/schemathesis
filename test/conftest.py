@@ -5,7 +5,9 @@ from click.testing import CliRunner
 
 import schemathesis.cli
 
-from .app import create_app, run_server
+from .app import create_app
+from .app import make_schema as make_app_schema
+from .app import run_server
 from .utils import make_schema
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
@@ -93,6 +95,11 @@ def simple_schema():
 @pytest.fixture()
 def swagger_20(simple_schema):
     return schemathesis.from_dict(simple_schema)
+
+
+@pytest.fixture()
+def app_schema():
+    return make_app_schema(endpoints=("success", "failure"))
 
 
 @pytest.fixture()

@@ -43,11 +43,13 @@ def create_app(endpoints=("success", "failure")) -> web.Application:
     >>>     assert app["incoming_requests"][0].method == "GET"
     """
     incoming_requests = []
+    schema_requests = []
 
     schema_data = make_schema(endpoints)
 
     async def schema(request):
         content = yaml.dump(schema_data)
+        schema_requests.append(request)
         return web.Response(body=content)
 
     def wrapper(handler):
@@ -64,6 +66,7 @@ def create_app(endpoints=("success", "failure")) -> web.Application:
         + [web.get(item.value[0], wrapper(item.value[1])) for item in Endpoint if item.name in endpoints]
     )
     app["incoming_requests"] = incoming_requests
+    app["schema_requests"] = schema_requests
     return app
 
 
