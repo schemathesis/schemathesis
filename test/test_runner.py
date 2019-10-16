@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis import __version__
+from schemathesis.constants import __version__
 from schemathesis.runner import execute, get_base_url
 
 
@@ -40,6 +40,8 @@ def test_execute(schema_url, app):
     # Then there are three executed cases
     # Two errors - the second one is a flakiness check
     headers = {"User-Agent": f"schemathesis/{__version__}"}
+    assert len(app["schema_requests"]) == 1
+    assert app["schema_requests"][0].headers.get("User-Agent") == headers["User-Agent"]
     assert len(app["incoming_requests"]) == 3
     assert_request(app, 0, "GET", "/api/failure", headers)
     assert_request(app, 1, "GET", "/api/failure", headers)
