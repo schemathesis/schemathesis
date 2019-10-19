@@ -1,6 +1,8 @@
 name: build
 
-on: [push]
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
 
 jobs:
   black:
