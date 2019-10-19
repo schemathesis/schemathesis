@@ -61,9 +61,10 @@ def execute_from_schema(
         session.headers.update({"User-agent": f"schemathesis/{__version__}"})
         if headers is not None:
             session.headers.update(**headers)
-        settings: Optional[hypothesis.settings] = None
+        # Default settings, used as a parent settings object below
+        settings = hypothesis.settings(deadline=500)
         if hypothesis_options is not None:
-            settings = hypothesis.settings(**hypothesis_options)
+            settings = hypothesis.settings(settings, **hypothesis_options)
         for _, test in schema.get_all_tests(single_test, settings):
             with suppress(AssertionError):
                 test(session, base_url, checks, stats)
