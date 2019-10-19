@@ -26,6 +26,7 @@ from .utils import NOT_SET
 @attr.s()
 class BaseSchema(Mapping):
     raw_schema: Dict[str, Any] = attr.ib()
+    base_url: Optional[str] = attr.ib(default=None)
     method: Optional[Filter] = attr.ib(default=None)
     endpoint: Optional[Filter] = attr.ib(default=None)
 
@@ -71,7 +72,9 @@ class BaseSchema(Mapping):
             endpoint = self.endpoint
 
         def wrapper(func: Callable) -> Callable:
-            func._schemathesis_test = self.__class__(self.raw_schema, method=method, endpoint=endpoint)  # type: ignore
+            func._schemathesis_test = self.__class__(  # type: ignore
+                self.raw_schema, base_url=self.base_url, method=method, endpoint=endpoint
+            )
             return func
 
         return wrapper
@@ -111,7 +114,10 @@ class SwaggerV20(BaseSchema):
         self, full_path: str, method: str, parameters: Iterator[Dict[str, Any]], definition: Dict[str, Any]
     ) -> Endpoint:
         """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
-        endpoint = Endpoint(path=full_path, method=method.upper())
+        base_url = self.base_url
+        if base_url is not None:
+            base_url = base_url.rstrip("/")
+        endpoint = Endpoint(path=full_path, method=method.upper(), base_url=base_url)
         for parameter in parameters:
             self.process_parameter(endpoint, parameter)
         return endpoint

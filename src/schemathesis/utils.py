@@ -4,6 +4,7 @@ import warnings
 from contextlib import contextmanager
 from functools import wraps
 from typing import Any, Callable, Generator, List, Mapping, Set, Tuple, Union
+from urllib.parse import urlsplit, urlunsplit
 
 from .types import Filter
 
@@ -27,6 +28,12 @@ def is_schemathesis_test(func: Callable) -> bool:
         return hasattr(func, "_schemathesis_test")
     except Exception:
         return False
+
+
+def get_base_url(uri: str) -> str:
+    """Remove the path part off the given uri."""
+    parts = urlsplit(uri)[:2] + ("", "", "")
+    return urlunsplit(parts)
 
 
 def force_tuple(item: Filter) -> Union[List, Set, Tuple]:
