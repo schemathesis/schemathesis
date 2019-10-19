@@ -60,13 +60,12 @@ look like this:
     import requests
     import schemathesis
 
-    BASE_URL = "http://0.0.0.0:8080"
-    schema = schemathesis.from_uri(f"{BASE_URL}/swagger.json")
+    schema = schemathesis.from_uri("http://0.0.0.0:8080/swagger.json")
 
     @schema.parametrize()
     def test_no_server_errors(case):
         # `requests` will make an appropriate call under the hood
-        response = case.call(BASE_URL)
+        response = case.call()
         assert response.status_code < 500
 
 
@@ -107,9 +106,11 @@ You can use them manually in network calls or can convert to a dictionary accept
 
     import requests
 
+    schema = schemathesis.from_uri("http://0.0.0.0:8080/swagger.json")
+
     @schema.parametrize()
     def test_no_server_errors(case):
-        kwargs = case.as_requests_kwargs("http://0.0.0.0:8080")
+        kwargs = case.as_requests_kwargs()
         response = requests.request(**kwargs)
 
 

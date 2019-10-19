@@ -68,7 +68,7 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
     Path & endpoint are static, the others are JSON schemas.
     """
     return st.builds(
-        partial(Case, path=endpoint.path, method=endpoint.method),
+        partial(Case, path=endpoint.path, method=endpoint.method, base_url=endpoint.base_url),
         path_parameters=from_schema(endpoint.path_parameters),
         headers=from_schema(endpoint.headers),
         cookies=from_schema(endpoint.cookies),

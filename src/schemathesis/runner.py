@@ -1,7 +1,6 @@
 from collections import Counter, defaultdict
 from contextlib import suppress
 from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Union
-from urllib.parse import urlsplit, urlunsplit
 
 import attr
 import hypothesis
@@ -12,6 +11,7 @@ from . import __version__
 from .loaders import from_uri
 from .models import Case
 from .schemas import BaseSchema
+from .utils import get_base_url
 
 Auth = Union[Tuple[str, str], AuthBase]
 
@@ -89,17 +89,11 @@ def execute(  # pylint: disable=too-many-arguments
     return execute_from_schema(schema, base_url, checks, hypothesis_options=hypothesis_options, **api_options)
 
 
-def get_base_url(uri: str) -> str:
-    """Remove the path part off the given uri."""
-    parts = urlsplit(uri)[:2] + ("", "", "")
-    return urlunsplit(parts)
-
-
 def single_test(
-    case: Case, session: requests.Session, url: str, checks: Iterable[Callable], stats: StatsCollector
+    case: Case, session: requests.Session, base_url: str, checks: Iterable[Callable], stats: StatsCollector
 ) -> None:
     """A single test body that will be executed against the target."""
-    response = get_response(session, url, case)
+    response = get_response(session, base_url, case)
     errors = False
 
     for check in checks:
@@ -117,8 +111,8 @@ def single_test(
         raise AssertionError
 
 
-def get_response(session: requests.Session, url: str, case: Case) -> requests.Response:
+def get_response(session: requests.Session, base_url: str, case: Case) -> requests.Response:
     """Send an appropriate request to the target."""
     return session.request(
-        case.method, f"{url}{case.formatted_path}", headers=case.headers, params=case.query, json=case.body
+        case.method, f"{base_url}{case.formatted_path}", headers=case.headers, params=case.query, json=case.body
     )

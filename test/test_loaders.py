@@ -13,6 +13,18 @@ def test_loaders(simple_schema, method, path):
     assert method(path).raw_schema == simple_schema
 
 
+def test_base_url(base_url, schema_url):
+    schema = schemathesis.from_uri(schema_url)
+    assert schema.base_url == base_url
+
+
+@pytest.mark.parametrize("url", ("http://example.com/", "http://example.com"))
+def test_base_url_override(schema_url, url):
+    schema = schemathesis.from_uri(schema_url, base_url=url)
+    endpoint = next(schema.get_all_endpoints())
+    assert endpoint.base_url == "http://example.com"
+
+
 @pytest.mark.parametrize(
     "method, path, message",
     (

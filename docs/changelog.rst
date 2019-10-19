@@ -15,6 +15,8 @@ Added
 Changed
 ~~~~~~~
 
+- Base URL in schema instances could be reused when it is defined during creation.
+  Now on, `base_url` argument in `Case.call` is optional in such cases. `#153`_
 - Hypothesis deadline is set to 500ms by default `#138`_
 
 `0.10.0`_ - 2019-10-14
@@ -238,6 +240,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#153: https://github.com/kiwicom/schemathesis/issues/153
 .. _#149: https://github.com/kiwicom/schemathesis/issues/149
 .. _#138: https://github.com/kiwicom/schemathesis/issues/138
 .. _#130: https://github.com/kiwicom/schemathesis/issues/130

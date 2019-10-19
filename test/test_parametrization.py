@@ -200,6 +200,42 @@ def test_(request, case):
     result.stdout.re_match_lines([r".*\[GET:/users\]"])
 
 
+def test_base_url_from_uri(testdir, app, base_url, schema_url):
+    # When the schema is created out of URI
+    testdir.make_test(
+        f"""
+schema = schemathesis.from_uri("{schema_url}")
+
+@schema.parametrize()
+def test_(request, case):
+    assert case._get_base_url(None) == "{base_url}"
+    case.call()
+"""
+    )
+    result = testdir.runpytest("-v")
+    # Then base URL can be discovered automatically
+    # And can be omitted in `call`
+    result.assert_outcomes(passed=2)
+    result.stdout.re_match_lines([r".*\[GET:/api/failure\]", r".*\[GET:/api/success\]"])
+    assert len(app["incoming_requests"]) == 2
+
+
+def test_base_url_not_available(testdir):
+    # When the schema is created NOT out of URI
+    testdir.make_test(
+        """
+@schema.parametrize()
+def test_(request, case):
+    with pytest.raises(ValueError, match=".*Base URL is required.*"):
+        case._get_base_url(None)
+"""
+    )
+    result = testdir.runpytest("-v")
+    # Then base URL is not detected automatically
+    # And exception will be risen if there is no base URL specified explicitly
+    result.assert_outcomes(passed=1)
+
+
 def test_exceptions_on_collect(testdir):
     # When collected item raises an exception during `hasattr` in `is_schemathesis_test`
     testdir.make_test(
