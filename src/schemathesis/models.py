@@ -1,5 +1,5 @@
 # pylint: disable=too-many-instance-attributes
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import attr
 from hypothesis.searchstrategy import SearchStrategy
@@ -16,6 +16,7 @@ class Case:
 
     path: str = attr.ib()
     method: str = attr.ib()
+    base_url: Optional[str] = attr.ib(default=None)
     path_parameters: PathParameters = attr.ib(factory=dict)
     headers: Headers = attr.ib(factory=dict)
     cookies: Cookies = attr.ib(factory=dict)
@@ -28,8 +29,20 @@ class Case:
         # pylint: disable=not-a-mapping
         return self.path.format(**self.path_parameters)
 
-    def as_requests_kwargs(self, base_url: str) -> Dict[str, Any]:
+    def _get_base_url(self, base_url: Optional[str]) -> str:
+        if base_url is None:
+            if self.base_url is not None:
+                base_url = self.base_url
+            else:
+                raise ValueError(
+                    "Base URL is required as `base_url` argument in `call` or should be specified "
+                    "in the schema constructor as a part of Schema URL."
+                )
+        return base_url
+
+    def as_requests_kwargs(self, base_url: Optional[str] = None) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by requests."""
+        base_url = self._get_base_url(base_url)
         return {
             "method": self.method,
             "url": f"{base_url}{self.formatted_path}",
@@ -38,11 +51,12 @@ class Case:
             "json": self.body,
         }
 
-    def call(self, base_url: str, **kwargs: Any) -> "requests.Response":
+    def call(self, base_url: Optional[str] = None, **kwargs: Any) -> "requests.Response":
         """Convert the case into a dictionary acceptable by requests."""
         # Local import to speedup import of schemathesis
         import requests  # pylint: disable=import-outside-toplevel
 
+        base_url = self._get_base_url(base_url)
         data = self.as_requests_kwargs(base_url)
         return requests.request(**data, **kwargs)
 
@@ -57,6 +71,7 @@ class Endpoint:
 
     path: str = attr.ib()
     method: str = attr.ib()
+    base_url: Optional[str] = attr.ib(default=None)
     path_parameters: PathParameters = attr.ib(factory=empty_object)
     headers: Headers = attr.ib(factory=empty_object)
     cookies: Cookies = attr.ib(factory=empty_object)
