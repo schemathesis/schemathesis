@@ -1,5 +1,6 @@
 """Provide strategies for given endpoint(s) definition."""
 import asyncio
+from functools import partial
 from typing import Any, Callable, Generator, Optional
 
 import hypothesis
@@ -49,10 +50,7 @@ def get_examples(endpoint: Endpoint) -> Generator[Case, None, None]:
             with handle_warnings():
                 other_parameters = {other: from_schema(getattr(endpoint, other)) for other in PARAMETERS - {name}}
                 yield st.builds(
-                    Case,
-                    path=st.just(endpoint.path),
-                    method=st.just(endpoint.method),
-                    **{name: st.just(parameter["example"])},
+                    partial(Case, path=endpoint.path, method=endpoint.method, **{name: parameter["example"]}),
                     **other_parameters,
                 ).example()
 
@@ -70,9 +68,7 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
     Path & endpoint are static, the others are JSON schemas.
     """
     return st.builds(
-        Case,
-        path=st.just(endpoint.path),
-        method=st.just(endpoint.method),
+        partial(Case, path=endpoint.path, method=endpoint.method),
         path_parameters=from_schema(endpoint.path_parameters),
         headers=from_schema(endpoint.headers),
         cookies=from_schema(endpoint.cookies),

@@ -1,3 +1,4 @@
+from functools import partial
 from unittest.mock import ANY
 
 import pytest
@@ -61,10 +62,7 @@ def test_custom_strategies():
         }
     )
     result = strategies.builds(
-        Case,
-        path=strategies.just(endpoint.path),
-        method=strategies.just(endpoint.method),
-        query=from_schema(endpoint.query),
+        partial(Case, path=endpoint.path, method=endpoint.method), query=from_schema(endpoint.query)
     ).example()
     assert len(result.query["id"]) == 4
     assert int(result.query["id"]) % 2 == 0
