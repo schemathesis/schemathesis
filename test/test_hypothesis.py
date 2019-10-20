@@ -1,12 +1,10 @@
-from functools import partial
 from unittest.mock import ANY
 
 import pytest
 from hypothesis import strategies
-from hypothesis_jsonschema import from_schema
 
 from schemathesis import Case, register_string_format
-from schemathesis._hypothesis import PARAMETERS, get_examples
+from schemathesis._hypothesis import PARAMETERS, get_case_strategy, get_examples
 from schemathesis.models import Endpoint
 
 
@@ -49,6 +47,7 @@ def test_warning():
     assert not record
 
 
+@pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_custom_strategies():
     register_string_format("even_4_digits", strategies.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
     endpoint = make_endpoint(
@@ -61,9 +60,7 @@ def test_custom_strategies():
             }
         }
     )
-    result = strategies.builds(
-        partial(Case, path=endpoint.path, method=endpoint.method), query=from_schema(endpoint.query)
-    ).example()
+    result = get_case_strategy(endpoint).example()
     assert len(result.query["id"]) == 4
     assert int(result.query["id"]) % 2 == 0
 
