@@ -75,7 +75,7 @@ It consists of four main parts:
 
 2. Test parametrization; ``@schema.parametrize()`` generates separate tests for all endpoint/method combination available in the schema.
 
-3. A network call to the running application; ``requests`` will do the job, for example.
+3. A network call to the running application; ``case.call`` does it.
 
 4. Verifying a property you'd like to test; In the example, we verify that any app response will not indicate a server-side error (HTTP codes 5xx).
 
