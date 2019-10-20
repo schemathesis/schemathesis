@@ -1,4 +1,5 @@
 # pylint: disable=too-many-instance-attributes
+from collections import Counter, defaultdict
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import attr
@@ -83,3 +84,23 @@ class Endpoint:
         from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel
 
         return get_case_strategy(self)
+
+
+def _stats_data_factory() -> defaultdict:
+    return defaultdict(Counter)
+
+
+@attr.s(slots=True, repr=False)
+class StatsCollector:
+    """A container for collected data from test executor."""
+
+    data: Dict[str, Counter] = attr.ib(factory=_stats_data_factory)
+
+    @property
+    def is_empty(self) -> bool:
+        return len(self.data) == 0
+
+    def increment(self, check_name: str, error: Optional[Exception] = None) -> None:
+        self.data[check_name]["total"] += 1
+        self.data[check_name]["ok"] += error is None
+        self.data[check_name]["error"] += error is not None
