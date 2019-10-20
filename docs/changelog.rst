@@ -11,6 +11,7 @@ Added
 
 - LazySchema accepts filters. `#149`_
 - Ability to register strategies for custom string formats. `#94`_
+- Generator-based events in ``runner`` module to improve control over the execution flow.
 
 Changed
 ~~~~~~~
