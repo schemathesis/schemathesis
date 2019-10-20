@@ -10,14 +10,14 @@ Added
 ~~~~~
 
 - LazySchema accepts filters. `#149`_
-- Ability to register strategies for custom string formats `#94`_
+- Ability to register strategies for custom string formats. `#94`_
 
 Changed
 ~~~~~~~
 
 - Base URL in schema instances could be reused when it is defined during creation.
-  Now on, `base_url` argument in `Case.call` is optional in such cases. `#153`_
-- Hypothesis deadline is set to 500ms by default `#138`_
+  Now on, ``base_url`` argument in ``Case.call`` is optional in such cases. `#153`_
+- Hypothesis deadline is set to 500ms by default. `#138`_
 
 `0.10.0`_ - 2019-10-14
 ----------------------
@@ -51,7 +51,7 @@ Changed
 
 - CLI command ``schemathesis run`` prints results in a more readable way with a summary of passing checks.
 - Empty header names are forbidden for CLI.
-- Suppressed hypothesis exception about using `example` non-interactively `#92`_
+- Suppressed hypothesis exception about using ``example`` non-interactively. `#92`_
 
 `0.8.1`_ - 2019-10-04
 ---------------------
