@@ -10,7 +10,7 @@ from .. import runner
 @contextmanager
 def print_in_section(
     title: str, separator: str = "-", start_newline: bool = False, line_length: Optional[int] = None
-) -> Generator:
+) -> Generator[None, None, None]:
     """Print section in terminal with the given title nicely centered.
 
     Usage::
