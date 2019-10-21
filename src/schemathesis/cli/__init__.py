@@ -59,6 +59,7 @@ def main() -> None:
     help=r"Filter schemathesis test by endpoint pattern. Example: users/\d+",
 )
 @click.option("--method", "-M", "methods", type=str, multiple=True, help="Filter schemathesis test by HTTP method.")
+@click.option("--tag", "-T", "tags", type=str, multiple=True, help="Filter schemathesis test by schema tag pattern.")
 @click.option("--base-url", "-b", help="Base URL address of the API.", type=str)
 @click.option(
     "--hypothesis-deadline",
@@ -94,6 +95,7 @@ def run(  # pylint: disable=too-many-arguments
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
     endpoints: Optional[Filter] = None,
     methods: Optional[Filter] = None,
+    tags: Optional[Filter] = None,
     base_url: Optional[str] = None,
     hypothesis_deadline: Optional[int] = None,
     hypothesis_derandomize: Optional[bool] = None,
@@ -117,7 +119,7 @@ def run(  # pylint: disable=too-many-arguments
 
     options = dict_true_values(
         api_options=dict_true_values(base_url=base_url, auth=auth, headers=headers),
-        loader_options=dict_true_values(endpoint=endpoints, method=methods),
+        loader_options=dict_true_values(endpoint=endpoints, method=methods, tag=tags),
         hypothesis_options=dict_not_none_values(
             deadline=hypothesis_deadline,
             derandomize=hypothesis_derandomize,

@@ -51,6 +51,30 @@ def test_(request, case):
     )
 
 
+def test_tag_filter(testdir):
+    # When `tag` is specified
+    parameters = {"parameters": [integer(name="id", required=True)]}
+    testdir.make_test(
+        """
+@schema.parametrize(tag="bar")
+@settings(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/bar"
+    assert case.method == "GET"
+""",
+        paths={
+            "/foo": {"get": {**parameters, "tags": ["foo", "baz"]}},
+            "/bar": {"get": {**parameters, "tags": ["bar", "baz"]}},
+        },
+        tags={"foo": {}, "bar": {}, "baz": {}},
+    )
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+    # Then only tests for this tag should be generated
+    result.stdout.re_match_lines([r"test_tag_filter.py::test_[GET:/v1/bar] PASSED"])
+
+
 def test_loader_filter(testdir):
     testdir.make_test(
         """
