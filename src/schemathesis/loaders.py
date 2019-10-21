@@ -19,15 +19,10 @@ def from_path(
 
 
 def from_uri(
-    uri: str,
-    session: Optional[requests.Session] = None,
-    base_url: Optional[str] = None,
-    method: Optional[Filter] = None,
-    endpoint: Optional[Filter] = None,
+    uri: str, base_url: Optional[str] = None, method: Optional[Filter] = None, endpoint: Optional[Filter] = None
 ) -> BaseSchema:
     """Load a remote resource and parse to schema instance."""
-    if not session:
-        session = requests.Session()
+    session = requests.Session()
     session.headers.update({"User-Agent": USER_AGENT})
     response = session.get(uri)
     if base_url is None:
