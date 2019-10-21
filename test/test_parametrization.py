@@ -226,7 +226,11 @@ def test_base_url_not_available(testdir):
         """
 @schema.parametrize()
 def test_(request, case):
-    with pytest.raises(ValueError, match=".*Base URL is required.*"):
+    with pytest.raises(
+        ValueError,
+        match="^Base URL is required as `base_url` argument in `call` or should be specified "
+              "in the schema constructor as a part of Schema URL.$"
+    ):
         case._get_base_url(None)
 """
     )
