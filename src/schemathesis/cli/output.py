@@ -1,6 +1,6 @@
 import shutil
 from contextlib import contextmanager
-from typing import Generator, Optional
+from typing import Generator, List, Optional
 
 import click
 
@@ -28,11 +28,12 @@ def print_in_section(
     click.echo(separator * line_length)
 
 
-def pretty_print_stats(stats: runner.StatsCollector, hypothesis_out: Optional[str] = None) -> None:
+def pretty_print_stats(stats: runner.StatsCollector, hypothesis_output: Optional[List[str]] = None) -> None:
     """Format and print stats collected by :obj:`runner.StatsCollector`."""
-    if hypothesis_out:
+    if hypothesis_output:
         with print_in_section("FALSIFYING EXAMPLES", start_newline=True):
-            click.echo(click.style(hypothesis_out.strip(), fg="red"))
+            output = "\n".join(hypothesis_output)
+            click.echo(click.style(output, fg="red"))
 
     if stats.is_empty:
         click.echo(click.style("No checks were performed.", bold=True))

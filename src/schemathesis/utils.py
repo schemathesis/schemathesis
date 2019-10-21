@@ -1,10 +1,10 @@
-import io
-import sys
 import warnings
 from contextlib import contextmanager
 from functools import wraps
 from typing import Any, Callable, Generator, List, Mapping, Set, Tuple, Union
 from urllib.parse import urlsplit, urlunsplit
+
+from hypothesis.reporting import with_reporter
 
 from .types import Filter
 
@@ -52,20 +52,26 @@ def dict_not_none_values(**kwargs: Any) -> Mapping[str, Any]:
 
 
 @contextmanager
-def stdout_listener() -> Generator:
-    """Replace stdout and listen for printed values (without printing them).
+def capture_hypothesis_output() -> Generator:
+    """Capture all output of Hypothesis into a list of strings.
+
+    It allows us to have more granular control over Schemathesis output.
 
     Usage::
 
-        with stdout_listener() as getvalue:
-            print("Hello, World")
-            captured_stdout = getvalue()  # captured_stdout == "Hello, World\n"
-    """
-    stdout = io.StringIO()
-    old_stdout = sys.stdout
-    sys.stdout = stdout
+        @given(i=st.integers())
+        def test(i):
+            assert 0
 
-    try:
-        yield stdout.getvalue
-    finally:
-        sys.stdout = old_stdout
+        with capture_hypothesis_output() as output:
+            test()  # hypothesis test
+            # output == ["Falsifying example: test(i=0)"]
+    """
+    output = []
+
+    def get_output(value: str) -> None:
+        output.append(value)
+
+    # the following context manager is untyped
+    with with_reporter(get_output):  # type: ignore
+        yield output

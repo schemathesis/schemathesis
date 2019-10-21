@@ -19,6 +19,7 @@ Changed
 - Base URL in schema instances could be reused when it is defined during creation.
   Now on, ``base_url`` argument in ``Case.call`` is optional in such cases. `#153`_
 - Hypothesis deadline is set to 500ms by default. `#138`_
+- Hypothesis output is captured separately, without capturing the whole stdout during CLI run.
 
 Fixed
 ~~~~~
