@@ -129,11 +129,10 @@ def run(  # pylint: disable=too-many-arguments
         ),
     )
 
-    with utils.stdout_listener() as get_stdout:
+    with utils.capture_hypothesis_output() as hypothesis_output:
         stats = runner.execute(schema, checks=selected_checks, **options)
-        hypothesis_out = get_stdout()
 
-    output.pretty_print_stats(stats, hypothesis_out=hypothesis_out)
+    output.pretty_print_stats(stats, hypothesis_output=hypothesis_output)
     click.echo()
 
     if any(value.get("error") for value in stats.data.values()):
