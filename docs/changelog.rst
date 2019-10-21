@@ -23,12 +23,12 @@ Changed
 Fixed
 ~~~~~
 
-- User agent during schema loading
+- User agent during schema loading. `#144`_
 
 Removed
 ~~~~~~~
 
-- Undocumented support for `file://` uri schema
+- Undocumented support for ``file://`` uri schema
 
 `0.10.0`_ - 2019-10-14
 ----------------------
@@ -253,6 +253,7 @@ Fixed
 
 .. _#153: https://github.com/kiwicom/schemathesis/issues/153
 .. _#149: https://github.com/kiwicom/schemathesis/issues/149
+.. _#144: https://github.com/kiwicom/schemathesis/issues/144
 .. _#138: https://github.com/kiwicom/schemathesis/issues/138
 .. _#130: https://github.com/kiwicom/schemathesis/issues/130
 .. _#126: https://github.com/kiwicom/schemathesis/issues/126
