@@ -16,17 +16,22 @@ class LazySchema:
     fixture_name: str = attr.ib()
     method: Optional[Filter] = attr.ib(default=NOT_SET)
     endpoint: Optional[Filter] = attr.ib(default=NOT_SET)
+    tag: Optional[Filter] = attr.ib(default=NOT_SET)
 
-    def parametrize(self, method: Optional[Filter] = NOT_SET, endpoint: Optional[Filter] = NOT_SET) -> Callable:
+    def parametrize(
+        self, method: Optional[Filter] = NOT_SET, endpoint: Optional[Filter] = NOT_SET, tag: Optional[Filter] = NOT_SET
+    ) -> Callable:
         if method is NOT_SET:
             method = self.method
         if endpoint is NOT_SET:
             endpoint = self.endpoint
+        if tag is NOT_SET:
+            tag = self.tag
 
         def wrapper(func: Callable) -> Callable:
             def test(request: FixtureRequest, subtests: SubTests) -> None:
                 """The actual test, which is executed by pytest."""
-                schema = get_schema(request, self.fixture_name, method, endpoint)
+                schema = get_schema(request, self.fixture_name, method, endpoint, tag)
                 fixtures = get_fixtures(func, request)
                 # Changing the node id is required for better reporting - the method and endpoint will appear there
                 node_id = subtests.item._nodeid
@@ -56,7 +61,11 @@ def run_subtest(endpoint: Endpoint, fixtures: Dict[str, Any], sub_test: Callable
 
 
 def get_schema(
-    request: FixtureRequest, name: str, method: Optional[Filter] = None, endpoint: Optional[Filter] = None
+    request: FixtureRequest,
+    name: str,
+    method: Optional[Filter] = None,
+    endpoint: Optional[Filter] = None,
+    tag: Optional[Filter] = None,
 ) -> BaseSchema:
     """Loads a schema from the fixture."""
     schema = request.getfixturevalue(name)
@@ -66,7 +75,9 @@ def get_schema(
         method = schema.method
     if endpoint is NOT_SET:
         endpoint = schema.endpoint
-    return schema.__class__(schema.raw_schema, method=method, endpoint=endpoint)
+    if tag is NOT_SET:
+        tag = schema.tag
+    return schema.__class__(schema.raw_schema, method=method, endpoint=endpoint, tag=tag)
 
 
 def get_fixtures(func: Callable, request: FixtureRequest) -> Dict[str, Any]:
