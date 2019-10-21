@@ -92,20 +92,31 @@ def test_a(request, case):
 def test_b(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.method == "POST"
+
+@lazy_schema.parametrize(tag="foo")
+def test_c(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/second"
+    assert case.method == "GET"
 """,
-        paths={"/first": {"post": {}, "get": {}}, "/second": {"post": {}, "get": {}}},
+        paths={
+            "/first": {"post": {"tags": ["bar"]}, "get": {"tags": ["baz"]}},
+            "/second": {"post": {}, "get": {"tags": ["foo"]}},
+        },
+        tags={"foo": {}, "bar": {}},
     )
     result = testdir.runpytest("-v")
     # Then the filters should be applied to the generated tests
-    result.assert_outcomes(passed=2)
+    result.assert_outcomes(passed=3)
     result.stdout.re_match_lines(
         [
             r"test_with_parametrize_filters.py::test_a PASSED",
             r"test_with_parametrize_filters.py::test_b PASSED",
-            r".*2 passed",
+            r"test_with_parametrize_filters.py::test_c PASSED",
+            r".*3 passed",
         ]
     )
-    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 5$"])
 
 
 def test_with_parametrize_filters_override(testdir):

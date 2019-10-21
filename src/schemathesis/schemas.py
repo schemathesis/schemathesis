@@ -17,7 +17,7 @@ import hypothesis
 import jsonschema
 
 from ._hypothesis import create_test
-from .filters import should_skip_endpoint, should_skip_method
+from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .models import Endpoint
 from .types import Filter
 from .utils import NOT_SET
@@ -29,6 +29,7 @@ class BaseSchema(Mapping):
     base_url: Optional[str] = attr.ib(default=None)
     method: Optional[Filter] = attr.ib(default=None)
     endpoint: Optional[Filter] = attr.ib(default=None)
+    tag: Optional[Filter] = attr.ib(default=None)
 
     def __iter__(self) -> Iterator:
         return iter(self.endpoints)
@@ -64,16 +65,20 @@ class BaseSchema(Mapping):
         for endpoint in self.get_all_endpoints():
             yield endpoint, create_test(endpoint, func, settings)
 
-    def parametrize(self, method: Optional[Filter] = NOT_SET, endpoint: Optional[Filter] = NOT_SET) -> Callable:
+    def parametrize(
+        self, method: Optional[Filter] = NOT_SET, endpoint: Optional[Filter] = NOT_SET, tag: Optional[Filter] = NOT_SET
+    ) -> Callable:
         """Mark a test function as a parametrized one."""
         if method is NOT_SET:
             method = self.method
         if endpoint is NOT_SET:
             endpoint = self.endpoint
+        if tag is NOT_SET:
+            tag = self.tag
 
         def wrapper(func: Callable) -> Callable:
             func._schemathesis_test = self.__class__(  # type: ignore
-                self.raw_schema, base_url=self.base_url, method=method, endpoint=endpoint
+                self.raw_schema, base_url=self.base_url, method=method, endpoint=endpoint, tag=tag
             )
             return func
 
@@ -105,7 +110,11 @@ class SwaggerV20(BaseSchema):
                 continue
             common_parameters = get_common_parameters(methods)
             for method, definition in methods.items():
-                if method == "parameters" or should_skip_method(method, self.method):
+                if (
+                    method == "parameters"
+                    or should_skip_method(method, self.method)
+                    or should_skip_by_tag(definition.get("tags"), self.tag)
+                ):
                     continue
                 parameters = itertools.chain(definition.get("parameters", ()), common_parameters)
                 yield self.make_endpoint(full_path, method, parameters, definition)
