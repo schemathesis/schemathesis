@@ -52,7 +52,7 @@ def dict_not_none_values(**kwargs: Any) -> Mapping[str, Any]:
 
 
 @contextmanager
-def capture_hypothesis_output() -> Generator:
+def capture_hypothesis_output() -> Generator[List[str], None, None]:
     """Capture all output of Hypothesis into a list of strings.
 
     It allows us to have more granular control over Schemathesis output.
