@@ -1,25 +1,21 @@
-from unittest.mock import ANY
-
 import pytest
-from hypothesis import strategies
+from hypothesis import given, strategies
 
 from schemathesis import Case, register_string_format
 from schemathesis._hypothesis import PARAMETERS, get_case_strategy, get_examples
 from schemathesis.models import Endpoint
 
 
-def _make(cls, default, **kwargs):
-    for parameter in PARAMETERS:
-        kwargs.setdefault(parameter, default)
+def _make(cls, **kwargs):
     return cls("/users", "GET", **kwargs)
 
 
 def make_endpoint(**kwargs):
-    return _make(Endpoint, {}, **kwargs)
+    return _make(Endpoint, **kwargs)
 
 
 def make_case(**kwargs):
-    return _make(Case, ANY, **kwargs)
+    return _make(Case, **kwargs)
 
 
 @pytest.mark.parametrize("name", PARAMETERS)
@@ -51,13 +47,11 @@ def test_warning():
 def test_custom_strategies():
     register_string_format("even_4_digits", strategies.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
     endpoint = make_endpoint(
-        **{
-            "query": {
-                "required": ["id"],
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {"id": {"type": "string", "format": "even_4_digits"}},
-            }
+        query={
+            "required": ["id"],
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"id": {"type": "string", "format": "even_4_digits"}},
         }
     )
     result = get_case_strategy(endpoint).example()
@@ -76,3 +70,23 @@ def test_invalid_custom_strategy(values, error):
     with pytest.raises(TypeError) as exc:
         register_string_format(*values)
     assert error in str(exc.value)
+
+
+def test_valid_headers(base_url):
+    endpoint = Endpoint(
+        "/api/success",
+        "GET",
+        base_url=base_url,
+        headers={
+            "properties": {"api_key": {"name": "api_key", "in": "header", "type": "string"}},
+            "additionalProperties": False,
+            "type": "object",
+            "required": ["api_key"],
+        },
+    )
+
+    @given(case=get_case_strategy(endpoint))
+    def inner(case):
+        case.call()
+
+    inner()

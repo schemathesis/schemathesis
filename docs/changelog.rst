@@ -26,6 +26,7 @@ Fixed
 ~~~~~
 
 - User agent during schema loading. `#144`_
+- Generation of invalid values in ``Case.headers``. `#167`_
 
 Removed
 ~~~~~~~
@@ -253,6 +254,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#167: https://github.com/kiwicom/schemathesis/issues/167
 .. _#153: https://github.com/kiwicom/schemathesis/issues/153
 .. _#149: https://github.com/kiwicom/schemathesis/issues/149
 .. _#144: https://github.com/kiwicom/schemathesis/issues/144
