@@ -13,6 +13,7 @@ def test_validate_schema(value):
 
 
 @given(value=st.text())
+@example(":")
 def test_validate_auth(value):
     with pytest.raises(click.BadParameter):
         callbacks.validate_auth(None, None, value)
