@@ -89,10 +89,8 @@ def _has_invalid_characters(name: str, value: str) -> bool:
         return True
 
 
-def is_valid_header(headers: Optional[Dict[str, str]]) -> bool:
+def is_valid_header(headers: Dict[str, str]) -> bool:
     """Verify if the generated headers are valid."""
-    if headers is None:
-        return True
     for name, value in headers.items():
         if not _is_latin_1_encodable(value):
             return False
