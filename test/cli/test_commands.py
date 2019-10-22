@@ -35,6 +35,10 @@ def test_commands_version(cli):
             'Error: Invalid value for "--auth" / "-a": Should be in KEY:VALUE format. Got: 123',
         ),
         (
+            ("run", "http://127.0.0.1", "--auth=:pass"),
+            'Error: Invalid value for "--auth" / "-a": Username should not be empty',
+        ),
+        (
             ("run", "http://127.0.0.1", "--auth-type=random"),
             'Error: Invalid value for "--auth-type" / "-A": invalid choice: random. (choose from basic, digest)',
         ),

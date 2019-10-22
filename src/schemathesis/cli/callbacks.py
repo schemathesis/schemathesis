@@ -18,6 +18,8 @@ def validate_auth(
     if raw_value is not None:
         with reraise_format_error(raw_value):
             user, password = tuple(raw_value.split(":"))
+        if not user:
+            raise click.BadParameter("Username should not be empty")
         return user, password
     return None
 
