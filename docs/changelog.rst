@@ -12,6 +12,7 @@ Added
 - LazySchema accepts filters. `#149`_
 - Ability to register strategies for custom string formats. `#94`_
 - Generator-based events in ``runner`` module to improve control over the execution flow.
+- Filtration by tags. `#134`_
 
 Changed
 ~~~~~~~
@@ -259,6 +260,7 @@ Fixed
 .. _#149: https://github.com/kiwicom/schemathesis/issues/149
 .. _#144: https://github.com/kiwicom/schemathesis/issues/144
 .. _#138: https://github.com/kiwicom/schemathesis/issues/138
+.. _#134: https://github.com/kiwicom/schemathesis/issues/134
 .. _#130: https://github.com/kiwicom/schemathesis/issues/130
 .. _#126: https://github.com/kiwicom/schemathesis/issues/126
 .. _#121: https://github.com/kiwicom/schemathesis/issues/121
