@@ -177,7 +177,7 @@ SCHEMA_URI = "https://example.com/swagger.json"
     ),
 )
 def test_execute_arguments(cli, mocker, args, expected):
-    m_execute = mocker.patch("schemathesis.runner.execute", autospec=True)
+    m_execute = mocker.patch("schemathesis.runner.execute_as_generator", autospec=True)
 
     result = cli.run_inprocess(*args)
 

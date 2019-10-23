@@ -132,7 +132,8 @@ def run(  # pylint: disable=too-many-arguments
     )
 
     with utils.capture_hypothesis_output() as hypothesis_output:
-        stats = runner.execute(schema, checks=selected_checks, **options)
+        results_generator = runner.execute_as_generator(schema, checks=selected_checks, **options)
+        stats = output.pretty_print_test_progress(results_generator)
 
     output.pretty_print_stats(stats, hypothesis_output=hypothesis_output)
     click.echo()

@@ -55,6 +55,10 @@ class BaseSchema(Mapping):
             self._resolver = jsonschema.RefResolver("", self.raw_schema)
         return self._resolver
 
+    @property
+    def endpoints_count(self) -> int:
+        return len(list(self.get_all_endpoints()))
+
     def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
         raise NotImplementedError
 
