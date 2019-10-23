@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Display progress during the CLI run `#125`_
+
 `0.11.0`_ - 2019-10-22
 ----------------------
 
@@ -267,6 +272,7 @@ Fixed
 .. _#134: https://github.com/kiwicom/schemathesis/issues/134
 .. _#130: https://github.com/kiwicom/schemathesis/issues/130
 .. _#126: https://github.com/kiwicom/schemathesis/issues/126
+.. _#125: https://github.com/kiwicom/schemathesis/issues/125
 .. _#121: https://github.com/kiwicom/schemathesis/issues/121
 .. _#118: https://github.com/kiwicom/schemathesis/issues/118
 .. _#109: https://github.com/kiwicom/schemathesis/issues/109
