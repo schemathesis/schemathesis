@@ -286,7 +286,8 @@ For such cases it is possible to register custom strategies:
 
 .. code-block:: python
 
-    schemathesis.register_string_format("visa_cards", strategies.from_regex(r"\A4[0-9]{15}\Z").filter(luhn_validator)
+    strategy = strategies.from_regex(r"\A4[0-9]{15}\Z").filter(luhn_validator)
+    schemathesis.register_string_format("visa_cards", strategy)
 
 Documentation
 -------------
