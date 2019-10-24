@@ -3,6 +3,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import click
 import hypothesis
 from requests.auth import HTTPDigestAuth
+from requests.exceptions import HTTPError
 
 from .. import runner, utils
 from ..types import Filter
@@ -132,7 +133,16 @@ def run(  # pylint: disable=too-many-arguments
     )
 
     with utils.capture_hypothesis_output() as hypothesis_output:
-        results_generator = runner.execute_as_generator(schema, checks=selected_checks, **options)
+        try:
+            results_generator = runner.execute_as_generator(schema, checks=selected_checks, **options)
+        except HTTPError as exc:
+            if exc.response.status_code == 404:
+                click.secho(f"Schema was not found via {exc.request.url}", fg="red")
+                raise click.Abort
+            click.secho(
+                f"Failed to load schema, code {exc.response.status_code} was returned via {exc.request.url}", fg="red"
+            )
+            raise click.Abort
         stats = output.pretty_print_test_progress(results_generator)
 
     output.pretty_print_stats(stats, hypothesis_output=hypothesis_output)

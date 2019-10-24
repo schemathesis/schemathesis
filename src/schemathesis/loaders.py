@@ -33,6 +33,7 @@ def from_uri(
     session = requests.Session()
     session.headers.update({"User-Agent": USER_AGENT})
     response = session.get(uri)
+    response.raise_for_status()
     if base_url is None:
         base_url = get_base_url(uri)
     return from_file(response.text, base_url=base_url, method=method, endpoint=endpoint, tag=tag)

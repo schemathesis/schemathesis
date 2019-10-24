@@ -1,7 +1,9 @@
 import pytest
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
+from requests import Request, Response
 from requests.auth import HTTPDigestAuth
+from requests.exceptions import HTTPError
 
 from schemathesis.runner import DEFAULT_CHECKS
 
@@ -237,3 +239,22 @@ def test_cli_run_output_empty(cli, schema_url):
     lines = result.stdout.split("\n")
     assert "No checks were performed." in lines
     assert "Tests succeeded." in lines
+
+
+@pytest.mark.parametrize(
+    "status_code, message",
+    (
+        (404, f"Schema was not found via {SCHEMA_URI}"),
+        (500, f"Failed to load schema, code 500 was returned via {SCHEMA_URI}"),
+    ),
+)
+def test_execute_missing_schema(cli, mocker, status_code, message):
+    response = Response()
+    response.status_code = status_code
+    request = Request(url=SCHEMA_URI)
+    mocker.patch(
+        "schemathesis.runner.execute_as_generator", side_effect=(HTTPError(response=response, request=request))
+    )
+    result = cli.run_inprocess(SCHEMA_URI)
+    assert result.exit_code == 1
+    assert message in result.stdout
