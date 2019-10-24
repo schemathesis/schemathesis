@@ -27,6 +27,11 @@ class BeforeExecution(ExecutionEvent):
 
 
 @attr.s(slots=True)
+class FailedExecution(ExecutionEvent):
+    endpoint: Endpoint = attr.ib()
+
+
+@attr.s(slots=True)
 class AfterExecution(ExecutionEvent):
     endpoint: Endpoint = attr.ib()
 

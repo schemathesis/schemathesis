@@ -2,6 +2,7 @@ from contextlib import contextmanager, suppress
 from typing import Any, Callable, Dict, Generator, Iterable, Optional, Tuple, Union
 
 import hypothesis
+import hypothesis.errors
 import requests
 from requests.auth import AuthBase
 
@@ -67,7 +68,11 @@ def execute_from_schema(
         for endpoint, test in schema.get_all_tests(single_test, settings):
             yield events.BeforeExecution(statistic, endpoint)
             with suppress(AssertionError):
-                test(session, base_url, checks, statistic)
+                try:
+                    test(session, base_url, checks, statistic)
+                except hypothesis.errors.HypothesisException:
+                    yield events.FailedExecution(statistic, endpoint)
+                    continue
             yield events.AfterExecution(statistic, endpoint)
 
     yield events.Finished(statistic=statistic)
