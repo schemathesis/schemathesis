@@ -120,7 +120,11 @@ def run_server(app: web.Application, port: int, timeout: float = 0.05) -> None:
 @click.argument("port", type=int)
 @click.option("--endpoints", type=CSVOption(Endpoint))
 def run_app(port, endpoints):
-    app = create_app(endpoints or ("success", "failure"))
+    if endpoints is not None:
+        endpoints = tuple(endpoint.name for endpoint in endpoints)
+    else:
+        endpoints = ("success", "failure")
+    app = create_app(endpoints)
     web.run_app(app, port=port)
 
 
