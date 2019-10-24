@@ -244,7 +244,7 @@ def test_cli_run_output_empty(cli, schema_url):
 @pytest.mark.parametrize(
     "status_code, message",
     (
-        (404, f"Schema was not found via {SCHEMA_URI}"),
+        (404, f"Schema was not found at {SCHEMA_URI}"),
         (500, f"Failed to load schema, code 500 was returned via {SCHEMA_URI}"),
     ),
 )
