@@ -137,7 +137,7 @@ def run(  # pylint: disable=too-many-arguments
             results_generator = runner.execute_as_generator(schema, checks=selected_checks, **options)
         except HTTPError as exc:
             if exc.response.status_code == 404:
-                click.secho(f"Schema was not found via {exc.request.url}", fg="red")
+                click.secho(f"Schema was not found at {exc.request.url}", fg="red")
                 raise click.Abort
             click.secho(
                 f"Failed to load schema, code {exc.response.status_code} was returned via {exc.request.url}", fg="red"
