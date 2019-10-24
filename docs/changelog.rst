@@ -11,6 +11,11 @@ Added
 
 - Display progress during the CLI run. `#125`_
 
+Changed
+~~~~~~~
+
+- Run internal test suite in parallel via ``pytest-xdist`` by default. `#176`_
+
 Fixed
 ~~~~~
 
@@ -269,6 +274,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#176: https://github.com/kiwicom/schemathesis/issues/176
 .. _#173: https://github.com/kiwicom/schemathesis/issues/173
 .. _#167: https://github.com/kiwicom/schemathesis/issues/167
 .. _#153: https://github.com/kiwicom/schemathesis/issues/153
