@@ -40,10 +40,10 @@ def pretty_print_stats(stats: runner.StatsCollector, hypothesis_output: Optional
     if hypothesis_output:
         with print_in_section("FALSIFYING EXAMPLES", start_newline=True):
             output = "\n".join(hypothesis_output)
-            click.echo(click.style(output, fg="red"))
+            click.secho(output, fg="red")
 
     if stats.is_empty:
-        click.echo(click.style("No checks were performed.", bold=True))
+        click.secho("No checks were performed.", bold=True)
         return
 
     padding = 20
@@ -98,17 +98,21 @@ def pretty_print_test_progress(results_generator: Generator[events.ExecutionEven
             template = f"    {{:<{col1_len}}} {{:<{col2_len}}} "
             click.echo(template.format(result.endpoint.method, result.endpoint.path), nl=False)
         # Print test result and progress after execution
-        if isinstance(result, events.AfterExecution):
+        if isinstance(result, (events.AfterExecution, events.FailedExecution)):
             position += 1
             # Recalculate number of errors to obtain test state after execution
             new_errors = sum([check["error"] for check in result.statistic.data.values()])
             template = f"{{:{col3_len}}} "
             if new_errors > errors:
-                click.echo(template.format("F"), nl=False)
+                click.secho(template.format("F"), nl=False, fg="red")
+            elif isinstance(result, events.FailedExecution):
+                click.secho(template.format("E"), nl=False, fg="red")
             else:
-                click.echo(template.format("."), nl=False)
+                click.secho(template.format("."), nl=False, fg="green")
             col4_len = int(columns) - col1_len - col2_len - col3_len - 10
-            click.echo(f"{{:>{col4_len}}}".format(percentage(position, init.schema.endpoints_count)))  # type: ignore
+            click.secho(
+                f"{{:>{col4_len}}}".format(percentage(position, init.schema.endpoints_count)), fg="cyan"  # type:ignore
+            )
         if isinstance(result, events.Finished):
             return result.statistic
     return StatsCollector()

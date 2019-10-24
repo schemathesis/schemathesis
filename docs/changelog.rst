@@ -16,6 +16,7 @@ Fixed
 
 - Test server generated wrong schema when ``endpoints`` option is passed via CLI. `#173`_
 - Error message if schema is not found in CLI. `#172`_
+- Continue trying running tests on hypothesis error. `#137`_
 
 `0.11.0`_ - 2019-10-22
 ----------------------
@@ -277,6 +278,7 @@ Fixed
 .. _#149: https://github.com/kiwicom/schemathesis/issues/149
 .. _#144: https://github.com/kiwicom/schemathesis/issues/144
 .. _#138: https://github.com/kiwicom/schemathesis/issues/138
+.. _#137: https://github.com/kiwicom/schemathesis/issues/137
 .. _#134: https://github.com/kiwicom/schemathesis/issues/134
 .. _#130: https://github.com/kiwicom/schemathesis/issues/130
 .. _#126: https://github.com/kiwicom/schemathesis/issues/126

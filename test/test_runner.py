@@ -1,7 +1,7 @@
 import pytest
 
 from schemathesis.constants import __version__
-from schemathesis.runner import execute, get_base_url
+from schemathesis.runner import events, execute, execute_as_generator, get_base_url
 
 
 def assert_request(app, idx, method, path, headers=None):
@@ -98,10 +98,11 @@ def test_hypothesis_deadline(schema_url, app):
     # When `deadline` is passed in `hypothesis_options` in the `execute` call
     execute(schema_url, hypothesis_options={"deadline": 500})
 
-    # Then it should be passed to `hypothesis.settings`
-    # And slow endpoint (250ms) should not be considered as breaking the deadline
-    assert len(app["incoming_requests"]) == 1
-    assert_request(app, 0, "GET", "/api/slow")
+
+@pytest.mark.endpoints("slow")
+def test_hypothesis_failed_event(schema_url, app):
+    results = execute_as_generator(schema_url, hypothesis_options={"deadline": 1})
+    assert any([isinstance(event, events.FailedExecution) for event in results])
 
 
 @pytest.mark.parametrize(

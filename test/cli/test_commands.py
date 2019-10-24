@@ -258,3 +258,10 @@ def test_execute_missing_schema(cli, mocker, status_code, message):
     result = cli.run_inprocess(SCHEMA_URI)
     assert result.exit_code == 1
     assert message in result.stdout
+
+
+@pytest.mark.endpoints("slow")
+def test_hypothesis_failed_event(cli, schema_url):
+    result = cli.run_inprocess(schema_url, "--hypothesis-deadline=1")
+    assert result.exit_code == 0
+    assert "/slow E" in result.stdout
