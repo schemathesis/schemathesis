@@ -11,7 +11,7 @@ from ..models import Endpoint
 from ..utils import is_schemathesis_test
 
 
-@hookimpl(hookwrapper=True)  # pragma: no mutate
+@hookimpl(hookwrapper=True)  # type:ignore # pragma: no mutate
 def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> Optional["SchemathesisCase"]:
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
     outcome = yield
@@ -54,7 +54,7 @@ class SchemathesisCase(PyCollector):
             pytest.fail("Error during collection")
 
 
-@hookimpl(hookwrapper=True)  # type: ignore # pragma: no mutate
+@hookimpl(hookwrapper=True)  # pragma: no mutate
 def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     """It is possible to have a Hypothesis exception in runtime.
 
