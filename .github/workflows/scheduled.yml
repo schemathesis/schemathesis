@@ -14,5 +14,6 @@ jobs:
     - uses: actions/setup-python@v1
       with:
         python-version: '3.7'
-    - run: pip install tox
-    - run: tox -e mutmut
+    - run: poetry install
+    - run: pip install mutmut
+    - run: mutmut run --backup --paths-to-mutate "src/" --tests-dir "test/" --runner "pytest -x --tb=no -q"
