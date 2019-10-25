@@ -11,19 +11,19 @@ if TYPE_CHECKING:
     import requests  # Typechecking-only import to speedup import of schemathesis
 
 
-@attr.s(slots=True)
+@attr.s(slots=True)  # pragma: no mutate
 class Case:
     """A single test case parameters."""
 
-    path: str = attr.ib()
-    method: str = attr.ib()
-    base_url: Optional[str] = attr.ib(default=None)
-    path_parameters: PathParameters = attr.ib(factory=dict)
-    headers: Headers = attr.ib(factory=dict)
-    cookies: Cookies = attr.ib(factory=dict)
-    query: Query = attr.ib(factory=dict)
-    body: Body = attr.ib(factory=dict)
-    form_data: FormData = attr.ib(factory=dict)
+    path: str = attr.ib()  # pragma: no mutate
+    method: str = attr.ib()  # pragma: no mutate
+    base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    path_parameters: PathParameters = attr.ib(factory=dict)  # pragma: no mutate
+    headers: Headers = attr.ib(factory=dict)  # pragma: no mutate
+    cookies: Cookies = attr.ib(factory=dict)  # pragma: no mutate
+    query: Query = attr.ib(factory=dict)  # pragma: no mutate
+    body: Body = attr.ib(factory=dict)  # pragma: no mutate
+    form_data: FormData = attr.ib(factory=dict)  # pragma: no mutate
 
     @property
     def formatted_path(self) -> str:
@@ -66,19 +66,19 @@ def empty_object() -> Dict[str, Any]:
     return {"properties": {}, "additionalProperties": False, "type": "object", "required": []}
 
 
-@attr.s(slots=True)
+@attr.s(slots=True)  # pragma: no mutate
 class Endpoint:
     """A container that could be used for test cases generation."""
 
-    path: str = attr.ib()
-    method: str = attr.ib()
-    base_url: Optional[str] = attr.ib(default=None)
-    path_parameters: PathParameters = attr.ib(factory=empty_object)
-    headers: Headers = attr.ib(factory=empty_object)
-    cookies: Cookies = attr.ib(factory=empty_object)
-    query: Query = attr.ib(factory=empty_object)
-    body: Body = attr.ib(factory=empty_object)
-    form_data: FormData = attr.ib(factory=empty_object)
+    path: str = attr.ib()  # pragma: no mutate
+    method: str = attr.ib()  # pragma: no mutate
+    base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    path_parameters: PathParameters = attr.ib(factory=empty_object)  # pragma: no mutate
+    headers: Headers = attr.ib(factory=empty_object)  # pragma: no mutate
+    cookies: Cookies = attr.ib(factory=empty_object)  # pragma: no mutate
+    query: Query = attr.ib(factory=empty_object)  # pragma: no mutate
+    body: Body = attr.ib(factory=empty_object)  # pragma: no mutate
+    form_data: FormData = attr.ib(factory=empty_object)  # pragma: no mutate
 
     def as_strategy(self) -> SearchStrategy:
         from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel
@@ -90,11 +90,11 @@ def _stats_data_factory() -> defaultdict:
     return defaultdict(Counter)
 
 
-@attr.s(slots=True, repr=False)
+@attr.s(slots=True, repr=False)  # pragma: no mutate
 class StatsCollector:
     """A container for collected data from test executor."""
 
-    data: Dict[str, Counter] = attr.ib(factory=_stats_data_factory)
+    data: Dict[str, Counter] = attr.ib(factory=_stats_data_factory)  # pragma: no mutate
 
     @property
     def is_empty(self) -> bool:
