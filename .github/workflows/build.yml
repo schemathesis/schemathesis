@@ -1,6 +1,14 @@
 name: build
 
-on: [pull_request]
+on:
+  pull_request:
+    paths:
+      - '**.py'
+      - '!docs/**'
+      - '!adr/**'
+  push:
+    branches:
+      - master
 
 jobs:
   black:
