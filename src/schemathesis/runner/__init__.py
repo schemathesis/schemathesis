@@ -66,16 +66,19 @@ def execute_from_schema(
         yield events.Initialized(statistic=statistic, schema=schema, checks=checks, hypothesis_settings=settings)
 
         for endpoint, test in schema.get_all_tests(single_test, settings):
-            yield events.BeforeExecution(statistic, endpoint)
+            yield events.BeforeExecution(statistic=statistic, schema=schema, endpoint=endpoint)
             with suppress(AssertionError):
                 try:
                     test(session, base_url, checks, statistic)
+                    result = events.ExecutionResult.success
+                except AssertionError:
+                    result = events.ExecutionResult.failure
+                    raise
                 except hypothesis.errors.HypothesisException:
-                    yield events.FailedExecution(statistic, endpoint)
-                    continue
-            yield events.AfterExecution(statistic, endpoint)
+                    result = events.ExecutionResult.error
+            yield events.AfterExecution(statistic=statistic, schema=schema, endpoint=endpoint, result=result)
 
-    yield events.Finished(statistic=statistic)
+    yield events.Finished(statistic=statistic, schema=schema)
 
 
 def execute(  # pylint: disable=too-many-arguments
@@ -86,7 +89,7 @@ def execute(  # pylint: disable=too-many-arguments
     hypothesis_options: Optional[Dict[str, Any]] = None,
     loader: Callable = from_uri,
 ) -> StatsCollector:
-    generator = execute_as_generator(
+    generator = prepare(
         schema_uri=schema_uri,
         checks=checks,
         api_options=api_options,
@@ -99,7 +102,7 @@ def execute(  # pylint: disable=too-many-arguments
     return finished.statistic
 
 
-def execute_as_generator(  # pylint: disable=too-many-arguments
+def prepare(  # pylint: disable=too-many-arguments
     schema_uri: str,
     checks: Iterable[Callable] = DEFAULT_CHECKS,
     api_options: Optional[Dict[str, Any]] = None,
@@ -107,7 +110,7 @@ def execute_as_generator(  # pylint: disable=too-many-arguments
     hypothesis_options: Optional[Dict[str, Any]] = None,
     loader: Callable = from_uri,
 ) -> Generator[events.ExecutionEvent, None, None]:
-    """Generate and run test cases against the given API definition."""
+    """Prepare a generator that will run test cases against the given API definition."""
     api_options = api_options or {}
     loader_options = loader_options or {}
 

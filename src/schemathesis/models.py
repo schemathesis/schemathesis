@@ -100,6 +100,10 @@ class StatsCollector:
     def is_empty(self) -> bool:
         return len(self.data) == 0
 
+    @property
+    def has_errors(self) -> bool:
+        return any(value.get("error") for value in self.data.values())
+
     def increment(self, check_name: str, error: Optional[Exception] = None) -> None:
         self.data[check_name]["total"] += 1
         self.data[check_name]["ok"] += error is None
