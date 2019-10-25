@@ -23,13 +23,13 @@ from .types import Filter
 from .utils import NOT_SET
 
 
-@attr.s()
+@attr.s()  # pragma: no mutate
 class BaseSchema(Mapping):
-    raw_schema: Dict[str, Any] = attr.ib()
-    base_url: Optional[str] = attr.ib(default=None)
-    method: Optional[Filter] = attr.ib(default=None)
-    endpoint: Optional[Filter] = attr.ib(default=None)
-    tag: Optional[Filter] = attr.ib(default=None)
+    raw_schema: Dict[str, Any] = attr.ib()  # pragma: no mutate
+    base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    method: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
+    endpoint: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
+    tag: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
 
     def __iter__(self) -> Iterator:
         return iter(self.endpoints)
@@ -97,14 +97,14 @@ class SwaggerV20(BaseSchema):
     @property
     def base_path(self) -> str:
         """Base path for the schema."""
-        path: str = self.raw_schema.get("basePath", "/")
+        path: str = self.raw_schema.get("basePath", "/")  # pragma: no mutate
         if not path.endswith("/"):
             path += "/"
         return path
 
     def get_full_path(self, path: str) -> str:
         """Compute full path for the given path."""
-        return urljoin(self.base_path, path.lstrip("/"))
+        return urljoin(self.base_path, path.lstrip("/"))  # pragma: no mutate
 
     def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
         paths = self.raw_schema["paths"]  # pylint: disable=unsubscriptable-object
@@ -186,11 +186,11 @@ class SwaggerV20(BaseSchema):
             if not (key == "required" and not isinstance(value, list))
         }
 
-    @overload
+    @overload  # pragma: no mutate
     def resolve(self, item: Dict[str, Any]) -> Dict[str, Any]:  # pylint: disable=function-redefined
         pass
 
-    @overload
+    @overload  # pragma: no mutate
     def resolve(self, item: List) -> List:  # pylint: disable=function-redefined
         pass
 

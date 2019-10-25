@@ -13,7 +13,7 @@ from ..schemas import BaseSchema
 from ..utils import get_base_url
 from . import events
 
-Auth = Union[Tuple[str, str], AuthBase]
+Auth = Union[Tuple[str, str], AuthBase]  # pragma: no mutate
 
 
 def not_a_server_error(response: requests.Response) -> None:

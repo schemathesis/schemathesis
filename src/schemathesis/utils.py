@@ -14,7 +14,7 @@ NOT_SET = object()
 def deprecated(func: Callable, message: str) -> Callable:
     """Emit a warning if the given function is used."""
 
-    @wraps(func)
+    @wraps(func)  # pragma: no mutate
     def inner(*args: Any, **kwargs: Any) -> Any:
         warnings.warn(message, DeprecationWarning)
         return func(*args, **kwargs)

@@ -11,12 +11,12 @@ from .types import Filter
 from .utils import NOT_SET
 
 
-@attr.s(slots=True)
+@attr.s(slots=True)  # pragma: no mutate
 class LazySchema:
-    fixture_name: str = attr.ib()
-    method: Optional[Filter] = attr.ib(default=NOT_SET)
-    endpoint: Optional[Filter] = attr.ib(default=NOT_SET)
-    tag: Optional[Filter] = attr.ib(default=NOT_SET)
+    fixture_name: str = attr.ib()  # pragma: no mutate
+    method: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
+    endpoint: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
+    tag: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
 
     def parametrize(
         self, method: Optional[Filter] = NOT_SET, endpoint: Optional[Filter] = NOT_SET, tag: Optional[Filter] = NOT_SET
