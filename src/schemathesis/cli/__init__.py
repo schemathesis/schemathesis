@@ -1,4 +1,5 @@
-from typing import Dict, Iterable, List, Optional, Tuple
+from contextlib import contextmanager
+from typing import Dict, Generator, Iterable, List, Optional, Tuple
 
 import click
 import hypothesis
@@ -6,6 +7,7 @@ from requests.auth import HTTPDigestAuth
 from requests.exceptions import HTTPError
 
 from .. import runner, utils
+from ..runner import events
 from ..types import Filter
 from ..utils import dict_not_none_values, dict_true_values
 from . import callbacks, output
@@ -132,24 +134,29 @@ def run(  # pylint: disable=too-many-arguments
         ),
     )
 
-    with utils.capture_hypothesis_output() as hypothesis_output:
-        try:
-            results_generator = runner.execute_as_generator(schema, checks=selected_checks, **options)
-        except HTTPError as exc:
-            if exc.response.status_code == 404:
-                click.secho(f"Schema was not found at {exc.request.url}", fg="red")
-                raise click.Abort
-            click.secho(
-                f"Failed to load schema, code {exc.response.status_code} was returned via {exc.request.url}", fg="red"
-            )
+    with abort_on_network_errors():
+        prepared_runner = runner.prepare(schema, checks=selected_checks, **options)
+    execute(prepared_runner)
+
+
+@contextmanager
+def abort_on_network_errors() -> Generator[None, None, None]:
+    """Abort on network errors during the schema loading."""
+    try:
+        yield
+    except HTTPError as exc:
+        if exc.response.status_code == 404:
+            click.secho(f"Schema was not found at {exc.request.url}", fg="red")
             raise click.Abort
-        stats = output.pretty_print_test_progress(results_generator)
+        click.secho(
+            f"Failed to load schema, code {exc.response.status_code} was returned via {exc.request.url}", fg="red"
+        )
+        raise click.Abort
 
-    output.pretty_print_stats(stats, hypothesis_output=hypothesis_output)
-    click.echo()
 
-    if any(value.get("error") for value in stats.data.values()):
-        click.echo(click.style("Tests failed.", fg="red"))
-        raise click.exceptions.Exit(1)
-
-    click.echo(click.style("Tests succeeded.", fg="green"))
+def execute(prepared_runner: Generator[events.ExecutionEvent, None, None]) -> None:
+    """Execute a prepared runner by drawing events from it and passing to a proper handler."""
+    with utils.capture_hypothesis_output() as hypothesis_output:
+        context = events.ExecutionContext(hypothesis_output)
+        for event in prepared_runner:
+            output.handle_event(context, event)

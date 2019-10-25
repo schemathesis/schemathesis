@@ -179,7 +179,7 @@ SCHEMA_URI = "https://example.com/swagger.json"
     ),
 )
 def test_execute_arguments(cli, mocker, args, expected):
-    m_execute = mocker.patch("schemathesis.runner.execute_as_generator", autospec=True)
+    m_execute = mocker.patch("schemathesis.runner.prepare", autospec=True)
 
     result = cli.run_inprocess(*args)
 
@@ -252,9 +252,7 @@ def test_execute_missing_schema(cli, mocker, status_code, message):
     response = Response()
     response.status_code = status_code
     request = Request(url=SCHEMA_URI)
-    mocker.patch(
-        "schemathesis.runner.execute_as_generator", side_effect=(HTTPError(response=response, request=request))
-    )
+    mocker.patch("schemathesis.runner.prepare", side_effect=(HTTPError(response=response, request=request)))
     result = cli.run_inprocess(SCHEMA_URI)
     assert result.exit_code == 1
     assert message in result.stdout
