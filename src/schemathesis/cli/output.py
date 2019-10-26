@@ -1,9 +1,7 @@
 import os
 import platform
 import shutil
-from contextlib import contextmanager
-from enum import IntEnum
-from typing import Counter, Generator, List, Optional
+from typing import Counter, List
 
 import click
 from hypothesis import settings
@@ -14,37 +12,13 @@ from ..constants import __version__
 from ..runner import events
 
 
-class ColumnWidth(IntEnum):
-    """Width of different columns in the output."""
-
-    method = 8
-    endpoint = 10
-    result = 4
-
-
 def get_terminal_width() -> int:
     return shutil.get_terminal_size().columns
 
 
-@contextmanager
-def print_in_section(
-    title: str, separator: str = "-", start_newline: bool = False, line_length: Optional[int] = None
-) -> Generator[None, None, None]:
-    """Print section in terminal with the given title nicely centered.
-
-    Usage::
-
-        with print_in_section("statistics"):
-            print("Number of items:", len(items))
-    """
-    if start_newline:
-        click.echo()
-
-    line_length = line_length or get_terminal_width()
-
-    click.echo(f" {title} ".center(line_length, separator))
-    yield
-    click.echo(separator * line_length)
+def display_section_name(title: str, separator: str = "=") -> None:
+    """Print section name with separators in terminal with the given title nicely centered."""
+    click.echo(f" {title} ".center(get_terminal_width(), separator))
 
 
 def get_percentage(position: int, length: int) -> str:
@@ -55,63 +29,65 @@ def get_percentage(position: int, length: int) -> str:
 
 def handle_initialized(context: events.ExecutionContext, event: events.Initialized) -> None:
     """Display information about the test session."""
-    with print_in_section("test session starts"):
-        versions = (
-            f"platform {platform.system()} -- "
-            f"Python {platform.python_version()}, "
-            f"schemathesis-{__version__}, "
-            f"hypothesis-{version('hypothesis')}, "
-            f"hypothesis_jsonschema-{version('hypothesis_jsonschema')}, "
-            f"jsonschema-{version('jsonschema')}"
-        )
-        click.echo(versions)
-        click.echo(f"rootdir: {os.getcwd()}")
-        click.echo(
-            f"hypothesis profile '{settings._current_profile}' "  # type: ignore
-            f"-> {settings.get_profile(settings._current_profile).show_changed()}"
-        )
-        click.echo(f"Collected endpoints: {event.schema.endpoints_count}")
+    display_section_name("Schemathesis test session starts")
+    versions = (
+        f"platform {platform.system()} -- "
+        f"Python {platform.python_version()}, "
+        f"schemathesis-{__version__}, "
+        f"hypothesis-{version('hypothesis')}, "
+        f"hypothesis_jsonschema-{version('hypothesis_jsonschema')}, "
+        f"jsonschema-{version('jsonschema')}"
+    )
+    click.echo(versions)
+    click.echo(f"rootdir: {os.getcwd()}")
+    click.echo(
+        f"hypothesis profile '{settings._current_profile}' "  # type: ignore
+        f"-> {settings.get_profile(settings._current_profile).show_changed()}"
+    )
+    click.secho(f"collected endpoints: {event.schema.endpoints_count}\n", bold=True)
 
 
 def handle_before_execution(context: events.ExecutionContext, event: events.BeforeExecution) -> None:
     """Display what method / endpoint will be tested next."""
-    # Print test method and endpoint before test execution
-    col2_len = len(event.endpoint.path)
-    template = f"    {{:<{ColumnWidth.method}}} {{:<{col2_len}}} "
-    click.echo(template.format(event.endpoint.method, event.endpoint.path), nl=False)
+    message = f"{event.endpoint.method} {event.endpoint.path} "
+    context.current_line_length = len(message)
+    click.echo(message, nl=False)
 
 
 def handle_after_execution(context: events.ExecutionContext, event: events.AfterExecution) -> None:
     """Display the execution result + current progress at the same line with the method / endpoint names."""
-    context.current_position += 1
-    display_execution_result(event)
+    context.endpoints_processed += 1
+    display_execution_result(context, event)
     display_percentage(context, event)
 
 
-def display_execution_result(event: events.AfterExecution) -> None:
+def display_execution_result(context: events.ExecutionContext, event: events.AfterExecution) -> None:
     """Display an appropriate symbol for the given event's execution result."""
-    template = f"{{:{ColumnWidth.result}}} "
     if event.result == runner.events.ExecutionResult.failure:
         symbol, color = "F", "red"
     elif event.result == runner.events.ExecutionResult.error:
         symbol, color = "E", "red"
     else:
         symbol, color = ".", "green"
-    click.secho(template.format(symbol), nl=False, fg=color)
+    context.current_line_length += len(symbol)
+    click.secho(symbol, nl=False, fg=color)
 
 
 def display_percentage(context: events.ExecutionContext, event: events.AfterExecution) -> None:
     """Add the current progress in % to the right side of the current line."""
-    padding = 10
-    percentage_length = get_terminal_width() - ColumnWidth.method - ColumnWidth.endpoint - ColumnWidth.result - padding
-    current_percentage = get_percentage(context.current_position, event.schema.endpoints_count)
-    message = f"{{:>{percentage_length}}}".format(click.style(current_percentage, fg="cyan"))  # type:ignore
-    click.echo(message)
+    padding = 1
+    current_percentage = get_percentage(context.endpoints_processed, event.schema.endpoints_count)
+    styled = click.style(current_percentage, fg="cyan")
+    # Total length of the message so it will fill to the right border of the terminal minus padding
+    length = get_terminal_width() - context.current_line_length + len(styled) - len(current_percentage) - padding
+    template = f"{{:>{length}}}"
+    click.echo(template.format(styled))
 
 
 def handle_finished(context: events.ExecutionContext, event: events.Finished) -> None:
     """Show the outcome of the whole testing session."""
-    display_falsifying_examples(context.hypothesis_output)
+    click.echo()
+    display_hypothesis_output(context.hypothesis_output)
     display_statistic(event.statistic)
     click.echo()
 
@@ -122,12 +98,12 @@ def handle_finished(context: events.ExecutionContext, event: events.Finished) ->
     click.secho("Tests succeeded.", fg="green")
 
 
-def display_falsifying_examples(hypothesis_output: List[str]) -> None:
+def display_hypothesis_output(hypothesis_output: List[str]) -> None:
     """Show falsifying examples from Hypothesis output if there are any."""
     if hypothesis_output:
-        with print_in_section("FALSIFYING EXAMPLES", start_newline=True):
-            output = "\n".join(hypothesis_output)
-            click.secho(output, fg="red")
+        display_section_name("HYPOTHESIS OUTPUT")
+        output = "\n".join(hypothesis_output)
+        click.secho(output, fg="red")
 
 
 def display_statistic(statistic: runner.StatsCollector) -> None:
@@ -143,9 +119,10 @@ def display_statistic(statistic: runner.StatsCollector) -> None:
 
     template = f"{{:{col1_len}}}{{:{col2_len}}}{{:{col3_len}}}"
 
-    with print_in_section("SUMMARY", start_newline=True):
-        for check_name, results in statistic.data.items():
-            display_check_result(check_name, results, template)
+    display_section_name("SUMMARY")
+    click.echo()
+    for check_name, results in statistic.data.items():
+        display_check_result(check_name, results, template)
 
 
 def display_check_result(check_name: str, results: Counter, template: str) -> None:
