@@ -115,8 +115,6 @@ def run(  # pylint: disable=too-many-arguments
     # pylint: disable=too-many-locals
     selected_checks = tuple(check for check in runner.DEFAULT_CHECKS if check.__name__ in checks)
 
-    click.echo("Running schemathesis test cases ...")
-
     if auth and auth_type == "digest":
         auth = HTTPDigestAuth(*auth)  # type: ignore
 

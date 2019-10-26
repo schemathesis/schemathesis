@@ -209,22 +209,20 @@ def test_hypothesis_parameters(cli, schema_url):
 def test_cli_run_output_success(cli, schema_url):
     result = cli.run_inprocess(schema_url)
     assert result.exit_code == 0
-    assert " FALSIFYING EXAMPLES " not in result.stdout
+    assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
 
     lines = result.stdout.split("\n")
-    assert "Running schemathesis test cases ..." in lines
     assert "Tests succeeded." in lines
 
 
 def test_cli_run_output_with_errors(cli, schema_url):
     result = cli.run_inprocess(schema_url)
     assert result.exit_code == 1
-    assert " FALSIFYING EXAMPLES " in result.stdout
+    assert " HYPOTHESIS OUTPUT " in result.stdout
     assert " SUMMARY " in result.stdout
 
     lines = result.stdout.split("\n")
-    assert "Running schemathesis test cases ..." in lines
     assert "not_a_server_error            1 / 3 passed          FAILED " in lines
     assert "Tests failed." in lines
 
@@ -233,7 +231,7 @@ def test_cli_run_output_with_errors(cli, schema_url):
 def test_cli_run_output_empty(cli, schema_url):
     result = cli.run_inprocess(schema_url)
     assert result.exit_code == 0
-    assert " FALSIFYING EXAMPLES " not in result.stdout
+    assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " not in result.stdout
 
     lines = result.stdout.split("\n")

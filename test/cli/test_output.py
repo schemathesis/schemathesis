@@ -18,15 +18,15 @@ def click_context():
 @pytest.mark.parametrize(
     "title,separator,printed,expected",
     [
-        ("TEST", "-", "data in section", "------- TEST -------\ndata in section\n--------------------\n"),
-        ("TEST", "*", "data in section", "******* TEST *******\ndata in section\n********************\n"),
+        ("TEST", "-", "data in section", "------- TEST -------"),
+        ("TEST", "*", "data in section", "******* TEST *******"),
     ],
 )
-def test_print_in_section(capsys, title, separator, printed, expected):
-    with output.print_in_section(title, separator=separator, line_length=20):
-        print(printed)
-
-    assert capsys.readouterr().out == expected
+def test_display_section_name(capsys, title, separator, printed, expected):
+    output.display_section_name(title, separator=separator)
+    out = capsys.readouterr().out.strip()
+    assert len(out) == output.get_terminal_width()
+    assert expected in out
 
 
 def test_display_statistic(capsys):
@@ -68,11 +68,11 @@ def test_get_percentage(position, length, expected):
     assert output.get_percentage(position, length) == expected
 
 
-@pytest.mark.parametrize("current_position, percentage", ((0, "[  0%]"), (1, "[100%]")))
-def test_display_percentage(capsys, swagger_20, current_position, percentage):
+@pytest.mark.parametrize("endpoints_processed, percentage", ((0, "[  0%]"), (1, "[100%]")))
+def test_display_percentage(capsys, swagger_20, endpoints_processed, percentage):
     statistic = StatsCollector()
     context = runner.events.ExecutionContext([])
-    context.current_position = current_position
+    context.endpoints_processed = endpoints_processed
     endpoint = Endpoint("/success", "GET")
     event = runner.events.AfterExecution(
         statistic=statistic, schema=swagger_20, endpoint=endpoint, result=runner.events.ExecutionResult.success
@@ -82,7 +82,7 @@ def test_display_percentage(capsys, swagger_20, current_position, percentage):
     assert out == click.style(percentage, fg="cyan")
 
 
-def test_display_falsifying_examples(capsys):
-    output.display_falsifying_examples(["foo", "bar"])
+def test_display_hypothesis_output(capsys):
+    output.display_hypothesis_output(["foo", "bar"])
     lines = capsys.readouterr().out.split("\n")
-    assert " ".join(lines[2:4]) == click.style("foo bar", fg="red")
+    assert " ".join(lines[1:3]) == click.style("foo bar", fg="red")
