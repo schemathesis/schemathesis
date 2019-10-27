@@ -2,8 +2,8 @@ name: scheduled
 
 on:
   schedule:
-    # Every Sunday at 00:00
-    - cron: "0 0 * * 0"
+    # Every Monday at 00:00
+    - cron: "0 0 * * 1"
 
 jobs:
   mutmut:
