@@ -16,9 +16,10 @@ def get_terminal_width() -> int:
     return shutil.get_terminal_size().columns
 
 
-def display_section_name(title: str, separator: str = "=") -> None:
+def display_section_name(title: str, separator: str = "=", bold: bool = True) -> None:
     """Print section name with separators in terminal with the given title nicely centered."""
-    click.echo(f" {title} ".center(get_terminal_width(), separator))
+    message = f" {title} ".center(get_terminal_width(), separator)
+    click.secho(message, bold=bold)
 
 
 def get_percentage(position: int, length: int) -> str:
