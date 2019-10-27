@@ -53,8 +53,7 @@ def test_execute(schema_url, app):
     assert_request(app, 2, "GET", "/api/success", headers)
 
     # And statistic is showing the breakdown of cases types
-    assert "not_a_server_error" in stats.data
-    assert dict(stats.data["not_a_server_error"]) == {"total": 3, "ok": 1, "error": 2}
+    assert stats.total["not_a_server_error"] == {"total": 3, "ok": 1, "error": 2}
 
 
 def test_auth(schema_url, app):

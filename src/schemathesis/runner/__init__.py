@@ -8,7 +8,7 @@ from requests.auth import AuthBase
 
 from ..constants import USER_AGENT
 from ..loaders import from_uri
-from ..models import Case, StatsCollector
+from ..models import Case, ExecutionResultSet, StatsCollector
 from ..schemas import BaseSchema
 from ..utils import get_base_url
 from . import events
@@ -58,15 +58,17 @@ def execute_from_schema(
 
     Provides the main testing loop and preparation step.
     """
-    statistic = StatsCollector()
+    results = ExecutionResultSet()
 
     with get_session(auth, headers) as session:
         settings = get_hypothesis_settings(hypothesis_options)
 
-        yield events.Initialized(statistic=statistic, schema=schema, checks=checks, hypothesis_settings=settings)
+        yield events.Initialized(results=results, schema=schema, checks=checks, hypothesis_settings=settings)
 
         for endpoint, test in schema.get_all_tests(single_test, settings):
-            yield events.BeforeExecution(statistic=statistic, schema=schema, endpoint=endpoint)
+            statistic = StatsCollector(path=endpoint.path, method=endpoint.method)
+            # TODO. set result to statistic?
+            yield events.BeforeExecution(results=results, schema=schema, endpoint=endpoint)
             with suppress(AssertionError):
                 try:
                     test(session, base_url, checks, statistic)
@@ -76,9 +78,10 @@ def execute_from_schema(
                     raise
                 except hypothesis.errors.HypothesisException:
                     result = events.ExecutionResult.error
-            yield events.AfterExecution(statistic=statistic, schema=schema, endpoint=endpoint, result=result)
+            results.append(statistic)
+            yield events.AfterExecution(results=results, schema=schema, endpoint=endpoint, result=result)
 
-    yield events.Finished(statistic=statistic, schema=schema)
+    yield events.Finished(results=results, schema=schema)
 
 
 def execute(  # pylint: disable=too-many-arguments
@@ -88,7 +91,7 @@ def execute(  # pylint: disable=too-many-arguments
     loader_options: Optional[Dict[str, Any]] = None,
     hypothesis_options: Optional[Dict[str, Any]] = None,
     loader: Callable = from_uri,
-) -> StatsCollector:
+) -> ExecutionResultSet:
     generator = prepare(
         schema_uri=schema_uri,
         checks=checks,
@@ -99,7 +102,7 @@ def execute(  # pylint: disable=too-many-arguments
     )
     all_events = list(generator)
     finished = all_events[-1]
-    return finished.statistic
+    return finished.results
 
 
 def prepare(  # pylint: disable=too-many-arguments

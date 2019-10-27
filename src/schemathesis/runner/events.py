@@ -6,7 +6,7 @@ from typing import Callable, Iterable, List
 import attr
 import hypothesis
 
-from ..models import Endpoint, StatsCollector
+from ..models import Endpoint, ExecutionResultSet
 from ..schemas import BaseSchema
 
 
@@ -28,7 +28,7 @@ class ExecutionContext:
 
 @attr.s()  # pragma: no mutate
 class ExecutionEvent:
-    statistic: StatsCollector = attr.ib()  # pragma: no mutate
+    results: ExecutionResultSet = attr.ib()  # pragma: no mutate
     schema: BaseSchema = attr.ib()  # pragma: no mutate
 
 
