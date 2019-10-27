@@ -24,7 +24,7 @@ def click_context():
 )
 def test_display_section_name(capsys, title, separator, printed, expected):
     output.display_section_name(title, separator=separator)
-    out = capsys.readouterr().out.strip()
+    out = click.unstyle(capsys.readouterr().out.strip())
     assert len(out) == output.get_terminal_width()
     assert expected in out
 
