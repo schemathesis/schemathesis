@@ -14,7 +14,7 @@ jobs:
     - uses: actions/setup-python@v1
       with:
         python-version: '3.7'
+    - run: pip install poetry mutmut
     - run: poetry install
-    - run: pip install mutmut
     - run: mutmut run --backup --paths-to-mutate "src/" --tests-dir "test/" --runner "pytest -x --tb=no -q"
     - run: while read -r line; do mutmut show $line; done <<< $(sqlite3 .mutmut-cache "select id from Mutant where status='bad_survived'")
