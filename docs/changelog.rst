@@ -16,7 +16,11 @@ Fixed
 
 - Test server generated wrong schema when ``endpoints`` option is passed via CLI. `#173`_
 - Error message if schema is not found in CLI. `#172`_
-- Continue trying running tests on hypothesis error. `#137`_
+
+Changed
+~~~~~~~
+
+- Continue running tests on hypothesis error. `#137`_
 
 `0.11.0`_ - 2019-10-22
 ----------------------
