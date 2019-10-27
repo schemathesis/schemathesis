@@ -89,10 +89,10 @@ def handle_finished(context: events.ExecutionContext, event: events.Finished) ->
     """Show the outcome of the whole testing session."""
     click.echo()
     display_hypothesis_output(context.hypothesis_output)
-    display_statistic(event.statistic)
+    display_statistic(event.results)
     click.echo()
 
-    if event.statistic.has_errors:
+    if event.results.has_errors:
         click.secho("Tests failed.", fg="red")
         raise click.exceptions.Exit(1)
 
@@ -107,7 +107,7 @@ def display_hypothesis_output(hypothesis_output: List[str]) -> None:
         click.secho(output, fg="red")
 
 
-def display_statistic(statistic: runner.StatsCollector) -> None:
+def display_statistic(statistic: runner.ExecutionResultSet) -> None:
     """Format and print statistic collected by :obj:`runner.StatsCollector`."""
     display_section_name("SUMMARY")
     click.echo()
@@ -116,13 +116,14 @@ def display_statistic(statistic: runner.StatsCollector) -> None:
         return
 
     padding = 20
-    col1_len = max(map(len, statistic.data.keys())) + padding
-    col2_len = len(str(max(statistic.data.values(), key=lambda v: v["total"])["total"])) * 2 + padding
+    # TODO. what if no checks were done during the test??
+    col1_len = max(map(len, statistic.keys())) + padding
+    col2_len = len(str(max(statistic.values(), key=lambda v: v["total"])["total"])) * 2 + padding
     col3_len = padding
 
     template = f"{{:{col1_len}}}{{:{col2_len}}}{{:{col3_len}}}"
 
-    for check_name, results in statistic.data.items():
+    for check_name, results in statistic.total.items():
         display_check_result(check_name, results, template)
 
 

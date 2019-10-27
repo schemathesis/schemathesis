@@ -30,14 +30,13 @@ def test_display_section_name(capsys, title, separator, printed, expected):
 
 
 def test_display_statistic(capsys):
-    output.display_statistic(
-        runner.StatsCollector(
-            {
-                "not_a_server_error": {"total": 5, "ok": 3, "error": 2},
-                "different_check": {"total": 1, "ok": 1, "error": 0},
-            }
-        )
+    single_test_statistic = runner.StatsCollector(
+        "/success",
+        "GET",
+        {"not_a_server_error": {"total": 5, "ok": 3, "error": 2}, "different_check": {"total": 1, "ok": 1, "error": 0}},
     )
+    results = runner.ExecutionResultSet([single_test_statistic])
+    output.display_statistic(results)
 
     lines = [line for line in capsys.readouterr().out.split("\n") if line]
     failed = click.style("FAILED", bold=True, fg="red")
@@ -51,7 +50,8 @@ def test_display_statistic(capsys):
 
 
 def test_display_statistic_empty(capsys):
-    output.display_statistic(runner.StatsCollector({}))
+    results = runner.ExecutionResultSet()
+    output.display_statistic(results)
     assert capsys.readouterr().out.split("\n")[2] == click.style("No checks were performed.", bold=True)
 
 
@@ -70,12 +70,13 @@ def test_get_percentage(position, length, expected):
 
 @pytest.mark.parametrize("endpoints_processed, percentage", ((0, "[  0%]"), (1, "[100%]")))
 def test_display_percentage(capsys, swagger_20, endpoints_processed, percentage):
-    statistic = StatsCollector()
+    statistic = StatsCollector("/success", "GET")
+    results = runner.ExecutionResultSet([statistic])
     context = runner.events.ExecutionContext([])
     context.endpoints_processed = endpoints_processed
     endpoint = Endpoint("/success", "GET")
     event = runner.events.AfterExecution(
-        statistic=statistic, schema=swagger_20, endpoint=endpoint, result=runner.events.ExecutionResult.success
+        results=results, schema=swagger_20, endpoint=endpoint, result=runner.events.ExecutionResult.success
     )
     output.display_percentage(context, event)
     out = capsys.readouterr().out.strip()

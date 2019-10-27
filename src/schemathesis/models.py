@@ -1,6 +1,6 @@
 # pylint: disable=too-many-instance-attributes
 from collections import Counter, defaultdict
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Tuple
 
 import attr
 from hypothesis.searchstrategy import SearchStrategy
@@ -94,6 +94,8 @@ def _stats_data_factory() -> defaultdict:
 class StatsCollector:
     """A container for collected data from test executor."""
 
+    path: str = attr.ib()  # pragma: no mutate
+    method: str = attr.ib()  # pragma: no mutate
     data: Dict[str, Counter] = attr.ib(factory=_stats_data_factory)  # pragma: no mutate
 
     @property
@@ -108,3 +110,41 @@ class StatsCollector:
         self.data[check_name]["total"] += 1
         self.data[check_name]["ok"] += error is None
         self.data[check_name]["error"] += error is not None
+
+
+@attr.s(slots=True, repr=False)
+class ExecutionResultSet:
+    """Statistic for the whole CLI run."""
+
+    data: List[StatsCollector] = attr.ib(factory=list)
+
+    @property
+    def is_empty(self) -> bool:
+        return len(self.data) == 0
+
+    @property
+    def has_errors(self) -> bool:
+        return any(item.has_errors for item in self.data)
+
+    def keys(self) -> List[str]:
+        return [key for item in self.data for key in item.data.keys()]
+
+    def values(self) -> List[Counter]:
+        return [value for item in self.data for value in item.data.values()]
+
+    @property
+    def total(self) -> Dict[str, Counter]:
+        output: Dict[str, Counter] = {}
+        for item in self.data:
+            for check_name, counter in item.data.items():
+                output.setdefault(check_name, Counter())
+                for key, value in counter.items():
+                    output[check_name][key] += value
+        return output
+
+    def items(self) -> Generator[Tuple[str, Counter], None, None]:
+        for item in self.data:
+            yield from item.data.items()
+
+    def append(self, item: StatsCollector) -> None:
+        self.data.append(item)
