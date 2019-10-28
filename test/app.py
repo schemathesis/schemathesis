@@ -4,7 +4,7 @@ import threading
 from enum import Enum
 from functools import wraps
 from time import sleep
-from typing import Dict, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import click
 import yaml
@@ -13,15 +13,15 @@ from aiohttp import web
 from schemathesis.cli import CSVOption
 
 
-async def success(request):
+async def success(request: web.Request) -> web.Response:
     return web.json_response({"success": True})
 
 
-async def failure(request):
+async def failure(request: web.Request) -> web.Response:
     raise web.HTTPInternalServerError
 
 
-async def slow(request):
+async def slow(request: web.Request) -> web.Response:
     await asyncio.sleep(0.25)
     return web.json_response({"slow": True})
 
@@ -32,7 +32,7 @@ class Endpoint(Enum):
     slow = ("/api/slow", slow)
 
 
-def create_app(endpoints=("success", "failure")) -> web.Application:
+def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Application:
     """Factory for aioHTTP app.
 
     Each endpoint except the one for schema saves requests in the list shared in the app instance and could be
@@ -47,14 +47,14 @@ def create_app(endpoints=("success", "failure")) -> web.Application:
 
     schema_data = make_schema(endpoints)
 
-    async def schema(request):
+    async def schema(request: web.Request) -> web.Response:
         content = yaml.dump(schema_data)
         schema_requests.append(request)
         return web.Response(body=content)
 
-    def wrapper(handler):
+    def wrapper(handler: Callable) -> Callable:
         @wraps(handler)
-        async def inner(request):
+        async def inner(request: web.Request) -> web.Response:
             incoming_requests.append(request)
             return await handler(request)
 
@@ -70,14 +70,14 @@ def create_app(endpoints=("success", "failure")) -> web.Application:
     return app
 
 
-def make_schema(endpoints: Tuple[str]) -> Dict:
+def make_schema(endpoints: Tuple[str, ...]) -> Dict:
     """Generate a Swagger 2.0 schema with the given endpoints.
 
     Example:
         If `endpoints` is ("success", "failure")
         then the app will contain GET /success and GET /failure
     """
-    template = {
+    template: Dict[str, Any] = {
         "swagger": "2.0",
         "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},
         "host": "127.0.0.1:8888",
@@ -119,12 +119,12 @@ def run_server(app: web.Application, port: int, timeout: float = 0.05) -> None:
 @click.command()
 @click.argument("port", type=int)
 @click.option("--endpoints", type=CSVOption(Endpoint))
-def run_app(port, endpoints):
+def run_app(port: int, endpoints: List[Endpoint]) -> None:
     if endpoints is not None:
-        endpoints = tuple(endpoint.name for endpoint in endpoints)
+        prepared_endpoints = tuple(endpoint.name for endpoint in endpoints)
     else:
-        endpoints = ("success", "failure")
-    app = create_app(endpoints)
+        prepared_endpoints = ("success", "failure")
+    app = create_app(prepared_endpoints)
     web.run_app(app, port=port)
 
 

@@ -1,26 +1,28 @@
 import datetime
 import os
+from typing import Any, Callable, Dict, Type
 
 import yaml
 
 import schemathesis
+from schemathesis.schemas import BaseSchema
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
-def get_schema_path(schema_name):
+def get_schema_path(schema_name: str) -> str:
     return os.path.join(HERE, "data", schema_name)
 
 
 SIMPLE_PATH = get_schema_path("simple_swagger.yaml")
 
 
-def get_schema(schema_name="simple_swagger.yaml", **kwargs):
+def get_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> BaseSchema:
     schema = make_schema(schema_name, **kwargs)
     return schemathesis.from_dict(schema)
 
 
-def make_schema(schema_name="simple_swagger.yaml", **kwargs):
+def make_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> Dict[str, Any]:
     path = get_schema_path(schema_name)
     with open(path) as fd:
         schema = yaml.safe_load(fd)
@@ -29,7 +31,7 @@ def make_schema(schema_name="simple_swagger.yaml", **kwargs):
     return schema
 
 
-def merge(a, b):
+def merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
     for key in b:
         if key in a:
             if isinstance(a[key], dict) and isinstance(b[key], dict):
@@ -39,48 +41,48 @@ def merge(a, b):
     return a
 
 
-def integer(**kwargs):
+def integer(**kwargs: Any) -> Dict[str, Any]:
     return {"type": "integer", "in": "query", **kwargs}
 
 
-def string(**kwargs):
+def string(**kwargs: Any) -> Dict[str, Any]:
     return {"type": "string", "in": "query", **kwargs}
 
 
-def array(**kwargs):
+def array(**kwargs: Any) -> Dict[str, Any]:
     return {"name": "values", "in": "query", "type": "array", **kwargs}
 
 
-def as_param(*parameters):
+def as_param(*parameters: Any) -> Dict[str, Any]:
     return {"paths": {"/users": {"get": {"parameters": list(parameters)}}}}
 
 
-def as_array(**kwargs):
+def as_array(**kwargs: Any) -> Dict[str, Any]:
     return as_param(array(**kwargs))
 
 
-def noop(value):
+def noop(value: Any) -> bool:
     return True
 
 
-def _assert_value(value, type, predicate=noop):
+def _assert_value(value: Any, type: Type, predicate: Callable = noop) -> None:
     assert isinstance(value, type)
     assert predicate(value)
 
 
-def assert_int(value, predicate=noop):
+def assert_int(value: Any, predicate: Callable = noop) -> None:
     _assert_value(value, int, predicate)
 
 
-def assert_str(value, predicate=noop):
+def assert_str(value: Any, predicate: Callable = noop) -> None:
     _assert_value(value, str, predicate)
 
 
-def assert_list(value, predicate=noop):
+def assert_list(value: Any, predicate: Callable = noop) -> None:
     _assert_value(value, list, predicate)
 
 
-def _assert_date(value, format):
+def _assert_date(value: str, format: str) -> bool:
     try:
         datetime.datetime.strptime(value, format)
         return True
@@ -88,9 +90,9 @@ def _assert_date(value, format):
         return False
 
 
-def assert_date(value):
+def assert_date(value: str) -> bool:
     return _assert_date(value, "%Y-%m-%d")
 
 
-def assert_datetime(value):
+def assert_datetime(value: str) -> bool:
     return _assert_date(value, "%Y-%m-%dT%H:%M:%S%z") or _assert_date(value, "%Y-%m-%dT%H:%M:%S.%f%z")

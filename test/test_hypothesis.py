@@ -1,3 +1,5 @@
+from typing import Any, Type, TypeVar, Union
+
 import pytest
 from hypothesis import given, strategies
 
@@ -5,16 +7,18 @@ from schemathesis import Case, register_string_format
 from schemathesis._hypothesis import PARAMETERS, get_case_strategy, get_examples
 from schemathesis.models import Endpoint
 
+T = TypeVar("T", bound=Union[Endpoint, Case])
 
-def _make(cls, **kwargs):
+
+def _make(cls: Type[T], **kwargs: Any) -> T:
     return cls("/users", "GET", **kwargs)
 
 
-def make_endpoint(**kwargs):
+def make_endpoint(**kwargs: Any) -> Endpoint:
     return _make(Endpoint, **kwargs)
 
 
-def make_case(**kwargs):
+def make_case(**kwargs: Any) -> Case:
     return _make(Case, **kwargs)
 
 
