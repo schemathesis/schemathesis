@@ -4,6 +4,7 @@ import pytest
 from aiohttp import web
 
 from schemathesis.constants import __version__
+from schemathesis.models import Status
 from schemathesis.runner import events, execute, get_base_url, prepare
 
 
@@ -53,7 +54,7 @@ def test_execute(schema_url, app):
     assert_request(app, 2, "GET", "/api/success", headers)
 
     # And statistic is showing the breakdown of cases types
-    assert stats.total["not_a_server_error"] == {"total": 3, "ok": 1, "error": 2}
+    assert stats.total == {"not_a_server_error": {Status.success: 1, Status.failure: 2, "total": 3}}
 
 
 def test_auth(schema_url, app):
@@ -106,9 +107,7 @@ def test_hypothesis_deadline(schema_url, app):
 @pytest.mark.endpoints("slow")
 def test_hypothesis_error(schema_url, app):
     results = prepare(schema_url, hypothesis_options={"deadline": 1})
-    assert any(
-        [event.result == events.ExecutionResult.error for event in results if isinstance(event, events.AfterExecution)]
-    )
+    assert any([event.status == Status.error for event in results if isinstance(event, events.AfterExecution)])
 
 
 @pytest.mark.parametrize(

@@ -1,6 +1,7 @@
 # pylint: disable=too-many-instance-attributes
-from collections import Counter, defaultdict
-from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Tuple
+from collections import Counter
+from enum import IntEnum
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import attr
 from hypothesis.searchstrategy import SearchStrategy
@@ -86,65 +87,63 @@ class Endpoint:
         return get_case_strategy(self)
 
 
-def _stats_data_factory() -> defaultdict:
-    return defaultdict(Counter)
+class Status(IntEnum):
+    """Status of an action or multiple actions."""
+
+    success = 1
+    failure = 2
+    error = 3
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
-class StatsCollector:
-    """A container for collected data from test executor."""
+class Check:
+    """Single check run result."""
+
+    name: str = attr.ib()  # pragma: no mutate
+    value: Status = attr.ib()  # pragma: no mutate
+
+
+@attr.s(slots=True, repr=False)  # pragma: no mutate
+class TestResult:
+    """Result of a single test."""
 
     path: str = attr.ib()  # pragma: no mutate
     method: str = attr.ib()  # pragma: no mutate
-    data: Dict[str, Counter] = attr.ib(factory=_stats_data_factory)  # pragma: no mutate
+    checks: List[Check] = attr.ib(factory=list)  # pragma: no mutate
 
-    @property
-    def is_empty(self) -> bool:
-        return len(self.data) == 0
+    def _add_check(self, name: str, status: Status) -> None:
+        self.checks.append(Check(name, status))
 
-    @property
-    def has_errors(self) -> bool:
-        return any(value.get("error") for value in self.data.values())
+    def add_success(self, name: str) -> None:
+        self._add_check(name, Status.success)
 
-    def increment(self, check_name: str, error: Optional[Exception] = None) -> None:
-        self.data[check_name]["total"] += 1
-        self.data[check_name]["ok"] += error is None
-        self.data[check_name]["error"] += error is not None
+    def add_failure(self, name: str) -> None:
+        self._add_check(name, Status.failure)
 
 
 @attr.s(slots=True, repr=False)
-class ExecutionResultSet:
-    """Statistic for the whole CLI run."""
+class TestResultSet:
+    """Set of multiple test results."""
 
-    data: List[StatsCollector] = attr.ib(factory=list)
+    results: List[TestResult] = attr.ib(factory=list)  # pragma: no mutate
 
     @property
     def is_empty(self) -> bool:
-        return len(self.data) == 0
+        return len(self.results) == 0
 
     @property
     def has_errors(self) -> bool:
-        return any(item.has_errors for item in self.data)
-
-    def keys(self) -> List[str]:
-        return [key for item in self.data for key in item.data.keys()]
-
-    def values(self) -> List[Counter]:
-        return [value for item in self.data for value in item.data.values()]
+        return any(check.value != Status.success for result in self.results for check in result.checks)
 
     @property
     def total(self) -> Dict[str, Counter]:
         output: Dict[str, Counter] = {}
-        for item in self.data:
-            for check_name, counter in item.data.items():
-                output.setdefault(check_name, Counter())
-                for key, value in counter.items():
-                    output[check_name][key] += value
+        for item in self.results:
+            for check in item.checks:
+                output.setdefault(check.name, Counter())
+                output[check.name][check.value] += 1
+                output[check.name]["total"] += 1
         return output
 
-    def items(self) -> Generator[Tuple[str, Counter], None, None]:
-        for item in self.data:
-            yield from item.data.items()
-
-    def append(self, item: StatsCollector) -> None:
-        self.data.append(item)
+    def append(self, item: TestResult) -> None:
+        self.results.append(item)
