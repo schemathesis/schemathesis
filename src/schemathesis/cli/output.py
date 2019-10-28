@@ -7,8 +7,8 @@ import click
 from hypothesis import settings
 from importlib_metadata import version
 
-from .. import runner
 from ..constants import __version__
+from ..models import Status, TestResultSet
 from ..runner import events
 
 
@@ -64,9 +64,9 @@ def handle_after_execution(context: events.ExecutionContext, event: events.After
 
 def display_execution_result(context: events.ExecutionContext, event: events.AfterExecution) -> None:
     """Display an appropriate symbol for the given event's execution result."""
-    if event.result == runner.events.ExecutionResult.failure:
+    if event.status == Status.failure:
         symbol, color = "F", "red"
-    elif event.result == runner.events.ExecutionResult.error:
+    elif event.status == Status.error:
         symbol, color = "E", "red"
     else:
         symbol, color = ".", "green"
@@ -107,8 +107,8 @@ def display_hypothesis_output(hypothesis_output: List[str]) -> None:
         click.secho(output, fg="red")
 
 
-def display_statistic(statistic: runner.ExecutionResultSet) -> None:
-    """Format and print statistic collected by :obj:`runner.StatsCollector`."""
+def display_statistic(statistic: TestResultSet) -> None:
+    """Format and print statistic collected by :obj:`models.TestResult`."""
     display_section_name("SUMMARY")
     click.echo()
     if statistic.is_empty:
@@ -117,19 +117,20 @@ def display_statistic(statistic: runner.ExecutionResultSet) -> None:
 
     padding = 20
     # TODO. what if no checks were done during the test??
-    col1_len = max(map(len, statistic.keys())) + padding
-    col2_len = len(str(max(statistic.values(), key=lambda v: v["total"])["total"])) * 2 + padding
+    total = statistic.total
+    col1_len = max(map(len, total.keys())) + padding
+    col2_len = len(str(max(total.values(), key=lambda v: v["total"])["total"])) * 2 + padding
     col3_len = padding
 
     template = f"{{:{col1_len}}}{{:{col2_len}}}{{:{col3_len}}}"
 
-    for check_name, results in statistic.total.items():
+    for check_name, results in total.items():
         display_check_result(check_name, results, template)
 
 
 def display_check_result(check_name: str, results: Counter, template: str) -> None:
     """Show results of single check execution."""
-    if results["error"]:
+    if results[Status.failure]:
         verdict = "FAILED"
         color = "red"
     else:
@@ -138,7 +139,7 @@ def display_check_result(check_name: str, results: Counter, template: str) -> No
     click.echo(
         template.format(
             click.style(check_name, bold=True),
-            f"{results['ok']} / {results['total']} passed",
+            f"{results[Status.success]} / {results['total']} passed",
             click.style(verdict, fg=color, bold=True),
         )
     )

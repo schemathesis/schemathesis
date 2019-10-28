@@ -1,19 +1,12 @@
 import os
 import shutil
-from enum import IntEnum
 from typing import Callable, Iterable, List
 
 import attr
 import hypothesis
 
-from ..models import Endpoint, ExecutionResultSet
+from ..models import Endpoint, Status, TestResultSet
 from ..schemas import BaseSchema
-
-
-class ExecutionResult(IntEnum):
-    success = 1
-    failure = 2
-    error = 3
 
 
 @attr.s(slots=True)
@@ -28,7 +21,7 @@ class ExecutionContext:
 
 @attr.s()  # pragma: no mutate
 class ExecutionEvent:
-    results: ExecutionResultSet = attr.ib()  # pragma: no mutate
+    results: TestResultSet = attr.ib()  # pragma: no mutate
     schema: BaseSchema = attr.ib()  # pragma: no mutate
 
 
@@ -48,7 +41,7 @@ class BeforeExecution(ExecutionEvent):
 @attr.s(slots=True)
 class AfterExecution(ExecutionEvent):
     endpoint: Endpoint = attr.ib()  # pragma: no mutate
-    result: ExecutionResult = attr.ib()  # pragma: no mutate
+    status: Status = attr.ib()  # pragma: no mutate
 
 
 @attr.s(slots=True)  # pragma: no mutate

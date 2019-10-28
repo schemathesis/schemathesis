@@ -3,9 +3,8 @@ import pytest
 from hypothesis.reporting import report
 
 import schemathesis
-from schemathesis import runner, utils
+from schemathesis import models, runner, utils
 from schemathesis.cli import output
-from schemathesis.models import Endpoint, StatsCollector
 
 
 @pytest.fixture(autouse=True)
@@ -30,12 +29,14 @@ def test_display_section_name(capsys, title, separator, printed, expected):
 
 
 def test_display_statistic(capsys):
-    single_test_statistic = runner.StatsCollector(
+    success = models.Check("not_a_server_error", models.Status.success)
+    failure = models.Check("not_a_server_error", models.Status.failure)
+    single_test_statistic = models.TestResult(
         "/success",
         "GET",
-        {"not_a_server_error": {"total": 5, "ok": 3, "error": 2}, "different_check": {"total": 1, "ok": 1, "error": 0}},
+        [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
     )
-    results = runner.ExecutionResultSet([single_test_statistic])
+    results = models.TestResultSet([single_test_statistic])
     output.display_statistic(results)
 
     lines = [line for line in capsys.readouterr().out.split("\n") if line]
@@ -50,7 +51,7 @@ def test_display_statistic(capsys):
 
 
 def test_display_statistic_empty(capsys):
-    results = runner.ExecutionResultSet()
+    results = models.TestResultSet()
     output.display_statistic(results)
     assert capsys.readouterr().out.split("\n")[2] == click.style("No checks were performed.", bold=True)
 
@@ -70,13 +71,13 @@ def test_get_percentage(position, length, expected):
 
 @pytest.mark.parametrize("endpoints_processed, percentage", ((0, "[  0%]"), (1, "[100%]")))
 def test_display_percentage(capsys, swagger_20, endpoints_processed, percentage):
-    statistic = StatsCollector("/success", "GET")
-    results = runner.ExecutionResultSet([statistic])
+    statistic = models.TestResult("/success", "GET")
+    results = models.TestResultSet([statistic])
     context = runner.events.ExecutionContext([])
     context.endpoints_processed = endpoints_processed
-    endpoint = Endpoint("/success", "GET")
+    endpoint = models.Endpoint("/success", "GET")
     event = runner.events.AfterExecution(
-        results=results, schema=swagger_20, endpoint=endpoint, result=runner.events.ExecutionResult.success
+        results=results, schema=swagger_20, endpoint=endpoint, status=models.Status.success
     )
     output.display_percentage(context, event)
     out = capsys.readouterr().out.strip()

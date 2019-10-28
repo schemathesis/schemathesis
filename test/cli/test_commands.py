@@ -223,6 +223,7 @@ def test_cli_run_output_with_errors(cli, schema_url):
     assert " SUMMARY " in result.stdout
 
     lines = result.stdout.split("\n")
+    print(lines)
     assert "not_a_server_error            1 / 3 passed          FAILED " in lines
     assert "Tests failed." in lines
 
