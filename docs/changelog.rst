@@ -6,10 +6,15 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Handling for errors other than ``AssertionError`` and ``HypothesisException`` in the runner. `#189`_
+
 Changed
 ~~~~~~~
 
-- Display "SUMMARY" section in the CLI output for empty test suites
+- Display "SUMMARY" section in the CLI output for empty test suites.
 
 `0.12.0`_ - 2019-10-28
 ----------------------
@@ -284,6 +289,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#189: https://github.com/kiwicom/schemathesis/issues/189
 .. _#173: https://github.com/kiwicom/schemathesis/issues/173
 .. _#172: https://github.com/kiwicom/schemathesis/issues/172
 .. _#167: https://github.com/kiwicom/schemathesis/issues/167
