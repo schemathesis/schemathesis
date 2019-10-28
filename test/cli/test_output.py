@@ -52,7 +52,7 @@ def test_display_statistic(capsys):
 
 def test_display_statistic_empty(capsys):
     output.display_statistic(runner.StatsCollector({}))
-    assert capsys.readouterr().out == click.style("No checks were performed.", bold=True) + "\n"
+    assert capsys.readouterr().out.split("\n")[2] == click.style("No checks were performed.", bold=True)
 
 
 def test_capture_hypothesis_output():

@@ -232,7 +232,7 @@ def test_cli_run_output_empty(cli, schema_url):
     result = cli.run_inprocess(schema_url)
     assert result.exit_code == 0
     assert " HYPOTHESIS OUTPUT " not in result.stdout
-    assert " SUMMARY " not in result.stdout
+    assert " SUMMARY " in result.stdout
 
     lines = result.stdout.split("\n")
     assert "No checks were performed." in lines

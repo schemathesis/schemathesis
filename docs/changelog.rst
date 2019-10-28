@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+~~~~~~~
+
+- Display "SUMMARY" section in the CLI output for empty test suites
+
 `0.12.0`_ - 2019-10-28
 ----------------------
 

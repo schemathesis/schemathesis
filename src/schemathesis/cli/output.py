@@ -109,6 +109,8 @@ def display_hypothesis_output(hypothesis_output: List[str]) -> None:
 
 def display_statistic(statistic: runner.StatsCollector) -> None:
     """Format and print statistic collected by :obj:`runner.StatsCollector`."""
+    display_section_name("SUMMARY")
+    click.echo()
     if statistic.is_empty:
         click.secho("No checks were performed.", bold=True)
         return
@@ -120,8 +122,6 @@ def display_statistic(statistic: runner.StatsCollector) -> None:
 
     template = f"{{:{col1_len}}}{{:{col2_len}}}{{:{col3_len}}}"
 
-    display_section_name("SUMMARY")
-    click.echo()
     for check_name, results in statistic.data.items():
         display_check_result(check_name, results, template)
 
