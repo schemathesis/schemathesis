@@ -104,9 +104,12 @@ def test_hypothesis_deadline(schema_url, app):
     execute(schema_url, hypothesis_options={"deadline": 500})
 
 
+@pytest.mark.parametrize(
+    "options", ({"api_options": {"base_url": "http://127.0.0.1:1/"}}, {"hypothesis_options": {"deadline": 1}})
+)
 @pytest.mark.endpoints("slow")
-def test_hypothesis_error(schema_url, app):
-    results = prepare(schema_url, hypothesis_options={"deadline": 1})
+def test_exceptions(schema_url, app, options):
+    results = prepare(schema_url, **options)
     assert any([event.status == Status.error for event in results if isinstance(event, events.AfterExecution)])
 
 

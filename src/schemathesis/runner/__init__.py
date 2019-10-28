@@ -73,7 +73,7 @@ def execute_from_schema(
                 status = Status.success
             except AssertionError:
                 status = Status.failure
-            except hypothesis.errors.HypothesisException:
+            except Exception:
                 status = Status.error
             results.append(result)
             yield events.AfterExecution(results=results, schema=schema, endpoint=endpoint, status=status)
