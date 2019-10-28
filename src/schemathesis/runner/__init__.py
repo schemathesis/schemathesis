@@ -1,4 +1,4 @@
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, Iterable, Optional, Tuple, Union
 
 import hypothesis
@@ -8,7 +8,7 @@ from requests.auth import AuthBase
 
 from ..constants import USER_AGENT
 from ..loaders import from_uri
-from ..models import Case, ExecutionResultSet, StatsCollector
+from ..models import Case, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
 from ..utils import get_base_url
 from . import events
@@ -58,7 +58,7 @@ def execute_from_schema(
 
     Provides the main testing loop and preparation step.
     """
-    results = ExecutionResultSet()
+    results = TestResultSet()
 
     with get_session(auth, headers) as session:
         settings = get_hypothesis_settings(hypothesis_options)
@@ -66,20 +66,17 @@ def execute_from_schema(
         yield events.Initialized(results=results, schema=schema, checks=checks, hypothesis_settings=settings)
 
         for endpoint, test in schema.get_all_tests(single_test, settings):
-            statistic = StatsCollector(path=endpoint.path, method=endpoint.method)
-            # TODO. set result to statistic?
+            result = TestResult(path=endpoint.path, method=endpoint.method)
             yield events.BeforeExecution(results=results, schema=schema, endpoint=endpoint)
-            with suppress(AssertionError):
-                try:
-                    test(session, base_url, checks, statistic)
-                    result = events.ExecutionResult.success
-                except AssertionError:
-                    result = events.ExecutionResult.failure
-                    raise
-                except hypothesis.errors.HypothesisException:
-                    result = events.ExecutionResult.error
-            results.append(statistic)
-            yield events.AfterExecution(results=results, schema=schema, endpoint=endpoint, result=result)
+            try:
+                test(session, base_url, checks, result)
+                status = Status.success
+            except AssertionError:
+                status = Status.failure
+            except hypothesis.errors.HypothesisException:
+                status = Status.error
+            results.append(result)
+            yield events.AfterExecution(results=results, schema=schema, endpoint=endpoint, status=status)
 
     yield events.Finished(results=results, schema=schema)
 
@@ -91,7 +88,7 @@ def execute(  # pylint: disable=too-many-arguments
     loader_options: Optional[Dict[str, Any]] = None,
     hypothesis_options: Optional[Dict[str, Any]] = None,
     loader: Callable = from_uri,
-) -> ExecutionResultSet:
+) -> TestResultSet:
     generator = prepare(
         schema_uri=schema_uri,
         checks=checks,
@@ -123,7 +120,7 @@ def prepare(  # pylint: disable=too-many-arguments
 
 
 def single_test(
-    case: Case, session: requests.Session, base_url: str, checks: Iterable[Callable], stats: StatsCollector
+    case: Case, session: requests.Session, base_url: str, checks: Iterable[Callable], stats: TestResult
 ) -> None:
     """A single test body that will be executed against the target."""
     response = get_response(session, base_url, case)
@@ -133,10 +130,10 @@ def single_test(
         check_name = check.__name__
         try:
             check(response)
-            stats.increment(check_name)
-        except AssertionError as e:
-            stats.increment(check_name, error=e)
+            stats.add_success(check_name)
+        except AssertionError:
             errors = True
+            stats.add_failure(check_name)
 
     if errors:
         # An exception needed to trigger Hypothesis shrinking & flaky tests detection logic
