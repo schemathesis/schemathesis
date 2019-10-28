@@ -111,13 +111,12 @@ def display_statistic(statistic: TestResultSet) -> None:
     """Format and print statistic collected by :obj:`models.TestResult`."""
     display_section_name("SUMMARY")
     click.echo()
-    if statistic.is_empty:
+    total = statistic.total
+    if statistic.is_empty or not total:
         click.secho("No checks were performed.", bold=True)
         return
 
     padding = 20
-    # TODO. what if no checks were done during the test??
-    total = statistic.total
     col1_len = max(map(len, total.keys())) + padding
     col2_len = len(str(max(total.values(), key=lambda v: v["total"])["total"])) * 2 + padding
     col3_len = padding
