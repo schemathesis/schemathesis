@@ -1,10 +1,15 @@
+from typing import Dict, Optional
+
 import pytest
+from aiohttp import web
 
 from schemathesis.constants import __version__
 from schemathesis.runner import events, execute, get_base_url, prepare
 
 
-def assert_request(app, idx, method, path, headers=None):
+def assert_request(
+    app: web.Application, idx: int, method: str, path: str, headers: Optional[Dict[str, str]] = None
+) -> None:
     request = app["incoming_requests"][idx]
     assert request.method == method
     assert request.path == path
@@ -13,7 +18,7 @@ def assert_request(app, idx, method, path, headers=None):
             assert request.headers.get(key) == value
 
 
-def assert_not_request(app, method, path):
+def assert_not_request(app: web.Application, method: str, path: str) -> None:
     for request in app["incoming_requests"]:
         assert not (request.path == path and request.method == method)
 
