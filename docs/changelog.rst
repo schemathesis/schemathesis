@@ -10,6 +10,7 @@ Fixed
 ~~~~~
 
 - Handling for errors other than ``AssertionError`` and ``HypothesisException`` in the runner. `#189`_
+- CLI failing on the case when there are tests, but no checks were performed. `#191`_
 
 Changed
 ~~~~~~~
@@ -289,6 +290,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#191: https://github.com/kiwicom/schemathesis/issues/191
 .. _#189: https://github.com/kiwicom/schemathesis/issues/189
 .. _#173: https://github.com/kiwicom/schemathesis/issues/173
 .. _#172: https://github.com/kiwicom/schemathesis/issues/172

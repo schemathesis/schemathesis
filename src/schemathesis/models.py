@@ -133,7 +133,13 @@ class TestResultSet:
 
     @property
     def has_errors(self) -> bool:
-        return any(check.value != Status.success for result in self.results for check in result.checks)
+        checks_statuses = [check.value for result in self.results for check in result.checks]
+        # First case: tests were collected but no checks were executed due to exception during the test
+        # Second case: there are not successful checks in the results
+        # pylint: disable=consider-using-ternary
+        return (not checks_statuses and not self.is_empty) or any(
+            status != Status.success for status in checks_statuses
+        )
 
     @property
     def total(self) -> Dict[str, Counter]:

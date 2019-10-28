@@ -262,3 +262,10 @@ def test_hypothesis_failed_event(cli, schema_url):
     result = cli.run_inprocess(schema_url, "--hypothesis-deadline=1")
     assert result.exit_code == 0
     assert "/slow E" in result.stdout
+
+
+def test_connection_error(cli, schema_url):
+    result = cli.run_inprocess(schema_url, "--base-url=http://127.0.0.1:1/")
+    assert result.exit_code == 1
+    assert "GET /api/failure E" in result.stdout
+    assert "GET /api/success E" in result.stdout
