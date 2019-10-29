@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+~~~~~~~
+
+- More readable falsifying examples output. `#127`_
+
 `0.12.2`_ - 2019-10-30
 ----------------------
 
@@ -318,6 +323,7 @@ Fixed
 .. _#137: https://github.com/kiwicom/schemathesis/issues/137
 .. _#134: https://github.com/kiwicom/schemathesis/issues/134
 .. _#130: https://github.com/kiwicom/schemathesis/issues/130
+.. _#127: https://github.com/kiwicom/schemathesis/issues/127
 .. _#126: https://github.com/kiwicom/schemathesis/issues/126
 .. _#125: https://github.com/kiwicom/schemathesis/issues/125
 .. _#121: https://github.com/kiwicom/schemathesis/issues/121
