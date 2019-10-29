@@ -26,7 +26,7 @@ def assert_not_request(app: web.Application, method: str, path: str) -> None:
 
 def test_execute_base_url_not_found(base_url, schema_url, app):
     # When base URL is pointing to an unknown location
-    execute(schema_url, api_options={"base_url": f"{base_url}/404"})
+    execute(schema_url, api_options={"base_url": f"{base_url}/404/"})
     # Then the runner should use this base
     # And they will not reach the application
     assert len(app["incoming_requests"]) == 0
@@ -67,6 +67,19 @@ def test_auth(schema_url, app):
     assert_request(app, 0, "GET", "/api/failure", headers)
     assert_request(app, 1, "GET", "/api/failure", headers)
     assert_request(app, 2, "GET", "/api/success", headers)
+
+
+@pytest.mark.parametrize("converter", (lambda x: x, lambda x: x + "/"))
+def test_base_url(base_url, schema_url, app, converter):
+    base_url = converter(base_url)
+    # When `base_url` is specified explicitly with or without trailing slash
+    execute(schema_url, api_options={"base_url": base_url})
+
+    # Then each request should reach the app in both cases
+    assert len(app["incoming_requests"]) == 3
+    assert_request(app, 0, "GET", "/api/failure")
+    assert_request(app, 1, "GET", "/api/failure")
+    assert_request(app, 2, "GET", "/api/success")
 
 
 def test_execute_with_headers(schema_url, app):
