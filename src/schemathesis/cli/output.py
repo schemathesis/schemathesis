@@ -1,14 +1,14 @@
 import os
 import platform
 import shutil
-from typing import Counter, List
+from typing import Any, Counter, List
 
 import click
 from hypothesis import settings
 from importlib_metadata import version
 
 from ..constants import __version__
-from ..models import Status, TestResultSet
+from ..models import Case, Status, TestResult, TestResultSet
 from ..runner import events
 
 
@@ -16,10 +16,11 @@ def get_terminal_width() -> int:
     return shutil.get_terminal_size().columns
 
 
-def display_section_name(title: str, separator: str = "=", bold: bool = True) -> None:
+def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> None:
     """Print section name with separators in terminal with the given title nicely centered."""
     message = f" {title} ".center(get_terminal_width(), separator)
-    click.secho(message, bold=bold)
+    kwargs.setdefault("bold", True)
+    click.secho(message, **kwargs)
 
 
 def get_percentage(position: int, length: int) -> str:
@@ -89,6 +90,7 @@ def handle_finished(context: events.ExecutionContext, event: events.Finished) ->
     """Show the outcome of the whole testing session."""
     click.echo()
     display_hypothesis_output(context.hypothesis_output)
+    display_failures(event.results)
     display_statistic(event.results)
     click.echo()
 
@@ -105,6 +107,40 @@ def display_hypothesis_output(hypothesis_output: List[str]) -> None:
         display_section_name("HYPOTHESIS OUTPUT")
         output = "\n".join(hypothesis_output)
         click.secho(output, fg="red")
+
+
+def display_failures(results: TestResultSet) -> None:
+    """Display all failures in the test run."""
+    if not results.has_errors:
+        return
+
+    display_section_name("FAILURES")
+    for result in results.results:
+        if not result.has_errors:
+            continue
+        display_single_failure(result)
+
+
+def display_single_failure(result: TestResult) -> None:
+    """Display a failure for a single method / endpoint."""
+    section_name = f"{result.method}: {result.path}"
+    display_section_name(section_name, "_", fg="red")
+    for check in reversed(result.checks):
+        if check.example is not None:
+            output = {
+                attribute.name.capitalize().replace("_", " "): getattr(check.example, attribute.name)
+                for attribute in Case.__attrs_attrs__  # type: ignore
+                if attribute.name not in ("path", "method", "base_url")
+            }
+            max_length = max(map(len, output))
+            template = f"{{:<{max_length}}} : {{}}"
+            click.secho(template.format("Check", check.name), fg="red")
+            for key, value in output.items():
+                click.secho(template.format(key, value), fg="red")
+            # Display only the latest case
+            # (dd): It is possible to find multiple errors, but the simplest option for now is to display
+            # the latest and avoid deduplication, which will be done in the future.
+            break
 
 
 def display_statistic(statistic: TestResultSet) -> None:

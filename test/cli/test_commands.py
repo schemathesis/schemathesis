@@ -219,7 +219,7 @@ def test_cli_run_output_success(cli, schema_url):
 def test_cli_run_output_with_errors(cli, schema_url):
     result = cli.run_inprocess(schema_url)
     assert result.exit_code == 1
-    assert " HYPOTHESIS OUTPUT " in result.stdout
+    assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
 
     lines = result.stdout.split("\n")
