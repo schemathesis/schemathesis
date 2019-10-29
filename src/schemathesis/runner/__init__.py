@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, Iterable, Optional, Tuple, Union
+from urllib.parse import urljoin
 
 import hypothesis
 import hypothesis.errors
@@ -143,6 +144,7 @@ def single_test(
 
 def get_response(session: requests.Session, base_url: str, case: Case) -> requests.Response:
     """Send an appropriate request to the target."""
-    return session.request(
-        case.method, f"{base_url}{case.formatted_path}", headers=case.headers, params=case.query, json=case.body
-    )
+    if not base_url.endswith("/"):
+        base_url += "/"
+    url = urljoin(base_url, case.formatted_path.lstrip("/"))
+    return session.request(case.method, url, headers=case.headers, params=case.query, json=case.body)
