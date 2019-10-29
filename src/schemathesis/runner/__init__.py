@@ -133,7 +133,7 @@ def single_test(
             stats.add_success(check_name)
         except AssertionError:
             errors = True
-            stats.add_failure(check_name)
+            stats.add_failure(check_name, case)
 
     if errors:
         # An exception needed to trigger Hypothesis shrinking & flaky tests detection logic

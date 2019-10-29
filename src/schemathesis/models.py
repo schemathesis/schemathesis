@@ -104,6 +104,7 @@ class Check:
 
     name: str = attr.ib()  # pragma: no mutate
     value: Status = attr.ib()  # pragma: no mutate
+    example: Optional[Case] = attr.ib(default=None)  # pragma: no mutate
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
@@ -114,14 +115,15 @@ class TestResult:
     method: str = attr.ib()  # pragma: no mutate
     checks: List[Check] = attr.ib(factory=list)  # pragma: no mutate
 
-    def _add_check(self, name: str, status: Status) -> None:
-        self.checks.append(Check(name, status))
+    @property
+    def has_errors(self) -> bool:
+        return any(check.value != Status.success for check in self.checks)
 
     def add_success(self, name: str) -> None:
-        self._add_check(name, Status.success)
+        self.checks.append(Check(name, Status.success))
 
-    def add_failure(self, name: str) -> None:
-        self._add_check(name, Status.failure)
+    def add_failure(self, name: str, example: Case) -> None:
+        self.checks.append(Check(name, Status.failure, example))
 
 
 @attr.s(slots=True, repr=False)

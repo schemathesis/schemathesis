@@ -88,3 +88,20 @@ def test_display_hypothesis_output(capsys):
     output.display_hypothesis_output(["foo", "bar"])
     lines = capsys.readouterr().out.split("\n")
     assert " ".join(lines[1:3]) == click.style("foo bar", fg="red")
+
+
+def test_display_single_failure(capsys):
+    success = models.Check("not_a_server_error", models.Status.success)
+    failure = models.Check(
+        "not_a_server_error", models.Status.failure, models.Case("/success", "GET", body={"foo": "bar"})
+    )
+    test_statistic = models.TestResult(
+        "/success",
+        "GET",
+        [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
+    )
+    output.display_single_failure(test_statistic)
+    lines = capsys.readouterr().out.split("\n")
+    assert " GET: /success " in lines[0]
+    assert lines[1] == click.style("Check           : not_a_server_error", fg="red")
+    assert click.style("Body            : {'foo': 'bar'}", fg="red") in lines
