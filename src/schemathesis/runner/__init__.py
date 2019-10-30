@@ -31,7 +31,7 @@ def get_session(
     with requests.Session() as session:
         if auth is not None:
             session.auth = auth
-        session.headers.update({"User-agent": USER_AGENT})
+        session.headers["User-agent"] = USER_AGENT
         if headers is not None:
             session.headers.update(**headers)
         yield session
