@@ -72,23 +72,29 @@ def test_direct_schema(testdir):
     # When body has schema specified directly, not via $ref
     testdir.make_test(
         """
-@schema.parametrize()
+@schema.parametrize(method="POST")
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
-    assert case.method == "GET"
+    assert case.method == "POST"
     assert_list(case.body)
     assert_str(case.body[0])
 """,
-        **as_param(
-            {
-                "schema": {"type": "array", "items": {"type": "string"}, "minItems": 1},
-                "in": "body",
-                "name": "object",
-                "required": True,
+        paths={
+            "/users": {
+                "post": {
+                    "parameters": [
+                        {
+                            "schema": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+                            "in": "body",
+                            "name": "object",
+                            "required": True,
+                        }
+                    ]
+                }
             }
-        ),
+        },
     )
     # Then it should be correctly used in the generated case
     result = testdir.runpytest("-v", "-s")
@@ -102,13 +108,26 @@ def test_specified_example(testdir):
         """
 from hypothesis import Phase
 
-@schema.parametrize()
+@schema.parametrize(method="POST")
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.body == {"name": "John"}
 """,
-        **as_param({"schema": {"$ref": "#/definitions/ObjectRef"}, "in": "body", "name": "object", "required": True}),
+        paths={
+            "/users": {
+                "post": {
+                    "parameters": [
+                        {
+                            "schema": {"$ref": "#/definitions/ObjectRef"},
+                            "in": "body",
+                            "name": "object",
+                            "required": True,
+                        }
+                    ]
+                }
+            }
+        },
         definitions={
             "ObjectRef": {
                 "required": ["name"],

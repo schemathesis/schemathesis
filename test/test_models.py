@@ -22,7 +22,7 @@ def test_as_requests_kwargs(override, server, base_url, converter):
         data = case.as_requests_kwargs()
     assert data == {
         "headers": {},
-        "json": {},
+        "json": None,
         "method": "GET",
         "params": {},
         "url": f"http://127.0.0.1:{server['port']}/api/success",

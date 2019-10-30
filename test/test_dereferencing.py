@@ -86,15 +86,28 @@ def test_recursive_dereference(testdir):
     # When a given parameter contains a JSON reference, that reference an object with another reference
     testdir.make_test(
         """
-@schema.parametrize()
+@schema.parametrize(method="POST")
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
-    assert case.method == "GET"
+    assert case.method == "POST"
     assert_int(case.body["id"])
 """,
-        **as_param({"schema": {"$ref": "#/definitions/ObjectRef"}, "in": "body", "name": "object", "required": True}),
+        paths={
+            "/users": {
+                "post": {
+                    "parameters": [
+                        {
+                            "schema": {"$ref": "#/definitions/ObjectRef"},
+                            "in": "body",
+                            "name": "object",
+                            "required": True,
+                        }
+                    ]
+                }
+            }
+        },
         definitions={
             "ObjectRef": {
                 "required": ["id"],
@@ -115,26 +128,32 @@ def test_inner_dereference(testdir):
     # When a given parameter contains a JSON reference inside a property of an object
     testdir.make_test(
         """
-@schema.parametrize()
+@schema.parametrize(method="POST")
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
-    assert case.method == "GET"
+    assert case.method == "POST"
     assert_int(case.body["id"])
 """,
-        **as_param(
-            {
-                "schema": {
-                    "type": "object",
-                    "required": ["id"],
-                    "properties": {"id": {"$ref": "#/definitions/SimpleIntRef"}},
-                },
-                "in": "body",
-                "name": "object",
-                "required": True,
+        paths={
+            "/users": {
+                "post": {
+                    "parameters": [
+                        {
+                            "schema": {
+                                "type": "object",
+                                "required": ["id"],
+                                "properties": {"id": {"$ref": "#/definitions/SimpleIntRef"}},
+                            },
+                            "in": "body",
+                            "name": "object",
+                            "required": True,
+                        }
+                    ]
+                }
             }
-        ),
+        },
         definitions={"SimpleIntRef": {"type": "integer"}},
     )
     # Then it should be correctly resolved and used in the generated case
@@ -147,27 +166,35 @@ def test_inner_dereference_with_lists(testdir):
     # When a given parameter contains a JSON reference inside a list in `allOf`
     testdir.make_test(
         """
-@schema.parametrize()
+@schema.parametrize(method="POST")
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
-    assert case.method == "GET"
+    assert case.method == "POST"
     assert_int(case.body["id"]["a"])
     assert_str(case.body["id"]["b"])
 """,
-        **as_param(
-            {
-                "schema": {
-                    "type": "object",
-                    "required": ["id"],
-                    "properties": {"id": {"allOf": [{"$ref": "#/definitions/A"}, {"$ref": "#/definitions/B"}]}},
-                },
-                "in": "body",
-                "name": "object",
-                "required": True,
+        paths={
+            "/users": {
+                "post": {
+                    "parameters": [
+                        {
+                            "schema": {
+                                "type": "object",
+                                "required": ["id"],
+                                "properties": {
+                                    "id": {"allOf": [{"$ref": "#/definitions/A"}, {"$ref": "#/definitions/B"}]}
+                                },
+                            },
+                            "in": "body",
+                            "name": "object",
+                            "required": True,
+                        }
+                    ]
+                }
             }
-        ),
+        },
         definitions={
             "A": {"type": "object", "required": ["a"], "properties": {"a": {"type": "integer"}}},
             "B": {"type": "object", "required": ["b"], "properties": {"b": {"type": "string"}}},

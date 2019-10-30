@@ -38,7 +38,8 @@ def impl(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
     assert case.method in ["GET", "POST"]
-    assert_int(case.body)
+    if case.method == "POST":
+        assert_int(case.body)
     assert_int(case.query["not_common_id"])
 
 @schema.parametrize()
