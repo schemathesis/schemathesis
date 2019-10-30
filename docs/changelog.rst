@@ -9,7 +9,7 @@ Changelog
 Fixed
 ~~~~~
 
-- Wrong handling of ``base_url`` parameter in runner if it has a trailing slash. `#194`_
+- Wrong handling of ``base_url`` parameter in runner and ``Case.call`` if it has a trailing slash. `#194`_ and `#199`_
 
 `0.12.1`_ - 2019-10-28
 ----------------------
@@ -299,6 +299,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#199: https://github.com/kiwicom/schemathesis/issues/199
 .. _#194: https://github.com/kiwicom/schemathesis/issues/194
 .. _#191: https://github.com/kiwicom/schemathesis/issues/191
 .. _#189: https://github.com/kiwicom/schemathesis/issues/189

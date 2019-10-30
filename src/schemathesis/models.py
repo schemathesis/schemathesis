@@ -2,6 +2,7 @@
 from collections import Counter
 from enum import IntEnum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from urllib.parse import urljoin
 
 import attr
 from hypothesis.searchstrategy import SearchStrategy
@@ -45,22 +46,24 @@ class Case:
     def as_requests_kwargs(self, base_url: Optional[str] = None) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by requests."""
         base_url = self._get_base_url(base_url)
-        return {
-            "method": self.method,
-            "url": f"{base_url}{self.formatted_path}",
-            "headers": self.headers,
-            "params": self.query,
-            "json": self.body,
-        }
+        if not base_url.endswith("/"):
+            base_url += "/"
+        url = urljoin(base_url, self.formatted_path.lstrip("/"))
+        return {"method": self.method, "url": url, "headers": self.headers, "params": self.query, "json": self.body}
 
-    def call(self, base_url: Optional[str] = None, **kwargs: Any) -> "requests.Response":
+    def call(
+        self, base_url: Optional[str] = None, session: Optional["requests.Session"] = None, **kwargs: Any
+    ) -> "requests.Response":
         """Convert the case into a dictionary acceptable by requests."""
         # Local import to speedup import of schemathesis
         import requests  # pylint: disable=import-outside-toplevel
 
+        if session is None:
+            session = requests.Session()
+
         base_url = self._get_base_url(base_url)
         data = self.as_requests_kwargs(base_url)
-        return requests.request(**data, **kwargs)
+        return session.request(**data, **kwargs)  # type: ignore
 
 
 def empty_object() -> Dict[str, Any]:

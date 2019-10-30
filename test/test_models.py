@@ -10,7 +10,9 @@ def test_path():
 
 
 @pytest.mark.parametrize("override", (False, True))
-def test_as_requests_kwargs(override, server, base_url):
+@pytest.mark.parametrize("converter", (lambda x: x, lambda x: x + "/"))
+def test_as_requests_kwargs(override, server, base_url, converter):
+    base_url = converter(base_url)
     kwargs = {"method": "GET", "path": "/api/success"}
     if override:
         case = Case(**kwargs)
