@@ -1,6 +1,5 @@
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, Iterable, Optional, Tuple, Union
-from urllib.parse import urljoin
 
 import hypothesis
 import hypothesis.errors
@@ -124,7 +123,7 @@ def single_test(
     case: Case, session: requests.Session, base_url: str, checks: Iterable[Callable], stats: TestResult
 ) -> None:
     """A single test body that will be executed against the target."""
-    response = get_response(session, base_url, case)
+    response = case.call(base_url=base_url, session=session)
     errors = False
 
     for check in checks:
@@ -140,11 +139,3 @@ def single_test(
         # An exception needed to trigger Hypothesis shrinking & flaky tests detection logic
         # The message doesn't matter
         raise AssertionError
-
-
-def get_response(session: requests.Session, base_url: str, case: Case) -> requests.Response:
-    """Send an appropriate request to the target."""
-    if not base_url.endswith("/"):
-        base_url += "/"
-    url = urljoin(base_url, case.formatted_path.lstrip("/"))
-    return session.request(case.method, url, headers=case.headers, params=case.query, json=case.body)
