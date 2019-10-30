@@ -2,6 +2,7 @@ from typing import Dict, Optional
 
 import pytest
 from aiohttp import web
+from aiohttp.streams import EmptyStreamReader
 
 from schemathesis.constants import __version__
 from schemathesis.models import Status
@@ -13,6 +14,11 @@ def assert_request(
 ) -> None:
     request = app["incoming_requests"][idx]
     assert request.method == method
+    if request.method == "GET":
+        # Ref: #200
+        # GET requests should not contain bodies
+        if not isinstance(request.content, EmptyStreamReader):
+            assert request.content._read_nowait(-1) != b"{}"
     assert request.path == path
     if headers:
         for key, value in headers.items():

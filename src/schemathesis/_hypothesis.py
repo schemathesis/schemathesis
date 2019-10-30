@@ -51,11 +51,9 @@ def get_examples(endpoint: Endpoint) -> Generator[Case, None, None]:
         parameter = getattr(endpoint, name)
         if "example" in parameter:
             with handle_warnings():
-                other_parameters = {other: from_schema(getattr(endpoint, other)) for other in PARAMETERS - {name}}
-                yield st.builds(
-                    partial(Case, path=endpoint.path, method=endpoint.method, **{name: parameter["example"]}),
-                    **other_parameters,
-                ).example()
+                strategies = {other: from_schema(getattr(endpoint, other)) for other in PARAMETERS - {name}}
+                static_parameters = {name: parameter["example"]}
+                yield _get_case_strategy(endpoint, static_parameters, strategies).example()
 
 
 def add_examples(test: Callable, endpoint: Endpoint) -> Callable:
@@ -104,15 +102,32 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
 
     Path & endpoint are static, the others are JSON schemas.
     """
-    return st.builds(
-        partial(Case, path=endpoint.path, method=endpoint.method, base_url=endpoint.base_url),
-        path_parameters=from_schema(endpoint.path_parameters),
-        headers=from_schema(endpoint.headers).filter(is_valid_header),  # type: ignore
-        cookies=from_schema(endpoint.cookies),
-        query=from_schema(endpoint.query),
-        body=from_schema(endpoint.body),
-        form_data=from_schema(endpoint.form_data),
-    )
+    static_kwargs = {"path": endpoint.path, "method": endpoint.method, "base_url": endpoint.base_url}
+    strategies = {
+        "path_parameters": from_schema(endpoint.path_parameters),
+        "headers": from_schema(endpoint.headers).filter(is_valid_header),  # type: ignore
+        "cookies": from_schema(endpoint.cookies),
+        "query": from_schema(endpoint.query),
+        "form_data": from_schema(endpoint.form_data),
+    }
+    return _get_case_strategy(endpoint, static_kwargs, strategies)
+
+
+def _get_case_strategy(
+    endpoint: Endpoint, extra_static_parameters: Dict[str, Any], strategies: Dict[str, st.SearchStrategy]
+) -> st.SearchStrategy:
+    static_parameters = {
+        "path": endpoint.path,
+        "method": endpoint.method,
+        "base_url": endpoint.base_url,
+        **extra_static_parameters,
+    }
+    if endpoint.method == "GET":
+        static_parameters["body"] = None
+        strategies.pop("body", None)
+    elif "body" not in static_parameters:
+        strategies["body"] = from_schema(endpoint.body)
+    return st.builds(partial(Case, **static_parameters), **strategies)
 
 
 def register_string_format(name: str, strategy: st.SearchStrategy) -> None:

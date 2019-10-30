@@ -24,7 +24,7 @@ class Case:
     headers: Headers = attr.ib(factory=dict)  # pragma: no mutate
     cookies: Cookies = attr.ib(factory=dict)  # pragma: no mutate
     query: Query = attr.ib(factory=dict)  # pragma: no mutate
-    body: Body = attr.ib(factory=dict)  # pragma: no mutate
+    body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
     form_data: FormData = attr.ib(factory=dict)  # pragma: no mutate
 
     @property
