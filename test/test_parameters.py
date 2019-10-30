@@ -36,12 +36,16 @@ def test_body(testdir):
     # When parameter is specified for "body"
     testdir.make_test(
         """
-@schema.parametrize()
+@schema.parametrize(method="POST")
 @settings(max_examples=3)
 def test_(case):
     assert_int(case.body)
         """,
-        **as_param({"name": "id", "in": "body", "required": True, "schema": {"type": "integer"}}),
+        paths={
+            "/users": {
+                "post": {"parameters": [{"name": "id", "in": "body", "required": True, "schema": {"type": "integer"}}]}
+            }
+        },
     )
     # Then the generated test case should contain it in its `body` attribute
     testdir.run_and_assert(passed=1)

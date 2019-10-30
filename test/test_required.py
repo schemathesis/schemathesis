@@ -4,22 +4,28 @@ from .utils import as_param, integer
 def test_required_parameters(testdir):
     testdir.make_test(
         """
-@schema.parametrize()
+@schema.parametrize(method="POST")
 @settings(max_examples=20)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
-    assert case.method == "GET"
+    assert case.method == "POST"
     assert "id" in case.body
 """,
-        **as_param(
-            {
-                "in": "body",
-                "name": "object",
-                "required": True,
-                "schema": {"type": "object", "required": ["id"], "properties": {"id": integer(name="id")}},
+        paths={
+            "/users": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "name": "object",
+                            "required": True,
+                            "schema": {"type": "object", "required": ["id"], "properties": {"id": integer(name="id")}},
+                        }
+                    ]
+                }
             }
-        ),
+        },
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)

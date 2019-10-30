@@ -11,7 +11,7 @@ T = TypeVar("T", bound=Union[Endpoint, Case])
 
 
 def _make(cls: Type[T], **kwargs: Any) -> T:
-    return cls("/users", "GET", **kwargs)
+    return cls("/users", "POST", **kwargs)
 
 
 def make_endpoint(**kwargs: Any) -> Endpoint:
@@ -19,6 +19,7 @@ def make_endpoint(**kwargs: Any) -> Endpoint:
 
 
 def make_case(**kwargs: Any) -> Case:
+    kwargs.setdefault("body", {})
     return _make(Case, **kwargs)
 
 
