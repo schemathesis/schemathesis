@@ -1,7 +1,7 @@
 # pylint: disable=too-many-instance-attributes
 from collections import Counter
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional
 from urllib.parse import urljoin
 
 import attr
@@ -116,8 +116,8 @@ class TestResult:
     checks: List[Check] = attr.ib(factory=list)  # pragma: no mutate
 
     @property
-    def has_errors(self) -> bool:
-        return any(check.value != Status.success for check in self.checks)
+    def has_failures(self) -> bool:
+        return any(check.value == Status.failure for check in self.checks)
 
     def add_success(self, name: str) -> None:
         self.checks.append(Check(name, Status.success))
@@ -137,14 +137,22 @@ class TestResultSet:
         return len(self.results) == 0
 
     @property
+    def _check_statuses(self) -> Generator[Status, None, None]:
+        return (check.value for result in self.results for check in result.checks)
+
+    def _has_check_with_status(self, status: Status) -> bool:
+        return any(check_status == status for check_status in self._check_statuses)
+
+    @property
+    def has_failures(self) -> bool:
+        return self._has_check_with_status(Status.failure)
+
+    @property
     def has_errors(self) -> bool:
-        checks_statuses = [check.value for result in self.results for check in result.checks]
         # First case: tests were collected but no checks were executed due to exception during the test
         # Second case: there are not successful checks in the results
         # pylint: disable=consider-using-ternary
-        return (not checks_statuses and not self.is_empty) or any(
-            status != Status.success for status in checks_statuses
-        )
+        return (not list(self._check_statuses) and not self.is_empty) or self._has_check_with_status(Status.error)
 
     @property
     def total(self) -> Dict[str, Counter]:
