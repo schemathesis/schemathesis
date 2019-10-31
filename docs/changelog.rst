@@ -10,6 +10,7 @@ Changed
 ~~~~~~~
 
 - More readable falsifying examples output. `#127`_
+- Show exceptions in a separate section of the CLI output. `#203`_
 
 `0.12.2`_ - 2019-10-30
 ----------------------
@@ -308,6 +309,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#203: https://github.com/kiwicom/schemathesis/issues/203
 .. _#200: https://github.com/kiwicom/schemathesis/issues/200
 .. _#199: https://github.com/kiwicom/schemathesis/issues/199
 .. _#194: https://github.com/kiwicom/schemathesis/issues/194

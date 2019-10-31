@@ -223,7 +223,6 @@ def test_cli_run_output_with_errors(cli, schema_url):
     assert " SUMMARY " in result.stdout
 
     lines = result.stdout.split("\n")
-    print(lines)
     assert "not_a_server_error            1 / 3 passed          FAILED " in lines
     assert "Tests failed." in lines
 
@@ -257,11 +256,12 @@ def test_execute_missing_schema(cli, mocker, status_code, message):
     assert message in result.stdout
 
 
-@pytest.mark.endpoints("slow")
+@pytest.mark.endpoints("success", "slow")
 def test_hypothesis_failed_event(cli, schema_url):
-    result = cli.run_inprocess(schema_url, "--hypothesis-deadline=1")
-    assert result.exit_code == 0
+    result = cli.run_inprocess(schema_url, "--hypothesis-deadline=20")
+    assert result.exit_code == 1
     assert "/slow E" in result.stdout
+    assert "hypothesis.errors.DeadlineExceeded: Test took " in result.stdout
 
 
 def test_connection_error(cli, schema_url):
@@ -269,3 +269,8 @@ def test_connection_error(cli, schema_url):
     assert result.exit_code == 1
     assert "GET /api/failure E" in result.stdout
     assert "GET /api/success E" in result.stdout
+    assert "= ERRORS =" in result.stdout
+    assert "_ GET: /api/success _" in result.stdout
+    assert "_ GET: /api/failure _" in result.stdout
+    assert "Max retries exceeded with url: /api/success" in result.stdout
+    assert "Max retries exceeded with url: /api/failure" in result.stdout
