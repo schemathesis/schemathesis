@@ -71,7 +71,7 @@ def capture_hypothesis_output() -> Generator[List[str], None, None]:
 
     def get_output(value: str) -> None:
         # Drop falsifying examples - we display them on our own
-        if value.startswith("Falsifying example: "):
+        if value.startswith(("Falsifying example: ", "You can add @seed")):
             return
         output.append(value)
 
