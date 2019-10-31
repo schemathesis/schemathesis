@@ -1,6 +1,7 @@
 import os
 import platform
 import shutil
+import traceback
 from typing import Any, Counter, List
 
 import click
@@ -21,6 +22,11 @@ def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> Non
     message = f" {title} ".center(get_terminal_width(), separator)
     kwargs.setdefault("bold", True)
     click.secho(message, **kwargs)
+
+
+def display_subsection(result: TestResult) -> None:
+    section_name = f"{result.method}: {result.path}"
+    display_section_name(section_name, "_", fg="red")
 
 
 def get_percentage(position: int, length: int) -> str:
@@ -90,6 +96,7 @@ def handle_finished(context: events.ExecutionContext, event: events.Finished) ->
     """Show the outcome of the whole testing session."""
     click.echo()
     display_hypothesis_output(context.hypothesis_output)
+    display_errors(event.results)
     display_failures(event.results)
     display_statistic(event.results)
     click.echo()
@@ -109,6 +116,25 @@ def display_hypothesis_output(hypothesis_output: List[str]) -> None:
         click.secho(output, fg="red")
 
 
+def display_errors(results: TestResultSet) -> None:
+    """Display all errors in the test run."""
+    if not results.has_errors:
+        return
+
+    display_section_name("ERRORS")
+    for result in results.results:
+        if not result.has_errors:
+            continue
+        display_single_error(result)
+
+
+def display_single_error(result: TestResult) -> None:
+    display_subsection(result)
+    for error in result.errors:
+        message = "".join(traceback.format_exception_only(type(error), error))
+        click.secho(message)
+
+
 def display_failures(results: TestResultSet) -> None:
     """Display all failures in the test run."""
     if not results.has_failures:
@@ -123,8 +149,7 @@ def display_failures(results: TestResultSet) -> None:
 
 def display_single_failure(result: TestResult) -> None:
     """Display a failure for a single method / endpoint."""
-    section_name = f"{result.method}: {result.path}"
-    display_section_name(section_name, "_", fg="red")
+    display_subsection(result)
     for check in reversed(result.checks):
         if check.example is not None:
             output = {

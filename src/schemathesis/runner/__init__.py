@@ -73,8 +73,9 @@ def execute_from_schema(
                 status = Status.success
             except AssertionError:
                 status = Status.failure
-            except Exception:
+            except Exception as error:
                 status = Status.error
+                result.add_error(error)
             results.append(result)
             yield events.AfterExecution(results=results, schema=schema, endpoint=endpoint, status=status)
 

@@ -114,6 +114,11 @@ class TestResult:
     path: str = attr.ib()  # pragma: no mutate
     method: str = attr.ib()  # pragma: no mutate
     checks: List[Check] = attr.ib(factory=list)  # pragma: no mutate
+    errors: List[Exception] = attr.ib(factory=list)  # pragma: no mutate
+
+    @property
+    def has_errors(self) -> bool:
+        return bool(self.errors)
 
     @property
     def has_failures(self) -> bool:
@@ -124,6 +129,9 @@ class TestResult:
 
     def add_failure(self, name: str, example: Case) -> None:
         self.checks.append(Check(name, Status.failure, example))
+
+    def add_error(self, exception: Exception) -> None:
+        self.errors.append(exception)
 
 
 @attr.s(slots=True, repr=False)
@@ -149,10 +157,7 @@ class TestResultSet:
 
     @property
     def has_errors(self) -> bool:
-        # First case: tests were collected but no checks were executed due to exception during the test
-        # Second case: there are not successful checks in the results
-        # pylint: disable=consider-using-ternary
-        return (not list(self._check_statuses) and not self.is_empty) or self._has_check_with_status(Status.error)
+        return any(result.has_errors for result in self.results)
 
     @property
     def total(self) -> Dict[str, Counter]:
