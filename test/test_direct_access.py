@@ -1,6 +1,7 @@
 import hypothesis.strategies as st
 import pytest
 
+import schemathesis
 from schemathesis.models import Case, Endpoint
 from schemathesis.schemas import endpoints_to_dict
 
@@ -9,14 +10,15 @@ def test_contains(swagger_20):
     assert "/v1/users" in swagger_20
 
 
-def test_getitem(swagger_20, mocker):
+def test_getitem(simple_schema, mocker):
+    swagger = schemathesis.from_dict(simple_schema)
     mocked = mocker.patch("schemathesis.schemas.endpoints_to_dict", wraps=endpoints_to_dict)
-    assert "_endpoints" not in swagger_20.__dict__
-    assert isinstance(swagger_20["/v1/users"], dict)
+    assert "_endpoints" not in swagger.__dict__
+    assert isinstance(swagger["/v1/users"], dict)
     assert mocked.call_count == 1
     # Check cached access
-    assert "_endpoints" in swagger_20.__dict__
-    assert isinstance(swagger_20["/v1/users"], dict)
+    assert "_endpoints" in swagger.__dict__
+    assert isinstance(swagger["/v1/users"], dict)
     assert mocked.call_count == 1
 
 

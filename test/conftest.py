@@ -71,7 +71,7 @@ def cli(testdir):
     return Runner()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def simple_schema():
     return {
         "swagger": "2.0",
@@ -92,7 +92,7 @@ def simple_schema():
     }
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def swagger_20(simple_schema):
     return schemathesis.from_dict(simple_schema)
 

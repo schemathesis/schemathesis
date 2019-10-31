@@ -1,5 +1,6 @@
 import datetime
 import os
+from functools import lru_cache
 from typing import Any, Callable, Dict, Type
 
 import yaml
@@ -23,12 +24,17 @@ def get_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> BaseS
 
 
 def make_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> Dict[str, Any]:
-    path = get_schema_path(schema_name)
-    with open(path) as fd:
-        schema = yaml.safe_load(fd)
+    schema = load_schema(schema_name)
     if kwargs is not None:
         schema = merge(kwargs, schema)
     return schema
+
+
+@lru_cache()
+def load_schema(schema_name: str) -> Dict[str, Any]:
+    path = get_schema_path(schema_name)
+    with open(path) as fd:
+        return yaml.safe_load(fd)
 
 
 def merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
