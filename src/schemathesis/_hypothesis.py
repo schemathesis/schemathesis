@@ -16,9 +16,11 @@ from .models import Case, Endpoint
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
 
 
-def create_test(endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None) -> Callable:
+def create_test(
+    endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None, skip_invalid=True
+) -> Callable:
     """Create a Hypothesis test."""
-    strategy = endpoint.as_strategy()
+    strategy = endpoint.as_strategy(skip_invalid=skip_invalid)
     wrapped_test = hypothesis.given(case=strategy)(test)
     original_test = get_original_test(test)
     if asyncio.iscoroutinefunction(original_test):
@@ -102,20 +104,25 @@ def is_valid_header(headers: Dict[str, str]) -> bool:
     return True
 
 
-def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
+def get_case_strategy(endpoint: Endpoint, skip_invalid: bool) -> Optional[st.SearchStrategy]:
     """Create a strategy for a complete test case.
 
     Path & endpoint are static, the others are JSON schemas.
     """
     static_kwargs = {"path": endpoint.path, "method": endpoint.method, "base_url": endpoint.base_url}
-    strategies = {
-        "path_parameters": from_schema(endpoint.path_parameters),
-        "headers": from_schema(endpoint.headers).filter(is_valid_header),  # type: ignore
-        "cookies": from_schema(endpoint.cookies),
-        "query": from_schema(endpoint.query),
-        "form_data": from_schema(endpoint.form_data),
-    }
-    return _get_case_strategy(endpoint, static_kwargs, strategies)
+    try:
+        strategies = {
+            "path_parameters": from_schema(endpoint.path_parameters),
+            "headers": from_schema(endpoint.headers).filter(is_valid_header),  # type: ignore
+            "cookies": from_schema(endpoint.cookies),
+            "query": from_schema(endpoint.query),
+            "form_data": from_schema(endpoint.form_data),
+        }
+        return _get_case_strategy(endpoint, static_kwargs, strategies)
+    except AssertionError as exc:
+        if skip_invalid:
+            return None
+        raise exc
 
 
 def _get_case_strategy(

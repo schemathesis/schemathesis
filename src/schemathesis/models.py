@@ -84,10 +84,10 @@ class Endpoint:
     body: Body = attr.ib(factory=empty_object)  # pragma: no mutate
     form_data: FormData = attr.ib(factory=empty_object)  # pragma: no mutate
 
-    def as_strategy(self) -> SearchStrategy:
+    def as_strategy(self, skip_invalid: bool) -> SearchStrategy:
         from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel
 
-        return get_case_strategy(self)
+        return get_case_strategy(self, skip_invalid)
 
 
 class Status(IntEnum):
