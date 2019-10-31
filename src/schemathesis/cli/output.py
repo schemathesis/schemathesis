@@ -94,7 +94,7 @@ def handle_finished(context: events.ExecutionContext, event: events.Finished) ->
     display_statistic(event.results)
     click.echo()
 
-    if event.results.has_errors:
+    if event.results.has_failures or event.results.has_errors:
         click.secho("Tests failed.", fg="red")
         raise click.exceptions.Exit(1)
 
@@ -111,12 +111,12 @@ def display_hypothesis_output(hypothesis_output: List[str]) -> None:
 
 def display_failures(results: TestResultSet) -> None:
     """Display all failures in the test run."""
-    if not results.has_errors:
+    if not results.has_failures:
         return
 
     display_section_name("FAILURES")
     for result in results.results:
-        if not result.has_errors:
+        if not result.has_failures:
             continue
         display_single_failure(result)
 
@@ -136,7 +136,8 @@ def display_single_failure(result: TestResult) -> None:
             template = f"{{:<{max_length}}} : {{}}"
             click.secho(template.format("Check", check.name), fg="red")
             for key, value in output.items():
-                click.secho(template.format(key, value), fg="red")
+                if (key == "Body" and value is not None) or value not in (None, {}):
+                    click.secho(template.format(key, value), fg="red")
             # Display only the latest case
             # (dd): It is possible to find multiple errors, but the simplest option for now is to display
             # the latest and avoid deduplication, which will be done in the future.
