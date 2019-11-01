@@ -62,6 +62,7 @@ def execute_from_schema(
     results = TestResultSet()
 
     with get_session(auth, headers) as session:
+        exception: Exception
         settings = get_hypothesis_settings(hypothesis_options)
 
         yield events.Initialized(results=results, schema=schema, checks=checks, hypothesis_settings=settings)
@@ -70,12 +71,12 @@ def execute_from_schema(
             result = TestResult(path=endpoint.path, method=endpoint.method)
             yield events.BeforeExecution(results=results, schema=schema, endpoint=endpoint)
             try:
-                if endpoint.is_valid:
+                if test is not None:
                     test(session, base_url, checks, result)
                     status = Status.success
                 else:
                     status = Status.error
-                    exception: Exception = InvalidEndpoint("Invalid schema for this endpoint")
+                    exception = InvalidEndpoint("Invalid schema for this endpoint")
                     result.add_error(exception)
             except AssertionError:
                 status = Status.failure

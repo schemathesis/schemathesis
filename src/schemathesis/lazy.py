@@ -5,6 +5,7 @@ import attr
 from _pytest.fixtures import FixtureRequest
 from pytest_subtests import SubTests
 
+from .exceptions import InvalidEndpoint
 from .models import Endpoint
 from .schemas import BaseSchema
 from .types import Filter
@@ -37,8 +38,11 @@ class LazySchema:
                 node_id = subtests.item._nodeid
                 settings = getattr(test, "_hypothesis_internal_use_settings", None)
                 for _endpoint, sub_test in schema.get_all_tests(func, settings):
-                    subtests.item._nodeid = _get_node_name(node_id, _endpoint)
-                    run_subtest(_endpoint, fixtures, sub_test, subtests)
+                    if sub_test:
+                        subtests.item._nodeid = _get_node_name(node_id, _endpoint)
+                        run_subtest(_endpoint, fixtures, sub_test, subtests)
+                    else:
+                        raise InvalidEndpoint
                 subtests.item._nodeid = node_id
 
             # Needed to prevent a failure when settings are applied to the test function
