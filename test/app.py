@@ -26,10 +26,15 @@ async def slow(request: web.Request) -> web.Response:
     return web.json_response({"slow": True})
 
 
+async def unsatisfiable(request: web.Request) -> web.Response:
+    return web.json_response({"result": "IMPOSSIBLE!"})
+
+
 class Endpoint(Enum):
-    success = ("/api/success", success)
-    failure = ("/api/failure", failure)
-    slow = ("/api/slow", slow)
+    success = ("GET", "/api/success", success)
+    failure = ("GET", "/api/failure", failure)
+    slow = ("GET", "/api/slow", slow)
+    unsatisfiable = ("POST", "/api/unsatisfiable", unsatisfiable)
 
 
 def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Application:
@@ -63,7 +68,11 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Appli
     app = web.Application()
     app.add_routes(
         [web.get("/swagger.yaml", schema)]
-        + [web.get(item.value[0], wrapper(item.value[1])) for item in Endpoint if item.name in endpoints]
+        + [
+            web.route(item.value[0], item.value[1], wrapper(item.value[2]))
+            for item in Endpoint
+            if item.name in endpoints
+        ]
     )
     app["incoming_requests"] = incoming_requests
     app["schema_requests"] = schema_requests
@@ -86,9 +95,22 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
         "paths": {},
     }
     for endpoint in endpoints:
-        template["paths"][f"/{endpoint}"] = {
-            "get": {"summary": "Endpoint", "produces": ["application/json"], "responses": {200: {"description": "OK"}}}
-        }
+        method = Endpoint[endpoint].value[0].lower()
+        if endpoint == "unsatisfiable":
+            schema = {
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "body",
+                        "required": True,
+                        # Impossible to satisfy
+                        "schema": {"allOf": [{"type": "integer"}, {"type": "string"}]},
+                    }
+                ]
+            }
+        else:
+            schema = {"produces": ["application/json"], "responses": {200: {"description": "OK"}}}
+        template["paths"][f"/{endpoint}"] = {method: schema}
     return template
 
 
