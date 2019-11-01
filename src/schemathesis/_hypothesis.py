@@ -10,6 +10,8 @@ from hypothesis_jsonschema import from_schema
 from requests.exceptions import InvalidHeader  # type: ignore
 from requests.utils import check_header_validity  # type: ignore
 
+from schemathesis.exceptions import InvalidEndpoint
+
 from ._compat import handle_warnings
 from .models import Case, Endpoint
 
@@ -17,10 +19,10 @@ PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"
 
 
 def create_test(
-    endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None, skip_invalid=True
+    endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None, skip_invalid: bool = True
 ) -> Callable:
     """Create a Hypothesis test."""
-    strategy = endpoint.as_strategy(skip_invalid=skip_invalid)
+    strategy = endpoint.as_strategy()
     wrapped_test = hypothesis.given(case=strategy)(test)
     original_test = get_original_test(test)
     if asyncio.iscoroutinefunction(original_test):
@@ -104,7 +106,7 @@ def is_valid_header(headers: Dict[str, str]) -> bool:
     return True
 
 
-def get_case_strategy(endpoint: Endpoint, skip_invalid: bool) -> Optional[st.SearchStrategy]:
+def get_case_strategy(endpoint: Endpoint) -> Optional[st.SearchStrategy]:
     """Create a strategy for a complete test case.
 
     Path & endpoint are static, the others are JSON schemas.
@@ -120,9 +122,7 @@ def get_case_strategy(endpoint: Endpoint, skip_invalid: bool) -> Optional[st.Sea
         }
         return _get_case_strategy(endpoint, static_kwargs, strategies)
     except AssertionError as exc:
-        if skip_invalid:
-            return None
-        raise exc
+        raise InvalidEndpoint
 
 
 def _get_case_strategy(

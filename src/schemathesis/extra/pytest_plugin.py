@@ -6,6 +6,8 @@ from _pytest.config import hookimpl
 from _pytest.python import Function, PyCollector  # type: ignore
 from hypothesis.errors import InvalidArgument  # pylint: disable=ungrouped-imports
 
+from schemathesis.exceptions import InvalidEndpoint
+
 from .._hypothesis import create_test
 from ..models import Endpoint
 from ..utils import is_schemathesis_test
@@ -36,7 +38,10 @@ class SchemathesisCase(PyCollector):
         Could produce more than one test item if
         parametrization is applied via ``pytest.mark.parametrize`` or ``pytest_generate_tests``.
         """
-        hypothesis_item = create_test(endpoint, self.test_function)
+        try:
+            hypothesis_item = create_test(endpoint, self.test_function)
+        except InvalidEndpoint:
+            pytest.fail("Invalid endpoint")
         items = self.ihook.pytest_pycollect_makeitem(
             collector=self.parent, name=self._get_test_name(endpoint), obj=hypothesis_item
         )
