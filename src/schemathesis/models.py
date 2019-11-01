@@ -97,7 +97,6 @@ class Status(IntEnum):
     success = 1
     failure = 2
     error = 3
-    invalid = 4
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate

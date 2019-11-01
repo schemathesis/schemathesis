@@ -281,6 +281,22 @@ def test_unsatisfiable(cli, schema_url):
     assert "hypothesis.errors.Unsatisfiable: Unable to satisfy schema parameters for this endpoint" in lines
 
 
+@pytest.mark.endpoints("invalid")
+def test_invalid_endpoint(cli, schema_url):
+    # When the app's schema contains errors
+    # For example if it type is "int" but should be "integer"
+    result = cli.run_inprocess(schema_url)
+    # Then the whole Schemathesis run should fail
+    assert result.exit_code == 1
+    # And standard Hypothesis error should not appear in the output
+    assert "You can add @seed" not in result.stdout
+    # And this endpoint should be marked as errored in the progress line
+    assert "POST /api/invalid E" in result.stdout
+    # And more clear error message is displayed instead of Hypothesis one
+    lines = result.stdout.split("\n")
+    assert "schemathesis.exceptions.InvalidEndpoint: Invalid schema for this endpoint" in lines
+
+
 def test_connection_error(cli, schema_url):
     result = cli.run_inprocess(schema_url, "--base-url=http://127.0.0.1:1/")
     assert result.exit_code == 1
