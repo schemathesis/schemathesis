@@ -70,7 +70,7 @@ def capture_hypothesis_output() -> Generator[List[str], None, None]:
     output = []
 
     def get_output(value: str) -> None:
-        # Drop falsifying examples - we display them on our own
+        # Drop messages that could be confusing in the Schemathesis context
         if value.startswith(("Falsifying example: ", "You can add @seed")):
             return
         output.append(value)

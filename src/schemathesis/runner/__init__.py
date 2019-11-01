@@ -73,6 +73,11 @@ def execute_from_schema(
                 status = Status.success
             except AssertionError:
                 status = Status.failure
+            except hypothesis.errors.Unsatisfiable:
+                # We need more clear error message here
+                status = Status.error
+                exception = hypothesis.errors.Unsatisfiable("Unable to satisfy schema parameters for this endpoint")
+                result.add_error(exception)
             except Exception as error:
                 status = Status.error
                 result.add_error(error)
