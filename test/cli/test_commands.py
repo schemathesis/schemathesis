@@ -264,6 +264,23 @@ def test_hypothesis_failed_event(cli, schema_url):
     assert "hypothesis.errors.DeadlineExceeded: Test took " in result.stdout
 
 
+@pytest.mark.endpoints("unsatisfiable")
+def test_unsatisfiable(cli, schema_url):
+    # When the app's schema contains parameters that can't be generated
+    # For example if it contains contradiction in the parameters definition - requires to be integer AND string at the
+    # same time
+    result = cli.run_inprocess(schema_url)
+    # Then the whole Schemathesis run should fail
+    assert result.exit_code == 1
+    # And standard Hypothesis error should not appear in the output
+    assert "You can add @seed" not in result.stdout
+    # And this endpoint should be marked as errored in the progress line
+    assert "POST /api/unsatisfiable E" in result.stdout
+    # And more clear error message is displayed instead of Hypothesis one
+    lines = result.stdout.split("\n")
+    assert "hypothesis.errors.Unsatisfiable: Unable to satisfy schema parameters for this endpoint" in lines
+
+
 def test_connection_error(cli, schema_url):
     result = cli.run_inprocess(schema_url, "--base-url=http://127.0.0.1:1/")
     assert result.exit_code == 1

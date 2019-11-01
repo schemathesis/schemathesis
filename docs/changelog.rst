@@ -16,6 +16,7 @@ Changed
 
 - More readable falsifying examples output. `#127`_
 - Show exceptions in a separate section of the CLI output. `#203`_
+- Error message for cases when it is not possible to satisfy schema parameters. It should be more clear now. `#216`_
 
 `0.12.2`_ - 2019-10-30
 ----------------------
@@ -315,6 +316,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#216: https://github.com/kiwicom/schemathesis/issues/216
 .. _#212: https://github.com/kiwicom/schemathesis/issues/212
 .. _#203: https://github.com/kiwicom/schemathesis/issues/203
 .. _#200: https://github.com/kiwicom/schemathesis/issues/200
