@@ -7,6 +7,7 @@ import requests
 from requests.auth import AuthBase
 
 from ..constants import USER_AGENT
+from ..exceptions import InvalidEndpoint
 from ..loaders import from_uri
 from ..models import Case, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
@@ -66,13 +67,16 @@ def execute_from_schema(
         yield events.Initialized(results=results, schema=schema, checks=checks, hypothesis_settings=settings)
 
         for endpoint, test in schema.get_all_tests(single_test, settings):
-            if not endpoint.is_valid:
-                status = Status.invalid
             result = TestResult(path=endpoint.path, method=endpoint.method)
             yield events.BeforeExecution(results=results, schema=schema, endpoint=endpoint)
             try:
-                test(session, base_url, checks, result)
-                status = Status.success
+                if endpoint.is_valid:
+                    test(session, base_url, checks, result)
+                    status = Status.success
+                else:
+                    status = Status.error
+                    exception: Exception = InvalidEndpoint("Invalid schema for this endpoint")
+                    result.add_error(exception)
             except AssertionError:
                 status = Status.failure
             except hypothesis.errors.Unsatisfiable:

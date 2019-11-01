@@ -121,7 +121,7 @@ def get_case_strategy(endpoint: Endpoint) -> Optional[st.SearchStrategy]:
             "form_data": from_schema(endpoint.form_data),
         }
         return _get_case_strategy(endpoint, static_kwargs, strategies)
-    except AssertionError as exc:
+    except AssertionError:
         raise InvalidEndpoint
 
 
