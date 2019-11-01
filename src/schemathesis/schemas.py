@@ -16,6 +16,8 @@ import attr
 import hypothesis
 import jsonschema
 
+from schemathesis.exceptions import InvalidEndpoint
+
 from ._hypothesis import create_test
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .models import Endpoint
@@ -67,7 +69,12 @@ class BaseSchema(Mapping):
     ) -> Generator[Tuple[Endpoint, Callable], None, None]:
         """Generate all endpoints and Hypothesis tests for them."""
         for endpoint in self.get_all_endpoints():
-            yield endpoint, create_test(endpoint, func, settings)
+            test = None
+            try:
+                test = create_test(endpoint, func, settings)
+            except InvalidEndpoint:
+                endpoint.is_valid = False
+            yield endpoint, test
 
     def parametrize(
         self, method: Optional[Filter] = NOT_SET, endpoint: Optional[Filter] = NOT_SET, tag: Optional[Filter] = NOT_SET

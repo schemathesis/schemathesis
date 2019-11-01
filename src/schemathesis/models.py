@@ -83,11 +83,12 @@ class Endpoint:
     query: Query = attr.ib(factory=empty_object)  # pragma: no mutate
     body: Body = attr.ib(factory=empty_object)  # pragma: no mutate
     form_data: FormData = attr.ib(factory=empty_object)  # pragma: no mutate
+    is_valid: bool = attr.ib(default=True)  # pragma: no mutate
 
-    def as_strategy(self, skip_invalid: bool) -> SearchStrategy:
+    def as_strategy(self) -> SearchStrategy:
         from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel
 
-        return get_case_strategy(self, skip_invalid)
+        return get_case_strategy(self)
 
 
 class Status(IntEnum):
@@ -96,6 +97,7 @@ class Status(IntEnum):
     success = 1
     failure = 2
     error = 3
+    invalid = 4
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate

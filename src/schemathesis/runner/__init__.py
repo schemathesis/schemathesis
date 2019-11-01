@@ -66,6 +66,8 @@ def execute_from_schema(
         yield events.Initialized(results=results, schema=schema, checks=checks, hypothesis_settings=settings)
 
         for endpoint, test in schema.get_all_tests(single_test, settings):
+            if not endpoint.is_valid:
+                status = Status.invalid
             result = TestResult(path=endpoint.path, method=endpoint.method)
             yield events.BeforeExecution(results=results, schema=schema, endpoint=endpoint)
             try:

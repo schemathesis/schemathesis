@@ -1,0 +1,2 @@
+class InvalidEndpoint(Exception):
+    pass
