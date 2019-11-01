@@ -35,6 +35,7 @@ class Endpoint(Enum):
     failure = ("GET", "/api/failure", failure)
     slow = ("GET", "/api/slow", slow)
     unsatisfiable = ("POST", "/api/unsatisfiable", unsatisfiable)
+    invalid = ("POST", "/api/invalid", unsatisfiable)
 
 
 def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Application:
@@ -108,6 +109,8 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
                     }
                 ]
             }
+        elif endpoint == "invalid":
+            schema = {"parameters": [{"name": "id", "in": "query", "required": True, "type": "int"}]}
         else:
             schema = {"produces": ["application/json"], "responses": {200: {"description": "OK"}}}
         template["paths"][f"/{endpoint}"] = {method: schema}

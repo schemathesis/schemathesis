@@ -66,7 +66,7 @@ class BaseSchema(Mapping):
 
     def get_all_tests(
         self, func: Callable, settings: Optional[hypothesis.settings] = None
-    ) -> Generator[Tuple[Endpoint, Callable], None, None]:
+    ) -> Generator[Tuple[Endpoint, Optional[Callable]], None, None]:
         """Generate all endpoints and Hypothesis tests for them."""
         for endpoint in self.get_all_endpoints():
             test = None

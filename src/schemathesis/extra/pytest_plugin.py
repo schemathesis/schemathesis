@@ -41,7 +41,7 @@ class SchemathesisCase(PyCollector):
         try:
             hypothesis_item = create_test(endpoint, self.test_function)
         except InvalidEndpoint:
-            pytest.fail("Invalid endpoint")
+            pytest.fail("Invalid schema for this endpoint")
         items = self.ihook.pytest_pycollect_makeitem(
             collector=self.parent, name=self._get_test_name(endpoint), obj=hypothesis_item
         )
