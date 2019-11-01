@@ -29,9 +29,14 @@ def create_test(endpoint: Endpoint, test: Callable, settings: Optional[hypothesi
 
 
 def get_original_test(test: Callable) -> Callable:
-    """Get the original test function even if it is wrapped by `hypothesis.settings` decorator."""
-    if getattr(test, "_hypothesis_internal_settings_applied", False):
-        # `settings` decorator is applied
+    """Get the original test function even if it is wrapped by `hypothesis.settings` decorator.
+
+    Applies only to Hypothesis pre 4.42.4 versions.
+    """
+    # `settings` decorator is applied
+    if getattr(test, "_hypothesis_internal_settings_applied", False) and hypothesis.__version_info__ < (4, 42, 4):
+        # This behavior was changed due to a bug - https://github.com/HypothesisWorks/hypothesis/issues/2160
+        # And since Hypothesis 4.42.4 is no longer required
         return test._hypothesis_internal_test_function_without_warning  # type: ignore
     return test
 
