@@ -202,6 +202,27 @@ def test_(request, case):
     result.stdout.re_match_lines([r".*Cannot have max_size=6 < min_size=10", ".*Failed: Cannot"])
 
 
+def test_invalid_endpoint(testdir):
+    # When the given schema has logical errors
+    testdir.make_test(
+        """
+@schema.parametrize()
+def test_(request, case):
+    pass
+""",
+        paths={
+            "/valid": {"get": {"parameters": [{"type": "integer", "name": "id", "in": "query", "required": True}]}},
+            "/invalid": {"get": {"parameters": [{"type": "int", "name": "id", "in": "query", "required": True}]}},
+        },
+    )
+    result = testdir.runpytest("-v", "-rf")
+    # Then the tests should fail with the relevant error message
+    result.assert_outcomes(failed=1, passed=2)
+    result.stdout.re_match_lines(
+        [r".*test_invalid_endpoint.py::test_\[GET:/v1/invalid\] FAILED", ".*Failed: Invalid schema for endpoint"]
+    )
+
+
 def test_no_base_path(testdir):
     # When the given schema has no "basePath"
     testdir.make_test(

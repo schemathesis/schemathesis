@@ -83,9 +83,8 @@ class Endpoint:
     query: Query = attr.ib(factory=empty_object)  # pragma: no mutate
     body: Body = attr.ib(factory=empty_object)  # pragma: no mutate
     form_data: FormData = attr.ib(factory=empty_object)  # pragma: no mutate
-    is_valid: bool = attr.ib(default=True)  # pragma: no mutate
 
-    def as_strategy(self) -> SearchStrategy:
+    def as_strategy(self) -> Optional[SearchStrategy]:
         from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel
 
         return get_case_strategy(self)
