@@ -68,12 +68,12 @@ class BaseSchema(Mapping):
         self, func: Callable, settings: Optional[hypothesis.settings] = None
     ) -> Generator[Tuple[Endpoint, Optional[Callable]], None, None]:
         """Generate all endpoints and Hypothesis tests for them."""
+        test: Optional[Callable]
         for endpoint in self.get_all_endpoints():
-            test = None
             try:
                 test = create_test(endpoint, func, settings)
             except InvalidEndpoint:
-                endpoint.is_valid = False
+                test = None
             yield endpoint, test
 
     def parametrize(
