@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Compatibility with Hypothesis 4.42.4+ . `#212`_
+
 Changed
 ~~~~~~~
 
@@ -310,6 +315,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#212: https://github.com/kiwicom/schemathesis/issues/212
 .. _#203: https://github.com/kiwicom/schemathesis/issues/203
 .. _#200: https://github.com/kiwicom/schemathesis/issues/200
 .. _#199: https://github.com/kiwicom/schemathesis/issues/199
