@@ -93,9 +93,9 @@ class Endpoint:
 class Status(IntEnum):
     """Status of an action or multiple actions."""
 
-    success = 1
-    failure = 2
-    error = 3
+    success = 1  # pragma: no mutate
+    failure = 2  # pragma: no mutate
+    error = 3  # pragma: no mutate
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
@@ -134,7 +134,7 @@ class TestResult:
         self.errors.append(exception)
 
 
-@attr.s(slots=True, repr=False)
+@attr.s(slots=True, repr=False)  # pragma: no mutate
 class TestResultSet:
     """Set of multiple test results."""
 

@@ -9,7 +9,7 @@ from ..models import Endpoint, Status, TestResultSet
 from ..schemas import BaseSchema
 
 
-@attr.s(slots=True)
+@attr.s(slots=True)  # pragma: no mutate
 class ExecutionContext:
     """Storage for the current context of the execution."""
 
@@ -38,7 +38,7 @@ class BeforeExecution(ExecutionEvent):
     endpoint: Endpoint = attr.ib()  # pragma: no mutate
 
 
-@attr.s(slots=True)
+@attr.s(slots=True)  # pragma: no mutate
 class AfterExecution(ExecutionEvent):
     endpoint: Endpoint = attr.ib()  # pragma: no mutate
     status: Status = attr.ib()  # pragma: no mutate

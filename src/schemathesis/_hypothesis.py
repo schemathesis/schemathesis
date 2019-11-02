@@ -70,7 +70,7 @@ def add_examples(test: Callable, endpoint: Endpoint) -> Callable:
 
 
 # Adapted from http.client._is_illegal_header_value
-INVALID_HEADER_RE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])")
+INVALID_HEADER_RE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])")  # pragma: no mutate
 
 
 def _is_latin_1_encodable(value: str) -> bool:
