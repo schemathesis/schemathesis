@@ -80,6 +80,17 @@ def execute_from_schema(
                     status = Status.success
             except AssertionError:
                 status = Status.failure
+            except hypothesis.errors.Flaky:
+                status = Status.error
+                result.mark_errored()
+                flaky_example = result.checks[-1].example
+                result.add_error(
+                    hypothesis.errors.Flaky(
+                        "Tests on this endpoint produce unreliable results: \n"
+                        "Falsified on the first call but did not on a subsequent one"
+                    ),
+                    flaky_example,
+                )
             except hypothesis.errors.Unsatisfiable:
                 # We need more clear error message here
                 status = Status.error
@@ -144,7 +155,7 @@ def single_test(
         check_name = check.__name__
         try:
             check(response)
-            stats.add_success(check_name)
+            stats.add_success(check_name, case)
         except AssertionError:
             errors = True  # pragma: no mutate
             stats.add_failure(check_name, case)

@@ -1,7 +1,7 @@
 # pylint: disable=too-many-instance-attributes
 from collections import Counter
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Tuple, Union
 from urllib.parse import urljoin
 
 import attr
@@ -113,7 +113,11 @@ class TestResult:
     path: str = attr.ib()  # pragma: no mutate
     method: str = attr.ib()  # pragma: no mutate
     checks: List[Check] = attr.ib(factory=list)  # pragma: no mutate
-    errors: List[Exception] = attr.ib(factory=list)  # pragma: no mutate
+    errors: List[Tuple[Exception, Optional[Case]]] = attr.ib(factory=list)  # pragma: no mutate
+    is_errored: bool = attr.ib(default=False)  # pragma: no mutate
+
+    def mark_errored(self) -> None:
+        self.is_errored = True
 
     @property
     def has_errors(self) -> bool:
@@ -123,14 +127,14 @@ class TestResult:
     def has_failures(self) -> bool:
         return any(check.value == Status.failure for check in self.checks)
 
-    def add_success(self, name: str) -> None:
-        self.checks.append(Check(name, Status.success))
+    def add_success(self, name: str, example: Case) -> None:
+        self.checks.append(Check(name, Status.success, example))
 
     def add_failure(self, name: str, example: Case) -> None:
         self.checks.append(Check(name, Status.failure, example))
 
-    def add_error(self, exception: Exception) -> None:
-        self.errors.append(exception)
+    def add_error(self, exception: Exception, example: Optional[Case] = None) -> None:
+        self.errors.append((exception, example))
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
@@ -138,6 +142,9 @@ class TestResultSet:
     """Set of multiple test results."""
 
     results: List[TestResult] = attr.ib(factory=list)  # pragma: no mutate
+
+    def __iter__(self) -> Iterator[TestResult]:
+        return iter(self.results)
 
     @property
     def is_empty(self) -> bool:
