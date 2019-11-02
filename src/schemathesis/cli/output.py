@@ -2,7 +2,7 @@ import os
 import platform
 import shutil
 import traceback
-from typing import Any, Counter, List
+from typing import Any, Dict, List, Union
 
 import click
 from hypothesis import settings
@@ -193,9 +193,9 @@ def display_statistic(statistic: TestResultSet) -> None:
         display_check_result(check_name, results, template)
 
 
-def display_check_result(check_name: str, results: Counter, template: str) -> None:
+def display_check_result(check_name: str, results: Dict[Union[str, Status], int], template: str) -> None:
     """Show results of single check execution."""
-    if results[Status.failure]:
+    if Status.failure in results:
         verdict = "FAILED"
         color = "red"
     else:
