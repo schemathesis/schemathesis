@@ -100,17 +100,25 @@ def test_(request, case):
 def test_override_filter(testdir):
     testdir.make_test(
         """
-@schema.parametrize(method=None, endpoint="/v1/users")
+@schema.parametrize(method=None, endpoint="/v1/users", tag=None)
 @settings(max_examples=1)
-def test_(request, case):
+def test_a(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
     assert case.method == "GET"
+
+@schema.parametrize(method=None, endpoint=None)
+@settings(max_examples=1)
+def test_b(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/foo"
+    assert case.method == "POST"
 """,
-        paths={"/foo": {"post": {"parameters": [integer(name="id", required=True)]}}},
+        paths={"/foo": {"post": {"parameters": [integer(name="id", required=True)], "tags": ["foo"]}}},
         method="POST",
         endpoint="/v1/foo",
+        tag="foo",
     )
     result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.assert_outcomes(passed=2)
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
