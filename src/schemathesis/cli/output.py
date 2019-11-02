@@ -2,7 +2,7 @@ import os
 import platform
 import shutil
 import traceback
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import click
 from attr import Attribute
@@ -121,7 +121,7 @@ def display_errors(results: TestResultSet) -> None:
         return
 
     display_section_name("ERRORS")
-    for result in results.results:
+    for result in results:
         if not result.has_errors:
             continue
         display_single_error(result)
@@ -129,18 +129,22 @@ def display_errors(results: TestResultSet) -> None:
 
 def display_single_error(result: TestResult) -> None:
     display_subsection(result)
-    for error in result.errors:
+    for error, example in result.errors:
         message = "".join(traceback.format_exception_only(type(error), error))
         click.secho(message, fg="red")
+        if example is not None:
+            display_example(example)
 
 
 def display_failures(results: TestResultSet) -> None:
     """Display all failures in the test run."""
     if not results.has_failures:
         return
-
+    relevant_results = [result for result in results if not result.is_errored]
+    if not relevant_results:
+        return
     display_section_name("FAILURES")
-    for result in results.results:
+    for result in relevant_results:
         if not result.has_failures:
             continue
         display_single_failure(result)
@@ -151,21 +155,26 @@ def display_single_failure(result: TestResult) -> None:
     display_subsection(result)
     for check in reversed(result.checks):
         if check.example is not None:
-            output = {
-                make_verbose_name(attribute): getattr(check.example, attribute.name)
-                for attribute in Case.__attrs_attrs__  # type: ignore
-                if attribute.name not in ("path", "method", "base_url")
-            }
-            max_length = max(map(len, output))
-            template = f"{{:<{max_length}}} : {{}}"
-            click.secho(template.format("Check", check.name), fg="red")
-            for key, value in output.items():
-                if (key == "Body" and value is not None) or value not in (None, {}):
-                    click.secho(template.format(key, value), fg="red")
+            display_example(check.example, check.name)
             # Display only the latest case
             # (dd): It is possible to find multiple errors, but the simplest option for now is to display
             # the latest and avoid deduplication, which will be done in the future.
             break
+
+
+def display_example(case: Case, check_name: Optional[str] = None) -> None:
+    output = {
+        make_verbose_name(attribute): getattr(case, attribute.name)
+        for attribute in Case.__attrs_attrs__  # type: ignore
+        if attribute.name not in ("path", "method", "base_url")
+    }
+    max_length = max(map(len, output))
+    template = f"{{:<{max_length}}} : {{}}"
+    if check_name is not None:
+        click.secho(template.format("Check", check_name), fg="red")
+    for key, value in output.items():
+        if (key == "Body" and value is not None) or value not in (None, {}):
+            click.secho(template.format(key, value), fg="red")
 
 
 def make_verbose_name(attribute: Attribute) -> str:
