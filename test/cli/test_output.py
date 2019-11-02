@@ -105,3 +105,11 @@ def test_display_single_failure(capsys):
     assert " GET: /success " in lines[0]
     assert lines[1] == click.style("Check           : not_a_server_error", fg="red")
     assert click.style("Body            : {'foo': 'bar'}", fg="red") in lines
+
+
+@pytest.mark.parametrize(
+    "attribute, expected",
+    ((models.Case.__attrs_attrs__[0], "Path"), (models.Case.__attrs_attrs__[3], "Path parameters")),
+)
+def test_make_verbose_name(attribute, expected):
+    assert output.make_verbose_name(attribute) == expected

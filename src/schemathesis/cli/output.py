@@ -153,7 +153,7 @@ def display_single_failure(result: TestResult) -> None:
     for check in reversed(result.checks):
         if check.example is not None:
             output = {
-                attribute.name.capitalize().replace("_", " "): getattr(check.example, attribute.name)
+                make_verbose_name(attribute): getattr(check.example, attribute.name)
                 for attribute in Case.__attrs_attrs__  # type: ignore
                 if attribute.name not in ("path", "method", "base_url")
             }
@@ -167,6 +167,10 @@ def display_single_failure(result: TestResult) -> None:
             # (dd): It is possible to find multiple errors, but the simplest option for now is to display
             # the latest and avoid deduplication, which will be done in the future.
             break
+
+
+def make_verbose_name(attribute: Attribute) -> str:
+    return attribute.name.capitalize().replace("_", " ")
 
 
 def display_statistic(statistic: TestResultSet) -> None:
