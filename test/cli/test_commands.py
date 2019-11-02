@@ -96,6 +96,8 @@ def test_commands_run_help(cli):
         "  -T, --tag TEXT                  Filter schemathesis test by schema tag",
         "                                  pattern.",
         "  -b, --base-url TEXT             Base URL address of the API.",
+        "  --request-timeout INTEGER       Timeout in milliseconds for network requests",
+        "                                  during the test run.",
         "  --hypothesis-deadline INTEGER   Duration in milliseconds that each",
         "                                  individual example with a test is not",
         "                                  allowed to exceed.",
@@ -268,6 +270,21 @@ def test_hypothesis_failed_event(cli, schema_url):
     # And the proper error message from Hypothesis should be displayed
     assert "hypothesis.errors.DeadlineExceeded: Test took " in result.stdout
     assert "which exceeds the deadline of 20.00ms" in result.stdout
+
+
+@pytest.mark.endpoints("success", "slow")
+def test_connection_timeout(cli, server, schema_url):
+    # When connection timeout is specified in the CLI and the request fails because of it
+    result = cli.run_inprocess(schema_url, "--request-timeout=100")
+    # Then the whole Schemathesis run should fail
+    assert result.exit_code == 1
+    # And the given endpoint should be displayed as an error
+    assert "GET /api/slow E" in result.stdout
+    # And the proper error message should be displayed
+    assert (
+        f"requests.exceptions.ReadTimeout: HTTPConnectionPool(host='127.0.0.1', port={server['port']}): "
+        "Read timed out. (read timeout=0.1)" in result.stdout
+    )
 
 
 @pytest.mark.endpoints("success", "slow")
