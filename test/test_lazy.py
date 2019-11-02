@@ -177,9 +177,14 @@ def test_b(request, case):
 def test_c(request, case):
     request.config.HYPOTHESIS_CASES += 1
 """,
-        paths={"/first": {"post": {}, "get": {}}, "/second": {"post": {}, "get": {}}},
+        paths={
+            "/first": {"post": {"tags": ["foo"]}, "get": {"tags": ["foo"]}},
+            "/second": {"post": {"tags": ["foo"]}, "get": {"tags": ["foo"]}},
+            "/third": {"post": {"tags": ["bar"]}, "get": {"tags": ["bar"]}},
+        },
         method="POST",
         endpoint="/first",
+        tag="foo",
     )
     result = testdir.runpytest("-v", "-s")
     # Then the filters should be applied to the generated tests
@@ -192,10 +197,10 @@ def test_c(request, case):
             r".*3 passed",
         ]
     )
-    # test_a: 3 = 3 GET to /first, /second, /users
+    # test_a: 2 = 2 GET to /first, /second
     # test_b: 2 = 1 GET + 1 POST to /second
     # test_c: 1 = 1 POST to /first
-    result.stdout.re_match_lines([r"Hypothesis calls: 6$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 5$"])
 
 
 def test_with_schema_filters(testdir):

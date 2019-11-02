@@ -104,7 +104,7 @@ def app_schema():
 
 @pytest.fixture()
 def testdir(testdir):
-    def maker(content, method=None, endpoint=None, pytest_plugins=("aiohttp.pytest_plugin",), **kwargs):
+    def maker(content, method=None, endpoint=None, tag=None, pytest_plugins=("aiohttp.pytest_plugin",), **kwargs):
         schema = make_schema(**kwargs)
         preparation = dedent(
             """
@@ -113,9 +113,9 @@ def testdir(testdir):
         from test.utils import *
         from hypothesis import settings
         raw_schema = {schema}
-        schema = schemathesis.from_dict(raw_schema, method={method}, endpoint={endpoint})
+        schema = schemathesis.from_dict(raw_schema, method={method}, endpoint={endpoint}, tag={tag})
         """.format(
-                schema=schema, method=repr(method), endpoint=repr(endpoint)
+                schema=schema, method=repr(method), endpoint=repr(endpoint), tag=repr(tag)
             )
         )
         testdir.makepyfile(preparation, content)
