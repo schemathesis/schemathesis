@@ -56,11 +56,13 @@ def execute_from_schema(
     hypothesis_options: Optional[Dict[str, Any]] = None,
     auth: Optional[Auth] = None,
     headers: Optional[Dict[str, Any]] = None,
+    request_timeout: Optional[int] = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Execute tests for the given schema.
 
     Provides the main testing loop and preparation step.
     """
+    # pylint: disable=too-many-locals
     results = TestResultSet()
 
     with get_session(auth, headers) as session:
@@ -76,7 +78,7 @@ def execute_from_schema(
                     status = Status.error
                     result.add_error(test)
                 else:
-                    test(session, base_url, checks, result)
+                    test(session, base_url, checks, result, request_timeout)
                     status = Status.success
             except AssertionError:
                 status = Status.failure
@@ -145,10 +147,17 @@ def prepare(  # pylint: disable=too-many-arguments
 
 
 def single_test(
-    case: Case, session: requests.Session, base_url: str, checks: Iterable[Callable], stats: TestResult
+    case: Case,
+    session: requests.Session,
+    base_url: str,
+    checks: Iterable[Callable],
+    stats: TestResult,
+    request_timeout: Optional[int],
 ) -> None:
     """A single test body that will be executed against the target."""
-    response = case.call(base_url=base_url, session=session)
+    # pylint: disable=too-many-arguments
+    timeout = prepare_timeout(request_timeout)
+    response = case.call(base_url=base_url, session=session, timeout=timeout)
     errors = None
 
     for check in checks:
@@ -164,3 +173,11 @@ def single_test(
         # An exception needed to trigger Hypothesis shrinking & flaky tests detection logic
         # The message doesn't matter
         raise AssertionError
+
+
+def prepare_timeout(timeout: Optional[int]) -> Optional[float]:
+    """Request timeout is in milliseconds, but `requests` uses seconds"""
+    output: Optional[Union[int, float]] = timeout
+    if timeout is not None:
+        output = timeout / 1000
+    return output
