@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- An option to configure request timeout for CLI / Runner. `#204`_
+
 Fixed
 ~~~~~
 
@@ -321,6 +326,7 @@ Fixed
 .. _#216: https://github.com/kiwicom/schemathesis/issues/216
 .. _#215: https://github.com/kiwicom/schemathesis/issues/215
 .. _#212: https://github.com/kiwicom/schemathesis/issues/212
+.. _#204: https://github.com/kiwicom/schemathesis/issues/204
 .. _#203: https://github.com/kiwicom/schemathesis/issues/203
 .. _#200: https://github.com/kiwicom/schemathesis/issues/200
 .. _#199: https://github.com/kiwicom/schemathesis/issues/199

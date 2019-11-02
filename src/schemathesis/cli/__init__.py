@@ -64,6 +64,7 @@ def main() -> None:
 @click.option("--method", "-M", "methods", type=str, multiple=True, help="Filter schemathesis test by HTTP method.")
 @click.option("--tag", "-T", "tags", type=str, multiple=True, help="Filter schemathesis test by schema tag pattern.")
 @click.option("--base-url", "-b", help="Base URL address of the API.", type=str)
+@click.option("--request-timeout", help="Timeout in milliseconds for network requests during the test run.", type=int)
 @click.option(
     "--hypothesis-deadline",
     help="Duration in milliseconds that each individual example with a test is not allowed to exceed.",
@@ -100,6 +101,7 @@ def run(  # pylint: disable=too-many-arguments
     methods: Optional[Filter] = None,
     tags: Optional[Filter] = None,
     base_url: Optional[str] = None,
+    request_timeout: Optional[int] = None,
     hypothesis_deadline: Optional[int] = None,
     hypothesis_derandomize: Optional[bool] = None,
     hypothesis_max_examples: Optional[int] = None,
@@ -119,7 +121,7 @@ def run(  # pylint: disable=too-many-arguments
         auth = HTTPDigestAuth(*auth)  # type: ignore
 
     options = dict_true_values(
-        api_options=dict_true_values(base_url=base_url, auth=auth, headers=headers),
+        api_options=dict_true_values(base_url=base_url, auth=auth, headers=headers, request_timeout=request_timeout),
         loader_options=dict_true_values(endpoint=endpoints, method=methods, tag=tags),
         hypothesis_options=dict_not_none_values(
             deadline=hypothesis_deadline,
