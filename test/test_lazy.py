@@ -44,6 +44,40 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 0$"])
 
 
+def test_invalid_endpoint(testdir):
+    # When the given schema is invalid
+    testdir.make_test(
+        """
+@pytest.fixture
+def simple_schema():
+    return schema
+
+lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+
+@lazy_schema.parametrize()
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+""",
+        paths={
+            "/valid": {"get": {"parameters": [{"type": "integer", "name": "id", "in": "query", "required": True}]}},
+            "/invalid": {"get": {"parameters": [{"type": "int", "name": "id", "in": "query", "required": True}]}},
+        },
+    )
+    result = testdir.runpytest("-v", "-s")
+    # Then one test should be marked as failed (passed - /users, failed /)
+    result.assert_outcomes(passed=1, failed=1)
+    result.stdout.re_match_lines(
+        [
+            "test_invalid_endpoint.py::test_[GET:/v1/valid] PASSED",
+            "test_invalid_endpoint.py::test_[GET:/v1/invalid] FAILED",
+            r"test_invalid_endpoint.py::test_ PASSED",
+            r".*1 passed",
+        ]
+    )
+    # 100 for /valid, 1 for /users
+    result.stdout.re_match_lines([r"Hypothesis calls: 101$"])
+
+
 def test_with_fixtures(testdir):
     # When the test uses custom arguments for pytest fixtures
     testdir.make_test(

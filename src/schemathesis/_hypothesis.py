@@ -10,17 +10,14 @@ from hypothesis_jsonschema import from_schema
 from requests.exceptions import InvalidHeader  # type: ignore
 from requests.utils import check_header_validity  # type: ignore
 
-from schemathesis.exceptions import InvalidEndpoint
-
 from ._compat import handle_warnings
+from .exceptions import InvalidSchema
 from .models import Case, Endpoint
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
 
 
-def create_test(
-    endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None, skip_invalid: bool = True
-) -> Callable:
+def create_test(endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None) -> Callable:
     """Create a Hypothesis test."""
     strategy = endpoint.as_strategy()
     wrapped_test = hypothesis.given(case=strategy)(test)
@@ -106,7 +103,7 @@ def is_valid_header(headers: Dict[str, str]) -> bool:
     return True
 
 
-def get_case_strategy(endpoint: Endpoint) -> Optional[st.SearchStrategy]:
+def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
     """Create a strategy for a complete test case.
 
     Path & endpoint are static, the others are JSON schemas.
@@ -122,7 +119,7 @@ def get_case_strategy(endpoint: Endpoint) -> Optional[st.SearchStrategy]:
         }
         return _get_case_strategy(endpoint, static_kwargs, strategies)
     except AssertionError:
-        raise InvalidEndpoint
+        raise InvalidSchema("Invalid schema for this endpoint")
 
 
 def _get_case_strategy(
