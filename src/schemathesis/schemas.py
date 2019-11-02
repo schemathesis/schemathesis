@@ -136,7 +136,7 @@ class SwaggerV20(BaseSchema):
         """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
         base_url = self.base_url
         if base_url is not None:
-            base_url = base_url.rstrip("/")
+            base_url = base_url.rstrip("/")  # pragma: no mutate
         endpoint = Endpoint(path=full_path, method=method.upper(), base_url=base_url)
         for parameter in parameters:
             self.process_parameter(endpoint, parameter)
