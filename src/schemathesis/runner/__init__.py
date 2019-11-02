@@ -14,6 +14,8 @@ from ..schemas import BaseSchema
 from ..utils import get_base_url
 from . import events
 
+DEFAULT_DEADLINE = 500  # pragma: no mutate
+
 Auth = Union[Tuple[str, str], AuthBase]  # pragma: no mutate
 
 
@@ -40,7 +42,7 @@ def get_session(
 
 def get_hypothesis_settings(hypothesis_options: Optional[Dict[str, Any]] = None) -> hypothesis.settings:
     # Default settings, used as a parent settings object below
-    settings = hypothesis.settings(deadline=500)
+    settings = hypothesis.settings(deadline=DEFAULT_DEADLINE)
     if hypothesis_options is not None:
         settings = hypothesis.settings(settings, **hypothesis_options)
     return settings
@@ -136,7 +138,7 @@ def single_test(
 ) -> None:
     """A single test body that will be executed against the target."""
     response = case.call(base_url=base_url, session=session)
-    errors = False
+    errors = None
 
     for check in checks:
         check_name = check.__name__
@@ -144,10 +146,10 @@ def single_test(
             check(response)
             stats.add_success(check_name)
         except AssertionError:
-            errors = True
+            errors = True  # pragma: no mutate
             stats.add_failure(check_name, case)
 
-    if errors:
+    if errors is not None:
         # An exception needed to trigger Hypothesis shrinking & flaky tests detection logic
         # The message doesn't matter
         raise AssertionError
