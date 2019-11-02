@@ -1,4 +1,4 @@
-from .utils import as_param, integer, string
+from .utils import integer, string
 
 
 def test_parametrization(testdir):
