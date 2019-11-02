@@ -10,6 +10,7 @@ Fixed
 ~~~~~
 
 - Compatibility with Hypothesis 4.42.4+ . `#212`_
+- Display flaky errors only in the "ERRORS" section and improve CLI output. `#215`_
 
 Changed
 ~~~~~~~
@@ -318,6 +319,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#216: https://github.com/kiwicom/schemathesis/issues/216
+.. _#215: https://github.com/kiwicom/schemathesis/issues/215
 .. _#212: https://github.com/kiwicom/schemathesis/issues/212
 .. _#203: https://github.com/kiwicom/schemathesis/issues/203
 .. _#200: https://github.com/kiwicom/schemathesis/issues/200

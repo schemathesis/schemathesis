@@ -30,12 +30,25 @@ async def unsatisfiable(request: web.Request) -> web.Response:
     return web.json_response({"result": "IMPOSSIBLE!"})
 
 
+SHOULD_FAIL = True
+
+
+async def flaky(request: web.Request) -> web.Response:
+    global SHOULD_FAIL
+    if SHOULD_FAIL:
+        SHOULD_FAIL = False
+        raise web.HTTPInternalServerError
+    SHOULD_FAIL = True
+    return web.json_response({"result": "flaky!"})
+
+
 class Endpoint(Enum):
     success = ("GET", "/api/success", success)
     failure = ("GET", "/api/failure", failure)
     slow = ("GET", "/api/slow", slow)
     unsatisfiable = ("POST", "/api/unsatisfiable", unsatisfiable)
     invalid = ("POST", "/api/invalid", unsatisfiable)
+    flaky = ("GET", "/api/flaky", flaky)
 
 
 def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Application:
