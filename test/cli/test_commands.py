@@ -209,6 +209,7 @@ def test_hypothesis_parameters(cli, schema_url):
 def test_cli_run_output_success(cli, schema_url):
     result = cli.run_inprocess(schema_url)
     assert result.exit_code == 0
+    assert "GET /api/success ." in result.stdout
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
 
@@ -258,10 +259,25 @@ def test_execute_missing_schema(cli, mocker, status_code, message):
 
 @pytest.mark.endpoints("success", "slow")
 def test_hypothesis_failed_event(cli, schema_url):
+    # When the Hypothesis deadline option is set manually and it is smaller than the response time
     result = cli.run_inprocess(schema_url, "--hypothesis-deadline=20")
+    # Then the whole Schemathesis run should fail
     assert result.exit_code == 1
-    assert "/slow E" in result.stdout
+    # And the given endpoint should be displayed as an error
+    assert "GET /api/slow E" in result.stdout
+    # And the proper error message from Hypothesis should be displayed
     assert "hypothesis.errors.DeadlineExceeded: Test took " in result.stdout
+    assert "which exceeds the deadline of 20.00ms" in result.stdout
+
+
+@pytest.mark.endpoints("success", "slow")
+def test_default_hypothesis_settings(cli, schema_url):
+    # When there is a slow endpoint and if it is faster than 500ms
+    result = cli.run_inprocess(schema_url)
+    # Then the tests should pass, because of default 500ms deadline
+    assert result.exit_code == 0
+    assert "GET /api/success ." in result.stdout
+    assert "GET /api/slow ." in result.stdout
 
 
 @pytest.mark.endpoints("unsatisfiable")
@@ -298,12 +314,18 @@ def test_invalid_endpoint(cli, schema_url):
 
 
 def test_connection_error(cli, schema_url):
+    # When the given base_url is unreachable
     result = cli.run_inprocess(schema_url, "--base-url=http://127.0.0.1:1/")
+    # Then the whole Schemathesis run should fail
     assert result.exit_code == 1
+    # And all collected endpoints should be marked as errored
     assert "GET /api/failure E" in result.stdout
     assert "GET /api/success E" in result.stdout
+    # And errors section title should be displayed
     assert "= ERRORS =" in result.stdout
+    # And all endpoints should be mentioned in this section as subsections
     assert "_ GET: /api/success _" in result.stdout
     assert "_ GET: /api/failure _" in result.stdout
+    # And the proper error messages should be displayed for each endpoint
     assert "Max retries exceeded with url: /api/success" in result.stdout
     assert "Max retries exceeded with url: /api/failure" in result.stdout
