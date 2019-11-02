@@ -1,7 +1,7 @@
 # pylint: disable=too-many-instance-attributes
 from collections import Counter
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
 
 import attr
@@ -155,14 +155,18 @@ class TestResultSet:
         return any(result.has_errors for result in self.results)
 
     @property
-    def total(self) -> Dict[str, Counter]:
-        output: Dict[str, Counter] = {}
+    def total(self) -> Dict[str, Dict[Union[str, Status], int]]:
+        """Aggregated statistic about test results."""
+        output: Dict[str, Dict[Union[str, Status], int]] = {}
         for item in self.results:
             for check in item.checks:
                 output.setdefault(check.name, Counter())
                 output[check.name][check.value] += 1
                 output[check.name]["total"] += 1
-        return output
+        # Avoid using Counter, since its behavior could harm in other places:
+        # `if not total["unknown"]:` - this will lead to the branch execution
+        # It is better to let it fail if there is a wrong key
+        return {key: dict(value) for key, value in output.items()}
 
     def append(self, item: TestResult) -> None:
         """Add a new item to the results list."""
