@@ -17,6 +17,7 @@ Changed
 - More readable falsifying examples output. `#127`_
 - Show exceptions in a separate section of the CLI output. `#203`_
 - Error message for cases when it is not possible to satisfy schema parameters. It should be more clear now. `#216`_
+- Do not stop on schema errors related to single endpoint. `#139`_
 
 `0.12.2`_ - 2019-10-30
 ----------------------
@@ -330,6 +331,7 @@ Fixed
 .. _#153: https://github.com/kiwicom/schemathesis/issues/153
 .. _#149: https://github.com/kiwicom/schemathesis/issues/149
 .. _#144: https://github.com/kiwicom/schemathesis/issues/144
+.. _#139: https://github.com/kiwicom/schemathesis/issues/139
 .. _#138: https://github.com/kiwicom/schemathesis/issues/138
 .. _#137: https://github.com/kiwicom/schemathesis/issues/137
 .. _#134: https://github.com/kiwicom/schemathesis/issues/134

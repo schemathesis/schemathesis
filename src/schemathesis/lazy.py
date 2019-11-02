@@ -1,11 +1,12 @@
 from inspect import signature
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Union
 
 import attr
+import pytest
 from _pytest.fixtures import FixtureRequest
 from pytest_subtests import SubTests
 
-from .exceptions import InvalidEndpoint
+from .exceptions import InvalidSchema
 from .models import Endpoint
 from .schemas import BaseSchema
 from .types import Filter
@@ -38,11 +39,9 @@ class LazySchema:
                 node_id = subtests.item._nodeid
                 settings = getattr(test, "_hypothesis_internal_use_settings", None)
                 for _endpoint, sub_test in schema.get_all_tests(func, settings):
-                    if sub_test:
-                        subtests.item._nodeid = _get_node_name(node_id, _endpoint)
-                        run_subtest(_endpoint, fixtures, sub_test, subtests)
-                    else:
-                        raise InvalidEndpoint
+                    actual_test = get_test(sub_test)
+                    subtests.item._nodeid = _get_node_name(node_id, _endpoint)
+                    run_subtest(_endpoint, fixtures, actual_test, subtests)
                 subtests.item._nodeid = node_id
 
             # Needed to prevent a failure when settings are applied to the test function
@@ -51,6 +50,18 @@ class LazySchema:
             return test
 
         return wrapper
+
+
+def get_test(test: Union[Callable, InvalidSchema]) -> Callable:
+    """For invalid schema exceptions construct a failing test function, return the original test otherwise."""
+    if isinstance(test, InvalidSchema):
+        message = test.args[0]
+
+        def actual_test(*args: Any, **kwargs: Any) -> None:
+            pytest.fail(message)
+
+        return actual_test
+    return test
 
 
 def _get_node_name(node_id: str, endpoint: Endpoint) -> str:

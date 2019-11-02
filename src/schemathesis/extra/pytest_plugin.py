@@ -6,9 +6,8 @@ from _pytest.config import hookimpl
 from _pytest.python import Function, PyCollector  # type: ignore
 from hypothesis.errors import InvalidArgument  # pylint: disable=ungrouped-imports
 
-from schemathesis.exceptions import InvalidEndpoint
-
 from .._hypothesis import create_test
+from ..exceptions import InvalidSchema
 from ..models import Endpoint
 from ..utils import is_schemathesis_test
 
@@ -40,7 +39,7 @@ class SchemathesisCase(PyCollector):
         """
         try:
             hypothesis_item = create_test(endpoint, self.test_function)
-        except InvalidEndpoint:
+        except InvalidSchema:
             hypothesis_item = lambda: pytest.fail("Invalid schema for endpoint")
         items = self.ihook.pytest_pycollect_makeitem(
             collector=self.parent, name=self._get_test_name(endpoint), obj=hypothesis_item

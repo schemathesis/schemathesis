@@ -7,7 +7,7 @@ import requests
 from requests.auth import AuthBase
 
 from ..constants import USER_AGENT
-from ..exceptions import InvalidEndpoint
+from ..exceptions import InvalidSchema
 from ..loaders import from_uri
 from ..models import Case, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
@@ -62,7 +62,6 @@ def execute_from_schema(
     results = TestResultSet()
 
     with get_session(auth, headers) as session:
-        exception: Exception
         settings = get_hypothesis_settings(hypothesis_options)
 
         yield events.Initialized(results=results, schema=schema, checks=checks, hypothesis_settings=settings)
@@ -71,20 +70,20 @@ def execute_from_schema(
             result = TestResult(path=endpoint.path, method=endpoint.method)
             yield events.BeforeExecution(results=results, schema=schema, endpoint=endpoint)
             try:
-                if test is not None:
+                if isinstance(test, InvalidSchema):
+                    status = Status.error
+                    result.add_error(test)
+                else:
                     test(session, base_url, checks, result)
                     status = Status.success
-                else:
-                    status = Status.error
-                    exception = InvalidEndpoint("Invalid schema for this endpoint")
-                    result.add_error(exception)
             except AssertionError:
                 status = Status.failure
             except hypothesis.errors.Unsatisfiable:
                 # We need more clear error message here
                 status = Status.error
-                exception = hypothesis.errors.Unsatisfiable("Unable to satisfy schema parameters for this endpoint")
-                result.add_error(exception)
+                result.add_error(
+                    hypothesis.errors.Unsatisfiable("Unable to satisfy schema parameters for this endpoint")
+                )
             except Exception as error:
                 status = Status.error
                 result.add_error(error)

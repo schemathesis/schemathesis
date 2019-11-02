@@ -294,7 +294,7 @@ def test_invalid_endpoint(cli, schema_url):
     assert "POST /api/invalid E" in result.stdout
     # And more clear error message is displayed instead of Hypothesis one
     lines = result.stdout.split("\n")
-    assert "schemathesis.exceptions.InvalidEndpoint: Invalid schema for this endpoint" in lines
+    assert "schemathesis.exceptions.InvalidSchema: Invalid schema for this endpoint" in lines
 
 
 def test_connection_error(cli, schema_url):
