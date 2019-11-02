@@ -203,7 +203,7 @@ def test_(request, case):
 
 
 def test_invalid_endpoint(testdir):
-    # When the given schema has logical errors
+    # When the given schema is invalid
     testdir.make_test(
         """
 @schema.parametrize()
