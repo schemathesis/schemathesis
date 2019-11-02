@@ -141,21 +141,17 @@ class TestResultSet:
 
     @property
     def is_empty(self) -> bool:
+        """If the result set contains no results."""
         return len(self.results) == 0
 
     @property
-    def _check_statuses(self) -> Generator[Status, None, None]:
-        return (check.value for result in self.results for check in result.checks)
-
-    def _has_check_with_status(self, status: Status) -> bool:
-        return any(check_status == status for check_status in self._check_statuses)
-
-    @property
     def has_failures(self) -> bool:
-        return self._has_check_with_status(Status.failure)
+        """If any result has any failures."""
+        return any(result.has_failures for result in self.results)
 
     @property
     def has_errors(self) -> bool:
+        """If any result has any errors."""
         return any(result.has_errors for result in self.results)
 
     @property
@@ -169,4 +165,5 @@ class TestResultSet:
         return output
 
     def append(self, item: TestResult) -> None:
+        """Add a new item to the results list."""
         self.results.append(item)
