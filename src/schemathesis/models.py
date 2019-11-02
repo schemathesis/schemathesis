@@ -46,9 +46,8 @@ class Case:
     def as_requests_kwargs(self, base_url: Optional[str] = None) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by requests."""
         base_url = self._get_base_url(base_url)
-        if not base_url.endswith("/"):
-            base_url += "/"
-        url = urljoin(base_url, self.formatted_path.lstrip("/"))
+        formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
+        url = urljoin(base_url + "/", formatted_path)
         return {"method": self.method, "url": url, "headers": self.headers, "params": self.query, "json": self.body}
 
     def call(
