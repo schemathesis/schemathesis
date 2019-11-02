@@ -5,6 +5,7 @@ import traceback
 from typing import Any, Dict, List, Union
 
 import click
+from attr import Attribute
 from hypothesis import settings
 from importlib_metadata import version
 
@@ -52,7 +53,8 @@ def handle_initialized(context: events.ExecutionContext, event: events.Initializ
         f"hypothesis profile '{settings._current_profile}' "  # type: ignore
         f"-> {settings.get_profile(settings._current_profile).show_changed()}"
     )
-    click.secho(f"collected endpoints: {event.schema.endpoints_count}\n", bold=True)
+    click.secho(f"collected endpoints: {event.schema.endpoints_count}", bold=True)
+    click.echo("\n")
 
 
 def handle_before_execution(context: events.ExecutionContext, event: events.BeforeExecution) -> None:
@@ -129,7 +131,7 @@ def display_single_error(result: TestResult) -> None:
     display_subsection(result)
     for error in result.errors:
         message = "".join(traceback.format_exception_only(type(error), error))
-        click.secho(message)
+        click.secho(message, fg="red")
 
 
 def display_failures(results: TestResultSet) -> None:
