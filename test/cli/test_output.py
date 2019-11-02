@@ -1,4 +1,5 @@
 import os
+import sys
 
 import click
 import hypothesis
@@ -226,9 +227,11 @@ def test_display_single_error(capsys):
     output.display_single_error(result)
     lines = capsys.readouterr().out.strip().split("\n")
     # Then it should be correctly formatted and displayed in red color
-    assert "\n".join(lines[1:6]) == click.style(
-        '  File "<string>", line 1\n    some invalid code\n               ^\nSyntaxError: invalid syntax\n', fg="red"
-    )
+    if sys.version_info <= (3, 8):
+        expected = '  File "<string>", line 1\n    some invalid code\n               ^\nSyntaxError: invalid syntax\n'
+    else:
+        expected = '  File "<string>", line 1\n    some invalid code\n         ^\nSyntaxError: invalid syntax\n'
+    assert "\n".join(lines[1:6]) == click.style(expected, fg="red")
 
 
 def test_display_failures(capsys, results_set):
