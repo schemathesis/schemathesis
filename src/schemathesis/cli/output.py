@@ -71,12 +71,9 @@ def handle_after_execution(context: events.ExecutionContext, event: events.After
 
 def display_execution_result(context: events.ExecutionContext, event: events.AfterExecution) -> None:
     """Display an appropriate symbol for the given event's execution result."""
-    if event.status == Status.failure:
-        symbol, color = "F", "red"
-    elif event.status == Status.error:
-        symbol, color = "E", "red"
-    else:
-        symbol, color = ".", "green"
+    symbol, color = {Status.success: (".", "green"), Status.failure: ("F", "red"), Status.error: ("E", "red")}[
+        event.status
+    ]
     context.current_line_length += len(symbol)
     click.secho(symbol, nl=False, fg=color)
 
