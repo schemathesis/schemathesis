@@ -175,6 +175,8 @@ def display_example(case: Case, check_name: Optional[str] = None) -> None:
     for key, value in output.items():
         if (key == "Body" and value is not None) or value not in (None, {}):
             click.secho(template.format(key, value), fg="red")
+    click.echo()
+    click.secho(f"Run this Python code to reproduce this failure: \n\n{case.get_code_to_reproduce()}", fg="red")
 
 
 def make_verbose_name(attribute: Attribute) -> str:
