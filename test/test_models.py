@@ -13,7 +13,7 @@ def test_path():
 @pytest.mark.parametrize("converter", (lambda x: x, lambda x: x + "/"))
 def test_as_requests_kwargs(override, server, base_url, converter):
     base_url = converter(base_url)
-    kwargs = {"method": "GET", "path": "/api/success"}
+    kwargs = {"method": "GET", "path": "/api/success", "cookies": {"TOKEN": "secret"}}
     if override:
         case = Case(**kwargs)
         data = case.as_requests_kwargs(base_url)
@@ -25,6 +25,7 @@ def test_as_requests_kwargs(override, server, base_url, converter):
         "json": None,
         "method": "GET",
         "params": {},
+        "cookies": {"TOKEN": "secret"},
         "url": f"http://127.0.0.1:{server['port']}/api/success",
     }
     response = requests.request(**data)
