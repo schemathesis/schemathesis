@@ -1,3 +1,4 @@
+# pylint: disable=too-many-instance-attributes
 """Schema objects provide a convenient interface to raw schemas.
 
 Their responsibilities:
@@ -28,6 +29,7 @@ from .utils import NOT_SET
 @attr.s()  # pragma: no mutate
 class BaseSchema(Mapping):
     raw_schema: Dict[str, Any] = attr.ib()  # pragma: no mutate
+    location: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     method: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     endpoint: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
@@ -41,6 +43,14 @@ class BaseSchema(Mapping):
 
     def __len__(self) -> int:
         return len(self.endpoints)
+
+    @property
+    def spec_version(self) -> str:
+        raise NotImplementedError
+
+    @property
+    def verbose_name(self) -> str:
+        raise NotImplementedError
 
     @property
     def endpoints(self) -> Dict[str, Dict[str, Endpoint]]:
@@ -100,6 +110,14 @@ class SwaggerV20(BaseSchema):
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
         return f"{self.__class__.__name__} for {info['title']} ({info['version']})"
+
+    @property
+    def spec_version(self) -> str:
+        return self.raw_schema["swagger"]
+
+    @property
+    def verbose_name(self) -> str:
+        return f"Swagger {self.spec_version}"
 
     @property
     def base_path(self) -> str:
@@ -237,6 +255,14 @@ class SwaggerV20(BaseSchema):
 
 
 class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
+    @property
+    def spec_version(self) -> str:
+        return self.raw_schema["openapi"]
+
+    @property
+    def verbose_name(self) -> str:
+        return f"Open API {self.spec_version}"
+
     def make_endpoint(
         self, full_path: str, method: str, parameters: Iterator[Dict[str, Any]], definition: Dict[str, Any]
     ) -> Endpoint:
