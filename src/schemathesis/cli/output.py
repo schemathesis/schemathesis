@@ -99,11 +99,11 @@ def handle_finished(context: events.ExecutionContext, event: events.Finished) ->
     display_failures(event.results)
     display_statistic(event.results)
     click.echo()
-    display_summary(event.results)
+    display_summary(event)
 
 
-def display_summary(results: TestResultSet) -> None:
-    message, color, status_code = get_summary_output(results)
+def display_summary(event: events.Finished) -> None:
+    message, color, status_code = get_summary_output(event)
     display_section_name(message, fg=color)
     raise click.exceptions.Exit(status_code)
 
@@ -122,15 +122,15 @@ def get_summary_message_parts(results: TestResultSet) -> List[str]:
     return parts
 
 
-def get_summary_output(results: TestResultSet) -> Tuple[str, str, int]:
-    parts = get_summary_message_parts(results)
+def get_summary_output(event: events.Finished) -> Tuple[str, str, int]:
+    parts = get_summary_message_parts(event.results)
     if not parts:
         message = "Empty test suite"
         color = "yellow"
         status_code = 0
     else:
-        message = ", ".join(parts)
-        if results.has_failures or results.has_errors:
+        message = f'{", ".join(parts)} in {event.running_time:.2f}s'
+        if event.results.has_failures or event.results.has_errors:
             color = "red"
             status_code = 1
         else:

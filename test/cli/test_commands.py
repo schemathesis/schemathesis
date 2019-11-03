@@ -216,7 +216,7 @@ def test_cli_run_output_success(cli, schema_url):
     assert " SUMMARY " in result.stdout
 
     lines = result.stdout.strip().split("\n")
-    assert "== 1 passed ==" in lines[-1]
+    assert "== 1 passed in " in lines[-1]
 
 
 def test_cli_run_output_with_errors(cli, schema_url):
@@ -227,7 +227,7 @@ def test_cli_run_output_with_errors(cli, schema_url):
 
     lines = result.stdout.strip().split("\n")
     assert "not_a_server_error            1 / 3 passed          FAILED " in lines
-    assert "== 1 passed, 1 failed ==" in lines[-1]
+    assert f"== 1 passed, 1 failed in " in lines[-1]
 
 
 @pytest.mark.endpoints()
