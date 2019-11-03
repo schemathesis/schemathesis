@@ -74,7 +74,7 @@ def test_handle_initialized(capsys, execution_context, results_set, swagger_20):
     # And number of collected endpoints
     assert click.style("collected endpoints: 1", bold=True) in lines
     # And the output has an empty line in the end
-    assert out.endswith("\n\n")
+    assert out.endswith("\n")
 
 
 def test_display_statistic(capsys):
