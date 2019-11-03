@@ -20,6 +20,7 @@ Fixed
 - Compatibility with Hypothesis 4.42.4+ . `#212`_
 - Display flaky errors only in the "ERRORS" section and improve CLI output. `#215`_
 - Handling ``formData`` parameters in ``Case.call``. `#196`_
+- Handling cookies in ``Case.call``. `#211`_
 
 Changed
 ~~~~~~~
@@ -332,6 +333,7 @@ Fixed
 .. _#215: https://github.com/kiwicom/schemathesis/issues/215
 .. _#214: https://github.com/kiwicom/schemathesis/issues/214
 .. _#212: https://github.com/kiwicom/schemathesis/issues/212
+.. _#211: https://github.com/kiwicom/schemathesis/issues/211
 .. _#209: https://github.com/kiwicom/schemathesis/issues/209
 .. _#206: https://github.com/kiwicom/schemathesis/issues/206
 .. _#204: https://github.com/kiwicom/schemathesis/issues/204
