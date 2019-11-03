@@ -149,12 +149,13 @@ def test_display_hypothesis_output(capsys):
 
 
 @pytest.mark.parametrize("body", ({}, {"foo": "bar"}, None))
-@pytest.mark.parametrize("base_url", (None, "http://example.com"))
-def test_display_single_failure(capsys, base_url, body):
+def test_display_single_failure(capsys, body):
     # Given a single test result with multiple successful & failed checks
     success = models.Check("not_a_server_error", models.Status.success)
     failure = models.Check(
-        "not_a_server_error", models.Status.failure, models.Case("/success", "GET", base_url=base_url, body=body)
+        "not_a_server_error",
+        models.Status.failure,
+        models.Case("/success", "GET", base_url="http://example.com", body=body),
     )
     test_statistic = models.TestResult(
         "/success",
@@ -237,7 +238,7 @@ def test_display_single_error(capsys):
 def test_display_failures(capsys, results_set):
     # Given two test results - success and failure
     failure = models.TestResult("/api/failure", "GET")
-    failure.add_failure("test", models.Case("/api/failure", "GET"))
+    failure.add_failure("test", models.Case("/api/failure", "GET", base_url="http://127.0.0.1:8080"))
     results_set.append(failure)
     # When the failures are displayed
     output.display_failures(results_set)
@@ -248,12 +249,17 @@ def test_display_failures(capsys, results_set):
     assert " GET: /api/failure " in out
     # And check name is displayed
     assert "Check           : test" in out
+    assert "Run this Python code to reproduce this failure: " in out
+    assert "requests.get('http://127.0.0.1:8080/api/failure')" in out
 
 
 def test_display_errors(capsys, results_set):
     # Given two test results - success and error
     error = models.TestResult("/api/error", "GET")
-    error.add_error(ConnectionError("Connection refused!"), models.Case("/api/error", "GET", query={"a": 1}))
+    error.add_error(
+        ConnectionError("Connection refused!"),
+        models.Case("/api/error", "GET", base_url="http://127.0.0.1:8080", query={"a": 1}),
+    )
     results_set.append(error)
     # When the errors are displayed
     output.display_errors(results_set)
