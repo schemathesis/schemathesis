@@ -3,8 +3,8 @@ from typing import Dict, Generator, Iterable, List, Optional, Tuple
 
 import click
 import hypothesis
+from requests import exceptions
 from requests.auth import HTTPDigestAuth
-from requests.exceptions import HTTPError
 
 from .. import runner, utils
 from ..runner import events
@@ -144,12 +144,17 @@ def abort_on_network_errors() -> Generator[None, None, None]:
     """Abort on network errors during the schema loading."""
     try:
         yield
-    except HTTPError as exc:
+    except exceptions.ConnectionError as exc:
+        click.secho(f"Failed to load schema from {exc.request.url}", fg="red")
+        message = utils.format_exception(exc)
+        click.secho(f"Error: {message}", fg="red")
+        raise click.Abort
+    except exceptions.HTTPError as exc:
         if exc.response.status_code == 404:
             click.secho(f"Schema was not found at {exc.request.url}", fg="red")
             raise click.Abort
         click.secho(
-            f"Failed to load schema, code {exc.response.status_code} was returned via {exc.request.url}", fg="red"
+            f"Failed to load schema, code {exc.response.status_code} was returned from {exc.request.url}", fg="red"
         )
         raise click.Abort
 
