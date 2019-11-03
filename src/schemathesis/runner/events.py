@@ -1,5 +1,6 @@
 import os
 import shutil
+import time
 from typing import Callable, Iterable, List
 
 import attr
@@ -31,6 +32,7 @@ class Initialized(ExecutionEvent):
 
     checks: Iterable[Callable] = attr.ib()  # pragma: no mutate
     hypothesis_settings: hypothesis.settings = attr.ib()  # pragma: no mutate
+    start_time: float = attr.ib(factory=time.time)
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -46,4 +48,4 @@ class AfterExecution(ExecutionEvent):
 
 @attr.s(slots=True)  # pragma: no mutate
 class Finished(ExecutionEvent):
-    pass
+    running_time: float = attr.ib()
