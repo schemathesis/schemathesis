@@ -246,7 +246,7 @@ def test_cli_run_output_empty(cli, schema_url):
     "status_code, message",
     (
         (404, f"Schema was not found at {SCHEMA_URI}"),
-        (500, f"Failed to load schema, code 500 was returned via {SCHEMA_URI}"),
+        (500, f"Failed to load schema, code 500 was returned from {SCHEMA_URI}"),
     ),
 )
 def test_execute_missing_schema(cli, mocker, status_code, message):
@@ -367,3 +367,18 @@ def test_connection_error(cli, schema_url):
     # And the proper error messages should be displayed for each endpoint
     assert "Max retries exceeded with url: /api/success" in result.stdout
     assert "Max retries exceeded with url: /api/failure" in result.stdout
+
+
+def test_schema_not_available(cli):
+    # When the given schema is unreachable
+    result = cli.run_inprocess("http://127.0.0.1:1/swagger.yaml")
+    # Then the whole Schemathesis run should fail
+    assert result.exit_code == 1
+    # And error message is displayed
+    lines = result.stdout.split("\n")
+    assert lines[0] == "Failed to load schema from http://127.0.0.1:1/swagger.yaml"
+    assert lines[1].startswith(
+        "Error: requests.exceptions.ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=1): "
+        "Max retries exceeded with url: /swagger.yaml"
+    )
+    assert lines[-2] == "Aborted!"

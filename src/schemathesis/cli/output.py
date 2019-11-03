@@ -1,7 +1,6 @@
 import os
 import platform
 import shutil
-import traceback
 from typing import Any, Dict, List, Optional, Union
 
 import click
@@ -9,6 +8,7 @@ from attr import Attribute
 from hypothesis import settings
 from importlib_metadata import version
 
+from .. import utils
 from ..constants import __version__
 from ..models import Case, Status, TestResult, TestResultSet
 from ..runner import events
@@ -130,7 +130,7 @@ def display_errors(results: TestResultSet) -> None:
 def display_single_error(result: TestResult) -> None:
     display_subsection(result)
     for error, example in result.errors:
-        message = "".join(traceback.format_exception_only(type(error), error))
+        message = utils.format_exception(error)
         click.secho(message, fg="red")
         if example is not None:
             display_example(example)

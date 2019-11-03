@@ -24,6 +24,7 @@ Changed
 - Show exceptions in a separate section of the CLI output. `#203`_
 - Error message for cases when it is not possible to satisfy schema parameters. It should be more clear now. `#216`_
 - Do not stop on schema errors related to single endpoint. `#139`_
+- Display a proper error message when schema is not available in CLI / Runner. `#214`_
 
 `0.12.2`_ - 2019-10-30
 ----------------------
@@ -325,6 +326,7 @@ Fixed
 
 .. _#216: https://github.com/kiwicom/schemathesis/issues/216
 .. _#215: https://github.com/kiwicom/schemathesis/issues/215
+.. _#214: https://github.com/kiwicom/schemathesis/issues/214
 .. _#212: https://github.com/kiwicom/schemathesis/issues/212
 .. _#204: https://github.com/kiwicom/schemathesis/issues/204
 .. _#203: https://github.com/kiwicom/schemathesis/issues/203
