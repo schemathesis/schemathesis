@@ -32,6 +32,25 @@ class Case:
         # pylint: disable=not-a-mapping
         return self.path.format(**self.path_parameters)
 
+    def get_code_to_reproduce(self) -> str:
+        """Construct a Python code to reproduce this case with `requests`."""
+        kwargs = self.as_requests_kwargs()
+        method = kwargs["method"].lower()
+
+        def are_defaults(key: str, value: Optional[Dict]) -> bool:
+            default_value: Optional[Dict] = {"json": None}.get(key, {})
+            return value == default_value
+
+        printed_kwargs = ", ".join(
+            f"{key}={value}"
+            for key, value in kwargs.items()
+            if key not in ("method", "url") and not are_defaults(key, value)
+        )
+        args_repr = f"'{kwargs['url']}'"
+        if printed_kwargs:
+            args_repr += f", {printed_kwargs}"
+        return f"requests.{method}({args_repr})"
+
     def _get_base_url(self, base_url: Optional[str]) -> str:
         if base_url is None:
             if self.base_url is not None:

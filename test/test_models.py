@@ -43,3 +43,24 @@ def test_call(override, base_url):
         response = case.call()
     assert response.status_code == 200
     assert response.json() == {"success": True}
+
+
+@pytest.mark.parametrize(
+    "case, expected",
+    (
+        (
+            Case(method="GET", path="/api/success", base_url="http://example.com", body={"test": 1}),
+            "requests.get('http://example.com/api/success', json={'test': 1})",
+        ),
+        (
+            Case(method="GET", path="/api/success", base_url="http://example.com"),
+            "requests.get('http://example.com/api/success')",
+        ),
+        (
+            Case(method="GET", path="/api/success", base_url="http://example.com", query={"a": 1}),
+            "requests.get('http://example.com/api/success', params={'a': 1})",
+        ),
+    ),
+)
+def test_get_code_to_reproduce(case, expected):
+    assert case.get_code_to_reproduce() == expected

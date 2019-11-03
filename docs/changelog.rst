@@ -10,6 +10,7 @@ Added
 ~~~~~
 
 - An option to configure request timeout for CLI / Runner. `#204`_
+- A help snippet to reproduce errors caught by Schemathesis. `#206`_
 
 Fixed
 ~~~~~
@@ -329,6 +330,7 @@ Fixed
 .. _#215: https://github.com/kiwicom/schemathesis/issues/215
 .. _#214: https://github.com/kiwicom/schemathesis/issues/214
 .. _#212: https://github.com/kiwicom/schemathesis/issues/212
+.. _#206: https://github.com/kiwicom/schemathesis/issues/206
 .. _#204: https://github.com/kiwicom/schemathesis/issues/204
 .. _#203: https://github.com/kiwicom/schemathesis/issues/203
 .. _#200: https://github.com/kiwicom/schemathesis/issues/200
