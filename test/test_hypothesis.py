@@ -23,7 +23,7 @@ def make_case(**kwargs: Any) -> Case:
     return _make(Case, **kwargs)
 
 
-@pytest.mark.parametrize("name", PARAMETERS)
+@pytest.mark.parametrize("name", sorted(PARAMETERS))
 def test_get_examples(name):
     example = {"name": "John"}
     endpoint = make_endpoint(
