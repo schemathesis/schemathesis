@@ -48,7 +48,13 @@ class Case:
         base_url = self._get_base_url(base_url)
         formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
         url = urljoin(base_url + "/", formatted_path)
-        return {"method": self.method, "url": url, "headers": self.headers, "params": self.query, "json": self.body}
+        # Form data and body are mutually exclusive
+        extra: Dict[str, Optional[Dict]]
+        if self.form_data:
+            extra = {"files": self.form_data}
+        else:
+            extra = {"json": self.body}
+        return {"method": self.method, "url": url, "headers": self.headers, "params": self.query, **extra}
 
     def call(
         self, base_url: Optional[str] = None, session: Optional["requests.Session"] = None, **kwargs: Any

@@ -12,43 +12,21 @@ from aiohttp import web
 
 from schemathesis.cli import CSVOption
 
-
-async def success(request: web.Request) -> web.Response:
-    return web.json_response({"success": True})
-
-
-async def failure(request: web.Request) -> web.Response:
-    raise web.HTTPInternalServerError
-
-
-async def slow(request: web.Request) -> web.Response:
-    await asyncio.sleep(0.25)
-    return web.json_response({"slow": True})
-
-
-async def unsatisfiable(request: web.Request) -> web.Response:
-    return web.json_response({"result": "IMPOSSIBLE!"})
-
-
-SHOULD_FAIL = True
-
-
-async def flaky(request: web.Request) -> web.Response:
-    global SHOULD_FAIL
-    if SHOULD_FAIL:
-        SHOULD_FAIL = False
-        raise web.HTTPInternalServerError
-    SHOULD_FAIL = True
-    return web.json_response({"result": "flaky!"})
+try:
+    from . import handlers
+except ImportError:
+    # Case if the app is started from the command line
+    import handlers
 
 
 class Endpoint(Enum):
-    success = ("GET", "/api/success", success)
-    failure = ("GET", "/api/failure", failure)
-    slow = ("GET", "/api/slow", slow)
-    unsatisfiable = ("POST", "/api/unsatisfiable", unsatisfiable)
-    invalid = ("POST", "/api/invalid", unsatisfiable)
-    flaky = ("GET", "/api/flaky", flaky)
+    success = ("GET", "/api/success", handlers.success)
+    failure = ("GET", "/api/failure", handlers.failure)
+    slow = ("GET", "/api/slow", handlers.slow)
+    unsatisfiable = ("POST", "/api/unsatisfiable", handlers.unsatisfiable)
+    invalid = ("POST", "/api/invalid", handlers.unsatisfiable)
+    flaky = ("GET", "/api/flaky", handlers.flaky)
+    multipart = ("POST", "/api/multipart", handlers.multipart)
 
 
 def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Application:
@@ -126,6 +104,13 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
             schema = {"parameters": [{"name": "id", "in": "query", "required": True, "type": "integer"}]}
         elif endpoint == "invalid":
             schema = {"parameters": [{"name": "id", "in": "query", "required": True, "type": "int"}]}
+        elif endpoint == "multipart":
+            schema = {
+                "parameters": [
+                    {"in": "formData", "name": "key", "required": True, "type": "string"},
+                    {"in": "formData", "name": "value", "required": True, "type": "integer"},
+                ]
+            }
         else:
             schema = {"produces": ["application/json"], "responses": {200: {"description": "OK"}}}
         template["paths"][f"/{endpoint}"] = {method: schema}
