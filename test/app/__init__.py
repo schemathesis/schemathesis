@@ -148,7 +148,7 @@ def run_app(port: int, endpoints: List[Endpoint]) -> None:
     if endpoints is not None:
         prepared_endpoints = tuple(endpoint.name for endpoint in endpoints)
     else:
-        prepared_endpoints = ("success", "failure")
+        prepared_endpoints = ()
     app = create_app(prepared_endpoints)
     web.run_app(app, port=port)
 

@@ -215,8 +215,8 @@ def test_cli_run_output_success(cli, schema_url):
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
 
-    lines = result.stdout.split("\n")
-    assert "Tests succeeded." in lines
+    lines = result.stdout.strip().split("\n")
+    assert "== 1 passed ==" in lines[-1]
 
 
 def test_cli_run_output_with_errors(cli, schema_url):
@@ -225,9 +225,9 @@ def test_cli_run_output_with_errors(cli, schema_url):
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
 
-    lines = result.stdout.split("\n")
+    lines = result.stdout.strip().split("\n")
     assert "not_a_server_error            1 / 3 passed          FAILED " in lines
-    assert "Tests failed." in lines
+    assert "== 1 passed, 1 failed ==" in lines[-1]
 
 
 @pytest.mark.endpoints()
@@ -237,9 +237,9 @@ def test_cli_run_output_empty(cli, schema_url):
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
 
-    lines = result.stdout.split("\n")
+    lines = result.stdout.strip().split("\n")
     assert "No checks were performed." in lines
-    assert "Tests succeeded." in lines
+    assert "= Empty test suite =" in lines[-1]
 
 
 @pytest.mark.parametrize(

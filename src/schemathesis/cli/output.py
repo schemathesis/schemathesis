@@ -1,7 +1,7 @@
 import os
 import platform
 import shutil
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import click
 from attr import Attribute
@@ -99,12 +99,44 @@ def handle_finished(context: events.ExecutionContext, event: events.Finished) ->
     display_failures(event.results)
     display_statistic(event.results)
     click.echo()
+    display_summary(event.results)
 
-    if event.results.has_failures or event.results.has_errors:
-        click.secho("Tests failed.", fg="red")
-        raise click.exceptions.Exit(1)
 
-    click.secho("Tests succeeded.", fg="green")
+def display_summary(results: TestResultSet) -> None:
+    message, color, status_code = get_summary_output(results)
+    display_section_name(message, fg=color)
+    raise click.exceptions.Exit(status_code)
+
+
+def get_summary_message_parts(results: TestResultSet) -> List[str]:
+    parts = []
+    passed = results.passed_count
+    if passed:
+        parts.append(f"{passed} passed")
+    failed = results.failed_count
+    if failed:
+        parts.append(f"{failed} failed")
+    errored = results.errored_count
+    if errored:
+        parts.append(f"{errored} errored")
+    return parts
+
+
+def get_summary_output(results: TestResultSet) -> Tuple[str, str, int]:
+    parts = get_summary_message_parts(results)
+    if not parts:
+        message = "Empty test suite"
+        color = "yellow"
+        status_code = 0
+    else:
+        message = ", ".join(parts)
+        if results.has_failures or results.has_errors:
+            color = "red"
+            status_code = 1
+        else:
+            color = "green"
+            status_code = 0
+    return message, color, status_code
 
 
 def display_hypothesis_output(hypothesis_output: List[str]) -> None:
