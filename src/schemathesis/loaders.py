@@ -1,3 +1,4 @@
+# pylint: disable=too-many-arguments
 from typing import IO, Any, Dict, Optional, Union
 
 import requests
@@ -19,7 +20,7 @@ def from_path(
 ) -> BaseSchema:
     """Load a file from OS path and parse to schema instance.."""
     with open(path) as fd:
-        return from_file(fd, base_url=base_url, method=method, endpoint=endpoint, tag=tag)
+        return from_file(fd, location=str(path), base_url=base_url, method=method, endpoint=endpoint, tag=tag)
 
 
 def from_uri(
@@ -36,11 +37,12 @@ def from_uri(
     response.raise_for_status()
     if base_url is None:
         base_url = get_base_url(uri)
-    return from_file(response.text, base_url=base_url, method=method, endpoint=endpoint, tag=tag)
+    return from_file(response.text, location=uri, base_url=base_url, method=method, endpoint=endpoint, tag=tag)
 
 
 def from_file(
     file: Union[IO[str], str],
+    location: Optional[str] = None,
     base_url: Optional[str] = None,
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
@@ -51,11 +53,12 @@ def from_file(
     `file` could be a file descriptor, string or bytes.
     """
     raw = yaml.safe_load(file)
-    return from_dict(raw, base_url=base_url, method=method, endpoint=endpoint, tag=tag)
+    return from_dict(raw, location=location, base_url=base_url, method=method, endpoint=endpoint, tag=tag)
 
 
 def from_dict(
     raw_schema: Dict[str, Any],
+    location: Optional[str] = None,
     base_url: Optional[str] = None,
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
@@ -63,10 +66,10 @@ def from_dict(
 ) -> BaseSchema:
     """Get a proper abstraction for the given raw schema."""
     if "swagger" in raw_schema:
-        return SwaggerV20(raw_schema, base_url=base_url, method=method, endpoint=endpoint, tag=tag)
+        return SwaggerV20(raw_schema, location=location, base_url=base_url, method=method, endpoint=endpoint, tag=tag)
 
     if "openapi" in raw_schema:
-        return OpenApi30(raw_schema, base_url=base_url, method=method, endpoint=endpoint, tag=tag)
+        return OpenApi30(raw_schema, location=location, base_url=base_url, method=method, endpoint=endpoint, tag=tag)
     raise ValueError("Unsupported schema type")
 
 

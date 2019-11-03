@@ -13,6 +13,7 @@ Added
 - A help snippet to reproduce errors caught by Schemathesis. `#206`_
 - Total running time to the CLI output. `#181`_
 - Summary line in the CLI output with the number of passed / failed / errored endpoint tests. `#209`_
+- Extra information to the CLI output: schema address, spec version and base url. `#188`_
 
 Fixed
 ~~~~~
@@ -344,6 +345,7 @@ Fixed
 .. _#194: https://github.com/kiwicom/schemathesis/issues/194
 .. _#191: https://github.com/kiwicom/schemathesis/issues/191
 .. _#189: https://github.com/kiwicom/schemathesis/issues/189
+.. _#188: https://github.com/kiwicom/schemathesis/issues/188
 .. _#181: https://github.com/kiwicom/schemathesis/issues/181
 .. _#173: https://github.com/kiwicom/schemathesis/issues/173
 .. _#172: https://github.com/kiwicom/schemathesis/issues/172

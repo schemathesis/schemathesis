@@ -53,8 +53,14 @@ def handle_initialized(context: events.ExecutionContext, event: events.Initializ
         f"hypothesis profile '{settings._current_profile}' "  # type: ignore
         f"-> {settings.get_profile(settings._current_profile).show_changed()}"
     )
+    if event.schema.location is not None:
+        click.echo(f"Schema location: {event.schema.location}")
+    if event.schema.base_url is not None:
+        click.echo(f"Base URL: {event.schema.base_url}")
+    click.echo(f"Specification version: {event.schema.verbose_name}")
     click.secho(f"collected endpoints: {event.schema.endpoints_count}", bold=True)
-    click.echo()
+    if event.schema.endpoints_count > 1:
+        click.echo()
 
 
 def handle_before_execution(context: events.ExecutionContext, event: events.BeforeExecution) -> None:
