@@ -11,6 +11,7 @@ Added
 
 - An option to configure request timeout for CLI / Runner. `#204`_
 - A help snippet to reproduce errors caught by Schemathesis. `#206`_
+- Summary line in the CLI output with the number of passed / failed / errored endpoint tests. `#209`_
 
 Fixed
 ~~~~~
@@ -330,6 +331,7 @@ Fixed
 .. _#215: https://github.com/kiwicom/schemathesis/issues/215
 .. _#214: https://github.com/kiwicom/schemathesis/issues/214
 .. _#212: https://github.com/kiwicom/schemathesis/issues/212
+.. _#209: https://github.com/kiwicom/schemathesis/issues/209
 .. _#206: https://github.com/kiwicom/schemathesis/issues/206
 .. _#204: https://github.com/kiwicom/schemathesis/issues/204
 .. _#203: https://github.com/kiwicom/schemathesis/issues/203

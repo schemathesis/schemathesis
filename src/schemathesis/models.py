@@ -1,7 +1,7 @@
 # pylint: disable=too-many-instance-attributes
 from collections import Counter
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 from urllib.parse import urljoin
 
 import attr
@@ -179,12 +179,27 @@ class TestResultSet:
     @property
     def has_failures(self) -> bool:
         """If any result has any failures."""
-        return any(result.has_failures for result in self.results)
+        return any(result.has_failures for result in self)
 
     @property
     def has_errors(self) -> bool:
         """If any result has any errors."""
-        return any(result.has_errors for result in self.results)
+        return any(result.has_errors for result in self)
+
+    def _count(self, predicate: Callable) -> int:
+        return sum(1 for result in self if predicate(result))
+
+    @property
+    def passed_count(self) -> int:
+        return self._count(lambda result: not result.has_errors and not result.has_failures)
+
+    @property
+    def failed_count(self) -> int:
+        return self._count(lambda result: result.has_failures and not result.is_errored)
+
+    @property
+    def errored_count(self) -> int:
+        return self._count(lambda result: result.has_errors or result.is_errored)
 
     @property
     def total(self) -> Dict[str, Dict[Union[str, Status], int]]:
