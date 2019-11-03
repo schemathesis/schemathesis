@@ -1,3 +1,4 @@
+import traceback
 import warnings
 from contextlib import contextmanager
 from functools import wraps
@@ -78,3 +79,7 @@ def capture_hypothesis_output() -> Generator[List[str], None, None]:
     # the following context manager is untyped
     with with_reporter(get_output):  # type: ignore
         yield output
+
+
+def format_exception(error: Exception) -> str:
+    return "".join(traceback.format_exception_only(type(error), error))
