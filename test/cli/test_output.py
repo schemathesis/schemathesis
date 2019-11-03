@@ -280,3 +280,16 @@ def test_display_errors(capsys, results_set):
 )
 def test_make_verbose_name(attribute, expected):
     assert output.make_verbose_name(attribute) == expected
+
+
+def test_display_summary(capsys, results_set, swagger_20):
+    # Given the Finished event
+    event = runner.events.Finished(results=results_set, schema=swagger_20, running_time=1.257)
+    # When `display_summary` is called
+    with pytest.raises(click.exceptions.Exit):
+        output.display_summary(event)
+    out = capsys.readouterr().out.strip()
+    # Then number of total tests & total running time should be displayed
+    assert "=== 1 passed in 1.26s ===" in out
+    # And it should be in green & bold style
+    assert click.style(click.unstyle(out), fg="green", bold=True) == out

@@ -1,3 +1,4 @@
+import time
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, Iterable, Optional, Tuple, Union
 
@@ -68,7 +69,8 @@ def execute_from_schema(
     with get_session(auth, headers) as session:
         settings = get_hypothesis_settings(hypothesis_options)
 
-        yield events.Initialized(results=results, schema=schema, checks=checks, hypothesis_settings=settings)
+        initialized = events.Initialized(results=results, schema=schema, checks=checks, hypothesis_settings=settings)
+        yield initialized
 
         for endpoint, test in schema.get_all_tests(single_test, settings):
             result = TestResult(path=endpoint.path, method=endpoint.method)
@@ -105,7 +107,7 @@ def execute_from_schema(
             results.append(result)
             yield events.AfterExecution(results=results, schema=schema, endpoint=endpoint, status=status)
 
-    yield events.Finished(results=results, schema=schema)
+    yield events.Finished(results=results, schema=schema, running_time=time.time() - initialized.start_time)
 
 
 def execute(  # pylint: disable=too-many-arguments
