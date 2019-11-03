@@ -54,7 +54,7 @@ def handle_initialized(context: events.ExecutionContext, event: events.Initializ
         f"-> {settings.get_profile(settings._current_profile).show_changed()}"
     )
     click.secho(f"collected endpoints: {event.schema.endpoints_count}", bold=True)
-    click.echo("\n")
+    click.echo()
 
 
 def handle_before_execution(context: events.ExecutionContext, event: events.BeforeExecution) -> None:
