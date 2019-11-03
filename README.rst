@@ -339,6 +339,21 @@ Then you could use CLI against this server:
     Tests succeeded.
 
 
+Running tests
+~~~~~~~~~~~~~
+
+You could run tests via ``tox``:
+
+.. code:: bash
+
+    tox -p all -o
+
+or ``pytest`` in your current environment:
+
+.. code:: bash
+
+    pytest test/ -n auto
+
 Contributing
 ------------
 
