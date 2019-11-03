@@ -317,7 +317,8 @@ def test_unsatisfiable(cli, schema_url):
 @pytest.mark.endpoints("flaky")
 def test_flaky(cli, schema_url):
     # When the endpoint fails / succeeds randomly
-    result = cli.run_inprocess(schema_url)
+    # Derandomize is needed for reproducible test results
+    result = cli.run_inprocess(schema_url, "--hypothesis-derandomize")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == 1
     # And standard Hypothesis error should not appear in the output
@@ -333,6 +334,8 @@ def test_flaky(cli, schema_url):
     lines = result.stdout.split("\n")
     assert "hypothesis.errors.Flaky: Tests on this endpoint produce unreliable results: " in lines
     assert "Falsified on the first call but did not on a subsequent one" in lines
+    # And example is displayed
+    assert "Query           : {'id': 0}" in lines
 
 
 @pytest.mark.endpoints("invalid")
