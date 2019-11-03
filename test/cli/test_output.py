@@ -253,7 +253,7 @@ def test_display_failures(capsys, results_set):
 def test_display_errors(capsys, results_set):
     # Given two test results - success and error
     error = models.TestResult("/api/error", "GET")
-    error.add_error(ConnectionError("Connection refused!"))
+    error.add_error(ConnectionError("Connection refused!"), models.Case("/api/error", "GET", query={"a": 1}))
     results_set.append(error)
     # When the errors are displayed
     output.display_errors(results_set)
@@ -264,6 +264,8 @@ def test_display_errors(capsys, results_set):
     assert " GET: /api/error " in out
     # And the error itself is displayed
     assert "ConnectionError: Connection refused!" in out
+    # And the example is displayed
+    assert "Query           : {'a': 1}" in out
 
 
 @pytest.mark.parametrize(

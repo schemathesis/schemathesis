@@ -122,6 +122,8 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
                     }
                 ]
             }
+        elif endpoint == "flaky":
+            schema = {"parameters": [{"name": "id", "in": "query", "required": True, "type": "integer"}]}
         elif endpoint == "invalid":
             schema = {"parameters": [{"name": "id", "in": "query", "required": True, "type": "int"}]}
         else:

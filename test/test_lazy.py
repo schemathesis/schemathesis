@@ -63,14 +63,17 @@ def test_(request, case):
             "/invalid": {"get": {"parameters": [{"type": "int", "name": "id", "in": "query", "required": True}]}},
         },
     )
-    result = testdir.runpytest("-v", "-s")
+    result = testdir.runpytest("-v", "-rf")
     # Then one test should be marked as failed (passed - /users, failed /)
     result.assert_outcomes(passed=1, failed=1)
     result.stdout.re_match_lines(
         [
-            "test_invalid_endpoint.py::test_[GET:/v1/valid] PASSED",
-            "test_invalid_endpoint.py::test_[GET:/v1/invalid] FAILED",
-            r"test_invalid_endpoint.py::test_ PASSED",
+            # Percentage is weird, due to subtest behavior
+            r"test_invalid_endpoint.py::test_[GET:/v1/valid] PASSED                    [100%]",
+            r"test_invalid_endpoint.py::test_[GET:/v1/invalid] FAILED                  [200%]",
+            r"test_invalid_endpoint.py::test_[GET:/v1/users] PASSED                    [300%]",
+            r"E       Failed: Invalid schema for this endpoint",
+            r"FAILED test_invalid_endpoint.py::test_[GET:/v1/invalid] - Failed: Invalid sch...",
             r".*1 passed",
         ]
     )
