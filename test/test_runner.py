@@ -123,6 +123,28 @@ def test_hypothesis_deadline(schema_url, app):
     execute(schema_url, hypothesis_options={"deadline": 500})
 
 
+@pytest.mark.endpoints("multipart")
+def test_form_data(schema_url, app):
+    def is_ok(response):
+        assert response.status_code == 200
+
+    def check_content(response):
+        data = response.json()
+        assert isinstance(data["key"], str)
+        assert data["value"].lstrip("-").isdigit()
+
+    # When endpoint specifies parameters with `in=formData`
+    # Then responses should have 200 status, and not 415 (unsupported media type)
+    results = execute(schema_url, checks=(is_ok, check_content), hypothesis_options={"max_examples": 3})
+    # And there should be no errors or failures
+    assert not results.has_errors
+    assert not results.has_failures
+    # And the application should receive 3 requests as specified in `max_examples`
+    assert len(app["incoming_requests"]) == 3
+    # And the Content-Type of incoming requests should be `multipart/form-data`
+    assert app["incoming_requests"][0].headers["Content-Type"].startswith("multipart/form-data")
+
+
 @pytest.mark.parametrize(
     "options", ({"api_options": {"base_url": "http://127.0.0.1:1/"}}, {"hypothesis_options": {"deadline": 1}})
 )
