@@ -230,6 +230,18 @@ def test_cli_run_output_with_errors(cli, schema_url):
     assert f"== 1 passed, 1 failed in " in lines[-1]
 
 
+@pytest.mark.endpoints("failure")
+def test_cli_run_only_failure(cli, schema_url):
+    result = cli.run_inprocess(schema_url)
+    assert result.exit_code == 1
+    assert " HYPOTHESIS OUTPUT " not in result.stdout
+    assert " SUMMARY " in result.stdout
+
+    lines = result.stdout.strip().split("\n")
+    assert "not_a_server_error            0 / 2 passed          FAILED " in lines
+    assert "== 1 failed in " in lines[-1]
+
+
 @pytest.mark.endpoints()
 def test_cli_run_output_empty(cli, schema_url):
     result = cli.run_inprocess(schema_url)
