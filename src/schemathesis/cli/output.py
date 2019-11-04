@@ -59,7 +59,7 @@ def handle_initialized(context: events.ExecutionContext, event: events.Initializ
         click.echo(f"Base URL: {event.schema.base_url}")
     click.echo(f"Specification version: {event.schema.verbose_name}")
     click.secho(f"collected endpoints: {event.schema.endpoints_count}", bold=True)
-    if event.schema.endpoints_count > 1:
+    if event.schema.endpoints_count >= 1:
         click.echo()
 
 
