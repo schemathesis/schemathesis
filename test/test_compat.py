@@ -2,6 +2,7 @@ import sys
 import warnings
 
 import hypothesis
+import pytest
 from hypothesis.errors import NonInteractiveExampleWarning
 
 from schemathesis._compat import handle_warnings
@@ -22,8 +23,9 @@ def test_handle_warnings_old_hypothesis(monkeypatch, recwarn):
     assert recwarn
 
 
-def test_get_original_test_old_hypothesis(monkeypatch):
-    monkeypatch.setattr(hypothesis, "__version_info__", (4, 40, 0))
+@pytest.mark.parametrize("version", ((4, 40, 0), (4, 42, 3)))
+def test_get_original_test_old_hypothesis(monkeypatch, version):
+    monkeypatch.setattr(hypothesis, "__version_info__", version)
 
     def original_test():
         pass
@@ -38,4 +40,15 @@ def test_get_original_test_old_hypothesis(monkeypatch):
     # Then original test should be returned from the function
     assert get_original_test(wrapped) is original_test
     # And it should be no-op for not-wrapped tests
+    assert get_original_test(original_test) is original_test
+
+
+@pytest.mark.parametrize("version", ((4, 42, 4), (4, 43, 1)))
+def test_get_original_test_new_hypothesis(monkeypatch, version):
+    monkeypatch.setattr(hypothesis, "__version_info__", version)
+
+    def original_test():
+        pass
+
+    original_test._hypothesis_internal_settings_applied = True
     assert get_original_test(original_test) is original_test

@@ -44,11 +44,11 @@ class BaseSchema(Mapping):
     def __len__(self) -> int:
         return len(self.endpoints)
 
-    @property
+    @property  # pragma: no mutate
     def spec_version(self) -> str:
         raise NotImplementedError
 
-    @property
+    @property  # pragma: no mutate
     def verbose_name(self) -> str:
         raise NotImplementedError
 
