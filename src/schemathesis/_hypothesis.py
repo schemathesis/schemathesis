@@ -147,3 +147,7 @@ def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
     from hypothesis_jsonschema._impl import STRING_FORMATS  # pylint: disable=import-outside-toplevel
 
     STRING_FORMATS[name] = strategy
+
+
+def init_default_strategies() -> None:
+    register_string_format("binary", st.binary())
