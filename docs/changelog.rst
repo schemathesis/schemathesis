@@ -11,6 +11,11 @@ Added
 
 - Support for binary format `#197`_
 
+Fixed
+~~~~~
+
+- Error that happens when there are no success checks in the statistic in CLI. `#237`_
+
 `0.13.0`_ - 2019-11-03
 ----------------------
 
@@ -339,6 +344,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#237: https://github.com/kiwicom/schemathesis/issues/237
 .. _#216: https://github.com/kiwicom/schemathesis/issues/216
 .. _#215: https://github.com/kiwicom/schemathesis/issues/215
 .. _#214: https://github.com/kiwicom/schemathesis/issues/214

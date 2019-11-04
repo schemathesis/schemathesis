@@ -249,11 +249,11 @@ def display_check_result(check_name: str, results: Dict[Union[str, Status], int]
     else:
         verdict = "PASSED"
         color = "green"
+    success = results.get(Status.success, 0)
+    total = results.get("total", 0)
     click.echo(
         template.format(
-            click.style(check_name, bold=True),
-            f"{results[Status.success]} / {results['total']} passed",
-            click.style(verdict, fg=color, bold=True),
+            click.style(check_name, bold=True), f"{success} / {total} passed", click.style(verdict, fg=color, bold=True)
         )
     )
 
