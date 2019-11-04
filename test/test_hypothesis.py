@@ -64,6 +64,30 @@ def test_custom_strategies():
     assert int(result.query["id"]) % 2 == 0
 
 
+def test_register_default_strategies():
+    # If schemathesis is imported
+    import schemathesis
+
+    # Default strategies should be registered
+    from hypothesis_jsonschema._impl import STRING_FORMATS
+
+    assert "binary" in STRING_FORMATS
+
+
+@pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
+def test_default_strategies():
+    endpoint = make_endpoint(
+        form_data={
+            "required": ["file"],
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"file": {"type": "string", "format": "binary"}},
+        }
+    )
+    result = get_case_strategy(endpoint).example()
+    assert isinstance(result.form_data["file"], bytes)
+
+
 @pytest.mark.parametrize(
     "values, error",
     (
