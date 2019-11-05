@@ -77,7 +77,8 @@ def capture_hypothesis_output() -> Generator[List[str], None, None]:
                 "Falsifying example: ",
                 "You can add @seed",
                 "Failed to reproduce exception. Expected:",
-                "Flaky example! Hypothesis",
+                "Flaky example!",
+                "Inconsistent test results!",
             )
         ):
             return

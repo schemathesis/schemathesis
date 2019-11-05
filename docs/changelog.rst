@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- ``IndexError`` when Hypothesis found inconsistent test results during the test execution in runner. `#236`_
+
 `0.13.1`_ - 2019-11-05
 ----------------------
 
@@ -349,6 +354,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#237: https://github.com/kiwicom/schemathesis/issues/237
+.. _#236: https://github.com/kiwicom/schemathesis/issues/236
 .. _#216: https://github.com/kiwicom/schemathesis/issues/216
 .. _#215: https://github.com/kiwicom/schemathesis/issues/215
 .. _#214: https://github.com/kiwicom/schemathesis/issues/214
