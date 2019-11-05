@@ -154,6 +154,26 @@ def test_exceptions(schema_url, app, options):
     assert any([event.status == Status.error for event in results if isinstance(event, events.AfterExecution)])
 
 
+@pytest.mark.endpoints("multipart")
+def test_flaky_exceptions(schema_url, mocker):
+    # GH: #236
+    error_idx = 0
+
+    def flaky(*args, **kwargs):
+        nonlocal error_idx
+        exception_class = [ValueError, TypeError, ZeroDivisionError, KeyError][error_idx % 4]
+        error_idx += 1
+        raise exception_class
+
+    # When there are many different exceptions during the test
+    # And Hypothesis consider this test as a flaky one
+    mocker.patch("schemathesis.Case.call", side_effect=flaky)
+    results = execute(schema_url, hypothesis_options={"max_examples": 3, "derandomize": True})
+    # Then the execution result should indicate errors
+    assert results.has_errors
+    assert results.results[0].errors[0][0].args[0].startswith("Tests on this endpoint produce unreliable results:")
+
+
 @pytest.mark.parametrize(
     "url, base_url",
     (

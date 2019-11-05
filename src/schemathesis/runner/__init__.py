@@ -87,7 +87,11 @@ def execute_from_schema(
             except hypothesis.errors.Flaky:
                 status = Status.error
                 result.mark_errored()
-                flaky_example = result.checks[-1].example
+                # Sometimes Hypothesis detects inconsistent test results and checks are not available
+                if result.checks:
+                    flaky_example = result.checks[-1].example
+                else:
+                    flaky_example = None
                 result.add_error(
                     hypothesis.errors.Flaky(
                         "Tests on this endpoint produce unreliable results: \n"
