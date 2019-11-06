@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- CLI: Support file paths in `schema` argument `#119`_
+
 `0.13.2`_ - 2019-11-05
 ----------------------
 
@@ -392,6 +397,7 @@ Fixed
 .. _#126: https://github.com/kiwicom/schemathesis/issues/126
 .. _#125: https://github.com/kiwicom/schemathesis/issues/125
 .. _#121: https://github.com/kiwicom/schemathesis/issues/121
+.. _#119: https://github.com/kiwicom/schemathesis/issues/119
 .. _#118: https://github.com/kiwicom/schemathesis/issues/118
 .. _#109: https://github.com/kiwicom/schemathesis/issues/109
 .. _#107: https://github.com/kiwicom/schemathesis/issues/107

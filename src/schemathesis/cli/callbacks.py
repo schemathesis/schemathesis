@@ -1,3 +1,4 @@
+import pathlib
 from contextlib import contextmanager
 from typing import Dict, Generator, Optional, Tuple
 from urllib.parse import urlparse
@@ -8,7 +9,10 @@ import hypothesis
 
 def validate_schema(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
     if not urlparse(raw_value).netloc:
-        raise click.UsageError("Invalid SCHEMA, must be a valid URL.")
+        if "\x00" in raw_value or not pathlib.Path(raw_value).is_file():
+            raise click.UsageError("Invalid SCHEMA, must be a valid URL or file path.")
+        if "base_url" not in ctx.params:
+            raise click.UsageError('Missing argument, "--base-url" is required for SCHEMA specified by file.')
     return raw_value
 
 
