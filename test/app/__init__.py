@@ -27,6 +27,8 @@ class Endpoint(Enum):
     invalid = ("POST", "/api/invalid", handlers.unsatisfiable)
     flaky = ("GET", "/api/flaky", handlers.flaky)
     multipart = ("POST", "/api/multipart", handlers.multipart)
+    teapot = ("POST", "/api/teapot", handlers.teapot)
+    text = ("GET", "/api/text", handlers.text)
 
 
 def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Application:
@@ -84,6 +86,7 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
         "host": "127.0.0.1:8888",
         "basePath": "/api",
         "schemes": ["http"],
+        "produces": ["application/json"],
         "paths": {},
     }
     for endpoint in endpoints:
@@ -111,8 +114,10 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
                     {"in": "formData", "name": "value", "required": True, "type": "integer"},
                 ]
             }
-        else:
+        elif endpoint == "teapot":
             schema = {"produces": ["application/json"], "responses": {200: {"description": "OK"}}}
+        else:
+            schema = {"responses": {200: {"description": "OK"}, "default": {"description": "Default response"}}}
         template["paths"][f"/{endpoint}"] = {method: schema}
     return template
 
