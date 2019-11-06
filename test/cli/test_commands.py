@@ -1,3 +1,5 @@
+from test.utils import SIMPLE_PATH
+
 import pytest
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
@@ -5,6 +7,7 @@ from requests import Request, Response
 from requests.auth import HTTPDigestAuth
 from requests.exceptions import HTTPError
 
+from schemathesis.loaders import from_path
 from schemathesis.runner import DEFAULT_CHECKS
 
 
@@ -31,7 +34,8 @@ def test_commands_version(cli):
     "args, error",
     (
         (("run",), 'Error: Missing argument "SCHEMA".'),
-        (("run", "not-url"), "Error: Invalid SCHEMA, must be a valid URL."),
+        (("run", "not-url"), "Error: Invalid SCHEMA, must be a valid URL or file path."),
+        (("run", SIMPLE_PATH), 'Error: Missing argument, "--base-url" is required for SCHEMA specified by file.'),
         (
             ("run", "http://127.0.0.1", "--auth=123"),
             'Error: Invalid value for "--auth" / "-a": Should be in KEY:VALUE format. Got: 123',
@@ -77,7 +81,7 @@ def test_commands_run_help(cli):
         "",
         "  Perform schemathesis test against an API specified by SCHEMA.",
         "",
-        "  SCHEMA must be a valid URL pointing to an Open API / Swagger",
+        "  SCHEMA must be a valid URL or file path pointing to an Open API / Swagger",
         "  specification.",
         "",
         "Options:",
@@ -95,7 +99,8 @@ def test_commands_run_help(cli):
         "  -M, --method TEXT               Filter schemathesis test by HTTP method.",
         "  -T, --tag TEXT                  Filter schemathesis test by schema tag",
         "                                  pattern.",
-        "  -b, --base-url TEXT             Base URL address of the API.",
+        "  -b, --base-url TEXT             Base URL address of the API, required for",
+        "                                  SCHEMA if specified by file.",
         "  --request-timeout INTEGER       Timeout in milliseconds for network requests",
         "                                  during the test run.",
         "  --hypothesis-deadline INTEGER   Duration in milliseconds that each",
@@ -127,6 +132,10 @@ SCHEMA_URI = "https://example.com/swagger.json"
     "args, expected",
     (
         ([SCHEMA_URI], {"checks": DEFAULT_CHECKS}),
+        (
+            [SIMPLE_PATH, "--base-url=http://127.0.0.1"],
+            {"checks": DEFAULT_CHECKS, "api_options": {"base_url": "http://127.0.0.1"}, "loader": from_path},
+        ),
         ([SCHEMA_URI, "--auth=test:test"], {"checks": DEFAULT_CHECKS, "api_options": {"auth": ("test", "test")}}),
         (
             [SCHEMA_URI, "--auth=test:test", "--auth-type=digest"],
@@ -186,7 +195,7 @@ def test_execute_arguments(cli, mocker, args, expected):
     result = cli.run_inprocess(*args)
 
     assert result.exit_code == 0
-    m_execute.assert_called_once_with(SCHEMA_URI, **expected)
+    m_execute.assert_called_once_with(args[0], **expected)
 
 
 @pytest.mark.endpoints()
