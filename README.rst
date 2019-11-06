@@ -56,7 +56,7 @@ The ``schemathesis`` command can be used to perform Schemathesis test cases:
 
     schemathesis run https://example.com/api/swagger.json
 
-.. image:: https://github.com/kiwicom/schemathesis/blob/readme/img/schemathesis.gif
+.. image:: https://github.com/kiwicom/schemathesis/blob/master/img/schemathesis.gif
 
 If your application requires authorization then you can use ``--auth`` option for Basic Auth and ``--header`` to specify
 custom headers to be sent with each request.
