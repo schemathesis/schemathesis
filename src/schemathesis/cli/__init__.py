@@ -1,3 +1,4 @@
+import pathlib
 from contextlib import contextmanager
 from typing import Dict, Generator, Iterable, List, Optional, Tuple
 
@@ -7,6 +8,7 @@ from requests import exceptions
 from requests.auth import HTTPDigestAuth
 
 from .. import runner, utils
+from ..loaders import from_path
 from ..runner import events
 from ..types import Filter
 from ..utils import dict_not_none_values, dict_true_values
@@ -63,7 +65,9 @@ def main() -> None:
 )
 @click.option("--method", "-M", "methods", type=str, multiple=True, help="Filter schemathesis test by HTTP method.")
 @click.option("--tag", "-T", "tags", type=str, multiple=True, help="Filter schemathesis test by schema tag pattern.")
-@click.option("--base-url", "-b", help="Base URL address of the API.", type=str)
+@click.option(
+    "--base-url", "-b", help="Base URL address of the API, required for SCHEMA if specified by file. ", type=str
+)
 @click.option("--request-timeout", help="Timeout in milliseconds for network requests during the test run.", type=int)
 @click.option(
     "--hypothesis-deadline",
@@ -112,7 +116,7 @@ def run(  # pylint: disable=too-many-arguments
 ) -> None:
     """Perform schemathesis test against an API specified by SCHEMA.
 
-    SCHEMA must be a valid URL pointing to an Open API / Swagger specification.
+    SCHEMA must be a valid URL or file path pointing to an Open API / Swagger specification.
     """
     # pylint: disable=too-many-locals
     selected_checks = tuple(check for check in runner.DEFAULT_CHECKS if check.__name__ in checks)
@@ -135,7 +139,10 @@ def run(  # pylint: disable=too-many-arguments
     )
 
     with abort_on_network_errors():
-        prepared_runner = runner.prepare(schema, checks=selected_checks, **options)
+        if pathlib.Path(schema).is_file():
+            prepared_runner = runner.prepare(schema, checks=selected_checks, loader=from_path, **options)
+        else:
+            prepared_runner = runner.prepare(schema, checks=selected_checks, **options)
     execute(prepared_runner)
 
 
