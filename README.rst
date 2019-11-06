@@ -40,6 +40,44 @@ Gitter: https://gitter.im/kiwicom/schemathesis
 Usage
 -----
 
+There are two basic ways to use Schemathesis:
+
+- `Command Line Interface <https://github.com/kiwicom/schemathesis#cli>`_
+- `Writing tests in Python <https://github.com/kiwicom/schemathesis#in-code>`_
+
+CLI is pretty simple to use and requires no coding, in-code approach gives more flexibility.
+
+Command Line Interface
+~~~~~~~~~~~~~~~~~~~~~~
+
+The ``schemathesis`` command can be used to perform Schemathesis test cases:
+
+.. code:: bash
+
+    schemathesis run https://example.com/api/swagger.json
+
+.. image:: https://github.com/kiwicom/schemathesis/blob/readme/img/schemathesis.gif
+
+If your application requires authorization then you can use ``--auth`` option for Basic Auth and ``--header`` to specify
+custom headers to be sent with each request.
+
+To filter your tests by endpoint name, HTTP method or Open API tags you could use ``-E``, ``-M``, ``-T`` options respectively.
+
+CLI supports passing options to ``hypothesis.settings``. All of them are prefixed with ``--hypothesis-``:
+
+.. code:: bash
+
+    schemathesis run --hypothesis-max-examples=1000 https://example.com/api/swagger.json
+
+For the full list of options, run:
+
+.. code:: bash
+
+    schemathesis --help
+
+In-code
+~~~~~~~
+
 To examine your application with Schemathesis you need to:
 
 - Setup & run your application, so it is accessible via the network;
@@ -136,30 +174,6 @@ To narrow down the scope of the schemathesis tests it is possible to filter by m
         ...
 
 The acceptable values are regexps or list of regexps (matched with ``re.search``).
-
-CLI
-~~~
-
-The ``schemathesis`` command can be used to perform Schemathesis test cases:
-
-.. code:: bash
-
-    schemathesis run https://example.com/api/swagger.json
-
-If your application requires authorization then you can use ``--auth`` option for Basic Auth and ``--header`` to specify
-custom headers to be sent with each request.
-
-CLI supports passing options to ``hypothesis.settings``. All of them are prefixed with ``--hypothesis-``:
-
-.. code:: bash
-
-    schemathesis run --hypothesis-max-examples=1000 https://example.com/api/swagger.json
-
-For the full list of options, run:
-
-.. code:: bash
-
-    schemathesis --help
 
 Explicit examples
 ~~~~~~~~~~~~~~~~~
