@@ -10,6 +10,7 @@ from hypothesis.searchstrategy import SearchStrategy
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 
 if TYPE_CHECKING:
+    from .schemas import BaseSchema
     import requests  # Typechecking-only import to speedup import of schemathesis
 
 
@@ -107,6 +108,7 @@ class Endpoint:
 
     path: str = attr.ib()  # pragma: no mutate
     method: str = attr.ib()  # pragma: no mutate
+    definition: Dict[str, Any] = attr.ib()  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     path_parameters: PathParameters = attr.ib(factory=empty_object)  # pragma: no mutate
     headers: Headers = attr.ib(factory=empty_object)  # pragma: no mutate
@@ -142,8 +144,8 @@ class Check:
 class TestResult:
     """Result of a single test."""
 
-    path: str = attr.ib()  # pragma: no mutate
-    method: str = attr.ib()  # pragma: no mutate
+    endpoint: Endpoint = attr.ib()  # pragma: no mutate
+    schema: "BaseSchema" = attr.ib()  # pragma: no mutate
     checks: List[Check] = attr.ib(factory=list)  # pragma: no mutate
     errors: List[Tuple[Exception, Optional[Case]]] = attr.ib(factory=list)  # pragma: no mutate
     is_errored: bool = attr.ib(default=False)  # pragma: no mutate

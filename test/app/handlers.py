@@ -7,6 +7,14 @@ async def success(request: web.Request) -> web.Response:
     return web.json_response({"success": True})
 
 
+async def teapot(request: web.Request) -> web.Response:
+    return web.json_response({"success": True}, status=418)
+
+
+async def text(request: web.Request) -> web.Response:
+    return web.Response(body="Text response", content_type="text/plain")
+
+
 async def failure(request: web.Request) -> web.Response:
     raise web.HTTPInternalServerError
 

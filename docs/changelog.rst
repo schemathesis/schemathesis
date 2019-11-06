@@ -9,7 +9,8 @@ Changelog
 Added
 ~~~~~
 
-- CLI: Support file paths in `schema` argument `#119`_
+- CLI: Support file paths in ``schema`` argument. `#119`_
+- Check to verify response status & content type in CLI / Runner. `#101`_
 
 `0.13.2`_ - 2019-11-05
 ----------------------
@@ -402,6 +403,7 @@ Fixed
 .. _#109: https://github.com/kiwicom/schemathesis/issues/109
 .. _#107: https://github.com/kiwicom/schemathesis/issues/107
 .. _#106: https://github.com/kiwicom/schemathesis/issues/106
+.. _#101: https://github.com/kiwicom/schemathesis/issues/101
 .. _#99: https://github.com/kiwicom/schemathesis/issues/99
 .. _#98: https://github.com/kiwicom/schemathesis/issues/98
 .. _#94: https://github.com/kiwicom/schemathesis/issues/94

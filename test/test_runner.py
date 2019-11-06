@@ -6,7 +6,14 @@ from aiohttp.streams import EmptyStreamReader
 
 from schemathesis.constants import __version__
 from schemathesis.models import Status
-from schemathesis.runner import events, execute, get_base_url, prepare
+from schemathesis.runner import (
+    content_type_conformance,
+    events,
+    execute,
+    get_base_url,
+    prepare,
+    status_code_conformance,
+)
 
 
 def assert_request(
@@ -125,10 +132,10 @@ def test_hypothesis_deadline(schema_url, app):
 
 @pytest.mark.endpoints("multipart")
 def test_form_data(schema_url, app):
-    def is_ok(response):
+    def is_ok(response, result):
         assert response.status_code == 200
 
-    def check_content(response):
+    def check_content(response, result):
         data = response.json()
         assert isinstance(data["key"], str)
         assert data["value"].lstrip("-").isdigit()
@@ -143,6 +150,51 @@ def test_form_data(schema_url, app):
     assert len(app["incoming_requests"]) == 3
     # And the Content-Type of incoming requests should be `multipart/form-data`
     assert app["incoming_requests"][0].headers["Content-Type"].startswith("multipart/form-data")
+
+
+@pytest.mark.endpoints("teapot")
+def test_unknown_response_code(schema_url, app):
+    # When endpoint returns a status code, that is not listed in "responses"
+    # And "status_code_conformance" is specified
+    results = execute(schema_url, checks=(status_code_conformance,), hypothesis_options={"max_examples": 1})
+    # Then there should be a failure
+    assert results.has_failures
+    check = results.results[0].checks[0]
+    assert check.name == "status_code_conformance"
+    assert check.value == Status.failure
+
+
+@pytest.mark.endpoints("success")
+def test_unknown_response_code_with_default(schema_url, app):
+    # When endpoint returns a status code, that is not listed in "responses", but there is a "default" response
+    # And "status_code_conformance" is specified
+    results = execute(schema_url, checks=(status_code_conformance,), hypothesis_options={"max_examples": 1})
+    # Then there should be no failure
+    assert not results.has_failures
+    check = results.results[0].checks[0]
+    assert check.name == "status_code_conformance"
+    assert check.value == Status.success
+
+
+@pytest.mark.endpoints("text")
+def test_unknown_content_type(schema_url, app):
+    # When endpoint returns a response with content type, not specified in "produces"
+    # And "content_type_conformance" is specified
+    results = execute(schema_url, checks=(content_type_conformance,), hypothesis_options={"max_examples": 1})
+    # Then there should be a failure
+    assert results.has_failures
+    check = results.results[0].checks[0]
+    assert check.name == "content_type_conformance"
+    assert check.value == Status.failure
+
+
+@pytest.mark.endpoints("success")
+def test_known_content_type(schema_url, app):
+    # When endpoint returns a response with a proper content type
+    # And "content_type_conformance" is specified
+    results = execute(schema_url, checks=(content_type_conformance,), hypothesis_options={"max_examples": 1})
+    # Then there should be no a failures
+    assert not results.has_failures
 
 
 @pytest.mark.parametrize(
