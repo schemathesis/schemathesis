@@ -15,7 +15,7 @@ def _make(cls: Type[T], **kwargs: Any) -> T:
 
 
 def make_endpoint(**kwargs: Any) -> Endpoint:
-    return _make(Endpoint, **kwargs)
+    return _make(Endpoint, definition={}, **kwargs)
 
 
 def make_case(**kwargs: Any) -> Case:
@@ -44,6 +44,7 @@ def test_no_body_in_get():
     endpoint = Endpoint(
         path="/api/success",
         method="GET",
+        definition={},
         query={
             "required": ["name"],
             "type": "object",
@@ -120,6 +121,7 @@ def test_valid_headers(base_url):
     endpoint = Endpoint(
         "/api/success",
         "GET",
+        definition={},
         base_url=base_url,
         headers={
             "properties": {"api_key": {"name": "api_key", "in": "header", "type": "string"}},

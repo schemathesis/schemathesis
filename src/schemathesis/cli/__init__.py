@@ -18,6 +18,7 @@ from .options import CSVOption
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 DEFAULT_CHECKS_NAMES = tuple(check.__name__ for check in runner.DEFAULT_CHECKS)
+ALL_CHECKS_NAMES = tuple(check.__name__ for check in runner.ALL_CHECKS)
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -33,7 +34,7 @@ def main() -> None:
     "-c",
     multiple=True,
     help="List of checks to run.",
-    type=click.Choice(DEFAULT_CHECKS_NAMES),
+    type=click.Choice(ALL_CHECKS_NAMES),
     default=DEFAULT_CHECKS_NAMES,
 )
 @click.option(
@@ -119,7 +120,7 @@ def run(  # pylint: disable=too-many-arguments
     SCHEMA must be a valid URL or file path pointing to an Open API / Swagger specification.
     """
     # pylint: disable=too-many-locals
-    selected_checks = tuple(check for check in runner.DEFAULT_CHECKS if check.__name__ in checks)
+    selected_checks = tuple(check for check in runner.ALL_CHECKS if check.__name__ in checks)
 
     if auth and auth_type == "digest":
         auth = HTTPDigestAuth(*auth)  # type: ignore

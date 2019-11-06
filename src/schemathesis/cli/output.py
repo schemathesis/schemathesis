@@ -26,7 +26,7 @@ def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> Non
 
 
 def display_subsection(result: TestResult) -> None:
-    section_name = f"{result.method}: {result.path}"
+    section_name = f"{result.endpoint.method}: {result.endpoint.path}"
     display_section_name(section_name, "_", fg="red")
 
 

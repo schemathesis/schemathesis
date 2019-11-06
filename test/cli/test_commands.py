@@ -85,7 +85,7 @@ def test_commands_run_help(cli):
         "  specification.",
         "",
         "Options:",
-        "  -c, --checks [not_a_server_error]",
+        "  -c, --checks [not_a_server_error|status_code_conformance|content_type_conformance]",
         "                                  List of checks to run.",
         "  -a, --auth TEXT                 Server user and password. Example:",
         "                                  USER:PASSWORD",
@@ -373,6 +373,18 @@ def test_invalid_endpoint(cli, schema_url):
     # And more clear error message is displayed instead of Hypothesis one
     lines = result.stdout.split("\n")
     assert "schemathesis.exceptions.InvalidSchema: Invalid schema for this endpoint" in lines
+
+
+@pytest.mark.endpoints("teapot")
+def test_status_code_conformance(cli, schema_url):
+    # When endpoint returns a status code, that is not listed in "responses"
+    # And "status_code_conformance" is specified
+    result = cli.run_inprocess(schema_url, "-c", "status_code_conformance")
+    # Then the whole Schemathesis run should fail
+    assert result.exit_code == 1
+    # And this endpoint should be marked as failed in the progress line
+    assert "POST /api/teapot F" in result.stdout
+    assert "status_code_conformance            0 / 2 passed          FAILED" in result.stdout
 
 
 def test_connection_error(cli, schema_url):

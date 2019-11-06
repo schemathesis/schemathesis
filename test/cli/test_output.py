@@ -23,15 +23,19 @@ def execution_context():
     return runner.events.ExecutionContext([])
 
 
+@pytest.fixture
+def endpoint():
+    return models.Endpoint("/success", "GET", definition={})
+
+
 @pytest.fixture()
-def results_set():
-    statistic = models.TestResult("/success", "GET")
+def results_set(endpoint, swagger_20):
+    statistic = models.TestResult(endpoint, swagger_20)
     return models.TestResultSet([statistic])
 
 
 @pytest.fixture()
-def after_execution(results_set, swagger_20):
-    endpoint = models.Endpoint("/success", "GET")
+def after_execution(results_set, endpoint, swagger_20):
     return runner.events.AfterExecution(
         results=results_set, schema=swagger_20, endpoint=endpoint, status=models.Status.success
     )
@@ -77,13 +81,13 @@ def test_handle_initialized(capsys, execution_context, results_set, swagger_20):
     assert out.endswith("\n\n")
 
 
-def test_display_statistic(capsys):
+def test_display_statistic(capsys, swagger_20, endpoint):
     # Given multiple successful & failed checks in a single test
     success = models.Check("not_a_server_error", models.Status.success)
     failure = models.Check("not_a_server_error", models.Status.failure)
     single_test_statistic = models.TestResult(
-        "/success",
-        "GET",
+        endpoint,
+        swagger_20,
         [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
     )
     results = models.TestResultSet([single_test_statistic])
@@ -149,7 +153,7 @@ def test_display_hypothesis_output(capsys):
 
 
 @pytest.mark.parametrize("body", ({}, {"foo": "bar"}, None))
-def test_display_single_failure(capsys, body):
+def test_display_single_failure(capsys, swagger_20, endpoint, body):
     # Given a single test result with multiple successful & failed checks
     success = models.Check("not_a_server_error", models.Status.success)
     failure = models.Check(
@@ -158,8 +162,8 @@ def test_display_single_failure(capsys, body):
         models.Case("/success", "GET", base_url="http://example.com", body=body),
     )
     test_statistic = models.TestResult(
-        "/success",
-        "GET",
+        endpoint,
+        swagger_20,
         [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
     )
     # When this failure is displayed
@@ -214,7 +218,7 @@ def test_after_execution_attributes(execution_context, after_execution):
     assert execution_context.current_line_length == 2
 
 
-def test_display_single_error(capsys):
+def test_display_single_error(capsys, swagger_20, endpoint):
     # Given exception is multiline
     exception = None
     try:
@@ -222,7 +226,7 @@ def test_display_single_error(capsys):
     except SyntaxError as exc:
         exception = exc
 
-    result = models.TestResult("/success", "GET")
+    result = models.TestResult(endpoint, swagger_20)
     result.add_error(exception)
     # When the related test result is displayed
     output.display_single_error(result)
@@ -235,9 +239,9 @@ def test_display_single_error(capsys):
     assert "\n".join(lines[1:6]) == click.style(expected, fg="red")
 
 
-def test_display_failures(capsys, results_set):
+def test_display_failures(swagger_20, capsys, results_set):
     # Given two test results - success and failure
-    failure = models.TestResult("/api/failure", "GET")
+    failure = models.TestResult(models.Endpoint("/api/failure", "GET", {}), swagger_20)
     failure.add_failure("test", models.Case("/api/failure", "GET", base_url="http://127.0.0.1:8080"))
     results_set.append(failure)
     # When the failures are displayed
@@ -253,9 +257,9 @@ def test_display_failures(capsys, results_set):
     assert "requests.get('http://127.0.0.1:8080/api/failure')" in out
 
 
-def test_display_errors(capsys, results_set):
+def test_display_errors(swagger_20, capsys, results_set):
     # Given two test results - success and error
-    error = models.TestResult("/api/error", "GET")
+    error = models.TestResult(models.Endpoint("/api/error", "GET", {}), swagger_20)
     error.add_error(
         ConnectionError("Connection refused!"),
         models.Case("/api/error", "GET", base_url="http://127.0.0.1:8080", query={"a": 1}),

@@ -12,7 +12,7 @@ from ..exceptions import InvalidSchema
 from ..loaders import from_uri
 from ..models import Case, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
-from ..utils import get_base_url
+from ..utils import are_content_types_equal, get_base_url
 from . import events
 
 DEFAULT_DEADLINE = 500  # pragma: no mutate
@@ -20,12 +20,36 @@ DEFAULT_DEADLINE = 500  # pragma: no mutate
 Auth = Union[Tuple[str, str], AuthBase]  # pragma: no mutate
 
 
-def not_a_server_error(response: requests.Response) -> None:
+def not_a_server_error(response: requests.Response, result: TestResult) -> None:
     """A check to verify that the response is not a server-side error."""
     assert response.status_code < 500
 
 
+def status_code_conformance(response: requests.Response, result: TestResult) -> None:
+    responses = result.endpoint.definition.get("responses", {})
+    # "default" can be used as the default response object for all HTTP codes that are not covered individually
+    if "default" in responses:
+        return
+    assert response.status_code in map(int, responses)
+
+
+def content_type_conformance(response: requests.Response, result: TestResult) -> None:
+    global_produces = result.schema.raw_schema.get("produces", None)
+    if global_produces:
+        produces = global_produces
+    else:
+        produces = result.endpoint.definition.get("produces", None)
+    if not produces:
+        return
+    for option in produces:
+        if are_content_types_equal(option, response.headers["Content-Type"]):
+            return
+    raise AssertionError("Content type is not listed in 'produces' field")
+
+
 DEFAULT_CHECKS = (not_a_server_error,)
+OPTIONAL_CHECKS = (status_code_conformance, content_type_conformance)
+ALL_CHECKS = DEFAULT_CHECKS + OPTIONAL_CHECKS
 
 
 @contextmanager
@@ -73,7 +97,7 @@ def execute_from_schema(
         yield initialized
 
         for endpoint, test in schema.get_all_tests(single_test, settings):
-            result = TestResult(path=endpoint.path, method=endpoint.method)
+            result = TestResult(endpoint=endpoint, schema=schema)
             yield events.BeforeExecution(results=results, schema=schema, endpoint=endpoint)
             try:
                 if isinstance(test, InvalidSchema):
@@ -157,7 +181,7 @@ def single_test(
     session: requests.Session,
     base_url: str,
     checks: Iterable[Callable],
-    stats: TestResult,
+    result: TestResult,
     request_timeout: Optional[int],
 ) -> None:
     """A single test body that will be executed against the target."""
@@ -169,11 +193,11 @@ def single_test(
     for check in checks:
         check_name = check.__name__
         try:
-            check(response)
-            stats.add_success(check_name, case)
+            check(response, result)
+            result.add_success(check_name, case)
         except AssertionError:
             errors = True  # pragma: no mutate
-            stats.add_failure(check_name, case)
+            result.add_failure(check_name, case)
 
     if errors is not None:
         # An exception needed to trigger Hypothesis shrinking & flaky tests detection logic

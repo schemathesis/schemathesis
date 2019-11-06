@@ -1,3 +1,4 @@
+import cgi
 import traceback
 import warnings
 from contextlib import contextmanager
@@ -91,3 +92,15 @@ def capture_hypothesis_output() -> Generator[List[str], None, None]:
 
 def format_exception(error: Exception) -> str:
     return "".join(traceback.format_exception_only(type(error), error))
+
+
+def parse_content_type(content_type: str) -> Tuple[str, str]:
+    """Parse Content Type and return main type and subtype."""
+    content_type, _ = cgi.parse_header(content_type)
+    main_type, sub_type = content_type.split("/", 1)
+    return main_type.lower(), sub_type.lower()
+
+
+def are_content_types_equal(source: str, target: str) -> bool:
+    """Check if two content types are the same excluding options."""
+    return parse_content_type(source) == parse_content_type(target)
