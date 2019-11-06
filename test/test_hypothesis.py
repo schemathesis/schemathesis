@@ -40,6 +40,21 @@ def test_get_examples(name):
     assert list(get_examples(endpoint)) == [make_case(**{name: example})]
 
 
+def test_no_body_in_get():
+    endpoint = Endpoint(
+        path="/api/success",
+        method="GET",
+        query={
+            "required": ["name"],
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"name": {"type": "string"}},
+            "example": {"name": "John"},
+        },
+    )
+    assert list(get_examples(endpoint))[0].body is None
+
+
 def test_warning():
     example = {"name": "John"}
     endpoint = make_endpoint(**{"query": {"example": example}})
