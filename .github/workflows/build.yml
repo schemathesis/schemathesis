@@ -88,13 +88,10 @@ jobs:
     name: py38
     runs-on: ubuntu-latest
     steps:
-    - run: sudo add-apt-repository ppa:deadsnakes/ppa
-    - run: sudo apt-get update
-    - run: sudo apt-get install -y --no-install-recommends python3.8-dev python3.8-distutils
     - uses: actions/checkout@master
     - uses: actions/setup-python@v1
       with:
-        python-version: '3.7'
+        python-version: '3.8'
     - run: pip install tox coverage
     - run: tox -e py38
     - run: coverage combine
