@@ -42,7 +42,7 @@ Usage
 
 There are two basic ways to use Schemathesis:
 
-- `Command Line Interface <https://github.com/kiwicom/schemathesis#cli>`_
+- `Command Line Interface <https://github.com/kiwicom/schemathesis#command-line-interface>`_
 - `Writing tests in Python <https://github.com/kiwicom/schemathesis#in-code>`_
 
 CLI is pretty simple to use and requires no coding, in-code approach gives more flexibility.
