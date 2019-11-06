@@ -391,5 +391,5 @@ will be licensed under its MIT license.
 .. _poetry: https://github.com/sdispater/poetry
 .. _installation guide: https://github.com/sdispater/poetry#installation
 .. _here: https://hypothesis.readthedocs.io/en/latest/reproducing.html#providing-explicit-examples
-.. _CONTRIBUTING.rst: https://github.com/kiwicom/schemathesis/blob/contributing/CONTRIBUTING.rst
+.. _CONTRIBUTING.rst: https://github.com/kiwicom/schemathesis/blob/master/CONTRIBUTING.rst
 .. _MIT license: https://opensource.org/licenses/MIT
