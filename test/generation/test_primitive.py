@@ -51,6 +51,7 @@ def test_(case):
         string(name="key5", minLength=3, maxLength=6, pattern="ab{2}", required=True),
         string(name="key6", format="date", required=True),
         string(name="key7", format="date-time", required=True),
+        string(name="key8", type="file", required=True),
     ),
 )
 def test_string(testdir, parameter):
@@ -64,6 +65,7 @@ validator = {{
     "key5": lambda x: len(x) in (3, 4, 5, 6) and "abb" in x,
     "key6": assert_date,
     "key7": assert_datetime,
+    "key8": assert_bytes,
 }}["{name}"]
 @schema.parametrize()
 @settings(max_examples=3)
