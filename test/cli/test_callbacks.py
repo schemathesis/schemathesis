@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import click
 import pytest
 from hypothesis import example, given
@@ -5,11 +7,18 @@ from hypothesis import strategies as st
 
 from schemathesis.cli import callbacks
 
+from ..utils import SIMPLE_PATH
+
 
 @given(value=st.text().filter(lambda x: "//" not in x))
 def test_validate_schema(value):
     with pytest.raises(click.UsageError):
         callbacks.validate_schema(None, None, value)
+
+
+def test_validate_schema_path_without_base_url():
+    with pytest.raises(click.UsageError):
+        callbacks.validate_schema(SimpleNamespace(params={}), None, SIMPLE_PATH)
 
 
 @given(value=st.text())
