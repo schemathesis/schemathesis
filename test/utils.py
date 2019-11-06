@@ -84,6 +84,10 @@ def assert_str(value: Any, predicate: Callable = noop) -> None:
     _assert_value(value, str, predicate)
 
 
+def assert_bytes(value: Any, predicate: Callable = noop) -> None:
+    _assert_value(value, bytes, predicate)
+
+
 def assert_list(value: Any, predicate: Callable = noop) -> None:
     _assert_value(value, list, predicate)
 
