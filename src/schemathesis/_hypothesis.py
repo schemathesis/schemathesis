@@ -12,7 +12,7 @@ from requests.utils import check_header_validity  # type: ignore
 
 from ._compat import handle_warnings
 from .exceptions import InvalidSchema
-from .models import Case, Endpoint
+from .models import Case, Endpoint, empty_object
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
 
@@ -132,6 +132,8 @@ def _get_case_strategy(
         **extra_static_parameters,
     }
     if endpoint.method == "GET":
+        if endpoint.body != empty_object():
+            raise InvalidSchema("Body parameters are defined for GET request.")
         static_parameters["body"] = None
         strategies.pop("body", None)
     elif "body" not in static_parameters:
