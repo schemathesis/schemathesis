@@ -36,28 +36,28 @@ def test_common_parameters_with_references(testdir):
         """
 def impl(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
-    assert case.method in ["GET", "POST"]
+    assert case.path == "/v1/foo"
+    assert case.method in ["PUT", "POST"]
     if case.method == "POST":
         assert_int(case.body)
     assert_int(case.query["not_common_id"])
 
-@schema.parametrize()
+@schema.parametrize(endpoint="/foo")
 @settings(max_examples=1)
 def test_a(request, case):
     impl(request, case)
 
-@schema.parametrize()
+@schema.parametrize(endpoint="/foo")
 @settings(max_examples=1)
 def test_b(request, case):
     impl(request, case)
 """,
         paths={
-            "/users": {
+            "/foo": {
                 "parameters": [
                     {"schema": {"$ref": "#/definitions/SimpleIntRef"}, "in": "body", "name": "id", "required": True}
                 ],
-                "get": {"parameters": [integer(name="not_common_id", required=True)]},
+                "put": {"parameters": [integer(name="not_common_id", required=True)]},
                 "post": {"parameters": [integer(name="not_common_id", required=True)]},
             }
         },

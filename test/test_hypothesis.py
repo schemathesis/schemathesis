@@ -5,6 +5,7 @@ from hypothesis import given, strategies
 
 from schemathesis import Case, register_string_format
 from schemathesis._hypothesis import PARAMETERS, get_case_strategy, get_examples
+from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Endpoint
 
 T = TypeVar("T", bound=Union[Endpoint, Case])
@@ -54,6 +55,17 @@ def test_no_body_in_get():
         },
     )
     assert list(get_examples(endpoint))[0].body is None
+
+
+def test_invalid_body_in_get():
+    endpoint = Endpoint(
+        path="/foo",
+        method="GET",
+        definition={},
+        body={"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
+    )
+    with pytest.raises(InvalidSchema):
+        get_case_strategy(endpoint)
 
 
 def test_warning():

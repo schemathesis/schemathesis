@@ -12,6 +12,11 @@ Added
 - CLI: Support file paths in ``schema`` argument. `#119`_
 - Check to verify response status & content type in CLI / Runner. `#101`_
 
+Changed
+~~~~~~~
+
+- Raise an error if schema has body for GET requests `#218`_
+
 `0.13.2`_ - 2019-11-05
 ----------------------
 
@@ -365,6 +370,7 @@ Fixed
 
 .. _#237: https://github.com/kiwicom/schemathesis/issues/237
 .. _#236: https://github.com/kiwicom/schemathesis/issues/236
+.. _#218: https://github.com/kiwicom/schemathesis/issues/218
 .. _#216: https://github.com/kiwicom/schemathesis/issues/216
 .. _#215: https://github.com/kiwicom/schemathesis/issues/215
 .. _#214: https://github.com/kiwicom/schemathesis/issues/214
