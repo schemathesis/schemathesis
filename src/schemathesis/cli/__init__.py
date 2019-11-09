@@ -126,8 +126,8 @@ def run(  # pylint: disable=too-many-arguments
         auth = HTTPDigestAuth(*auth)  # type: ignore
 
     options = dict_true_values(
-        api_options=dict_true_values(base_url=base_url, auth=auth, headers=headers, request_timeout=request_timeout),
-        loader_options=dict_true_values(endpoint=endpoints, method=methods, tag=tags),
+        api_options=dict_true_values(auth=auth, headers=headers, request_timeout=request_timeout),
+        loader_options=dict_true_values(base_url=base_url, endpoint=endpoints, method=methods, tag=tags),
         hypothesis_options=dict_not_none_values(
             deadline=hypothesis_deadline,
             derandomize=hypothesis_derandomize,

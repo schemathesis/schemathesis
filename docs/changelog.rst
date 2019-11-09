@@ -12,6 +12,11 @@ Added
 - CLI: Support file paths in ``schema`` argument. `#119`_
 - Check to verify response status & content type in CLI / Runner. `#101`_
 
+Fixed
+~~~~~
+
+- Custom base URL handling in CLI / Runner. `#248`_
+
 Changed
 ~~~~~~~
 
@@ -368,6 +373,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#248: https://github.com/kiwicom/schemathesis/issues/248
 .. _#237: https://github.com/kiwicom/schemathesis/issues/237
 .. _#236: https://github.com/kiwicom/schemathesis/issues/236
 .. _#218: https://github.com/kiwicom/schemathesis/issues/218

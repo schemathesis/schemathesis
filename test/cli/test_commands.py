@@ -134,7 +134,7 @@ SCHEMA_URI = "https://example.com/swagger.json"
         ([SCHEMA_URI], {"checks": DEFAULT_CHECKS}),
         (
             [SIMPLE_PATH, "--base-url=http://127.0.0.1"],
-            {"checks": DEFAULT_CHECKS, "api_options": {"base_url": "http://127.0.0.1"}, "loader": from_path},
+            {"checks": DEFAULT_CHECKS, "loader_options": {"base_url": "http://127.0.0.1"}, "loader": from_path},
         ),
         ([SCHEMA_URI, "--auth=test:test"], {"checks": DEFAULT_CHECKS, "api_options": {"auth": ("test", "test")}}),
         (
@@ -161,7 +161,7 @@ SCHEMA_URI = "https://example.com/swagger.json"
         ([SCHEMA_URI, "--tag=foo"], {"checks": DEFAULT_CHECKS, "loader_options": {"tag": ("foo",)}}),
         (
             [SCHEMA_URI, "--base-url=https://example.com/api/v1test"],
-            {"checks": DEFAULT_CHECKS, "api_options": {"base_url": "https://example.com/api/v1test"}},
+            {"checks": DEFAULT_CHECKS, "loader_options": {"base_url": "https://example.com/api/v1test"}},
         ),
         (
             [
@@ -265,6 +265,16 @@ def test_cli_run_output_empty(cli, schema_url):
     lines = result.stdout.strip().split("\n")
     assert "No checks were performed." in lines
     assert "= Empty test suite =" in lines[-1]
+
+
+@pytest.mark.endpoints()
+def test_cli_run_changed_base_url(cli, schema_url, server):
+    # When the CLI receives custom base URL
+    base_url = f"http://127.0.0.1:{server['port']}/api/"
+    result = cli.run_inprocess(schema_url, "--base-url", base_url)
+    # Then the base URL should be correctly displayed in the CLI output
+    lines = result.stdout.strip().split("\n")
+    assert lines[-9] == f"Base URL: {base_url}"
 
 
 @pytest.mark.parametrize(

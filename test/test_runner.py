@@ -39,7 +39,7 @@ def assert_not_request(app: web.Application, method: str, path: str) -> None:
 
 def test_execute_base_url_not_found(base_url, schema_url, app):
     # When base URL is pointing to an unknown location
-    execute(schema_url, api_options={"base_url": f"{base_url}/404/"})
+    execute(schema_url, loader_options={"base_url": f"{base_url}/404/"})
     # Then the runner should use this base
     # And they will not reach the application
     assert len(app["incoming_requests"]) == 0
@@ -47,7 +47,7 @@ def test_execute_base_url_not_found(base_url, schema_url, app):
 
 def test_execute_base_url_found(base_url, schema_url, app):
     # When base_url is specified
-    execute(schema_url, api_options={"base_url": base_url})
+    execute(schema_url, loader_options={"base_url": base_url})
     # Then it should be used by the runner
     assert len(app["incoming_requests"]) == 3
 
@@ -86,7 +86,7 @@ def test_auth(schema_url, app):
 def test_base_url(base_url, schema_url, app, converter):
     base_url = converter(base_url)
     # When `base_url` is specified explicitly with or without trailing slash
-    execute(schema_url, api_options={"base_url": base_url})
+    execute(schema_url, loader_options={"base_url": base_url})
 
     # Then each request should reach the app in both cases
     assert len(app["incoming_requests"]) == 3
@@ -198,7 +198,7 @@ def test_known_content_type(schema_url, app):
 
 
 @pytest.mark.parametrize(
-    "options", ({"api_options": {"base_url": "http://127.0.0.1:1/"}}, {"hypothesis_options": {"deadline": 1}})
+    "options", ({"loader_options": {"base_url": "http://127.0.0.1:1/"}}, {"hypothesis_options": {"deadline": 1}})
 )
 @pytest.mark.endpoints("slow")
 def test_exceptions(schema_url, app, options):
