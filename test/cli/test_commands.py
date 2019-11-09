@@ -225,7 +225,11 @@ def test_cli_run_output_success(cli, schema_url):
     assert " SUMMARY " in result.stdout
 
     lines = result.stdout.strip().split("\n")
-    assert "== 1 passed in " in lines[-1]
+    last_line = lines[-1]
+    assert "== 1 passed in " in last_line
+    # And the running time is a small positive number
+    time = float(last_line.split(" ")[-2].replace("s", ""))
+    assert 0 < time < 5
 
 
 def test_cli_run_output_with_errors(cli, schema_url):

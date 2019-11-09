@@ -64,7 +64,7 @@ def test_invalid_body_in_get():
         definition={},
         body={"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
     )
-    with pytest.raises(InvalidSchema):
+    with pytest.raises(InvalidSchema, match=r"^Body parameters are defined for GET request.$"):
         get_case_strategy(endpoint)
 
 
