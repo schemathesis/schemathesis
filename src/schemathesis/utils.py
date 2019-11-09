@@ -74,13 +74,7 @@ def capture_hypothesis_output() -> Generator[List[str], None, None]:
     def get_output(value: str) -> None:
         # Drop messages that could be confusing in the Schemathesis context
         if value.startswith(
-            (
-                "Falsifying example: ",
-                "You can add @seed",
-                "Failed to reproduce exception. Expected:",
-                "Flaky example!",
-                "Inconsistent test results!",
-            )
+            ("Falsifying example: ", "You can add @seed", "Failed to reproduce exception. Expected:", "Flaky example!")
         ):
             return
         output.append(value)
