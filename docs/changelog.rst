@@ -20,7 +20,8 @@ Fixed
 Changed
 ~~~~~~~
 
-- Raise an error if schema has body for GET requests `#218`_
+- Raise an error if schema has body for GET requests. `#218`_
+- Method names are case insensitive during direct schema access. `#246`_
 
 `0.13.2`_ - 2019-11-05
 ----------------------
@@ -374,6 +375,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#248: https://github.com/kiwicom/schemathesis/issues/248
+.. _#246: https://github.com/kiwicom/schemathesis/issues/246
 .. _#237: https://github.com/kiwicom/schemathesis/issues/237
 .. _#236: https://github.com/kiwicom/schemathesis/issues/236
 .. _#218: https://github.com/kiwicom/schemathesis/issues/218

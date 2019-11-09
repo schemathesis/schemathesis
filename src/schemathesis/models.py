@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional,
 from urllib.parse import urljoin
 
 import attr
+import requests
 from hypothesis.searchstrategy import SearchStrategy
 
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 
 if TYPE_CHECKING:
     from .schemas import BaseSchema
-    import requests  # Typechecking-only import to speedup import of schemathesis
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -84,12 +84,9 @@ class Case:
         }
 
     def call(
-        self, base_url: Optional[str] = None, session: Optional["requests.Session"] = None, **kwargs: Any
-    ) -> "requests.Response":
+        self, base_url: Optional[str] = None, session: Optional[requests.Session] = None, **kwargs: Any
+    ) -> requests.Response:
         """Convert the case into a dictionary acceptable by requests."""
-        # Local import to speedup import of schemathesis
-        import requests  # pylint: disable=import-outside-toplevel
-
         if session is None:
             session = requests.Session()
 
