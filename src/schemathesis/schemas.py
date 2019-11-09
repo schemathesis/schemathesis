@@ -16,6 +16,7 @@ from urllib.parse import urljoin
 import attr
 import hypothesis
 import jsonschema
+from requests.structures import CaseInsensitiveDict
 
 from schemathesis.exceptions import InvalidSchema
 
@@ -38,7 +39,7 @@ class BaseSchema(Mapping):
     def __iter__(self) -> Iterator:
         return iter(self.endpoints)
 
-    def __getitem__(self, item: str) -> Dict[str, Endpoint]:
+    def __getitem__(self, item: str) -> CaseInsensitiveDict:
         return self.endpoints[item]
 
     def __len__(self) -> int:
@@ -53,7 +54,7 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     @property
-    def endpoints(self) -> Dict[str, Dict[str, Endpoint]]:
+    def endpoints(self) -> Dict[str, CaseInsensitiveDict]:
         if not hasattr(self, "_endpoints"):
             # pylint: disable=attribute-defined-outside-init
             endpoints = self.get_all_endpoints()
@@ -304,10 +305,10 @@ def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
     return []
 
 
-def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, Dict[str, Endpoint]]:
-    output: Dict[str, Dict[str, Endpoint]] = {}
+def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, CaseInsensitiveDict]:
+    output: Dict[str, CaseInsensitiveDict] = {}
     for endpoint in endpoints:
-        output.setdefault(endpoint.path, {})
+        output.setdefault(endpoint.path, CaseInsensitiveDict())
         # case insensitive dict?
         output[endpoint.path][endpoint.method] = endpoint
     return output
