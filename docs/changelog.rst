@@ -10,7 +10,7 @@ Added
 ~~~~~
 
 - CLI: Support file paths in ``schema`` argument. `#119`_
-- Check to verify response status & content type in CLI / Runner. `#101`_
+- Checks to verify response status & content type in CLI / Runner. `#101`_
 
 Fixed
 ~~~~~

@@ -273,15 +273,17 @@ It can run tests against the given schema URI and will do some simple checks for
 The built-in checks list includes the following:
 
 - Not a server error. Asserts that response's status code is less than 500;
+- Status code conformance. Asserts that response's status code is listed in the schema;
+- Content type conformance. Asserts that response's content type is listed in the schema;
 
 You can provide your custom checks to the execute function, the check is a callable that accepts one argument of ``requests.Response`` type.
 
 .. code:: python
 
     from datetime import timedelta
-    from schemathesis import runner
+    from schemathesis import runner, models
 
-    def not_too_long(response):
+    def not_too_long(response, result: models.TestResult):
         assert response.elapsed < timedelta(milliseconds=300)
 
     runner.execute("http://127.0.0.1:8080/swagger.json", checks=[not_too_long])
@@ -325,6 +327,13 @@ For simpler local development Schemathesis includes a ``aiohttp``-based server w
 - ``/api/success`` - always returns ``{"success": true}``
 - ``/api/failure`` - always returns 500
 - ``/api/slow`` - always returns ``{"slow": true}`` after 250 ms delay
+- ``/api/unsatisfiable`` - parameters for this endpoint are impossible to generate
+- ``/api/invalid`` - invalid parameter definition. Uses ``int`` instead of ``integer``
+- ``/api/flaky`` - returns 1/1 ratio of 200/500 responses
+- ``/api/multipart`` - accepts multipart data
+- ``/api/teapot`` - returns 418 status code, that is not listed in the schema
+- ``/api/text`` - returns ``plain/text`` responses, which are not declared in the schema
+
 
 To start the server:
 
@@ -344,13 +353,23 @@ Then you could use CLI against this server:
 .. code:: bash
 
     schemathesis run http://127.0.0.1:8081/swagger.yaml
-    Running schemathesis test cases ...
+    ================================== Schemathesis test session starts =================================
+    platform Linux -- Python 3.7.4, schemathesis-0.12.2, hypothesis-4.39.0, hypothesis_jsonschema-0.9.8
+    rootdir: /
+    hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase('/.hypothesis/examples')
+    Schema location: http://127.0.0.1:8081/swagger.yaml
+    Base URL: http://127.0.0.1:8081
+    Specification version: Swagger 2.0
+    collected endpoints: 2
 
-    -------------------------------------------------------------
+    GET /api/slow .                                                                               [ 50%]
+    GET /api/success .                                                                            [100%]
+
+    ============================================== SUMMARY ==============================================
+
     not_a_server_error            2 / 2 passed          PASSED
-    -------------------------------------------------------------
 
-    Tests succeeded.
+    ========================================= 2 passed in 0.29s =========================================
 
 
 Running tests
