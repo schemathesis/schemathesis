@@ -75,7 +75,6 @@ def get_hypothesis_settings(hypothesis_options: Optional[Dict[str, Any]] = None)
 
 def execute_from_schema(
     schema: BaseSchema,
-    base_url: str,
     checks: Iterable[Callable],
     *,
     hypothesis_options: Optional[Dict[str, Any]] = None,
@@ -104,7 +103,7 @@ def execute_from_schema(
                     status = Status.error
                     result.add_error(test)
                 else:
-                    test(session, base_url, checks, result, request_timeout)
+                    test(session, checks, result, request_timeout)
                     status = Status.success
             except AssertionError:
                 status = Status.failure
@@ -171,15 +170,15 @@ def prepare(  # pylint: disable=too-many-arguments
     api_options = api_options or {}
     loader_options = loader_options or {}
 
+    if "base_url" not in loader_options:
+        loader_options["base_url"] = get_base_url(schema_uri)
     schema = loader(schema_uri, **loader_options)
-    base_url = api_options.pop("base_url", "") or get_base_url(schema_uri)
-    return execute_from_schema(schema, base_url, checks, hypothesis_options=hypothesis_options, **api_options)
+    return execute_from_schema(schema, checks, hypothesis_options=hypothesis_options, **api_options)
 
 
 def single_test(
     case: Case,
     session: requests.Session,
-    base_url: str,
     checks: Iterable[Callable],
     result: TestResult,
     request_timeout: Optional[int],
@@ -187,7 +186,7 @@ def single_test(
     """A single test body that will be executed against the target."""
     # pylint: disable=too-many-arguments
     timeout = prepare_timeout(request_timeout)
-    response = case.call(base_url=base_url, session=session, timeout=timeout)
+    response = case.call(session=session, timeout=timeout)
     errors = None
 
     for check in checks:
