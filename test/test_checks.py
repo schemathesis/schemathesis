@@ -37,5 +37,5 @@ def test_content_type_conformance_valid(response, results):
     indirect=["response", "results"],
 )
 def test_content_type_conformance_invalid(response, results):
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError, match="^Content type is not listed in 'produces' field$"):
         content_type_conformance(response, results)

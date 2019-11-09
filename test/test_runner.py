@@ -164,7 +164,7 @@ def test_unknown_response_code(schema_url, app):
     assert check.value == Status.failure
 
 
-@pytest.mark.endpoints("success")
+@pytest.mark.endpoints("failure")
 def test_unknown_response_code_with_default(schema_url, app):
     # When endpoint returns a status code, that is not listed in "responses", but there is a "default" response
     # And "status_code_conformance" is specified
