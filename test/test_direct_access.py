@@ -1,5 +1,6 @@
 import hypothesis.strategies as st
 import pytest
+from requests.structures import CaseInsensitiveDict
 
 import schemathesis
 from schemathesis.models import Case, Endpoint
@@ -14,11 +15,11 @@ def test_getitem(simple_schema, mocker):
     swagger = schemathesis.from_dict(simple_schema)
     mocked = mocker.patch("schemathesis.schemas.endpoints_to_dict", wraps=endpoints_to_dict)
     assert "_endpoints" not in swagger.__dict__
-    assert isinstance(swagger["/v1/users"], dict)
+    assert isinstance(swagger["/v1/users"], CaseInsensitiveDict)
     assert mocked.call_count == 1
     # Check cached access
     assert "_endpoints" in swagger.__dict__
-    assert isinstance(swagger["/v1/users"], dict)
+    assert isinstance(swagger["/v1/users"], CaseInsensitiveDict)
     assert mocked.call_count == 1
 
 
@@ -34,8 +35,9 @@ def test_repr(swagger_20):
     assert str(swagger_20) == "SwaggerV20 for Sample API (1.0.0)"
 
 
-def test_endpoint_access(swagger_20):
-    assert isinstance(swagger_20["/v1/users"]["GET"], Endpoint)
+@pytest.mark.parametrize("method", ("GET", "get"))
+def test_endpoint_access(swagger_20, method):
+    assert isinstance(swagger_20["/v1/users"][method], Endpoint)
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
