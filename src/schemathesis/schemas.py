@@ -11,7 +11,7 @@ import itertools
 from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Tuple, Union, overload
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 import attr
 import hypothesis
@@ -263,6 +263,21 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     @property
     def verbose_name(self) -> str:
         return f"Open API {self.spec_version}"
+
+    @property
+    def base_path(self) -> str:
+        """Base path for the schema."""
+        servers = self.raw_schema.get("servers", [])
+        if servers:
+            # assume we're the first server in list
+            server = servers[0]
+            url = server["url"].format(**{k: v["default"] for k, v in server.get("variables", {}).items()})
+            path = urlsplit(url).path
+        else:
+            path = "/"
+        if not path.endswith("/"):
+            path += "/"
+        return path
 
     def make_endpoint(
         self, full_path: str, method: str, parameters: Iterator[Dict[str, Any]], definition: Dict[str, Any]
