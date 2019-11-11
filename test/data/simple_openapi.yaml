@@ -12,4 +12,7 @@ paths:
         "200":
           description: OK
 servers:
-  - url: https://api.example.com/v1
+  - url: https://api.example.com/{basePath}
+    variables:
+      basePath:
+        default: v1

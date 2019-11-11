@@ -12,6 +12,26 @@ def test_base_path_suffix(swagger_20, base_path):
     assert swagger_20.spec_version == "2.0"
 
 
+@pytest.mark.parametrize(
+    "server, base_path",
+    (
+        (
+            [
+                {
+                    "url": "https://api.example.com/{basePath}/foo/{bar}",
+                    "variables": {"basePath": {"default": "v1"}, "bar": {"default": "bar"}},
+                }
+            ],
+            "/v1/foo/bar/",
+        ),
+        ([], "/"),
+    ),
+)
+def test_open_api_base_path(openapi_30, server, base_path):
+    openapi_30.raw_schema["servers"] = server
+    assert openapi_30.base_path == base_path
+
+
 def test_open_api_verbose_name(openapi_30):
     assert openapi_30.verbose_name == "Open API 3.0.0"
     assert openapi_30.spec_version == "3.0.0"
