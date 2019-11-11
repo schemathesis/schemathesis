@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Support for OpenAPI 3.0 server variables (base_path) `#40`_
+
 `0.14.0`_ - 2019-11-09
 ----------------------
 
@@ -434,6 +439,7 @@ Fixed
 .. _#58: https://github.com/kiwicom/schemathesis/issues/58
 .. _#55: https://github.com/kiwicom/schemathesis/issues/55
 .. _#45: https://github.com/kiwicom/schemathesis/issues/45
+.. _#40: https://github.com/kiwicom/schemathesis/issues/40
 .. _#35: https://github.com/kiwicom/schemathesis/issues/35
 .. _#34: https://github.com/kiwicom/schemathesis/issues/34
 .. _#30: https://github.com/kiwicom/schemathesis/issues/30
