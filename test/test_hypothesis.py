@@ -1,3 +1,4 @@
+from base64 import b64decode
 from typing import Any, Type, TypeVar, Union
 
 import pytest
@@ -100,10 +101,11 @@ def test_register_default_strategies():
     from hypothesis_jsonschema._impl import STRING_FORMATS
 
     assert "binary" in STRING_FORMATS
+    assert "byte" in STRING_FORMATS
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_default_strategies():
+def test_default_strategies_binary():
     endpoint = make_endpoint(
         form_data={
             "required": ["file"],
@@ -114,6 +116,21 @@ def test_default_strategies():
     )
     result = get_case_strategy(endpoint).example()
     assert isinstance(result.form_data["file"], bytes)
+
+
+@pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
+def test_default_strategies_bytes():
+    endpoint = make_endpoint(
+        body={
+            "required": ["byte"],
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"byte": {"type": "string", "format": "byte"}},
+        }
+    )
+    result = get_case_strategy(endpoint).example()
+    assert isinstance(result.body["byte"], str)
+    b64decode(result.body["byte"])
 
 
 @pytest.mark.parametrize(
