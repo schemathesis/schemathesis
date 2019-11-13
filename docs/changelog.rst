@@ -11,7 +11,7 @@ Added
 
 - Support for OpenAPI 3.0 server variables (base_path). `#40`_
 - Support for ``format: byte``. `#254`_
-- Response schema conformance check. `#256`_
+- Response schema conformance check in CLI / Runner. `#256`_
 
 `0.14.0`_ - 2019-11-09
 ----------------------

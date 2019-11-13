@@ -85,7 +85,8 @@ def test_commands_run_help(cli):
         "  specification.",
         "",
         "Options:",
-        "  -c, --checks [not_a_server_error|status_code_conformance|content_type_conformance]",
+        "  -c, --checks [not_a_server_error|status_code_conformance|"
+        "content_type_conformance|response_schema_conformance]",
         "                                  List of checks to run.",
         "  -a, --auth TEXT                 Server user and password. Example:",
         "                                  USER:PASSWORD",
