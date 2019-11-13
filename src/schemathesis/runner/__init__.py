@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, Generator, Iterable, Optional, Tuple, Un
 
 import hypothesis
 import hypothesis.errors
+import jsonschema
 import requests
 from requests.auth import AuthBase
 
@@ -45,6 +46,26 @@ def content_type_conformance(response: requests.Response, result: TestResult) ->
         if are_content_types_equal(option, response.headers["Content-Type"]):
             return
     raise AssertionError("Content type is not listed in 'produces' field")
+
+
+def response_schema_conformance(response: requests.Response, result: TestResult) -> None:
+    # the keys should be strings
+    responses = {str(key): value for key, value in result.endpoint.definition.get("responses", {}).items()}
+    status_code = str(response.status_code)
+    if status_code in responses:
+        definition = responses[status_code]
+    elif "default" in responses:
+        definition = responses["default"]
+    else:
+        # No response defined for the received response status code
+        return
+    schema = definition.get("schema")
+    if not schema:
+        return
+    try:
+        jsonschema.validate(response.json(), schema)
+    except jsonschema.ValidationError:
+        raise AssertionError
 
 
 DEFAULT_CHECKS = (not_a_server_error,)
