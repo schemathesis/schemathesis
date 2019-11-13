@@ -23,7 +23,7 @@ Auth = Union[Tuple[str, str], AuthBase]  # pragma: no mutate
 
 def not_a_server_error(response: requests.Response, result: TestResult) -> None:
     """A check to verify that the response is not a server-side error."""
-    assert response.status_code < 500
+    assert response.status_code < 500, f"Received a response with 5xx status code: {response.status_code}"
 
 
 def status_code_conformance(response: requests.Response, result: TestResult) -> None:
@@ -31,7 +31,12 @@ def status_code_conformance(response: requests.Response, result: TestResult) -> 
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
     if "default" in responses:
         return
-    assert response.status_code in map(int, responses)
+    allowed_response_statuses = list(map(str, responses))
+    message = (
+        f"Received a response with a status code, which is not defined in the schema: "
+        f"{response.status_code}\n\nDeclared status codes: {', '.join(allowed_response_statuses)}"
+    )
+    assert str(response.status_code) in allowed_response_statuses, message
 
 
 def content_type_conformance(response: requests.Response, result: TestResult) -> None:
@@ -42,10 +47,15 @@ def content_type_conformance(response: requests.Response, result: TestResult) ->
         produces = result.endpoint.definition.get("produces", None)
     if not produces:
         return
+    content_type = response.headers["Content-Type"]
     for option in produces:
-        if are_content_types_equal(option, response.headers["Content-Type"]):
+        if are_content_types_equal(option, content_type):
             return
-    raise AssertionError("Content type is not listed in 'produces' field")
+    raise AssertionError(
+        f"Received a response with '{content_type}' Content-Type, "
+        f"but it is not declared in the schema.\n\n"
+        f"Defined content types: {', '.join(produces)}"
+    )
 
 
 def response_schema_conformance(response: requests.Response, result: TestResult) -> None:
@@ -64,8 +74,8 @@ def response_schema_conformance(response: requests.Response, result: TestResult)
         return
     try:
         jsonschema.validate(response.json(), schema)
-    except jsonschema.ValidationError:
-        raise AssertionError
+    except jsonschema.ValidationError as exc:
+        raise AssertionError(f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}")
 
 
 DEFAULT_CHECKS = (not_a_server_error,)
@@ -215,9 +225,9 @@ def single_test(
         try:
             check(response, result)
             result.add_success(check_name, case)
-        except AssertionError:
+        except AssertionError as exc:
             errors = True  # pragma: no mutate
-            result.add_failure(check_name, case)
+            result.add_failure(check_name, case, str(exc))
 
     if errors is not None:
         # An exception needed to trigger Hypothesis shrinking & flaky tests detection logic

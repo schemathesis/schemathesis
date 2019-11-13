@@ -193,14 +193,17 @@ def display_single_failure(result: TestResult) -> None:
     display_subsection(result)
     for check in reversed(result.checks):
         if check.example is not None:
-            display_example(check.example, check.name)
+            display_example(check.example, check.name, check.message)
             # Display only the latest case
             # (dd): It is possible to find multiple errors, but the simplest option for now is to display
             # the latest and avoid deduplication, which will be done in the future.
             break
 
 
-def display_example(case: Case, check_name: Optional[str] = None) -> None:
+def display_example(case: Case, check_name: Optional[str] = None, message: Optional[str] = None) -> None:
+    if message is not None:
+        click.secho(message, fg="red")
+        click.echo()
     output = {
         make_verbose_name(attribute): getattr(case, attribute.name)
         for attribute in Case.__attrs_attrs__  # type: ignore
