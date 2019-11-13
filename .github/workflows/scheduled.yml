@@ -3,7 +3,8 @@ name: scheduled
 on:
   schedule:
     # Every Monday at 00:00
-    - cron: "45 11 * * 3"
+    # - cron: "0 0 * * 1"
+    - cron: "0 13  * * 3"
 
 jobs:
   mutmut:
@@ -13,8 +14,31 @@ jobs:
     - uses: actions/checkout@master
     - uses: actions/setup-python@v1
       with:
-        python-version: '3.7'
+        python-version: '3.8'
+    - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends sqlite3
     - run: pip install poetry mutmut
     - run: poetry install
-    - run: mutmut run --backup --paths-to-mutate "src/" --tests-dir "test/" --runner "poetry run pytest -n auto -x --tb=no -q"
-    - run: while read -r line; do mutmut show $line; done <<< $(sqlite3 .mutmut-cache "select id from Mutant where status='bad_survived'")
+    # Run mutmut
+    # If exit code is 0, finish the job
+    # Else ignore exit code and extract mutant ids
+    #  If no id is found, then exit with exit code 0
+    #  Else run `mutmut show $id` and exit with exit code 1 to fail the job
+    #  and make failure more visible
+    - run: 
+        mutmut run
+          --backup
+          --paths-to-mutate "src/"
+          --tests-dir "test/"
+          --runner "poetry run pytest -n auto -x --tb=no -q"
+        ||
+        while read -r line;
+          do
+            if [[ -n $line ]];
+              then EXIT=false; mutmut show $line;
+              else EXIT=true;
+            fi;
+        done <<< $(
+          sqlite3 .mutmut-cache
+            "select id from Mutant where status in ('bad_survived', 'bad_timeout', 'ok_suspicious');"
+          );
+        $EXIT
