@@ -117,14 +117,14 @@ def testdir(testdir):
         import pytest
         import schemathesis
         from test.utils import *
-        from hypothesis import settings
+        from hypothesis import given, settings
         raw_schema = {schema}
         schema = schemathesis.from_dict(raw_schema, method={method}, endpoint={endpoint}, tag={tag})
         """.format(
                 schema=schema, method=repr(method), endpoint=repr(endpoint), tag=repr(tag)
             )
         )
-        testdir.makepyfile(preparation, content)
+        module = testdir.makepyfile(preparation, content)
         testdir.makepyfile(
             conftest=dedent(
                 f"""
@@ -136,6 +136,7 @@ def testdir(testdir):
         """
             )
         )
+        return module
 
     testdir.make_test = maker
 
