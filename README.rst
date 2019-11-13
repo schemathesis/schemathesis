@@ -275,6 +275,7 @@ The built-in checks list includes the following:
 - Not a server error. Asserts that response's status code is less than 500;
 - Status code conformance. Asserts that response's status code is listed in the schema;
 - Content type conformance. Asserts that response's content type is listed in the schema;
+- Response schema conformance. Asserts that response's content conforms to the declared schema;
 
 You can provide your custom checks to the execute function, the check is a callable that accepts one argument of ``requests.Response`` type.
 

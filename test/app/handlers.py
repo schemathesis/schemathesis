@@ -7,6 +7,10 @@ async def success(request: web.Request) -> web.Response:
     return web.json_response({"success": True})
 
 
+async def invalid_response(request: web.Request) -> web.Response:
+    return web.json_response({"random": "key"})
+
+
 async def teapot(request: web.Request) -> web.Response:
     return web.json_response({"success": True}, status=418)
 

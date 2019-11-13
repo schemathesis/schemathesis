@@ -12,6 +12,7 @@ from schemathesis.runner import (
     execute,
     get_base_url,
     prepare,
+    response_schema_conformance,
     status_code_conformance,
 )
 
@@ -195,6 +196,25 @@ def test_known_content_type(schema_url, app):
     results = execute(schema_url, checks=(content_type_conformance,), hypothesis_options={"max_examples": 1})
     # Then there should be no a failures
     assert not results.has_failures
+
+
+@pytest.mark.endpoints("invalid_response")
+def test_invalid_response(schema_url, app):
+    # When endpoint returns a response that doesn't conform to the schema
+    # And "response_schema_conformance" is specified
+    results = execute(schema_url, checks=(response_schema_conformance,), hypothesis_options={"max_examples": 1})
+    # Then there should be a failure
+    assert results.has_failures
+
+
+@pytest.mark.endpoints("success")
+def test_valid_response(schema_url, app):
+    # When endpoint returns a response that conforms to the schema
+    # And "response_schema_conformance" is specified
+    results = execute(schema_url, checks=(response_schema_conformance,), hypothesis_options={"max_examples": 1})
+    # Then there should be no failures or errors
+    assert not results.has_failures
+    assert not results.has_errors
 
 
 @pytest.mark.parametrize(
