@@ -1,6 +1,7 @@
 """Provide strategies for given endpoint(s) definition."""
 import asyncio
 import re
+from base64 import b64encode
 from functools import partial
 from typing import Any, Callable, Dict, Generator, Optional
 
@@ -153,3 +154,4 @@ def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
 
 def init_default_strategies() -> None:
     register_string_format("binary", st.binary())
+    register_string_format("byte", st.binary().map(lambda x: b64encode(x).decode()))
