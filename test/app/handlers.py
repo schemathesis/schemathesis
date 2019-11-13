@@ -19,6 +19,10 @@ async def text(request: web.Request) -> web.Response:
     return web.Response(body="Text response", content_type="text/plain")
 
 
+async def malformed_json(request: web.Request) -> web.Response:
+    return web.Response(body="{malformed}", content_type="application/json")
+
+
 async def failure(request: web.Request) -> web.Response:
     raise web.HTTPInternalServerError
 

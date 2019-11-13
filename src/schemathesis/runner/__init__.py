@@ -59,6 +59,8 @@ def content_type_conformance(response: requests.Response, result: TestResult) ->
 
 
 def response_schema_conformance(response: requests.Response, result: TestResult) -> None:
+    if not response.headers["Content-Type"].startswith("application/json"):
+        return
     # the keys should be strings
     responses = {str(key): value for key, value in result.endpoint.definition.get("responses", {}).items()}
     status_code = str(response.status_code)

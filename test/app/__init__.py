@@ -29,6 +29,7 @@ class Endpoint(Enum):
     multipart = ("POST", "/api/multipart", handlers.multipart)
     teapot = ("POST", "/api/teapot", handlers.teapot)
     text = ("GET", "/api/text", handlers.text)
+    malformed_json = ("GET", "/api/malformed_json", handlers.malformed_json)
     invalid_response = ("GET", "/api/invalid_response", handlers.invalid_response)
 
 

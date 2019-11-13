@@ -199,7 +199,7 @@ def test_known_content_type(schema_url, app):
 
 
 @pytest.mark.endpoints("invalid_response")
-def test_invalid_response(schema_url, app):
+def test_response_conformance_invalid(schema_url, app):
     # When endpoint returns a response that doesn't conform to the schema
     # And "response_schema_conformance" is specified
     results = execute(schema_url, checks=(response_schema_conformance,), hypothesis_options={"max_examples": 1})
@@ -212,13 +212,34 @@ def test_invalid_response(schema_url, app):
 
 
 @pytest.mark.endpoints("success")
-def test_valid_response(schema_url, app):
+def test_response_conformance_valid(schema_url, app):
     # When endpoint returns a response that conforms to the schema
     # And "response_schema_conformance" is specified
     results = execute(schema_url, checks=(response_schema_conformance,), hypothesis_options={"max_examples": 1})
     # Then there should be no failures or errors
     assert not results.has_failures
     assert not results.has_errors
+
+
+@pytest.mark.endpoints("text")
+def test_response_conformance_text(schema_url, app):
+    # When endpoint returns a response that is not JSON
+    # And "response_schema_conformance" is specified
+    results = execute(schema_url, checks=(response_schema_conformance,), hypothesis_options={"max_examples": 1})
+    # Then the check should be ignored if the response headers are not application/json
+    assert not results.has_failures
+    assert not results.has_errors
+
+
+@pytest.mark.endpoints("malformed_json")
+def test_response_conformance_malformed_json(schema_url, app):
+    # When endpoint returns a response that contains a malformed JSON, but has a valid content type header
+    # And "response_schema_conformance" is specified
+    results = execute(schema_url, checks=(response_schema_conformance,), hypothesis_options={"max_examples": 1})
+    # Then there should be a failure
+    assert results.has_errors
+    error = results.results[-1].errors[-1][0]
+    assert "Expecting property name enclosed in double quotes" in str(error)
 
 
 @pytest.mark.parametrize(
