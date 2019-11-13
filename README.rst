@@ -357,6 +357,7 @@ For simpler local development Schemathesis includes a ``aiohttp``-based server w
 - ``/api/multipart`` - accepts multipart data
 - ``/api/teapot`` - returns 418 status code, that is not listed in the schema
 - ``/api/text`` - returns ``plain/text`` responses, which are not declared in the schema
+- ``/api/malformed_json`` - returns malformed JSON with ``application/json`` content type header
 
 
 To start the server:
