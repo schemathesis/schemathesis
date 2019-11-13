@@ -69,7 +69,7 @@ def response_schema_conformance(response: requests.Response, result: TestResult)
 
 
 DEFAULT_CHECKS = (not_a_server_error,)
-OPTIONAL_CHECKS = (status_code_conformance, content_type_conformance)
+OPTIONAL_CHECKS = (status_code_conformance, content_type_conformance, response_schema_conformance)
 ALL_CHECKS = DEFAULT_CHECKS + OPTIONAL_CHECKS
 
 
