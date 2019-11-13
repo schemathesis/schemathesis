@@ -50,7 +50,11 @@ def test_content_type_conformance_valid(response, results):
     indirect=["response", "results"],
 )
 def test_content_type_conformance_invalid(response, results):
-    with pytest.raises(AssertionError, match="^Content type is not listed in 'produces' field$"):
+    message = (
+        f"^Received a response with '{response.headers['Content-Type']}' Content-Type, "
+        "but it is not declared in the schema.\n\nDefined content types: application/json$"
+    )
+    with pytest.raises(AssertionError, match=message):
         content_type_conformance(response, results)
 
 

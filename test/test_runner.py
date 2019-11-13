@@ -205,6 +205,10 @@ def test_invalid_response(schema_url, app):
     results = execute(schema_url, checks=(response_schema_conformance,), hypothesis_options={"max_examples": 1})
     # Then there should be a failure
     assert results.has_failures
+    lines = results.results[0].checks[-1].message.split("\n")
+    assert lines[0] == "The received response does not conform to the defined schema!"
+    assert lines[2] == "Details: "
+    assert lines[4] == "'success' is a required property"
 
 
 @pytest.mark.endpoints("success")
