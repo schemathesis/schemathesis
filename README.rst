@@ -306,6 +306,29 @@ For such cases it is possible to register custom strategies:
     strategy = strategies.from_regex(r"\A4[0-9]{15}\Z").filter(luhn_validator)
     schemathesis.register_string_format("visa_cards", strategy)
 
+
+Unittest support
+################
+
+Schemathesis supports Python's built-in ``unittest`` framework out of the box,
+you only need to specify strategies for ``hypothesis.given``:
+
+.. code-block:: python
+
+    from unittest import TestCase
+    from hypothesis import given
+    import schemathesis
+
+    schema = schemathesis.from_uri("http://0.0.0.0:8080/petstore.json")
+    new_pet_strategy = schema["/v2/pet"]["POST"].as_strategy()
+
+    class TestSchema(TestCase):
+
+        @given(case=new_pet_strategy)
+        def test_pets(self, case):
+            response = case.call()
+            assert response.status_code < 500
+
 Documentation
 -------------
 
