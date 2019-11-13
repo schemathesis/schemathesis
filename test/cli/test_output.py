@@ -242,7 +242,7 @@ def test_display_single_error(capsys, swagger_20, endpoint):
 def test_display_failures(swagger_20, capsys, results_set):
     # Given two test results - success and failure
     failure = models.TestResult(models.Endpoint("/api/failure", "GET", {}), swagger_20)
-    failure.add_failure("test", models.Case("/api/failure", "GET", base_url="http://127.0.0.1:8080"))
+    failure.add_failure("test", models.Case("/api/failure", "GET", base_url="http://127.0.0.1:8080"), "Message")
     results_set.append(failure)
     # When the failures are displayed
     output.display_failures(results_set)
@@ -251,6 +251,7 @@ def test_display_failures(swagger_20, capsys, results_set):
     assert " FAILURES " in out
     # And endpoint with a failure is displayed as a subsection
     assert " GET: /api/failure " in out
+    assert "Message" in out
     # And check name is displayed
     assert "Check           : test" in out
     assert "Run this Python code to reproduce this failure: " in out

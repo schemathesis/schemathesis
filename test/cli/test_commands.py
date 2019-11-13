@@ -240,6 +240,7 @@ def test_cli_run_output_with_errors(cli, schema_url):
     assert " SUMMARY " in result.stdout
 
     lines = result.stdout.strip().split("\n")
+    assert "Received a response with 5xx status code: 500" in lines
     assert "not_a_server_error            1 / 3 passed          FAILED " in lines
     assert f"== 1 passed, 1 failed in " in lines[-1]
 
@@ -400,6 +401,9 @@ def test_status_code_conformance(cli, schema_url):
     # And this endpoint should be marked as failed in the progress line
     assert "POST /api/teapot F" in result.stdout
     assert "status_code_conformance            0 / 2 passed          FAILED" in result.stdout
+    lines = result.stdout.split("\n")
+    assert "Received a response with a status code, which is not defined in the schema: 418" in lines
+    assert lines[15] == "Declared status codes: 200"
 
 
 def test_connection_error(cli, schema_url):
