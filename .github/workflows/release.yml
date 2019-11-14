@@ -1,0 +1,17 @@
+name: Perform actions after release
+
+on:
+  release:
+    type: [published, created, edited]
+
+jobs:
+  release_image:
+    name: Build and publish to Docker Hub
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - uses: elgohr/Publish-Docker-Github-Action@master
+      with:
+        name: kiwicom/schemathesis:$GITHUB_REF
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_PASSWORD }}

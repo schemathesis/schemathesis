@@ -24,7 +24,7 @@ jobs:
     #  If no id is found, then exit with exit code 0
     #  Else run `mutmut show $id` and exit with exit code 1 to fail the job
     #  and make failure more visible
-    - run: 
+    - run:
         mutmut run
           --backup
           --paths-to-mutate "src/"
