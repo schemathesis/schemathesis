@@ -11,6 +11,10 @@ async def invalid_response(request: web.Request) -> web.Response:
     return web.json_response({"random": "key"})
 
 
+async def digits(request: web.Request) -> web.Response:
+    return web.json_response({"value": request.query["id"]})
+
+
 async def teapot(request: web.Request) -> web.Response:
     return web.json_response({"success": True}, status=418)
 
