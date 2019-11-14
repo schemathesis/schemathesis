@@ -13,6 +13,7 @@ Added
 - Support for ``format: byte``. `#254`_
 - Response schema conformance check in CLI / Runner. `#256`_
 - Docker image for CLI. `#268`_
+- Pre-run hooks for CLI. `#147`_
 
 Changed
 ~~~~~~~
@@ -423,6 +424,7 @@ Fixed
 .. _#167: https://github.com/kiwicom/schemathesis/issues/167
 .. _#153: https://github.com/kiwicom/schemathesis/issues/153
 .. _#149: https://github.com/kiwicom/schemathesis/issues/149
+.. _#147: https://github.com/kiwicom/schemathesis/issues/147
 .. _#144: https://github.com/kiwicom/schemathesis/issues/144
 .. _#139: https://github.com/kiwicom/schemathesis/issues/139
 .. _#138: https://github.com/kiwicom/schemathesis/issues/138

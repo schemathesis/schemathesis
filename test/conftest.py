@@ -58,11 +58,16 @@ def cli(testdir):
     Provides in-process execution via `click.CliRunner` and sub-process execution via `pytest.pytester.Testdir`.
     """
 
+    cli_runner = CliRunner()
+
     class Runner:
         @staticmethod
         def run_inprocess(*args, **kwargs):
-            cli_runner = CliRunner()
             return cli_runner.invoke(schemathesis.cli.run, args, **kwargs)
+
+        @staticmethod
+        def main_inprocess(*args, **kwargs):
+            return cli_runner.invoke(schemathesis.cli.main, args, **kwargs)
 
         @staticmethod
         def run_subprocess(*args, **kwargs):

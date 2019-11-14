@@ -437,3 +437,68 @@ def test_schema_not_available(cli):
         "Max retries exceeded with url: /swagger.yaml"
     )
     assert lines[-2] == "Aborted!"
+
+
+def make_importable(module):
+    """Make the package importable by the inline CLI execution."""
+    pkgroot = module.dirpath()
+    module._ensuresyspath(True, pkgroot)
+
+
+@pytest.mark.endpoints("custom_format")
+def test_pre_run_hook_valid(testdir, cli, schema_url, app):
+    # When `--pre-run` hook is passed to the CLI call
+    module = testdir.makepyfile(
+        hook="""
+    import string
+    import schemathesis
+    from hypothesis import strategies as st
+
+    schemathesis.register_string_format(
+        "digits",
+        st.text(
+            min_size=1,
+            alphabet=st.characters(
+                whitelist_characters=string.digits,
+                whitelist_categories=()
+            )
+        )
+    )
+    """
+    )
+    make_importable(module)
+
+    result = cli.main_inprocess("--pre-run", module.purebasename, "run", schema_url)
+
+    # Then CLI should run successfully
+    assert result.exit_code == 0
+    # And all registered new string format should produce digits as expected
+    assert all(request.query["id"].isdigit() for request in app["incoming_requests"])
+
+
+def test_pre_run_hook_invalid(testdir, cli):
+    # When `--pre-run` hook is passed to the CLI call
+    # And its importing causes an exception
+    module = testdir.makepyfile(hook="1 / 0")
+    make_importable(module)
+
+    result = cli.main_inprocess("--pre-run", module.purebasename, "run", "http://127.0.0.1:1")
+
+    # Then CLI run should fail
+    assert result.exit_code == 1
+    # And a helpful message should be displayed in the output
+    lines = result.stdout.strip().split("\n")
+    assert lines[0] == "An exception happened during the hook loading:"
+    assert lines[7] == "ZeroDivisionError: division by zero"
+    assert lines[9] == "Aborted!"
+
+
+def test_run_via_main(testdir, cli):
+    # This flow is similar to subprocess run, but faster and allows to gather coverage
+    result = cli.main_inprocess("run")
+
+    # Then CLI run should fail
+    assert result.exit_code == 2
+    # And a helpful message should be displayed in the output
+    lines = result.stdout.strip().split("\n")
+    assert lines[0] == "Usage: main run [OPTIONS] SCHEMA"
