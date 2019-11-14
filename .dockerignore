@@ -1,0 +1,10 @@
+**/.dockerignore
+**/.env
+**/.git
+**/.gitignore
+**/docker-compose*
+**/Dockerfile*
+**/docs
+**/img
+**/test
+LICENSE
