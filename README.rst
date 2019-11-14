@@ -90,6 +90,21 @@ To run it against localhost server add ``--network=host`` parameter:
 
     docker run --network="host" schemathesis:latest run http://127.0.0.1/schema.json
 
+Pre-run CLI hook
+################
+
+Sometimes you need to execute custom code before the CLI run, for example setup an environment,
+register custom string format strategies or modify Schemathesis behavior in runtime you can use ``--pre-run`` hook:
+
+.. code:: bash
+
+    schemathesis --pre-run importable.path.to.module run https://example.com/api/swagger.json
+
+**NOTE**. This option should be passed before the ``run`` part.
+
+The passed value will be processed as an importable Python path, where you can execute your code.
+An example - https://github.com/kiwicom/schemathesis#custom-string-strategies
+
 In-code
 ~~~~~~~
 

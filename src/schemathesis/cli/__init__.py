@@ -1,4 +1,5 @@
 import pathlib
+import traceback
 from contextlib import contextmanager
 from typing import Dict, Generator, Iterable, List, Optional, Tuple
 
@@ -19,23 +20,22 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 DEFAULT_CHECKS_NAMES = tuple(check.__name__ for check in runner.DEFAULT_CHECKS)
 ALL_CHECKS_NAMES = tuple(check.__name__ for check in runner.ALL_CHECKS)
+CHECKS_TYPE = click.Choice(ALL_CHECKS_NAMES)
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
+@click.option("--pre-run", help="A module to execute before the running the tests.", type=str)
 @click.version_option()
-def main() -> None:
+def main(pre_run: Optional[str] = None) -> None:
     """Command line tool for testing your web application built with Open API / Swagger specifications."""
+    if pre_run:
+        load_hook(pre_run)
 
 
 @main.command(short_help="Perform schemathesis test.")
 @click.argument("schema", type=str, callback=callbacks.validate_schema)
 @click.option(
-    "--checks",
-    "-c",
-    multiple=True,
-    help="List of checks to run.",
-    type=click.Choice(ALL_CHECKS_NAMES),
-    default=DEFAULT_CHECKS_NAMES,
+    "--checks", "-c", multiple=True, help="List of checks to run.", type=CHECKS_TYPE, default=DEFAULT_CHECKS_NAMES
 )
 @click.option(
     "--auth", "-a", help="Server user and password. Example: USER:PASSWORD", type=str, callback=callbacks.validate_auth
@@ -120,6 +120,7 @@ def run(  # pylint: disable=too-many-arguments
     SCHEMA must be a valid URL or file path pointing to an Open API / Swagger specification.
     """
     # pylint: disable=too-many-locals
+
     selected_checks = tuple(check for check in runner.ALL_CHECKS if check.__name__ in checks)
 
     if auth and auth_type == "digest":
@@ -145,6 +146,17 @@ def run(  # pylint: disable=too-many-arguments
         else:
             prepared_runner = runner.prepare(schema, checks=selected_checks, **options)
     execute(prepared_runner)
+
+
+def load_hook(module_name: str) -> None:
+    """Load the given hook by importing it."""
+    try:
+        __import__(module_name)
+    except Exception:
+        click.secho("An exception happened during the hook loading:\n", fg="red")
+        message = traceback.format_exc()
+        click.secho(message, fg="red")
+        raise click.Abort()
 
 
 @contextmanager
