@@ -242,6 +242,16 @@ def test_response_conformance_malformed_json(schema_url, app):
     assert "Expecting property name enclosed in double quotes" in str(error)
 
 
+@pytest.mark.endpoints("path_variable")
+def test_path_parameters_encoding(schema_url, app):
+    # When endpoint has a path parameter
+    results = execute(schema_url, checks=(status_code_conformance,), hypothesis_options={"derandomize": True})
+    # Then there should be no failures
+    # since all path parameters are quoted
+    assert not results.has_errors
+    assert not results.has_failures
+
+
 @pytest.mark.parametrize(
     "options", ({"loader_options": {"base_url": "http://127.0.0.1:1/"}}, {"hypothesis_options": {"deadline": 1}})
 )
