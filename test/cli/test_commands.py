@@ -497,3 +497,27 @@ def test_pre_run_hook_invalid(testdir, cli):
     assert lines[0] == "An exception happened during the hook loading:"
     assert lines[7] == "ZeroDivisionError: division by zero"
     assert lines[9] == "Aborted!"
+
+
+@pytest.mark.endpoints("success")
+def test_register_check(testdir, cli, schema_url):
+    # When `--pre-run` hook is passed to the CLI call
+    # And it contains registering a new check, which always fails for the testing purposes
+    module = testdir.makepyfile(
+        hook="""
+        import schemathesis
+
+        @schemathesis.register_check
+        def new_check(response, result):
+            raise AssertionError("Custom check failed!")
+        """
+    )
+    make_importable(module)
+
+    result = cli.main("--pre-run", module.purebasename, "run", "-c", "new_check", schema_url)
+
+    # Then CLI run should fail
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    # And a message from the new check should be displayed
+    lines = result.stdout.strip().split("\n")
+    assert lines[13] == "Custom check failed!"

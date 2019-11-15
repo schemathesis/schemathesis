@@ -6,6 +6,7 @@ import hypothesis
 import hypothesis.errors
 import jsonschema
 import requests
+from requests import Response
 from requests.auth import AuthBase
 
 from ..constants import USER_AGENT
@@ -82,7 +83,7 @@ def response_schema_conformance(response: requests.Response, result: TestResult)
 
 DEFAULT_CHECKS = (not_a_server_error,)
 OPTIONAL_CHECKS = (status_code_conformance, content_type_conformance, response_schema_conformance)
-ALL_CHECKS = DEFAULT_CHECKS + OPTIONAL_CHECKS
+ALL_CHECKS: Tuple[Callable[[Response, TestResult], None], ...] = DEFAULT_CHECKS + OPTIONAL_CHECKS
 
 
 @contextmanager
