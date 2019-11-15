@@ -276,8 +276,8 @@ def test_display_errors(swagger_20, capsys, results_set):
     # And the error itself is displayed
     assert "ConnectionError: Connection refused!" in out
     # And the example is displayed
-    assert "Used seed       : 123" in out
     assert "Query           : {'a': 1}" in out
+    assert "Or add this option to your command line parameters: --hypothesis-seed=123" in out
 
 
 @pytest.mark.parametrize(

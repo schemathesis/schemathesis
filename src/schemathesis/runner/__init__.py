@@ -166,7 +166,7 @@ def execute_from_schema(
             except Exception as error:
                 status = Status.error
                 result.add_error(error)
-            # Fetch seed value, hypothesis generates it during test executionz
+            # Fetch seed value, hypothesis generates it during test execution
             result.seed = getattr(test, "_hypothesis_internal_use_seed", None) or getattr(
                 test, "_hypothesis_internal_use_generated_seed", None
             )

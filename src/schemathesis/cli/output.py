@@ -213,15 +213,15 @@ def display_example(
     }
     max_length = max(map(len, output))
     template = f"{{:<{max_length}}} : {{}}"
-    if seed is not None:
-        click.secho(template.format("Used seed", seed), fg="red")
     if check_name is not None:
         click.secho(template.format("Check", check_name), fg="red")
     for key, value in output.items():
         if (key == "Body" and value is not None) or value not in (None, {}):
             click.secho(template.format(key, value), fg="red")
     click.echo()
-    click.secho(f"Run this Python code to reproduce this failure: \n\n{case.get_code_to_reproduce()}", fg="red")
+    click.secho(f"Run this Python code to reproduce this failure: \n\n    {case.get_code_to_reproduce()}", fg="red")
+    if seed is not None:
+        click.secho(f"\nOr add this option to your command line parameters: --hypothesis-seed={seed}", fg="red")
 
 
 def make_verbose_name(attribute: Attribute) -> str:
