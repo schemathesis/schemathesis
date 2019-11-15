@@ -12,6 +12,7 @@ Added
 - Support for OpenAPI 3.0 server variables (base_path). `#40`_
 - Support for ``format: byte``. `#254`_
 - Response schema conformance check in CLI / Runner. `#256`_
+- Docker image for CLI. `#268`_
 
 Changed
 ~~~~~~~
@@ -390,6 +391,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#268: https://github.com/kiwicom/schemathesis/issues/268
 .. _#261: https://github.com/kiwicom/schemathesis/issues/261
 .. _#256: https://github.com/kiwicom/schemathesis/issues/256
 .. _#254: https://github.com/kiwicom/schemathesis/issues/254
