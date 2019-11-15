@@ -399,7 +399,7 @@ Install ``poetry`` (check out the `installation guide`_) and run this command in
 
     poetry install
 
-For simpler local development Schemathesis includes a ``aiohttp``-based server with 3 endpoints in Swagger 2.0 schema:
+For simpler local development Schemathesis includes a ``aiohttp``-based server with the following endpoints in Swagger 2.0 schema:
 
 - ``/api/success`` - always returns ``{"success": true}``
 - ``/api/failure`` - always returns 500
@@ -420,7 +420,7 @@ To start the server:
     ./test_server.sh 8081
 
 It is possible to configure available endpoints via ``--endpoints`` option.
-The value is expected to be a comma separated string with endpoint names (``success``, ``failure`` or ``slow``):
+The value is expected to be a comma separated string with endpoint names (``success``, ``failure``, ``slow``, etc):
 
 .. code:: bash
 
