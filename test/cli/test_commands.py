@@ -348,7 +348,7 @@ def test_seed(cli, schema_url):
     result = cli.run(schema_url, "--hypothesis-seed=456")
     # Then the tests should fail and RNG seed should be displayed
     assert result.exit_code == 1
-    assert "Used seed       : 456" in result.stdout
+    assert "Or add this option to your command line parameters: --hypothesis-seed=456" in result.stdout.split("\n")
 
 
 @pytest.mark.endpoints("unsatisfiable")
