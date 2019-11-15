@@ -491,14 +491,3 @@ def test_pre_run_hook_invalid(testdir, cli):
     assert lines[0] == "An exception happened during the hook loading:"
     assert lines[7] == "ZeroDivisionError: division by zero"
     assert lines[9] == "Aborted!"
-
-
-def test_run_via_main(testdir, cli):
-    # This flow is similar to subprocess run, but faster and allows to gather coverage
-    result = cli.main("run")
-
-    # Then CLI run should fail
-    assert result.exit_code == ExitCode.INTERRUPTED
-    # And a helpful message should be displayed in the output
-    lines = result.stdout.strip().split("\n")
-    assert lines[0] == "Usage: schemathesis run [OPTIONS] SCHEMA"
