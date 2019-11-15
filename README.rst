@@ -105,6 +105,29 @@ register custom string format strategies or modify Schemathesis behavior in runt
 The passed value will be processed as an importable Python path, where you can execute your code.
 An example - https://github.com/kiwicom/schemathesis#custom-string-strategies
 
+Registering custom checks for CLI
+#################################
+
+To add a new check for the Schemathesis CLI there is a special function
+
+.. code:: python
+
+    import schemathesis
+
+    @schemathesis.register_check
+    def new_check(response, result):
+        # some awesome assertions!
+        pass
+
+The registered check should accept a ``response`` with ``requests.Response`` type and
+``result`` with ``schemathesis.models.TestResult`` type.
+
+After registration, your checks will be available in Schemathesis CLI and you can use them via ``-c`` command line option.
+
+.. code:: bash
+
+    schemathesis --pre-run module.with.checks run -c new_check https://example.com/api/swagger.json
+
 In-code
 ~~~~~~~
 

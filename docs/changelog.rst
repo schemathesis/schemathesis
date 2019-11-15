@@ -14,6 +14,7 @@ Added
 - Response schema conformance check in CLI / Runner. `#256`_
 - Docker image for CLI. `#268`_
 - Pre-run hooks for CLI. `#147`_
+- A way to register custom checks for CLI via ``schemathesis.register_check``. `#270`_
 
 Changed
 ~~~~~~~
@@ -392,6 +393,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#270: https://github.com/kiwicom/schemathesis/issues/270
 .. _#268: https://github.com/kiwicom/schemathesis/issues/268
 .. _#261: https://github.com/kiwicom/schemathesis/issues/261
 .. _#256: https://github.com/kiwicom/schemathesis/issues/256
