@@ -122,6 +122,7 @@ def test_commands_run_help(cli):
         "  --hypothesis-report-multiple-bugs BOOLEAN",
         "                                  Raise only the exception with the smallest",
         "                                  minimal example.",
+        "  --hypothesis-seed INTEGER       Set a seed to use for all Hypothesis tests.",
         "  --hypothesis-suppress-health-check [data_too_large|filter_too_much|too_slow|return_value|"
         "hung_test|large_base_example|not_a_test_method]",
         "                                  Comma-separated list of health checks to",
@@ -170,6 +171,7 @@ SCHEMA_URI = "https://example.com/swagger.json"
             [SCHEMA_URI, "--base-url=https://example.com/api/v1test"],
             {"checks": DEFAULT_CHECKS, "loader_options": {"base_url": "https://example.com/api/v1test"}},
         ),
+        ([SCHEMA_URI, "--hypothesis-seed=123"], {"checks": DEFAULT_CHECKS, "seed": 123}),
         (
             [
                 SCHEMA_URI,
@@ -338,6 +340,15 @@ def test_default_hypothesis_settings(cli, schema_url):
     assert result.exit_code == ExitCode.OK
     assert "GET /api/success ." in result.stdout
     assert "GET /api/slow ." in result.stdout
+
+
+@pytest.mark.endpoints("failure")
+def test_seed(cli, schema_url):
+    # When there is a failure
+    result = cli.run(schema_url, "--hypothesis-seed=456")
+    # Then the tests should fail and RNG seed should be displayed
+    assert result.exit_code == 1
+    assert "Used seed       : 456" in result.stdout
 
 
 @pytest.mark.endpoints("unsatisfiable")
