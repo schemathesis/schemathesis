@@ -1,14 +1,15 @@
 import pathlib
 import traceback
 from contextlib import contextmanager
-from typing import Dict, Generator, Iterable, List, Optional, Tuple
+from typing import Callable, Dict, Generator, Iterable, List, Optional, Tuple
 
 import click
 import hypothesis
+import requests
 from requests import exceptions
 from requests.auth import HTTPDigestAuth
 
-from .. import runner, utils
+from .. import models, runner, utils
 from ..loaders import from_path
 from ..runner import events
 from ..types import Filter
@@ -21,6 +22,12 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 DEFAULT_CHECKS_NAMES = tuple(check.__name__ for check in runner.DEFAULT_CHECKS)
 ALL_CHECKS_NAMES = tuple(check.__name__ for check in runner.ALL_CHECKS)
 CHECKS_TYPE = click.Choice(ALL_CHECKS_NAMES)
+
+
+def register_check(function: Callable[[requests.Response, models.TestResult], None]) -> None:
+    """Register a new check for schemathesis CLI."""
+    runner.ALL_CHECKS += (function,)
+    CHECKS_TYPE.choices += (function.__name__,)  # type: ignore
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
