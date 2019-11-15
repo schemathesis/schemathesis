@@ -6,6 +6,12 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Display RNG seed in the CLI output to allow test reproducing. `#267`_
+- Allow to specify seed in CLI.
+
 `0.15.0`_ - 2019-11-15
 ----------------------
 
@@ -404,6 +410,7 @@ Fixed
 .. _#272: https://github.com/kiwicom/schemathesis/issues/272
 .. _#270: https://github.com/kiwicom/schemathesis/issues/270
 .. _#268: https://github.com/kiwicom/schemathesis/issues/268
+.. _#267: https://github.com/kiwicom/schemathesis/issues/267
 .. _#261: https://github.com/kiwicom/schemathesis/issues/261
 .. _#256: https://github.com/kiwicom/schemathesis/issues/256
 .. _#254: https://github.com/kiwicom/schemathesis/issues/254

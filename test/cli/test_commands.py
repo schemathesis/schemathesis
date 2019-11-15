@@ -384,7 +384,7 @@ def test_flaky(cli, schema_url):
 @pytest.mark.endpoints("invalid")
 def test_invalid_endpoint(cli, schema_url):
     # When the app's schema contains errors
-    # For example if it type is "int" but should be "integer"
+    # For example if its type is "int" but should be "integer"
     result = cli.run(schema_url)
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
