@@ -260,7 +260,7 @@ def test_display_failures(swagger_20, capsys, results_set):
 
 def test_display_errors(swagger_20, capsys, results_set):
     # Given two test results - success and error
-    error = models.TestResult(models.Endpoint("/api/error", "GET", {}), swagger_20)
+    error = models.TestResult(models.Endpoint("/api/error", "GET", {}), swagger_20, seed=123)
     error.add_error(
         ConnectionError("Connection refused!"),
         models.Case("/api/error", "GET", base_url="http://127.0.0.1:8080", query={"a": 1}),
@@ -276,6 +276,7 @@ def test_display_errors(swagger_20, capsys, results_set):
     # And the error itself is displayed
     assert "ConnectionError: Connection refused!" in out
     # And the example is displayed
+    assert "Used seed       : 123" in out
     assert "Query           : {'a': 1}" in out
 
 

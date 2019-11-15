@@ -147,6 +147,7 @@ class TestResult:
     checks: List[Check] = attr.ib(factory=list)  # pragma: no mutate
     errors: List[Tuple[Exception, Optional[Case]]] = attr.ib(factory=list)  # pragma: no mutate
     is_errored: bool = attr.ib(default=False)  # pragma: no mutate
+    seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
 
     def mark_errored(self) -> None:
         self.is_errored = True
