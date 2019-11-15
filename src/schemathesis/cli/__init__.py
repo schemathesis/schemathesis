@@ -26,13 +26,13 @@ CHECKS_TYPE = click.Choice(ALL_CHECKS_NAMES)
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.option("--pre-run", help="A module to execute before the running the tests.", type=str)
 @click.version_option()
-def main(pre_run: Optional[str] = None) -> None:
+def schemathesis(pre_run: Optional[str] = None) -> None:
     """Command line tool for testing your web application built with Open API / Swagger specifications."""
     if pre_run:
         load_hook(pre_run)
 
 
-@main.command(short_help="Perform schemathesis test.")
+@schemathesis.command(short_help="Perform schemathesis test.")
 @click.argument("schema", type=str, callback=callbacks.validate_schema)
 @click.option(
     "--checks", "-c", multiple=True, help="List of checks to run.", type=CHECKS_TYPE, default=DEFAULT_CHECKS_NAMES

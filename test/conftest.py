@@ -52,7 +52,7 @@ def schema_url(base_url):
 
 
 @pytest.fixture()
-def cli(testdir):
+def cli():
     """CLI runner helper.
 
     Provides in-process execution via `click.CliRunner` and sub-process execution via `pytest.pytester.Testdir`.
@@ -62,16 +62,12 @@ def cli(testdir):
 
     class Runner:
         @staticmethod
-        def run_inprocess(*args, **kwargs):
+        def run(*args, **kwargs):
             return cli_runner.invoke(schemathesis.cli.run, args, **kwargs)
 
         @staticmethod
-        def main_inprocess(*args, **kwargs):
-            return cli_runner.invoke(schemathesis.cli.main, args, **kwargs)
-
-        @staticmethod
-        def run_subprocess(*args, **kwargs):
-            return testdir.run("schemathesis", *args, **kwargs)
+        def main(*args, **kwargs):
+            return cli_runner.invoke(schemathesis.cli.schemathesis, args, **kwargs)
 
     return Runner()
 
