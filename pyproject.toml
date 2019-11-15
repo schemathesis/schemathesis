@@ -49,7 +49,7 @@ typing_extensions = "^3.7"
 pytest11 = {schemathesis = "schemathesis.extra.pytest_plugin"}
 
 [tool.poetry.scripts]
-schemathesis = "schemathesis.cli:main"
+schemathesis = "schemathesis.cli:schemathesis"
 
 [tool.black]
 line-length = 120

@@ -24,6 +24,12 @@ def test_commands_help(cli):
     assert result.stdout == result_h.stdout == result_help.stdout
 
 
+def test_run_subprocess(testdir):
+    # To verify that CLI entry point is installed properly
+    result = testdir.run("schemathesis")
+    assert result.ret == ExitCode.OK
+
+
 def test_commands_version(cli):
     result = cli.main("--version")
 
