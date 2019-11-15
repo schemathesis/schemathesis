@@ -165,6 +165,7 @@ def execute_from_schema(
             except Exception as error:
                 status = Status.error
                 result.add_error(error)
+            result.seed = getattr(test, "_hypothesis_internal_use_generated_seed", None)
             results.append(result)
             yield events.AfterExecution(results=results, schema=schema, endpoint=endpoint, status=status)
 

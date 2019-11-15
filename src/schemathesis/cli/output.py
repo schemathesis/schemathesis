@@ -171,7 +171,7 @@ def display_single_error(result: TestResult) -> None:
         message = utils.format_exception(error)
         click.secho(message, fg="red")
         if example is not None:
-            display_example(example)
+            display_example(example, seed=result.seed)
 
 
 def display_failures(results: TestResultSet) -> None:
@@ -193,14 +193,16 @@ def display_single_failure(result: TestResult) -> None:
     display_subsection(result)
     for check in reversed(result.checks):
         if check.example is not None:
-            display_example(check.example, check.name, check.message)
+            display_example(check.example, check.name, check.message, result.seed)
             # Display only the latest case
             # (dd): It is possible to find multiple errors, but the simplest option for now is to display
             # the latest and avoid deduplication, which will be done in the future.
             break
 
 
-def display_example(case: Case, check_name: Optional[str] = None, message: Optional[str] = None) -> None:
+def display_example(
+    case: Case, check_name: Optional[str] = None, message: Optional[str] = None, seed: Optional[int] = None
+) -> None:
     if message is not None:
         click.secho(message, fg="red")
         click.echo()
@@ -211,6 +213,8 @@ def display_example(case: Case, check_name: Optional[str] = None, message: Optio
     }
     max_length = max(map(len, output))
     template = f"{{:<{max_length}}} : {{}}"
+    if seed is not None:
+        click.secho(template.format("Used seed", seed), fg="red")
     if check_name is not None:
         click.secho(template.format("Check", check_name), fg="red")
     for key, value in output.items():
