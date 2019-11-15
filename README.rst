@@ -75,6 +75,21 @@ For the full list of options, run:
 
     schemathesis --help
 
+Docker
+~~~~~~
+
+Schemathesis CLI also available as a docker image
+
+.. code:: bash
+
+    docker run schemathesis:latest run http://example.com/schema.json
+
+To run it against localhost server add ``--network=host`` parameter:
+
+.. code:: bash
+
+    docker run --network="host" schemathesis:latest run http://127.0.0.1/schema.json
+
 In-code
 ~~~~~~~
 
