@@ -32,7 +32,7 @@ async def failure(request: web.Request) -> web.Response:
 
 
 async def slow(request: web.Request) -> web.Response:
-    await asyncio.sleep(0.25)
+    await asyncio.sleep(0.1)
     return web.json_response({"slow": True})
 
 
@@ -40,15 +40,12 @@ async def unsatisfiable(request: web.Request) -> web.Response:
     return web.json_response({"result": "IMPOSSIBLE!"})
 
 
-SHOULD_FAIL = True
-
-
 async def flaky(request: web.Request) -> web.Response:
-    global SHOULD_FAIL
-    if SHOULD_FAIL:
-        SHOULD_FAIL = False
+    config = request.app["config"]
+    if config["should_fail"]:
+        config["should_fail"] = False
         raise web.HTTPInternalServerError
-    SHOULD_FAIL = True
+    config["should_fail"] = True
     return web.json_response({"result": "flaky!"})
 
 

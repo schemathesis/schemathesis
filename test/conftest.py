@@ -1,13 +1,14 @@
 from textwrap import dedent
 
 import pytest
+from aiohttp.test_utils import unused_port
 from click.testing import CliRunner
 
 import schemathesis.cli
 
 from .app import create_app
 from .app import make_schema as make_app_schema
-from .app import run_server
+from .app import reset_app, run_server
 from .utils import make_schema
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
@@ -17,30 +18,37 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "endpoints(*names): add only specified endpoints to the test application.")
 
 
-@pytest.fixture()
-def app(request):
-    """AioHTTP application with configurable endpoints.
+@pytest.fixture(scope="session")
+def _app():
+    """A global AioHTTP application with configurable endpoints."""
+    return create_app(("success", "failure"))
 
-    Endpoint names should be passed as positional arguments to `pytest.mark.endpoints` decorator.
+
+@pytest.fixture()
+def app(_app, request):
+    """Set up the global app for a specific test.
+
+    NOTE. It might cause race conditions when `pytest-xdist` is used, but they have very low probability.
     """
     marker = request.node.get_closest_marker("endpoints")
     if marker:
         endpoints = marker.args
     else:
         endpoints = ("success", "failure")
-    return create_app(endpoints)
+    reset_app(_app, endpoints)
+    return _app
 
 
-@pytest.fixture()
-def server(app, aiohttp_unused_port):
+@pytest.fixture(scope="session")
+def server(_app):
     """Run the app on an unused port."""
-    port = aiohttp_unused_port()
-    run_server(app, port)
+    port = unused_port()
+    run_server(_app, port)
     yield {"port": port}
 
 
 @pytest.fixture()
-def base_url(server):
+def base_url(server, app):
     """Base URL for the running application."""
     return f"http://127.0.0.1:{server['port']}"
 
@@ -51,7 +59,7 @@ def schema_url(base_url):
     return f"{base_url}/swagger.yaml"
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def cli():
     """CLI runner helper.
 
