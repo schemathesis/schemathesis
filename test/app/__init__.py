@@ -23,6 +23,7 @@ class Endpoint(Enum):
     success = ("GET", "/api/success", handlers.success)
     failure = ("GET", "/api/failure", handlers.failure)
     slow = ("GET", "/api/slow", handlers.slow)
+    path_variable = ("GET", "/api/path_variable/{key}", handlers.success)
     unsatisfiable = ("POST", "/api/unsatisfiable", handlers.unsatisfiable)
     invalid = ("POST", "/api/invalid", handlers.unsatisfiable)
     flaky = ("GET", "/api/flaky", handlers.flaky)
@@ -93,7 +94,8 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
         "paths": {},
     }
     for endpoint in endpoints:
-        method = Endpoint[endpoint].value[0].lower()
+        method, path, _ = Endpoint[endpoint].value
+        path = path.replace(template["basePath"], "")
         if endpoint == "unsatisfiable":
             schema = {
                 "parameters": [
@@ -108,6 +110,11 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
             }
         elif endpoint == "flaky":
             schema = {"parameters": [{"name": "id", "in": "query", "required": True, "type": "integer"}]}
+        elif endpoint == "path_variable":
+            schema = {
+                "parameters": [{"name": "key", "in": "path", "required": True, "type": "string", "minLength": 1}],
+                "responses": {200: {"description": "OK"}},
+            }
         elif endpoint == "invalid":
             schema = {"parameters": [{"name": "id", "in": "query", "required": True, "type": "int"}]}
         elif endpoint == "custom_format":
@@ -137,7 +144,7 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
                     "default": {"description": "Default response"},
                 }
             }
-        template["paths"][f"/{endpoint}"] = {method: schema}
+        template["paths"][path] = {method.lower(): schema}
     return template
 
 
