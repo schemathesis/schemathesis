@@ -92,6 +92,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 @click.option(
     "--hypothesis-report-multiple-bugs", help="Raise only the exception with the smallest minimal example.", type=bool
 )
+@click.option("--hypothesis-seed", help="Set a seed to use for all Hypothesis tests.", type=int)
 @click.option(
     "--hypothesis-suppress-health-check",
     help="Comma-separated list of health checks to disable.",
@@ -120,6 +121,7 @@ def run(  # pylint: disable=too-many-arguments
     hypothesis_phases: Optional[List[hypothesis.Phase]] = None,
     hypothesis_report_multiple_bugs: Optional[bool] = None,
     hypothesis_suppress_health_check: Optional[List[hypothesis.HealthCheck]] = None,
+    hypothesis_seed: Optional[int] = None,
     hypothesis_verbosity: Optional[hypothesis.Verbosity] = None,
 ) -> None:
     """Perform schemathesis test against an API specified by SCHEMA.
@@ -145,6 +147,7 @@ def run(  # pylint: disable=too-many-arguments
             suppress_health_check=hypothesis_suppress_health_check,
             verbosity=hypothesis_verbosity,
         ),
+        seed=hypothesis_seed,
     )
 
     with abort_on_network_errors():

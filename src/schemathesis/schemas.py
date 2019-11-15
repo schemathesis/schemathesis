@@ -76,13 +76,13 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def get_all_tests(
-        self, func: Callable, settings: Optional[hypothesis.settings] = None
+        self, func: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
     ) -> Generator[Tuple[Endpoint, Union[Callable, InvalidSchema]], None, None]:
         """Generate all endpoints and Hypothesis tests for them."""
         test: Union[Callable, InvalidSchema]
         for endpoint in self.get_all_endpoints():
             try:
-                test = create_test(endpoint, func, settings)
+                test = create_test(endpoint, func, settings, seed=seed)
             except InvalidSchema as exc:
                 test = exc
             yield endpoint, test

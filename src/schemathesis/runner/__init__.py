@@ -115,6 +115,7 @@ def execute_from_schema(
     auth: Optional[Auth] = None,
     headers: Optional[Dict[str, Any]] = None,
     request_timeout: Optional[int] = None,
+    seed: Optional[int] = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Execute tests for the given schema.
 
@@ -129,7 +130,7 @@ def execute_from_schema(
         initialized = events.Initialized(results=results, schema=schema, checks=checks, hypothesis_settings=settings)
         yield initialized
 
-        for endpoint, test in schema.get_all_tests(single_test, settings):
+        for endpoint, test in schema.get_all_tests(single_test, settings, seed=seed):
             result = TestResult(endpoint=endpoint, schema=schema)
             yield events.BeforeExecution(results=results, schema=schema, endpoint=endpoint)
             try:
@@ -165,7 +166,10 @@ def execute_from_schema(
             except Exception as error:
                 status = Status.error
                 result.add_error(error)
-            result.seed = getattr(test, "_hypothesis_internal_use_generated_seed", None)
+            # Fetch seed value, hypothesis generates it during test executionz
+            result.seed = getattr(test, "_hypothesis_internal_use_seed", None) or getattr(
+                test, "_hypothesis_internal_use_generated_seed", None
+            )
             results.append(result)
             yield events.AfterExecution(results=results, schema=schema, endpoint=endpoint, status=status)
 
@@ -200,6 +204,7 @@ def prepare(  # pylint: disable=too-many-arguments
     loader_options: Optional[Dict[str, Any]] = None,
     hypothesis_options: Optional[Dict[str, Any]] = None,
     loader: Callable = from_uri,
+    seed: Optional[int] = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Prepare a generator that will run test cases against the given API definition."""
     api_options = api_options or {}
@@ -208,7 +213,7 @@ def prepare(  # pylint: disable=too-many-arguments
     if "base_url" not in loader_options:
         loader_options["base_url"] = get_base_url(schema_uri)
     schema = loader(schema_uri, **loader_options)
-    return execute_from_schema(schema, checks, hypothesis_options=hypothesis_options, **api_options)
+    return execute_from_schema(schema, checks, hypothesis_options=hypothesis_options, seed=seed, **api_options)
 
 
 def single_test(

@@ -19,10 +19,14 @@ from .models import Case, Endpoint, empty_object
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
 
 
-def create_test(endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None) -> Callable:
+def create_test(
+    endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
+) -> Callable:
     """Create a Hypothesis test."""
     strategy = endpoint.as_strategy()
     wrapped_test = hypothesis.given(case=strategy)(test)
+    if seed is not None:
+        wrapped_test = hypothesis.seed(seed)(wrapped_test)
     original_test = get_original_test(test)
     if asyncio.iscoroutinefunction(original_test):
         wrapped_test.hypothesis.inner_test = make_async_test(original_test)  # type: ignore
