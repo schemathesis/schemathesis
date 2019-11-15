@@ -48,9 +48,8 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Appli
     incoming_requests = []
     schema_requests = []
 
-    schema_data = make_schema(endpoints)
-
     async def schema(request: web.Request) -> web.Response:
+        schema_data = request.app["config"]["schema_data"]
         content = yaml.dump(schema_data)
         schema_requests.append(request)
         return web.Response(body=content)
@@ -66,15 +65,19 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Appli
     app = web.Application()
     app.add_routes(
         [web.get("/swagger.yaml", schema)]
-        + [
-            web.route(item.value[0], item.value[1], wrapper(item.value[2]))
-            for item in Endpoint
-            if item.name in endpoints
-        ]
+        + [web.route(item.value[0], item.value[1], wrapper(item.value[2])) for item in Endpoint]
     )
     app["incoming_requests"] = incoming_requests
     app["schema_requests"] = schema_requests
+    app["config"] = {"should_fail": True, "schema_data": make_schema(endpoints)}
     return app
+
+
+def reset_app(app: web.Application, endpoints: Tuple[str, ...] = ("success", "failure")) -> None:
+    """Clean up all internal containers of the application and resets its config."""
+    app["incoming_requests"][:] = []
+    app["schema_requests"][:] = []
+    app["config"].update({"should_fail": True, "schema_data": make_schema(endpoints)})
 
 
 def make_schema(endpoints: Tuple[str, ...]) -> Dict:
