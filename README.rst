@@ -82,13 +82,13 @@ Schemathesis CLI also available as a docker image
 
 .. code:: bash
 
-    docker run kiwicom/schemathesis:latest run http://example.com/schema.json
+    docker run kiwicom/schemathesis:stable run http://example.com/schema.json
 
 To run it against localhost server add ``--network=host`` parameter:
 
 .. code:: bash
 
-    docker run --network="host" kiwicom/schemathesis:latest run http://127.0.0.1/schema.json
+    docker run --network="host" kiwicom/schemathesis:stable run http://127.0.0.1/schema.json
 
 Pre-run CLI hook
 ################
