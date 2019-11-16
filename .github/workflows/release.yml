@@ -1,8 +1,8 @@
-name: Perform actions after release
+name: Post-release actions
 
 on:
   release:
-    type: [published, created, edited]
+    type: [published, edited]
 
 jobs:
   release_image:
@@ -10,8 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@master
-    - uses: elgohr/Publish-Docker-Github-Action@master
-      with:
-        name: kiwicom/schemathesis:${GITHUB_REF}
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_PASSWORD }}
+    - name: Build the image
+      run: docker build -f "Dockerfile" -t "kiwicom/schemathesis:${GITHUB_REF##*/}" -t "kiwicom/schemathesis:stable" .
+    - name: Login to registry
+      run: docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+    - name: Publish stable image
+      run: docker push kiwicom/schemathesis:${GITHUB_REF##*/}
+    - name: Publish tag image
+      run: docker push kiwicom/schemathesis:stable
