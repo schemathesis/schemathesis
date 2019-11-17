@@ -117,7 +117,9 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
     static_kwargs = {"path": endpoint.path, "method": endpoint.method, "base_url": endpoint.base_url}
     try:
         strategies = {
-            "path_parameters": from_schema(endpoint.path_parameters).filter(filter_path_parameters).map(quote_all),
+            "path_parameters": from_schema(endpoint.path_parameters)
+            .filter(filter_path_parameters)  # type: ignore
+            .map(quote_all),  # type: ignore
             "headers": from_schema(endpoint.headers).filter(is_valid_header),  # type: ignore
             "cookies": from_schema(endpoint.cookies),
             "query": from_schema(endpoint.query),
