@@ -14,7 +14,7 @@ from requests.utils import check_header_validity  # type: ignore
 
 from ._compat import handle_warnings
 from .exceptions import InvalidSchema
-from .models import Case, Endpoint, empty_object
+from .models import Case, Endpoint
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
 
@@ -61,9 +61,13 @@ def make_async_test(test: Callable) -> Callable:
 def get_examples(endpoint: Endpoint) -> Generator[Case, None, None]:
     for name in PARAMETERS:
         parameter = getattr(endpoint, name)
-        if "example" in parameter:
+        if parameter is not None and "example" in parameter:
             with handle_warnings():
-                strategies = {other: from_schema(getattr(endpoint, other)) for other in PARAMETERS - {name}}
+                strategies = {
+                    other: from_schema(getattr(endpoint, other))
+                    for other in PARAMETERS - {name}
+                    if getattr(endpoint, other) is not None
+                }
                 static_parameters = {name: parameter["example"]}
                 yield _get_case_strategy(endpoint, static_parameters, strategies).example()
 
@@ -114,17 +118,24 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
 
     Path & endpoint are static, the others are JSON schemas.
     """
+    strategies = {}
     static_kwargs = {"path": endpoint.path, "method": endpoint.method, "base_url": endpoint.base_url}
     try:
-        strategies = {
-            "path_parameters": from_schema(endpoint.path_parameters)
-            .filter(filter_path_parameters)  # type: ignore
-            .map(quote_all),  # type: ignore
-            "headers": from_schema(endpoint.headers).filter(is_valid_header),  # type: ignore
-            "cookies": from_schema(endpoint.cookies),
-            "query": from_schema(endpoint.query),
-            "form_data": from_schema(endpoint.form_data),
-        }
+        for parameter in PARAMETERS:
+            value = getattr(endpoint, parameter)
+            if value is not None:
+                if parameter == "path_parameters":
+                    strategies[parameter] = (
+                        from_schema(value)
+                        .filter(filter_path_parameters)  # type: ignore
+                        .map(quote_all)  # type: ignore
+                    )
+                elif parameter == "headers":
+                    strategies[parameter] = from_schema(value).filter(is_valid_header)  # type: ignore
+                else:
+                    strategies[parameter] = from_schema(value)  # type: ignore
+            else:
+                static_kwargs[parameter] = None
         return _get_case_strategy(endpoint, static_kwargs, strategies)
     except AssertionError:
         raise InvalidSchema("Invalid schema for this endpoint")
@@ -153,12 +164,10 @@ def _get_case_strategy(
         **extra_static_parameters,
     }
     if endpoint.method == "GET":
-        if endpoint.body != empty_object():
+        if endpoint.body is not None:
             raise InvalidSchema("Body parameters are defined for GET request.")
         static_parameters["body"] = None
         strategies.pop("body", None)
-    elif "body" not in static_parameters:
-        strategies["body"] = from_schema(endpoint.body)
     return st.builds(partial(Case, **static_parameters), **strategies)
 
 

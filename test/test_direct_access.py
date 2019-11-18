@@ -44,6 +44,4 @@ def test_endpoint_access(swagger_20, method):
 def test_as_strategy(swagger_20):
     strategy = swagger_20["/v1/users"]["GET"].as_strategy()
     assert isinstance(strategy, st.SearchStrategy)
-    assert strategy.example() == Case(
-        path="/v1/users", method="GET", path_parameters={}, headers={}, cookies={}, query={}, body=None, form_data={}
-    )
+    assert strategy.example() == Case(path="/v1/users", method="GET")

@@ -21,7 +21,7 @@ def make_endpoint(**kwargs: Any) -> Endpoint:
 
 
 def make_case(**kwargs: Any) -> Case:
-    kwargs.setdefault("body", {})
+    kwargs.setdefault("body", None)
     return _make(Case, **kwargs)
 
 
