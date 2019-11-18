@@ -83,9 +83,9 @@ def test_update_pet(testdir):
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["petId"])
-    if "name" in case.form_data:
+    if case.form_data is not None and "name" in case.form_data:
         assert_str(case.form_data["name"])
-    if "status" in case.form_data:
+    if case.form_data is not None and "status" in case.form_data:
         assert_str(case.form_data["status"])
 """
     )
@@ -114,7 +114,7 @@ def test_upload_image(testdir):
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["petId"])
-    if "additionalMetadata" in case.form_data:
+    if case.form_data is not None and "additionalMetadata" in case.form_data:
         assert_str(case.form_data["additionalMetadata"])
 """
     )

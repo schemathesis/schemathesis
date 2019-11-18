@@ -21,17 +21,17 @@ class Case:
     path: str = attr.ib()  # pragma: no mutate
     method: str = attr.ib()  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
-    path_parameters: PathParameters = attr.ib(factory=dict)  # pragma: no mutate
-    headers: Headers = attr.ib(factory=dict)  # pragma: no mutate
-    cookies: Cookies = attr.ib(factory=dict)  # pragma: no mutate
-    query: Query = attr.ib(factory=dict)  # pragma: no mutate
+    path_parameters: PathParameters = attr.ib(default=None)  # pragma: no mutate
+    headers: Headers = attr.ib(default=None)  # pragma: no mutate
+    cookies: Cookies = attr.ib(default=None)  # pragma: no mutate
+    query: Query = attr.ib(default=None)  # pragma: no mutate
     body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
-    form_data: FormData = attr.ib(factory=dict)  # pragma: no mutate
+    form_data: FormData = attr.ib(default=None)  # pragma: no mutate
 
     @property
     def formatted_path(self) -> str:
         # pylint: disable=not-a-mapping
-        return self.path.format(**self.path_parameters)
+        return self.path.format(**self.path_parameters or {})
 
     def get_code_to_reproduce(self) -> str:
         """Construct a Python code to reproduce this case with `requests`."""
@@ -39,7 +39,7 @@ class Case:
         method = kwargs["method"].lower()
 
         def are_defaults(key: str, value: Optional[Dict]) -> bool:
-            default_value: Optional[Dict] = {"json": None}.get(key, {})
+            default_value: Optional[Dict] = {"json": None}.get(key, None)
             return value == default_value
 
         printed_kwargs = ", ".join(
@@ -113,12 +113,12 @@ class Endpoint:
     method: str = attr.ib()  # pragma: no mutate
     definition: Dict[str, Any] = attr.ib()  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
-    path_parameters: PathParameters = attr.ib(factory=empty_object)  # pragma: no mutate
-    headers: Headers = attr.ib(factory=empty_object)  # pragma: no mutate
-    cookies: Cookies = attr.ib(factory=empty_object)  # pragma: no mutate
-    query: Query = attr.ib(factory=empty_object)  # pragma: no mutate
-    body: Body = attr.ib(factory=empty_object)  # pragma: no mutate
-    form_data: FormData = attr.ib(factory=empty_object)  # pragma: no mutate
+    path_parameters: PathParameters = attr.ib(default=None)  # pragma: no mutate
+    headers: Headers = attr.ib(default=None)  # pragma: no mutate
+    cookies: Cookies = attr.ib(default=None)  # pragma: no mutate
+    query: Query = attr.ib(default=None)  # pragma: no mutate
+    body: Body = attr.ib(default=None)  # pragma: no mutate
+    form_data: FormData = attr.ib(default=None)  # pragma: no mutate
 
     def as_strategy(self) -> SearchStrategy:
         from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel

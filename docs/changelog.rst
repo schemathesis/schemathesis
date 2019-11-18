@@ -13,6 +13,11 @@ Added
 - Allow to specify seed in CLI.
 - Ability to pass custom kwargs to the ``requests.get`` call in ``loaders.from_uri``.
 
+Changed
+~~~~~~~
+
+- Refactor case generation strategies: strategy is not used to generate empty value.
+
 Fixed
 ~~~~~
 
