@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Any, Callable, Generator, List, Type
 
 import pytest
@@ -42,14 +43,14 @@ class SchemathesisCase(PyCollector):
         metafunc = self._parametrize(cls, definition, fixtureinfo)
 
         if not metafunc._calls:
-            yield Function(name, parent=self.parent, callobj=funcobj, fixtureinfo=fixtureinfo)
+            yield SchemathesisFunction(name, parent=self.parent, callobj=funcobj, fixtureinfo=fixtureinfo)
         else:
             fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)
             fixtureinfo.prune_dependency_tree()
 
             for callspec in metafunc._calls:
                 subname = "{}[{}]".format(name, callspec.id)
-                yield Function(
+                yield SchemathesisFunction(
                     name=subname,
                     parent=self.parent,
                     callspec=callspec,
@@ -88,6 +89,15 @@ class SchemathesisCase(PyCollector):
             ]
         except Exception:
             pytest.fail("Error during collection")
+
+
+class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
+    def _getobj(self) -> partial:
+        """Tests defined as methods require `self` as the first argument.
+
+        This method is called only for this case.
+        """
+        return partial(self.obj, self.parent.obj)
 
 
 @hookimpl(hookwrapper=True)  # type:ignore # pragma: no mutate

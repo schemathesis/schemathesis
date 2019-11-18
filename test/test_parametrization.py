@@ -48,6 +48,31 @@ def test_(request, param, case):
     )
 
 
+def test_method(testdir):
+    # When tests are written as methods
+    testdir.make_test(
+        """
+class TestAPI:
+    @schema.parametrize()
+    def test_(self, request, case):
+        request.config.HYPOTHESIS_CASES += 1
+        assert case.path == "/v1/users"
+        assert case.method in ("GET", "POST")
+""",
+        paths={"/users": {"get": {}, "post": {}}},
+    )
+    # Then they should work as regular tests
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=2)
+    result.stdout.re_match_lines(
+        [
+            r"test_method.py::TestAPI::test_\[GET:/v1/users\] PASSED",
+            r"test_method.py::TestAPI::test_\[POST:/v1/users\] PASSED",
+            r"Hypothesis calls: 2",
+        ]
+    )
+
+
 def test_max_examples(testdir):
     # When `max_examples` is specified
     parameters = {"parameters": [integer(name="id", required=True)]}
