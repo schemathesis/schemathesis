@@ -21,10 +21,10 @@ def test_as_requests_kwargs(override, server, base_url, converter):
         case = Case(base_url=base_url, **kwargs)
         data = case.as_requests_kwargs()
     assert data == {
-        "headers": {},
+        "headers": None,
         "json": None,
         "method": "GET",
-        "params": {},
+        "params": None,
         "cookies": {"TOKEN": "secret"},
         "url": f"http://127.0.0.1:{server['port']}/api/success",
     }

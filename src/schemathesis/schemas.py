@@ -19,6 +19,7 @@ import jsonschema
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.exceptions import InvalidSchema
+from schemathesis.models import empty_object
 
 from ._hypothesis import create_test
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
@@ -181,27 +182,29 @@ class SwaggerV20(BaseSchema):
             self.process_form_data(endpoint, parameter)
 
     def process_path(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        self.add_parameter(endpoint.path_parameters, parameter)
+        endpoint.path_parameters = self.add_parameter(endpoint.path_parameters, parameter)
 
     def process_header(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        self.add_parameter(endpoint.headers, parameter)
+        endpoint.headers = self.add_parameter(endpoint.headers, parameter)
 
     def process_query(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        self.add_parameter(endpoint.query, parameter)
+        endpoint.query = self.add_parameter(endpoint.query, parameter)
 
     def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         # "schema" is a required field
         endpoint.body = self.resolve(parameter["schema"])
 
     def process_form_data(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        self.add_parameter(endpoint.form_data, parameter)
+        endpoint.form_data = self.add_parameter(endpoint.form_data, parameter)
 
-    def add_parameter(self, container: Dict[str, Any], parameter: Dict[str, Any]) -> None:
+    def add_parameter(self, container: Dict[str, Any], parameter: Dict[str, Any]) -> Dict[str, Any]:
         """Add parameter object to the container."""
         name = parameter["name"]
+        container = container or empty_object()
         container["properties"][name] = self.parameter_to_json_schema(parameter)
         if parameter.get("required", False):
             container["required"].append(name)
+        return container
 
     def parameter_to_json_schema(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Convert Parameter object to a JSON schema."""
@@ -295,7 +298,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
             super().process_by_type(endpoint, parameter)
 
     def process_cookie(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        self.add_parameter(endpoint.cookies, parameter)
+        endpoint.cookies = self.add_parameter(endpoint.cookies, parameter)
 
     def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         parameter = self.resolve(parameter)
