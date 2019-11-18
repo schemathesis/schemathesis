@@ -89,10 +89,16 @@ class Case:
         """Convert the case into a dictionary acceptable by requests."""
         if session is None:
             session = requests.Session()
+            close_session = True
+        else:
+            close_session = False
 
         base_url = self._get_base_url(base_url)
         data = self.as_requests_kwargs(base_url)
-        return session.request(**data, **kwargs)  # type: ignore
+        response = session.request(**data, **kwargs)  # type: ignore
+        if close_session:
+            session.close()
+        return response
 
 
 def empty_object() -> Dict[str, Any]:
