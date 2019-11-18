@@ -34,6 +34,7 @@ def test_as_requests_kwargs(override, server, base_url, converter):
 
 
 @pytest.mark.parametrize("override", (False, True))
+@pytest.mark.filterwarnings("always")
 def test_call(override, base_url):
     kwargs = {"method": "GET", "path": "/api/success"}
     if override:
@@ -44,6 +45,9 @@ def test_call(override, base_url):
         response = case.call()
     assert response.status_code == 200
     assert response.json() == {"success": True}
+    with pytest.warns(None) as records:
+        del response
+    assert not records
 
 
 @pytest.mark.parametrize(
