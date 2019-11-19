@@ -1,6 +1,7 @@
 import pytest
 
 import schemathesis
+from schemathesis.constants import USER_AGENT
 
 from .utils import SIMPLE_PATH
 
@@ -13,6 +14,14 @@ def test_path_loader(simple_schema):
 def test_uri_loader(app_schema, app, schema_url):
     # Each loader method should read the specified schema correctly
     assert schemathesis.from_uri(schema_url).raw_schema == app_schema
+
+
+def test_uri_loader_custom_kwargs(app, schema_url):
+    # All custom kwargs are passed to `requests.get`
+    schemathesis.from_uri(schema_url, verify=False, headers={"X-Test": "foo"})
+    request = app["schema_requests"][0]
+    assert request.headers["X-Test"] == "foo"
+    assert request.headers["User-Agent"] == USER_AGENT
 
 
 def test_base_url(base_url, schema_url):

@@ -11,6 +11,7 @@ Added
 
 - Display RNG seed in the CLI output to allow test reproducing. `#267`_
 - Allow to specify seed in CLI.
+- Ability to pass custom kwargs to the ``requests.get`` call in ``loaders.from_uri``.
 
 Fixed
 ~~~~~
