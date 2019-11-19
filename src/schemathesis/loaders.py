@@ -29,11 +29,11 @@ def from_uri(
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
+    **kwargs: Any,
 ) -> BaseSchema:
     """Load a remote resource and parse to schema instance."""
-    session = requests.Session()
-    session.headers.update({"User-Agent": USER_AGENT})
-    response = session.get(uri)
+    kwargs.setdefault("headers", {}).setdefault("User-Agent", USER_AGENT)
+    response = requests.get(uri, **kwargs)
     response.raise_for_status()
     if base_url is None:
         base_url = get_base_url(uri)
