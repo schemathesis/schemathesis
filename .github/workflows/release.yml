@@ -21,3 +21,20 @@ jobs:
       run: docker push kiwicom/schemathesis:${GITHUB_REF##*/}
     - name: Publish tag image
       run: docker push kiwicom/schemathesis:stable
+
+  release_package:
+    name: Build and publish package to pypi.org
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - uses: actions/setup-python@v1
+      with:
+        python-version: '3.7'
+    - run: pip install poetry
+    - name: Build package
+      run: poetry build --no-interaction
+    - name: Publish package
+      run: poetry publish --no-interaction --username=${PYPI_USERNAME} --password=${PYPI_PASSWORD}
+      env:
+        PYPY_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
