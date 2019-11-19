@@ -16,7 +16,8 @@ Added
 Changed
 ~~~~~~~
 
-- Refactor case generation strategies: strategy is not used to generate empty value.
+- Refactor case generation strategies: strategy is not used to generate empty value. `#253`_
+- Improved error message for invalid path parameter declaration. `#255`_
 
 Fixed
 ~~~~~
@@ -430,7 +431,9 @@ Fixed
 .. _#267: https://github.com/kiwicom/schemathesis/issues/267
 .. _#261: https://github.com/kiwicom/schemathesis/issues/261
 .. _#256: https://github.com/kiwicom/schemathesis/issues/256
+.. _#255: https://github.com/kiwicom/schemathesis/issues/255
 .. _#254: https://github.com/kiwicom/schemathesis/issues/254
+.. _#253: https://github.com/kiwicom/schemathesis/issues/253
 .. _#248: https://github.com/kiwicom/schemathesis/issues/248
 .. _#246: https://github.com/kiwicom/schemathesis/issues/246
 .. _#237: https://github.com/kiwicom/schemathesis/issues/237
