@@ -8,6 +8,7 @@ import attr
 import requests
 from hypothesis.searchstrategy import SearchStrategy
 
+from .exceptions import InvalidSchema
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 
 if TYPE_CHECKING:
@@ -31,7 +32,10 @@ class Case:
     @property
     def formatted_path(self) -> str:
         # pylint: disable=not-a-mapping
-        return self.path.format(**self.path_parameters or {})
+        try:
+            return self.path.format(**self.path_parameters or {})
+        except KeyError:
+            raise InvalidSchema("Missing required property `required: true`")
 
     def get_code_to_reproduce(self) -> str:
         """Construct a Python code to reproduce this case with `requests`."""

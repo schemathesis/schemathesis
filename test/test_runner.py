@@ -5,6 +5,7 @@ from aiohttp import web
 from aiohttp.streams import EmptyStreamReader
 
 from schemathesis.constants import __version__
+from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Status
 from schemathesis.runner import (
     content_type_conformance,
@@ -291,3 +292,12 @@ def test_flaky_exceptions(schema_url, mocker):
 )
 def test_get_base_url(url, base_url):
     assert get_base_url(url) == base_url
+
+
+@pytest.mark.endpoints("invalid_path_parameter")
+def test_invalid_path_parameter(schema_url, app):
+    results = execute(schema_url)
+    assert results.has_errors
+    error, _ = results.results[0].errors[0]
+    assert isinstance(error, InvalidSchema)
+    assert str(error) == "Missing required property `required: true`"

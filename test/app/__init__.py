@@ -33,6 +33,7 @@ class Endpoint(Enum):
     malformed_json = ("GET", "/api/malformed_json", handlers.malformed_json)
     invalid_response = ("GET", "/api/invalid_response", handlers.invalid_response)
     custom_format = ("GET", "/api/custom_format", handlers.success)
+    invalid_path_parameter = ("GET", "/api/invalid_path_parameter/{id}", handlers.success)
 
 
 def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Application:
@@ -133,6 +134,8 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
             }
         elif endpoint == "teapot":
             schema = {"produces": ["application/json"], "responses": {200: {"description": "OK"}}}
+        elif endpoint == "invalid_path_parameter/{id}":
+            schema = {"parameters": [{"name": "id", "in": "path", "required": False, "type": "integer"}]}
         else:
             schema = {
                 "responses": {
