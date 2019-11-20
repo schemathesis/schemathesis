@@ -1,10 +1,4 @@
-**/.dockerignore
-**/.env
-**/.git
-**/.gitignore
-**/docker-compose*
-**/Dockerfile*
-**/docs
-**/img
-**/test
-LICENSE
+*
+!poetry.lock
+!pyproject.toml
+!src/schemathesis
