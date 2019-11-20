@@ -38,3 +38,15 @@ jobs:
       env:
         PYPY_USERNAME: ${{ secrets.PYPI_USERNAME }}
         PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        
+  release-notes:
+    name: Release Notes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v1
+
+      - name: Release Notary Action
+        uses: docker://commitsar/release-notary
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
