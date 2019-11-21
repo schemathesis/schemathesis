@@ -10,12 +10,14 @@ They give only static definitions of endpoints.
 import itertools
 from collections.abc import Mapping
 from copy import deepcopy
+from functools import lru_cache
 from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Tuple, Union, overload
 from urllib.parse import urljoin, urlsplit
 
 import attr
 import hypothesis
 import jsonschema
+import yaml
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.exceptions import InvalidSchema
@@ -26,6 +28,13 @@ from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_metho
 from .models import Endpoint
 from .types import Filter
 from .utils import NOT_SET
+
+
+@lru_cache()
+def load_file(location: str) -> Dict[str, Any]:
+    """Load a schema from the given file."""
+    with open(location) as fd:
+        return yaml.safe_load(fd)
 
 
 @attr.s()  # pragma: no mutate
@@ -66,7 +75,7 @@ class BaseSchema(Mapping):
     def resolver(self) -> jsonschema.RefResolver:
         if not hasattr(self, "_resolver"):
             # pylint: disable=attribute-defined-outside-init
-            self._resolver = jsonschema.RefResolver("", self.raw_schema)
+            self._resolver = jsonschema.RefResolver("", self.raw_schema, handlers={"": load_file})
         return self._resolver
 
     @property
