@@ -36,7 +36,7 @@ jobs:
     - name: Publish package
       run: poetry publish --no-interaction --username=${PYPI_USERNAME} --password=${PYPI_PASSWORD}
       env:
-        PYPY_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        PYPI_USERNAME: ${{ secrets.PYPI_USERNAME }}
         PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         
   release-notes:
