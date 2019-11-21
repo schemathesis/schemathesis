@@ -1,50 +1,66 @@
-name: Post-release actions
+name: Post-release jobs
 
 on:
   release:
-    type: [published, edited]
+    type: [published]
 
 jobs:
   release_image:
     name: Build and publish to Docker Hub
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v1
+      with:
+        fetch-depth: 1
+
     - name: Build the image
       run: docker build -f "Dockerfile" -t "kiwicom/schemathesis:${GITHUB_REF##*/}" -t "kiwicom/schemathesis:stable" .
+
     - name: Login to registry
       run: docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
-    - name: Publish stable image
-      run: docker push kiwicom/schemathesis:${GITHUB_REF##*/}
+
     - name: Publish tag image
+      run: docker push kiwicom/schemathesis:${GITHUB_REF##*/}
+
+    - name: Publish stable image
       run: docker push kiwicom/schemathesis:stable
+
 
   release_package:
     name: Build and publish package to pypi.org
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v1
+      with:
+        fetch-depth: 1
+
     - uses: actions/setup-python@v1
       with:
-        python-version: '3.7'
+        python-version: '3.8'
+
     - run: pip install poetry
+
     - name: Build package
       run: poetry build --no-interaction
+
     - name: Publish package
       run: poetry publish --no-interaction --username=${PYPI_USERNAME} --password=${PYPI_PASSWORD}
       env:
         PYPI_USERNAME: ${{ secrets.PYPI_USERNAME }}
         PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        
+
+
   release-notes:
     name: Release Notes
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
 
       - name: Release Notary Action
         uses: docker://commitsar/release-notary

@@ -1,4 +1,4 @@
-name: Post-update master actions
+name: Post-update master jobs
 
 on:
   push:
@@ -10,13 +10,18 @@ jobs:
     name: Build and publish to Docker Hub
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v1
+      with:
+        fetch-depth: 1
+
     - name: Build the image
       run: docker build -f "Dockerfile" -t "kiwicom/schemathesis:latest" .
+
     - name: Login to registry
       run: docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+
     - name: Publish latest image
       run: docker push kiwicom/schemathesis:latest
