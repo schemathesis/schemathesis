@@ -1,6 +1,8 @@
-from test.utils import SIMPLE_PATH
+import os
+from test.utils import HERE, SIMPLE_PATH
 
 import pytest
+import yaml
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
 from requests import Request, Response
@@ -558,3 +560,42 @@ def test_keyboard_interrupt(testdir, cli, schema_url, base_url, mocker):
     assert "!! KeyboardInterrupt !!" in lines[11]
     # And summary is still displayed in the end of the output
     assert "== SUMMARY ==" in lines[13]
+
+
+async def test_multiple_files_schema(app, testdir, cli, base_url):
+    # When the schema contains references to other files
+    schema = {
+        "swagger": "2.0",
+        "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},
+        "host": "127.0.0.1:8888",
+        "basePath": "/api",
+        "schemes": ["http"],
+        "produces": ["application/json"],
+        "paths": {
+            "teapot": {
+                "post": {
+                    "parameters": [
+                        {
+                            # during the CLI run we have a different working directory, so specifying an absolute file path
+                            "schema": {"$ref": os.path.join(HERE, "data/petstore_v2.yaml#/definitions/Pet")},
+                            "in": "body",
+                            "name": "user",
+                            "required": True,
+                        }
+                    ]
+                }
+            }
+        },
+    }
+    app["config"].update({"should_fail": True, "schema_data": schema})
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
+    # And file path is given to the CLI
+    result = cli.run(
+        str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=5", "--hypothesis-derandomize"
+    )
+    # Then Schemathesis should resolve it and run successfully
+    assert result.exit_code == ExitCode.OK
+    # And all relevant requests should contain proper data for resolved references
+    payload = await app["incoming_requests"][0].json()
+    assert isinstance(payload["name"], str)
+    assert isinstance(payload["photoUrls"], list)

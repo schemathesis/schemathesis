@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Resolving references that point to different files. `#294`_
+
 Changed
 ~~~~~~~
 
@@ -432,6 +437,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#295: https://github.com/kiwicom/schemathesis/issues/295
+.. _#294: https://github.com/kiwicom/schemathesis/issues/294
 .. _#286: https://github.com/kiwicom/schemathesis/issues/286
 .. _#282: https://github.com/kiwicom/schemathesis/issues/282
 .. _#280: https://github.com/kiwicom/schemathesis/issues/280
