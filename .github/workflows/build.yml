@@ -1,116 +1,114 @@
-name: build
+name: Build jobs
+# Triggered by changes in code-specific or job-specific files
 
 on:
   pull_request:
     paths:
-      - '**.py'
-      - '!docs/**'
-      - '!adr/**'
+       - '**.py'
+       - '.github/workflows/*.yml'
+       - '.pylintrc'
+       - 'poetry.lock'
+       - 'pyproject.toml'
+       - 'tox.ini'
+       - 'mypy.ini'
+       - '!docs/**'
+       - '!adr/**'
   push:
     branches:
       - master
 
 jobs:
-  black:
-    name: black
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@master
-    - uses: docker://kiwicom/black
-      with:
-        args: black --check --diff .
-        
-        
-  commitsar:
-    name: Verify commit messages
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v1
-      - name: Run commitsar
-        uses: docker://commitsar/commitsar
+   black:
+     name: black
+     runs-on: ubuntu-latest
+     steps:
+     - uses: actions/checkout@v1
+       with:
+        fetch-depth: 1
+     - uses: docker://kiwicom/black
+       with:
+         args: black --check --diff .
 
-  pylint:
-    name: pylint
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@master
-    - uses: actions/setup-python@v1
-      with:
-        python-version: '3.7'
-    - run: pip install poetry
-    - run: poetry add pylint
-    - run: poetry install
-    - run: poetry run pylint src/schemathesis
 
-  mypy:
-    name: mypy
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@master
-    - uses: docker://kiwicom/mypy
-      with:
-        args: mypy src/schemathesis
+   pylint:
+     name: pylint
+     runs-on: ubuntu-latest
+     steps:
+     - uses: actions/checkout@v1
+       with:
+         fetch-depth: 1
 
-  py36:
-    name: py36
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@master
-    - uses: actions/setup-python@v1
-      with:
-        python-version: '3.6'
-    - run: pip install tox coverage
-    - run: tox -e py36
-    - run: coverage combine
-    - run: coverage report
-    - run: coverage xml -i
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v1.0.2
-      with:
-        token: ${{secrets.CODECOV_TOKEN}}
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-py36
+     - uses: actions/setup-python@v1
+       with:
+         python-version: '3.8'
 
-  py37:
-    name: py37
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@master
-    - uses: actions/setup-python@v1
-      with:
-        python-version: '3.7'
-    - run: pip install tox coverage
-    - run: tox -e py37
-    - run: coverage combine
-    - run: coverage report
-    - run: coverage xml -i
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v1.0.2
-      with:
-        token: ${{secrets.CODECOV_TOKEN}}
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-py37
+     - run: pip install poetry
 
-  py38:
-    name: py38
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@master
-    - uses: actions/setup-python@v1
-      with:
-        python-version: '3.8'
-    - run: pip install tox coverage
-    - run: tox -e py38
-    - run: coverage combine
-    - run: coverage report
-    - run: coverage xml -i
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v1.0.2
-      with:
-        token: ${{secrets.CODECOV_TOKEN}}
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-py38
+     - name: Cache Poetry virtualenv
+       uses: actions/cache@v1
+       id: cache
+       with:
+         path: ~/.virtualenvs
+         key: poetry-${{ hashFiles('**/poetry.lock') }}
+         restore-keys: |
+           poetry-${{ hashFiles('**/poetry.lock') }}
+
+     - name: Set Poetry config
+       run: |
+         poetry config settings.virtualenvs.in-project false
+         poetry config settings.virtualenvs.path ~/.virtualenvs
+
+     - run: poetry add pylint
+
+     - run: poetry install
+       if: steps.cache.outputs.cache-hit != 'true'
+
+     - run: poetry run pylint src/schemathesis
+
+
+   mypy:
+     name: mypy
+     runs-on: ubuntu-latest
+     steps:
+     - uses: actions/checkout@v1
+       with:
+         fetch-depth: 1
+     - uses: docker://kiwicom/mypy
+       with:
+         args: mypy src/schemathesis
+
+
+   tests:
+     strategy:
+       matrix:
+         python: [3.6, 3.7, 3.8]
+
+     name: tests_${{ matrix.python }}
+     runs-on: ubuntu-latest
+     steps:
+     - uses: actions/checkout@v1
+       with:
+         fetch-depth: 1
+
+     - uses: actions/setup-python@v1
+       with:
+         python-version: ${{ matrix.python }}
+
+     - run: pip install tox coverage
+
+     - name: Run ${{ matrix.python }} tox job
+       run: tox -e py${TOX_JOB//.} # Strip dot from python version to match tox job
+       env:
+         TOX_JOB: ${{ matrix.python }}
+
+     - run: coverage combine
+     - run: coverage report
+     - run: coverage xml -i
+
+     - name: Upload coverage to Codecov
+       uses: codecov/codecov-action@v1.0.2
+       with:
+         token: ${{secrets.CODECOV_TOKEN}}
+         file: ./coverage.xml
+         flags: unittests
+         name: codecov-py36
