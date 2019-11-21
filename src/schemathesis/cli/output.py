@@ -265,6 +265,11 @@ def display_check_result(check_name: str, results: Dict[Union[str, Status], int]
     )
 
 
+def handle_interrupted(context: events.ExecutionContext, event: events.Interrupted) -> None:
+    click.echo()
+    display_section_name("KeyboardInterrupt", "!", bold=False)
+
+
 def handle_event(context: events.ExecutionContext, event: events.ExecutionEvent) -> None:
     """Choose and execute a proper handler for the given event."""
     if isinstance(event, events.Initialized):
@@ -275,3 +280,5 @@ def handle_event(context: events.ExecutionContext, event: events.ExecutionEvent)
         handle_after_execution(context, event)
     if isinstance(event, events.Finished):
         handle_finished(context, event)
+    if isinstance(event, events.Interrupted):
+        handle_interrupted(context, event)
