@@ -163,6 +163,9 @@ def execute_from_schema(
                 result.add_error(
                     hypothesis.errors.Unsatisfiable("Unable to satisfy schema parameters for this endpoint")
                 )
+            except KeyboardInterrupt:
+                yield events.Interrupted(results=results, schema=schema)
+                break
             except Exception as error:
                 status = Status.error
                 result.add_error(error)

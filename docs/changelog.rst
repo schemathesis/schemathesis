@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+~~~~~~~
+
+- Keyboard interrupt is now handled during the CLI run and the summary is displayed in the output. `#295`_
+
 `0.16.0`_ - 2019-11-19
 ----------------------
 
@@ -426,6 +431,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#295: https://github.com/kiwicom/schemathesis/issues/295
 .. _#286: https://github.com/kiwicom/schemathesis/issues/286
 .. _#282: https://github.com/kiwicom/schemathesis/issues/282
 .. _#280: https://github.com/kiwicom/schemathesis/issues/280

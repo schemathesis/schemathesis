@@ -47,5 +47,10 @@ class AfterExecution(ExecutionEvent):
 
 
 @attr.s(slots=True)  # pragma: no mutate
+class Interrupted(ExecutionEvent):
+    pass
+
+
+@attr.s(slots=True)  # pragma: no mutate
 class Finished(ExecutionEvent):
     running_time: float = attr.ib()

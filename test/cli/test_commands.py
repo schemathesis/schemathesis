@@ -7,6 +7,7 @@ from requests import Request, Response
 from requests.auth import HTTPDigestAuth
 from requests.exceptions import HTTPError
 
+from schemathesis import Case
 from schemathesis.loaders import from_path
 from schemathesis.runner import DEFAULT_CHECKS
 
@@ -532,3 +533,28 @@ def test_register_check(testdir, cli, schema_url):
     # And a message from the new check should be displayed
     lines = result.stdout.strip().split("\n")
     assert lines[13] == "Custom check failed!"
+
+
+def test_keyboard_interrupt(testdir, cli, schema_url, base_url, mocker):
+    # When a Schemathesis run in interrupted by keyboard or via SIGINT
+    original = Case("/success", "GET", base_url=base_url).call
+    counter = 0
+
+    def mocked(*args, **kwargs):
+        nonlocal counter
+        counter += 1
+        if counter > 1:
+            raise KeyboardInterrupt
+        return original(*args, **kwargs)
+
+    mocker.patch("schemathesis.Case.call", wraps=mocked)
+    result = cli.run(schema_url)
+    assert result.exit_code == ExitCode.OK
+    # Then execution stops and a message about interruption is displayed
+    lines = result.stdout.strip().split("\n")
+    assert lines[9].startswith("GET /api/failure .")
+    assert lines[9].endswith("[ 50%]")
+    assert lines[10] == "GET /api/success "
+    assert "!! KeyboardInterrupt !!" in lines[11]
+    # And summary is still displayed in the end of the output
+    assert "== SUMMARY ==" in lines[13]
