@@ -4,7 +4,7 @@ import pytest
 import requests
 
 from schemathesis import models
-from schemathesis.runner import content_type_conformance, response_schema_conformance
+from schemathesis.runner.checks import content_type_conformance, response_schema_conformance
 from schemathesis.schemas import BaseSchema
 
 

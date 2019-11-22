@@ -7,15 +7,8 @@ from aiohttp.streams import EmptyStreamReader
 from schemathesis.constants import __version__
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Status
-from schemathesis.runner import (
-    content_type_conformance,
-    events,
-    execute,
-    get_base_url,
-    prepare,
-    response_schema_conformance,
-    status_code_conformance,
-)
+from schemathesis.runner import events, execute, get_base_url, prepare
+from schemathesis.runner.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 
 
 def assert_request(

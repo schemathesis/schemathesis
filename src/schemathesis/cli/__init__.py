@@ -19,14 +19,14 @@ from .options import CSVOption
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
-DEFAULT_CHECKS_NAMES = tuple(check.__name__ for check in runner.DEFAULT_CHECKS)
-ALL_CHECKS_NAMES = tuple(check.__name__ for check in runner.ALL_CHECKS)
+DEFAULT_CHECKS_NAMES = tuple(check.__name__ for check in runner.checks.DEFAULT_CHECKS)
+ALL_CHECKS_NAMES = tuple(check.__name__ for check in runner.checks.ALL_CHECKS)
 CHECKS_TYPE = click.Choice(ALL_CHECKS_NAMES)
 
 
 def register_check(function: Callable[[requests.Response, models.TestResult], None]) -> None:
     """Register a new check for schemathesis CLI."""
-    runner.ALL_CHECKS += (function,)
+    runner.checks.ALL_CHECKS += (function,)
     CHECKS_TYPE.choices += (function.__name__,)  # type: ignore
 
 
@@ -130,7 +130,7 @@ def run(  # pylint: disable=too-many-arguments
     """
     # pylint: disable=too-many-locals
 
-    selected_checks = tuple(check for check in runner.ALL_CHECKS if check.__name__ in checks)
+    selected_checks = tuple(check for check in runner.checks.ALL_CHECKS if check.__name__ in checks)
 
     if auth and auth_type == "digest":
         auth = HTTPDigestAuth(*auth)  # type: ignore
