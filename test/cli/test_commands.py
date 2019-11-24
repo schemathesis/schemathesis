@@ -112,6 +112,7 @@ def test_commands_run_help(cli):
         "  -M, --method TEXT               Filter schemathesis test by HTTP method.",
         "  -T, --tag TEXT                  Filter schemathesis test by schema tag",
         "                                  pattern.",
+        "  -w, --workers INTEGER RANGE     Number of workers to run tests",
         "  -b, --base-url TEXT             Base URL address of the API, required for",
         "                                  SCHEMA if specified by file.",
         "  --request-timeout INTEGER       Timeout in milliseconds for network requests",
@@ -144,39 +145,54 @@ SCHEMA_URI = "https://example.com/swagger.json"
 @pytest.mark.parametrize(
     "args, expected",
     (
-        ([SCHEMA_URI], {"checks": DEFAULT_CHECKS}),
+        ([SCHEMA_URI], {"checks": DEFAULT_CHECKS, "workers_num": 1}),
         (
             [SIMPLE_PATH, "--base-url=http://127.0.0.1"],
-            {"checks": DEFAULT_CHECKS, "loader_options": {"base_url": "http://127.0.0.1"}, "loader": from_path},
+            {
+                "checks": DEFAULT_CHECKS,
+                "loader_options": {"base_url": "http://127.0.0.1"},
+                "loader": from_path,
+                "workers_num": 1,
+            },
         ),
-        ([SCHEMA_URI, "--auth=test:test"], {"checks": DEFAULT_CHECKS, "api_options": {"auth": ("test", "test")}}),
+        (
+            [SCHEMA_URI, "--auth=test:test"],
+            {"checks": DEFAULT_CHECKS, "api_options": {"auth": ("test", "test")}, "workers_num": 1},
+        ),
         (
             [SCHEMA_URI, "--auth=test:test", "--auth-type=digest"],
-            {"checks": DEFAULT_CHECKS, "api_options": {"auth": HTTPDigestAuth("test", "test")}},
+            {"checks": DEFAULT_CHECKS, "api_options": {"auth": HTTPDigestAuth("test", "test")}, "workers_num": 1},
         ),
         (
             [SCHEMA_URI, "--auth=test:test", "--auth-type=DIGEST"],
-            {"checks": DEFAULT_CHECKS, "api_options": {"auth": HTTPDigestAuth("test", "test")}},
+            {"checks": DEFAULT_CHECKS, "api_options": {"auth": HTTPDigestAuth("test", "test")}, "workers_num": 1},
         ),
         (
             [SCHEMA_URI, "--header=Authorization:Bearer 123"],
-            {"checks": DEFAULT_CHECKS, "api_options": {"headers": {"Authorization": "Bearer 123"}}},
+            {"checks": DEFAULT_CHECKS, "api_options": {"headers": {"Authorization": "Bearer 123"}}, "workers_num": 1},
         ),
         (
             [SCHEMA_URI, "--header=Authorization:  Bearer 123 "],
-            {"checks": DEFAULT_CHECKS, "api_options": {"headers": {"Authorization": "Bearer 123 "}}},
+            {"checks": DEFAULT_CHECKS, "api_options": {"headers": {"Authorization": "Bearer 123 "}}, "workers_num": 1},
         ),
         (
             [SCHEMA_URI, "--method=POST", "--method", "GET"],
-            {"checks": DEFAULT_CHECKS, "loader_options": {"method": ("POST", "GET")}},
+            {"checks": DEFAULT_CHECKS, "loader_options": {"method": ("POST", "GET")}, "workers_num": 1},
         ),
-        ([SCHEMA_URI, "--endpoint=users"], {"checks": DEFAULT_CHECKS, "loader_options": {"endpoint": ("users",)}}),
-        ([SCHEMA_URI, "--tag=foo"], {"checks": DEFAULT_CHECKS, "loader_options": {"tag": ("foo",)}}),
+        (
+            [SCHEMA_URI, "--endpoint=users"],
+            {"checks": DEFAULT_CHECKS, "loader_options": {"endpoint": ("users",)}, "workers_num": 1},
+        ),
+        ([SCHEMA_URI, "--tag=foo"], {"checks": DEFAULT_CHECKS, "loader_options": {"tag": ("foo",)}, "workers_num": 1}),
         (
             [SCHEMA_URI, "--base-url=https://example.com/api/v1test"],
-            {"checks": DEFAULT_CHECKS, "loader_options": {"base_url": "https://example.com/api/v1test"}},
+            {
+                "checks": DEFAULT_CHECKS,
+                "loader_options": {"base_url": "https://example.com/api/v1test"},
+                "workers_num": 1,
+            },
         ),
-        ([SCHEMA_URI, "--hypothesis-seed=123"], {"checks": DEFAULT_CHECKS, "seed": 123}),
+        ([SCHEMA_URI, "--hypothesis-seed=123"], {"checks": DEFAULT_CHECKS, "seed": 123, "workers_num": 1}),
         (
             [
                 SCHEMA_URI,
@@ -199,6 +215,7 @@ SCHEMA_URI = "https://example.com/swagger.json"
                     "suppress_health_check": [HealthCheck.too_slow, HealthCheck.filter_too_much],
                     "verbosity": Verbosity.normal,
                 },
+                "workers_num": 1,
             },
         ),
     ),
@@ -231,10 +248,16 @@ def test_hypothesis_parameters(cli, schema_url):
 
 
 @pytest.mark.endpoints("success")
-def test_cli_run_output_success(cli, schema_url):
-    result = cli.run(schema_url)
+@pytest.mark.parametrize("workers", (1, 2))
+def test_cli_run_output_success(cli, schema_url, workers):
+    result = cli.run(schema_url, f"--workers={workers}")
     assert result.exit_code == ExitCode.OK
-    assert "GET /api/success ." in result.stdout
+    lines = result.stdout.split("\n")
+    assert lines[7] == f"Workers: {workers}"
+    if workers == 1:
+        assert lines[10].startswith("GET /api/success .")
+    else:
+        assert lines[10] == "."
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
 
@@ -246,8 +269,9 @@ def test_cli_run_output_success(cli, schema_url):
     assert 0 < time < 5
 
 
-def test_cli_run_output_with_errors(cli, schema_url):
-    result = cli.run(schema_url)
+@pytest.mark.parametrize("workers", (1, 2))
+def test_cli_run_output_with_errors(cli, schema_url, workers):
+    result = cli.run(schema_url, f"--workers={workers}")
     assert result.exit_code == ExitCode.TESTS_FAILED
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
@@ -259,8 +283,9 @@ def test_cli_run_output_with_errors(cli, schema_url):
 
 
 @pytest.mark.endpoints("failure")
-def test_cli_run_only_failure(cli, schema_url):
-    result = cli.run(schema_url)
+@pytest.mark.parametrize("workers", (1, 2))
+def test_cli_run_only_failure(cli, schema_url, workers):
+    result = cli.run(schema_url, f"--workers={workers}")
     assert result.exit_code == ExitCode.TESTS_FAILED
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
@@ -271,8 +296,9 @@ def test_cli_run_only_failure(cli, schema_url):
 
 
 @pytest.mark.endpoints()
-def test_cli_run_output_empty(cli, schema_url):
-    result = cli.run(schema_url)
+@pytest.mark.parametrize("workers", (1, 2))
+def test_cli_run_output_empty(cli, schema_url, workers):
+    result = cli.run(schema_url, f"--workers={workers}")
     assert result.exit_code == ExitCode.OK
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
@@ -283,13 +309,14 @@ def test_cli_run_output_empty(cli, schema_url):
 
 
 @pytest.mark.endpoints()
-def test_cli_run_changed_base_url(cli, schema_url, server):
+@pytest.mark.parametrize("workers", (1, 2))
+def test_cli_run_changed_base_url(cli, schema_url, server, workers):
     # When the CLI receives custom base URL
     base_url = f"http://127.0.0.1:{server['port']}/api/"
-    result = cli.run(schema_url, "--base-url", base_url)
+    result = cli.run(schema_url, "--base-url", base_url, f"--workers={workers}")
     # Then the base URL should be correctly displayed in the CLI output
     lines = result.stdout.strip().split("\n")
-    assert lines[-9] == f"Base URL: {base_url}"
+    assert lines[-10] == f"Base URL: {base_url}"
 
 
 @pytest.mark.parametrize(
@@ -299,91 +326,124 @@ def test_cli_run_changed_base_url(cli, schema_url, server):
         (500, f"Failed to load schema, code 500 was returned from {SCHEMA_URI}"),
     ),
 )
-def test_execute_missing_schema(cli, mocker, status_code, message):
+@pytest.mark.parametrize("workers", (1, 2))
+def test_execute_missing_schema(cli, mocker, status_code, message, workers):
     response = Response()
     response.status_code = status_code
     request = Request(url=SCHEMA_URI)
     mocker.patch("schemathesis.runner.prepare", side_effect=(HTTPError(response=response, request=request)))
-    result = cli.run(SCHEMA_URI)
+    result = cli.run(SCHEMA_URI, f"--workers={workers}")
     assert result.exit_code == ExitCode.TESTS_FAILED
     assert message in result.stdout
 
 
 @pytest.mark.endpoints("success", "slow")
-def test_hypothesis_failed_event(cli, schema_url):
+@pytest.mark.parametrize("workers", (1, 2))
+def test_hypothesis_failed_event(cli, schema_url, workers):
     # When the Hypothesis deadline option is set manually and it is smaller than the response time
-    result = cli.run(schema_url, "--hypothesis-deadline=20")
+    result = cli.run(schema_url, "--hypothesis-deadline=20", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And the given endpoint should be displayed as an error
-    assert "GET /api/slow E" in result.stdout
+    lines = result.stdout.split("\n")
+    if workers == 1:
+        assert lines[10].startswith("GET /api/slow E")
+    else:
+        # It could be in any sequence, because of multiple threads
+        assert lines[10].split("\n")[0] in ("E.", ".E")
+        # empty line after all tests progress output
+        assert lines[11] == ""
     # And the proper error message from Hypothesis should be displayed
     assert "hypothesis.errors.DeadlineExceeded: Test took " in result.stdout
     assert "which exceeds the deadline of 20.00ms" in result.stdout
 
 
 @pytest.mark.endpoints("success", "slow")
-def test_connection_timeout(cli, server, schema_url):
+@pytest.mark.parametrize("workers", (1, 2))
+def test_connection_timeout(cli, server, schema_url, workers):
     # When connection timeout is specified in the CLI and the request fails because of it
-    result = cli.run(schema_url, "--request-timeout=1")
+    result = cli.run(schema_url, "--request-timeout=10", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And the given endpoint should be displayed as an error
-    assert "GET /api/slow E" in result.stdout
+    lines = result.stdout.split("\n")
+    if workers == 1:
+        assert lines[10].startswith("GET /api/slow E")
+        assert lines[11].startswith("GET /api/success .")
+    else:
+        # It could be in any sequence, because of multiple threads
+        assert lines[10].split("\n")[0] in ("E.", ".E")
     # And the proper error message should be displayed
     assert (
         f"requests.exceptions.ReadTimeout: HTTPConnectionPool(host='127.0.0.1', port={server['port']}): "
-        "Read timed out. (read timeout=0.001)" in result.stdout
+        "Read timed out. (read timeout=0.01)" in result.stdout
     )
 
 
 @pytest.mark.endpoints("success", "slow")
-def test_default_hypothesis_settings(cli, schema_url):
+@pytest.mark.parametrize("workers", (1, 2))
+def test_default_hypothesis_settings(cli, schema_url, workers):
     # When there is a slow endpoint and if it is faster than 500ms
-    result = cli.run(schema_url)
+    result = cli.run(schema_url, f"--workers={workers}")
     # Then the tests should pass, because of default 500ms deadline
     assert result.exit_code == ExitCode.OK
-    assert "GET /api/success ." in result.stdout
-    assert "GET /api/slow ." in result.stdout
+    lines = result.stdout.split("\n")
+    if workers == 1:
+        assert lines[10].startswith("GET /api/slow .")
+        assert lines[11].startswith("GET /api/success .")
+    else:
+        # It could be in any sequence, because of multiple threads
+        assert lines[10] == ".."
 
 
 @pytest.mark.endpoints("failure")
-def test_seed(cli, schema_url):
+@pytest.mark.parametrize("workers", (1, 2))
+def test_seed(cli, schema_url, workers):
     # When there is a failure
-    result = cli.run(schema_url, "--hypothesis-seed=456")
+    result = cli.run(schema_url, "--hypothesis-seed=456", f"--workers={workers}")
     # Then the tests should fail and RNG seed should be displayed
     assert result.exit_code == 1
     assert "Or add this option to your command line parameters: --hypothesis-seed=456" in result.stdout.split("\n")
 
 
 @pytest.mark.endpoints("unsatisfiable")
-def test_unsatisfiable(cli, schema_url):
+@pytest.mark.parametrize("workers", (1, 2))
+def test_unsatisfiable(cli, schema_url, workers):
     # When the app's schema contains parameters that can't be generated
     # For example if it contains contradiction in the parameters definition - requires to be integer AND string at the
     # same time
-    result = cli.run(schema_url)
+    result = cli.run(schema_url, f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And standard Hypothesis error should not appear in the output
     assert "You can add @seed" not in result.stdout
     # And this endpoint should be marked as errored in the progress line
-    assert "POST /api/unsatisfiable E" in result.stdout
+    lines = result.stdout.split("\n")
+    if workers == 1:
+        assert lines[10].startswith("POST /api/unsatisfiable E")
+    else:
+        assert lines[10] == "E"
     # And more clear error message is displayed instead of Hypothesis one
     lines = result.stdout.split("\n")
     assert "hypothesis.errors.Unsatisfiable: Unable to satisfy schema parameters for this endpoint" in lines
 
 
 @pytest.mark.endpoints("flaky")
-def test_flaky(cli, schema_url):
+@pytest.mark.parametrize("workers", (1, 2))
+def test_flaky(cli, schema_url, workers):
     # When the endpoint fails / succeeds randomly
     # Derandomize is needed for reproducible test results
-    result = cli.run(schema_url, "--hypothesis-derandomize")
+    result = cli.run(schema_url, "--hypothesis-derandomize", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And standard Hypothesis error should not appear in the output
     assert "Failed to reproduce exception. Expected:" not in result.stdout
     # And this endpoint should be marked as errored in the progress line
-    assert "GET /api/flaky E" in result.stdout
+    lines = result.stdout.split("\n")
+    if workers == 1:
+        assert lines[10].startswith("GET /api/flaky E")
+    else:
+        assert lines[10] == "E"
     # And it should be displayed only once in "ERRORS" section
     assert "= ERRORS =" in result.stdout
     assert "_ GET: /api/flaky _" in result.stdout
@@ -398,44 +458,59 @@ def test_flaky(cli, schema_url):
 
 
 @pytest.mark.endpoints("invalid")
-def test_invalid_endpoint(cli, schema_url):
+@pytest.mark.parametrize("workers", (1, 2))
+def test_invalid_endpoint(cli, schema_url, workers):
     # When the app's schema contains errors
     # For example if its type is "int" but should be "integer"
-    result = cli.run(schema_url)
+    result = cli.run(schema_url, f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And standard Hypothesis error should not appear in the output
     assert "You can add @seed" not in result.stdout
     # And this endpoint should be marked as errored in the progress line
-    assert "POST /api/invalid E" in result.stdout
+    lines = result.stdout.split("\n")
+    if workers == 1:
+        assert lines[10].startswith("POST /api/invalid E")
+    else:
+        assert lines[10] == "E"
     # And more clear error message is displayed instead of Hypothesis one
     lines = result.stdout.split("\n")
     assert "schemathesis.exceptions.InvalidSchema: Invalid schema for this endpoint" in lines
 
 
 @pytest.mark.endpoints("teapot")
-def test_status_code_conformance(cli, schema_url):
+@pytest.mark.parametrize("workers", (1, 2))
+def test_status_code_conformance(cli, schema_url, workers):
     # When endpoint returns a status code, that is not listed in "responses"
     # And "status_code_conformance" is specified
-    result = cli.run(schema_url, "-c", "status_code_conformance")
+    result = cli.run(schema_url, "-c", "status_code_conformance", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And this endpoint should be marked as failed in the progress line
-    assert "POST /api/teapot F" in result.stdout
+    lines = result.stdout.split("\n")
+    if workers == 1:
+        assert lines[10].startswith("POST /api/teapot F")
+    else:
+        assert lines[10] == "F"
     assert "status_code_conformance            0 / 2 passed          FAILED" in result.stdout
     lines = result.stdout.split("\n")
     assert "Received a response with a status code, which is not defined in the schema: 418" in lines
-    assert lines[15].strip() == "Declared status codes: 200"
+    assert lines[16].strip() == "Declared status codes: 200"
 
 
-def test_connection_error(cli, schema_url):
+@pytest.mark.parametrize("workers", (1, 2))
+def test_connection_error(cli, schema_url, workers):
     # When the given base_url is unreachable
-    result = cli.run(schema_url, "--base-url=http://127.0.0.1:1/")
+    result = cli.run(schema_url, "--base-url=http://127.0.0.1:1/", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And all collected endpoints should be marked as errored
-    assert "GET /api/failure E" in result.stdout
-    assert "GET /api/success E" in result.stdout
+    lines = result.stdout.split("\n")
+    if workers == 1:
+        assert lines[10].startswith("GET /api/failure E")
+        assert lines[11].startswith("GET /api/success E")
+    else:
+        assert lines[10] == "EE"
     # And errors section title should be displayed
     assert "= ERRORS =" in result.stdout
     # And all endpoints should be mentioned in this section as subsections
@@ -446,9 +521,10 @@ def test_connection_error(cli, schema_url):
     assert "Max retries exceeded with url: /api/failure" in result.stdout
 
 
-def test_schema_not_available(cli):
+@pytest.mark.parametrize("workers", (1, 2))
+def test_schema_not_available(cli, workers):
     # When the given schema is unreachable
-    result = cli.run("http://127.0.0.1:1/swagger.yaml")
+    result = cli.run("http://127.0.0.1:1/swagger.yaml", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And error message is displayed
@@ -536,10 +612,11 @@ def test_register_check(testdir, cli, schema_url):
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And a message from the new check should be displayed
     lines = result.stdout.strip().split("\n")
-    assert lines[13] == "Custom check failed!"
+    assert lines[14] == "Custom check failed!"
 
 
-def test_keyboard_interrupt(testdir, cli, schema_url, base_url, mocker):
+@pytest.mark.parametrize("workers", (1, 2))
+def test_keyboard_interrupt(testdir, cli, schema_url, base_url, mocker, workers):
     # When a Schemathesis run in interrupted by keyboard or via SIGINT
     original = Case("/success", "GET", base_url=base_url).call
     counter = 0
@@ -552,16 +629,22 @@ def test_keyboard_interrupt(testdir, cli, schema_url, base_url, mocker):
         return original(*args, **kwargs)
 
     mocker.patch("schemathesis.Case.call", wraps=mocked)
-    result = cli.run(schema_url)
+    result = cli.run(schema_url, f"--workers={workers}")
     assert result.exit_code == ExitCode.OK
     # Then execution stops and a message about interruption is displayed
     lines = result.stdout.strip().split("\n")
-    assert lines[9].startswith("GET /api/failure .")
-    assert lines[9].endswith("[ 50%]")
-    assert lines[10] == "GET /api/success "
-    assert "!! KeyboardInterrupt !!" in lines[11]
     # And summary is still displayed in the end of the output
-    assert "== SUMMARY ==" in lines[13]
+    if workers == 1:
+        assert lines[10].startswith("GET /api/failure .")
+        assert lines[10].endswith("[ 50%]")
+        assert lines[11] == "GET /api/success "
+        assert "!! KeyboardInterrupt !!" in lines[12]
+        assert "== SUMMARY ==" in lines[14]
+    else:
+        print(lines)
+        assert lines[10] == "."
+        assert "!! KeyboardInterrupt !!" in lines[11]
+        assert "== SUMMARY ==" in lines[13]
 
 
 async def test_multiple_files_schema(app, testdir, cli, base_url):

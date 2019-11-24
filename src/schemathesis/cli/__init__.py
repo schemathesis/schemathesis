@@ -23,6 +23,8 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 DEFAULT_CHECKS_NAMES = tuple(check.__name__ for check in runner.checks.DEFAULT_CHECKS)
 ALL_CHECKS_NAMES = tuple(check.__name__ for check in runner.checks.ALL_CHECKS)
 CHECKS_TYPE = click.Choice(ALL_CHECKS_NAMES)
+DEFAULT_WORKERS = 1
+MAX_WORKERS = 64
 
 
 def register_check(function: Callable[[requests.Response, models.TestResult], None]) -> None:
@@ -75,6 +77,14 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 @click.option("--method", "-M", "methods", type=str, multiple=True, help="Filter schemathesis test by HTTP method.")
 @click.option("--tag", "-T", "tags", type=str, multiple=True, help="Filter schemathesis test by schema tag pattern.")
 @click.option(
+    "--workers",
+    "-w",
+    "workers_num",
+    help="Number of workers to run tests",
+    type=click.IntRange(1, MAX_WORKERS),
+    default=DEFAULT_WORKERS,
+)
+@click.option(
     "--base-url",
     "-b",
     help="Base URL address of the API, required for SCHEMA if specified by file. ",
@@ -118,6 +128,7 @@ def run(  # pylint: disable=too-many-arguments
     endpoints: Optional[Filter] = None,
     methods: Optional[Filter] = None,
     tags: Optional[Filter] = None,
+    workers_num: int = DEFAULT_WORKERS,
     base_url: Optional[str] = None,
     request_timeout: Optional[int] = None,
     hypothesis_deadline: Optional[int] = None,
@@ -157,11 +168,20 @@ def run(  # pylint: disable=too-many-arguments
 
     with abort_on_network_errors():
         if pathlib.Path(schema).is_file():
-            prepared_runner = runner.prepare(schema, checks=selected_checks, loader=from_path, **options)
+            prepared_runner = runner.prepare(
+                schema, checks=selected_checks, workers_num=workers_num, loader=from_path, **options
+            )
         else:
-            prepared_runner = runner.prepare(schema, checks=selected_checks, **options)
-    output_style = cast(Callable, OutputStyle.default)
-    execute(prepared_runner, output_style)
+            prepared_runner = runner.prepare(schema, checks=selected_checks, workers_num=workers_num, **options)
+    execute(prepared_runner, workers_num)
+
+
+def get_output_handler(workers_num: int) -> Callable:
+    if workers_num > 1:
+        output_style = OutputStyle.short
+    else:
+        output_style = OutputStyle.default
+    return cast(Callable, output_style)
 
 
 def load_hook(module_name: str) -> None:
@@ -196,12 +216,16 @@ def abort_on_network_errors() -> Generator[None, None, None]:
 
 
 class OutputStyle(Enum):
+    """Provide different output styles."""
+
     default = output.default.handle_event
+    short = output.short.handle_event
 
 
-def execute(prepared_runner: Generator[events.ExecutionEvent, None, None], handler: Callable) -> None:
+def execute(prepared_runner: Generator[events.ExecutionEvent, None, None], workers_num: int) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
+    handler = get_output_handler(workers_num)
     with utils.capture_hypothesis_output() as hypothesis_output:
-        context = events.ExecutionContext(hypothesis_output)
+        context = events.ExecutionContext(hypothesis_output, workers_num)
         for event in prepared_runner:
             handler(context, event)
