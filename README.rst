@@ -69,6 +69,14 @@ CLI supports passing options to ``hypothesis.settings``. All of them are prefixe
 
     schemathesis run --hypothesis-max-examples=1000 https://example.com/api/swagger.json
 
+To speed up the testing process Schemathesis provides ``-w/--workers`` option for concurrent test execution:
+
+.. code:: bash
+
+    schemathesis run -w 8 https://example.com/api/swagger.json
+
+In the example above all tests will be distributed among 8 worker threads.
+
 For the full list of options, run:
 
 .. code:: bash
