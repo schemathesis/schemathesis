@@ -3,7 +3,7 @@ import asyncio
 import re
 from base64 import b64encode
 from functools import partial
-from typing import Any, Callable, Dict, Generator, Optional
+from typing import Any, Callable, Dict, Generator, Optional, Union
 from urllib.parse import quote_plus
 
 import hypothesis
@@ -33,6 +33,15 @@ def create_test(
     if settings is not None:
         wrapped_test = settings(wrapped_test)
     return add_examples(wrapped_test, endpoint)
+
+
+def make_test_or_exception(
+    endpoint: Endpoint, func: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
+) -> Union[Callable, InvalidSchema]:
+    try:
+        return create_test(endpoint, func, settings, seed=seed)
+    except InvalidSchema as exc:
+        return exc
 
 
 def get_original_test(test: Callable) -> Callable:
@@ -126,9 +135,7 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
             if value is not None:
                 if parameter == "path_parameters":
                     strategies[parameter] = (
-                        from_schema(value)
-                        .filter(filter_path_parameters)  # type: ignore
-                        .map(quote_all)  # type: ignore
+                        from_schema(value).filter(filter_path_parameters).map(quote_all)  # type: ignore  # type: ignore
                     )
                 elif parameter == "headers":
                     strategies[parameter] = from_schema(value).filter(is_valid_header)  # type: ignore

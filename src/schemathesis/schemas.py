@@ -23,7 +23,7 @@ from requests.structures import CaseInsensitiveDict
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import empty_object
 
-from ._hypothesis import create_test
+from ._hypothesis import make_test_or_exception
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .models import Endpoint
 from .types import Filter
@@ -91,10 +91,7 @@ class BaseSchema(Mapping):
         """Generate all endpoints and Hypothesis tests for them."""
         test: Union[Callable, InvalidSchema]
         for endpoint in self.get_all_endpoints():
-            try:
-                test = create_test(endpoint, func, settings, seed=seed)
-            except InvalidSchema as exc:
-                test = exc
+            test = make_test_or_exception(endpoint, func, settings, seed)
             yield endpoint, test
 
     def parametrize(
