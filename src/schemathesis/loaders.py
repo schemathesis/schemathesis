@@ -9,7 +9,7 @@ from .constants import USER_AGENT
 from .lazy import LazySchema
 from .schemas import BaseSchema, OpenApi30, SwaggerV20
 from .types import Filter, PathLike
-from .utils import NOT_SET, deprecated, get_base_url
+from .utils import NOT_SET, StringDatesYAMLLoader, deprecated, get_base_url
 
 
 def from_path(
@@ -55,7 +55,7 @@ def from_file(
 
     `file` could be a file descriptor, string or bytes.
     """
-    raw = yaml.safe_load(file)
+    raw = yaml.load(file, StringDatesYAMLLoader)
     return from_dict(raw, location=location, base_url=base_url, method=method, endpoint=endpoint, tag=tag)
 
 

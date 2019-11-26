@@ -7,6 +7,7 @@ import yaml
 
 import schemathesis
 from schemathesis.schemas import BaseSchema
+from schemathesis.utils import StringDatesYAMLLoader
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -34,7 +35,7 @@ def make_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> Dict
 def load_schema(schema_name: str) -> Dict[str, Any]:
     path = get_schema_path(schema_name)
     with open(path) as fd:
-        return yaml.safe_load(fd)
+        return yaml.load(fd, StringDatesYAMLLoader)
 
 
 def merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
