@@ -8,7 +8,7 @@ from hypothesis.reporting import report
 
 import schemathesis
 from schemathesis import models, runner, utils
-from schemathesis.cli import output
+from schemathesis.cli.output import default
 
 
 @pytest.fixture(autouse=True)
@@ -50,9 +50,9 @@ def after_execution(results_set, endpoint, swagger_20):
 )
 def test_display_section_name(capsys, title, separator, printed, expected):
     # When section name is displayed
-    output.display_section_name(title, separator=separator)
+    default.display_section_name(title, separator=separator)
     out = capsys.readouterr().out.strip()
-    terminal_width = output.get_terminal_width()
+    terminal_width = default.get_terminal_width()
     # It should fit into the terminal width
     assert len(click.unstyle(out)) == terminal_width
     # And the section name should be bold
@@ -66,7 +66,7 @@ def test_handle_initialized(capsys, execution_context, results_set, swagger_20):
         results=results_set, schema=swagger_20, checks=(), hypothesis_settings=hypothesis.settings()
     )
     # When this even is handled
-    output.handle_initialized(execution_context, event)
+    default.handle_initialized(execution_context, event)
     out = capsys.readouterr().out
     lines = out.split("\n")
     # Then initial title is displayed
@@ -92,7 +92,7 @@ def test_display_statistic(capsys, swagger_20, endpoint):
     )
     results = models.TestResultSet([single_test_statistic])
     # When test results are displayed
-    output.display_statistic(results)
+    default.display_statistic(results)
 
     lines = [line for line in capsys.readouterr().out.split("\n") if line]
     failed = click.style("FAILED", bold=True, fg="red")
@@ -107,7 +107,7 @@ def test_display_statistic(capsys, swagger_20, endpoint):
 
 
 def test_display_statistic_empty(capsys, results_set):
-    output.display_statistic(results_set)
+    default.display_statistic(results_set)
     assert capsys.readouterr().out.split("\n")[2] == click.style("No checks were performed.", bold=True)
 
 
@@ -123,7 +123,7 @@ def test_capture_hypothesis_output():
 
 @pytest.mark.parametrize("position, length, expected", ((1, 100, "[  1%]"), (20, 100, "[ 20%]"), (100, 100, "[100%]")))
 def test_get_percentage(position, length, expected):
-    assert output.get_percentage(position, length) == expected
+    assert default.get_percentage(position, length) == expected
 
 
 @pytest.mark.parametrize("current_line_length", (0, 20))
@@ -134,17 +134,17 @@ def test_display_percentage(
     execution_context.current_line_length = current_line_length
     execution_context.endpoints_processed = endpoints_processed
     # When percentage is displayed
-    output.display_percentage(execution_context, after_execution)
+    default.display_percentage(execution_context, after_execution)
     out = capsys.readouterr().out
     # Then the whole line fits precisely to the terminal width
-    assert len(click.unstyle(out)) + current_line_length == output.get_terminal_width()
+    assert len(click.unstyle(out)) + current_line_length == default.get_terminal_width()
     # And the percentage displayed as expected in cyan color
     assert out.strip() == click.style(percentage, fg="cyan")
 
 
 def test_display_hypothesis_output(capsys):
     # When Hypothesis output is displayed
-    output.display_hypothesis_output(["foo", "bar"])
+    default.display_hypothesis_output(["foo", "bar"])
     lines = capsys.readouterr().out.split("\n")
     # Then the relevant section title is displayed
     assert " HYPOTHESIS OUTPUT" in lines[0]
@@ -167,7 +167,7 @@ def test_display_single_failure(capsys, swagger_20, endpoint, body):
         [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
     )
     # When this failure is displayed
-    output.display_single_failure(test_statistic)
+    default.display_single_failure(test_statistic)
     out = capsys.readouterr().out
     lines = out.split("\n")
     # Then the endpoint name is displayed as a subsection
@@ -195,7 +195,7 @@ def test_handle_after_execution(capsys, execution_context, after_execution, stat
     # Given AfterExecution even with certain status
     after_execution.status = status
     # When this event is handled
-    output.handle_after_execution(execution_context, after_execution)
+    default.handle_after_execution(execution_context, after_execution)
 
     lines = capsys.readouterr().out.strip().split("\n")
     symbol, percentage = lines[0].split()
@@ -207,13 +207,13 @@ def test_handle_after_execution(capsys, execution_context, after_execution, stat
 
 def test_after_execution_attributes(execution_context, after_execution):
     # When `handle_after_execution` is executed
-    output.handle_after_execution(execution_context, after_execution)
+    default.handle_after_execution(execution_context, after_execution)
     # Then number of endpoints processed grows by 1
     assert execution_context.endpoints_processed == 1
     # And the line length grows by 1 symbol
     assert execution_context.current_line_length == 1
 
-    output.handle_after_execution(execution_context, after_execution)
+    default.handle_after_execution(execution_context, after_execution)
     assert execution_context.endpoints_processed == 2
     assert execution_context.current_line_length == 2
 
@@ -229,7 +229,7 @@ def test_display_single_error(capsys, swagger_20, endpoint):
     result = models.TestResult(endpoint, swagger_20)
     result.add_error(exception)
     # When the related test result is displayed
-    output.display_single_error(result)
+    default.display_single_error(result)
     lines = capsys.readouterr().out.strip().split("\n")
     # Then it should be correctly formatted and displayed in red color
     if sys.version_info <= (3, 8):
@@ -245,7 +245,7 @@ def test_display_failures(swagger_20, capsys, results_set):
     failure.add_failure("test", models.Case("/api/failure", "GET", base_url="http://127.0.0.1:8080"), "Message")
     results_set.append(failure)
     # When the failures are displayed
-    output.display_failures(results_set)
+    default.display_failures(results_set)
     out = capsys.readouterr().out.strip()
     # Then section title is displayed
     assert " FAILURES " in out
@@ -267,7 +267,7 @@ def test_display_errors(swagger_20, capsys, results_set):
     )
     results_set.append(error)
     # When the errors are displayed
-    output.display_errors(results_set)
+    default.display_errors(results_set)
     out = capsys.readouterr().out.strip()
     # Then section title is displayed
     assert " ERRORS " in out
@@ -285,7 +285,7 @@ def test_display_errors(swagger_20, capsys, results_set):
     ((models.Case.__attrs_attrs__[0], "Path"), (models.Case.__attrs_attrs__[3], "Path parameters")),
 )
 def test_make_verbose_name(attribute, expected):
-    assert output.make_verbose_name(attribute) == expected
+    assert default.make_verbose_name(attribute) == expected
 
 
 def test_display_summary(capsys, results_set, swagger_20):
@@ -293,7 +293,7 @@ def test_display_summary(capsys, results_set, swagger_20):
     event = runner.events.Finished(results=results_set, schema=swagger_20, running_time=1.257)
     # When `display_summary` is called
     with pytest.raises(click.exceptions.Exit):
-        output.display_summary(event)
+        default.display_summary(event)
     out = capsys.readouterr().out.strip()
     # Then number of total tests & total running time should be displayed
     assert "=== 1 passed in 1.26s ===" in out
