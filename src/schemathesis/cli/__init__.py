@@ -1,7 +1,8 @@
 import pathlib
 import traceback
 from contextlib import contextmanager
-from typing import Callable, Dict, Generator, Iterable, List, Optional, Tuple
+from enum import Enum
+from typing import Callable, Dict, Generator, Iterable, List, Optional, Tuple, cast
 
 import click
 import hypothesis
@@ -155,7 +156,8 @@ def run(  # pylint: disable=too-many-arguments
             prepared_runner = runner.prepare(schema, checks=selected_checks, loader=from_path, **options)
         else:
             prepared_runner = runner.prepare(schema, checks=selected_checks, **options)
-    execute(prepared_runner)
+    output_style = cast(Callable, OutputStyle.default)
+    execute(prepared_runner, output_style)
 
 
 def load_hook(module_name: str) -> None:
@@ -189,9 +191,13 @@ def abort_on_network_errors() -> Generator[None, None, None]:
         raise click.Abort
 
 
-def execute(prepared_runner: Generator[events.ExecutionEvent, None, None]) -> None:
+class OutputStyle(Enum):
+    default = output.default.handle_event
+
+
+def execute(prepared_runner: Generator[events.ExecutionEvent, None, None], handler: Callable) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     with utils.capture_hypothesis_output() as hypothesis_output:
         context = events.ExecutionContext(hypothesis_output)
         for event in prepared_runner:
-            output.handle_event(context, event)
+            handler(context, event)

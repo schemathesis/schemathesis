@@ -8,10 +8,10 @@ from attr import Attribute
 from hypothesis import settings
 from importlib_metadata import version
 
+from ...constants import __version__
+from ...models import Case, Status, TestResult, TestResultSet
+from ...runner import events
 from .. import utils
-from ..constants import __version__
-from ..models import Case, Status, TestResult, TestResultSet
-from ..runner import events
 
 
 def get_terminal_width() -> int:
@@ -36,47 +36,6 @@ def get_percentage(position: int, length: int) -> str:
     return f"[{percentage_message}]"
 
 
-def handle_initialized(context: events.ExecutionContext, event: events.Initialized) -> None:
-    """Display information about the test session."""
-    display_section_name("Schemathesis test session starts")
-    versions = (
-        f"platform {platform.system()} -- "
-        f"Python {platform.python_version()}, "
-        f"schemathesis-{__version__}, "
-        f"hypothesis-{version('hypothesis')}, "
-        f"hypothesis_jsonschema-{version('hypothesis_jsonschema')}, "
-        f"jsonschema-{version('jsonschema')}"
-    )
-    click.echo(versions)
-    click.echo(f"rootdir: {os.getcwd()}")
-    click.echo(
-        f"hypothesis profile '{settings._current_profile}' "  # type: ignore
-        f"-> {settings.get_profile(settings._current_profile).show_changed()}"
-    )
-    if event.schema.location is not None:
-        click.echo(f"Schema location: {event.schema.location}")
-    if event.schema.base_url is not None:
-        click.echo(f"Base URL: {event.schema.base_url}")
-    click.echo(f"Specification version: {event.schema.verbose_name}")
-    click.secho(f"collected endpoints: {event.schema.endpoints_count}", bold=True)
-    if event.schema.endpoints_count >= 1:
-        click.echo()
-
-
-def handle_before_execution(context: events.ExecutionContext, event: events.BeforeExecution) -> None:
-    """Display what method / endpoint will be tested next."""
-    message = f"{event.endpoint.method} {event.endpoint.path} "
-    context.current_line_length = len(message)
-    click.echo(message, nl=False)
-
-
-def handle_after_execution(context: events.ExecutionContext, event: events.AfterExecution) -> None:
-    """Display the execution result + current progress at the same line with the method / endpoint names."""
-    context.endpoints_processed += 1
-    display_execution_result(context, event)
-    display_percentage(context, event)
-
-
 def display_execution_result(context: events.ExecutionContext, event: events.AfterExecution) -> None:
     """Display an appropriate symbol for the given event's execution result."""
     symbol, color = {Status.success: (".", "green"), Status.failure: ("F", "red"), Status.error: ("E", "red")}[
@@ -95,17 +54,6 @@ def display_percentage(context: events.ExecutionContext, event: events.AfterExec
     length = get_terminal_width() - context.current_line_length + len(styled) - len(current_percentage) - padding
     template = f"{{:>{length}}}"
     click.echo(template.format(styled))
-
-
-def handle_finished(context: events.ExecutionContext, event: events.Finished) -> None:
-    """Show the outcome of the whole testing session."""
-    click.echo()
-    display_hypothesis_output(context.hypothesis_output)
-    display_errors(event.results)
-    display_failures(event.results)
-    display_statistic(event.results)
-    click.echo()
-    display_summary(event)
 
 
 def display_summary(event: events.Finished) -> None:
@@ -263,6 +211,58 @@ def display_check_result(check_name: str, results: Dict[Union[str, Status], int]
             click.style(check_name, bold=True), f"{success} / {total} passed", click.style(verdict, fg=color, bold=True)
         )
     )
+
+
+def handle_initialized(context: events.ExecutionContext, event: events.Initialized) -> None:
+    """Display information about the test session."""
+    display_section_name("Schemathesis test session starts")
+    versions = (
+        f"platform {platform.system()} -- "
+        f"Python {platform.python_version()}, "
+        f"schemathesis-{__version__}, "
+        f"hypothesis-{version('hypothesis')}, "
+        f"hypothesis_jsonschema-{version('hypothesis_jsonschema')}, "
+        f"jsonschema-{version('jsonschema')}"
+    )
+    click.echo(versions)
+    click.echo(f"rootdir: {os.getcwd()}")
+    click.echo(
+        f"hypothesis profile '{settings._current_profile}' "  # type: ignore
+        f"-> {settings.get_profile(settings._current_profile).show_changed()}"
+    )
+    if event.schema.location is not None:
+        click.echo(f"Schema location: {event.schema.location}")
+    if event.schema.base_url is not None:
+        click.echo(f"Base URL: {event.schema.base_url}")
+    click.echo(f"Specification version: {event.schema.verbose_name}")
+    click.secho(f"collected endpoints: {event.schema.endpoints_count}", bold=True)
+    if event.schema.endpoints_count >= 1:
+        click.echo()
+
+
+def handle_before_execution(context: events.ExecutionContext, event: events.BeforeExecution) -> None:
+    """Display what method / endpoint will be tested next."""
+    message = f"{event.endpoint.method} {event.endpoint.path} "
+    context.current_line_length = len(message)
+    click.echo(message, nl=False)
+
+
+def handle_after_execution(context: events.ExecutionContext, event: events.AfterExecution) -> None:
+    """Display the execution result + current progress at the same line with the method / endpoint names."""
+    context.endpoints_processed += 1
+    display_execution_result(context, event)
+    display_percentage(context, event)
+
+
+def handle_finished(context: events.ExecutionContext, event: events.Finished) -> None:
+    """Show the outcome of the whole testing session."""
+    click.echo()
+    display_hypothesis_output(context.hypothesis_output)
+    display_errors(event.results)
+    display_failures(event.results)
+    display_statistic(event.results)
+    click.echo()
+    display_summary(event)
 
 
 def handle_interrupted(context: events.ExecutionContext, event: events.Interrupted) -> None:
