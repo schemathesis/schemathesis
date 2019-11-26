@@ -327,6 +327,32 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
+def test_path_ref(testdir):
+    # When path is specified via `$ref`
+    testdir.make_test(
+        """
+@schema.parametrize()
+@settings(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/users"
+    assert isinstance(case.body, str)
+""",
+        paths={"/users": {"$ref": "#/definitions/UsersPath"}},
+        definitions={
+            "UsersPath": {
+                "post": {
+                    "parameters": [{"schema": {"type": "string"}, "in": "body", "name": "object", "required": True}]
+                }
+            }
+        },
+    )
+    # Then it should be correctly resolved and used in the generated case
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+
+
 def test_nullable_enum(testdir):
     testdir.make_test(
         """

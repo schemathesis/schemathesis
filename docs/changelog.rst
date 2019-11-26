@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Resolving references in ``PathItem`` objects. `#301`_
+
 `0.17.0`_ - 2019-11-21
 ----------------------
 
@@ -440,6 +445,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#301: https://github.com/kiwicom/schemathesis/issues/301
 .. _#295: https://github.com/kiwicom/schemathesis/issues/295
 .. _#294: https://github.com/kiwicom/schemathesis/issues/294
 .. _#286: https://github.com/kiwicom/schemathesis/issues/286

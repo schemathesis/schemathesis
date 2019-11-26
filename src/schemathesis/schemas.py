@@ -148,6 +148,7 @@ class SwaggerV20(BaseSchema):
             full_path = self.get_full_path(path)
             if should_skip_endpoint(full_path, self.endpoint):
                 continue
+            methods = self.resolve(methods)
             common_parameters = get_common_parameters(methods)
             for method, definition in methods.items():
                 if (
