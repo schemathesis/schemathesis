@@ -1,4 +1,5 @@
 # pylint: disable=too-many-arguments
+import os
 from typing import IO, Any, Dict, Optional, Union
 
 import requests
@@ -20,7 +21,9 @@ def from_path(
 ) -> BaseSchema:
     """Load a file from OS path and parse to schema instance.."""
     with open(path) as fd:
-        return from_file(fd, location=str(path), base_url=base_url, method=method, endpoint=endpoint, tag=tag)
+        return from_file(
+            fd, location=os.path.abspath(path), base_url=base_url, method=method, endpoint=endpoint, tag=tag
+        )
 
 
 def from_uri(
