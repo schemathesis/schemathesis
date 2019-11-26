@@ -3,9 +3,10 @@ import traceback
 import warnings
 from contextlib import contextmanager
 from functools import wraps
-from typing import Any, Callable, Generator, List, Mapping, Set, Tuple, Union
+from typing import Any, Callable, Generator, List, Mapping, Set, Tuple, Type, Union
 from urllib.parse import urlsplit, urlunsplit
 
+import yaml
 from hypothesis.reporting import with_reporter
 
 from .types import Filter
@@ -98,3 +99,16 @@ def parse_content_type(content_type: str) -> Tuple[str, str]:
 def are_content_types_equal(source: str, target: str) -> bool:
     """Check if two content types are the same excluding options."""
     return parse_content_type(source) == parse_content_type(target)
+
+
+def make_loader(*tags_to_remove: str) -> Type[yaml.SafeLoader]:
+    """Create a YAML loader, that doesn't parse specific tokens into Python objects."""
+    cls: Type[yaml.SafeLoader] = type("YAMLLoader", (yaml.SafeLoader,), {})
+    cls.yaml_implicit_resolvers = {
+        key: [(tag, regexp) for tag, regexp in mapping if tag not in tags_to_remove]
+        for key, mapping in cls.yaml_implicit_resolvers.copy().items()
+    }
+    return cls
+
+
+StringDatesYAMLLoader = make_loader("tag:yaml.org,2002:timestamp")
