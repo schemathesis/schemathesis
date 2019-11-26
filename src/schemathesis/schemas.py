@@ -75,7 +75,7 @@ class BaseSchema(Mapping):
     def resolver(self) -> jsonschema.RefResolver:
         if not hasattr(self, "_resolver"):
             # pylint: disable=attribute-defined-outside-init
-            self._resolver = jsonschema.RefResolver("", self.raw_schema, handlers={"": load_file})
+            self._resolver = jsonschema.RefResolver(self.location or "", self.raw_schema, handlers={"": load_file})
         return self._resolver
 
     @property
