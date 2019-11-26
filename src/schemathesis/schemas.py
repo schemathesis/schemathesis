@@ -27,14 +27,14 @@ from ._hypothesis import create_test
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .models import Endpoint
 from .types import Filter
-from .utils import NOT_SET
+from .utils import NOT_SET, StringDatesYAMLLoader
 
 
 @lru_cache()
 def load_file(location: str) -> Dict[str, Any]:
     """Load a schema from the given file."""
     with open(location) as fd:
-        return yaml.safe_load(fd)
+        return yaml.load(fd, StringDatesYAMLLoader)
 
 
 @attr.s()  # pragma: no mutate

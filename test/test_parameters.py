@@ -1,3 +1,10 @@
+import datetime
+
+import yaml
+from hypothesis import given
+
+import schemathesis
+
 from .utils import as_param
 
 
@@ -98,3 +105,43 @@ def test_(case):
     )
     # Then the generated test ignores this parameter
     testdir.run_and_assert(passed=1)
+
+
+def test_date_deserializing(testdir):
+    # When dates in schema are written without quotes (achieved by dumping the schema with date instances)
+    schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/teapot": {
+                "get": {
+                    "summary": "Test",
+                    "parameters": [
+                        {
+                            "name": "key",
+                            "in": "query",
+                            "required": True,
+                            "schema": {
+                                "allOf": [
+                                    # For sake of example to check allOf logic
+                                    {"type": "string", "example": datetime.date(2020, 1, 1)},
+                                    {"type": "string", "example": datetime.date(2020, 1, 1)},
+                                ]
+                            },
+                        }
+                    ],
+                }
+            }
+        },
+    }
+
+    schema_path = testdir.makefile(".yaml", schema=yaml.dump(schema))
+    # Then yaml loader should ignore it
+    # And data generation should work without errors
+    schema = schemathesis.from_path(str(schema_path))
+
+    @given(case=schema["/teapot"]["GET"].as_strategy())
+    def test(case):
+        assert isinstance(case.query["key"], str)
+
+    test()
