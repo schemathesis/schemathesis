@@ -63,6 +63,6 @@ jobs:
           fetch-depth: 1
 
       - name: Release Notary Action
-        uses: docker://commitsar/release-notary
+        uses: docker://outillage/release-notary
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
