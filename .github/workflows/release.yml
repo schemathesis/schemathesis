@@ -2,7 +2,7 @@ name: Post-release jobs
 
 on:
   release:
-    type: [published]
+    types: [published]
 
 jobs:
   release_image:
