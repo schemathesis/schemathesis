@@ -75,7 +75,11 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 @click.option("--method", "-M", "methods", type=str, multiple=True, help="Filter schemathesis test by HTTP method.")
 @click.option("--tag", "-T", "tags", type=str, multiple=True, help="Filter schemathesis test by schema tag pattern.")
 @click.option(
-    "--base-url", "-b", help="Base URL address of the API, required for SCHEMA if specified by file. ", type=str
+    "--base-url",
+    "-b",
+    help="Base URL address of the API, required for SCHEMA if specified by file. ",
+    type=str,
+    callback=callbacks.validate_base_url,
 )
 @click.option("--request-timeout", help="Timeout in milliseconds for network requests during the test run.", type=int)
 @click.option(

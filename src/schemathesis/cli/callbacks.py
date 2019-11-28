@@ -16,6 +16,12 @@ def validate_schema(ctx: click.core.Context, param: click.core.Parameter, raw_va
     return raw_value
 
 
+def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
+    if raw_value and not urlparse(raw_value).netloc:
+        raise click.UsageError("Invalid base URL")
+    return raw_value
+
+
 def validate_auth(
     ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]
 ) -> Optional[Tuple[str, str]]:

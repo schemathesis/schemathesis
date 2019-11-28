@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Validation of ``base-url`` CLI parameter. `#311`_
+
 `0.18.0`_ - 2019-11-27
 ----------------------
 
@@ -455,6 +460,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#311: https://github.com/kiwicom/schemathesis/issues/311
 .. _#305: https://github.com/kiwicom/schemathesis/issues/305
 .. _#303: https://github.com/kiwicom/schemathesis/issues/303
 .. _#301: https://github.com/kiwicom/schemathesis/issues/301
