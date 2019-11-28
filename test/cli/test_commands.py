@@ -46,6 +46,8 @@ def test_commands_version(cli):
         (("run",), 'Error: Missing argument "SCHEMA".'),
         (("run", "not-url"), "Error: Invalid SCHEMA, must be a valid URL or file path."),
         (("run", SIMPLE_PATH), 'Error: Missing argument, "--base-url" is required for SCHEMA specified by file.'),
+        (("run", SIMPLE_PATH, "--base-url=test"), "Error: Invalid base URL"),
+        (("run", SIMPLE_PATH, "--base-url=127.0.0.1:8080"), "Error: Invalid base URL"),
         (
             ("run", "http://127.0.0.1", "--auth=123"),
             'Error: Invalid value for "--auth" / "-a": Should be in KEY:VALUE format. Got: 123',
