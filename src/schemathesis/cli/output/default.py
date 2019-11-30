@@ -278,6 +278,7 @@ def handle_event(context: events.ExecutionContext, event: events.ExecutionEvent)
     if isinstance(event, events.BeforeExecution):
         handle_before_execution(context, event)
     if isinstance(event, events.AfterExecution):
+        context.hypothesis_output.extend(event.hypothesis_output)
         handle_after_execution(context, event)
     if isinstance(event, events.Finished):
         handle_finished(context, event)

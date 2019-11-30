@@ -19,6 +19,7 @@ def handle_event(context: events.ExecutionContext, event: events.ExecutionEvent)
     if isinstance(event, events.Initialized):
         default.handle_initialized(context, event)
     if isinstance(event, events.AfterExecution):
+        context.hypothesis_output.extend(event.hypothesis_output)
         handle_after_execution(context, event)
     if isinstance(event, events.Finished):
         default.handle_finished(context, event)

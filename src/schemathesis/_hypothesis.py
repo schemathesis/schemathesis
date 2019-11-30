@@ -135,7 +135,7 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
             if value is not None:
                 if parameter == "path_parameters":
                     strategies[parameter] = (
-                        from_schema(value).filter(filter_path_parameters).map(quote_all)  # type: ignore  # type: ignore
+                        from_schema(value).filter(filter_path_parameters).map(quote_all)  # type: ignore
                     )
                 elif parameter == "headers":
                     strategies[parameter] = from_schema(value).filter(is_valid_header)  # type: ignore
