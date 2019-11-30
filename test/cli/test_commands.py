@@ -1,4 +1,5 @@
 import os
+import time
 from test.utils import HERE, SIMPLE_PATH
 
 import pytest
@@ -615,8 +616,18 @@ def test_register_check(testdir, cli, schema_url):
     assert lines[14] == "Custom check failed!"
 
 
+def assert_threaded_executor_interruption(lines, expected):
+    # It is possible to have a case when first call without an error will start processing
+    # But after, another thread will have interruption and will push this event before the
+    # first thread will finish. Race condition: "" is for this case and "." for the other
+    # way around
+    assert lines[10] in expected
+    assert "!! KeyboardInterrupt !!" in lines[11]
+    assert "== SUMMARY ==" in lines[13]
+
+
 @pytest.mark.parametrize("workers", (1, 2))
-def test_keyboard_interrupt(testdir, cli, schema_url, base_url, mocker, workers):
+def test_keyboard_interrupt(cli, schema_url, base_url, mocker, workers):
     # When a Schemathesis run in interrupted by keyboard or via SIGINT
     original = Case("/success", "GET", base_url=base_url).call
     counter = 0
@@ -625,6 +636,7 @@ def test_keyboard_interrupt(testdir, cli, schema_url, base_url, mocker, workers)
         nonlocal counter
         counter += 1
         if counter > 1:
+            # For threaded case it emulates SIGINT for the worker thread
             raise KeyboardInterrupt
         return original(*args, **kwargs)
 
@@ -641,10 +653,41 @@ def test_keyboard_interrupt(testdir, cli, schema_url, base_url, mocker, workers)
         assert "!! KeyboardInterrupt !!" in lines[12]
         assert "== SUMMARY ==" in lines[14]
     else:
-        print(lines)
-        assert lines[10] == "."
-        assert "!! KeyboardInterrupt !!" in lines[11]
-        assert "== SUMMARY ==" in lines[13]
+        assert_threaded_executor_interruption(lines, ("", "."))
+
+
+def test_keyboard_interrupt_threaded(cli, schema_url, mocker):
+    # When a Schemathesis run in interrupted by keyboard or via SIGINT
+    original = time.sleep
+    counter = 0
+
+    def mocked(*args, **kwargs):
+        nonlocal counter
+        counter += 1
+        if counter > 1:
+            raise KeyboardInterrupt
+        return original(*args, **kwargs)
+
+    mocker.patch("schemathesis.runner.time.sleep", wraps=mocked)
+    result = cli.run(schema_url, "--workers=2")
+    # the exit status depends on what thread finished first
+    assert result.exit_code in (ExitCode.OK, ExitCode.TESTS_FAILED)
+    # Then execution stops and a message about interruption is displayed
+    lines = result.stdout.strip().split("\n")
+    # There are many scenarios possible, depends how many tests will be executed before interruption
+    # and in what order. it could be no tests at all, some of them or all of them.
+    assert_threaded_executor_interruption(lines, ("F", ".", "F.", ".F", ""))
+
+
+@pytest.mark.endpoints("failure")
+@pytest.mark.parametrize("workers", (1, 2))
+def test_hypothesis_output_capture(mocker, cli, schema_url, workers):
+    mocker.patch("schemathesis.utils.IGNORED_PATTERNS", ())
+
+    result = cli.run(schema_url, f"--workers={workers}")
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    assert "= HYPOTHESIS OUTPUT =" in result.stdout
+    assert "Falsifying example" in result.stdout
 
 
 async def test_multiple_files_schema(app, testdir, cli, base_url):

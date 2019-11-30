@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Concurrent test execution in CLI / runner. `#91`_
+
 `0.18.1`_ - 2019-11-28
 ----------------------
 
@@ -531,6 +536,7 @@ Fixed
 .. _#98: https://github.com/kiwicom/schemathesis/issues/98
 .. _#94: https://github.com/kiwicom/schemathesis/issues/94
 .. _#92: https://github.com/kiwicom/schemathesis/issues/92
+.. _#91: https://github.com/kiwicom/schemathesis/issues/91
 .. _#90: https://github.com/kiwicom/schemathesis/issues/90
 .. _#78: https://github.com/kiwicom/schemathesis/issues/78
 .. _#75: https://github.com/kiwicom/schemathesis/issues/75

@@ -225,7 +225,6 @@ class OutputStyle(Enum):
 def execute(prepared_runner: Generator[events.ExecutionEvent, None, None], workers_num: int) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handler = get_output_handler(workers_num)
-    with utils.capture_hypothesis_output() as hypothesis_output:
-        context = events.ExecutionContext(hypothesis_output, workers_num)
-        for event in prepared_runner:
-            handler(context, event)
+    context = events.ExecutionContext(workers_num=workers_num)
+    for event in prepared_runner:
+        handler(context, event)
