@@ -3,7 +3,7 @@ import threading
 import time
 from contextlib import contextmanager
 from queue import Queue
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union, cast
 
 import attr
 import hypothesis
@@ -91,7 +91,6 @@ def thread_task(
     Pretty similar to the default one-thread flow, but includes communication with the main thread via the events queue.
     """
     # pylint: disable=too-many-arguments
-    # TODO. catch hypothesis output - we should move it to the main thread
     with get_session(auth, headers) as session:
         with capture_hypothesis_output():
             while not tasks_queue.empty():
@@ -101,13 +100,13 @@ def thread_task(
                     events_queue.put(event)
 
 
-class Worker(threading.Thread):
-    def stop(self) -> None:
-        """Raise an error in a thread so it is possible to immediately stop thread execution."""
-        thread_id = self._ident  # type: ignore
-        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(thread_id), ctypes.py_object(SystemExit))
-        if res > 1:
-            ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0)
+def stop_worker(thread_id: int) -> None:
+    """Raise an error in a thread so it is possible to asynchronously stop thread execution."""
+    ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(thread_id), ctypes.py_object(SystemExit))
+
+
+class ThreadInterrupted(Exception):
+    """Special exception when worker thread received SIGINT."""
 
 
 @attr.s(slots=True)
@@ -123,6 +122,13 @@ class ThreadPoolRunner(BaseRunner):
         events_queue: Queue = Queue()
         workers = self._init_workers(tasks_queue, events_queue, results)
 
+        def stop_workers() -> None:
+            for worker in workers:
+                # workers are initialized at this point and `worker.ident` is set with an integer value
+                ident = cast(int, worker.ident)
+                stop_worker(ident)
+                worker.join()
+
         is_finished = False
         try:
             while not is_finished:
@@ -132,11 +138,17 @@ class ThreadPoolRunner(BaseRunner):
                 time.sleep(0.001)
                 is_finished = all(not worker.is_alive() for worker in workers)
                 while not events_queue.empty():
-                    yield events_queue.get()
+                    event = events_queue.get()
+                    yield event
+                    if isinstance(event, events.Interrupted):
+                        # Thread received SIGINT
+                        # We could still have events in the queue, but ignore them to keep the logic simple
+                        # for now, could be improved in the future to show more info in such corner cases
+                        raise ThreadInterrupted
+        except ThreadInterrupted:
+            stop_workers()
         except KeyboardInterrupt:
-            for worker in workers:
-                worker.stop()
-                worker.join()
+            stop_workers()
             yield events.Interrupted(results=results, schema=self.schema)
 
     def _get_tasks_queue(self) -> Queue:
@@ -145,10 +157,10 @@ class ThreadPoolRunner(BaseRunner):
         tasks_queue.queue.extend(self.schema.get_all_endpoints())
         return tasks_queue
 
-    def _init_workers(self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet) -> List[Worker]:
+    def _init_workers(self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet) -> List[threading.Thread]:
         """Initialize & start workers that will execute tests."""
         workers = [
-            Worker(
+            threading.Thread(
                 target=thread_task,
                 kwargs={
                     "tasks_queue": tasks_queue,
@@ -209,12 +221,14 @@ def run_test(
     # pylint: disable=too-many-arguments
     result = TestResult(endpoint=endpoint, schema=schema)
     yield events.BeforeExecution(results=results, schema=schema, endpoint=endpoint)
+    hypothesis_output: List[str] = []
     try:
         if isinstance(test, InvalidSchema):
             status = Status.error
             result.add_error(test)
         else:
-            test(session, checks, result, request_timeout)
+            with capture_hypothesis_output() as hypothesis_output:
+                test(session, checks, result, request_timeout)
             status = Status.success
     except AssertionError:
         status = Status.failure
@@ -247,8 +261,10 @@ def run_test(
     result.seed = getattr(test, "_hypothesis_internal_use_seed", None) or getattr(
         test, "_hypothesis_internal_use_generated_seed", None
     )
-    results.append(result)  # TODO. make thread safe
-    yield events.AfterExecution(results=results, schema=schema, endpoint=endpoint, status=status)
+    results.append(result)
+    yield events.AfterExecution(
+        results=results, schema=schema, endpoint=endpoint, status=status, hypothesis_output=hypothesis_output
+    )
 
 
 def execute(  # pylint: disable=too-many-arguments

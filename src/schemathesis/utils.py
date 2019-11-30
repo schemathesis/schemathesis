@@ -54,6 +54,14 @@ def dict_not_none_values(**kwargs: Any) -> Mapping[str, Any]:
     return {key: value for key, value in kwargs.items() if value is not None}
 
 
+IGNORED_PATTERNS = (
+    "Falsifying example: ",
+    "You can add @seed",
+    "Failed to reproduce exception. Expected:",
+    "Flaky example!",
+)
+
+
 @contextmanager
 def capture_hypothesis_output() -> Generator[List[str], None, None]:
     """Capture all output of Hypothesis into a list of strings.
@@ -74,9 +82,7 @@ def capture_hypothesis_output() -> Generator[List[str], None, None]:
 
     def get_output(value: str) -> None:
         # Drop messages that could be confusing in the Schemathesis context
-        if value.startswith(
-            ("Falsifying example: ", "You can add @seed", "Failed to reproduce exception. Expected:", "Flaky example!")
-        ):
+        if value.startswith(IGNORED_PATTERNS):
             return
         output.append(value)
 

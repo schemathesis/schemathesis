@@ -14,7 +14,7 @@ from ..schemas import BaseSchema
 class ExecutionContext:
     """Storage for the current context of the execution."""
 
-    hypothesis_output: List[str] = attr.ib()  # pragma: no mutate
+    hypothesis_output: List[str] = attr.ib(factory=list)  # pragma: no mutate
     workers_num: int = attr.ib(default=1)  # pragma: no mutate
     endpoints_processed: int = attr.ib(default=0)  # pragma: no mutate
     current_line_length: int = attr.ib(default=0)  # pragma: no mutate
@@ -45,6 +45,7 @@ class BeforeExecution(ExecutionEvent):
 class AfterExecution(ExecutionEvent):
     endpoint: Endpoint = attr.ib()  # pragma: no mutate
     status: Status = attr.ib()  # pragma: no mutate
+    hypothesis_output: List[str] = attr.ib(factory=list)  # pragma: no mutate
 
 
 @attr.s(slots=True)  # pragma: no mutate
