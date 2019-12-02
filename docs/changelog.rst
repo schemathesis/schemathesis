@@ -6,11 +6,14 @@ Changelog
 `Unreleased`_
 -------------
 
+`0.19.0`_ - 2019-12-02
+----------------------
+
 Added
 ~~~~~
 
 - Concurrent test execution in CLI / runner. `#91`_
-- update importlib_metadata pin to ``^1.1`` `#315`_
+- update importlib_metadata pin to ``^1.1``. `#315`_
 
 `0.18.1`_ - 2019-11-28
 ----------------------
@@ -441,7 +444,8 @@ Fixed
 
 - Initial public release
 
-.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.18.1...HEAD
+.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.19.0...HEAD
+.. _0.19.0: https://github.com/kiwicom/schemathesis/compare/v0.18.1...v0.19.0
 .. _0.18.1: https://github.com/kiwicom/schemathesis/compare/v0.18.0...v0.18.1
 .. _0.18.0: https://github.com/kiwicom/schemathesis/compare/v0.17.0...v0.18.0
 .. _0.17.0: https://github.com/kiwicom/schemathesis/compare/v0.16.0...v0.17.0
@@ -470,6 +474,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#315: https://github.com/kiwicom/schemathesis/issues/315
 .. _#311: https://github.com/kiwicom/schemathesis/issues/311
 .. _#314: https://github.com/kiwicom/schemathesis/issues/314
 .. _#305: https://github.com/kiwicom/schemathesis/issues/305
