@@ -10,6 +10,7 @@ Added
 ~~~~~
 
 - Concurrent test execution in CLI / runner. `#91`_
+- update importlib_metadata pin to ``^1.1`` `#315`_
 
 `0.18.1`_ - 2019-11-28
 ----------------------
@@ -470,6 +471,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#311: https://github.com/kiwicom/schemathesis/issues/311
+.. _#314: https://github.com/kiwicom/schemathesis/issues/314
 .. _#305: https://github.com/kiwicom/schemathesis/issues/305
 .. _#303: https://github.com/kiwicom/schemathesis/issues/303
 .. _#301: https://github.com/kiwicom/schemathesis/issues/301
