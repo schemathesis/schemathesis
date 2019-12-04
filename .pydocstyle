@@ -1,0 +1,5 @@
+[pydocstyle]
+# D100-D107 ignore missing docstrings
+# D203 disabled in favor of D211
+# D213 disabled in favor of D212
+ignore = D100,D101,D102,D103,D104,D105,D106,D107,D202,D203,D213,D401,D407
