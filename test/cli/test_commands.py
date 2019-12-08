@@ -623,7 +623,12 @@ def assert_threaded_executor_interruption(lines, expected):
     # way around
     assert lines[10] in expected
     assert "!! KeyboardInterrupt !!" in lines[11]
-    assert "== SUMMARY ==" in lines[13]
+    if "F" in lines[10]:
+        assert "=== FAILURES ===" in lines[12]
+        position = 24
+    else:
+        position = 13
+    assert "== SUMMARY ==" in lines[position]
 
 
 @pytest.mark.parametrize("workers", (1, 2))
