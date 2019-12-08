@@ -9,11 +9,19 @@ import hypothesis
 
 def validate_schema(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
     if not urlparse(raw_value).netloc:
-        if "\x00" in raw_value or not pathlib.Path(raw_value).is_file():
+        if "\x00" in raw_value or not _verify_path(raw_value):
             raise click.UsageError("Invalid SCHEMA, must be a valid URL or file path.")
         if "base_url" not in ctx.params:
             raise click.UsageError('Missing argument, "--base-url" is required for SCHEMA specified by file.')
     return raw_value
+
+
+def _verify_path(path: str) -> bool:
+    try:
+        return pathlib.Path(path).is_file()
+    except OSError:
+        # For example, path could be too long
+        return False
 
 
 def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
