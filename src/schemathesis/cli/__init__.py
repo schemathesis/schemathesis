@@ -2,16 +2,17 @@ import pathlib
 import traceback
 from contextlib import contextmanager
 from enum import Enum
-from typing import Callable, Dict, Generator, Iterable, List, Optional, Tuple, cast
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, cast
+from urllib.parse import urlparse
 
 import click
 import hypothesis
 import requests
 from requests import exceptions
-from requests.auth import HTTPDigestAuth
 
 from .. import models, runner, utils
-from ..loaders import from_path
+from ..exceptions import HTTPError
+from ..loaders import from_path, from_wsgi
 from ..runner import events
 from ..types import Filter
 from ..utils import dict_not_none_values, dict_true_values
@@ -87,10 +88,11 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 @click.option(
     "--base-url",
     "-b",
-    help="Base URL address of the API, required for SCHEMA if specified by file. ",
+    help="Base URL address of the API, required for SCHEMA if specified by file.",
     type=str,
     callback=callbacks.validate_base_url,
 )
+@click.option("--app", help="WSGI application to test", type=str, callback=callbacks.validate_app)
 @click.option("--request-timeout", help="Timeout in milliseconds for network requests during the test run.", type=int)
 @click.option(
     "--hypothesis-deadline",
@@ -130,6 +132,7 @@ def run(  # pylint: disable=too-many-arguments
     tags: Optional[Filter] = None,
     workers_num: int = DEFAULT_WORKERS,
     base_url: Optional[str] = None,
+    app: Any = None,
     request_timeout: Optional[int] = None,
     hypothesis_deadline: Optional[int] = None,
     hypothesis_derandomize: Optional[bool] = None,
@@ -148,12 +151,13 @@ def run(  # pylint: disable=too-many-arguments
 
     selected_checks = tuple(check for check in runner.checks.ALL_CHECKS if check.__name__ in checks)
 
-    if auth and auth_type == "digest":
-        auth = HTTPDigestAuth(*auth)  # type: ignore
+    if auth is None:
+        # Auth type doesn't matter if auth is not passed
+        auth_type = None  # type: ignore
 
     options = dict_true_values(
-        api_options=dict_true_values(auth=auth, headers=headers, request_timeout=request_timeout),
-        loader_options=dict_true_values(base_url=base_url, endpoint=endpoints, method=methods, tag=tags),
+        api_options=dict_true_values(auth=auth, auth_type=auth_type, headers=headers, request_timeout=request_timeout),
+        loader_options=dict_true_values(base_url=base_url, endpoint=endpoints, method=methods, tag=tags, app=app),
         hypothesis_options=dict_not_none_values(
             deadline=hypothesis_deadline,
             derandomize=hypothesis_derandomize,
@@ -167,12 +171,14 @@ def run(  # pylint: disable=too-many-arguments
     )
 
     with abort_on_network_errors():
+        options.update({"checks": selected_checks, "workers_num": workers_num})
         if pathlib.Path(schema).is_file():
-            prepared_runner = runner.prepare(
-                schema, checks=selected_checks, workers_num=workers_num, loader=from_path, **options
-            )
-        else:
-            prepared_runner = runner.prepare(schema, checks=selected_checks, workers_num=workers_num, **options)
+            options["loader"] = from_path
+        elif app is not None and not urlparse(schema).netloc:
+            # If `schema` is not an existing filesystem path or an URL then it is considered as an endpoint with
+            # the given app
+            options["loader"] = from_wsgi
+        prepared_runner = runner.prepare(schema, **options)
     execute(prepared_runner, workers_num)
 
 
@@ -205,13 +211,11 @@ def abort_on_network_errors() -> Generator[None, None, None]:
         message = utils.format_exception(exc)
         click.secho(f"Error: {message}", fg="red")
         raise click.Abort
-    except exceptions.HTTPError as exc:
+    except HTTPError as exc:
         if exc.response.status_code == 404:
-            click.secho(f"Schema was not found at {exc.request.url}", fg="red")
+            click.secho(f"Schema was not found at {exc.url}", fg="red")
             raise click.Abort
-        click.secho(
-            f"Failed to load schema, code {exc.response.status_code} was returned from {exc.request.url}", fg="red"
-        )
+        click.secho(f"Failed to load schema, code {exc.response.status_code} was returned from {exc.url}", fg="red")
         raise click.Abort
 
 

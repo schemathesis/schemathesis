@@ -1,15 +1,19 @@
 # pylint: disable=too-many-instance-attributes
 from collections import Counter
+from contextlib import contextmanager
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
+from logging import LogRecord
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, Iterator, List, Optional, Tuple, Union
 from urllib.parse import urljoin
 
 import attr
 import requests
+import werkzeug
 from hypothesis.strategies import SearchStrategy
 
 from .exceptions import InvalidSchema
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
+from .utils import WSGIResponse
 
 if TYPE_CHECKING:
     from .schemas import BaseSchema
@@ -21,6 +25,7 @@ class Case:
 
     path: str = attr.ib()  # pragma: no mutate
     method: str = attr.ib()  # pragma: no mutate
+    app: Any = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     path_parameters: Optional[PathParameters] = attr.ib(default=None)  # pragma: no mutate
     headers: Optional[Headers] = attr.ib(default=None)  # pragma: no mutate
@@ -39,7 +44,8 @@ class Case:
 
     def get_code_to_reproduce(self) -> str:
         """Construct a Python code to reproduce this case with `requests`."""
-        kwargs = self.as_requests_kwargs()
+        base_url = self.base_url or "http://localhost"
+        kwargs = self.as_requests_kwargs(base_url)
         method = kwargs["method"].lower()
 
         def are_defaults(key: str, value: Optional[Dict]) -> bool:
@@ -56,7 +62,7 @@ class Case:
             args_repr += f", {printed_kwargs}"
         return f"requests.{method}({args_repr})"
 
-    def _get_base_url(self, base_url: Optional[str]) -> str:
+    def _get_base_url(self, base_url: Optional[str] = None) -> str:
         if base_url is None:
             if self.base_url is not None:
                 base_url = self.base_url
@@ -104,6 +110,52 @@ class Case:
             session.close()
         return response
 
+    def as_werkzeug_kwargs(self) -> Dict[str, Any]:
+        """Convert the case into a dictionary acceptable by werkzeug.Client."""
+        headers = self.headers
+        extra: Dict[str, Optional[Dict]]
+        if self.form_data:
+            extra = {"data": self.form_data}
+            headers = headers or {}
+            headers.setdefault("Content-Type", "multipart/form-data")
+        else:
+            extra = {"json": self.body}
+        return {
+            "method": self.method,
+            "path": self.formatted_path,
+            "headers": headers,
+            "query_string": self.query,
+            **extra,
+        }
+
+    def call_wsgi(self, app: Any = None, headers: Optional[Dict[str, str]] = None, **kwargs: Any) -> WSGIResponse:
+        application = app or self.app
+        if application is None:
+            raise RuntimeError(
+                "WSGI application instance is required. "
+                "Please, set `app` argument in the schema constructor or pass it to `call_wsgi`"
+            )
+        data = self.as_werkzeug_kwargs()
+        if headers:
+            data["headers"] = data["headers"] or {}
+            data["headers"].update(headers)
+        client = werkzeug.Client(application, WSGIResponse)
+        with cookie_handler(client, self.cookies):
+            return client.open(**data, **kwargs)  # type: ignore
+
+
+@contextmanager
+def cookie_handler(client: werkzeug.Client, cookies: Optional[Cookies]) -> Generator[None, None, None]:
+    """Set cookies required for a call."""
+    if not cookies:
+        yield
+    else:
+        for key, value in cookies.items():
+            client.set_cookie("localhost", key, value)
+        yield
+        for key in cookies:
+            client.delete_cookie("localhost", key)
+
 
 def empty_object() -> Dict[str, Any]:
     return {"properties": {}, "additionalProperties": False, "type": "object", "required": []}
@@ -116,6 +168,7 @@ class Endpoint:
     path: str = attr.ib()  # pragma: no mutate
     method: str = attr.ib()  # pragma: no mutate
     definition: Dict[str, Any] = attr.ib()  # pragma: no mutate
+    app: Any = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     path_parameters: PathParameters = attr.ib(default=None)  # pragma: no mutate
     headers: Headers = attr.ib(default=None)  # pragma: no mutate
@@ -156,6 +209,7 @@ class TestResult:
     schema: "BaseSchema" = attr.ib()  # pragma: no mutate
     checks: List[Check] = attr.ib(factory=list)  # pragma: no mutate
     errors: List[Tuple[Exception, Optional[Case]]] = attr.ib(factory=list)  # pragma: no mutate
+    logs: List[LogRecord] = attr.ib(factory=list)  # pragma: no mutate
     is_errored: bool = attr.ib(default=False)  # pragma: no mutate
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
 
@@ -169,6 +223,10 @@ class TestResult:
     @property
     def has_failures(self) -> bool:
         return any(check.value == Status.failure for check in self.checks)
+
+    @property
+    def has_logs(self) -> bool:
+        return bool(self.logs)
 
     def add_success(self, name: str, example: Case) -> None:
         self.checks.append(Check(name, Status.success, example))
@@ -203,6 +261,11 @@ class TestResultSet:
     def has_errors(self) -> bool:
         """If any result has any errors."""
         return any(result.has_errors for result in self)
+
+    @property
+    def has_logs(self) -> bool:
+        """If any result has any captured logs."""
+        return any(result.has_logs for result in self)
 
     def _count(self, predicate: Callable) -> int:
         return sum(1 for result in self if predicate(result))
