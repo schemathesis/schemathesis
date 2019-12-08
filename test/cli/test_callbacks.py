@@ -11,6 +11,7 @@ from ..utils import SIMPLE_PATH
 
 
 @given(value=st.text().filter(lambda x: "//" not in x))
+@example("0" * 1000)
 def test_validate_schema(value):
     with pytest.raises(click.UsageError):
         callbacks.validate_schema(None, None, value)
