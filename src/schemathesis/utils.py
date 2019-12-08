@@ -8,6 +8,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 import yaml
 from hypothesis.reporting import with_reporter
+from werkzeug.wrappers import Response as BaseResponse
+from werkzeug.wrappers.json import JSONMixin
 
 from .types import Filter
 
@@ -118,3 +120,7 @@ def make_loader(*tags_to_remove: str) -> Type[yaml.SafeLoader]:
 
 
 StringDatesYAMLLoader = make_loader("tag:yaml.org,2002:timestamp")
+
+
+class WSGIResponse(BaseResponse, JSONMixin):  # pylint: disable=too-many-ancestors
+    pass

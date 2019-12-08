@@ -1,19 +1,21 @@
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Union
 
 import jsonschema
 import requests
 
 from ..models import TestResult
-from ..utils import are_content_types_equal
+from ..utils import WSGIResponse, are_content_types_equal
+
+GenericResponse = Union[requests.Response, WSGIResponse]  # pragma: no mutate
 
 
-def not_a_server_error(response: requests.Response, result: TestResult) -> None:
+def not_a_server_error(response: GenericResponse, result: TestResult) -> None:
     """A check to verify that the response is not a server-side error."""
     if response.status_code >= 500:
         raise AssertionError(f"Received a response with 5xx status code: {response.status_code}")
 
 
-def status_code_conformance(response: requests.Response, result: TestResult) -> None:
+def status_code_conformance(response: GenericResponse, result: TestResult) -> None:
     responses = result.endpoint.definition.get("responses", {})
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
     if "default" in responses:
@@ -27,7 +29,7 @@ def status_code_conformance(response: requests.Response, result: TestResult) -> 
         raise AssertionError(message)
 
 
-def content_type_conformance(response: requests.Response, result: TestResult) -> None:
+def content_type_conformance(response: GenericResponse, result: TestResult) -> None:
     global_produces = result.schema.raw_schema.get("produces", None)
     if global_produces:
         produces = global_produces
@@ -46,7 +48,7 @@ def content_type_conformance(response: requests.Response, result: TestResult) ->
     )
 
 
-def response_schema_conformance(response: requests.Response, result: TestResult) -> None:
+def response_schema_conformance(response: GenericResponse, result: TestResult) -> None:
     if not response.headers["Content-Type"].startswith("application/json"):
         return
     # the keys should be strings
@@ -62,8 +64,12 @@ def response_schema_conformance(response: requests.Response, result: TestResult)
     schema = definition.get("schema")
     if not schema:
         return
+    if isinstance(response, requests.Response):
+        data = response.json()
+    else:
+        data = response.json
     try:
-        jsonschema.validate(response.json(), schema)
+        jsonschema.validate(data, schema)
     except jsonschema.ValidationError as exc:
         raise AssertionError(f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}")
 

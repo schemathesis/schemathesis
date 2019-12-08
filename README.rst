@@ -77,6 +77,21 @@ To speed up the testing process Schemathesis provides ``-w/--workers`` option fo
 
 In the example above all tests will be distributed among 8 worker threads.
 
+If you'd like to test your WSGI app (Flask for example) then there is ``--app`` option for you:
+
+.. code:: bash
+
+    schemathesis run --app=importable.path:app /swagger.json
+
+You need to specify an importable path to the module where your app instance resides and a variable name after ``:`` that points
+to your app. **Note**, app factories are not supported. The schema location could be:
+
+- A full URL;
+- An existing filesystem path;
+- In-app endpoint with schema.
+
+This method is significantly faster than the default one, which involves network.
+
 For the full list of options, run:
 
 .. code:: bash
@@ -162,19 +177,21 @@ look like this:
     @schema.parametrize()
     def test_no_server_errors(case):
         # `requests` will make an appropriate call under the hood
-        response = case.call()
+        response = case.call()  # use `call_wsgi` if you used `schemathesis.from_wsgi`
         assert response.status_code < 500
 
 
 It consists of four main parts:
 
-1. Schema preparation; ``schemathesis`` package provides multiple ways to initialize the schema - ``from_path``, ``from_dict``, ``from_uri``, ``from_file``.
+1. Schema preparation; ``schemathesis`` package provides multiple ways to initialize the schema - ``from_path``, ``from_dict``, ``from_uri``, ``from_file`` and ``from_wsgi``*.
 
 2. Test parametrization; ``@schema.parametrize()`` generates separate tests for all endpoint/method combination available in the schema.
 
 3. A network call to the running application; ``case.call`` does it.
 
 4. Verifying a property you'd like to test; In the example, we verify that any app response will not indicate a server-side error (HTTP codes 5xx).
+
+**NOTE**. Look for ``from_wsgi`` usage `below <https://github.com/kiwicom/schemathesis#wsgi>`_
 
 Run the tests:
 
@@ -235,6 +252,31 @@ To narrow down the scope of the schemathesis tests it is possible to filter by m
         ...
 
 The acceptable values are regexps or list of regexps (matched with ``re.search``).
+
+WSGI applications support
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Schemathesis supports making calls to WSGI-compliant applications instead of real network calls, in this case
+the test execution will go much faster.
+
+.. code:: python
+
+    app = Flask("test_app")
+
+    @app.route("/schema.json")
+    def schema():
+        return {...}
+
+    @app.route("/v1/users", methods=["GET"])
+    def users():
+        return jsonify([{"name": "Robin"}])
+
+    schema = schemathesis.from_wsgi("/schema.json", app)
+
+    @schema.parametrize()
+    def test_no_server_errors(case):
+        response = case.call_wsgi()
+        assert response.status_code < 500
 
 Explicit examples
 ~~~~~~~~~~~~~~~~~

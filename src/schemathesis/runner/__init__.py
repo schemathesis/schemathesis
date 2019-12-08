@@ -1,4 +1,5 @@
 import ctypes
+import logging
 import threading
 import time
 from contextlib import contextmanager
@@ -9,7 +10,8 @@ import attr
 import hypothesis
 import hypothesis.errors
 import requests
-from requests.auth import AuthBase
+from _pytest.logging import LogCaptureHandler, catching_logs
+from requests.auth import HTTPDigestAuth, _basic_auth_str
 
 from .._hypothesis import make_test_or_exception
 from ..constants import USER_AGENT
@@ -17,13 +19,12 @@ from ..exceptions import InvalidSchema
 from ..loaders import from_uri
 from ..models import Case, Endpoint, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
-from ..utils import capture_hypothesis_output, get_base_url
+from ..utils import WSGIResponse, capture_hypothesis_output, get_base_url
 from . import events
 from .checks import DEFAULT_CHECKS
 
 DEFAULT_DEADLINE = 500  # pragma: no mutate
-
-Auth = Union[Tuple[str, str], AuthBase]  # pragma: no mutate
+RawAuth = Tuple[str, str]  # pragma: no mutate
 
 
 def get_hypothesis_settings(hypothesis_options: Optional[Dict[str, Any]] = None) -> hypothesis.settings:
@@ -34,12 +35,14 @@ def get_hypothesis_settings(hypothesis_options: Optional[Dict[str, Any]] = None)
     return settings
 
 
+# pylint: disable=too-many-instance-attributes
 @attr.s
 class BaseRunner:
     schema: BaseSchema = attr.ib()
     checks: Iterable[Callable] = attr.ib()
     hypothesis_settings: hypothesis.settings = attr.ib(converter=get_hypothesis_settings)
-    auth: Optional[Auth] = attr.ib(default=None)
+    auth: Optional[RawAuth] = attr.ib(default=None)
+    auth_type: Optional[str] = attr.ib(default=None)
     headers: Optional[Dict[str, Any]] = attr.ib(default=None)
     request_timeout: Optional[int] = attr.ib(default=None)
     seed: Optional[int] = attr.ib(default=None)
@@ -66,12 +69,60 @@ class SingleThreadRunner(BaseRunner):
     """Fast runner that runs tests sequentially in the main thread."""
 
     def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
-        with get_session(self.auth, self.headers) as session:
-            for endpoint, test in self.schema.get_all_tests(single_test, self.hypothesis_settings, self.seed):
-                for event in run_test(self.schema, endpoint, test, self.checks, session, results, self.request_timeout):
+        auth = get_requests_auth(self.auth, self.auth_type)
+        with get_session(auth, self.headers) as session:
+            for endpoint, test in self.schema.get_all_tests(network_test, self.hypothesis_settings, self.seed):
+                for event in run_test(
+                    self.schema,
+                    endpoint,
+                    test,
+                    self.checks,
+                    results,
+                    session=session,
+                    request_timeout=self.request_timeout,
+                ):
                     yield event
                     if isinstance(event, events.Interrupted):
                         return
+
+
+@attr.s(slots=True)
+class SingleThreadWSGIRunner(SingleThreadRunner):
+    def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
+        for endpoint, test in self.schema.get_all_tests(wsgi_test, self.hypothesis_settings, self.seed):
+            for event in run_test(
+                self.schema,
+                endpoint,
+                test,
+                self.checks,
+                results,
+                auth=self.auth,
+                auth_type=self.auth_type,
+                headers=self.headers,
+            ):
+                yield event
+                if isinstance(event, events.Interrupted):
+                    return
+
+
+def _run_task(
+    test_template: Callable,
+    tasks_queue: Queue,
+    events_queue: Queue,
+    schema: BaseSchema,
+    checks: Iterable[Callable],
+    settings: hypothesis.settings,
+    seed: Optional[int],
+    results: TestResultSet,
+    **kwargs: Any,
+) -> None:
+    # pylint: disable=too-many-arguments
+    with capture_hypothesis_output():
+        while not tasks_queue.empty():
+            endpoint = tasks_queue.get()
+            test = make_test_or_exception(endpoint, test_template, settings, seed)
+            for event in run_test(schema, endpoint, test, checks, results, **kwargs):
+                events_queue.put(event)
 
 
 def thread_task(
@@ -80,24 +131,37 @@ def thread_task(
     schema: BaseSchema,
     checks: Iterable[Callable],
     settings: hypothesis.settings,
-    auth: Optional[Auth],
+    auth: Optional[RawAuth],
+    auth_type: Optional[str],
     headers: Optional[Dict[str, Any]],
-    request_timeout: Optional[int],
     seed: Optional[int],
     results: TestResultSet,
+    kwargs: Any,
 ) -> None:
     """A single task, that threads do.
 
     Pretty similar to the default one-thread flow, but includes communication with the main thread via the events queue.
     """
     # pylint: disable=too-many-arguments
-    with get_session(auth, headers) as session:
-        with capture_hypothesis_output():
-            while not tasks_queue.empty():
-                endpoint = tasks_queue.get()
-                test = make_test_or_exception(endpoint, single_test, settings, seed)
-                for event in run_test(schema, endpoint, test, checks, session, results, request_timeout):
-                    events_queue.put(event)
+    prepared_auth = get_requests_auth(auth, auth_type)
+    with get_session(prepared_auth, headers) as session:
+        _run_task(
+            network_test, tasks_queue, events_queue, schema, checks, settings, seed, results, session=session, **kwargs
+        )
+
+
+def wsgi_thread_task(
+    tasks_queue: Queue,
+    events_queue: Queue,
+    schema: BaseSchema,
+    checks: Iterable[Callable],
+    settings: hypothesis.settings,
+    seed: Optional[int],
+    results: TestResultSet,
+    kwargs: Any,
+) -> None:
+    # pylint: disable=too-many-arguments
+    _run_task(wsgi_test, tasks_queue, events_queue, schema, checks, settings, seed, results, **kwargs)
 
 
 def stop_worker(thread_id: int) -> None:
@@ -161,25 +225,48 @@ class ThreadPoolRunner(BaseRunner):
         """Initialize & start workers that will execute tests."""
         workers = [
             threading.Thread(
-                target=thread_task,
-                kwargs={
-                    "tasks_queue": tasks_queue,
-                    "events_queue": events_queue,
-                    "schema": self.schema,
-                    "checks": self.checks,
-                    "settings": self.hypothesis_settings,
-                    "auth": self.auth,
-                    "headers": self.headers,
-                    "request_timeout": self.request_timeout,
-                    "seed": self.seed,
-                    "results": results,
-                },
+                target=self._get_task(), kwargs=self._get_worker_kwargs(tasks_queue, events_queue, results)
             )
             for _ in range(self.workers_num)
         ]
         for worker in workers:
             worker.start()
         return workers
+
+    def _get_task(self) -> Callable:
+        return thread_task
+
+    def _get_worker_kwargs(self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet) -> Dict[str, Any]:
+        return {
+            "tasks_queue": tasks_queue,
+            "events_queue": events_queue,
+            "schema": self.schema,
+            "checks": self.checks,
+            "settings": self.hypothesis_settings,
+            "auth": self.auth,
+            "auth_type": self.auth_type,
+            "headers": self.headers,
+            "seed": self.seed,
+            "results": results,
+            "kwargs": {"request_timeout": self.request_timeout},
+        }
+
+
+class ThreadPoolWSGIRunner(ThreadPoolRunner):
+    def _get_task(self) -> Callable:
+        return wsgi_thread_task
+
+    def _get_worker_kwargs(self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet) -> Dict[str, Any]:
+        return {
+            "tasks_queue": tasks_queue,
+            "events_queue": events_queue,
+            "schema": self.schema,
+            "checks": self.checks,
+            "settings": self.hypothesis_settings,
+            "seed": self.seed,
+            "results": results,
+            "kwargs": {"auth": self.auth, "auth_type": self.auth_type, "headers": self.headers},
+        }
 
 
 def execute_from_schema(
@@ -188,7 +275,8 @@ def execute_from_schema(
     *,
     workers_num: int = 1,
     hypothesis_options: Optional[Dict[str, Any]] = None,
-    auth: Optional[Auth] = None,
+    auth: Optional[RawAuth] = None,
+    auth_type: Optional[str] = None,
     headers: Optional[Dict[str, Any]] = None,
     request_timeout: Optional[int] = None,
     seed: Optional[int] = None,
@@ -199,11 +287,50 @@ def execute_from_schema(
     """
     runner: BaseRunner
     if workers_num > 1:
-        runner = ThreadPoolRunner(
-            schema, checks, hypothesis_options, auth, headers, request_timeout, seed, workers_num=workers_num
-        )
+        if schema.app:
+            runner = ThreadPoolWSGIRunner(
+                schema=schema,
+                checks=checks,
+                hypothesis_settings=hypothesis_options,
+                auth=auth,
+                auth_type=auth_type,
+                headers=headers,
+                seed=seed,
+                workers_num=workers_num,
+            )
+        else:
+            runner = ThreadPoolRunner(
+                schema=schema,
+                checks=checks,
+                hypothesis_settings=hypothesis_options,
+                auth=auth,
+                auth_type=auth_type,
+                headers=headers,
+                seed=seed,
+                request_timeout=request_timeout,
+            )
     else:
-        runner = SingleThreadRunner(schema, checks, hypothesis_options, auth, headers, request_timeout, seed)
+        if schema.app:
+            runner = SingleThreadWSGIRunner(
+                schema=schema,
+                checks=checks,
+                hypothesis_settings=hypothesis_options,
+                auth=auth,
+                auth_type=auth_type,
+                headers=headers,
+                seed=seed,
+            )
+        else:
+            runner = SingleThreadRunner(
+                schema=schema,
+                checks=checks,
+                hypothesis_settings=hypothesis_options,
+                auth=auth,
+                auth_type=auth_type,
+                headers=headers,
+                seed=seed,
+                request_timeout=request_timeout,
+            )
 
     yield from runner.execute()
 
@@ -213,9 +340,8 @@ def run_test(
     endpoint: Endpoint,
     test: Union[Callable, InvalidSchema],
     checks: Iterable[Callable],
-    session: requests.Session,
     results: TestResultSet,
-    request_timeout: Optional[int],
+    **kwargs: Any,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """A single test run with all error handling needed."""
     # pylint: disable=too-many-arguments
@@ -228,7 +354,7 @@ def run_test(
             result.add_error(test)
         else:
             with capture_hypothesis_output() as hypothesis_output:
-                test(session, checks, result, request_timeout)
+                test(checks, result, **kwargs)
             status = Status.success
     except AssertionError:
         status = Status.failure
@@ -310,17 +436,50 @@ def prepare(  # pylint: disable=too-many-arguments
     )
 
 
-def single_test(
+def network_test(
     case: Case,
-    session: requests.Session,
     checks: Iterable[Callable],
     result: TestResult,
+    session: requests.Session,
     request_timeout: Optional[int],
 ) -> None:
     """A single test body that will be executed against the target."""
     # pylint: disable=too-many-arguments
     timeout = prepare_timeout(request_timeout)
     response = case.call(session=session, timeout=timeout)
+    _run_checks(case, checks, result, response)
+
+
+def wsgi_test(
+    case: Case,
+    checks: Iterable[Callable],
+    result: TestResult,
+    auth: Optional[RawAuth],
+    auth_type: Optional[str],
+    headers: Optional[Dict[str, Any]],
+) -> None:
+    # pylint: disable=too-many-arguments
+    headers = _prepare_wsgi_headers(headers, auth, auth_type)
+    with catching_logs(LogCaptureHandler(), level=logging.DEBUG) as recorded:
+        response = case.call_wsgi(headers=headers)
+    result.logs.extend(recorded.records)
+    _run_checks(case, checks, result, response)
+
+
+def _prepare_wsgi_headers(
+    headers: Optional[Dict[str, Any]], auth: Optional[RawAuth], auth_type: Optional[str]
+) -> Dict[str, Any]:
+    headers = headers or {}
+    headers.setdefault("User-agent", USER_AGENT)
+    wsgi_auth = get_wsgi_auth(auth, auth_type)
+    if wsgi_auth:
+        headers["Authorization"] = wsgi_auth
+    return headers
+
+
+def _run_checks(
+    case: Case, checks: Iterable[Callable], result: TestResult, response: Union[requests.Response, WSGIResponse]
+) -> None:
     errors = None
 
     for check in checks:
@@ -348,7 +507,7 @@ def prepare_timeout(timeout: Optional[int]) -> Optional[float]:
 
 @contextmanager
 def get_session(
-    auth: Optional[Auth] = None, headers: Optional[Dict[str, Any]] = None
+    auth: Optional[Union[HTTPDigestAuth, RawAuth]] = None, headers: Optional[Dict[str, Any]] = None
 ) -> Generator[requests.Session, None, None]:
     with requests.Session() as session:
         if auth is not None:
@@ -357,3 +516,17 @@ def get_session(
         if headers is not None:
             session.headers.update(**headers)
         yield session
+
+
+def get_requests_auth(auth: Optional[RawAuth], auth_type: Optional[str]) -> Optional[Union[HTTPDigestAuth, RawAuth]]:
+    if auth and auth_type == "digest":
+        return HTTPDigestAuth(*auth)
+    return auth
+
+
+def get_wsgi_auth(auth: Optional[RawAuth], auth_type: Optional[str]) -> Optional[str]:
+    if auth:
+        if auth_type == "digest":
+            raise ValueError("Digest auth is not supported for WSGI apps")
+        return _basic_auth_str(*auth)
+    return None

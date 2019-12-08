@@ -1,3 +1,4 @@
+import logging
 import os
 import platform
 import shutil
@@ -25,9 +26,9 @@ def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> Non
     click.secho(message, **kwargs)
 
 
-def display_subsection(result: TestResult) -> None:
+def display_subsection(result: TestResult, color: Optional[str] = "red") -> None:
     section_name = f"{result.endpoint.method}: {result.endpoint.path}"
-    display_section_name(section_name, "_", fg="red")
+    display_section_name(section_name, "_", fg=color)
 
 
 def get_percentage(position: int, length: int) -> str:
@@ -157,7 +158,7 @@ def display_example(
     output = {
         make_verbose_name(attribute): getattr(case, attribute.name)
         for attribute in Case.__attrs_attrs__  # type: ignore
-        if attribute.name not in ("path", "method", "base_url")
+        if attribute.name not in ("path", "method", "base_url", "app")
     }
     max_length = max(map(len, output))
     template = f"{{:<{max_length}}} : {{}}"
@@ -174,6 +175,24 @@ def display_example(
 
 def make_verbose_name(attribute: Attribute) -> str:
     return attribute.name.capitalize().replace("_", " ")
+
+
+def display_application_logs(statistic: TestResultSet) -> None:
+    """Print logs captured during the application run."""
+    if not statistic.has_logs:
+        return
+    display_section_name("APPLICATION LOGS")
+    formatter = logging.Formatter("[%(asctime)s] %(levelname)s in %(module)s: %(message)s")
+    for result in statistic:
+        if not result.has_logs:
+            continue
+        display_single_log(result, formatter)
+
+
+def display_single_log(result: TestResult, formatter: logging.Formatter) -> None:
+    display_subsection(result, None)
+    formatted = [formatter.format(record) for record in result.logs]
+    click.echo("\n\n".join(formatted))
 
 
 def display_statistic(statistic: TestResultSet) -> None:
@@ -261,6 +280,7 @@ def handle_finished(context: events.ExecutionContext, event: events.Finished) ->
     display_hypothesis_output(context.hypothesis_output)
     display_errors(event.results)
     display_failures(event.results)
+    display_application_logs(event.results)
     display_statistic(event.results)
     click.echo()
     display_summary(event)

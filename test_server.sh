@@ -1,2 +1,2 @@
 # Run testing AioHTTP app on the given port
-PYTHONPATH=$(pwd)/src python test/app/__init__.py "$@"
+PYTHONPATH=$(pwd)/test/apps python test/apps/__init__.py "$@"

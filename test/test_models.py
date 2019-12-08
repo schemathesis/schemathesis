@@ -65,6 +65,10 @@ def test_call(override, base_url):
             Case(method="GET", path="/api/success", base_url="http://example.com", query={"a": 1}),
             "requests.get('http://example.com/api/success', params={'a': 1})",
         ),
+        (
+            Case(method="GET", path="/api/success", query={"a": 1}),
+            "requests.get('http://localhost/api/success', params={'a': 1})",
+        ),
     ),
 )
 def test_get_code_to_reproduce(case, expected):

@@ -282,7 +282,7 @@ def test_display_errors(swagger_20, capsys, results_set):
 
 @pytest.mark.parametrize(
     "attribute, expected",
-    ((models.Case.__attrs_attrs__[0], "Path"), (models.Case.__attrs_attrs__[3], "Path parameters")),
+    ((models.Case.__attrs_attrs__[0], "Path"), (models.Case.__attrs_attrs__[4], "Path parameters")),
 )
 def test_make_verbose_name(attribute, expected):
     assert default.make_verbose_name(attribute) == expected

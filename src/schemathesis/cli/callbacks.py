@@ -1,14 +1,17 @@
 import pathlib
+import re
 from contextlib import contextmanager
-from typing import Dict, Generator, Optional, Tuple
+from typing import Any, Dict, Generator, Optional, Tuple
 from urllib.parse import urlparse
 
 import click
 import hypothesis
 
+from .. import utils
+
 
 def validate_schema(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
-    if not urlparse(raw_value).netloc:
+    if "app" not in ctx.params and not urlparse(raw_value).netloc:
         if "\x00" in raw_value or not _verify_path(raw_value):
             raise click.UsageError("Invalid SCHEMA, must be a valid URL or file path.")
         if "base_url" not in ctx.params:
@@ -28,6 +31,24 @@ def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_
     if raw_value and not urlparse(raw_value).netloc:
         raise click.UsageError("Invalid base URL")
     return raw_value
+
+
+def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> Any:
+    if raw_value is None:
+        return raw_value
+    path, name = (re.split(r":(?![\\/])", raw_value, 1) + [None])[:2]  # type: ignore
+    try:
+        module = __import__(path)
+    except (ImportError, ValueError):
+        raise click.BadParameter("Can not import application from the given module")
+    except Exception as exc:
+        message = utils.format_exception(exc)
+        click.secho(f"Error: {message}", fg="red")
+        raise click.Abort
+    try:
+        return getattr(module, name)
+    except AttributeError:
+        raise click.BadParameter("Can not import application from the given module")
 
 
 def validate_auth(

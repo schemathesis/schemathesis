@@ -6,9 +6,7 @@ import pytest
 import yaml
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
-from requests import Request, Response
-from requests.auth import HTTPDigestAuth
-from requests.exceptions import HTTPError
+from requests import Response
 
 from schemathesis import Case
 from schemathesis.loaders import from_path
@@ -116,6 +114,7 @@ def test_commands_run_help(cli):
         "  -w, --workers INTEGER RANGE     Number of workers to run tests",
         "  -b, --base-url TEXT             Base URL address of the API, required for",
         "                                  SCHEMA if specified by file.",
+        "  --app TEXT                      WSGI application to test",
         "  --request-timeout INTEGER       Timeout in milliseconds for network requests",
         "                                  during the test run.",
         "  --hypothesis-deadline INTEGER   Duration in milliseconds that each individual",
@@ -158,15 +157,27 @@ SCHEMA_URI = "https://example.com/swagger.json"
         ),
         (
             [SCHEMA_URI, "--auth=test:test"],
-            {"checks": DEFAULT_CHECKS, "api_options": {"auth": ("test", "test")}, "workers_num": 1},
+            {
+                "checks": DEFAULT_CHECKS,
+                "api_options": {"auth": ("test", "test"), "auth_type": "basic"},
+                "workers_num": 1,
+            },
         ),
         (
             [SCHEMA_URI, "--auth=test:test", "--auth-type=digest"],
-            {"checks": DEFAULT_CHECKS, "api_options": {"auth": HTTPDigestAuth("test", "test")}, "workers_num": 1},
+            {
+                "checks": DEFAULT_CHECKS,
+                "api_options": {"auth": ("test", "test"), "auth_type": "digest"},
+                "workers_num": 1,
+            },
         ),
         (
             [SCHEMA_URI, "--auth=test:test", "--auth-type=DIGEST"],
-            {"checks": DEFAULT_CHECKS, "api_options": {"auth": HTTPDigestAuth("test", "test")}, "workers_num": 1},
+            {
+                "checks": DEFAULT_CHECKS,
+                "api_options": {"auth": ("test", "test"), "auth_type": "digest"},
+                "workers_num": 1,
+            },
         ),
         (
             [SCHEMA_URI, "--header=Authorization:Bearer 123"],
@@ -248,10 +259,30 @@ def test_hypothesis_parameters(cli, schema_url):
     assert result.exit_code == ExitCode.OK
 
 
+def pytest_generate_tests(metafunc):
+    """Generate all proper combinations for running CLI.
+
+    It should be runnable by single/multiple workers and running instance/WSGI app.
+    """
+    if "cli_args" in metafunc.fixturenames:
+        metafunc.parametrize("cli_args", ["wsgi", "real"], indirect=True)
+
+
+@pytest.fixture
+def cli_args(request):
+    if request.param == "real":
+        schema_url = request.getfixturevalue("schema_url")
+        args = (schema_url,)
+    else:
+        app_path = request.getfixturevalue("loadable_flask_app")
+        args = (f"--app={app_path}", "/swagger.yaml")
+    return args
+
+
 @pytest.mark.endpoints("success")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_cli_run_output_success(cli, schema_url, workers):
-    result = cli.run(schema_url, f"--workers={workers}")
+def test_cli_run_output_success(cli, cli_args, workers):
+    result = cli.run(*cli_args, f"--workers={workers}")
     assert result.exit_code == ExitCode.OK
     lines = result.stdout.split("\n")
     assert lines[7] == f"Workers: {workers}"
@@ -271,8 +302,8 @@ def test_cli_run_output_success(cli, schema_url, workers):
 
 
 @pytest.mark.parametrize("workers", (1, 2))
-def test_cli_run_output_with_errors(cli, schema_url, workers):
-    result = cli.run(schema_url, f"--workers={workers}")
+def test_cli_run_output_with_errors(cli, cli_args, workers):
+    result = cli.run(*cli_args, f"--workers={workers}")
     assert result.exit_code == ExitCode.TESTS_FAILED
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
@@ -285,8 +316,8 @@ def test_cli_run_output_with_errors(cli, schema_url, workers):
 
 @pytest.mark.endpoints("failure")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_cli_run_only_failure(cli, schema_url, workers):
-    result = cli.run(schema_url, f"--workers={workers}")
+def test_cli_run_only_failure(cli, cli_args, workers):
+    result = cli.run(*cli_args, f"--workers={workers}")
     assert result.exit_code == ExitCode.TESTS_FAILED
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
@@ -298,8 +329,8 @@ def test_cli_run_only_failure(cli, schema_url, workers):
 
 @pytest.mark.endpoints()
 @pytest.mark.parametrize("workers", (1, 2))
-def test_cli_run_output_empty(cli, schema_url, workers):
-    result = cli.run(schema_url, f"--workers={workers}")
+def test_cli_run_output_empty(cli, cli_args, workers):
+    result = cli.run(*cli_args, f"--workers={workers}")
     assert result.exit_code == ExitCode.OK
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
@@ -311,10 +342,10 @@ def test_cli_run_output_empty(cli, schema_url, workers):
 
 @pytest.mark.endpoints()
 @pytest.mark.parametrize("workers", (1, 2))
-def test_cli_run_changed_base_url(cli, schema_url, server, workers):
+def test_cli_run_changed_base_url(cli, server, cli_args, workers):
     # When the CLI receives custom base URL
     base_url = f"http://127.0.0.1:{server['port']}/api/"
-    result = cli.run(schema_url, "--base-url", base_url, f"--workers={workers}")
+    result = cli.run(*cli_args, "--base-url", base_url, f"--workers={workers}")
     # Then the base URL should be correctly displayed in the CLI output
     lines = result.stdout.strip().split("\n")
     assert lines[-10] == f"Base URL: {base_url}"
@@ -331,8 +362,7 @@ def test_cli_run_changed_base_url(cli, schema_url, server, workers):
 def test_execute_missing_schema(cli, mocker, status_code, message, workers):
     response = Response()
     response.status_code = status_code
-    request = Request(url=SCHEMA_URI)
-    mocker.patch("schemathesis.runner.prepare", side_effect=(HTTPError(response=response, request=request)))
+    mocker.patch("schemathesis.loaders.requests.get", autospec=True, return_value=response)
     result = cli.run(SCHEMA_URI, f"--workers={workers}")
     assert result.exit_code == ExitCode.TESTS_FAILED
     assert message in result.stdout
@@ -340,9 +370,9 @@ def test_execute_missing_schema(cli, mocker, status_code, message, workers):
 
 @pytest.mark.endpoints("success", "slow")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_hypothesis_failed_event(cli, schema_url, workers):
+def test_hypothesis_failed_event(cli, cli_args, workers):
     # When the Hypothesis deadline option is set manually and it is smaller than the response time
-    result = cli.run(schema_url, "--hypothesis-deadline=20", f"--workers={workers}")
+    result = cli.run(*cli_args, "--hypothesis-deadline=20", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And the given endpoint should be displayed as an error
@@ -383,9 +413,9 @@ def test_connection_timeout(cli, server, schema_url, workers):
 
 @pytest.mark.endpoints("success", "slow")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_default_hypothesis_settings(cli, schema_url, workers):
+def test_default_hypothesis_settings(cli, cli_args, workers):
     # When there is a slow endpoint and if it is faster than 500ms
-    result = cli.run(schema_url, f"--workers={workers}")
+    result = cli.run(*cli_args, f"--workers={workers}")
     # Then the tests should pass, because of default 500ms deadline
     assert result.exit_code == ExitCode.OK
     lines = result.stdout.split("\n")
@@ -399,9 +429,9 @@ def test_default_hypothesis_settings(cli, schema_url, workers):
 
 @pytest.mark.endpoints("failure")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_seed(cli, schema_url, workers):
+def test_seed(cli, cli_args, workers):
     # When there is a failure
-    result = cli.run(schema_url, "--hypothesis-seed=456", f"--workers={workers}")
+    result = cli.run(*cli_args, "--hypothesis-seed=456", f"--workers={workers}")
     # Then the tests should fail and RNG seed should be displayed
     assert result.exit_code == 1
     assert "Or add this option to your command line parameters: --hypothesis-seed=456" in result.stdout.split("\n")
@@ -409,11 +439,11 @@ def test_seed(cli, schema_url, workers):
 
 @pytest.mark.endpoints("unsatisfiable")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_unsatisfiable(cli, schema_url, workers):
+def test_unsatisfiable(cli, cli_args, workers):
     # When the app's schema contains parameters that can't be generated
     # For example if it contains contradiction in the parameters definition - requires to be integer AND string at the
     # same time
-    result = cli.run(schema_url, f"--workers={workers}")
+    result = cli.run(*cli_args, f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And standard Hypothesis error should not appear in the output
@@ -431,10 +461,10 @@ def test_unsatisfiable(cli, schema_url, workers):
 
 @pytest.mark.endpoints("flaky")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_flaky(cli, schema_url, workers):
+def test_flaky(cli, cli_args, workers):
     # When the endpoint fails / succeeds randomly
     # Derandomize is needed for reproducible test results
-    result = cli.run(schema_url, "--hypothesis-derandomize", f"--workers={workers}")
+    result = cli.run(*cli_args, "--hypothesis-derandomize", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And standard Hypothesis error should not appear in the output
@@ -460,10 +490,10 @@ def test_flaky(cli, schema_url, workers):
 
 @pytest.mark.endpoints("invalid")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_invalid_endpoint(cli, schema_url, workers):
+def test_invalid_endpoint(cli, cli_args, workers):
     # When the app's schema contains errors
     # For example if its type is "int" but should be "integer"
-    result = cli.run(schema_url, f"--workers={workers}")
+    result = cli.run(*cli_args, f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And standard Hypothesis error should not appear in the output
@@ -481,10 +511,10 @@ def test_invalid_endpoint(cli, schema_url, workers):
 
 @pytest.mark.endpoints("teapot")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_status_code_conformance(cli, schema_url, workers):
+def test_status_code_conformance(cli, cli_args, workers):
     # When endpoint returns a status code, that is not listed in "responses"
     # And "status_code_conformance" is specified
-    result = cli.run(schema_url, "-c", "status_code_conformance", f"--workers={workers}")
+    result = cli.run(*cli_args, "-c", "status_code_conformance", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And this endpoint should be marked as failed in the progress line
@@ -538,16 +568,21 @@ def test_schema_not_available(cli, workers):
     assert lines[-2] == "Aborted!"
 
 
-def make_importable(module):
-    """Make the package importable by the inline CLI execution."""
-    pkgroot = module.dirpath()
-    module._ensuresyspath(True, pkgroot)
+def test_schema_not_available_wsgi(cli, loadable_flask_app):
+    # When the given schema is unreachable
+    result = cli.run("unknown.yaml", f"--app={loadable_flask_app}")
+    # Then the whole Schemathesis run should fail
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    # And error message is displayed
+    lines = result.stdout.split("\n")
+    assert lines[0] == "Schema was not found at unknown.yaml"
+    assert lines[1] == "Aborted!"
 
 
 @pytest.mark.endpoints("custom_format")
 def test_pre_run_hook_valid(testdir, cli, schema_url, app):
     # When `--pre-run` hook is passed to the CLI call
-    module = testdir.makepyfile(
+    module = testdir.make_importable_pyfile(
         hook="""
     import string
     import schemathesis
@@ -565,7 +600,6 @@ def test_pre_run_hook_valid(testdir, cli, schema_url, app):
     )
     """
     )
-    make_importable(module)
 
     result = cli.main("--pre-run", module.purebasename, "run", schema_url)
 
@@ -578,8 +612,7 @@ def test_pre_run_hook_valid(testdir, cli, schema_url, app):
 def test_pre_run_hook_invalid(testdir, cli):
     # When `--pre-run` hook is passed to the CLI call
     # And its importing causes an exception
-    module = testdir.makepyfile(hook="1 / 0")
-    make_importable(module)
+    module = testdir.make_importable_pyfile(hook="1 / 0")
 
     result = cli.main("--pre-run", module.purebasename, "run", "http://127.0.0.1:1")
 
@@ -596,7 +629,7 @@ def test_pre_run_hook_invalid(testdir, cli):
 def test_register_check(testdir, cli, schema_url):
     # When `--pre-run` hook is passed to the CLI call
     # And it contains registering a new check, which always fails for the testing purposes
-    module = testdir.makepyfile(
+    module = testdir.make_importable_pyfile(
         hook="""
         import schemathesis
 
@@ -605,7 +638,6 @@ def test_register_check(testdir, cli, schema_url):
             raise AssertionError("Custom check failed!")
         """
     )
-    make_importable(module)
 
     result = cli.main("--pre-run", module.purebasename, "run", "-c", "new_check", schema_url)
 
@@ -632,9 +664,12 @@ def assert_threaded_executor_interruption(lines, expected):
 
 
 @pytest.mark.parametrize("workers", (1, 2))
-def test_keyboard_interrupt(cli, schema_url, base_url, mocker, workers):
+def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, workers):
     # When a Schemathesis run in interrupted by keyboard or via SIGINT
-    original = Case("/success", "GET", base_url=base_url).call
+    if len(cli_args) == 2:
+        original = Case("/success", "GET", base_url=base_url, app=flask_app).call_wsgi
+    else:
+        original = Case("/success", "GET", base_url=base_url).call
     counter = 0
 
     def mocked(*args, **kwargs):
@@ -645,8 +680,11 @@ def test_keyboard_interrupt(cli, schema_url, base_url, mocker, workers):
             raise KeyboardInterrupt
         return original(*args, **kwargs)
 
-    mocker.patch("schemathesis.Case.call", wraps=mocked)
-    result = cli.run(schema_url, f"--workers={workers}")
+    if len(cli_args) == 2:
+        mocker.patch("schemathesis.Case.call_wsgi", wraps=mocked)
+    else:
+        mocker.patch("schemathesis.Case.call", wraps=mocked)
+    result = cli.run(*cli_args, f"--workers={workers}")
     assert result.exit_code == ExitCode.OK
     # Then execution stops and a message about interruption is displayed
     lines = result.stdout.strip().split("\n")
@@ -661,7 +699,7 @@ def test_keyboard_interrupt(cli, schema_url, base_url, mocker, workers):
         assert_threaded_executor_interruption(lines, ("", "."))
 
 
-def test_keyboard_interrupt_threaded(cli, schema_url, mocker):
+def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
     # When a Schemathesis run in interrupted by keyboard or via SIGINT
     original = time.sleep
     counter = 0
@@ -673,8 +711,8 @@ def test_keyboard_interrupt_threaded(cli, schema_url, mocker):
             raise KeyboardInterrupt
         return original(*args, **kwargs)
 
-    mocker.patch("schemathesis.runner.time.sleep", wraps=mocked)
-    result = cli.run(schema_url, "--workers=2")
+    mocker.patch("schemathesis.runner.time.sleep", autospec=True, wraps=mocked)
+    result = cli.run(*cli_args, "--workers=2")
     # the exit status depends on what thread finished first
     assert result.exit_code in (ExitCode.OK, ExitCode.TESTS_FAILED)
     # Then execution stops and a message about interruption is displayed
@@ -686,10 +724,10 @@ def test_keyboard_interrupt_threaded(cli, schema_url, mocker):
 
 @pytest.mark.endpoints("failure")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_hypothesis_output_capture(mocker, cli, schema_url, workers):
+def test_hypothesis_output_capture(mocker, cli, cli_args, workers):
     mocker.patch("schemathesis.utils.IGNORED_PATTERNS", ())
 
-    result = cli.run(schema_url, f"--workers={workers}")
+    result = cli.run(*cli_args, f"--workers={workers}")
     assert result.exit_code == ExitCode.TESTS_FAILED
     assert "= HYPOTHESIS OUTPUT =" in result.stdout
     assert "Falsifying example" in result.stdout
@@ -732,3 +770,76 @@ async def test_multiple_files_schema(app, testdir, cli, base_url):
     payload = await app["incoming_requests"][0].json()
     assert isinstance(payload["name"], str)
     assert isinstance(payload["photoUrls"], list)
+
+
+def test_wsgi_app(testdir, cli):
+    module = testdir.make_importable_pyfile(
+        location="""
+        from test.apps._flask import create_app
+
+        app = create_app()
+        """
+    )
+    result = cli.run("/swagger.yaml", "--app", f"{module.purebasename}:app")
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    assert "1 passed, 1 failed in" in result.stdout
+
+
+def test_wsgi_app_exception(testdir, cli):
+    module = testdir.make_importable_pyfile(
+        location="""
+        from test.apps._flask import create_app
+
+        1 / 0
+        """
+    )
+    result = cli.run("/swagger.yaml", "--app", f"{module.purebasename}:app")
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    assert result.stdout == "Error: ZeroDivisionError: division by zero\n\nAborted!\n"
+
+
+def test_wsgi_app_missing(testdir, cli):
+    module = testdir.make_importable_pyfile(
+        location="""
+        from test.apps._flask import create_app
+        """
+    )
+    result = cli.run("/swagger.yaml", "--app", f"{module.purebasename}:app")
+    assert result.exit_code == ExitCode.INTERRUPTED
+    assert (
+        result.stdout.strip().split("\n")[-1]
+        == 'Error: Invalid value for "--app": Can not import application from the given module'
+    )
+
+
+def test_wsgi_app_internal_exception(testdir, cli, caplog):
+    module = testdir.make_importable_pyfile(
+        location="""
+        from test.apps._flask import create_app
+
+        app = create_app()
+        app.config["internal_exception"] = True
+        """
+    )
+    result = cli.run("/swagger.yaml", "--app", f"{module.purebasename}:app")
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    lines = result.stdout.strip().split("\n")
+    assert "== APPLICATION LOGS ==" in lines[34]
+    assert "ERROR in app: Exception on /api/success [GET]" in lines[36]
+    assert lines[52] == "ZeroDivisionError: division by zero"
+
+
+def test_wsgi_app_remote_schema(testdir, cli, schema_url, loadable_flask_app):
+    # When an URL is passed together with app
+    result = cli.run(schema_url, "--app", loadable_flask_app)
+    # Then the schema should be loaded from that URL
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    assert "1 passed, 1 failed in" in result.stdout
+
+
+def test_wsgi_app_path_schema(testdir, cli, loadable_flask_app):
+    # When an existing path to schema is passed together with app
+    result = cli.run(SIMPLE_PATH, "--app", loadable_flask_app)
+    # Then the schema should be loaded from that path
+    assert result.exit_code == ExitCode.OK
+    assert "1 passed in" in result.stdout

@@ -35,6 +35,7 @@ pytest-subtests = "^0.2.1"
 requests = "^2.22"
 click = "^7.0"
 importlib_metadata = "^1.1"
+werkzeug = "^0.16.0"
 
 [tool.poetry.dev-dependencies]
 coverage = "^4.5"
@@ -44,6 +45,7 @@ pytest-mock = "^1.11.0"
 pytest-asyncio = "^0.10.0"
 pytest-xdist = "^1.30"
 typing_extensions = "^3.7"
+flask = "^1.1"
 
 [tool.poetry.plugins]
 pytest11 = {schemathesis = "schemathesis.extra.pytest_plugin"}
