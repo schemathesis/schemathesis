@@ -168,6 +168,7 @@ def _get_case_strategy(
         "path": endpoint.path,
         "method": endpoint.method,
         "base_url": endpoint.base_url,
+        "app": endpoint.app,
         **extra_static_parameters,
     }
     if endpoint.method == "GET":

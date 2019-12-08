@@ -45,6 +45,7 @@ class BaseSchema(Mapping):
     method: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     endpoint: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     tag: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
+    app: Any = attr.ib(default=None)  # pragma: no mutate
 
     def __iter__(self) -> Iterator:
         return iter(self.endpoints)
@@ -164,7 +165,9 @@ class SwaggerV20(BaseSchema):
         base_url = self.base_url
         if base_url is not None:
             base_url = base_url.rstrip("/")  # pragma: no mutate
-        endpoint = Endpoint(path=full_path, method=method.upper(), definition=definition, base_url=base_url)
+        endpoint = Endpoint(
+            path=full_path, method=method.upper(), definition=definition, base_url=base_url, app=self.app
+        )
         for parameter in parameters:
             self.process_parameter(endpoint, parameter)
         return endpoint

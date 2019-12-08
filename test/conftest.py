@@ -6,9 +6,7 @@ from click.testing import CliRunner
 
 import schemathesis.cli
 
-from .app import create_app
-from .app import make_schema as make_app_schema
-from .app import reset_app, run_server
+from .apps import _aiohttp, _flask
 from .utils import make_schema
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
@@ -21,21 +19,26 @@ def pytest_configure(config):
 @pytest.fixture(scope="session")
 def _app():
     """A global AioHTTP application with configurable endpoints."""
-    return create_app(("success", "failure"))
+    return _aiohttp.create_app(("success", "failure"))
 
 
-@pytest.fixture()
-def app(_app, request):
-    """Set up the global app for a specific test.
-
-    NOTE. It might cause race conditions when `pytest-xdist` is used, but they have very low probability.
-    """
+@pytest.fixture
+def endpoints(request):
     marker = request.node.get_closest_marker("endpoints")
     if marker:
         endpoints = marker.args
     else:
         endpoints = ("success", "failure")
-    reset_app(_app, endpoints)
+    return endpoints
+
+
+@pytest.fixture()
+def app(_app, endpoints):
+    """Set up the global app for a specific test.
+
+    NOTE. It might cause race conditions when `pytest-xdist` is used, but they have very low probability.
+    """
+    _aiohttp.reset_app(_app, endpoints)
     return _app
 
 
@@ -43,7 +46,7 @@ def app(_app, request):
 def server(_app):
     """Run the app on an unused port."""
     port = unused_port()
-    run_server(_app, port)
+    _aiohttp.run_server(_app, port)
     yield {"port": port}
 
 
@@ -114,7 +117,7 @@ def openapi_30():
 
 @pytest.fixture()
 def app_schema():
-    return make_app_schema(endpoints=("success", "failure"))
+    return _aiohttp.make_schema(endpoints=("success", "failure"))
 
 
 @pytest.fixture()
@@ -149,6 +152,13 @@ def testdir(testdir):
 
     testdir.make_test = maker
 
+    def make_importable_pyfile(*args, **kwargs):
+        module = testdir.makepyfile(*args, **kwargs)
+        make_importable(module)
+        return module
+
+    testdir.make_importable_pyfile = make_importable_pyfile
+
     def run_and_assert(*args, **kwargs):
         result = testdir.runpytest(*args)
         result.assert_outcomes(**kwargs)
@@ -156,3 +166,26 @@ def testdir(testdir):
     testdir.run_and_assert = run_and_assert
 
     return testdir
+
+
+@pytest.fixture()
+def flask_app(endpoints):
+    return _flask.create_app(endpoints)
+
+
+def make_importable(module):
+    """Make the package importable by the inline CLI execution."""
+    pkgroot = module.dirpath()
+    module._ensuresyspath(True, pkgroot)
+
+
+@pytest.fixture
+def loadable_flask_app(testdir, endpoints):
+    module = testdir.make_importable_pyfile(
+        location=f"""
+        from test.apps._flask import create_app
+
+        app = create_app({endpoints})
+        """
+    )
+    return f"{module.purebasename}:app"

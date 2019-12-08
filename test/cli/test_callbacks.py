@@ -29,6 +29,12 @@ def test_validate_auth(value):
         callbacks.validate_auth(None, None, value)
 
 
+@given(value=st.text())
+def test_validate_app(value):
+    with pytest.raises(click.BadParameter):
+        callbacks.validate_app(None, None, value)
+
+
 @given(value=st.lists(st.text(), min_size=1).map(tuple))
 @example((":",))
 def test_validate_header(value):
