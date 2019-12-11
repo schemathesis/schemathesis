@@ -3,7 +3,7 @@ import traceback
 import warnings
 from contextlib import contextmanager
 from functools import wraps
-from typing import Any, Callable, Generator, List, Mapping, Set, Tuple, Type, Union
+from typing import Any, Callable, Dict, Generator, List, Set, Tuple, Type, Union
 from urllib.parse import urlsplit, urlunsplit
 
 import yaml
@@ -45,12 +45,12 @@ def force_tuple(item: Filter) -> Union[List, Set, Tuple]:
     return item
 
 
-def dict_true_values(**kwargs: Any) -> Mapping[str, Any]:
+def dict_true_values(**kwargs: Any) -> Dict[str, Any]:
     """Create dict with given kwargs while skipping items where bool(value) evaluates to False."""
     return {key: value for key, value in kwargs.items() if bool(value)}
 
 
-def dict_not_none_values(**kwargs: Any) -> Mapping[str, Any]:
+def dict_not_none_values(**kwargs: Any) -> Dict[str, Any]:
     return {key: value for key, value in kwargs.items() if value is not None}
 
 
