@@ -9,7 +9,8 @@ from ..utils import are_content_types_equal
 
 def not_a_server_error(response: requests.Response, result: TestResult) -> None:
     """A check to verify that the response is not a server-side error."""
-    assert response.status_code < 500, f"Received a response with 5xx status code: {response.status_code}"
+    if response.status_code >= 500:
+        raise AssertionError(f"Received a response with 5xx status code: {response.status_code}")
 
 
 def status_code_conformance(response: requests.Response, result: TestResult) -> None:
@@ -18,11 +19,12 @@ def status_code_conformance(response: requests.Response, result: TestResult) -> 
     if "default" in responses:
         return
     allowed_response_statuses = list(map(str, responses))
-    message = (
-        f"Received a response with a status code, which is not defined in the schema: "
-        f"{response.status_code}\n\nDeclared status codes: {', '.join(allowed_response_statuses)}"
-    )
-    assert str(response.status_code) in allowed_response_statuses, message
+    if str(response.status_code) not in allowed_response_statuses:
+        message = (
+            f"Received a response with a status code, which is not defined in the schema: "
+            f"{response.status_code}\n\nDeclared status codes: {', '.join(allowed_response_statuses)}"
+        )
+        raise AssertionError(message)
 
 
 def content_type_conformance(response: requests.Response, result: TestResult) -> None:
