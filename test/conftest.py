@@ -94,7 +94,7 @@ def simple_schema():
                     "summary": "Returns a list of users.",
                     "description": "Optional extended description in Markdown.",
                     "produces": ["application/json"],
-                    "responses": {200: {"description": "OK"}},
+                    "responses": {"200": {"description": "OK"}},
                 }
             }
         },
