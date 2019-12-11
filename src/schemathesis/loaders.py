@@ -19,7 +19,7 @@ def from_path(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
 ) -> BaseSchema:
-    """Load a file from OS path and parse to schema instance.."""
+    """Load a file from OS path and parse to schema instance."""
     with open(path) as fd:
         return from_file(
             fd, location=os.path.abspath(path), base_url=base_url, method=method, endpoint=endpoint, tag=tag
