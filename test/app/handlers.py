@@ -11,7 +11,7 @@ async def invalid_response(request: web.Request) -> web.Response:
     return web.json_response({"random": "key"})
 
 
-async def digits(request: web.Request) -> web.Response:
+async def custom_format(request: web.Request) -> web.Response:
     return web.json_response({"value": request.query["id"]})
 
 
@@ -54,3 +54,8 @@ async def multipart(request: web.Request) -> web.Response:
         raise web.HTTPUnsupportedMediaType
     data = {field.name: (await field.read()).decode() async for field in await request.multipart()}
     return web.json_response(data)
+
+
+path_variable = success
+invalid = success
+invalid_path_parameter = success
