@@ -25,15 +25,15 @@ class Endpoint(Enum):
     slow = ("GET", "/api/slow", handlers.slow)
     path_variable = ("GET", "/api/path_variable/{key}", handlers.success)
     unsatisfiable = ("POST", "/api/unsatisfiable", handlers.unsatisfiable)
-    invalid = ("POST", "/api/invalid", handlers.unsatisfiable)
+    invalid = ("POST", "/api/invalid", handlers.invalid)
     flaky = ("GET", "/api/flaky", handlers.flaky)
     multipart = ("POST", "/api/multipart", handlers.multipart)
     teapot = ("POST", "/api/teapot", handlers.teapot)
     text = ("GET", "/api/text", handlers.text)
     malformed_json = ("GET", "/api/malformed_json", handlers.malformed_json)
     invalid_response = ("GET", "/api/invalid_response", handlers.invalid_response)
-    custom_format = ("GET", "/api/custom_format", handlers.success)
-    invalid_path_parameter = ("GET", "/api/invalid_path_parameter/{id}", handlers.success)
+    custom_format = ("GET", "/api/custom_format", handlers.custom_format)
+    invalid_path_parameter = ("GET", "/api/invalid_path_parameter/{id}", handlers.invalid_path_parameter)
 
 
 def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Application:
