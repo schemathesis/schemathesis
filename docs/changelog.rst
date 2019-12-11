@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Compatibility with Hypothesis >= 4.53.2. `#322`_
+
 `0.19.0`_ - 2019-12-02
 ----------------------
 
@@ -474,6 +479,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#322: https://github.com/kiwicom/schemathesis/issues/322
 .. _#315: https://github.com/kiwicom/schemathesis/issues/315
 .. _#311: https://github.com/kiwicom/schemathesis/issues/311
 .. _#314: https://github.com/kiwicom/schemathesis/issues/314

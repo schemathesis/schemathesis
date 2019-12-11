@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 
 import attr
 import requests
-from hypothesis.searchstrategy import SearchStrategy
+from hypothesis.strategies import SearchStrategy
 
 from .exceptions import InvalidSchema
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
