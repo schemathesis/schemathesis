@@ -14,7 +14,7 @@ from ..utils import SIMPLE_PATH
 @example("0" * 1000)
 def test_validate_schema(value):
     with pytest.raises(click.UsageError):
-        callbacks.validate_schema(None, None, value)
+        callbacks.validate_schema(SimpleNamespace(params={}), None, value)
 
 
 def test_validate_schema_path_without_base_url():
