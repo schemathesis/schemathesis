@@ -1,22 +1,24 @@
-from typing import Callable, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Tuple, Union
 
 import jsonschema
 import requests
 
-from ..models import TestResult
-from ..utils import WSGIResponse, are_content_types_equal
+from .utils import WSGIResponse, are_content_types_equal
+
+if TYPE_CHECKING:
+    from .models import Case
 
 GenericResponse = Union[requests.Response, WSGIResponse]  # pragma: no mutate
 
 
-def not_a_server_error(response: GenericResponse, result: TestResult) -> None:
+def not_a_server_error(response: GenericResponse, case: "Case") -> None:
     """A check to verify that the response is not a server-side error."""
     if response.status_code >= 500:
         raise AssertionError(f"Received a response with 5xx status code: {response.status_code}")
 
 
-def status_code_conformance(response: GenericResponse, result: TestResult) -> None:
-    responses = result.endpoint.definition.get("responses", {})
+def status_code_conformance(response: GenericResponse, case: "Case") -> None:
+    responses = case.endpoint.definition.get("responses", {})
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
     if "default" in responses:
         return
@@ -29,12 +31,12 @@ def status_code_conformance(response: GenericResponse, result: TestResult) -> No
         raise AssertionError(message)
 
 
-def content_type_conformance(response: GenericResponse, result: TestResult) -> None:
-    global_produces = result.schema.raw_schema.get("produces", None)
+def content_type_conformance(response: GenericResponse, case: "Case") -> None:
+    global_produces = case.endpoint.schema.raw_schema.get("produces", None)
     if global_produces:
         produces = global_produces
     else:
-        produces = result.endpoint.definition.get("produces", None)
+        produces = case.endpoint.definition.get("produces", None)
     if not produces:
         return
     content_type = response.headers["Content-Type"]
@@ -48,11 +50,11 @@ def content_type_conformance(response: GenericResponse, result: TestResult) -> N
     )
 
 
-def response_schema_conformance(response: GenericResponse, result: TestResult) -> None:
+def response_schema_conformance(response: GenericResponse, case: "Case") -> None:
     if not response.headers["Content-Type"].startswith("application/json"):
         return
     # the keys should be strings
-    responses = {str(key): value for key, value in result.endpoint.definition.get("responses", {}).items()}
+    responses = {str(key): value for key, value in case.endpoint.definition.get("responses", {}).items()}
     status_code = str(response.status_code)
     if status_code in responses:
         definition = responses[status_code]
@@ -76,4 +78,6 @@ def response_schema_conformance(response: GenericResponse, result: TestResult) -
 
 DEFAULT_CHECKS = (not_a_server_error,)
 OPTIONAL_CHECKS = (status_code_conformance, content_type_conformance, response_schema_conformance)
-ALL_CHECKS: Tuple[Callable[[requests.Response, TestResult], None], ...] = DEFAULT_CHECKS + OPTIONAL_CHECKS
+ALL_CHECKS: Tuple[
+    Callable[[Union[requests.Response, WSGIResponse], "Case"], None], ...
+] = DEFAULT_CHECKS + OPTIONAL_CHECKS

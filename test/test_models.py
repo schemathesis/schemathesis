@@ -1,24 +1,30 @@
+from test.utils import SIMPLE_PATH
+
 import pytest
 import requests
 
-from schemathesis import Case
+import schemathesis
+from schemathesis.models import Case, Endpoint
 
 
-def test_path():
-    case = Case(method="GET", path="/users/{name}", path_parameters={"name": "test"})
+def test_path(swagger_20):
+    endpoint = Endpoint("/users/{name}", "GET", {}, swagger_20)
+    case = Case(endpoint, path_parameters={"name": "test"})
     assert case.formatted_path == "/users/test"
 
 
 @pytest.mark.parametrize("override", (False, True))
 @pytest.mark.parametrize("converter", (lambda x: x, lambda x: x + "/"))
-def test_as_requests_kwargs(override, server, base_url, converter):
+def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
     base_url = converter(base_url)
-    kwargs = {"method": "GET", "path": "/api/success", "cookies": {"TOKEN": "secret"}}
+    endpoint = Endpoint("/api/success", "GET", {}, swagger_20)
+    kwargs = {"endpoint": endpoint, "cookies": {"TOKEN": "secret"}}
     if override:
         case = Case(**kwargs)
         data = case.as_requests_kwargs(base_url)
     else:
-        case = Case(base_url=base_url, **kwargs)
+        case = Case(**kwargs)
+        endpoint.base_url = base_url
         data = case.as_requests_kwargs()
     assert data == {
         "headers": None,
@@ -35,13 +41,15 @@ def test_as_requests_kwargs(override, server, base_url, converter):
 
 @pytest.mark.parametrize("override", (False, True))
 @pytest.mark.filterwarnings("always")
-def test_call(override, base_url):
-    kwargs = {"method": "GET", "path": "/api/success"}
+def test_call(override, base_url, swagger_20):
+    endpoint = Endpoint("/api/success", "GET", {}, swagger_20)
+    kwargs = {"endpoint": endpoint}
     if override:
         case = Case(**kwargs)
         response = case.call(base_url)
     else:
-        case = Case(base_url=base_url, **kwargs)
+        case = Case(**kwargs)
+        endpoint.base_url = base_url
         response = case.call()
     assert response.status_code == 200
     assert response.json() == {"success": True}
@@ -50,26 +58,54 @@ def test_call(override, base_url):
     assert not records
 
 
+schema = schemathesis.from_path(SIMPLE_PATH)
+ENDPOINT = Endpoint("/api/success", "GET", {}, base_url="http://example.com", schema=schema)
+
+
 @pytest.mark.parametrize(
     "case, expected",
     (
-        (
-            Case(method="GET", path="/api/success", base_url="http://example.com", body={"test": 1}),
-            "requests.get('http://example.com/api/success', json={'test': 1})",
-        ),
-        (
-            Case(method="GET", path="/api/success", base_url="http://example.com"),
-            "requests.get('http://example.com/api/success')",
-        ),
-        (
-            Case(method="GET", path="/api/success", base_url="http://example.com", query={"a": 1}),
-            "requests.get('http://example.com/api/success', params={'a': 1})",
-        ),
-        (
-            Case(method="GET", path="/api/success", query={"a": 1}),
-            "requests.get('http://localhost/api/success', params={'a': 1})",
-        ),
+        (Case(ENDPOINT, body={"test": 1}), "requests.get('http://example.com/api/success', json={'test': 1})"),
+        (Case(ENDPOINT), "requests.get('http://example.com/api/success')"),
+        (Case(ENDPOINT, query={"a": 1}), "requests.get('http://example.com/api/success', params={'a': 1})"),
     ),
 )
 def test_get_code_to_reproduce(case, expected):
     assert case.get_code_to_reproduce() == expected
+
+
+def test_verify_response(testdir):
+    testdir.make_test(
+        r"""
+from requests import Response
+
+@schema.parametrize()
+def test_(case):
+    response = Response()
+    response.headers["Content-Type"] = "application/json"
+    response.status_code = 418
+    try:
+        case.verify_response(response)
+    except AssertionError as exc:
+        assert exc.args[0] == "Received a response with a status code, which is not defined in the schema: 418\n\nDeclared status codes: 200"
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
+def test_verify_response_no_errors(testdir):
+    testdir.make_test(
+        r"""
+from requests import Response
+
+@schema.parametrize()
+def test_(case):
+    response = Response()
+    response.headers["Content-Type"] = "application/json"
+    response.status_code = 200
+    assert case.verify_response(response) is None
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)

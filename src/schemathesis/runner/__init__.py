@@ -14,6 +14,7 @@ from _pytest.logging import LogCaptureHandler, catching_logs
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
 from .._hypothesis import make_test_or_exception
+from ..checks import DEFAULT_CHECKS
 from ..constants import USER_AGENT
 from ..exceptions import InvalidSchema
 from ..loaders import from_uri
@@ -21,7 +22,6 @@ from ..models import Case, Endpoint, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
 from ..utils import WSGIResponse, capture_hypothesis_output, get_base_url
 from . import events
-from .checks import DEFAULT_CHECKS
 
 DEFAULT_DEADLINE = 500  # pragma: no mutate
 RawAuth = Tuple[str, str]  # pragma: no mutate
@@ -345,7 +345,7 @@ def run_test(
 ) -> Generator[events.ExecutionEvent, None, None]:
     """A single test run with all error handling needed."""
     # pylint: disable=too-many-arguments
-    result = TestResult(endpoint=endpoint, schema=schema)
+    result = TestResult(endpoint=endpoint)
     yield events.BeforeExecution(results=results, schema=schema, endpoint=endpoint)
     hypothesis_output: List[str] = []
     try:

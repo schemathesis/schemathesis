@@ -510,4 +510,5 @@ def test_complex_dereference(testdir):
             "required": ["username", "profile"],
             "type": "object",
         },
+        schema=schema,
     )
