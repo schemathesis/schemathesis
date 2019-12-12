@@ -128,7 +128,7 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
     Path & endpoint are static, the others are JSON schemas.
     """
     strategies = {}
-    static_kwargs = {"path": endpoint.path, "method": endpoint.method, "base_url": endpoint.base_url}
+    static_kwargs: Dict[str, Any] = {"endpoint": endpoint}
     try:
         for parameter in PARAMETERS:
             value = getattr(endpoint, parameter)
@@ -164,13 +164,7 @@ def quote_all(parameters: Dict[str, Any]) -> Dict[str, Any]:
 def _get_case_strategy(
     endpoint: Endpoint, extra_static_parameters: Dict[str, Any], strategies: Dict[str, st.SearchStrategy]
 ) -> st.SearchStrategy:
-    static_parameters = {
-        "path": endpoint.path,
-        "method": endpoint.method,
-        "base_url": endpoint.base_url,
-        "app": endpoint.app,
-        **extra_static_parameters,
-    }
+    static_parameters = {"endpoint": endpoint, **extra_static_parameters}
     if endpoint.method == "GET":
         if endpoint.body is not None:
             raise InvalidSchema("Body parameters are defined for GET request.")

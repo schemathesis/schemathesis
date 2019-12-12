@@ -7,11 +7,11 @@ from flask import Flask
 from requests.auth import HTTPDigestAuth
 
 from schemathesis import from_wsgi
+from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.constants import __version__
 from schemathesis.exceptions import InvalidSchema
-from schemathesis.models import Case, Status
+from schemathesis.models import Status
 from schemathesis.runner import events, execute, get_base_url, get_requests_auth, get_wsgi_auth, prepare
-from schemathesis.runner.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 
 
 def assert_request(

@@ -75,8 +75,9 @@ def test_form_data(schema):
     test()
 
 
-def test_not_wsgi():
-    case = Case(method="GET", path="/api/success")
+def test_not_wsgi(schema):
+    case = Case(schema.endpoints["/api/success"]["GET"])
+    case.endpoint.app = None
     with pytest.raises(
         RuntimeError,
         match="WSGI application instance is required. "

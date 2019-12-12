@@ -166,7 +166,7 @@ class SwaggerV20(BaseSchema):
         if base_url is not None:
             base_url = base_url.rstrip("/")  # pragma: no mutate
         endpoint = Endpoint(
-            path=full_path, method=method.upper(), definition=definition, base_url=base_url, app=self.app
+            path=full_path, method=method.upper(), definition=definition, base_url=base_url, app=self.app, schema=self
         )
         for parameter in parameters:
             self.process_parameter(endpoint, parameter)

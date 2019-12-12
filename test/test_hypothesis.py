@@ -1,5 +1,4 @@
 from base64 import b64decode
-from typing import Any, Type, TypeVar, Union
 
 import pytest
 from hypothesis import given, strategies
@@ -9,26 +8,16 @@ from schemathesis._hypothesis import PARAMETERS, get_case_strategy, get_examples
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Endpoint
 
-T = TypeVar("T", bound=Union[Endpoint, Case])
 
-
-def _make(cls: Type[T], **kwargs: Any) -> T:
-    return cls("/users", "POST", **kwargs)
-
-
-def make_endpoint(**kwargs: Any) -> Endpoint:
-    return _make(Endpoint, definition={}, **kwargs)
-
-
-def make_case(**kwargs: Any) -> Case:
-    kwargs.setdefault("body", None)
-    return _make(Case, **kwargs)
+def make_endpoint(schema, **kwargs) -> Endpoint:
+    return Endpoint("/users", "POST", definition={}, schema=schema, **kwargs)
 
 
 @pytest.mark.parametrize("name", sorted(PARAMETERS))
-def test_get_examples(name):
+def test_get_examples(name, swagger_20):
     example = {"name": "John"}
     endpoint = make_endpoint(
+        swagger_20,
         **{
             name: {
                 "required": ["name"],
@@ -37,16 +26,17 @@ def test_get_examples(name):
                 "properties": {"name": {"type": "string"}},
                 "example": example,
             }
-        }
+        },
     )
-    assert list(get_examples(endpoint)) == [make_case(**{name: example})]
+    assert list(get_examples(endpoint)) == [Case(endpoint, **{name: example})]
 
 
-def test_no_body_in_get():
+def test_no_body_in_get(swagger_20):
     endpoint = Endpoint(
         path="/api/success",
         method="GET",
         definition={},
+        schema=swagger_20,
         query={
             "required": ["name"],
             "type": "object",
@@ -58,35 +48,37 @@ def test_no_body_in_get():
     assert list(get_examples(endpoint))[0].body is None
 
 
-def test_invalid_body_in_get():
+def test_invalid_body_in_get(swagger_20):
     endpoint = Endpoint(
         path="/foo",
         method="GET",
         definition={},
+        schema=swagger_20,
         body={"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
     )
     with pytest.raises(InvalidSchema, match=r"^Body parameters are defined for GET request.$"):
         get_case_strategy(endpoint)
 
 
-def test_warning():
+def test_warning(swagger_20):
     example = {"name": "John"}
-    endpoint = make_endpoint(**{"query": {"example": example}})
+    endpoint = make_endpoint(swagger_20, query={"example": example})
     with pytest.warns(None) as record:
-        assert list(get_examples(endpoint)) == [make_case(**{"query": example})]
+        assert list(get_examples(endpoint)) == [Case(endpoint, query=example)]
     assert not record
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_custom_strategies():
+def test_custom_strategies(swagger_20):
     register_string_format("even_4_digits", strategies.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
     endpoint = make_endpoint(
+        swagger_20,
         query={
             "required": ["id"],
             "type": "object",
             "additionalProperties": False,
             "properties": {"id": {"type": "string", "format": "even_4_digits"}},
-        }
+        },
     )
     result = get_case_strategy(endpoint).example()
     assert len(result.query["id"]) == 4
@@ -105,28 +97,30 @@ def test_register_default_strategies():
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_default_strategies_binary():
+def test_default_strategies_binary(swagger_20):
     endpoint = make_endpoint(
+        swagger_20,
         form_data={
             "required": ["file"],
             "type": "object",
             "additionalProperties": False,
             "properties": {"file": {"type": "string", "format": "binary"}},
-        }
+        },
     )
     result = get_case_strategy(endpoint).example()
     assert isinstance(result.form_data["file"], bytes)
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_default_strategies_bytes():
+def test_default_strategies_bytes(swagger_20):
     endpoint = make_endpoint(
+        swagger_20,
         body={
             "required": ["byte"],
             "type": "object",
             "additionalProperties": False,
             "properties": {"byte": {"type": "string", "format": "byte"}},
-        }
+        },
     )
     result = get_case_strategy(endpoint).example()
     assert isinstance(result.body["byte"], str)
@@ -146,11 +140,12 @@ def test_invalid_custom_strategy(values, error):
     assert error in str(exc.value)
 
 
-def test_valid_headers(base_url):
+def test_valid_headers(base_url, swagger_20):
     endpoint = Endpoint(
         "/api/success",
         "GET",
         definition={},
+        schema=swagger_20,
         base_url=base_url,
         headers={
             "properties": {"api_key": {"name": "api_key", "in": "header", "type": "string"}},
