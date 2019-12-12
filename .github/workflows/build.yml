@@ -42,7 +42,7 @@ jobs:
        with:
          python-version: '3.8'
 
-     - run: pip install poetry
+     - run: pip install "poetry<1.0.0"
 
      - name: Cache Poetry virtualenv
        uses: actions/cache@v1
