@@ -1,5 +1,6 @@
 import pathlib
 import re
+import sys
 from contextlib import contextmanager
 from typing import Any, Dict, Generator, Optional, Tuple
 from urllib.parse import urlparse
@@ -38,13 +39,16 @@ def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value
         return raw_value
     path, name = (re.split(r":(?![\\/])", raw_value, 1) + [None])[:2]  # type: ignore
     try:
-        module = __import__(path)
+        __import__(path)
     except (ImportError, ValueError):
         raise click.BadParameter("Can not import application from the given module")
     except Exception as exc:
         message = utils.format_exception(exc)
         click.secho(f"Error: {message}", fg="red")
         raise click.Abort
+    # accessing the module from sys.modules returns a proper module, while `__import__`
+    # may return a parent module (system dependent)
+    module = sys.modules[path]
     try:
         return getattr(module, name)
     except AttributeError:
