@@ -71,7 +71,7 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> Flask:
     @app.route("/api/multipart", methods=["POST"])
     def multipart():
         files = {name: value.stream.read().decode() for name, value in request.files.items()}
-        return jsonify(**files, **request.form)
+        return jsonify(**files, **request.form.to_dict())
 
     @app.route("/api/teapot", methods=["POST"])
     def teapot():
