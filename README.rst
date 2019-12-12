@@ -186,7 +186,7 @@ look like this:
 
 It consists of four main parts:
 
-1. Schema preparation; ``schemathesis`` package provides multiple ways to initialize the schema - ``from_path``, ``from_dict``, ``from_uri``, ``from_file`` and ``from_wsgi``*.
+1. Schema preparation; ``schemathesis`` package provides multiple ways to initialize the schema - ``from_path``, ``from_dict``, ``from_uri``, ``from_file`` and ``from_wsgi``.
 
 2. Test parametrization; ``@schema.parametrize()`` generates separate tests for all endpoint/method combination available in the schema.
 
