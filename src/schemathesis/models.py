@@ -90,7 +90,7 @@ class Case:
     def call(
         self, base_url: Optional[str] = None, session: Optional[requests.Session] = None, **kwargs: Any
     ) -> requests.Response:
-        """Convert the case into a dictionary acceptable by requests."""
+        """Make a network call with `requests`."""
         if session is None:
             session = requests.Session()
             close_session = True
