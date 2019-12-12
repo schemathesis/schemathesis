@@ -4,13 +4,13 @@ import pytest
 import requests
 
 from schemathesis import models
-from schemathesis.runner.checks import content_type_conformance, response_schema_conformance
+from schemathesis.checks import content_type_conformance, response_schema_conformance
 from schemathesis.schemas import BaseSchema
 
 
-def make_test_result(schema: BaseSchema, definition: Dict[str, Any]) -> models.TestResult:
-    endpoint = models.Endpoint("/path", "GET", definition=definition)
-    return models.TestResult(endpoint, schema)
+def make_case(schema: BaseSchema, definition: Dict[str, Any]) -> models.Case:
+    endpoint = models.Endpoint("/path", "GET", definition=definition, schema=schema)
+    return models.Case(endpoint)
 
 
 def make_response(content=b"{}", content_type="application/json") -> requests.Response:
@@ -27,35 +27,35 @@ def response(request):
 
 
 @pytest.fixture()
-def results(request, swagger_20) -> models.TestResult:
-    return make_test_result(swagger_20, {"produces": request.param})
+def case(request, swagger_20) -> models.Case:
+    return make_case(swagger_20, {"produces": request.param})
 
 
 @pytest.mark.parametrize(
-    "response, results",
+    "response, case",
     (
         ("application/json", []),
         ("application/json", ["application/json"]),
         ("application/json;charset=utf-8", ["application/json"]),
     ),
-    indirect=["response", "results"],
+    indirect=["response", "case"],
 )
-def test_content_type_conformance_valid(response, results):
-    assert content_type_conformance(response, results) is None
+def test_content_type_conformance_valid(response, case):
+    assert content_type_conformance(response, case) is None
 
 
 @pytest.mark.parametrize(
-    "response, results",
+    "response, case",
     (("plain/text", ["application/json"]), ("plain/text;charset=utf-8", ["application/json"])),
-    indirect=["response", "results"],
+    indirect=["response", "case"],
 )
-def test_content_type_conformance_invalid(response, results):
+def test_content_type_conformance_invalid(response, case):
     message = (
         f"^Received a response with '{response.headers['Content-Type']}' Content-Type, "
         "but it is not declared in the schema.\n\nDefined content types: application/json$"
     )
     with pytest.raises(AssertionError, match=message):
-        content_type_conformance(response, results)
+        content_type_conformance(response, case)
 
 
 SUCCESS_SCHEMA = {"type": "object", "properties": {"success": {"type": "boolean"}}, "required": ["success"]}
@@ -73,8 +73,8 @@ SUCCESS_SCHEMA = {"type": "object", "properties": {"success": {"type": "boolean"
 )
 def test_response_schema_conformance(swagger_20, content, definition):
     response = make_response(content)
-    results = make_test_result(swagger_20, definition)
-    assert response_schema_conformance(response, results) is None
+    case = make_case(swagger_20, definition)
+    assert response_schema_conformance(response, case) is None
 
 
 @pytest.mark.parametrize(
@@ -86,6 +86,6 @@ def test_response_schema_conformance(swagger_20, content, definition):
 )
 def test_response_schema_conformance_invalid(swagger_20, content, definition):
     response = make_response(content)
-    results = make_test_result(swagger_20, definition)
+    case = make_case(swagger_20, definition)
     with pytest.raises(AssertionError):
-        response_schema_conformance(response, results)
+        response_schema_conformance(response, case)

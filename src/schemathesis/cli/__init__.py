@@ -2,7 +2,7 @@ import pathlib
 import traceback
 from contextlib import contextmanager
 from enum import Enum
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, cast
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union, cast
 from urllib.parse import urlparse
 
 import click
@@ -10,27 +10,28 @@ import hypothesis
 import requests
 from requests import exceptions
 
+from .. import checks as checks_module
 from .. import models, runner, utils
 from ..exceptions import HTTPError
 from ..loaders import from_path, from_wsgi
 from ..runner import events
 from ..types import Filter
-from ..utils import dict_not_none_values, dict_true_values
+from ..utils import WSGIResponse, dict_not_none_values, dict_true_values
 from . import callbacks, output
 from .options import CSVOption
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
-DEFAULT_CHECKS_NAMES = tuple(check.__name__ for check in runner.checks.DEFAULT_CHECKS)
-ALL_CHECKS_NAMES = tuple(check.__name__ for check in runner.checks.ALL_CHECKS)
+DEFAULT_CHECKS_NAMES = tuple(check.__name__ for check in checks_module.DEFAULT_CHECKS)
+ALL_CHECKS_NAMES = tuple(check.__name__ for check in checks_module.ALL_CHECKS)
 CHECKS_TYPE = click.Choice(ALL_CHECKS_NAMES)
 DEFAULT_WORKERS = 1
 MAX_WORKERS = 64
 
 
-def register_check(function: Callable[[requests.Response, models.TestResult], None]) -> None:
+def register_check(function: Callable[[Union[requests.Response, WSGIResponse], models.Case], None]) -> None:
     """Register a new check for schemathesis CLI."""
-    runner.checks.ALL_CHECKS += (function,)
+    checks_module.ALL_CHECKS += (function,)
     CHECKS_TYPE.choices += (function.__name__,)  # type: ignore
 
 
@@ -149,7 +150,7 @@ def run(  # pylint: disable=too-many-arguments
     """
     # pylint: disable=too-many-locals
 
-    selected_checks = tuple(check for check in runner.checks.ALL_CHECKS if check.__name__ in checks)
+    selected_checks = tuple(check for check in checks_module.ALL_CHECKS if check.__name__ in checks)
 
     if auth is None:
         # Auth type doesn't matter if auth is not passed

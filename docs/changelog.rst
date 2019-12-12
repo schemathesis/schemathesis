@@ -10,6 +10,14 @@ Added
 ~~~~~
 
 - WSGI apps support. `#31`_
+- ``Case.validate_response`` for running built-in checks against app's response. `#319`_
+
+Changed
+~~~~~~~
+
+- Checks receive ``Case`` instance as a second argument instead of ``TestResult``.
+  This was done for making checks usable in Python tests via ``Case.validate_response``.
+  Endpoint and schema are accessible via `case.endpoint` and `case.endpoint.schema`.
 
 `0.19.1`_ - 2019-12-11
 ----------------------
@@ -489,6 +497,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#322: https://github.com/kiwicom/schemathesis/issues/322
+.. _#319: https://github.com/kiwicom/schemathesis/issues/319
 .. _#315: https://github.com/kiwicom/schemathesis/issues/315
 .. _#311: https://github.com/kiwicom/schemathesis/issues/311
 .. _#314: https://github.com/kiwicom/schemathesis/issues/314

@@ -11,6 +11,7 @@ import requests
 import werkzeug
 from hypothesis.strategies import SearchStrategy
 
+from .checks import ALL_CHECKS
 from .exceptions import InvalidSchema
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import WSGIResponse
@@ -23,16 +24,29 @@ if TYPE_CHECKING:
 class Case:
     """A single test case parameters."""
 
-    path: str = attr.ib()  # pragma: no mutate
-    method: str = attr.ib()  # pragma: no mutate
-    app: Any = attr.ib(default=None)  # pragma: no mutate
-    base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    endpoint: "Endpoint" = attr.ib()  # pragma: no mutate
     path_parameters: Optional[PathParameters] = attr.ib(default=None)  # pragma: no mutate
     headers: Optional[Headers] = attr.ib(default=None)  # pragma: no mutate
     cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
     query: Optional[Query] = attr.ib(default=None)  # pragma: no mutate
     body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
     form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
+
+    @property
+    def path(self) -> str:
+        return self.endpoint.path
+
+    @property
+    def method(self) -> str:
+        return self.endpoint.method
+
+    @property
+    def base_url(self) -> Optional[str]:
+        return self.endpoint.base_url
+
+    @property
+    def app(self) -> Any:
+        return self.endpoint.app
 
     @property
     def formatted_path(self) -> str:
@@ -143,6 +157,20 @@ class Case:
         with cookie_handler(client, self.cookies):
             return client.open(**data, **kwargs)  # type: ignore
 
+    def validate_response(
+        self,
+        response: Union[requests.Response, WSGIResponse],
+        checks: Tuple[Callable[[Union[requests.Response, WSGIResponse], "Case"], None], ...] = ALL_CHECKS,
+    ) -> None:
+        errors = []
+        for check in checks:
+            try:
+                check(response, self)
+            except AssertionError as exc:
+                errors.append(exc.args[0])
+        if errors:
+            raise AssertionError(*errors)
+
 
 @contextmanager
 def cookie_handler(client: werkzeug.Client, cookies: Optional[Cookies]) -> Generator[None, None, None]:
@@ -168,6 +196,7 @@ class Endpoint:
     path: str = attr.ib()  # pragma: no mutate
     method: str = attr.ib()  # pragma: no mutate
     definition: Dict[str, Any] = attr.ib()  # pragma: no mutate
+    schema: "BaseSchema" = attr.ib()  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     path_parameters: PathParameters = attr.ib(default=None)  # pragma: no mutate
@@ -206,7 +235,6 @@ class TestResult:
     """Result of a single test."""
 
     endpoint: Endpoint = attr.ib()  # pragma: no mutate
-    schema: "BaseSchema" = attr.ib()  # pragma: no mutate
     checks: List[Check] = attr.ib(factory=list)  # pragma: no mutate
     errors: List[Tuple[Exception, Optional[Case]]] = attr.ib(factory=list)  # pragma: no mutate
     logs: List[LogRecord] = attr.ib(factory=list)  # pragma: no mutate

@@ -158,7 +158,7 @@ def display_example(
     output = {
         make_verbose_name(attribute): getattr(case, attribute.name)
         for attribute in Case.__attrs_attrs__  # type: ignore
-        if attribute.name not in ("path", "method", "base_url", "app")
+        if attribute.name not in ("path", "method", "base_url", "app", "endpoint")
     }
     max_length = max(map(len, output))
     template = f"{{:<{max_length}}} : {{}}"

@@ -24,13 +24,13 @@ def execution_context():
 
 
 @pytest.fixture
-def endpoint():
-    return models.Endpoint("/success", "GET", definition={})
+def endpoint(swagger_20):
+    return models.Endpoint("/success", "GET", definition={}, base_url="http://127.0.0.1:8080", schema=swagger_20)
 
 
 @pytest.fixture()
-def results_set(endpoint, swagger_20):
-    statistic = models.TestResult(endpoint, swagger_20)
+def results_set(endpoint):
+    statistic = models.TestResult(endpoint)
     return models.TestResultSet([statistic])
 
 
@@ -86,9 +86,7 @@ def test_display_statistic(capsys, swagger_20, endpoint):
     success = models.Check("not_a_server_error", models.Status.success)
     failure = models.Check("not_a_server_error", models.Status.failure)
     single_test_statistic = models.TestResult(
-        endpoint,
-        swagger_20,
-        [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
+        endpoint, [success, success, success, failure, failure, models.Check("different_check", models.Status.success)]
     )
     results = models.TestResultSet([single_test_statistic])
     # When test results are displayed
@@ -156,15 +154,9 @@ def test_display_hypothesis_output(capsys):
 def test_display_single_failure(capsys, swagger_20, endpoint, body):
     # Given a single test result with multiple successful & failed checks
     success = models.Check("not_a_server_error", models.Status.success)
-    failure = models.Check(
-        "not_a_server_error",
-        models.Status.failure,
-        models.Case("/success", "GET", base_url="http://example.com", body=body),
-    )
+    failure = models.Check("not_a_server_error", models.Status.failure, models.Case(endpoint, body=body))
     test_statistic = models.TestResult(
-        endpoint,
-        swagger_20,
-        [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
+        endpoint, [success, success, success, failure, failure, models.Check("different_check", models.Status.success)]
     )
     # When this failure is displayed
     default.display_single_failure(test_statistic)
@@ -226,7 +218,7 @@ def test_display_single_error(capsys, swagger_20, endpoint):
     except SyntaxError as exc:
         exception = exc
 
-    result = models.TestResult(endpoint, swagger_20)
+    result = models.TestResult(endpoint)
     result.add_error(exception)
     # When the related test result is displayed
     default.display_single_error(result)
@@ -241,8 +233,9 @@ def test_display_single_error(capsys, swagger_20, endpoint):
 
 def test_display_failures(swagger_20, capsys, results_set):
     # Given two test results - success and failure
-    failure = models.TestResult(models.Endpoint("/api/failure", "GET", {}), swagger_20)
-    failure.add_failure("test", models.Case("/api/failure", "GET", base_url="http://127.0.0.1:8080"), "Message")
+    endpoint = models.Endpoint("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)
+    failure = models.TestResult(endpoint)
+    failure.add_failure("test", models.Case(endpoint), "Message")
     results_set.append(failure)
     # When the failures are displayed
     default.display_failures(results_set)
@@ -260,11 +253,9 @@ def test_display_failures(swagger_20, capsys, results_set):
 
 def test_display_errors(swagger_20, capsys, results_set):
     # Given two test results - success and error
-    error = models.TestResult(models.Endpoint("/api/error", "GET", {}), swagger_20, seed=123)
-    error.add_error(
-        ConnectionError("Connection refused!"),
-        models.Case("/api/error", "GET", base_url="http://127.0.0.1:8080", query={"a": 1}),
-    )
+    endpoint = models.Endpoint("/api/error", "GET", {}, swagger_20)
+    error = models.TestResult(endpoint, seed=123)
+    error.add_error(ConnectionError("Connection refused!"), models.Case(endpoint, query={"a": 1}))
     results_set.append(error)
     # When the errors are displayed
     default.display_errors(results_set)
@@ -281,8 +272,7 @@ def test_display_errors(swagger_20, capsys, results_set):
 
 
 @pytest.mark.parametrize(
-    "attribute, expected",
-    ((models.Case.__attrs_attrs__[0], "Path"), (models.Case.__attrs_attrs__[4], "Path parameters")),
+    "attribute, expected", ((models.Case.__attrs_attrs__[3], "Cookies"), (models.Case.__attrs_attrs__[4], "Query"))
 )
 def test_make_verbose_name(attribute, expected):
     assert default.make_verbose_name(attribute) == expected
