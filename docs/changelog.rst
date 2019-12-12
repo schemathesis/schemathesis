@@ -6,6 +6,9 @@ Changelog
 `Unreleased`_
 -------------
 
+`0.20.0`_ - 2019-12-12
+----------------------
+
 Added
 ~~~~~
 
@@ -17,7 +20,7 @@ Changed
 
 - Checks receive ``Case`` instance as a second argument instead of ``TestResult``.
   This was done for making checks usable in Python tests via ``Case.validate_response``.
-  Endpoint and schema are accessible via `case.endpoint` and `case.endpoint.schema`.
+  Endpoint and schema are accessible via ``case.endpoint`` and ``case.endpoint.schema``.
 
 `0.19.1`_ - 2019-12-11
 ----------------------
@@ -465,7 +468,8 @@ Fixed
 
 - Initial public release
 
-.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.19.1...HEAD
+.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.20.0...HEAD
+.. _0.20.0: https://github.com/kiwicom/schemathesis/compare/v0.19.1...v0.20.0
 .. _0.19.1: https://github.com/kiwicom/schemathesis/compare/v0.19.1...v0.19.1
 .. _0.19.0: https://github.com/kiwicom/schemathesis/compare/v0.18.1...v0.19.0
 .. _0.18.1: https://github.com/kiwicom/schemathesis/compare/v0.18.0...v0.18.1
