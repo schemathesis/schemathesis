@@ -648,16 +648,22 @@ def test_register_check(testdir, cli, schema_url):
     assert lines[14] == "Custom check failed!"
 
 
-def assert_threaded_executor_interruption(lines, expected):
+def assert_threaded_executor_interruption(lines, expected, optional_interrupt=False):
     # It is possible to have a case when first call without an error will start processing
     # But after, another thread will have interruption and will push this event before the
     # first thread will finish. Race condition: "" is for this case and "." for the other
     # way around
     assert lines[10] in expected
-    assert "!! KeyboardInterrupt !!" in lines[11]
+    if not optional_interrupt:
+        assert "!! KeyboardInterrupt !!" in lines[11]
     if "F" in lines[10]:
-        assert "=== FAILURES ===" in lines[12]
-        position = 24
+        # assert "=== FAILURES ===" in lines[12]
+        if "!! KeyboardInterrupt !!" not in lines[11]:
+            assert "=== FAILURES ===" in lines[12]
+            position = 23
+        else:
+            assert "=== FAILURES ===" in lines[13]
+            position = 24
     else:
         position = 13
     assert "== SUMMARY ==" in lines[position]
@@ -719,7 +725,7 @@ def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
     lines = result.stdout.strip().split("\n")
     # There are many scenarios possible, depends how many tests will be executed before interruption
     # and in what order. it could be no tests at all, some of them or all of them.
-    assert_threaded_executor_interruption(lines, ("F", ".", "F.", ".F", ""))
+    assert_threaded_executor_interruption(lines, ("F", ".", "F.", ".F", ""), True)
 
 
 @pytest.mark.endpoints("failure")
