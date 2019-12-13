@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Callable, Tuple, Union
+import string
+from itertools import product
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, Tuple, Union
 
 import jsonschema
 import requests
@@ -22,13 +24,20 @@ def status_code_conformance(response: GenericResponse, case: "Case") -> None:
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
     if "default" in responses:
         return
-    allowed_response_statuses = list(map(str, responses))
+    allowed_response_statuses = list(_expand_responses(responses))
     if str(response.status_code) not in allowed_response_statuses:
         message = (
             f"Received a response with a status code, which is not defined in the schema: "
             f"{response.status_code}\n\nDeclared status codes: {', '.join(allowed_response_statuses)}"
         )
         raise AssertionError(message)
+
+
+def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[str, None, None]:
+    for code in responses:
+        chars = [list(string.digits) if char == "X" else [char] for char in str(code).upper()]
+        for expanded in product(*chars):
+            yield "".join(expanded)
 
 
 def content_type_conformance(response: GenericResponse, case: "Case") -> None:
