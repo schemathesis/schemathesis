@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Support for response code ranges. `#330`_
+
 `0.20.0`_ - 2019-12-12
 ----------------------
 
@@ -500,6 +505,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#330: https://github.com/kiwicom/schemathesis/issues/330
 .. _#322: https://github.com/kiwicom/schemathesis/issues/322
 .. _#319: https://github.com/kiwicom/schemathesis/issues/319
 .. _#315: https://github.com/kiwicom/schemathesis/issues/315

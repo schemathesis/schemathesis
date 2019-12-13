@@ -4,7 +4,7 @@ import pytest
 import requests
 
 from schemathesis import models
-from schemathesis.checks import content_type_conformance, response_schema_conformance
+from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.schemas import BaseSchema
 
 
@@ -42,6 +42,23 @@ def case(request, swagger_20) -> models.Case:
 )
 def test_content_type_conformance_valid(response, case):
     assert content_type_conformance(response, case) is None
+
+
+@pytest.mark.parametrize("value", (400, 405))
+def test_status_code_conformance_valid(value, swagger_20):
+    response = make_response()
+    response.status_code = value
+    case = make_case(swagger_20, {"responses": {"4XX"}})
+    status_code_conformance(response, case)
+
+
+@pytest.mark.parametrize("value", (400, 405))
+def test_status_code_conformance_invalid(value, swagger_20):
+    response = make_response()
+    response.status_code = value
+    case = make_case(swagger_20, {"responses": {"5XX"}})
+    with pytest.raises(AssertionError):
+        status_code_conformance(response, case)
 
 
 @pytest.mark.parametrize(
