@@ -72,7 +72,7 @@ def response_schema_conformance(response: GenericResponse, case: "Case") -> None
     else:
         # No response defined for the received response status code
         return
-    schema = definition.get("schema")
+    schema = case.endpoint.schema._get_response_schema(definition)
     if not schema:
         return
     if isinstance(response, requests.Response):

@@ -114,6 +114,10 @@ class BaseSchema(Mapping):
 
         return wrapper
 
+    def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Extract response schema from `responses`."""
+        raise NotImplementedError
+
 
 class SwaggerV20(BaseSchema):
     def __repr__(self) -> str:
@@ -267,6 +271,9 @@ class SwaggerV20(BaseSchema):
             item["format"] = "binary"
         return item
 
+    def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        return definition.get("schema")
+
 
 class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     @property
@@ -320,6 +327,13 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     def parameter_to_json_schema(self, data: Dict[str, Any]) -> Dict[str, Any]:
         # "schema" field is required for all parameters in Open API 3.0
         return super().parameter_to_json_schema(data["schema"])
+
+    def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        options = iter(definition.get("content", {}).values())
+        option = next(options, None)
+        if option:
+            return option["schema"]
+        return None
 
 
 def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
