@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Response schema conformance check for Open API 3.0. `#332`_
+
 `0.20.1`_ - 2019-12-13
 ----------------------
 
@@ -509,6 +514,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#332: https://github.com/kiwicom/schemathesis/issues/332
 .. _#330: https://github.com/kiwicom/schemathesis/issues/330
 .. _#322: https://github.com/kiwicom/schemathesis/issues/322
 .. _#319: https://github.com/kiwicom/schemathesis/issues/319

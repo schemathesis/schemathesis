@@ -88,9 +88,39 @@ SUCCESS_SCHEMA = {"type": "object", "properties": {"success": {"type": "boolean"
         (b'{"success": true}', {"responses": {"default": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
     ),
 )
-def test_response_schema_conformance(swagger_20, content, definition):
+def test_response_schema_conformance_swagger(swagger_20, content, definition):
     response = make_response(content)
     case = make_case(swagger_20, definition)
+    assert response_schema_conformance(response, case) is None
+
+
+@pytest.mark.parametrize(
+    "content, definition",
+    (
+        (b'{"success": true}', {}),
+        (b'{"success": true}', {"responses": {"200": {"description": "text"}}}),
+        (b'{"random": "text"}', {"responses": {"200": {"description": "text"}}}),
+        (
+            b'{"success": true}',
+            {
+                "responses": {
+                    "200": {"description": "text", "content": {"application/json": {"schema": SUCCESS_SCHEMA}}}
+                }
+            },
+        ),
+        (
+            b'{"success": true}',
+            {
+                "responses": {
+                    "default": {"description": "text", "content": {"application/json": {"schema": SUCCESS_SCHEMA}}}
+                }
+            },
+        ),
+    ),
+)
+def test_response_schema_conformance_openapi(openapi_30, content, definition):
+    response = make_response(content)
+    case = make_case(openapi_30, definition)
     assert response_schema_conformance(response, case) is None
 
 
@@ -101,8 +131,36 @@ def test_response_schema_conformance(swagger_20, content, definition):
         (b'{"random": "text"}', {"responses": {"default": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
     ),
 )
-def test_response_schema_conformance_invalid(swagger_20, content, definition):
+def test_response_schema_conformance_invalid_swagger(swagger_20, content, definition):
     response = make_response(content)
     case = make_case(swagger_20, definition)
+    with pytest.raises(AssertionError):
+        response_schema_conformance(response, case)
+
+
+@pytest.mark.parametrize(
+    "content, definition",
+    (
+        (
+            b'{"random": "text"}',
+            {
+                "responses": {
+                    "200": {"description": "text", "content": {"application/json": {"schema": SUCCESS_SCHEMA}}}
+                }
+            },
+        ),
+        (
+            b'{"random": "text"}',
+            {
+                "responses": {
+                    "default": {"description": "text", "content": {"application/json": {"schema": SUCCESS_SCHEMA}}}
+                }
+            },
+        ),
+    ),
+)
+def test_response_schema_conformance_invalid_openapi(openapi_30, content, definition):
+    response = make_response(content)
+    case = make_case(openapi_30, definition)
     with pytest.raises(AssertionError):
         response_schema_conformance(response, case)
