@@ -25,19 +25,20 @@ def status_code_conformance(response: GenericResponse, case: "Case") -> None:
     if "default" in responses:
         return
     allowed_response_statuses = list(_expand_responses(responses))
-    if str(response.status_code) not in allowed_response_statuses:
+    if response.status_code not in allowed_response_statuses:
+        responses_list = ", ".join(map(str, responses))
         message = (
             f"Received a response with a status code, which is not defined in the schema: "
-            f"{response.status_code}\n\nDeclared status codes: {', '.join(allowed_response_statuses)}"
+            f"{response.status_code}\n\nDeclared status codes: {responses_list}"
         )
         raise AssertionError(message)
 
 
-def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[str, None, None]:
+def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, None, None]:
     for code in responses:
-        chars = [list(string.digits) if char == "X" else [char] for char in str(code).upper()]
+        chars = [list(string.digits) if digit == "X" else [digit] for digit in str(code).upper()]
         for expanded in product(*chars):
-            yield "".join(expanded)
+            yield int("".join(expanded))
 
 
 def content_type_conformance(response: GenericResponse, case: "Case") -> None:
