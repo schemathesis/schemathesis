@@ -71,7 +71,7 @@ def test_commands_version(cli):
         (
             ("run", "http://127.0.0.1", "--hypothesis-phases=explicit,first,second"),
             'Error: Invalid value for "--hypothesis-phases": invalid choice(s): first, second. '
-            "Choose from explicit, reuse, generate, shrink",
+            "Choose from explicit, reuse, generate, target, shrink",
         ),
     ),
 )
@@ -124,7 +124,7 @@ def test_commands_run_help(cli):
         "  --hypothesis-max-examples INTEGER",
         "                                  Maximum number of generated examples per each",
         "                                  method/endpoint combination.",
-        "  --hypothesis-phases [explicit|reuse|generate|shrink]",
+        "  --hypothesis-phases [explicit|reuse|generate|target|shrink]",
         "                                  Control which phases should be run.",
         "  --hypothesis-report-multiple-bugs BOOLEAN",
         "                                  Raise only the exception with the smallest",
