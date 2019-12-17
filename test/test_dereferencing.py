@@ -210,13 +210,13 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
-@pytest.mark.parametrize(
-    "nullable, expected",
-    (
+def make_nullable_test_data(spec_version):
+    field_name = {"openapi": "nullable", "swagger": "x-nullable"}[spec_version]
+    return (
         (
             {
                 "properties": {
-                    "id": {"format": "int64", "type": "integer", "x-nullable": True},
+                    "id": {"format": "int64", "type": "integer", field_name: True},
                     "name": {"type": "string"},
                 },
                 "type": "object",
@@ -232,7 +232,7 @@ def test_(request, case):
         (
             {
                 "parameters": [
-                    {"name": "id", "in": "query", "type": "integer", "format": "int64", "x-nullable": True},
+                    {"name": "id", "in": "query", "type": "integer", "format": "int64", field_name: True},
                     {"name": "name", "type": "string"},
                 ]
             },
@@ -246,7 +246,7 @@ def test_(request, case):
         (
             {
                 "properties": {
-                    "id": {"type": "string", "enum": ["a", "b"], "x-nullable": True},
+                    "id": {"type": "string", "enum": ["a", "b"], field_name: True},
                     "name": {"type": "string"},
                 },
                 "type": "object",
@@ -259,10 +259,17 @@ def test_(request, case):
                 "type": "object",
             },
         ),
-    ),
-)
+    )
+
+
+@pytest.mark.parametrize("nullable, expected", make_nullable_test_data("swagger"))
 def test_x_nullable(petstore, nullable, expected):
     assert petstore.resolve(nullable) == expected
+
+
+@pytest.mark.parametrize("nullable, expected", make_nullable_test_data("openapi"))
+def test_nullable(openapi_30, nullable, expected):
+    assert openapi_30.resolve(nullable) == expected
 
 
 def test_nullable_parameters(testdir):

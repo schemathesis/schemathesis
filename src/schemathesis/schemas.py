@@ -120,6 +120,8 @@ class BaseSchema(Mapping):
 
 
 class SwaggerV20(BaseSchema):
+    nullable_name = "x-nullable"
+
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
         return f"{self.__class__.__name__} for {info['title']} ({info['version']})"
@@ -252,12 +254,11 @@ class SwaggerV20(BaseSchema):
                 item[idx] = self.resolve(sub_item)
         return item
 
-    @staticmethod
-    def prepare(item: Dict[str, Any]) -> Dict[str, Any]:
+    def prepare(self, item: Dict[str, Any]) -> Dict[str, Any]:
         """Parse schema extension, e.g. "x-nullable" field."""
         # Add additional type "null" if parameter is nullable.
-        if item.get("x-nullable") is True:
-            del item["x-nullable"]
+        if item.get(self.nullable_name) is True:
+            del item[self.nullable_name]
             if item.get("in"):
                 initial_type = {"type": item["type"]}
                 if item.get("enum"):
@@ -276,6 +277,8 @@ class SwaggerV20(BaseSchema):
 
 
 class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
+    nullable_name = "nullable"
+
     @property
     def spec_version(self) -> str:
         return self.raw_schema["openapi"]
