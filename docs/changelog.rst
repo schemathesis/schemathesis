@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Response status code conformance check applicability for old `requests` version. `#330`_
+
 `0.20.2`_ - 2019-12-14
 ----------------------
 
