@@ -137,7 +137,7 @@ description = "Generate test data from JSON schemata with Hypothesis"
 name = "hypothesis-jsonschema"
 optional = false
 python-versions = ">=3.6"
-version = "0.9.12"
+version = "0.9.13"
 
 [package.dependencies]
 hypothesis = ">=4.5.0"
@@ -453,7 +453,7 @@ version = "0.6.0"
 more-itertools = "*"
 
 [metadata]
-content-hash = "2bf4a850269376d31b0d2be67ab0778fdf6d8de30539c0303ec209f3edbc9ec4"
+content-hash = "73a908d63e4cade37c4e94bb291557f261ff74c2c4e29dacd0afa7872a7773ea"
 python-versions = "^3.6"
 
 [metadata.hashes]
@@ -470,7 +470,7 @@ coverage = ["08907593569fe59baca0bf152c43f3863201efb6113ecb38ce7e97ce339805a6", 
 execnet = ["cacb9df31c9680ec5f95553976c4da484d407e85e41c83cb812aa014f0eddc50", "d4efd397930c46415f62f8a31388d6be4f27a91d7550eb79bc64a756e0056547"]
 flask = ["13f9f196f330c7c2c5d7a5cf91af894110ca0215ac051b5844701f2bfd934d52", "45eb5a6fd193d6cf7e0cf5d8a5b31f83d5faae0293695626f539a823e93b13f6"]
 hypothesis = ["5564ac1d76752ed4914b865148de030b73af7081fda652709c51074349568666", "b4075449d9126f664d0d24388e963cb07bcf0460b7a6f8b9b5adee67765a7057"]
-hypothesis-jsonschema = ["5b641b9ce5c1b076e48c8f74b58450407774062d0db5d13efc6f822a8c9c07c9", "992f264ed1866ef4c96381fc2423170be4aa36d1817518704071bee7a90b7fe6"]
+hypothesis-jsonschema = ["01f969c988d3b1c1f2cfd8c56257e79962c9aecde6174a4fb308f60cd60e404d", "593ab1af1150615fc274365ea9c5e24c689477a10674b9b55c26864aa9ee9433"]
 idna = ["c357b3f628cf53ae2c4c05627ecc484553142ca23264e593d327bcde5e9c3407", "ea8b7f6188e6fa117537c3df7da9fc686d485087abf6ac197f9c46432f7e4a3c"]
 idna-ssl = ["a933e3bb13da54383f9e8f35dc4f9cb9eb9b3b78c6b36f311254d6d0d92c6c7c"]
 importlib-metadata = ["b044f07694ef14a6683b097ba56bd081dbc7cdc7c7fe46011e499dfecc082f21", "e6ac600a142cf2db707b1998382cc7fc3b02befb7273876e01b8ad10b9652742"]
