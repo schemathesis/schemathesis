@@ -178,7 +178,7 @@ def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
         raise TypeError(f"name must be of type {str}, not {type(name)}")
     if not isinstance(strategy, st.SearchStrategy):
         raise TypeError(f"strategy must be of type {st.SearchStrategy}, not {type(strategy)}")
-    from hypothesis_jsonschema._impl import STRING_FORMATS  # pylint: disable=import-outside-toplevel
+    from hypothesis_jsonschema._from_schema import STRING_FORMATS  # pylint: disable=import-outside-toplevel
 
     STRING_FORMATS[name] = strategy
 
