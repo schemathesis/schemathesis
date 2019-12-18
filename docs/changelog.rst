@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Compatibility with the latest release of ``hypothesis-jsonschema`` and setting its minimal required version to ``0.9.13``. `#338`_
+
 `0.20.4`_ - 2019-12-17
 ----------------------
 
@@ -536,6 +541,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#338: https://github.com/kiwicom/schemathesis/issues/338
 .. _#335: https://github.com/kiwicom/schemathesis/issues/335
 .. _#332: https://github.com/kiwicom/schemathesis/issues/332
 .. _#330: https://github.com/kiwicom/schemathesis/issues/330
