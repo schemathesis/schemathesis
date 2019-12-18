@@ -90,7 +90,7 @@ def test_register_default_strategies():
     import schemathesis
 
     # Default strategies should be registered
-    from hypothesis_jsonschema._impl import STRING_FORMATS
+    from hypothesis_jsonschema._from_schema import STRING_FORMATS
 
     assert "binary" in STRING_FORMATS
     assert "byte" in STRING_FORMATS
