@@ -77,7 +77,7 @@ To speed up the testing process Schemathesis provides ``-w/--workers`` option fo
 
 In the example above all tests will be distributed among 8 worker threads.
 
-If you'd like to test your WSGI app (Flask for example) then there is ``--app`` option for you:
+If you'd like to test your web app (Flask or AioHTTP for example) then there is ``--app`` option for you:
 
 .. code:: bash
 
@@ -90,7 +90,7 @@ to your app. **Note**, app factories are not supported. The schema location coul
 - An existing filesystem path;
 - In-app endpoint with schema.
 
-This method is significantly faster than the default one, which involves network.
+This method is significantly faster for WSGI apps, since it doesn't involve network.
 
 For the full list of options, run:
 

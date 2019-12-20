@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Support for AioHTTP applications in CLI. `#329`_
+
 `0.20.5`_ - 2019-12-18
 ----------------------
 
@@ -549,6 +554,7 @@ Fixed
 .. _#335: https://github.com/kiwicom/schemathesis/issues/335
 .. _#332: https://github.com/kiwicom/schemathesis/issues/332
 .. _#330: https://github.com/kiwicom/schemathesis/issues/330
+.. _#329: https://github.com/kiwicom/schemathesis/issues/329
 .. _#322: https://github.com/kiwicom/schemathesis/issues/322
 .. _#319: https://github.com/kiwicom/schemathesis/issues/319
 .. _#315: https://github.com/kiwicom/schemathesis/issues/315

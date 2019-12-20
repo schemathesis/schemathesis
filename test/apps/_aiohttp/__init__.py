@@ -1,7 +1,4 @@
-import asyncio
-import threading
 from functools import wraps
-from time import sleep
 from typing import Callable, Tuple
 
 import yaml
@@ -62,27 +59,3 @@ def reset_app(app: web.Application, endpoints: Tuple[str, ...] = ("success", "fa
     app["incoming_requests"][:] = []
     app["schema_requests"][:] = []
     app["config"].update({"should_fail": True, "schema_data": make_schema(endpoints)})
-
-
-def _run_server(app: web.Application, port: int) -> None:
-    """Run the given app on the given port.
-
-    Intended to be called as a target for a separate thread.
-    NOTE. `aiohttp.web.run_app` works only in the main thread and can't be used here (or maybe can we some tuning)
-    """
-    # Set a loop for a new thread (there is no by default for non-main threads)
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    runner = web.AppRunner(app)
-    loop.run_until_complete(runner.setup())
-    site = web.TCPSite(runner, "127.0.0.1", port)
-    loop.run_until_complete(site.start())
-    loop.run_forever()
-
-
-def run_server(app: web.Application, port: int, timeout: float = 0.05) -> None:
-    """Start a thread with the given aiohttp application."""
-    server_thread = threading.Thread(target=_run_server, args=(app, port))
-    server_thread.daemon = True
-    server_thread.start()
-    sleep(timeout)

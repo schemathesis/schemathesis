@@ -838,6 +838,17 @@ def test_wsgi_app_internal_exception(testdir, cli, caplog):
     assert lines[52] == "ZeroDivisionError: division by zero"
 
 
+@pytest.mark.parametrize("args", ((), ("--base-url",)))
+def test_aiohttp_app(request, testdir, cli, loadable_aiohttp_app, args):
+    # When an URL is passed together with app
+    if args:
+        args += (request.getfixturevalue("base_url"),)
+    result = cli.run("/swagger.yaml", "--app", loadable_aiohttp_app, *args)
+    # Then the schema should be loaded from that URL
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    assert "1 passed, 1 failed in" in result.stdout
+
+
 def test_wsgi_app_remote_schema(testdir, cli, schema_url, loadable_flask_app):
     # When an URL is passed together with app
     result = cli.run(schema_url, "--app", loadable_flask_app)
