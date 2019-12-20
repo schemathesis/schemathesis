@@ -1,10 +1,10 @@
 from textwrap import dedent
 
 import pytest
-from aiohttp.test_utils import unused_port
 from click.testing import CliRunner
 
 import schemathesis.cli
+from schemathesis.extra._aiohttp import run_server
 
 from .apps import _aiohttp, _flask
 from .utils import make_schema
@@ -45,8 +45,7 @@ def app(_app, endpoints):
 @pytest.fixture(scope="session")
 def server(_app):
     """Run the app on an unused port."""
-    port = unused_port()
-    _aiohttp.run_server(_app, port)
+    port = run_server(_app)
     yield {"port": port}
 
 
@@ -184,6 +183,18 @@ def loadable_flask_app(testdir, endpoints):
     module = testdir.make_importable_pyfile(
         location=f"""
         from test.apps._flask import create_app
+
+        app = create_app({endpoints})
+        """
+    )
+    return f"{module.purebasename}:app"
+
+
+@pytest.fixture
+def loadable_aiohttp_app(testdir, endpoints):
+    module = testdir.make_importable_pyfile(
+        location=f"""
+        from test.apps._aiohttp import create_app
 
         app = create_app({endpoints})
         """

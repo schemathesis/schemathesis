@@ -1,6 +1,7 @@
 # pylint: disable=too-many-arguments
 import os
-from typing import IO, Any, Dict, Optional, Union
+from typing import IO, Any, Callable, Dict, Optional, Union
+from urllib.parse import urljoin
 
 import requests
 import yaml
@@ -120,6 +121,30 @@ def from_wsgi(
     return from_file(
         response.data, location=schema_path, base_url=base_url, method=method, endpoint=endpoint, tag=tag, app=app
     )
+
+
+def get_loader_for_app(app: Any) -> Callable:
+    if app.__class__.__module__.startswith("aiohttp."):
+        return from_aiohttp
+    return from_wsgi
+
+
+def from_aiohttp(
+    schema_path: str,
+    app: Any,
+    base_url: Optional[str] = None,
+    method: Optional[Filter] = None,
+    endpoint: Optional[Filter] = None,
+    tag: Optional[Filter] = None,
+) -> BaseSchema:
+    from .extra._aiohttp import run_server  # pylint: disable=import-outside-toplevel
+
+    port = run_server(app)
+    app_url = f"http://127.0.0.1:{port}/"
+    url = urljoin(app_url, schema_path)
+    if not base_url:
+        base_url = app_url
+    return from_uri(url, base_url=base_url, method=method, endpoint=endpoint, tag=tag)
 
 
 # Backward compatibility

@@ -13,7 +13,7 @@ from requests import exceptions
 from .. import checks as checks_module
 from .. import models, runner, utils
 from ..exceptions import HTTPError
-from ..loaders import from_path, from_wsgi
+from ..loaders import from_path, get_loader_for_app
 from ..runner import events
 from ..types import Filter
 from ..utils import WSGIResponse, dict_not_none_values, dict_true_values
@@ -178,7 +178,7 @@ def run(  # pylint: disable=too-many-arguments
         elif app is not None and not urlparse(schema).netloc:
             # If `schema` is not an existing filesystem path or an URL then it is considered as an endpoint with
             # the given app
-            options["loader"] = from_wsgi
+            options["loader"] = get_loader_for_app(app)
         prepared_runner = runner.prepare(schema, **options)
     execute(prepared_runner, workers_num)
 
