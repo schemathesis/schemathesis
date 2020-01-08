@@ -5,7 +5,8 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, Tuple, Union
 import jsonschema
 import requests
 
-from .utils import WSGIResponse, are_content_types_equal
+from .exceptions import get_response_type_error, get_schema_validation_error, get_status_code_error
+from .utils import WSGIResponse, are_content_types_equal, parse_content_type
 
 if TYPE_CHECKING:
     from .models import Case
@@ -16,7 +17,8 @@ GenericResponse = Union[requests.Response, WSGIResponse]  # pragma: no mutate
 def not_a_server_error(response: GenericResponse, case: "Case") -> None:
     """A check to verify that the response is not a server-side error."""
     if response.status_code >= 500:
-        raise AssertionError(f"Received a response with 5xx status code: {response.status_code}")
+        exc_class = get_status_code_error(response.status_code)
+        raise exc_class(f"Received a response with 5xx status code: {response.status_code}")
 
 
 def status_code_conformance(response: GenericResponse, case: "Case") -> None:
@@ -31,7 +33,8 @@ def status_code_conformance(response: GenericResponse, case: "Case") -> None:
             f"Received a response with a status code, which is not defined in the schema: "
             f"{response.status_code}\n\nDeclared status codes: {responses_list}"
         )
-        raise AssertionError(message)
+        exc_class = get_status_code_error(response.status_code)
+        raise exc_class(message)
 
 
 def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, None, None]:
@@ -53,7 +56,10 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> None:
     for option in produces:
         if are_content_types_equal(option, content_type):
             return
-    raise AssertionError(
+        expected_main, expected_sub = parse_content_type(option)
+        received_main, received_sub = parse_content_type(content_type)
+    exc_class = get_response_type_error(f"{expected_main}_{expected_sub}", f"{received_main}_{received_sub}")
+    raise exc_class(
         f"Received a response with '{content_type}' Content-Type, "
         f"but it is not declared in the schema.\n\n"
         f"Defined content types: {', '.join(produces)}"
@@ -83,7 +89,8 @@ def response_schema_conformance(response: GenericResponse, case: "Case") -> None
     try:
         jsonschema.validate(data, schema)
     except jsonschema.ValidationError as exc:
-        raise AssertionError(f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}")
+        exc_class = get_schema_validation_error(exc)
+        raise exc_class(f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}")
 
 
 DEFAULT_CHECKS = (not_a_server_error,)
