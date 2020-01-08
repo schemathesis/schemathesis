@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Raise different exceptions in checks `#266`_
+
 `0.21.0`_ - 2019-12-20
 ----------------------
 
@@ -576,6 +581,7 @@ Fixed
 .. _#270: https://github.com/kiwicom/schemathesis/issues/270
 .. _#268: https://github.com/kiwicom/schemathesis/issues/268
 .. _#267: https://github.com/kiwicom/schemathesis/issues/267
+.. _#266: https://github.com/kiwicom/schemathesis/issues/266
 .. _#261: https://github.com/kiwicom/schemathesis/issues/261
 .. _#256: https://github.com/kiwicom/schemathesis/issues/256
 .. _#255: https://github.com/kiwicom/schemathesis/issues/255

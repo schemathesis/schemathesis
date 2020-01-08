@@ -4,7 +4,12 @@ import pytest
 import requests
 
 from schemathesis import models
-from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
+from schemathesis.checks import (
+    content_type_conformance,
+    not_a_server_error,
+    response_schema_conformance,
+    status_code_conformance,
+)
 from schemathesis.schemas import BaseSchema
 
 
@@ -44,6 +49,16 @@ def test_content_type_conformance_valid(response, case):
     assert content_type_conformance(response, case) is None
 
 
+@pytest.mark.parametrize("value", (500, 502))
+def test_not_a_server_error(value, swagger_20):
+    response = make_response()
+    response.status_code = value
+    case = make_case(swagger_20, {})
+    with pytest.raises(AssertionError) as exc_info:
+        not_a_server_error(response, case)
+    assert exc_info.type.__name__ == f"StatusCodeError{value}"
+
+
 @pytest.mark.parametrize("value", (400, 405))
 def test_status_code_conformance_valid(value, swagger_20):
     response = make_response()
@@ -57,8 +72,9 @@ def test_status_code_conformance_invalid(value, swagger_20):
     response = make_response()
     response.status_code = value
     case = make_case(swagger_20, {"responses": {"5XX"}})
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError) as exc_info:
         status_code_conformance(response, case)
+    assert exc_info.type.__name__ == f"StatusCodeError{value}"
 
 
 @pytest.mark.parametrize(
@@ -71,8 +87,9 @@ def test_content_type_conformance_invalid(response, case):
         f"^Received a response with '{response.headers['Content-Type']}' Content-Type, "
         "but it is not declared in the schema.\n\nDefined content types: application/json$"
     )
-    with pytest.raises(AssertionError, match=message):
+    with pytest.raises(AssertionError, match=message) as exc_info:
         content_type_conformance(response, case)
+    assert "SchemaValidationError" in exc_info.type.__name__
 
 
 SUCCESS_SCHEMA = {"type": "object", "properties": {"success": {"type": "boolean"}}, "required": ["success"]}
@@ -134,8 +151,9 @@ def test_response_schema_conformance_openapi(openapi_30, content, definition):
 def test_response_schema_conformance_invalid_swagger(swagger_20, content, definition):
     response = make_response(content)
     case = make_case(swagger_20, definition)
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError) as exc_info:
         response_schema_conformance(response, case)
+    assert "SchemaValidationError" in exc_info.type.__name__
 
 
 @pytest.mark.parametrize(
