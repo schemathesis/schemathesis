@@ -5,6 +5,7 @@ from test.utils import HERE, SIMPLE_PATH
 import pytest
 import yaml
 from _pytest.main import ExitCode
+from importlib_metadata import version
 from hypothesis import HealthCheck, Phase, Verbosity
 from requests import Response
 
@@ -12,6 +13,11 @@ from schemathesis import Case
 from schemathesis.loaders import from_path
 from schemathesis.models import Endpoint
 from schemathesis.runner import DEFAULT_CHECKS
+
+
+phases = "explicit, reuse, generate, target, shrink"
+if version("hypothesis") < "4.5":
+    phases = "explicit, reuse, generate, shrink"
 
 
 def test_commands_help(cli):
@@ -71,7 +77,7 @@ def test_commands_version(cli):
         (
             ("run", "http://127.0.0.1", "--hypothesis-phases=explicit,first,second"),
             'Error: Invalid value for "--hypothesis-phases": invalid choice(s): first, second. '
-            "Choose from explicit, reuse, generate, target, shrink",
+            f"Choose from {phases}",
         ),
     ),
 )
@@ -124,7 +130,7 @@ def test_commands_run_help(cli):
         "  --hypothesis-max-examples INTEGER",
         "                                  Maximum number of generated examples per each",
         "                                  method/endpoint combination.",
-        "  --hypothesis-phases [explicit|reuse|generate|target|shrink]",
+        f"  --hypothesis-phases [{phases.replace(', ', '|')}]",
         "                                  Control which phases should be run.",
         "  --hypothesis-report-multiple-bugs BOOLEAN",
         "                                  Raise only the exception with the smallest",
