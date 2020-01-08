@@ -18,20 +18,8 @@ on:
       - master
 
 jobs:
-  black:
-    name: black
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-        with:
-          fetch-depth: 1
-      - uses: docker://kiwicom/black
-        with:
-          args: black --check --diff .
-
-
-  pylint:
-    name: pylint
+  pre-commit:
+    name: Generic pre-commit checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -40,43 +28,40 @@ jobs:
 
       - uses: actions/setup-python@v1
         with:
-          python-version: '3.8'
+          python-version: 3.7
 
-      - run: pip install "poetry<1.0.0"
+      - run: pip install pre-commit
+      - run: SKIP=pylint,mypy pre-commit run --all-files
 
-      - name: Cache Poetry virtualenv
-        uses: actions/cache@v1
-        id: cache
-        with:
-          path: ~/.virtualenvs
-          key: poetry-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            poetry-${{ hashFiles('**/poetry.lock') }}
-
-      - name: Set Poetry config
-        run: |
-          poetry config settings.virtualenvs.in-project false
-          poetry config settings.virtualenvs.path ~/.virtualenvs
-
-      - run: poetry add pylint
-
-      - run: poetry install
-        if: steps.cache.outputs.cache-hit != 'true'
-
-      - run: poetry run pylint src/schemathesis
-
-
-  mypy:
-    name: mypy
+  pylint:
+    name: Pylint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
         with:
           fetch-depth: 1
-      - uses: docker://kiwicom/mypy
-        with:
-          args: mypy src/schemathesis
 
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+
+      - run: pip install pre-commit
+      - run: pre-commit run pylint --all-files
+
+  mypy:
+    name: Mypy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.7
+
+      - run: pip install pre-commit
+      - run: pre-commit run mypy --all-files
 
   tests:
     strategy:
