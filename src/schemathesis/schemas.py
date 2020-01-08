@@ -20,12 +20,10 @@ import jsonschema
 import yaml
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.exceptions import InvalidSchema
-from schemathesis.models import empty_object
-
 from ._hypothesis import make_test_or_exception
+from .exceptions import InvalidSchema
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
-from .models import Endpoint
+from .models import Endpoint, empty_object
 from .types import Filter
 from .utils import NOT_SET, StringDatesYAMLLoader
 
