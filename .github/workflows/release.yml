@@ -57,10 +57,10 @@ jobs:
     name: Release Notes
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code
-        uses: actions/checkout@v1
+    - name: Check out code
+      uses: actions/checkout@v1
 
-      - name: Release Notary Action
-        uses: docker://outillage/release-notary
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Release Notary Action
+      uses: docker://outillage/release-notary
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

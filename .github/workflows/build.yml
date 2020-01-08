@@ -4,148 +4,148 @@ name: Build jobs
 on:
   pull_request:
     paths:
-       - '**.py'
-       - '.github/workflows/*.yml'
-       - '.pylintrc'
-       - 'poetry.lock'
-       - 'pyproject.toml'
-       - 'tox.ini'
-       - 'mypy.ini'
-       - '!docs/**'
-       - '!adr/**'
+      - '**.py'
+      - '.github/workflows/*.yml'
+      - '.pylintrc'
+      - 'poetry.lock'
+      - 'pyproject.toml'
+      - 'tox.ini'
+      - 'mypy.ini'
+      - '!docs/**'
+      - '!adr/**'
   push:
     branches:
       - master
 
 jobs:
-   black:
-     name: black
-     runs-on: ubuntu-latest
-     steps:
-     - uses: actions/checkout@v1
-       with:
+  black:
+    name: black
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+      - uses: docker://kiwicom/black
+        with:
+          args: black --check --diff .
+
+
+  pylint:
+    name: pylint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v1
+        with:
+          python-version: '3.8'
+
+      - run: pip install "poetry<1.0.0"
+
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v1
+        id: cache
+        with:
+          path: ~/.virtualenvs
+          key: poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Set Poetry config
+        run: |
+          poetry config settings.virtualenvs.in-project false
+          poetry config settings.virtualenvs.path ~/.virtualenvs
+
+      - run: poetry add pylint
+
+      - run: poetry install
+        if: steps.cache.outputs.cache-hit != 'true'
+
+      - run: poetry run pylint src/schemathesis
+
+
+  mypy:
+    name: mypy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+      - uses: docker://kiwicom/mypy
+        with:
+          args: mypy src/schemathesis
+
+
+  tests:
+    strategy:
+      matrix:
+        python: [3.6, 3.7, 3.8]
+
+    name: tests_${{ matrix.python }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python }}
+
+      - run: pip install tox coverage
+
+      - name: Run ${{ matrix.python }} tox job
+        run: tox -e py${TOX_JOB//.} # Strip dot from python version to match tox job
+        env:
+          TOX_JOB: ${{ matrix.python }}
+
+      - run: coverage combine
+      - run: coverage report
+      - run: coverage xml -i
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v1.0.2
+        with:
+          token: ${{secrets.CODECOV_TOKEN}}
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-py36
+
+  hypothesis-tests:
+    strategy:
+      matrix:
+        tox_job:
+          - py3-hypothesis-4.40
+          - py3-hypothesis-4.50
+          - py3-hypothesis-5.0
+          - py3-hypothesis-5.1
+
+    name: tests_${{ matrix.tox_job }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+      with:
         fetch-depth: 1
-     - uses: docker://kiwicom/black
-       with:
-         args: black --check --diff .
 
+    - uses: actions/setup-python@v1
+      with:
+        python-version: 3.x
 
-   pylint:
-     name: pylint
-     runs-on: ubuntu-latest
-     steps:
-     - uses: actions/checkout@v1
-       with:
-         fetch-depth: 1
+    - run: pip install tox coverage
 
-     - uses: actions/setup-python@v1
-       with:
-         python-version: '3.8'
+    - name: Run ${{ matrix.tox_job }} tox job
+      run: tox -e ${{ matrix.tox_job }}
 
-     - run: pip install "poetry<1.0.0"
+    - run: coverage combine
+    - run: coverage report
+    - run: coverage xml -i
 
-     - name: Cache Poetry virtualenv
-       uses: actions/cache@v1
-       id: cache
-       with:
-         path: ~/.virtualenvs
-         key: poetry-${{ hashFiles('**/poetry.lock') }}
-         restore-keys: |
-           poetry-${{ hashFiles('**/poetry.lock') }}
-
-     - name: Set Poetry config
-       run: |
-         poetry config settings.virtualenvs.in-project false
-         poetry config settings.virtualenvs.path ~/.virtualenvs
-
-     - run: poetry add pylint
-
-     - run: poetry install
-       if: steps.cache.outputs.cache-hit != 'true'
-
-     - run: poetry run pylint src/schemathesis
-
-
-   mypy:
-     name: mypy
-     runs-on: ubuntu-latest
-     steps:
-     - uses: actions/checkout@v1
-       with:
-         fetch-depth: 1
-     - uses: docker://kiwicom/mypy
-       with:
-         args: mypy src/schemathesis
-
-
-   tests:
-     strategy:
-       matrix:
-         python: [3.6, 3.7, 3.8]
-
-     name: tests_${{ matrix.python }}
-     runs-on: ubuntu-latest
-     steps:
-     - uses: actions/checkout@v1
-       with:
-         fetch-depth: 1
-
-     - uses: actions/setup-python@v1
-       with:
-         python-version: ${{ matrix.python }}
-
-     - run: pip install tox coverage
-
-     - name: Run ${{ matrix.python }} tox job
-       run: tox -e py${TOX_JOB//.} # Strip dot from python version to match tox job
-       env:
-         TOX_JOB: ${{ matrix.python }}
-
-     - run: coverage combine
-     - run: coverage report
-     - run: coverage xml -i
-
-     - name: Upload coverage to Codecov
-       uses: codecov/codecov-action@v1.0.2
-       with:
-         token: ${{secrets.CODECOV_TOKEN}}
-         file: ./coverage.xml
-         flags: unittests
-         name: codecov-py36
-
-   hypothesis-tests:
-     strategy:
-       matrix:
-         tox_job:
-           - py3-hypothesis-4.40
-           - py3-hypothesis-4.50
-           - py3-hypothesis-5.0
-           - py3-hypothesis-5.1
-
-     name: tests_${{ matrix.tox_job }}
-     runs-on: ubuntu-latest
-     steps:
-     - uses: actions/checkout@v1
-       with:
-         fetch-depth: 1
-
-     - uses: actions/setup-python@v1
-       with:
-         python-version: 3.x
-
-     - run: pip install tox coverage
-
-     - name: Run ${{ matrix.tox_job }} tox job
-       run: tox -e ${{ matrix.tox_job }}
-
-     - run: coverage combine
-     - run: coverage report
-     - run: coverage xml -i
-
-     - name: Upload coverage to Codecov
-       uses: codecov/codecov-action@v1.0.2
-       with:
-         token: ${{secrets.CODECOV_TOKEN}}
-         file: ./coverage.xml
-         flags: unittests
-         name: codecov-py36
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1.0.2
+      with:
+        token: ${{secrets.CODECOV_TOKEN}}
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-py36

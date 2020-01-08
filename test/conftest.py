@@ -67,7 +67,6 @@ def cli():
 
     Provides in-process execution via `click.CliRunner` and sub-process execution via `pytest.pytester.Testdir`.
     """
-
     cli_runner = CliRunner()
 
     class Runner:
