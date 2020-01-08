@@ -5,15 +5,14 @@ from test.utils import HERE, SIMPLE_PATH
 import pytest
 import yaml
 from _pytest.main import ExitCode
-from importlib_metadata import version
 from hypothesis import HealthCheck, Phase, Verbosity
+from importlib_metadata import version
 from requests import Response
 
 from schemathesis import Case
 from schemathesis.loaders import from_path
 from schemathesis.models import Endpoint
 from schemathesis.runner import DEFAULT_CHECKS
-
 
 phases = "explicit, reuse, generate, target, shrink"
 if version("hypothesis") < "4.5":

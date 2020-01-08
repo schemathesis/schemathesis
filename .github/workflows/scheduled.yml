@@ -2,57 +2,57 @@ name: Scheduled jobs
 
 on:
   schedule:
-     # Every Monday at 00:00
-     - cron: "0 0 * * 1"
+    # Every Monday at 00:00
+    - cron: "0 0 * * 1"
 
 jobs:
   mutmut:
     name: mutmut
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
 
-    - uses: actions/setup-python@v1
-      with:
-        python-version: '3.8'
+      - uses: actions/setup-python@v1
+        with:
+          python-version: '3.8'
 
-    - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends sqlite3
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends sqlite3
 
-    - run: pip install "poetry<1.0.0" mutmut
+      - run: pip install "poetry<1.0.0" mutmut
 
-    - name: Cache Poetry virtualenv
-      uses: actions/cache@v1
-      id: cache
-      with:
-        path: ~/.virtualenvs
-        key: poetry-${{ hashFiles('**/poetry.lock') }}
-        restore-keys: |
-          poetry-${{ hashFiles('**/poetry.lock') }}
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v1
+        id: cache
+        with:
+          path: ~/.virtualenvs
+          key: poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            poetry-${{ hashFiles('**/poetry.lock') }}
 
-    - name: Set Poetry config
-      run: |
-        poetry config settings.virtualenvs.in-project false
-        poetry config settings.virtualenvs.path ~/.virtualenvs
+      - name: Set Poetry config
+        run: |
+          poetry config settings.virtualenvs.in-project false
+          poetry config settings.virtualenvs.path ~/.virtualenvs
 
-    - run: poetry install
-      if: steps.cache.outputs.cache-hit != 'true'
+      - run: poetry install
+        if: steps.cache.outputs.cache-hit != 'true'
 
-    - name: Run mutmut tests
-      run:
-        mutmut run
-          --backup
-          --paths-to-mutate "src/"
-          --tests-dir "test/"
-          --runner "poetry run pytest -n auto -x --tb=no -q"
+      - name: Run mutmut tests
+        run:
+          mutmut run
+            --backup
+            --paths-to-mutate "src/"
+            --tests-dir "test/"
+            --runner "poetry run pytest -n auto -x --tb=no -q"
 
-    - name: Display survived mutations
-      if: failure()
-      run:
-        while read -r line;
-          do mutmut show $line;
-        done <<< $(
-          sqlite3 .mutmut-cache
-            "select id from Mutant where status in ('bad_survived', 'bad_timeout', 'ok_suspicious');"
-          );
+      - name: Display survived mutations
+        if: failure()
+        run:
+          while read -r line;
+            do mutmut show $line;
+          done <<< $(
+            sqlite3 .mutmut-cache
+              "select id from Mutant where status in ('bad_survived', 'bad_timeout', 'ok_suspicious');"
+            );

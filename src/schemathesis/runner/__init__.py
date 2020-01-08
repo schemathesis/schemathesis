@@ -498,7 +498,7 @@ def _run_checks(
 
 
 def prepare_timeout(timeout: Optional[int]) -> Optional[float]:
-    """Request timeout is in milliseconds, but `requests` uses seconds"""
+    """Request timeout is in milliseconds, but `requests` uses seconds."""
     output: Optional[Union[int, float]] = timeout
     if timeout is not None:
         output = timeout / 1000

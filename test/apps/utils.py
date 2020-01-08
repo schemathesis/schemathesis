@@ -25,6 +25,7 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
     Example:
         If `endpoints` is ("success", "failure")
         then the app will contain GET /success and GET /failure
+
     """
     template: Dict[str, Any] = {
         "swagger": "2.0",
