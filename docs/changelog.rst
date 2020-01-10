@@ -9,7 +9,8 @@ Changelog
 Added
 ~~~~~
 
-- Raise different exceptions in checks `#266`_
+- Raise different exceptions in checks. `#266`_
+- Raise proper exception when the given schema is invalid. `#308`_
 
 Fixed
 ~~~~~
@@ -575,6 +576,7 @@ Fixed
 .. _#315: https://github.com/kiwicom/schemathesis/issues/315
 .. _#311: https://github.com/kiwicom/schemathesis/issues/311
 .. _#314: https://github.com/kiwicom/schemathesis/issues/314
+.. _#308: https://github.com/kiwicom/schemathesis/issues/308
 .. _#305: https://github.com/kiwicom/schemathesis/issues/305
 .. _#303: https://github.com/kiwicom/schemathesis/issues/303
 .. _#301: https://github.com/kiwicom/schemathesis/issues/301

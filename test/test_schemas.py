@@ -1,7 +1,11 @@
+from copy import deepcopy
+from test.utils import as_param
+
 import pytest
 from jsonschema import RefResolver
 
 import schemathesis
+from schemathesis.exceptions import InvalidSchema
 
 
 @pytest.mark.parametrize("base_path", ("/v1", "/v1/"))
@@ -88,3 +92,17 @@ def test_resolving_multiple_files():
         },
         "xml": {"name": "User"},
     }
+
+
+@pytest.mark.parametrize("error_type", ("KeyError", "AttributeError", "RefResolutionError"))
+def test_schema_parsing_error(simple_schema, error_type):
+    raw_schema = deepcopy(simple_schema)
+    if error_type == "KeyError":
+        raw_schema.pop("paths")
+    elif error_type == "AttributeError":
+        raw_schema["paths"] = {None: ""}
+    elif error_type == "RefResolutionError":
+        raw_schema["paths"]["/users"]["get"]["parameters"] = [as_param({"$ref": "#/definitions/SimpleIntRef"})]
+    schema = schemathesis.from_dict(raw_schema)
+    with pytest.raises(InvalidSchema, match="Schema parsing failed. Please check your schema."):
+        list(schema.get_all_endpoints())
