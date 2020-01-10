@@ -14,9 +14,14 @@ from schemathesis.loaders import from_path
 from schemathesis.models import Endpoint
 from schemathesis.runner import DEFAULT_CHECKS
 
-phases = "explicit, reuse, generate, target, shrink"
+PHASES = "explicit, reuse, generate, target, shrink"
 if version("hypothesis") < "4.5":
-    phases = "explicit, reuse, generate, shrink"
+    PHASES = "explicit, reuse, generate, shrink"
+HEALTH_CHECKS = "data_too_large|filter_too_much|too_slow|return_value|large_base_example|not_a_test_method"
+if version("hypothesis") < "5.0":
+    HEALTH_CHECKS = (
+        "data_too_large|filter_too_much|too_slow|return_value|hung_test|large_base_example|not_a_test_method"
+    )
 
 
 def test_commands_help(cli):
@@ -76,7 +81,7 @@ def test_commands_version(cli):
         (
             ("run", "http://127.0.0.1", "--hypothesis-phases=explicit,first,second"),
             'Error: Invalid value for "--hypothesis-phases": invalid choice(s): first, second. '
-            f"Choose from {phases}",
+            f"Choose from {PHASES}",
         ),
     ),
 )
@@ -129,14 +134,13 @@ def test_commands_run_help(cli):
         "  --hypothesis-max-examples INTEGER",
         "                                  Maximum number of generated examples per each",
         "                                  method/endpoint combination.",
-        f"  --hypothesis-phases [{phases.replace(', ', '|')}]",
+        f"  --hypothesis-phases [{PHASES.replace(', ', '|')}]",
         "                                  Control which phases should be run.",
         "  --hypothesis-report-multiple-bugs BOOLEAN",
         "                                  Raise only the exception with the smallest",
         "                                  minimal example.",
         "  --hypothesis-seed INTEGER       Set a seed to use for all Hypothesis tests.",
-        "  --hypothesis-suppress-health-check [data_too_large|filter_too_much|too_slow|return_value|"
-        "hung_test|large_base_example|not_a_test_method]",
+        f"  --hypothesis-suppress-health-check [{HEALTH_CHECKS}]",
         "                                  Comma-separated list of health checks to",
         "                                  disable.",
         "  --hypothesis-verbosity [quiet|normal|verbose|debug]",
