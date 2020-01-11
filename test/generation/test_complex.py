@@ -58,6 +58,7 @@ def test_array_unique_items(testdir):
     testdir.make_test(
         """
 @schema.parametrize()
+@settings(suppress_health_check=[HealthCheck.filter_too_much])
 def test_(case):
     assert_list(case.query["values"], lambda x: len(x) == len(set(x)))
 """,
