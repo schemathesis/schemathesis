@@ -481,7 +481,7 @@ def _run_checks(case: Case, checks: Iterable[Check], result: TestResult, respons
     for check in checks:
         check_name = check.__name__
         try:
-            check(response, result)  # type: ignore
+            check(response, case)
             result.add_success(check_name, case)
         except AssertionError as exc:
             errors = True  # pragma: no mutate

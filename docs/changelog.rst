@@ -16,6 +16,9 @@ Fixed
 ~~~~~
 
 - Handling binary request payloads in ``Case.call``. `#350`_
+- Type of the second argument to all built-in checks set to proper ``Case`` instead of ``TestResult``.
+  The error was didn't affect built-in checks since both ``Case`` and ``TestResult`` had ``endpoint`` attribute and only
+  it was used. However this fix is not backward-compatible with 3rd party checks.
 
 `0.21.0`_ - 2019-12-20
 ----------------------
