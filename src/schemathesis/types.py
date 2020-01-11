@@ -1,5 +1,7 @@
 from pathlib import Path
-from typing import Any, Dict, List, NewType, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, NewType, Set, Tuple, Union
+
+from hypothesis.strategies import SearchStrategy
 
 Schema = NewType("Schema", Dict[str, Any])  # pragma: no mutate
 PathLike = Union[Path, str]  # pragma: no mutate
@@ -13,3 +15,5 @@ FormData = Dict[str, Any]  # pragma: no mutate
 
 # A filter for endpoint / method
 Filter = Union[str, List[str], Tuple[str], Set[str], object]  # pragma: no mutate
+
+Hook = Callable[[SearchStrategy], SearchStrategy]

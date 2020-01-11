@@ -21,10 +21,11 @@ import yaml
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
+from .constants import HookLocation
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .models import Endpoint, empty_object
-from .types import Filter
+from .types import Filter, Hook
 from .utils import NOT_SET, StringDatesYAMLLoader
 
 
@@ -44,6 +45,7 @@ class BaseSchema(Mapping):
     endpoint: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     tag: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
+    hooks: Dict[HookLocation, Hook] = attr.ib(factory=dict)  # pragma: no mutate
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.endpoints)
@@ -115,6 +117,14 @@ class BaseSchema(Mapping):
     def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Extract response schema from `responses`."""
         raise NotImplementedError
+
+    def register_hook(self, place: str, hook: Hook) -> None:
+        key = HookLocation[place]
+        self.hooks[key] = hook
+
+    def get_hook(self, place: str) -> Optional[Hook]:
+        key = HookLocation[place]
+        return self.hooks.get(key)
 
 
 class SwaggerV20(BaseSchema):
