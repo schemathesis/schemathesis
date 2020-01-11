@@ -1,11 +1,11 @@
 from functools import partial
-from typing import Any, Callable, Generator, List, Type
+from typing import Any, Callable, Generator, List, Optional, Type, cast
 
 import pytest
 from _pytest import fixtures, nodes
 from _pytest.config import hookimpl
 from _pytest.fixtures import FuncFixtureInfo
-from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector  # type: ignore
+from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from hypothesis.errors import InvalidArgument  # pylint: disable=ungrouped-imports
 
 from .._hypothesis import create_test
@@ -60,17 +60,20 @@ class SchemathesisCase(PyCollector):
                     originalname=name,
                 )
 
-    def _get_class_parent(self) -> Type:
+    def _get_class_parent(self) -> Optional[Type]:
         clscol = self.getparent(Class)
         return clscol.obj if clscol else None
 
-    def _parametrize(self, cls: Type, definition: FunctionDefinition, fixtureinfo: FuncFixtureInfo) -> Metafunc:
+    def _parametrize(
+        self, cls: Optional[Type], definition: FunctionDefinition, fixtureinfo: FuncFixtureInfo
+    ) -> Metafunc:
         module = self.getparent(Module).obj
         metafunc = Metafunc(definition, fixtureinfo, self.config, cls=cls, module=module)
         methods = []
         if hasattr(module, "pytest_generate_tests"):
             methods.append(module.pytest_generate_tests)
         if hasattr(cls, "pytest_generate_tests"):
+            cls = cast(Type, cls)
             methods.append(cls().pytest_generate_tests)
         self.ihook.pytest_generate_tests.call_extra(methods, {"metafunc": metafunc})
         return metafunc

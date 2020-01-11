@@ -9,15 +9,13 @@ class CSVOption(click.Choice):
         self.enum = choices
         super().__init__(tuple(choices.__members__))
 
-    # NOTE(dd). Return type is fixed in mypy==0.730
-    # Remove after upgrading the mypy image
-    def convert(  # type: ignore
+    def convert(
         self, value: str, param: Optional[click.core.Parameter], ctx: Optional[click.core.Context]
     ) -> List[Enum]:
         items = [item for item in value.split(",") if item]
         invalid_options = set(items) - set(self.choices)
         if not invalid_options and items:
-            return [self.enum[item] for item in items]  # type: ignore
+            return [self.enum[item] for item in items]
         # Sort to keep the error output consistent with the passed values
         sorted_options = ", ".join(sorted(invalid_options, key=items.index))
         available_options = ", ".join(self.choices)
