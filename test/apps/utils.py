@@ -5,6 +5,7 @@ from typing import Any, Dict, Tuple
 class Endpoint(Enum):
     success = ("GET", "/api/success")
     failure = ("GET", "/api/failure")
+    multiple_failures = ("GET", "/api/multiple_failures")
     slow = ("GET", "/api/slow")
     path_variable = ("GET", "/api/path_variable/{key}")
     unsatisfiable = ("POST", "/api/unsatisfiable")
@@ -52,7 +53,7 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
                     }
                 ]
             }
-        elif endpoint == "flaky":
+        elif endpoint in ("flaky", "multiple_failures"):
             schema = {"parameters": [{"name": "id", "in": "query", "required": True, "type": "integer"}]}
         elif endpoint == "path_variable":
             schema = {

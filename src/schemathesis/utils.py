@@ -61,6 +61,7 @@ IGNORED_PATTERNS = (
     "You can add @seed",
     "Failed to reproduce exception. Expected:",
     "Flaky example!",
+    "Traceback (most recent call last):",
 )
 
 

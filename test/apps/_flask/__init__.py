@@ -3,7 +3,7 @@ from typing import Tuple
 
 import yaml
 from flask import Flask, Response, _request_ctx_stack, jsonify, request
-from werkzeug.exceptions import InternalServerError
+from werkzeug.exceptions import GatewayTimeout, InternalServerError
 
 try:
     from ..utils import make_schema, Endpoint
@@ -42,6 +42,15 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> Flask:
     @app.route("/api/failure", methods=["GET"])
     def failure():
         raise InternalServerError
+
+    @app.route("/api/multiple_failures", methods=["GET"])
+    def multiple_failures():
+        id_value = int(request.args["id"])
+        if id_value == 0:
+            raise InternalServerError
+        if id_value > 0:
+            raise GatewayTimeout
+        return jsonify({"result": "OK"})
 
     @app.route("/api/slow", methods=["GET"])
     def slow():

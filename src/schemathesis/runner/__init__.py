@@ -16,7 +16,7 @@ from requests.auth import HTTPDigestAuth, _basic_auth_str
 from .._hypothesis import make_test_or_exception
 from ..checks import DEFAULT_CHECKS
 from ..constants import USER_AGENT
-from ..exceptions import InvalidSchema
+from ..exceptions import InvalidSchema, get_grouped_exception
 from ..loaders import from_uri
 from ..models import Case, Endpoint, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
@@ -358,7 +358,7 @@ def run_test(
             with capture_hypothesis_output() as hypothesis_output:
                 test(checks, result, **kwargs)
             status = Status.success
-    except AssertionError:
+    except (AssertionError, hypothesis.errors.MultipleFailures):
         status = Status.failure
     except hypothesis.errors.Flaky:
         status = Status.error
@@ -476,7 +476,7 @@ def _prepare_wsgi_headers(
 
 
 def _run_checks(case: Case, checks: Iterable[Check], result: TestResult, response: GenericResponse) -> None:
-    errors = None
+    errors = []
 
     for check in checks:
         check_name = check.__name__
@@ -484,13 +484,11 @@ def _run_checks(case: Case, checks: Iterable[Check], result: TestResult, respons
             check(response, case)
             result.add_success(check_name, case)
         except AssertionError as exc:
-            errors = True  # pragma: no mutate
+            errors.append(exc)
             result.add_failure(check_name, case, str(exc))
 
-    if errors is not None:
-        # An exception needed to trigger Hypothesis shrinking & flaky tests detection logic
-        # The message doesn't matter
-        raise AssertionError
+    if errors:
+        raise get_grouped_exception(*errors)
 
 
 def prepare_timeout(timeout: Optional[int]) -> Optional[float]:
