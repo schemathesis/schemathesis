@@ -45,7 +45,7 @@ class BaseSchema(Mapping):
     tag: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
 
-    def __iter__(self) -> Iterator:
+    def __iter__(self) -> Iterator[str]:
         return iter(self.endpoints)
 
     def __getitem__(self, item: str) -> CaseInsensitiveDict:

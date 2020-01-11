@@ -183,12 +183,12 @@ def run(  # pylint: disable=too-many-arguments
     execute(prepared_runner, workers_num)
 
 
-def get_output_handler(workers_num: int) -> Callable:
+def get_output_handler(workers_num: int) -> Callable[[events.ExecutionContext, events.ExecutionEvent], None]:
     if workers_num > 1:
         output_style = OutputStyle.short
     else:
         output_style = OutputStyle.default
-    return cast(Callable, output_style)
+    return cast(Callable[[events.ExecutionContext, events.ExecutionEvent], None], output_style)
 
 
 def load_hook(module_name: str) -> None:

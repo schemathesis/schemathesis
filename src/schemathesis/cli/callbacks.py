@@ -89,7 +89,7 @@ def convert_verbosity(
 
 
 @contextmanager
-def reraise_format_error(raw_value: str) -> Generator:
+def reraise_format_error(raw_value: str) -> Generator[None, None, None]:
     try:
         yield
     except ValueError:
