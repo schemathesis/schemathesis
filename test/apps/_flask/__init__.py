@@ -73,6 +73,10 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> Flask:
         files = {name: value.stream.read().decode() for name, value in request.files.items()}
         return jsonify(**files, **request.form.to_dict())
 
+    @app.route("/api/upload_file", methods=["POST"])
+    def upload_file():
+        return jsonify({"size": request.content_length})
+
     @app.route("/api/teapot", methods=["POST"])
     def teapot():
         return jsonify({"success": True}), 418

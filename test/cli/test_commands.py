@@ -337,6 +337,13 @@ def test_cli_run_only_failure(cli, cli_args, workers):
     assert "== 1 failed in " in lines[-1]
 
 
+@pytest.mark.endpoints("upload_file")
+def test_cli_binary_body(cli, schema_url):
+    result = cli.run(schema_url)
+    assert result.exit_code == ExitCode.OK
+    assert " HYPOTHESIS OUTPUT " not in result.stdout
+
+
 @pytest.mark.endpoints()
 @pytest.mark.parametrize("workers", (1, 2))
 def test_cli_run_output_empty(cli, cli_args, workers):

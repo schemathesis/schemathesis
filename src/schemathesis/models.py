@@ -93,9 +93,11 @@ class Case:
         formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
         url = urljoin(base_url + "/", formatted_path)
         # Form data and body are mutually exclusive
-        extra: Dict[str, Optional[Dict]]
+        extra: Dict[str, Optional[Union[Dict, bytes]]]
         if self.form_data:
             extra = {"files": self.form_data}
+        elif isinstance(self.body, bytes):
+            extra = {"data": self.body}
         else:
             extra = {"json": self.body}
         return {
@@ -127,11 +129,13 @@ class Case:
     def as_werkzeug_kwargs(self) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
         headers = self.headers
-        extra: Dict[str, Optional[Dict]]
+        extra: Dict[str, Optional[Union[Dict, bytes]]]
         if self.form_data:
             extra = {"data": self.form_data}
             headers = headers or {}
             headers.setdefault("Content-Type", "multipart/form-data")
+        elif isinstance(self.body, bytes):
+            extra = {"data": self.body}
         else:
             extra = {"json": self.body}
         return {

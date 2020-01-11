@@ -11,6 +11,7 @@ class Endpoint(Enum):
     invalid = ("POST", "/api/invalid")
     flaky = ("GET", "/api/flaky")
     multipart = ("POST", "/api/multipart")
+    upload_file = ("POST", "/api/upload_file")
     teapot = ("POST", "/api/teapot")
     text = ("GET", "/api/text")
     malformed_json = ("GET", "/api/malformed_json")
@@ -60,6 +61,8 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
             }
         elif endpoint == "invalid":
             schema = {"parameters": [{"name": "id", "in": "query", "required": True, "type": "int"}]}
+        elif endpoint == "upload_file":
+            schema = {"parameters": [{"name": "data", "in": "body", "required": True, "schema": {"type": "file"}}]}
         elif endpoint == "custom_format":
             schema = {
                 "parameters": [{"name": "id", "in": "query", "required": True, "type": "string", "format": "digits"}]
