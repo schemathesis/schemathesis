@@ -342,6 +342,43 @@ For convenience you can explore the schemas and strategies manually:
 
 Schema instances implement `Mapping` protocol.
 
+If you want to customize how data is generated, then you can use hooks of two types:
+
+- Global, which are applied to all schemas;
+- Schema-local, which are applied only for specific schema instance;
+
+Each hook accepts a Hypothesis strategy and should return a Hypothesis strategy:
+
+.. code:: python
+
+    import schemathesis
+
+    def global_hook(strategy):
+        return strategy.filter(lambda x: x["id"].isdigit())
+
+    schemathesis.hooks.register("query", hook)
+
+    schema = schemathesis.from_uri("http://0.0.0.0:8080/swagger.json")
+
+    def schema_hook(strategy):
+        return strategy.filter(lambda x: int(x["id"]) % 2 == 0)
+
+    schema.register_hook("query", schema_hook)
+
+There are 6 places, where hooks can be applied and you need to pass it as the first argument to ``schemathesis.hooks.register`` or ``schema.register_hook``:
+
+- path_parameters
+- headers
+- cookies
+- query
+- body
+- form_data
+
+It might be useful if you want to exclude certain cases that you don't want to test, or modify the generated data, so it
+will be more meaningful for the application - add existing IDs from the database, custom auth header, etc.
+
+**NOTE**. Global hooks are applied first.
+
 Lazy loading
 ~~~~~~~~~~~~
 
@@ -411,7 +448,6 @@ For such cases it is possible to register custom strategies:
 
     strategy = strategies.from_regex(r"\A4[0-9]{15}\Z").filter(luhn_validator)
     schemathesis.register_string_format("visa_cards", strategy)
-
 
 Unittest support
 ################

@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Hooks for strategy modification. `#313`_
+
 `0.22.0`_ - 2020-01-11
 ----------------------
 
@@ -582,8 +587,9 @@ Fixed
 .. _#322: https://github.com/kiwicom/schemathesis/issues/322
 .. _#319: https://github.com/kiwicom/schemathesis/issues/319
 .. _#315: https://github.com/kiwicom/schemathesis/issues/315
-.. _#311: https://github.com/kiwicom/schemathesis/issues/311
 .. _#314: https://github.com/kiwicom/schemathesis/issues/314
+.. _#313: https://github.com/kiwicom/schemathesis/issues/313
+.. _#311: https://github.com/kiwicom/schemathesis/issues/311
 .. _#308: https://github.com/kiwicom/schemathesis/issues/308
 .. _#305: https://github.com/kiwicom/schemathesis/issues/305
 .. _#303: https://github.com/kiwicom/schemathesis/issues/303

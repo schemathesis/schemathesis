@@ -14,7 +14,9 @@ from requests.utils import check_header_validity  # type: ignore
 
 from ._compat import handle_warnings
 from .exceptions import InvalidSchema
+from .hooks import get_hook
 from .models import Case, Endpoint
+from .types import Hook
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
 
@@ -170,7 +172,16 @@ def _get_case_strategy(
             raise InvalidSchema("Body parameters are defined for GET request.")
         static_parameters["body"] = None
         strategies.pop("body", None)
+    _apply_hooks(strategies, get_hook)
+    _apply_hooks(strategies, endpoint.schema.get_hook)
     return st.builds(partial(Case, **static_parameters), **strategies)
+
+
+def _apply_hooks(strategies: Dict[str, st.SearchStrategy], getter: Callable[[str], Optional[Hook]]) -> None:
+    for key, strategy in strategies.items():
+        hook = getter(key)
+        if hook is not None:
+            strategies[key] = hook(strategy)
 
 
 def register_string_format(name: str, strategy: st.SearchStrategy) -> None:

@@ -1,3 +1,4 @@
+from . import hooks
 from ._hypothesis import init_default_strategies, register_string_format
 from .cli import register_check
 from .constants import __version__
