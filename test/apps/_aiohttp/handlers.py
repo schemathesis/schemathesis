@@ -45,7 +45,6 @@ async def flaky(request: web.Request) -> web.Response:
     if config["should_fail"]:
         config["should_fail"] = False
         raise web.HTTPInternalServerError
-    config["should_fail"] = True
     return web.json_response({"result": "flaky!"})
 
 

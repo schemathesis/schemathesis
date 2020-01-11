@@ -74,7 +74,6 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> Flask:
         if app.config["should_fail"]:
             app.config["should_fail"] = False
             raise InternalServerError
-        app.config["should_fail"] = True
         return jsonify({"result": "flaky!"})
 
     @app.route("/api/multipart", methods=["POST"])

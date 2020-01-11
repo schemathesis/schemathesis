@@ -1,6 +1,6 @@
 import pytest
 from flask import jsonify, request
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis import Case
@@ -53,6 +53,7 @@ def test_cookies(flask_app):
     strategy = schema.endpoints["/cookies"]["GET"].as_strategy()
 
     @given(case=strategy)
+    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much])
     def test(case):
         response = case.call_wsgi()
         assert response.status_code == 200
@@ -66,6 +67,7 @@ def test_form_data(schema):
     strategy = schema.endpoints["/api/multipart"]["POST"].as_strategy()
 
     @given(case=strategy)
+    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much])
     def test(case):
         response = case.call_wsgi()
         assert response.status_code == 200
@@ -91,7 +93,7 @@ def test_binary_body(mocker, schema):
     strategy = schema.endpoints["/api/upload_file"]["POST"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3)
+    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much])
     def test(case):
         response = case.call_wsgi()
         assert response.status_code == 200

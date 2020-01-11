@@ -127,7 +127,7 @@ def testdir(testdir):
         import pytest
         import schemathesis
         from test.utils import *
-        from hypothesis import given, settings
+        from hypothesis import given, settings, HealthCheck
         raw_schema = {schema}
         schema = schemathesis.from_dict(raw_schema, method={method}, endpoint={endpoint}, tag={tag})
         """.format(
