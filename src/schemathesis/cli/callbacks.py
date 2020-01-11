@@ -34,7 +34,7 @@ def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_
     return raw_value
 
 
-def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> Any:
+def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]) -> Any:
     if raw_value is None:
         return raw_value
     path, name = (re.split(r":(?![\\/])", raw_value, 1) + [None])[:2]  # type: ignore

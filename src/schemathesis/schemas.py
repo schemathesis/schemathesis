@@ -214,7 +214,7 @@ class SwaggerV20(BaseSchema):
     def process_form_data(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         endpoint.form_data = self.add_parameter(endpoint.form_data, parameter)
 
-    def add_parameter(self, container: Dict[str, Any], parameter: Dict[str, Any]) -> Dict[str, Any]:
+    def add_parameter(self, container: Optional[Dict[str, Any]], parameter: Dict[str, Any]) -> Dict[str, Any]:
         """Add parameter object to the container."""
         name = parameter["name"]
         container = container or empty_object()
