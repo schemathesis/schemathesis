@@ -18,7 +18,7 @@ from ..runner import events
 from ..types import Filter
 from ..utils import WSGIResponse, dict_not_none_values, dict_true_values
 from . import callbacks, output
-from .options import CSVOption
+from .options import CSVOption, NotSet, OptionalInt
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
@@ -98,7 +98,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 @click.option(
     "--hypothesis-deadline",
     help="Duration in milliseconds that each individual example with a test is not allowed to exceed.",
-    type=int,
+    type=OptionalInt(),
 )
 @click.option("--hypothesis-derandomize", help="Use Hypothesis's deterministic mode.", is_flag=True, default=None)
 @click.option(
@@ -135,7 +135,7 @@ def run(  # pylint: disable=too-many-arguments
     base_url: Optional[str] = None,
     app: Any = None,
     request_timeout: Optional[int] = None,
-    hypothesis_deadline: Optional[int] = None,
+    hypothesis_deadline: Optional[Union[int, NotSet]] = None,
     hypothesis_derandomize: Optional[bool] = None,
     hypothesis_max_examples: Optional[int] = None,
     hypothesis_phases: Optional[List[hypothesis.Phase]] = None,
@@ -160,7 +160,6 @@ def run(  # pylint: disable=too-many-arguments
         api_options=dict_true_values(auth=auth, auth_type=auth_type, headers=headers, request_timeout=request_timeout),
         loader_options=dict_true_values(base_url=base_url, endpoint=endpoints, method=methods, tag=tags, app=app),
         hypothesis_options=dict_not_none_values(
-            deadline=hypothesis_deadline,
             derandomize=hypothesis_derandomize,
             max_examples=hypothesis_max_examples,
             phases=hypothesis_phases,
@@ -170,6 +169,13 @@ def run(  # pylint: disable=too-many-arguments
         ),
         seed=hypothesis_seed,
     )
+    # `deadline` is special, since Hypothesis allows to pass `None`
+    if hypothesis_deadline is not None:
+        options.setdefault("hypothesis_options", {})
+        if isinstance(hypothesis_deadline, NotSet):
+            options["hypothesis_options"]["deadline"] = None
+        else:
+            options["hypothesis_options"]["deadline"] = hypothesis_deadline
 
     with abort_on_network_errors():
         options.update({"checks": selected_checks, "workers_num": workers_num})
