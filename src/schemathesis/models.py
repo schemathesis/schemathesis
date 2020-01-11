@@ -159,7 +159,7 @@ class Case:
             data["headers"].update(headers)
         client = werkzeug.Client(application, WSGIResponse)
         with cookie_handler(client, self.cookies):
-            return client.open(**data, **kwargs)  # type: ignore
+            return client.open(**data, **kwargs)
 
     def validate_response(
         self,
@@ -203,12 +203,12 @@ class Endpoint:
     schema: "BaseSchema" = attr.ib()  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
-    path_parameters: PathParameters = attr.ib(default=None)  # pragma: no mutate
-    headers: Headers = attr.ib(default=None)  # pragma: no mutate
-    cookies: Cookies = attr.ib(default=None)  # pragma: no mutate
-    query: Query = attr.ib(default=None)  # pragma: no mutate
-    body: Body = attr.ib(default=None)  # pragma: no mutate
-    form_data: FormData = attr.ib(default=None)  # pragma: no mutate
+    path_parameters: Optional[PathParameters] = attr.ib(default=None)  # pragma: no mutate
+    headers: Optional[Headers] = attr.ib(default=None)  # pragma: no mutate
+    cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
+    query: Optional[Query] = attr.ib(default=None)  # pragma: no mutate
+    body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
+    form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
 
     def as_strategy(self) -> SearchStrategy:
         from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel

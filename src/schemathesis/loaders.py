@@ -113,7 +113,7 @@ def from_wsgi(
     tag: Optional[Filter] = None,
 ) -> BaseSchema:
     client = Client(app, WSGIResponse)
-    response = client.get(schema_path, headers={"User-Agent": USER_AGENT})  # type: ignore
+    response = client.get(schema_path, headers={"User-Agent": USER_AGENT})
     # Raising exception to provide unified behavior
     # E.g. it will be handled in CLI - a proper error message will be shown
     if 400 <= response.status_code < 600:
