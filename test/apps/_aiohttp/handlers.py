@@ -49,6 +49,15 @@ async def flaky(request: web.Request) -> web.Response:
     return web.json_response({"result": "flaky!"})
 
 
+async def multiple_failures(request: web.Request) -> web.Response:
+    id_value = int(request.query["id"])
+    if id_value == 0:
+        raise web.HTTPInternalServerError
+    if id_value > 0:
+        raise web.HTTPGatewayTimeout
+    return web.json_response({"result": "OK"})
+
+
 async def multipart(request: web.Request) -> web.Response:
     if not request.headers["Content-Type"].startswith("multipart/"):
         raise web.HTTPUnsupportedMediaType

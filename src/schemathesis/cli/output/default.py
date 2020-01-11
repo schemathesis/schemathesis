@@ -2,7 +2,7 @@ import logging
 import os
 import platform
 import shutil
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union, cast
 
 import click
 from attr import Attribute
@@ -10,7 +10,7 @@ from hypothesis import settings
 from importlib_metadata import version
 
 from ...constants import __version__
-from ...models import Case, Status, TestResult, TestResultSet
+from ...models import Case, Check, Status, TestResult, TestResultSet
 from ...runner import events
 from .. import utils
 
@@ -134,19 +134,36 @@ def display_failures(results: TestResultSet) -> None:
     for result in relevant_results:
         if not result.has_failures:
             continue
-        display_single_failure(result)
+        display_failures_for_single_test(result)
 
 
-def display_single_failure(result: TestResult) -> None:
+def display_failures_for_single_test(result: TestResult) -> None:
     """Display a failure for a single method / endpoint."""
     display_subsection(result)
-    for check in reversed(result.checks):
-        if check.example is not None:
-            display_example(check.example, check.name, check.message, result.seed)
-            # Display only the latest case
-            # (dd): It is possible to find multiple errors, but the simplest option for now is to display
-            # the latest and avoid deduplication, which will be done in the future.
-            break
+    checks = _get_unique_failures(result.checks)
+    for idx, check in enumerate(checks, 1):
+        message: Optional[str]
+        if check.message:
+            message = f"{idx}. {check.message}"
+        else:
+            message = None
+        example = cast(Case, check.example)  # filtered in `_get_unique_failures`
+        display_example(example, check.name, message, result.seed)
+        # Display every time except the last check
+        if idx != len(checks):
+            click.echo("\n")
+
+
+def _get_unique_failures(checks: List[Check]) -> List[Check]:
+    """Return only unique checks that should be displayed in the output."""
+    seen: Set[Tuple[str, Optional[str]]] = set()
+    unique_checks = []
+    for check in reversed(checks):
+        # There are also could be checks that didn't fail
+        if check.example is not None and check.value == Status.failure and (check.name, check.message) not in seen:
+            unique_checks.append(check)
+            seen.add((check.name, check.message))
+    return unique_checks
 
 
 def display_example(

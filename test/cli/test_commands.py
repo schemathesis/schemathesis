@@ -319,7 +319,7 @@ def test_cli_run_output_with_errors(cli, cli_args, workers):
     assert " SUMMARY " in result.stdout
 
     lines = result.stdout.strip().split("\n")
-    assert "Received a response with 5xx status code: 500" in lines
+    assert "1. Received a response with 5xx status code: 500" in lines
     assert "not_a_server_error            1 / 3 passed          FAILED " in lines
     assert f"== 1 passed, 1 failed in " in lines[-1]
 
@@ -542,8 +542,38 @@ def test_status_code_conformance(cli, cli_args, workers):
         assert lines[10] == "F"
     assert "status_code_conformance            0 / 2 passed          FAILED" in result.stdout
     lines = result.stdout.split("\n")
-    assert "Received a response with a status code, which is not defined in the schema: 418" in lines
+    assert "1. Received a response with a status code, which is not defined in the schema: 418" in lines
     assert lines[16].strip() == "Declared status codes: 200"
+
+
+@pytest.mark.endpoints("multiple_failures")
+def test_multiple_failures_single_check(cli, schema_url):
+    result = cli.run(schema_url, "--hypothesis-derandomize")
+
+    assert "= HYPOTHESIS OUTPUT =" not in result.stdout
+    assert "Hypothesis found 2 distinct failures" not in result.stdout
+
+    lines = result.stdout.strip().split("\n")
+    assert "1. Received a response with 5xx status code: 500" in lines
+    assert "2. Received a response with 5xx status code: 504" in lines
+    assert "1 failed in " in lines[-1]
+
+
+@pytest.mark.endpoints("multiple_failures")
+def test_multiple_failures_different_check(cli, schema_url):
+    result = cli.run(
+        schema_url, "-c", "status_code_conformance", "-c", "not_a_server_error", "--hypothesis-derandomize"
+    )
+
+    assert "= HYPOTHESIS OUTPUT =" not in result.stdout
+
+    lines = result.stdout.strip().split("\n")
+    assert "1. Received a response with a status code, which is not defined in the schema: 500" in lines
+    assert "2. Received a response with 5xx status code: 500" in lines
+    assert "3. Received a response with a status code, which is not defined in the schema: 504" in lines
+    assert "4. Received a response with 5xx status code: 504" in lines
+    assert "5. Received a response with a status code, which is not defined in the schema: 200" in lines
+    assert "1 failed in " in lines[-1]
 
 
 @pytest.mark.parametrize("workers", (1, 2))
@@ -662,7 +692,7 @@ def test_register_check(testdir, cli, schema_url):
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And a message from the new check should be displayed
     lines = result.stdout.strip().split("\n")
-    assert lines[14] == "Custom check failed!"
+    assert lines[14] == "1. Custom check failed!"
 
 
 def assert_threaded_executor_interruption(lines, expected, optional_interrupt=False):
