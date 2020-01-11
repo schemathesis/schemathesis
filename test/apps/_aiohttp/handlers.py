@@ -56,6 +56,10 @@ async def multipart(request: web.Request) -> web.Response:
     return web.json_response(data)
 
 
+async def upload_file(request: web.Request) -> web.Response:
+    return web.json_response({"size": request.content_length})
+
+
 path_variable = success
 invalid = success
 invalid_path_parameter = success

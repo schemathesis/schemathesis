@@ -1,6 +1,6 @@
 import pytest
 from flask import jsonify, request
-from hypothesis import given
+from hypothesis import given, settings
 
 import schemathesis
 from schemathesis import Case
@@ -84,3 +84,17 @@ def test_not_wsgi(schema):
         "Please, set `app` argument in the schema constructor or pass it to `call_wsgi`",
     ):
         case.call_wsgi()
+
+
+@pytest.mark.endpoints("upload_file")
+def test_binary_body(mocker, schema):
+    strategy = schema.endpoints["/api/upload_file"]["POST"].as_strategy()
+
+    @given(case=strategy)
+    @settings(max_examples=3)
+    def test(case):
+        response = case.call_wsgi()
+        assert response.status_code == 200
+        assert response.json == {"size": mocker.ANY}
+
+    test()

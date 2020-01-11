@@ -3,9 +3,12 @@ import os
 from functools import lru_cache
 from typing import Any, Callable, Dict, Type
 
+import pytest
+import requests
 import yaml
 
 import schemathesis
+from schemathesis import Case
 from schemathesis.schemas import BaseSchema
 from schemathesis.utils import StringDatesYAMLLoader
 
@@ -107,3 +110,9 @@ def assert_date(value: str) -> bool:
 
 def assert_datetime(value: str) -> bool:
     return _assert_date(value, "%Y-%m-%dT%H:%M:%S%z") or _assert_date(value, "%Y-%m-%dT%H:%M:%S.%f%z")
+
+
+def assert_requests_call(case: Case):
+    """Verify that all generated input parameters are usable by requests."""
+    with pytest.raises(requests.exceptions.ConnectionError):
+        case.call(base_url="http://127.0.0.1:1")

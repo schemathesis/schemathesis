@@ -11,6 +11,11 @@ Added
 
 - Raise different exceptions in checks `#266`_
 
+Fixed
+~~~~~
+
+- Handling binary request payloads in ``Case.call``. `#350`_
+
 `0.21.0`_ - 2019-12-20
 ----------------------
 
@@ -559,6 +564,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#350: https://github.com/kiwicom/schemathesis/issues/350
 .. _#338: https://github.com/kiwicom/schemathesis/issues/338
 .. _#335: https://github.com/kiwicom/schemathesis/issues/335
 .. _#332: https://github.com/kiwicom/schemathesis/issues/332
