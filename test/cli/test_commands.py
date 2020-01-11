@@ -83,6 +83,10 @@ def test_commands_version(cli):
             'Error: Invalid value for "--hypothesis-phases": invalid choice(s): first, second. '
             f"Choose from {PHASES}",
         ),
+        (
+            ("run", "http://127.0.0.1", "--hypothesis-deadline=wrong"),
+            'Error: Invalid value for "--hypothesis-deadline": wrong is not a valid integer or None',
+        ),
     ),
 )
 def test_commands_run_errors(cli, args, error):
@@ -239,6 +243,10 @@ SCHEMA_URI = "https://example.com/swagger.json"
                 },
                 "workers_num": 1,
             },
+        ),
+        (
+            [SCHEMA_URI, "--hypothesis-deadline=None"],
+            {"checks": DEFAULT_CHECKS, "hypothesis_options": {"deadline": None}, "workers_num": 1},
         ),
     ),
 )

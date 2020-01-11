@@ -11,6 +11,7 @@ Added
 
 - Show multiple found failures in the CLI output. `#266`_ & `#207`_
 - Raise proper exception when the given schema is invalid. `#308`_
+- Support for ``None`` as a value for ``--hypothesis-deadline``. `#349`_
 
 Fixed
 ~~~~~
@@ -569,6 +570,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#350: https://github.com/kiwicom/schemathesis/issues/350
+.. _#349: https://github.com/kiwicom/schemathesis/issues/349
 .. _#338: https://github.com/kiwicom/schemathesis/issues/338
 .. _#335: https://github.com/kiwicom/schemathesis/issues/335
 .. _#332: https://github.com/kiwicom/schemathesis/issues/332
