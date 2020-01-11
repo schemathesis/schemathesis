@@ -25,6 +25,8 @@ from . import events
 
 DEFAULT_DEADLINE = 500  # pragma: no mutate
 RawAuth = Tuple[str, str]  # pragma: no mutate
+GenericResponse = Union[requests.Response, WSGIResponse]  # pragma: no mutate
+Check = Callable[[GenericResponse, Case], None]  # pragma: no mutate
 
 
 def get_hypothesis_settings(hypothesis_options: Optional[Dict[str, Any]] = None) -> hypothesis.settings:
@@ -39,7 +41,7 @@ def get_hypothesis_settings(hypothesis_options: Optional[Dict[str, Any]] = None)
 @attr.s
 class BaseRunner:
     schema: BaseSchema = attr.ib()
-    checks: Iterable[Callable] = attr.ib()
+    checks: Iterable[Check] = attr.ib()
     hypothesis_settings: hypothesis.settings = attr.ib(converter=get_hypothesis_settings)
     auth: Optional[RawAuth] = attr.ib(default=None)
     auth_type: Optional[str] = attr.ib(default=None)
@@ -110,7 +112,7 @@ def _run_task(
     tasks_queue: Queue,
     events_queue: Queue,
     schema: BaseSchema,
-    checks: Iterable[Callable],
+    checks: Iterable[Check],
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
@@ -129,7 +131,7 @@ def thread_task(
     tasks_queue: Queue,
     events_queue: Queue,
     schema: BaseSchema,
-    checks: Iterable[Callable],
+    checks: Iterable[Check],
     settings: hypothesis.settings,
     auth: Optional[RawAuth],
     auth_type: Optional[str],
@@ -154,7 +156,7 @@ def wsgi_thread_task(
     tasks_queue: Queue,
     events_queue: Queue,
     schema: BaseSchema,
-    checks: Iterable[Callable],
+    checks: Iterable[Check],
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
@@ -271,7 +273,7 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
 
 def execute_from_schema(
     schema: BaseSchema,
-    checks: Iterable[Callable],
+    checks: Iterable[Check],
     *,
     workers_num: int = 1,
     hypothesis_options: Optional[Dict[str, Any]] = None,
@@ -339,7 +341,7 @@ def run_test(
     schema: BaseSchema,
     endpoint: Endpoint,
     test: Union[Callable, InvalidSchema],
-    checks: Iterable[Callable],
+    checks: Iterable[Check],
     results: TestResultSet,
     **kwargs: Any,
 ) -> Generator[events.ExecutionEvent, None, None]:
@@ -395,7 +397,7 @@ def run_test(
 
 def execute(  # pylint: disable=too-many-arguments
     schema_uri: str,
-    checks: Iterable[Callable] = DEFAULT_CHECKS,
+    checks: Iterable[Check] = DEFAULT_CHECKS,
     api_options: Optional[Dict[str, Any]] = None,
     loader_options: Optional[Dict[str, Any]] = None,
     hypothesis_options: Optional[Dict[str, Any]] = None,
@@ -416,7 +418,7 @@ def execute(  # pylint: disable=too-many-arguments
 
 def prepare(  # pylint: disable=too-many-arguments
     schema_uri: str,
-    checks: Iterable[Callable] = DEFAULT_CHECKS,
+    checks: Iterable[Check] = DEFAULT_CHECKS,
     workers_num: int = 1,
     api_options: Optional[Dict[str, Any]] = None,
     loader_options: Optional[Dict[str, Any]] = None,
@@ -437,11 +439,7 @@ def prepare(  # pylint: disable=too-many-arguments
 
 
 def network_test(
-    case: Case,
-    checks: Iterable[Callable],
-    result: TestResult,
-    session: requests.Session,
-    request_timeout: Optional[int],
+    case: Case, checks: Iterable[Check], result: TestResult, session: requests.Session, request_timeout: Optional[int]
 ) -> None:
     """A single test body that will be executed against the target."""
     # pylint: disable=too-many-arguments
@@ -452,7 +450,7 @@ def network_test(
 
 def wsgi_test(
     case: Case,
-    checks: Iterable[Callable],
+    checks: Iterable[Check],
     result: TestResult,
     auth: Optional[RawAuth],
     auth_type: Optional[str],
@@ -477,15 +475,13 @@ def _prepare_wsgi_headers(
     return headers
 
 
-def _run_checks(
-    case: Case, checks: Iterable[Callable], result: TestResult, response: Union[requests.Response, WSGIResponse]
-) -> None:
+def _run_checks(case: Case, checks: Iterable[Check], result: TestResult, response: GenericResponse) -> None:
     errors = None
 
     for check in checks:
         check_name = check.__name__
         try:
-            check(response, result)
+            check(response, result)  # type: ignore
             result.add_success(check_name, case)
         except AssertionError as exc:
             errors = True  # pragma: no mutate
