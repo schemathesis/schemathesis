@@ -138,12 +138,12 @@ To add a new check for the Schemathesis CLI there is a special function
     import schemathesis
 
     @schemathesis.register_check
-    def new_check(response, result):
+    def new_check(response, case):
         # some awesome assertions!
         pass
 
-The registered check should accept a ``response`` with ``requests.Response`` type and
-``result`` with ``schemathesis.models.TestResult`` type.
+The registered check should accept a ``response`` with ``requests.Response`` / ``schemathesis.utils.WSGIResponse`` type and
+``case`` with ``schemathesis.models.Case`` type.
 
 After registration, your checks will be available in Schemathesis CLI and you can use them via ``-c`` command line option.
 
