@@ -2,22 +2,14 @@ FROM python:3.8-alpine
 
 LABEL Name=Schemathesis
 
-ENV BINPATH=/usr/local/bin
 WORKDIR /app
 
-RUN addgroup -S schemathesis && \
-    adduser -D -S schemathesis -G schemathesis -s /sbin/nologin && \
+COPY --chown=1000:1000 pyproject.toml README.rst src ./
+RUN addgroup --gid 1000 -S schemathesis && \
+    adduser --uid 1000 -D -S schemathesis -G schemathesis -s /sbin/nologin && \
     apk add --no-cache --virtual=.build-deps build-base libffi-dev openssl-dev && \
-    pip install --no-cache-dir poetry==1.0.0b5 && \
-    apk del .build-deps && \
-    printf '#!/bin/sh\n(cd /app && poetry run schemathesis $@)' > $BINPATH/schemathesis && \
-    chmod +x $BINPATH/schemathesis
+    pip install --no-cache-dir ./ && \
+    apk del .build-deps
 
 USER schemathesis
-
-COPY poetry.lock pyproject.toml ./
-RUN poetry install --no-dev --no-root
-COPY src ./
-
-ENTRYPOINT ["schemathesis"]
-CMD [ "--help" ]
+CMD ["schemathesis", "--help"]
