@@ -210,12 +210,13 @@ def test_invalid_schema(testdir):
         """
 import schemathesis
 
-schema = schemathesis.from_dict({"swagger": "2.0", "paths": 1})
+schema = schemathesis.from_dict({"swagger": "2.0", "paths": 1}, validate_schema=False)
 
 @schema.parametrize()
 def test_(request, case):
     pass
-"""
+""",
+        validate_schema=False,
     )
     result = testdir.runpytest()
     # Then collection phase should fail with error
@@ -256,6 +257,7 @@ def test_(request, case):
 
 def test_invalid_endpoint(testdir):
     # When the given schema is invalid
+    # And schema validation is disabled
     testdir.make_test(
         """
 @schema.parametrize()
@@ -266,6 +268,7 @@ def test_(request, case):
             "/valid": {"get": {"parameters": [{"type": "integer", "name": "id", "in": "query", "required": True}]}},
             "/invalid": {"get": {"parameters": [{"type": "int", "name": "id", "in": "query", "required": True}]}},
         },
+        validate_schema=False,
     )
     result = testdir.runpytest("-v", "-rf")
     # Then the tests should fail with the relevant error message

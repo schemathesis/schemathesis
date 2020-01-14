@@ -100,6 +100,7 @@ def test_(case):
 
 def test_unknown_data(testdir):
     # When parameter is specified for unknown "in"
+    # And schema validation is disabled
     testdir.make_test(
         """
 @schema.parametrize()
@@ -108,6 +109,7 @@ def test_(case):
     pass
         """,
         **as_param({"name": "status", "in": "unknown", "required": True, "type": "string"}),
+        validate_schema=False,
     )
     # Then the generated test ignores this parameter
     testdir.run_and_assert(passed=1)

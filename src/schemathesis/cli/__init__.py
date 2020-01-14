@@ -95,6 +95,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 )
 @click.option("--app", help="WSGI application to test", type=str, callback=callbacks.validate_app)
 @click.option("--request-timeout", help="Timeout in milliseconds for network requests during the test run.", type=int)
+@click.option("--validate-schema", help="Enable or disable validation of input schema.", type=bool, default=True)
 @click.option(
     "--hypothesis-deadline",
     help="Duration in milliseconds that each individual example with a test is not allowed to exceed.",
@@ -135,6 +136,7 @@ def run(  # pylint: disable=too-many-arguments
     base_url: Optional[str] = None,
     app: Any = None,
     request_timeout: Optional[int] = None,
+    validate_schema: bool = True,
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
     hypothesis_derandomize: Optional[bool] = None,
     hypothesis_max_examples: Optional[int] = None,
@@ -169,6 +171,8 @@ def run(  # pylint: disable=too-many-arguments
         ),
         seed=hypothesis_seed,
     )
+    if validate_schema is False:
+        options.setdefault("loader_options", {})["validate_schema"] = validate_schema
     # `deadline` is special, since Hypothesis allows to pass `None`
     if hypothesis_deadline is not None:
         options.setdefault("hypothesis_options", {})
