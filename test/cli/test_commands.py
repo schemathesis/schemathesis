@@ -132,6 +132,7 @@ def test_commands_run_help(cli):
         "  --app TEXT                      WSGI application to test",
         "  --request-timeout INTEGER       Timeout in milliseconds for network requests",
         "                                  during the test run.",
+        "  --validate-schema BOOLEAN       Enable or disable validation of input schema.",
         "  --hypothesis-deadline INTEGER   Duration in milliseconds that each individual",
         "                                  example with a test is not allowed to exceed.",
         "  --hypothesis-derandomize        Use Hypothesis's deterministic mode.",
@@ -518,7 +519,8 @@ def test_flaky(cli, cli_args, workers):
 def test_invalid_endpoint(cli, cli_args, workers):
     # When the app's schema contains errors
     # For example if its type is "int" but should be "integer"
-    result = cli.run(*cli_args, f"--workers={workers}")
+    # And schema validation is disabled
+    result = cli.run(*cli_args, f"--workers={workers}", "--validate-schema=false")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And standard Hypothesis error should not appear in the output

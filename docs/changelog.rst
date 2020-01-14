@@ -10,6 +10,7 @@ Added
 ~~~~~
 
 - Hooks for strategy modification. `#313`_
+- Input schema validation. Use ``--validate-schema=false`` to disable it in CLI and ``validate_schema=False`` argument in loaders. `#110`_
 
 `0.22.0`_ - 2020-01-11
 ----------------------
@@ -651,6 +652,7 @@ Fixed
 .. _#121: https://github.com/kiwicom/schemathesis/issues/121
 .. _#119: https://github.com/kiwicom/schemathesis/issues/119
 .. _#118: https://github.com/kiwicom/schemathesis/issues/118
+.. _#110: https://github.com/kiwicom/schemathesis/issues/110
 .. _#109: https://github.com/kiwicom/schemathesis/issues/109
 .. _#107: https://github.com/kiwicom/schemathesis/issues/107
 .. _#106: https://github.com/kiwicom/schemathesis/issues/106

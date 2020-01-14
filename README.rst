@@ -471,6 +471,12 @@ you only need to specify strategies for ``hypothesis.given``:
             response = case.call()
             assert response.status_code < 500
 
+Schema validation
+#################
+
+To avoid obscure and hard to debug errors during test runs Schemathesis validates input schemas for conformance with the relevant spec.
+If you'd like to disable this behavior use ``--validate-schema=false`` in CLI and ``validate_schema=False`` argument in loaders.
+
 Documentation
 -------------
 
