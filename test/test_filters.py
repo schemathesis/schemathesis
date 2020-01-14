@@ -6,7 +6,7 @@ from .utils import integer
 @pytest.mark.parametrize("endpoint", ("'/foo'", "'/v1/foo'", ["/foo"], "'/.*oo'"))
 def test_endpoint_filter(testdir, endpoint):
     # When `endpoint` is specified
-    parameters = {"parameters": [integer(name="id", required=True)]}
+    parameters = {"parameters": [integer(name="id", required=True)], "responses": {"200": {"description": "OK"}}}
     testdir.make_test(
         """
 @schema.parametrize(endpoint={})
@@ -29,7 +29,7 @@ def test_(request, case):
 @pytest.mark.parametrize("method", ("'get'", "'GET'", ["GET"], ["get"]))
 def test_method_filter(testdir, method):
     # When `method` is specified
-    parameters = {"parameters": [integer(name="id", required=True)]}
+    parameters = {"parameters": [integer(name="id", required=True)], "responses": {"200": {"description": "OK"}}}
     testdir.make_test(
         """
 @schema.parametrize(method={})
@@ -53,7 +53,7 @@ def test_(request, case):
 
 def test_tag_filter(testdir):
     # When `tag` is specified
-    parameters = {"parameters": [integer(name="id", required=True)]}
+    parameters = {"parameters": [integer(name="id", required=True)], "responses": {"200": {"description": "OK"}}}
     testdir.make_test(
         """
 @schema.parametrize(tag="bar")
@@ -67,7 +67,7 @@ def test_(request, case):
             "/foo": {"get": {**parameters, "tags": ["foo", "baz"]}},
             "/bar": {"get": {**parameters, "tags": ["bar", "baz"]}},
         },
-        tags={"foo": {}, "bar": {}, "baz": {}},
+        tags=[{"name": "foo"}, {"name": "bar"}, {"name": "baz"}],
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
@@ -86,8 +86,14 @@ def test_(request, case):
     assert case.method == "POST"
 """,
         paths={
-            "/foo": {"post": {"parameters": []}, "get": {"parameters": []}},
-            "/bar": {"post": {"parameters": []}, "get": {"parameters": []}},
+            "/foo": {
+                "post": {"parameters": [], "responses": {"200": {"description": "OK"}}},
+                "get": {"parameters": [], "responses": {"200": {"description": "OK"}}},
+            },
+            "/bar": {
+                "post": {"parameters": [], "responses": {"200": {"description": "OK"}}},
+                "get": {"parameters": [], "responses": {"200": {"description": "OK"}}},
+            },
         },
         method="POST",
         endpoint="/v1/foo",
@@ -114,7 +120,15 @@ def test_b(request, case):
     assert case.path == "/v1/foo"
     assert case.method == "POST"
 """,
-        paths={"/foo": {"post": {"parameters": [integer(name="id", required=True)], "tags": ["foo"]}}},
+        paths={
+            "/foo": {
+                "post": {
+                    "parameters": [integer(name="id", required=True)],
+                    "responses": {"200": {"description": "OK"}},
+                    "tags": ["foo"],
+                }
+            }
+        },
         method="POST",
         endpoint="/v1/foo",
         tag="foo",

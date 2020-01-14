@@ -29,9 +29,7 @@ def get_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> BaseS
 
 def make_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> Dict[str, Any]:
     schema = load_schema(schema_name)
-    if kwargs is not None:
-        schema = merge(kwargs, schema)
-    return schema
+    return merge(kwargs, schema)
 
 
 @lru_cache()
@@ -56,19 +54,26 @@ def integer(**kwargs: Any) -> Dict[str, Any]:
 
 
 def string(**kwargs: Any) -> Dict[str, Any]:
-    return {"type": "string", "in": "query", **kwargs}
+    return {"type": "string", **kwargs}
 
 
 def array(**kwargs: Any) -> Dict[str, Any]:
-    return {"name": "values", "in": "query", "type": "array", **kwargs}
+    return {
+        "name": "values",
+        "in": "body",
+        "schema": {"type": "object", "required": ["values"], "properties": {"values": {"type": "array", **kwargs}}},
+        "required": True,
+    }
 
 
 def as_param(*parameters: Any) -> Dict[str, Any]:
-    return {"paths": {"/users": {"get": {"parameters": list(parameters)}}}}
+    return {"paths": {"/users": {"get": {"parameters": list(parameters), "responses": {"200": {"description": "OK"}}}}}}
 
 
 def as_array(**kwargs: Any) -> Dict[str, Any]:
-    return as_param(array(**kwargs))
+    return {
+        "paths": {"/users": {"post": {"parameters": [array(**kwargs)], "responses": {"200": {"description": "OK"}}}}}
+    }
 
 
 def noop(value: Any) -> bool:
@@ -86,10 +91,6 @@ def assert_int(value: Any, predicate: Callable = noop) -> None:
 
 def assert_str(value: Any, predicate: Callable = noop) -> None:
     _assert_value(value, str, predicate)
-
-
-def assert_bytes(value: Any, predicate: Callable = noop) -> None:
-    _assert_value(value, bytes, predicate)
 
 
 def assert_list(value: Any, predicate: Callable = noop) -> None:
