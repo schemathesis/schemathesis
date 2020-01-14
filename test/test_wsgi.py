@@ -40,9 +40,10 @@ def test_cookies(flask_app):
                                 "name": "token",
                                 "in": "cookie",
                                 "required": True,
-                                "schema": {"type": "string", "const": "test"},
+                                "schema": {"type": "string", "enum": ["test"]},
                             }
-                        ]
+                        ],
+                        "responses": {"200": {"description": "OK"}},
                     }
                 }
             },
@@ -88,8 +89,24 @@ def test_not_wsgi(schema):
         case.call_wsgi()
 
 
-@pytest.mark.endpoints("upload_file")
-def test_binary_body(mocker, schema):
+def test_binary_body(mocker, flask_app):
+    schema = schemathesis.from_dict(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+            "paths": {
+                "/api/upload_file": {
+                    "post": {
+                        "requestBody": {
+                            "content": {"application/octet-stream": {"schema": {"format": "binary", "type": "string"}}}
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        },
+        app=flask_app,
+    )
     strategy = schema.endpoints["/api/upload_file"]["POST"].as_strategy()
 
     @given(case=strategy)
