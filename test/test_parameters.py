@@ -136,6 +136,7 @@ def test_date_deserializing(testdir):
                             },
                         }
                     ],
+                    "responses": {"200": {"description": "OK"}},
                 }
             }
         },

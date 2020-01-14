@@ -431,9 +431,7 @@ def test_(request, case):
 ROOT_SCHEMA = {
     "openapi": "3.0.2",
     "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},
-    "schemes": ["http"],
-    "produces": ["application/json"],
-    "paths": {"teapot": {"$ref": "paths/teapot.yaml#/TeapotCreatePath"}},
+    "paths": {"/teapot": {"$ref": "paths/teapot.yaml#/TeapotCreatePath"}},
 }
 TEAPOT_PATHS = {
     "TeapotCreatePath": {
