@@ -69,16 +69,30 @@ def test_simple_dereference(testdir):
     # When a given parameter contains a JSON reference
     testdir.make_test(
         """
-@schema.parametrize()
+@schema.parametrize(method="POST")
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
-    assert case.method == "GET"
-    assert_int(case.query["id"])
+    assert case.method == "POST"
+    assert_int(case.body)
 """,
-        **as_param({"$ref": "#/definitions/SimpleIntRef"}),
-        definitions={"SimpleIntRef": integer(name="id", required=True)},
+        paths={
+            "/users": {
+                "post": {
+                    "parameters": [
+                        {
+                            "schema": {"$ref": "#/definitions/SimpleIntRef"},
+                            "in": "body",
+                            "name": "object",
+                            "required": True,
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        definitions={"SimpleIntRef": {"type": "integer"}},
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
@@ -108,7 +122,8 @@ def test_(request, case):
                             "name": "object",
                             "required": True,
                         }
-                    ]
+                    ],
+                    "responses": {"200": {"description": "OK"}},
                 }
             }
         },
@@ -154,7 +169,8 @@ def test_(request, case):
                             "name": "object",
                             "required": True,
                         }
-                    ]
+                    ],
+                    "responses": {"200": {"description": "OK"}},
                 }
             }
         },
@@ -195,7 +211,8 @@ def test_(request, case):
                             "name": "object",
                             "required": True,
                         }
-                    ]
+                    ],
+                    "responses": {"200": {"description": "OK"}},
                 }
             }
         },
@@ -294,23 +311,33 @@ def test_(request, case):
 def test_nullable_properties(testdir):
     testdir.make_test(
         """
-@schema.parametrize()
+@schema.parametrize(method="POST")
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
-    assert case.method == "GET"
-    assert case.query["attributes"]["id"] is None
+    assert case.method == "POST"
+    assert case.body["id"] is None
 """,
-        **as_param(
-            {
-                "type": "object",
-                "in": "query",
-                "name": "attributes",
-                "properties": {"id": {"type": "integer", "format": "int64", "x-nullable": True}},
-                "required": ["id"],
+        paths={
+            "/users": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "name": "attributes",
+                            "schema": {
+                                "type": "object",
+                                "properties": {"id": {"type": "integer", "format": "int64", "x-nullable": True}},
+                                "required": ["id"],
+                            },
+                            "required": True,
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
-        ),
+        },
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-vv", "-s")
@@ -321,16 +348,30 @@ def test_(request, case):
 def test_nullable_ref(testdir):
     testdir.make_test(
         """
-@schema.parametrize()
+@schema.parametrize(method="POST")
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
-    assert case.method == "GET"
-    assert case.query["id"] is None
+    assert case.method == "POST"
+    assert case.body is None
 """,
-        **as_param({"$ref": "#/definitions/NullableIntRef"}),
-        definitions={"NullableIntRef": integer(name="id", required=True, **{"x-nullable": True})},
+        paths={
+            "/users": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "name": "attributes",
+                            "schema": {"$ref": "#/definitions/NullableIntRef"},
+                            "required": True,
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        definitions={"NullableIntRef": {"type": "integer", "x-nullable": True}},
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
@@ -349,11 +390,15 @@ def test_(request, case):
     assert case.path == "/v1/users"
     assert isinstance(case.body, str)
 """,
-        paths={"/users": {"$ref": "#/definitions/UsersPath"}},
-        definitions={
-            "UsersPath": {
-                "post": {
-                    "parameters": [{"schema": {"type": "string"}, "in": "body", "name": "object", "required": True}]
+        paths={"/users": {"$ref": "#/x-paths/UsersPath"}},
+        **{
+            # custom extension `x-paths` to be compliant with the spec, otherwise there is no handy place
+            # to put the referenced object
+            "x-paths": {
+                "UsersPath": {
+                    "post": {
+                        "parameters": [{"schema": {"type": "string"}, "in": "body", "name": "object", "required": True}]
+                    }
                 }
             }
         },

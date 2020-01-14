@@ -50,7 +50,10 @@ def test_(case):
         """,
         paths={
             "/users": {
-                "post": {"parameters": [{"name": "id", "in": "body", "required": True, "schema": {"type": "integer"}}]}
+                "post": {
+                    "parameters": [{"name": "id", "in": "body", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         },
     )
@@ -69,7 +72,10 @@ def test_(case):
         """,
         paths={
             "/users/{user_id}": {
-                "get": {"parameters": [{"name": "user_id", "required": True, "in": "path", "type": "integer"}]}
+                "get": {
+                    "parameters": [{"name": "user_id", "required": True, "in": "path", "type": "integer"}],
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         },
     )

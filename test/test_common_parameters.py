@@ -17,8 +17,14 @@ def test_(request, case):
         paths={
             "/users": {
                 "parameters": [integer(name="common_id", required=True)],
-                "get": {"parameters": [integer(name="not_common_id", required=True)]},
-                "post": {"parameters": [integer(name="not_common_id", required=True)]},
+                "get": {
+                    "parameters": [integer(name="not_common_id", required=True)],
+                    "responses": {"200": {"description": "OK"}},
+                },
+                "post": {
+                    "parameters": [integer(name="not_common_id", required=True)],
+                    "responses": {"200": {"description": "OK"}},
+                },
             }
         },
     )
@@ -57,11 +63,17 @@ def test_b(request, case):
                 "parameters": [
                     {"schema": {"$ref": "#/definitions/SimpleIntRef"}, "in": "body", "name": "id", "required": True}
                 ],
-                "put": {"parameters": [integer(name="not_common_id", required=True)]},
-                "post": {"parameters": [integer(name="not_common_id", required=True)]},
+                "put": {
+                    "parameters": [integer(name="not_common_id", required=True)],
+                    "responses": {"200": {"description": "OK"}},
+                },
+                "post": {
+                    "parameters": [integer(name="not_common_id", required=True)],
+                    "responses": {"200": {"description": "OK"}},
+                },
             }
         },
-        definitions={"SimpleIntRef": {"type": "integer", "name": "id"}},
+        definitions={"SimpleIntRef": {"type": "integer"}},
     )
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used in all generated tests
@@ -90,7 +102,12 @@ def test_a(request, case):
 def test_b(request, case):
     impl(request, case)
 """,
-        paths={"/users": {"parameters": [integer(name="common_id", required=True)], "post": {}}},
+        paths={
+            "/users": {
+                "parameters": [integer(name="common_id", required=True)],
+                "post": {"responses": {"200": {"description": "OK"}}},
+            }
+        },
     )
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used in all test functions

@@ -51,38 +51,53 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
                         # Impossible to satisfy
                         "schema": {"allOf": [{"type": "integer"}, {"type": "string"}]},
                     }
-                ]
+                ],
+                "responses": {"200": {"description": "OK"}},
             }
         elif endpoint in ("flaky", "multiple_failures"):
-            schema = {"parameters": [{"name": "id", "in": "query", "required": True, "type": "integer"}]}
+            schema = {
+                "parameters": [{"name": "id", "in": "query", "required": True, "type": "integer"}],
+                "responses": {"200": {"description": "OK"}},
+            }
         elif endpoint == "path_variable":
             schema = {
                 "parameters": [{"name": "key", "in": "path", "required": True, "type": "string", "minLength": 1}],
-                "responses": {200: {"description": "OK"}},
+                "responses": {"200": {"description": "OK"}},
             }
         elif endpoint == "invalid":
-            schema = {"parameters": [{"name": "id", "in": "query", "required": True, "type": "int"}]}
+            schema = {
+                "parameters": [{"name": "id", "in": "query", "required": True, "type": "int"}],
+                "responses": {"200": {"description": "OK"}},
+            }
         elif endpoint == "upload_file":
-            schema = {"parameters": [{"name": "data", "in": "body", "required": True, "schema": {"type": "file"}}]}
+            schema = {
+                "parameters": [{"name": "data", "in": "formData", "required": True, "type": "file"}],
+                "responses": {"200": {"description": "OK"}},
+            }
         elif endpoint == "custom_format":
             schema = {
-                "parameters": [{"name": "id", "in": "query", "required": True, "type": "string", "format": "digits"}]
+                "parameters": [{"name": "id", "in": "query", "required": True, "type": "string", "format": "digits"}],
+                "responses": {"200": {"description": "OK"}},
             }
         elif endpoint == "multipart":
             schema = {
                 "parameters": [
                     {"in": "formData", "name": "key", "required": True, "type": "string"},
                     {"in": "formData", "name": "value", "required": True, "type": "integer"},
-                ]
+                ],
+                "responses": {"200": {"description": "OK"}},
             }
         elif endpoint == "teapot":
-            schema = {"produces": ["application/json"], "responses": {200: {"description": "OK"}}}
+            schema = {"produces": ["application/json"], "responses": {"200": {"description": "OK"}}}
         elif endpoint == "invalid_path_parameter/{id}":
-            schema = {"parameters": [{"name": "id", "in": "path", "required": False, "type": "integer"}]}
+            schema = {
+                "parameters": [{"name": "id", "in": "path", "required": False, "type": "integer"}],
+                "responses": {"200": {"description": "OK"}},
+            }
         else:
             schema = {
                 "responses": {
-                    200: {
+                    "200": {
                         "description": "OK",
                         "schema": {
                             "type": "object",

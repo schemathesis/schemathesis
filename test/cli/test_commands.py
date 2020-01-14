@@ -580,7 +580,6 @@ def test_multiple_failures_different_check(cli, schema_url):
     assert "2. Received a response with 5xx status code: 500" in lines
     assert "3. Received a response with a status code, which is not defined in the schema: 504" in lines
     assert "4. Received a response with 5xx status code: 504" in lines
-    assert "5. Received a response with a status code, which is not defined in the schema: 200" in lines
     assert "1 failed in " in lines[-1]
 
 
@@ -806,17 +805,19 @@ async def test_multiple_files_schema(app, testdir, cli, base_url):
         "schemes": ["http"],
         "produces": ["application/json"],
         "paths": {
-            "teapot": {
+            "/teapot": {
                 "post": {
                     "parameters": [
                         {
-                            # during the CLI run we have a different working directory, so specifying an absolute file path
+                            # during the CLI run we have a different working directory,
+                            # so specifying an absolute file path
                             "schema": {"$ref": os.path.join(HERE, "data/petstore_v2.yaml#/definitions/Pet")},
                             "in": "body",
                             "name": "user",
                             "required": True,
                         }
-                    ]
+                    ],
+                    "responses": {"200": {"description": "OK"}},
                 }
             }
         },

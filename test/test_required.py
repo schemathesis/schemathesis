@@ -1,4 +1,4 @@
-from .utils import as_param, integer
+from .utils import as_param
 
 
 def test_required_parameters(testdir):
@@ -20,9 +20,10 @@ def test_(request, case):
                             "in": "body",
                             "name": "object",
                             "required": True,
-                            "schema": {"type": "object", "required": ["id"], "properties": {"id": integer(name="id")}},
+                            "schema": {"type": "object", "required": ["id"], "properties": {"id": {"type": "integer"}}},
                         }
-                    ]
+                    ],
+                    "responses": {"200": {"description": "OK"}},
                 }
             }
         },

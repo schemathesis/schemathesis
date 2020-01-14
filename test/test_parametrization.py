@@ -1,4 +1,4 @@
-from .utils import integer, string
+from .utils import integer
 
 
 def test_parametrization(testdir):
@@ -32,7 +32,12 @@ def test_(request, param, case):
     assert case.path == "/v1/users"
     assert case.method in ("GET", "POST")
 """,
-        paths={"/users": {"get": {}, "post": {}}},
+        paths={
+            "/users": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"200": {"description": "OK"}}},
+            }
+        },
     )
     # And there are multiple method/endpoint combinations
     result = testdir.runpytest("-v", "-s")
@@ -59,7 +64,12 @@ class TestAPI:
         assert case.path == "/v1/users"
         assert case.method in ("GET", "POST")
 """,
-        paths={"/users": {"get": {}, "post": {}}},
+        paths={
+            "/users": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"200": {"description": "OK"}}},
+            }
+        },
     )
     # Then they should work as regular tests
     result = testdir.runpytest("-v", "-s")
@@ -75,7 +85,7 @@ class TestAPI:
 
 def test_max_examples(testdir):
     # When `max_examples` is specified
-    parameters = {"parameters": [integer(name="id", required=True)]}
+    parameters = {"parameters": [integer(name="id", required=True)], "responses": {"200": {"description": "OK"}}}
     testdir.make_test(
         """
 @schema.parametrize()
@@ -116,7 +126,8 @@ def test_(request, case):
                             "name": "object",
                             "required": True,
                         }
-                    ]
+                    ],
+                    "responses": {"200": {"description": "OK"}},
                 }
             }
         },
@@ -149,7 +160,8 @@ def test(request, case):
                             "name": "object",
                             "required": True,
                         }
-                    ]
+                    ],
+                    "responses": {"200": {"description": "OK"}},
                 }
             }
         },
@@ -183,7 +195,7 @@ def test_a(request, case):
 def test_b(request, case):
     request.config.HYPOTHESIS_CASES += 1
     """,
-        paths={"/pets": {"post": {}}},
+        paths={"/pets": {"post": {"responses": {"200": {"description": "OK"}}}}},
     )
     result = testdir.runpytest("-v", "-s", "-k", "pets")
     # Then only relevant tests should be selected for running
@@ -219,7 +231,22 @@ def test_exception_during_test(testdir):
 def test_(request, case):
     pass
 """,
-        paths={"/users": {"get": {"parameters": [string(name="key5", minLength=10, maxLength=6, required=True)]}}},
+        paths={
+            "/users": {
+                "get": {
+                    "parameters": [
+                        {
+                            "type": "string",
+                            "in": "query",
+                            "name": "key5",
+                            "minLength": 10,
+                            "maxLength": 6,
+                            "required": True,
+                        }
+                    ]
+                }
+            }
+        },
     )
     result = testdir.runpytest("-v", "-rf")
     # Then the tests should fail with the relevant error message

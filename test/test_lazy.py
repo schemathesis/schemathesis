@@ -59,8 +59,18 @@ def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
 """,
         paths={
-            "/valid": {"get": {"parameters": [{"type": "integer", "name": "id", "in": "query", "required": True}]}},
-            "/invalid": {"get": {"parameters": [{"type": "int", "name": "id", "in": "query", "required": True}]}},
+            "/valid": {
+                "get": {
+                    "parameters": [{"type": "integer", "name": "id", "in": "query", "required": True}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/invalid": {
+                "get": {
+                    "parameters": [{"type": "int", "name": "id", "in": "query", "required": True}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
         },
     )
     result = testdir.runpytest("-v", "-rf")
@@ -137,10 +147,16 @@ def test_c(request, case):
     assert case.method == "GET"
 """,
         paths={
-            "/first": {"post": {"tags": ["bar"]}, "get": {"tags": ["baz"]}},
-            "/second": {"post": {}, "get": {"tags": ["foo"]}},
+            "/first": {
+                "post": {"tags": ["bar"], "responses": {"200": {"description": "OK"}}},
+                "get": {"tags": ["baz"], "responses": {"200": {"description": "OK"}}},
+            },
+            "/second": {
+                "post": {"responses": {"200": {"description": "OK"}}},
+                "get": {"tags": ["foo"], "responses": {"200": {"description": "OK"}}},
+            },
         },
-        tags={"foo": {}, "bar": {}},
+        tags=[{"name": "foo"}, {"name": "bar"}],
     )
     result = testdir.runpytest("-v")
     # Then the filters should be applied to the generated tests
@@ -181,9 +197,18 @@ def test_c(request, case):
     request.config.HYPOTHESIS_CASES += 1
 """,
         paths={
-            "/first": {"post": {"tags": ["foo"]}, "get": {"tags": ["foo"]}},
-            "/second": {"post": {"tags": ["foo"]}, "get": {"tags": ["foo"]}},
-            "/third": {"post": {"tags": ["bar"]}, "get": {"tags": ["bar"]}},
+            "/first": {
+                "post": {"tags": ["foo"], "responses": {"200": {"description": "OK"}}},
+                "get": {"tags": ["foo"], "responses": {"200": {"description": "OK"}}},
+            },
+            "/second": {
+                "post": {"tags": ["foo"], "responses": {"200": {"description": "OK"}}},
+                "get": {"tags": ["foo"], "responses": {"200": {"description": "OK"}}},
+            },
+            "/third": {
+                "post": {"tags": ["bar"], "responses": {"200": {"description": "OK"}}},
+                "get": {"tags": ["bar"], "responses": {"200": {"description": "OK"}}},
+            },
         },
         method="POST",
         endpoint="/first",
@@ -222,7 +247,7 @@ def test_a(request, case):
     assert case.path == "/v1/pets"
     assert case.method == "POST"
 """,
-        paths={"/pets": {"post": {}}},
+        paths={"/pets": {"post": {"responses": {"200": {"description": "OK"}}}}},
     )
     result = testdir.runpytest("-v")
     # Then the filters should be applied to the generated tests
@@ -251,7 +276,16 @@ def test_b(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/second"
 """,
-        paths={"/first": {"post": {}, "get": {}}, "/second": {"post": {}, "get": {}}},
+        paths={
+            "/first": {
+                "post": {"responses": {"200": {"description": "OK"}}},
+                "get": {"responses": {"200": {"description": "OK"}}},
+            },
+            "/second": {
+                "post": {"responses": {"200": {"description": "OK"}}},
+                "get": {"responses": {"200": {"description": "OK"}}},
+            },
+        },
         method="GET",
         endpoint="/first",
     )
@@ -303,7 +337,16 @@ def test_d(request, case):
     assert case.method == "POST"
 
 """,
-        paths={"/first": {"post": {}, "get": {}}, "/second": {"post": {}, "get": {}}},
+        paths={
+            "/first": {
+                "post": {"responses": {"200": {"description": "OK"}}},
+                "get": {"responses": {"200": {"description": "OK"}}},
+            },
+            "/second": {
+                "post": {"responses": {"200": {"description": "OK"}}},
+                "get": {"responses": {"200": {"description": "OK"}}},
+            },
+        },
     )
     result = testdir.runpytest("-v")
     # Then the filters should be applied to the generated tests
