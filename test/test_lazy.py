@@ -46,6 +46,7 @@ def test_(request, case):
 
 def test_invalid_endpoint(testdir):
     # When the given schema is invalid
+    # And schema validation is disabled
     testdir.make_test(
         """
 @pytest.fixture
@@ -72,6 +73,7 @@ def test_(request, case):
                 }
             },
         },
+        validate_schema=False,
     )
     result = testdir.runpytest("-v", "-rf")
     # Then one test should be marked as failed (passed - /users, failed /)
