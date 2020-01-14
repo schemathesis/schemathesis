@@ -1,6 +1,6 @@
 import pytest
 
-from ..utils import as_param, integer, string
+from ..utils import as_param, integer
 
 
 @pytest.mark.parametrize(
@@ -44,14 +44,21 @@ def test_(case):
 @pytest.mark.parametrize(
     "parameter",
     (
-        string(name="key1", required=True),
-        string(name="key2", maxLength=5, required=True),
-        string(name="key3", minLength=5, required=True),
-        string(name="key4", pattern="ab{2}", required=True),
-        string(name="key5", minLength=3, maxLength=6, pattern="ab{2}", required=True),
-        string(name="key6", format="date", required=True),
-        string(name="key7", format="date-time", required=True),
-        string(name="key8", type="file", required=True),
+        {"name": "key1", "type": "string", "required": True, "in": "query"},
+        {"name": "key2", "type": "string", "required": True, "in": "query", "maxLength": 5},
+        {"name": "key3", "type": "string", "required": True, "in": "query", "minLength": 5},
+        {"name": "key4", "type": "string", "required": True, "in": "query", "pattern": "ab{2}"},
+        {
+            "name": "key5",
+            "type": "string",
+            "required": True,
+            "in": "query",
+            "minLength": 3,
+            "maxLength": 6,
+            "pattern": "ab{2}",
+        },
+        {"name": "key6", "type": "string", "required": True, "in": "query", "format": "date"},
+        {"name": "key7", "type": "string", "required": True, "in": "query", "format": "date-time"},
     ),
 )
 def test_string(testdir, parameter):
@@ -65,13 +72,12 @@ validator = {{
     "key5": lambda x: len(x) in (3, 4, 5, 6) and "abb" in x,
     "key6": assert_date,
     "key7": assert_datetime,
-    "key8": assert_bytes,
 }}["{name}"]
 @schema.parametrize()
 @settings(max_examples=3)
 def test_(case):
     assert case.path == "/v1/users"
-    assert case.method in ("GET", "POST")
+    assert case.method == "GET"
     validator(case.query["{name}"])
         """.format(
             name=parameter["name"]

@@ -15,7 +15,12 @@ def test_(request, param, case):
     assert case.path == "/v1/users"
     assert case.method in ("GET", "POST")
 """,
-        paths={"/users": {"get": {}, "post": {}}},
+        paths={
+            "/users": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"200": {"description": "OK"}}},
+            }
+        },
     )
     # And there are multiple method/endpoint combinations
     result = testdir.runpytest("-v", "-s")
@@ -52,7 +57,12 @@ class TestAPI:
         assert case.path == "/v1/users"
         assert case.method in ("GET", "POST")
 """,
-        paths={"/users": {"get": {}, "post": {}}},
+        paths={
+            "/users": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"200": {"description": "OK"}}},
+            }
+        },
     )
     # And there are multiple method/endpoint combinations
     result = testdir.runpytest("-v", "-s")
