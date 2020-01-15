@@ -12,4 +12,4 @@ RUN addgroup --gid 1000 -S schemathesis && \
     apk del .build-deps
 
 USER schemathesis
-CMD ["schemathesis", "--help"]
+ENTRYPOINT ["schemathesis"]
