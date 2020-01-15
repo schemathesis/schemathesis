@@ -97,6 +97,8 @@ For the full list of options, run:
 .. code:: bash
 
     schemathesis --help
+    # Or
+    schemathesis run --help
 
 Docker
 ~~~~~~
