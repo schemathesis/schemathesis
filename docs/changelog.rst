@@ -6,6 +6,14 @@ Changelog
 `Unreleased`_
 -------------
 
+`0.23.2`_ - 2020-01-16
+----------------------
+
+Fixed
+~~~~~
+
+- Prevent ``KeyError`` when response does not have Content-Type. `#365`_
+
 `0.23.1`_ - 2020-01-15
 ----------------------
 
@@ -551,7 +559,8 @@ Fixed
 
 - Initial public release
 
-.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.23.1...HEAD
+.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.23.2...HEAD
+.. _0.23.2: https://github.com/kiwicom/schemathesis/compare/v0.23.1...v0.23.2
 .. _0.23.1: https://github.com/kiwicom/schemathesis/compare/v0.23.0...v0.23.1
 .. _0.23.0: https://github.com/kiwicom/schemathesis/compare/v0.22.0...v0.23.0
 .. _0.22.0: https://github.com/kiwicom/schemathesis/compare/v0.21.0...v0.22.0
@@ -592,6 +601,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#365: https://github.com/kiwicom/schemathesis/issues/365
 .. _#361: https://github.com/kiwicom/schemathesis/issues/361
 .. _#350: https://github.com/kiwicom/schemathesis/issues/350
 .. _#349: https://github.com/kiwicom/schemathesis/issues/349
