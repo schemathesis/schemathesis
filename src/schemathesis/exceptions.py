@@ -11,7 +11,7 @@ CACHE: Dict[Union[str, int], Type[AssertionError]] = {}
 
 
 def get_exception(name: str) -> Type[AssertionError]:
-    """Create a new exception with provided name or fetch one from cache."""
+    """Create a new exception class with provided name or fetch one from cache."""
     if name in CACHE:
         exception_class = CACHE[name]
     else:
