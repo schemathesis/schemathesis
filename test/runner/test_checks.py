@@ -111,6 +111,17 @@ def test_response_schema_conformance_swagger(swagger_20, content, definition):
     assert response_schema_conformance(response, case) is None
 
 
+def test_response_schema_conformance_swagger_no_content_header(swagger_20):
+    """Regression: response_schema_conformance does not raise KeyError when response does not have a "Content-Type"."""
+    response = requests.Response()
+    response.status_code = 418
+    case = make_case(swagger_20, {})
+
+    result = response_schema_conformance(response, case)
+
+    assert result is None
+
+
 @pytest.mark.parametrize(
     "content, definition",
     (
