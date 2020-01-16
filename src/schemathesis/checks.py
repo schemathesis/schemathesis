@@ -67,7 +67,12 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> None:
 
 
 def response_schema_conformance(response: GenericResponse, case: "Case") -> None:
-    if not response.headers["Content-Type"].startswith("application/json"):
+    try:
+        content_type = response.headers["Content-Type"]
+    except KeyError:
+        # Not all responses have a content-type
+        return
+    if not content_type.startswith("application/json"):
         return
     # the keys should be strings
     responses = {str(key): value for key, value in case.endpoint.definition.get("responses", {}).items()}
