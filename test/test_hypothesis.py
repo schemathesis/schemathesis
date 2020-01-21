@@ -1,10 +1,10 @@
 from base64 import b64decode
 
 import pytest
-from hypothesis import given, strategies
+from hypothesis import given, settings, strategies
 
 from schemathesis import Case, register_string_format
-from schemathesis._hypothesis import PARAMETERS, get_case_strategy, get_examples
+from schemathesis._hypothesis import PARAMETERS, get_case_strategy, get_examples, is_valid_query
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Endpoint
 
@@ -160,3 +160,19 @@ def test_valid_headers(base_url, swagger_20):
         case.call()
 
     inner()
+
+
+@pytest.mark.parametrize("value, expected", (({"key": "1"}, True), ({"key": 1}, True), ({"key": "\udcff"}, False),))
+def test_is_valid_query(value, expected):
+    assert is_valid_query(value) == expected
+
+
+def test_is_valid_query_strategy():
+    strategy = strategies.sampled_from([{"key": "1"}, {"key": "\udcff"}]).filter(is_valid_query)
+
+    @given(strategy)
+    @settings(max_examples=10)
+    def test(value):
+        assert value == {"key": "1"}
+
+    test()

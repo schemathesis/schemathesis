@@ -124,6 +124,18 @@ def is_valid_header(headers: Dict[str, str]) -> bool:
     return True
 
 
+def is_surrogate(item: Any) -> bool:
+    return isinstance(item, str) and bool(re.search(r"[\ud800-\udfff]", item))
+
+
+def is_valid_query(query: Dict[str, Any]) -> bool:
+    """Surrogates are not allowed in a query string."""
+    for name, value in query.items():
+        if is_surrogate(name) or is_surrogate(value):
+            return False
+    return True
+
+
 def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
     """Create a strategy for a complete test case.
 
@@ -141,6 +153,8 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
                     )
                 elif parameter == "headers":
                     strategies[parameter] = from_schema(value).filter(is_valid_header)  # type: ignore
+                elif parameter == "query":
+                    strategies[parameter] = from_schema(value).filter(is_valid_query)  # type: ignore
                 else:
                     strategies[parameter] = from_schema(value)  # type: ignore
             else:
