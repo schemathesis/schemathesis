@@ -129,7 +129,10 @@ def is_surrogate(item: Any) -> bool:
 
 
 def is_valid_query(query: Dict[str, Any]) -> bool:
-    """Surrogates are not allowed in a query string."""
+    """Surrogates are not allowed in a query string.
+
+    `requests` and `werkzeug` will fail to send it to the application.
+    """
     for name, value in query.items():
         if is_surrogate(name) or is_surrogate(value):
             return False
