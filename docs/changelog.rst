@@ -6,6 +6,14 @@ Changelog
 `Unreleased`_
 -------------
 
+`0.23.3`_ - 2020-01-21
+----------------------
+
+Fixed
+~~~~~
+
+- Filter out surrogate pairs from query string.
+
 `0.23.2`_ - 2020-01-16
 ----------------------
 
@@ -559,7 +567,8 @@ Fixed
 
 - Initial public release
 
-.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.23.2...HEAD
+.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.23.3...HEAD
+.. _0.23.3: https://github.com/kiwicom/schemathesis/compare/v0.23.2...v0.23.3
 .. _0.23.2: https://github.com/kiwicom/schemathesis/compare/v0.23.1...v0.23.2
 .. _0.23.1: https://github.com/kiwicom/schemathesis/compare/v0.23.0...v0.23.1
 .. _0.23.0: https://github.com/kiwicom/schemathesis/compare/v0.22.0...v0.23.0
