@@ -365,6 +365,5 @@ def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, C
     output: Dict[str, CaseInsensitiveDict] = {}
     for endpoint in endpoints:
         output.setdefault(endpoint.path, CaseInsensitiveDict())
-        # case insensitive dict?
         output[endpoint.path][endpoint.method] = endpoint
     return output
