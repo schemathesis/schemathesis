@@ -219,7 +219,7 @@ class SwaggerV20(BaseSchema):
 
     def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         # "schema" is a required field
-        endpoint.body = self.resolve(parameter["schema"])
+        endpoint.body = parameter["schema"]
 
     def process_form_data(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         endpoint.form_data = self.add_parameter(endpoint.form_data, parameter)
@@ -332,7 +332,6 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         endpoint.cookies = self.add_parameter(endpoint.cookies, parameter)
 
     def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        parameter = self.resolve(parameter)
         # Take the first media type object
         options = iter(parameter["content"].values())
         parameter = next(options)
