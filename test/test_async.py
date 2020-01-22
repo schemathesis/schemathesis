@@ -28,7 +28,9 @@ async def test_(request, case):
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1)
     # Then it should be executed as any other test
-    result.stdout.re_match_lines([r"test_simple.py::test_\[GET:/v1/users\] PASSED", r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines(
+        [r"test_simple.py::test_\[valid_input\]\[GET:/v1/users\] PASSED", r"Hypothesis calls: 1"]
+    )
 
 
 def test_settings_first(testdir, plugin):

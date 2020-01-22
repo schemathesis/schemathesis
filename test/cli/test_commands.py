@@ -746,7 +746,7 @@ def test_pre_run_hook_valid(testdir, cli, schema_url, app):
     )
 
     # Then CLI should run successfully
-    assert result.exit_code == ExitCode.OK
+    assert result.exit_code == ExitCode.OK, result
     # And all registered new string format should produce digits as expected
     assert all(request.query["id"].isdigit() for request in app["incoming_requests"])
 
@@ -799,13 +799,12 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
     if not optional_interrupt:
         assert "!! KeyboardInterrupt !!" in lines[11]
     if "F" in lines[10]:
-        # assert "=== FAILURES ===" in lines[12]
         if "!! KeyboardInterrupt !!" not in lines[11]:
             assert "=== FAILURES ===" in lines[12]
-            position = 23
+            position = 24
         else:
             assert "=== FAILURES ===" in lines[13]
-            position = 24
+            position = 26
     else:
         position = 13
     assert "== SUMMARY ==" in lines[position]
@@ -977,9 +976,9 @@ def test_wsgi_app_internal_exception(testdir, cli, caplog):
     result = cli.run("/swagger.yaml", "--app", f"{module.purebasename}:app")
     assert result.exit_code == ExitCode.TESTS_FAILED
     lines = result.stdout.strip().split("\n")
-    assert "== APPLICATION LOGS ==" in lines[34]
-    assert "ERROR in app: Exception on /api/success [GET]" in lines[36]
-    assert lines[52] == "ZeroDivisionError: division by zero"
+    assert "== APPLICATION LOGS ==" in lines[36]
+    assert "ERROR in app: Exception on /api/success [GET]" in lines[38]
+    assert lines[54] == "ZeroDivisionError: division by zero"
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))

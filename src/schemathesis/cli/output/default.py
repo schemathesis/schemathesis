@@ -181,6 +181,7 @@ def display_example(
         for attribute in Case.__attrs_attrs__  # type: ignore
         if attribute.name not in ("path", "method", "base_url", "app", "endpoint")
     }
+    output["Input type"] = output["Input type"].value
     max_length = max(map(len, output))
     template = f"{{:<{max_length}}} : {{}}"
     if check_name is not None:

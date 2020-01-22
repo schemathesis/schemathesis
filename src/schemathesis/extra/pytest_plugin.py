@@ -9,6 +9,7 @@ from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module
 from hypothesis.errors import InvalidArgument  # pylint: disable=ungrouped-imports
 
 from .._hypothesis import create_test
+from ..constants import InputType
 from ..exceptions import InvalidSchema
 from ..models import Endpoint
 from ..utils import is_schemathesis_test
@@ -20,10 +21,10 @@ class SchemathesisCase(PyCollector):
         self.schemathesis_case = test_function._schemathesis_test  # type: ignore
         super().__init__(*args, **kwargs)
 
-    def _get_test_name(self, endpoint: Endpoint) -> str:
-        return f"{self.name}[{endpoint.method}:{endpoint.path}]"
+    def _get_test_name(self, endpoint: Endpoint, input_type: InputType) -> str:
+        return f"{self.name}[{input_type.value}_input][{endpoint.method}:{endpoint.path}]"
 
-    def _gen_items(self, endpoint: Endpoint) -> Generator[Function, None, None]:
+    def _gen_items(self, endpoint: Endpoint, input_type: InputType) -> Generator[Function, None, None]:
         """Generate all items for the given endpoint.
 
         Could produce more than one test item if
@@ -32,8 +33,8 @@ class SchemathesisCase(PyCollector):
         This implementation is based on the original one in pytest, but with slight adjustments
         to produce tests out of hypothesis ones.
         """
-        name = self._get_test_name(endpoint)
-        funcobj = self._make_test(endpoint)
+        name = self._get_test_name(endpoint, input_type)
+        funcobj = self._make_test(endpoint, input_type)
 
         cls = self._get_class_parent()
         definition = FunctionDefinition(name=self.name, parent=self.parent, callobj=funcobj)
@@ -78,9 +79,9 @@ class SchemathesisCase(PyCollector):
         self.ihook.pytest_generate_tests.call_extra(methods, {"metafunc": metafunc})
         return metafunc
 
-    def _make_test(self, endpoint: Endpoint) -> Callable:
+    def _make_test(self, endpoint: Endpoint, input_type: InputType) -> Callable:
         try:
-            return create_test(endpoint, self.test_function)
+            return create_test(endpoint, self.test_function, input_type=input_type)
         except InvalidSchema:
             return lambda: pytest.fail("Invalid schema for endpoint")
 
@@ -88,7 +89,10 @@ class SchemathesisCase(PyCollector):
         """Generate different test items for all endpoints available in the given schema."""
         try:
             return [
-                item for endpoint in self.schemathesis_case.get_all_endpoints() for item in self._gen_items(endpoint)
+                item
+                for input_type in self.schemathesis_case.input_types
+                for endpoint in self.schemathesis_case.get_all_endpoints()
+                for item in self._gen_items(endpoint, input_type)
             ]
         except Exception:
             pytest.fail("Error during collection")

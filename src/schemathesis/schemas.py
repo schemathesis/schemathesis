@@ -11,7 +11,7 @@ import itertools
 from collections.abc import Mapping
 from copy import deepcopy
 from functools import lru_cache
-from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Tuple, Union, overload
+from typing import Any, Callable, Dict, Generator, Iterable, Iterator, List, Optional, Tuple, Union, overload
 from urllib.parse import urljoin, urlsplit
 from urllib.request import urlopen
 
@@ -22,13 +22,15 @@ import yaml
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
-from .constants import HookLocation
+from .constants import HookLocation, InputType
 from .converter import to_json_schema
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .models import Endpoint, empty_object
 from .types import Filter, Hook, NotSet
 from .utils import NOT_SET, StringDatesYAMLLoader
+
+DEFAULT_INPUT_TYPES = (InputType.valid,)
 
 
 def load_file_impl(location: str, opener: Callable) -> Dict[str, Any]:
@@ -57,6 +59,7 @@ class BaseSchema(Mapping):
     method: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     endpoint: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     tag: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
+    input_types: Iterable[InputType] = attr.ib(default=DEFAULT_INPUT_TYPES)  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     hooks: Dict[HookLocation, Hook] = attr.ib(factory=dict)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
@@ -117,6 +120,7 @@ class BaseSchema(Mapping):
         endpoint: Optional[Filter] = NOT_SET,
         tag: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
+            input_types: Iterable[InputType] = DEFAULT_INPUT_TYPES,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
 
@@ -149,6 +153,7 @@ class BaseSchema(Mapping):
             method=method,
             endpoint=endpoint,
             tag=tag,
+            input_types=input_types,
             app=self.app,
             hooks=self.hooks,
             validate_schema=validate_schema,  # type: ignore

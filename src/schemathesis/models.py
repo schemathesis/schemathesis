@@ -12,6 +12,7 @@ import werkzeug
 from hypothesis.strategies import SearchStrategy
 
 from .checks import ALL_CHECKS
+from .constants import InputType
 from .exceptions import InvalidSchema
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import WSGIResponse
@@ -25,6 +26,7 @@ class Case:
     """A single test case parameters."""
 
     endpoint: "Endpoint" = attr.ib()  # pragma: no mutate
+    input_type: InputType = attr.ib(default=InputType.valid)  # pragma: no mutate
     path_parameters: Optional[PathParameters] = attr.ib(default=None)  # pragma: no mutate
     headers: Optional[Headers] = attr.ib(default=None)  # pragma: no mutate
     cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
@@ -210,10 +212,10 @@ class Endpoint:
     body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
     form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
 
-    def as_strategy(self) -> SearchStrategy:
+    def as_strategy(self, input_type: InputType = InputType.valid) -> SearchStrategy:
         from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel
 
-        return get_case_strategy(self)
+        return get_case_strategy(self, input_type)
 
 
 class Status(IntEnum):

@@ -19,3 +19,8 @@ class HookLocation(Enum):
     query = 4
     body = 5
     form_data = 6
+
+
+class InputType(Enum):
+    valid = "valid"
+    invalid = "invalid"

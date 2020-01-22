@@ -4,6 +4,7 @@ import pytest
 import requests
 
 import schemathesis
+from schemathesis import InputType
 from schemathesis.models import Case, Endpoint
 
 

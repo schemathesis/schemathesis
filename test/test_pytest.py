@@ -29,10 +29,10 @@ def test_(request, param, case):
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
-            r"test_pytest_parametrize_fixture.py::test_\[GET:/v1/users\]\[A\] PASSED",
-            r"test_pytest_parametrize_fixture.py::test_\[GET:/v1/users\]\[B\] PASSED",
-            r"test_pytest_parametrize_fixture.py::test_\[POST:/v1/users\]\[A\] PASSED",
-            r"test_pytest_parametrize_fixture.py::test_\[POST:/v1/users\]\[B\] PASSED",
+            r"test_pytest_parametrize_fixture.py::test_\[valid_input\]\[GET:/v1/users\]\[A\] PASSED",
+            r"test_pytest_parametrize_fixture.py::test_\[valid_input\]\[GET:/v1/users\]\[B\] PASSED",
+            r"test_pytest_parametrize_fixture.py::test_\[valid_input\]\[POST:/v1/users\]\[A\] PASSED",
+            r"test_pytest_parametrize_fixture.py::test_\[valid_input\]\[POST:/v1/users\]\[B\] PASSED",
             r"Hypothesis calls: 4",
         ]
     )
@@ -71,10 +71,10 @@ class TestAPI:
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
-            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[GET:/v1/users\]\[A\] PASSED",
-            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[GET:/v1/users\]\[B\] PASSED",
-            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[POST:/v1/users\]\[A\] PASSED",
-            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[POST:/v1/users\]\[B\] PASSED",
+            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[valid_input\]\[GET:/v1/users\]\[A\] PASSED",
+            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[valid_input\]\[GET:/v1/users\]\[B\] PASSED",
+            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[valid_input\]\[POST:/v1/users\]\[A\] PASSED",
+            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[valid_input\]\[POST:/v1/users\]\[B\] PASSED",
             r"Hypothesis calls: 4",
         ]
     )

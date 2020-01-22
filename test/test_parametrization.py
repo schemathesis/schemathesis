@@ -20,7 +20,9 @@ def test_(request, case):
     result.assert_outcomes(passed=1)
     # Then test name should contain method:endpoint
     # And there should be only 1 hypothesis call
-    result.stdout.re_match_lines([r"test_parametrization.py::test_\[GET:/v1/users\] PASSED", r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines(
+        [r"test_parametrization.py::test_\[valid_input\]\[GET:/v1/users\] PASSED", r"Hypothesis calls: 1"]
+    )
 
 
 def test_pytest_parametrize(testdir):
@@ -48,8 +50,8 @@ def test_(request, param, case):
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
-            r"test_pytest_parametrize.py::test_\[GET:/v1/users\]\[A\] PASSED",
-            r"test_pytest_parametrize.py::test_\[GET:/v1/users\]\[B\] PASSED",
+            r"test_pytest_parametrize.py::test_\[valid_input\]\[GET:/v1/users\]\[A\] PASSED",
+            r"test_pytest_parametrize.py::test_\[valid_input\]\[GET:/v1/users\]\[B\] PASSED",
             r"Hypothesis calls: 4",
         ]
     )
@@ -78,8 +80,8 @@ class TestAPI:
     result.assert_outcomes(passed=2)
     result.stdout.re_match_lines(
         [
-            r"test_method.py::TestAPI::test_\[GET:/v1/users\] PASSED",
-            r"test_method.py::TestAPI::test_\[POST:/v1/users\] PASSED",
+            r"test_method.py::TestAPI::test_\[valid_input\]\[GET:/v1/users\] PASSED",
+            r"test_method.py::TestAPI::test_\[valid_input\]\[POST:/v1/users\] PASSED",
             r"Hypothesis calls: 2",
         ]
     )
@@ -479,7 +481,10 @@ def test_(request, case):
     # Then the tests should fail with the relevant error message
     result.assert_outcomes(failed=1, passed=2)
     result.stdout.re_match_lines(
-        [r".*test_invalid_endpoint.py::test_\[GET:/v1/invalid\] FAILED", ".*Failed: Invalid schema for endpoint"]
+        [
+            r".*test_invalid_endpoint.py::test_\[valid_input\]\[GET:/v1/invalid\] FAILED",
+            ".*Failed: Invalid schema for endpoint",
+        ]
     )
 
 

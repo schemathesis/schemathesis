@@ -9,9 +9,11 @@ from urllib.parse import quote_plus
 import hypothesis
 import hypothesis.strategies as st
 from hypothesis_jsonschema import from_schema
+from hypothesis_jsonschema_unfit import not_from_schema
 
 from . import utils
 from ._compat import handle_warnings
+from .constants import InputType
 from .exceptions import InvalidSchema
 from .hooks import get_hook
 from .models import Case, Endpoint
@@ -21,10 +23,14 @@ PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"
 
 
 def create_test(
-    endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
+    endpoint: Endpoint,
+    test: Callable,
+    settings: Optional[hypothesis.settings] = None,
+    seed: Optional[int] = None,
+    input_type: InputType = InputType.valid,
 ) -> Callable:
     """Create a Hypothesis test."""
-    strategy = endpoint.as_strategy()
+    strategy = endpoint.as_strategy(input_type)
     wrapped_test = hypothesis.given(case=strategy)(test)
     if seed is not None:
         wrapped_test = hypothesis.seed(seed)(wrapped_test)
@@ -118,27 +124,31 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
     return True
 
 
-def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
+def get_schema_strategy(value: Any, input_type: InputType) -> st.SearchStrategy:
+    strategy_func = {InputType.valid: from_schema, InputType.invalid: not_from_schema,}[input_type]
+    return strategy_func(value)
+
+
+def get_case_strategy(endpoint: Endpoint, input_type: InputType = InputType.valid) -> st.SearchStrategy:
     """Create a strategy for a complete test case.
 
     Path & endpoint are static, the others are JSON schemas.
     """
     strategies = {}
-    static_kwargs: Dict[str, Any] = {"endpoint": endpoint}
+    static_kwargs: Dict[str, Any] = {"endpoint": endpoint, "input_type": input_type}
     try:
         for parameter in PARAMETERS:
             value = getattr(endpoint, parameter)
             if value is not None:
+                strategy = get_schema_strategy(value, input_type)
                 if parameter == "path_parameters":
-                    strategies[parameter] = (
-                        from_schema(value).filter(filter_path_parameters).map(quote_all)  # type: ignore
-                    )
+                    strategies[parameter] = strategy.filter(filter_path_parameters).map(quote_all)  # type: ignore
                 elif parameter in ("headers", "cookies"):
-                    strategies[parameter] = from_schema(value).filter(is_valid_header)  # type: ignore
+                    strategies[parameter] = strategy.filter(is_valid_header)  # type: ignore
                 elif parameter == "query":
-                    strategies[parameter] = from_schema(value).filter(is_valid_query)  # type: ignore
+                    strategies[parameter] = strategy.filter(is_valid_query)  # type: ignore
                 else:
-                    strategies[parameter] = from_schema(value)  # type: ignore
+                    strategies[parameter] = strategy  # type: ignore
             else:
                 static_kwargs[parameter] = None
         return _get_case_strategy(endpoint, static_kwargs, strategies)

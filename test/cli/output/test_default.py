@@ -293,7 +293,7 @@ def test_display_errors(swagger_20, capsys, results_set, execution_context, show
 
 
 @pytest.mark.parametrize(
-    "attribute, expected", ((models.Case.__attrs_attrs__[3], "Cookies"), (models.Case.__attrs_attrs__[4], "Query"))
+    "attribute, expected", ((models.Case.__attrs_attrs__[3], "Headers"), (models.Case.__attrs_attrs__[4], "Cookies"))
 )
 def test_make_verbose_name(attribute, expected):
     assert default.make_verbose_name(attribute) == expected

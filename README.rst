@@ -215,11 +215,12 @@ Each test function should have the ``case`` fixture, that represents a single te
 
 Important ``Case`` attributes:
 
-- ``method`` - HTTP method
-- ``formatted_path`` - full endpoint path
-- ``headers`` - HTTP headers
-- ``query`` - query parameters
-- ``body`` - request body
+- ``input_type`` - type of data in the case, it can be valid or invalid;
+- ``method`` - HTTP method;
+- ``formatted_path`` - full endpoint path;
+- ``headers`` - HTTP headers;
+- ``query`` - query parameters;
+- ``body`` - request body;
 
 You can use them manually in network calls or can convert to a dictionary acceptable by ``requests.request``:
 
