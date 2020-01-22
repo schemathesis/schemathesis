@@ -22,6 +22,7 @@ from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
 from .constants import HookLocation
+from .converter import to_json_schema
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .models import Endpoint, empty_object
@@ -267,21 +268,7 @@ class SwaggerV20(BaseSchema):
 
     def prepare(self, item: Dict[str, Any]) -> Dict[str, Any]:
         """Parse schema extension, e.g. "x-nullable" field."""
-        # Add additional type "null" if parameter is nullable.
-        if item.get(self.nullable_name) is True:
-            del item[self.nullable_name]
-            if item.get("in"):
-                initial_type = {"type": item["type"]}
-                if item.get("enum"):
-                    initial_type["enum"] = item.pop("enum")
-                item["anyOf"] = [initial_type, {"type": "null"}]
-                del item["type"]
-            else:
-                item = {"anyOf": [item, {"type": "null"}]}
-        if item.get("type") == "file":
-            item["type"] = "string"
-            item["format"] = "binary"
-        return item
+        return to_json_schema(item, self.nullable_name)
 
     def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return definition.get("schema")
