@@ -6,6 +6,9 @@ Changelog
 `Unreleased`_
 -------------
 
+`0.23.5`_ - 2020-01-24
+----------------------
+
 Fixed
 ~~~~~
 
@@ -580,7 +583,8 @@ Fixed
 
 - Initial public release
 
-.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.23.4...HEAD
+.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.23.5...HEAD
+.. _0.23.5: https://github.com/kiwicom/schemathesis/compare/v0.23.4...v0.23.5
 .. _0.23.4: https://github.com/kiwicom/schemathesis/compare/v0.23.3...v0.23.4
 .. _0.23.3: https://github.com/kiwicom/schemathesis/compare/v0.23.2...v0.23.3
 .. _0.23.2: https://github.com/kiwicom/schemathesis/compare/v0.23.1...v0.23.2
