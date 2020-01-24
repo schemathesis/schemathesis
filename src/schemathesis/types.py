@@ -13,7 +13,12 @@ Headers = Dict[str, Any]  # pragma: no mutate
 Cookies = Dict[str, Any]  # pragma: no mutate
 FormData = Dict[str, Any]  # pragma: no mutate
 
+
+class NotSet:
+    pass
+
+
 # A filter for endpoint / method
-Filter = Union[str, List[str], Tuple[str], Set[str], object]  # pragma: no mutate
+Filter = Union[str, List[str], Tuple[str], Set[str], NotSet]  # pragma: no mutate
 
 Hook = Callable[[SearchStrategy], SearchStrategy]
