@@ -11,9 +11,9 @@ from hypothesis.reporting import with_reporter
 from werkzeug.wrappers import Response as BaseResponse
 from werkzeug.wrappers.json import JSONMixin
 
-from .types import Filter
+from .types import Filter, NotSet
 
-NOT_SET = object()
+NOT_SET = NotSet()
 
 
 def deprecated(func: Callable, message: str) -> Callable:
