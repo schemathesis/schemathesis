@@ -1,6 +1,6 @@
 # pylint: disable=too-many-arguments
 import pathlib
-from typing import IO, Any, Callable, Dict, Optional, Union
+from typing import IO, Any, Callable, Dict, Iterable, Optional, Union
 from urllib.parse import urljoin
 
 import jsonschema
@@ -10,7 +10,7 @@ from jsonschema import ValidationError
 from werkzeug.test import Client
 
 from . import spec_schemas
-from .constants import USER_AGENT
+from .constants import DEFAULT_INPUT_TYPES, USER_AGENT, InputType
 from .exceptions import HTTPError
 from .lazy import LazySchema
 from .schemas import BaseSchema, OpenApi30, SwaggerV20
@@ -27,6 +27,7 @@ def from_path(
     *,
     app: Any = None,
     validate_schema: bool = True,
+    input_types: Iterable[InputType] = DEFAULT_INPUT_TYPES,
 ) -> BaseSchema:
     """Load a file from OS path and parse to schema instance."""
     with open(path) as fd:
@@ -39,6 +40,7 @@ def from_path(
             tag=tag,
             app=app,
             validate_schema=validate_schema,
+            input_types=input_types,
         )
 
 
@@ -51,6 +53,7 @@ def from_uri(
     *,
     app: Any = None,
     validate_schema: bool = True,
+    input_types: Iterable[InputType] = DEFAULT_INPUT_TYPES,
     **kwargs: Any,
 ) -> BaseSchema:
     """Load a remote resource and parse to schema instance."""
@@ -71,6 +74,7 @@ def from_uri(
         tag=tag,
         app=app,
         validate_schema=validate_schema,
+        input_types=input_types,
     )
 
 
@@ -84,6 +88,7 @@ def from_file(
     *,
     app: Any = None,
     validate_schema: bool = True,
+    input_types: Iterable[InputType] = DEFAULT_INPUT_TYPES,
 ) -> BaseSchema:
     """Load a file content and parse to schema instance.
 
@@ -99,6 +104,7 @@ def from_file(
         tag=tag,
         app=app,
         validate_schema=validate_schema,
+        input_types=input_types,
     )
 
 
@@ -112,6 +118,7 @@ def from_dict(
     *,
     app: Any = None,
     validate_schema: bool = True,
+    input_types: Iterable[InputType] = DEFAULT_INPUT_TYPES,
 ) -> BaseSchema:
     """Get a proper abstraction for the given raw schema."""
     if "swagger" in raw_schema:
@@ -124,6 +131,7 @@ def from_dict(
             endpoint=endpoint,
             tag=tag,
             app=app,
+            input_types=input_types,
             validate_schema=validate_schema,
         )
 
@@ -137,6 +145,7 @@ def from_dict(
             endpoint=endpoint,
             tag=tag,
             app=app,
+            input_types=input_types,
             validate_schema=validate_schema,
         )
     raise ValueError("Unsupported schema type")
@@ -168,6 +177,7 @@ def from_wsgi(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     validate_schema: bool = True,
+    input_types: Iterable[InputType] = DEFAULT_INPUT_TYPES,
 ) -> BaseSchema:
     client = Client(app, WSGIResponse)
     response = client.get(schema_path, headers={"User-Agent": USER_AGENT})
@@ -184,6 +194,7 @@ def from_wsgi(
         tag=tag,
         app=app,
         validate_schema=validate_schema,
+        input_types=input_types,
     )
 
 
@@ -202,6 +213,7 @@ def from_aiohttp(
     tag: Optional[Filter] = None,
     *,
     validate_schema: bool = True,
+    input_types: Iterable[InputType] = DEFAULT_INPUT_TYPES,
 ) -> BaseSchema:
     from .extra._aiohttp import run_server  # pylint: disable=import-outside-toplevel
 
@@ -210,7 +222,15 @@ def from_aiohttp(
     url = urljoin(app_url, schema_path)
     if not base_url:
         base_url = app_url
-    return from_uri(url, base_url=base_url, method=method, endpoint=endpoint, tag=tag, validate_schema=validate_schema)
+    return from_uri(
+        url,
+        base_url=base_url,
+        method=method,
+        endpoint=endpoint,
+        tag=tag,
+        validate_schema=validate_schema,
+        input_types=input_types,
+    )
 
 
 # Backward compatibility

@@ -24,3 +24,6 @@ class HookLocation(Enum):
 class InputType(Enum):
     valid = "valid"
     invalid = "invalid"
+
+
+DEFAULT_INPUT_TYPES = (InputType.valid,)

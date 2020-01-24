@@ -22,15 +22,13 @@ import yaml
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
-from .constants import HookLocation, InputType
+from .constants import DEFAULT_INPUT_TYPES, HookLocation, InputType
 from .converter import to_json_schema
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .models import Endpoint, empty_object
 from .types import Filter, Hook, NotSet
 from .utils import NOT_SET, StringDatesYAMLLoader
-
-DEFAULT_INPUT_TYPES = (InputType.valid,)
 
 
 def load_file_impl(location: str, opener: Callable) -> Dict[str, Any]:
@@ -111,8 +109,9 @@ class BaseSchema(Mapping):
         """Generate all endpoints and Hypothesis tests for them."""
         test: Union[Callable, InvalidSchema]
         for endpoint in self.get_all_endpoints():
-            test = make_test_or_exception(endpoint, func, settings, seed)
-            yield endpoint, test
+            for input_type in self.input_types:
+                test = make_test_or_exception(endpoint, func, settings, seed, input_type=input_type)
+                yield endpoint, test
 
     def parametrize(
         self,
@@ -120,7 +119,7 @@ class BaseSchema(Mapping):
         endpoint: Optional[Filter] = NOT_SET,
         tag: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
-            input_types: Iterable[InputType] = DEFAULT_INPUT_TYPES,
+        input_types: Union[Iterable[InputType], NotSet] = NOT_SET,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
 
@@ -136,6 +135,7 @@ class BaseSchema(Mapping):
         endpoint: Optional[Filter] = NOT_SET,
         tag: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
+        input_types: Union[Iterable[InputType], NotSet] = NOT_SET,
     ) -> "BaseSchema":
         if method is NOT_SET:
             method = self.method
@@ -145,6 +145,11 @@ class BaseSchema(Mapping):
             tag = self.tag
         if validate_schema is NOT_SET:
             validate_schema = self.validate_schema
+        # Need a different name because of mypy
+        if isinstance(input_types, NotSet):
+            input_types_ = self.input_types
+        else:
+            input_types_ = input_types
 
         return self.__class__(
             self.raw_schema,

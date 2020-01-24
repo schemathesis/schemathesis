@@ -43,10 +43,14 @@ def create_test(
 
 
 def make_test_or_exception(
-    endpoint: Endpoint, func: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
+    endpoint: Endpoint,
+    func: Callable,
+    settings: Optional[hypothesis.settings] = None,
+    seed: Optional[int] = None,
+    input_type: InputType = InputType.valid,
 ) -> Union[Callable, InvalidSchema]:
     try:
-        return create_test(endpoint, func, settings, seed=seed)
+        return create_test(endpoint, func, settings, seed=seed, input_type=input_type)
     except InvalidSchema as exc:
         return exc
 
@@ -99,9 +103,22 @@ def add_examples(test: Callable, endpoint: Endpoint) -> Callable:
     return test
 
 
-def is_valid_header(headers: Dict[str, str]) -> bool:
+def _has_invalid_characters(name: str, value: str) -> bool:
+    try:
+        check_header_validity((name, value))
+        return bool(INVALID_HEADER_RE.search(value))
+    except InvalidHeader:
+        return True
+
+def is_valid_header(headers: Any) -> bool:
     """Verify if the generated headers are valid."""
+    # Data could be of any type
+    if not isinstance(headers, dict):
+        return False
     for name, value in headers.items():
+        # only string values can be sent by clients to the app
+        if not isinstance(name, str) or not isinstance(value, str):
+            return False
         if not utils.is_latin_1_encodable(value):
             return False
         if utils.has_invalid_characters(name, value):
@@ -113,19 +130,32 @@ def is_surrogate(item: Any) -> bool:
     return isinstance(item, str) and bool(re.search(r"[\ud800-\udfff]", item))
 
 
-def is_valid_query(query: Dict[str, Any]) -> bool:
+def is_valid_query(query: Any) -> bool:
     """Surrogates are not allowed in a query string.
 
     `requests` and `werkzeug` will fail to send it to the application.
     """
+    if not isinstance(query, dict):
+        return False
     for name, value in query.items():
         if is_surrogate(name) or is_surrogate(value):
             return False
     return True
 
 
+def is_valid_cookie(cookies: Any) -> bool:
+    if not isinstance(cookies, dict):
+        return False
+    for name, value in cookies.items():
+        if not isinstance(name, str) or not isinstance(value, str):
+            return False
+        if not _is_latin_1_encodable(name) or not _is_latin_1_encodable(value):
+            return False
+    return True
+
+
 def get_schema_strategy(value: Any, input_type: InputType) -> st.SearchStrategy:
-    strategy_func = {InputType.valid: from_schema, InputType.invalid: not_from_schema,}[input_type]
+    strategy_func = {InputType.valid: from_schema, InputType.invalid: not_from_schema}[input_type]
     return strategy_func(value)
 
 
@@ -147,6 +177,8 @@ def get_case_strategy(endpoint: Endpoint, input_type: InputType = InputType.vali
                     strategies[parameter] = strategy.filter(is_valid_header)  # type: ignore
                 elif parameter == "query":
                     strategies[parameter] = strategy.filter(is_valid_query)  # type: ignore
+                elif parameter == "cookies":
+                    strategies[parameter] = strategy.filter(is_valid_cookie)  # type: ignore
                 else:
                     strategies[parameter] = strategy  # type: ignore
             else:
@@ -162,6 +194,10 @@ def filter_path_parameters(parameters: Dict[str, Any]) -> bool:
     In this case one variable in the path template will be empty, which will lead to 404 in most of the cases.
     Because of it this case doesn't bring much value and might lead to false positives results of Schemathesis runs.
     """
+    for value in parameters.values():
+        # Disallow composed values
+        if isinstance(value, (list, dict)):
+            return False
     return not any(value == "." for value in parameters.values())
 
 

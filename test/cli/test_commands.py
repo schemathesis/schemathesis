@@ -174,6 +174,7 @@ def test_commands_run_help(cli):
         "                                  Timeout in milliseconds for network requests",
         "                                  during the test run.",
         "  --validate-schema BOOLEAN       Enable or disable validation of input schema.",
+        "  --input-types [valid|invalid]   Input type to be generated",
         "  --show-errors-tracebacks        Show full tracebacks for internal errors.",
         "  --hypothesis-deadline INTEGER RANGE",
         "                                  Duration in milliseconds that each individual",
