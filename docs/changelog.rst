@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Generation of invalid values in ``Case.cookies``. `#371`_
+
 `0.23.4`_ - 2020-01-22
 ----------------------
 
@@ -619,6 +624,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#371: https://github.com/kiwicom/schemathesis/issues/371
 .. _#367: https://github.com/kiwicom/schemathesis/issues/367
 .. _#365: https://github.com/kiwicom/schemathesis/issues/365
 .. _#361: https://github.com/kiwicom/schemathesis/issues/361

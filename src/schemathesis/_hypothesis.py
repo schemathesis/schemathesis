@@ -154,7 +154,7 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
                     strategies[parameter] = (
                         from_schema(value).filter(filter_path_parameters).map(quote_all)  # type: ignore
                     )
-                elif parameter == "headers":
+                elif parameter in ("headers", "cookies"):
                     strategies[parameter] = from_schema(value).filter(is_valid_header)  # type: ignore
                 elif parameter == "query":
                     strategies[parameter] = from_schema(value).filter(is_valid_query)  # type: ignore

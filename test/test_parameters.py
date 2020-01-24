@@ -13,9 +13,9 @@ def test_headers(testdir):
     testdir.make_test(
         """
 @schema.parametrize()
-@settings(max_examples=1)
 def test_(case):
     assert_str(case.headers["api_key"])
+    assert_requests_call(case)
         """,
         **as_param({"name": "api_key", "in": "header", "required": True, "type": "string"}),
     )
@@ -28,9 +28,9 @@ def test_cookies(testdir):
     testdir.make_test(
         """
 @schema.parametrize()
-@settings(max_examples=1)
 def test_(case):
     assert_str(case.cookies["token"])
+    assert_requests_call(case)
         """,
         schema_name="simple_openapi.yaml",
         **as_param({"name": "token", "in": "cookie", "required": True, "schema": {"type": "string"}}),
@@ -47,6 +47,7 @@ def test_body(testdir):
 @settings(max_examples=3)
 def test_(case):
     assert_int(case.body)
+    assert_requests_call(case)
         """,
         paths={
             "/users": {
@@ -69,6 +70,7 @@ def test_path(testdir):
 @settings(max_examples=3)
 def test_(case):
     assert_int(case.path_parameters["user_id"])
+    assert_requests_call(case)
         """,
         paths={
             "/users/{user_id}": {
@@ -91,6 +93,7 @@ def test_form_data(testdir):
 @settings(max_examples=1)
 def test_(case):
     assert_str(case.form_data["status"])
+    assert_requests_call(case)
         """,
         **as_param({"name": "status", "in": "formData", "required": True, "type": "string"}),
     )
