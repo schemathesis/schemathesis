@@ -26,6 +26,8 @@ Built with:
 
 Inspired by wonderful `swagger-conformance <https://github.com/olipratt/swagger-conformance>`_ project.
 
+If you are looking for more information, then there is an article about Schemathesis: https://code.kiwi.com/schemathesis-property-based-testing-for-api-schemas-52811fd2b0a4
+
 Installation
 ------------
 
