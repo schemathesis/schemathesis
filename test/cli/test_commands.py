@@ -10,6 +10,7 @@ from importlib_metadata import version
 from requests import Response
 
 from schemathesis import Case
+from schemathesis.checks import ALL_CHECKS
 from schemathesis.loaders import from_path
 from schemathesis.models import Endpoint
 from schemathesis.runner import DEFAULT_CHECKS
@@ -112,7 +113,7 @@ def test_commands_run_help(cli):
         "",
         "Options:",
         "  -c, --checks [not_a_server_error|status_code_conformance|"
-        "content_type_conformance|response_schema_conformance]",
+        "content_type_conformance|response_schema_conformance|all]",
         "                                  List of checks to run.",
         "  -a, --auth TEXT                 Server user and password. Example:",
         "                                  USER:PASSWORD",
@@ -161,6 +162,7 @@ SCHEMA_URI = "https://example.com/swagger.json"
     "args, expected",
     (
         ([SCHEMA_URI], {"checks": DEFAULT_CHECKS, "workers_num": 1}),
+        ([SCHEMA_URI, "--checks=all"], {"checks": ALL_CHECKS, "workers_num": 1}),
         (
             [SIMPLE_PATH, "--base-url=http://127.0.0.1"],
             {
