@@ -6,20 +6,20 @@ import pytest
 import yaml
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
-from importlib_metadata import version
 from requests import Response
 
 from schemathesis import Case
+from schemathesis._compat import metadata
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.loaders import from_path
 from schemathesis.models import Endpoint
 from schemathesis.runner import DEFAULT_CHECKS
 
 PHASES = "explicit, reuse, generate, target, shrink"
-if version("hypothesis") < "4.5":
+if metadata.version("hypothesis") < "4.5":
     PHASES = "explicit, reuse, generate, shrink"
 HEALTH_CHECKS = "data_too_large|filter_too_much|too_slow|return_value|large_base_example|not_a_test_method"
-if version("hypothesis") < "5.0":
+if metadata.version("hypothesis") < "5.0":
     HEALTH_CHECKS = (
         "data_too_large|filter_too_much|too_slow|return_value|hung_test|large_base_example|not_a_test_method"
     )

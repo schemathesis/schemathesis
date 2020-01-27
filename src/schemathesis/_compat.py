@@ -1,3 +1,4 @@
+# pylint: disable=unused-import
 from contextlib import contextmanager
 from typing import Generator
 from warnings import catch_warnings, simplefilter
@@ -13,3 +14,9 @@ def handle_warnings() -> Generator[None, None, None]:
             yield
     except ImportError:
         yield
+
+
+try:
+    from importlib import metadata
+except ImportError:
+    import importlib_metadata as metadata  # type: ignore

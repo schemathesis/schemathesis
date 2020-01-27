@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+~~~~~~~
+
+- Use built-in ``importlib.metadata`` on Python 3.8. `#376`_
+
 `0.23.5`_ - 2020-01-24
 ----------------------
 
@@ -628,6 +633,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#376: https://github.com/kiwicom/schemathesis/issues/376
 .. _#371: https://github.com/kiwicom/schemathesis/issues/371
 .. _#367: https://github.com/kiwicom/schemathesis/issues/367
 .. _#365: https://github.com/kiwicom/schemathesis/issues/365

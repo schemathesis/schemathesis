@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union, cast
 import click
 from attr import Attribute
 from hypothesis import settings
-from importlib_metadata import version
 
+from ..._compat import metadata
 from ...constants import __version__
 from ...models import Case, Check, Status, TestResult, TestResultSet
 from ...runner import events
@@ -256,9 +256,9 @@ def handle_initialized(context: events.ExecutionContext, event: events.Initializ
         f"platform {platform.system()} -- "
         f"Python {platform.python_version()}, "
         f"schemathesis-{__version__}, "
-        f"hypothesis-{version('hypothesis')}, "
-        f"hypothesis_jsonschema-{version('hypothesis_jsonschema')}, "
-        f"jsonschema-{version('jsonschema')}"
+        f"hypothesis-{metadata.version('hypothesis')}, "
+        f"hypothesis_jsonschema-{metadata.version('hypothesis_jsonschema')}, "
+        f"jsonschema-{metadata.version('jsonschema')}"
     )
     click.echo(versions)
     click.echo(f"rootdir: {os.getcwd()}")
