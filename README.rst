@@ -431,7 +431,7 @@ You can provide your custom checks to the execute function, the check is a calla
     from datetime import timedelta
     from schemathesis import runner, models
 
-    def not_too_long(response, result: models.TestResult):
+    def not_too_long(response, case: models.Case):
         assert response.elapsed < timedelta(milliseconds=300)
 
     runner.execute("http://127.0.0.1:8080/swagger.json", checks=[not_too_long])
