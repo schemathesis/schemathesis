@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- ``all`` variant for ``--checks`` CLI option to use all available checks. `#374`_
+
 Changed
 ~~~~~~~
 
@@ -634,6 +639,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#376: https://github.com/kiwicom/schemathesis/issues/376
+.. _#374: https://github.com/kiwicom/schemathesis/issues/374
 .. _#371: https://github.com/kiwicom/schemathesis/issues/371
 .. _#367: https://github.com/kiwicom/schemathesis/issues/367
 .. _#365: https://github.com/kiwicom/schemathesis/issues/365
