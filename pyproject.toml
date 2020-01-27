@@ -34,7 +34,7 @@ pyyaml = "^5.1"
 pytest-subtests = "^0.2.1"
 requests = "^2.22"
 click = "^7.0"
-importlib_metadata = "^1.1"
+importlib_metadata = { version = "^1.1", python = "<3.8" }
 werkzeug = "^0.16.0"
 
 [tool.poetry.dev-dependencies]
@@ -64,7 +64,7 @@ multi_line_output = 3
 default_section = "THIRDPARTY"
 include_trailing_comma = true
 known_first_party = "schemathesis"
-known_third_party = ["_pytest", "aiohttp", "attr", "click", "flask", "hypothesis", "hypothesis_jsonschema", "importlib_metadata", "jsonschema", "pytest", "pytest_subtests", "requests", "schemathesis", "werkzeug", "yaml"]
+known_third_party = ["_pytest", "aiohttp", "attr", "click", "flask", "hypothesis", "hypothesis_jsonschema", "jsonschema", "pytest", "pytest_subtests", "requests", "schemathesis", "werkzeug", "yaml"]
 
 [build-system]
 requires = ["poetry>=0.12"]

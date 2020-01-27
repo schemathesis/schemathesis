@@ -1,10 +1,10 @@
 from enum import Enum
 
-from importlib_metadata import PackageNotFoundError, version
+from ._compat import metadata
 
 try:
-    __version__ = version(__package__)
-except PackageNotFoundError:
+    __version__ = metadata.version(__package__)
+except metadata.PackageNotFoundError:
     # Local run without installation
     __version__ = "dev"
 
