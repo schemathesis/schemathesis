@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- ``-x``/``--exitfirst`` CLI option to exit after first failed test. `#378`_
+
 `0.23.6`_ - 2020-01-28
 ----------------------
 
@@ -642,6 +647,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#378: https://github.com/kiwicom/schemathesis/issues/378
 .. _#376: https://github.com/kiwicom/schemathesis/issues/376
 .. _#374: https://github.com/kiwicom/schemathesis/issues/374
 .. _#371: https://github.com/kiwicom/schemathesis/issues/371

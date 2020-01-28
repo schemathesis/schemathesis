@@ -115,6 +115,7 @@ def test_commands_run_help(cli):
         "  -c, --checks [not_a_server_error|status_code_conformance|"
         "content_type_conformance|response_schema_conformance|all]",
         "                                  List of checks to run.",
+        "  -x, --exitfirst                 Exit instantly on first error or failed test.",
         "  -a, --auth TEXT                 Server user and password. Example:",
         "                                  USER:PASSWORD",
         "  -A, --auth-type [basic|digest]  The authentication mechanism to be used.",
@@ -163,6 +164,7 @@ SCHEMA_URI = "https://example.com/swagger.json"
     (
         ([SCHEMA_URI], {"checks": DEFAULT_CHECKS, "workers_num": 1}),
         ([SCHEMA_URI, "--checks=all"], {"checks": ALL_CHECKS, "workers_num": 1}),
+        ([SCHEMA_URI, "--exitfirst"], {"checks": DEFAULT_CHECKS, "exit_first": True, "workers_num": 1}),
         (
             [SIMPLE_PATH, "--base-url=http://127.0.0.1"],
             {
