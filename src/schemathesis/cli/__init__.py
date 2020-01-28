@@ -50,6 +50,9 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     "--checks", "-c", multiple=True, help="List of checks to run.", type=CHECKS_TYPE, default=DEFAULT_CHECKS_NAMES
 )
 @click.option(
+    "-x", "--exitfirst", "exit_first", is_flag=True, default=False, help="Exit instantly on first error or failed test."
+)
+@click.option(
     "--auth", "-a", help="Server user and password. Example: USER:PASSWORD", type=str, callback=callbacks.validate_auth
 )
 @click.option(
@@ -129,6 +132,7 @@ def run(  # pylint: disable=too-many-arguments
     auth_type: str,
     headers: Dict[str, str],
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
+    exit_first: bool = False,
     endpoints: Optional[Filter] = None,
     methods: Optional[Filter] = None,
     tags: Optional[Filter] = None,
@@ -173,6 +177,7 @@ def run(  # pylint: disable=too-many-arguments
             verbosity=hypothesis_verbosity,
         ),
         seed=hypothesis_seed,
+        exit_first=exit_first,
     )
     if validate_schema is False:
         options.setdefault("loader_options", {})["validate_schema"] = validate_schema

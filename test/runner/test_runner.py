@@ -375,3 +375,12 @@ def test_get_requests_auth():
 def test_get_wsgi_auth():
     with pytest.raises(ValueError, match="Digest auth is not supported for WSGI apps"):
         get_wsgi_auth(("test", "test"), "digest")
+
+
+@pytest.mark.endpoints("failure", "multiple_failures")
+def test_exit_first(args):
+    app, kwargs = args
+    results = prepare(**kwargs, exit_first=True)
+    results = list(results)
+    assert results[-1].results.has_failures is True
+    assert results[-1].results.failed_count == 1

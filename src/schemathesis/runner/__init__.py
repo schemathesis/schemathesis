@@ -48,6 +48,7 @@ class BaseRunner:
     headers: Optional[Dict[str, Any]] = attr.ib(default=None)
     request_timeout: Optional[int] = attr.ib(default=None)
     seed: Optional[int] = attr.ib(default=None)
+    exit_first: bool = attr.ib(default=False)
 
     def execute(self,) -> Generator[events.ExecutionEvent, None, None]:
         """Common logic for all runners."""
@@ -58,7 +59,14 @@ class BaseRunner:
         )
         yield initialized
 
-        yield from self._execute(results)
+        for event in self._execute(results):
+            if (
+                self.exit_first
+                and isinstance(event, events.AfterExecution)
+                and event.status in (Status.error, Status.failure)
+            ):
+                break
+            yield event
 
         yield events.Finished(results=results, schema=self.schema, running_time=time.time() - initialized.start_time)
 
@@ -282,6 +290,7 @@ def execute_from_schema(
     headers: Optional[Dict[str, Any]] = None,
     request_timeout: Optional[int] = None,
     seed: Optional[int] = None,
+    exit_first: bool = False,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Execute tests for the given schema.
 
@@ -299,6 +308,7 @@ def execute_from_schema(
                 headers=headers,
                 seed=seed,
                 workers_num=workers_num,
+                exit_first=exit_first,
             )
         else:
             runner = ThreadPoolRunner(
@@ -310,6 +320,7 @@ def execute_from_schema(
                 headers=headers,
                 seed=seed,
                 request_timeout=request_timeout,
+                exit_first=exit_first,
             )
     else:
         if schema.app:
@@ -321,6 +332,7 @@ def execute_from_schema(
                 auth_type=auth_type,
                 headers=headers,
                 seed=seed,
+                exit_first=exit_first,
             )
         else:
             runner = SingleThreadRunner(
@@ -332,6 +344,7 @@ def execute_from_schema(
                 headers=headers,
                 seed=seed,
                 request_timeout=request_timeout,
+                exit_first=exit_first,
             )
 
     yield from runner.execute()
@@ -425,6 +438,7 @@ def prepare(  # pylint: disable=too-many-arguments
     hypothesis_options: Optional[Dict[str, Any]] = None,
     loader: Callable = from_uri,
     seed: Optional[int] = None,
+    exit_first: bool = False,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Prepare a generator that will run test cases against the given API definition."""
     api_options = api_options or {}
@@ -434,7 +448,13 @@ def prepare(  # pylint: disable=too-many-arguments
         loader_options["base_url"] = get_base_url(schema_uri)
     schema = loader(schema_uri, **loader_options)
     return execute_from_schema(
-        schema, checks, hypothesis_options=hypothesis_options, seed=seed, workers_num=workers_num, **api_options
+        schema,
+        checks,
+        hypothesis_options=hypothesis_options,
+        seed=seed,
+        workers_num=workers_num,
+        exit_first=exit_first,
+        **api_options,
     )
 
 
