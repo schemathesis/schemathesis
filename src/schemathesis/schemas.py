@@ -315,6 +315,12 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         else:
             super().process_by_type(endpoint, parameter)
 
+    def add_parameter(self, container: Optional[Dict[str, Any]], parameter: Dict[str, Any]) -> Dict[str, Any]:
+        container = super().add_parameter(container, parameter)
+        if "example" in parameter:
+            container["example"] = {parameter["name"]: parameter["example"]}
+        return container
+
     def process_cookie(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         endpoint.cookies = self.add_parameter(endpoint.cookies, parameter)
 
