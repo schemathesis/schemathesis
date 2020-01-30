@@ -138,8 +138,8 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
-def test_specified_example(testdir):
-    # When the given parameter contains an example
+def test_specified_example_body(testdir):
+    # When the given body parameter contains an example
     testdir.make_test(
         """
 from hypothesis import Phase
@@ -175,6 +175,46 @@ def test(request, case):
             }
         },
     )
+    result = testdir.runpytest("-v", "-s")
+    # Then this example should be used in tests
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+
+
+def test_specified_example_query(testdir):
+    # When the given query parameter contains an example
+    testdir.make_test(
+        """
+from hypothesis import Phase
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.explicit])
+def test(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.query == {"id": "test"}
+""",
+        schema={
+            "openapi": "3.0.2",
+            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+            "paths": {
+                "/query": {
+                    "get": {
+                        "parameters": [
+                            {
+                                "name": "id",
+                                "in": "query",
+                                "required": True,
+                                "example": "test",
+                                "schema": {"type": "string"},
+                            }
+                        ],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        },
+    )
+
     result = testdir.runpytest("-v", "-s")
     # Then this example should be used in tests
     result.assert_outcomes(passed=1)

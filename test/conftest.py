@@ -127,9 +127,10 @@ def testdir(testdir):
         tag=None,
         pytest_plugins=("aiohttp.pytest_plugin",),
         validate_schema=True,
+        schema=None,
         **kwargs,
     ):
-        schema = make_schema(**kwargs)
+        schema = schema or make_schema(**kwargs)
         preparation = dedent(
             """
         import pytest
