@@ -1,7 +1,7 @@
 import datetime
 
 import yaml
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 
@@ -13,6 +13,7 @@ def test_headers(testdir):
     testdir.make_test(
         """
 @schema.parametrize()
+@settings(suppress_health_check=[HealthCheck.filter_too_much])
 def test_(case):
     assert_str(case.headers["api_key"])
     assert_requests_call(case)
@@ -28,6 +29,7 @@ def test_cookies(testdir):
     testdir.make_test(
         """
 @schema.parametrize()
+@settings(suppress_health_check=[HealthCheck.filter_too_much])
 def test_(case):
     assert_str(case.cookies["token"])
     assert_requests_call(case)
@@ -153,6 +155,7 @@ def test_date_deserializing(testdir):
     schema = schemathesis.from_path(str(schema_path))
 
     @given(case=schema["/teapot"]["GET"].as_strategy())
+    @settings(suppress_health_check=[HealthCheck.filter_too_much])
     def test(case):
         assert isinstance(case.query["key"], str)
 

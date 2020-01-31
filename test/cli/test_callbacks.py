@@ -22,7 +22,7 @@ def test_validate_schema_path_without_base_url():
         callbacks.validate_schema(SimpleNamespace(params={}), None, SIMPLE_PATH)
 
 
-@given(value=st.text().filter(lambda x: not x.endswith(":")))
+@given(value=st.text().filter(lambda x: x.count(":") != 1))
 @example(":")
 def test_validate_auth(value):
     with pytest.raises(click.BadParameter):

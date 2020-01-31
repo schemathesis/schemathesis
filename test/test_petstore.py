@@ -39,7 +39,7 @@ def test_find_by_status(testdir):
     testdir.make_petstore_test(
         """
 @schema.parametrize(endpoint="/pet/findByStatus$")
-@settings(max_examples=5)
+@settings(max_examples=5, deadline=None)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_list(case.query["status"])
@@ -83,7 +83,7 @@ def test_update_pet(testdir):
     testdir.make_petstore_test(
         """
 @schema.parametrize(method="POST", endpoint="/pet/{petId}$")
-@settings(max_examples=5)
+@settings(max_examples=5, deadline=None)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["petId"])
@@ -176,7 +176,7 @@ def test_delete_order(testdir):
     testdir.make_petstore_test(
         """
 @schema.parametrize(method="DELETE", endpoint="/store/order/{orderId}$")
-@settings(max_examples=5)
+@settings(max_examples=5, suppress_health_check=[HealthCheck.filter_too_much])
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["orderId"])
@@ -191,7 +191,7 @@ def test_create_user(testdir):
     testdir.make_petstore_test(
         """
 @schema.parametrize(endpoint="/user$")
-@settings(max_examples=5)
+@settings(max_examples=5, deadline=None)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert isinstance(case.body, dict)
@@ -205,7 +205,7 @@ def test_create_multiple_users(testdir):
     testdir.make_petstore_test(
         """
 @schema.parametrize(endpoint="/user/createWith")
-@settings(max_examples=5)
+@settings(max_examples=5, deadline=None)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_list(case.body)
