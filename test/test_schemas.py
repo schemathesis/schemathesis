@@ -43,14 +43,15 @@ def test_open_api_verbose_name(openapi_30):
     assert openapi_30.spec_version == "3.0.0"
 
 
-def test_resolver_cache(swagger_20, mocker):
+def test_resolver_cache(simple_schema, mocker):
+    schema = schemathesis.from_dict(simple_schema)
     spy = mocker.patch("schemathesis.schemas.jsonschema.RefResolver", wraps=RefResolver)
-    assert "_resolver" not in swagger_20.__dict__
-    assert isinstance(swagger_20.resolver, RefResolver)
+    assert "_resolver" not in schema.__dict__
+    assert isinstance(schema.resolver, RefResolver)
     assert spy.call_count == 1
     # Cached
-    assert "_resolver" in swagger_20.__dict__
-    assert isinstance(swagger_20.resolver, RefResolver)
+    assert "_resolver" in schema.__dict__
+    assert isinstance(schema.resolver, RefResolver)
     assert spy.call_count == 1
 
 
