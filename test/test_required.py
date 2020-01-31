@@ -5,7 +5,7 @@ def test_required_parameters(testdir):
     testdir.make_test(
         """
 @schema.parametrize(method="POST")
-@settings(max_examples=20)
+@settings(max_examples=20, suppress_health_check=[HealthCheck.data_too_large])
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"

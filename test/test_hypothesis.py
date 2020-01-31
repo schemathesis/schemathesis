@@ -1,7 +1,7 @@
 from base64 import b64decode
 
 import pytest
-from hypothesis import given, settings, strategies
+from hypothesis import HealthCheck, given, settings, strategies
 
 from schemathesis import Case, register_string_format
 from schemathesis._hypothesis import PARAMETERS, get_case_strategy, get_examples, is_valid_query
@@ -156,6 +156,7 @@ def test_valid_headers(base_url, swagger_20):
     )
 
     @given(case=get_case_strategy(endpoint))
+    @settings(suppress_health_check=[HealthCheck.filter_too_much])
     def inner(case):
         case.call()
 

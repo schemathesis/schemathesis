@@ -352,7 +352,7 @@ def test_cli_run_only_failure(cli, cli_args, workers):
 
 @pytest.mark.endpoints("upload_file")
 def test_cli_binary_body(cli, schema_url):
-    result = cli.run(schema_url)
+    result = cli.run(schema_url, "--hypothesis-suppress-health-check=filter_too_much")
     assert result.exit_code == ExitCode.OK
     assert " HYPOTHESIS OUTPUT " not in result.stdout
 
@@ -661,7 +661,9 @@ def test_pre_run_hook_valid(testdir, cli, schema_url, app):
     """
     )
 
-    result = cli.main("--pre-run", module.purebasename, "run", schema_url)
+    result = cli.main(
+        "--pre-run", module.purebasename, "run", "--hypothesis-suppress-health-check=filter_too_much", schema_url
+    )
 
     # Then CLI should run successfully
     assert result.exit_code == ExitCode.OK
