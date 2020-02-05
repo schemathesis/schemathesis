@@ -14,12 +14,9 @@ Welcome to schemathesis's documentation!
    :caption: Contents:
 
    changelog
-   sources/schemathesis
-
 
 Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
