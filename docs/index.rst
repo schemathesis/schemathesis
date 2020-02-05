@@ -13,6 +13,7 @@ Welcome to schemathesis's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   faq
    changelog
 
 Indices and tables
