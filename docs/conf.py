@@ -19,6 +19,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import datetime
 import os
 import sys
 
@@ -49,9 +50,9 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = "schemathesis"
-copyright = "2017, platform team"
-author = "platform team"
+project = "Schemathesis"
+copyright = "{year}, Kiwi.com".format(year=datetime.date.today().year)
+author = "Kiwi.com"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -97,7 +98,7 @@ html_theme = "alabaster"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
+html_static_path = []
 
 
 # -- Options for HTMLHelp output ------------------------------------------
