@@ -6,6 +6,7 @@ from aiohttp.streams import EmptyStreamReader
 from flask import Flask
 from requests.auth import HTTPDigestAuth
 
+import schemathesis
 from schemathesis import from_wsgi
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.constants import __version__
@@ -304,7 +305,20 @@ def test_response_conformance_malformed_json(args):
     assert "Expecting property name enclosed in double quotes" in str(error)
 
 
+@pytest.fixture()
+def filter_path_parameters():
+    # ".." and "." strings are treated specially, but this behavior is outside of the test's scope
+
+    def schema_filter(strategy):
+        return strategy.filter(lambda x: x["key"] not in ("..", "."))
+
+    schemathesis.hooks.register("path_parameters", schema_filter)
+    yield
+    schemathesis.hooks.unregister_all()
+
+
 @pytest.mark.endpoints("path_variable")
+@pytest.mark.usefixtures("filter_path_parameters")
 def test_path_parameters_encoding(schema_url):
     # NOTE. Flask still decodes %2F as / and returns 404
     # When endpoint has a path parameter
