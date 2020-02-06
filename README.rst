@@ -1,7 +1,7 @@
 Schemathesis
 ============
 
-|Build| |Coverage| |Version| |Python versions| |License|
+|Build| |Coverage| |Version| |Python versions| |Docs| |License|
 
 Schemathesis is a tool for testing your web applications built with Open API / Swagger specifications.
 
@@ -594,6 +594,9 @@ will be licensed under its MIT license.
    :target: https://pypi.org/project/schemathesis/
 .. |License| image:: https://img.shields.io/pypi/l/schemathesis.svg
    :target: https://opensource.org/licenses/MIT
+.. |Docs| image:: https://readthedocs.org/projects/schemathesis/badge/?version=stable
+   :target: https://schemathesis.readthedocs.io/en/stable/?badge=stable
+   :alt: Documentation Status
 
 .. _hypothesis: https://hypothesis.works/
 .. _hypothesis_jsonschema: https://github.com/Zac-HD/hypothesis-jsonschema
