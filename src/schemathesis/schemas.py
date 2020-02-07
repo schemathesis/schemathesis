@@ -318,6 +318,11 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
 
     def add_parameter(self, container: Optional[Dict[str, Any]], parameter: Dict[str, Any]) -> Dict[str, Any]:
         container = super().add_parameter(container, parameter)
+        if "example" in parameter["schema"]:
+            container["example"] = {parameter["name"]: parameter["schema"]["example"]}
+        # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#parameter-object
+        # > Furthermore, if referencing a schema which contains an example,
+        # > the example value SHALL override the example provided by the schema
         if "example" in parameter:
             container["example"] = {parameter["name"]: parameter["example"]}
         return container
@@ -329,6 +334,11 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         # Take the first media type object
         options = iter(parameter["content"].values())
         parameter = next(options)
+        # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#media-type-object
+        # > Furthermore, if referencing a schema which contains an example,
+        # > the example value SHALL override the example provided by the schema
+        if "example" in parameter:
+            parameter["schema"]["example"] = parameter["example"]
         super().process_body(endpoint, parameter)
 
     def parameter_to_json_schema(self, data: Dict[str, Any]) -> Dict[str, Any]:
