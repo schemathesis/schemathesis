@@ -10,6 +10,7 @@ Added
 ~~~~~
 
 - Support for testing of examples in Parameter & Media Type objects in Open API 3.0. `#394`_
+- ``--show-error-tracebacks`` CLI option to display errors' tracebacks in the output. `#391`_
 
 Changed
 ~~~~~~~
@@ -673,6 +674,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#394: https://github.com/kiwicom/schemathesis/issues/394
+.. _#391: https://github.com/kiwicom/schemathesis/issues/391
 .. _#386: https://github.com/kiwicom/schemathesis/issues/386
 .. _#383: https://github.com/kiwicom/schemathesis/issues/383
 .. _#381: https://github.com/kiwicom/schemathesis/issues/381

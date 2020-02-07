@@ -102,7 +102,7 @@ def display_hypothesis_output(hypothesis_output: List[str]) -> None:
         click.secho(output, fg="red")
 
 
-def display_errors(results: TestResultSet) -> None:
+def display_errors(context: events.ExecutionContext, results: TestResultSet) -> None:
     """Display all errors in the test run."""
     if not results.has_errors:
         return
@@ -111,13 +111,17 @@ def display_errors(results: TestResultSet) -> None:
     for result in results:
         if not result.has_errors:
             continue
-        display_single_error(result)
+        display_single_error(context, result)
+    if not context.show_errors_tracebacks:
+        click.secho(
+            "Add this option to your command line parameters to see full tracebacks: --show-error-tracebacks", fg="red"
+        )
 
 
-def display_single_error(result: TestResult) -> None:
+def display_single_error(context: events.ExecutionContext, result: TestResult) -> None:
     display_subsection(result)
     for error, example in result.errors:
-        message = utils.format_exception(error)
+        message = utils.format_exception(error, include_traceback=context.show_errors_tracebacks)
         click.secho(message, fg="red")
         if example is not None:
             display_example(example, seed=result.seed)
@@ -295,7 +299,7 @@ def handle_finished(context: events.ExecutionContext, event: events.Finished) ->
     """Show the outcome of the whole testing session."""
     click.echo()
     display_hypothesis_output(context.hypothesis_output)
-    display_errors(event.results)
+    display_errors(context, event.results)
     display_failures(event.results)
     display_application_logs(event.results)
     display_statistic(event.results)
