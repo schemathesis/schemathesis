@@ -312,12 +312,12 @@ def test_nullable_properties(testdir):
     testdir.make_test(
         """
 @schema.parametrize(method="POST")
-@settings(max_examples=1)
+@settings(max_examples=10)
 def test_(request, case):
-    request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/users"
     assert case.method == "POST"
-    assert case.body["id"] is None
+    if case.body["id"] is None:
+        request.config.HYPOTHESIS_CASES += 1
 """,
         paths={
             "/users": {
@@ -342,7 +342,9 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-vv", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    # At least one `None` value should be generated
+    hypothesis_calls = int(result.stdout.lines[-1].split(":")[-1].strip())
+    assert hypothesis_calls > 0
 
 
 def test_nullable_ref(testdir):
