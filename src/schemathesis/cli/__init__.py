@@ -13,7 +13,7 @@ from requests import exceptions
 from .. import checks as checks_module
 from .. import models, runner, utils
 from ..exceptions import HTTPError
-from ..loaders import from_path, get_loader_for_app
+from ..loaders import from_path, from_uri, get_loader_for_app
 from ..runner import events
 from ..types import Filter
 from ..utils import WSGIResponse, dict_not_none_values, dict_true_values
@@ -199,6 +199,13 @@ def run(  # pylint: disable=too-many-arguments
             # If `schema` is not an existing filesystem path or an URL then it is considered as an endpoint with
             # the given app
             options["loader"] = get_loader_for_app(app)
+        else:
+            options["loader"] = from_uri
+            loader_options = dict_true_values(headers=headers, auth=auth, auth_type=auth_type)
+            if options.get("loader_options") and loader_options:
+                options["loader_options"].update(loader_options)
+            elif loader_options:
+                options["loader_options"] = loader_options
         prepared_runner = runner.prepare(schema, **options)
     execute(prepared_runner, workers_num, show_errors_tracebacks)
 
