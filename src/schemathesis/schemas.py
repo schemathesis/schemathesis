@@ -47,6 +47,7 @@ class BaseSchema(Mapping):
     tag: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     hooks: Dict[HookLocation, Hook] = attr.ib(factory=dict)  # pragma: no mutate
+    validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.endpoints)

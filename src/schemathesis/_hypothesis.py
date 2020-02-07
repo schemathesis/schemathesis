@@ -184,7 +184,7 @@ def _get_case_strategy(
     endpoint: Endpoint, extra_static_parameters: Dict[str, Any], strategies: Dict[str, st.SearchStrategy]
 ) -> st.SearchStrategy:
     static_parameters: Dict[str, Any] = {"endpoint": endpoint, **extra_static_parameters}
-    if endpoint.method == "GET":
+    if endpoint.schema.validate_schema and endpoint.method == "GET":
         if endpoint.body is not None:
             raise InvalidSchema("Body parameters are defined for GET request.")
         static_parameters["body"] = None
