@@ -5,6 +5,7 @@ from typing import Any, Dict, Tuple
 class Endpoint(Enum):
     success = ("GET", "/api/success")
     failure = ("GET", "/api/failure")
+    payload = ("POST", "/api/payload")
     multiple_failures = ("GET", "/api/multiple_failures")
     slow = ("GET", "/api/slow")
     path_variable = ("GET", "/api/path_variable/{key}")
@@ -41,7 +42,24 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
     for endpoint in endpoints:
         method, path = Endpoint[endpoint].value
         path = path.replace(template["basePath"], "")
-        if endpoint == "unsatisfiable":
+        if endpoint == "payload":
+            schema = {
+                "parameters": [
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "required": True,
+                        "schema": {
+                            "type": "object",
+                            "properties": {"name": {"type": "string"}},
+                            "required": ["name"],
+                            "example": {"name": "John"},
+                        },
+                    }
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif endpoint == "unsatisfiable":
             schema = {
                 "parameters": [
                     {
