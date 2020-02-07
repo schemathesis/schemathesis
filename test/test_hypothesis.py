@@ -3,6 +3,7 @@ from base64 import b64decode
 import pytest
 from hypothesis import HealthCheck, given, settings, strategies
 
+import schemathesis
 from schemathesis import Case, register_string_format
 from schemathesis._hypothesis import PARAMETERS, get_case_strategy, get_examples, is_valid_query
 from schemathesis.exceptions import InvalidSchema
@@ -58,6 +59,25 @@ def test_invalid_body_in_get(swagger_20):
     )
     with pytest.raises(InvalidSchema, match=r"^Body parameters are defined for GET request.$"):
         get_case_strategy(endpoint)
+
+
+def test_invalid_body_in_get_disable_validation(simple_schema):
+    schema = schemathesis.from_dict(simple_schema, validate_schema=False)
+    endpoint = Endpoint(
+        path="/foo",
+        method="GET",
+        definition={},
+        schema=schema,
+        body={"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
+    )
+    strategy = get_case_strategy(endpoint)
+
+    @given(strategy)
+    @settings(max_examples=1)
+    def test(case):
+        assert case.body is not None
+
+    test()
 
 
 def test_warning(swagger_20):
