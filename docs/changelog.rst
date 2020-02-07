@@ -12,6 +12,11 @@ Changed
 - Schemas with GET endpoints accepting body are allowed now if schema validation is disabled (via ``--validate-schema=false`` for example).
   The usecase is for tools like ElasticSearch that use GET requests with non empty bodies. `#383`_
 
+Fixed
+~~~~~
+
+- CLI crash when an explicit example is specified in endpoint definition. `#386`_
+
 `0.23.7`_ - 2020-01-30
 ----------------------
 
@@ -662,6 +667,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#386: https://github.com/kiwicom/schemathesis/issues/386
 .. _#383: https://github.com/kiwicom/schemathesis/issues/383
 .. _#381: https://github.com/kiwicom/schemathesis/issues/381
 .. _#378: https://github.com/kiwicom/schemathesis/issues/378

@@ -86,7 +86,7 @@ def get_examples(endpoint: Endpoint) -> Generator[Case, None, None]:
 def add_examples(test: Callable, endpoint: Endpoint) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
     for case in get_examples(endpoint):
-        test = hypothesis.example(case)(test)
+        test = hypothesis.example(case=case)(test)
     return test
 
 

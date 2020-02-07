@@ -39,6 +39,10 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> Flask:
             1 / 0
         return jsonify({"success": True})
 
+    @app.route("/api/payload", methods=["POST"])
+    def payload():
+        return jsonify({"success": request.json})
+
     @app.route("/api/failure", methods=["GET"])
     def failure():
         raise InternalServerError

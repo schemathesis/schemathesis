@@ -4,6 +4,7 @@ import pytest
 from aiohttp import web
 from aiohttp.streams import EmptyStreamReader
 from flask import Flask
+from hypothesis import Phase
 from requests.auth import HTTPDigestAuth
 
 import schemathesis
@@ -358,6 +359,25 @@ def test_flaky_exceptions(args, mocker):
     # Then the execution result should indicate errors
     assert results.has_errors
     assert results.results[0].errors[0][0].args[0].startswith("Tests on this endpoint produce unreliable results:")
+
+
+@pytest.mark.endpoints("payload")
+async def test_payload_explicit_example(args):
+    # When endpoint has an example specified
+    app, kwargs = args
+    kwargs.setdefault("hypothesis_options", {})["phases"] = [Phase.explicit]
+    result = execute(**kwargs)
+    # Then run should be successful
+    assert not result.has_errors
+    assert not result.has_failures
+    incoming_requests = get_incoming_requests(app)
+
+    if isinstance(app, Flask):
+        body = incoming_requests[0].json
+    else:
+        body = await incoming_requests[0].json()
+    # And this example should be sent to the app
+    assert body == {"name": "John"}
 
 
 @pytest.mark.parametrize(
