@@ -117,13 +117,27 @@ def from_dict(
     if "swagger" in raw_schema:
         _maybe_validate_schema(raw_schema, spec_schemas.SWAGGER_20, validate_schema)
         return SwaggerV20(
-            raw_schema, location=location, base_url=base_url, method=method, endpoint=endpoint, tag=tag, app=app
+            raw_schema,
+            location=location,
+            base_url=base_url,
+            method=method,
+            endpoint=endpoint,
+            tag=tag,
+            app=app,
+            validate_schema=validate_schema,
         )
 
     if "openapi" in raw_schema:
         _maybe_validate_schema(raw_schema, spec_schemas.OPENAPI_30, validate_schema)
         return OpenApi30(
-            raw_schema, location=location, base_url=base_url, method=method, endpoint=endpoint, tag=tag, app=app
+            raw_schema,
+            location=location,
+            base_url=base_url,
+            method=method,
+            endpoint=endpoint,
+            tag=tag,
+            app=app,
+            validate_schema=validate_schema,
         )
     raise ValueError("Unsupported schema type")
 
