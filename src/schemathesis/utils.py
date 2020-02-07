@@ -1,4 +1,5 @@
 import cgi
+import pathlib
 import traceback
 import warnings
 from contextlib import contextmanager
@@ -14,6 +15,14 @@ from werkzeug.wrappers.json import JSONMixin
 from .types import Filter, NotSet
 
 NOT_SET = NotSet()
+
+
+def file_exists(path: str) -> bool:
+    try:
+        return pathlib.Path(path).is_file()
+    except OSError:
+        # For example, path could be too long
+        return False
 
 
 def deprecated(func: Callable, message: str) -> Callable:
