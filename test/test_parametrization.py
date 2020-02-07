@@ -182,7 +182,46 @@ def test(request, case):
 
 
 def test_specified_example_query(testdir):
-    # When the given query parameter contains an example
+    # When the given query parameter contains an example in the "schema" field
+    testdir.make_test(
+        """
+from hypothesis import Phase
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.explicit])
+def test(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.query == {"id": "test"}
+""",
+        schema={
+            "openapi": "3.0.2",
+            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+            "paths": {
+                "/query": {
+                    "get": {
+                        "parameters": [
+                            {
+                                "name": "id",
+                                "in": "query",
+                                "required": True,
+                                "schema": {"type": "string", "example": "test"},
+                            }
+                        ],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        },
+    )
+
+    result = testdir.runpytest("-v", "-s")
+    # Then this example should be used in tests
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+
+
+def test_specified_example_parameter_override(testdir):
+    # When the given parameter contains an example
     testdir.make_test(
         """
 from hypothesis import Phase
@@ -205,7 +244,7 @@ def test(request, case):
                                 "in": "query",
                                 "required": True,
                                 "example": "test",
-                                "schema": {"type": "string"},
+                                "schema": {"type": "string", "example": "NOT test"},
                             }
                         ],
                         "responses": {"200": {"description": "OK"}},
@@ -217,6 +256,50 @@ def test(request, case):
 
     result = testdir.runpytest("-v", "-s")
     # Then this example should be used in tests
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+
+
+def test_specified_example_body_media_type_override(testdir):
+    # When the given requestBody parameter contains an example specified in Media Type Object (not in Schema Object)
+    testdir.make_test(
+        """
+from hypothesis import Phase
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.explicit])
+def test(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.body == {"name": "John"}
+""",
+        schema={
+            "openapi": "3.0.2",
+            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+            "paths": {
+                "/body": {
+                    "post": {
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"name": {"type": "string"}},
+                                        "required": ["name"],
+                                        "example": {"name": "NOT John"},
+                                    },
+                                    "example": {"name": "John"},
+                                }
+                            }
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        },
+    )
+
+    result = testdir.runpytest("-v", "-s")
+    # Then this example should be used in tests, not the example from the schema
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
