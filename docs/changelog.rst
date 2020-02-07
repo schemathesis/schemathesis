@@ -11,6 +11,7 @@ Added
 
 - Support for testing of examples in Parameter & Media Type objects in Open API 3.0. `#394`_
 - ``--show-error-tracebacks`` CLI option to display errors' tracebacks in the output. `#391`_
+- Support for schema behind auth. `#115`_
 
 Changed
 ~~~~~~~
@@ -759,6 +760,7 @@ Fixed
 .. _#121: https://github.com/kiwicom/schemathesis/issues/121
 .. _#119: https://github.com/kiwicom/schemathesis/issues/119
 .. _#118: https://github.com/kiwicom/schemathesis/issues/118
+.. _#115: https://github.com/kiwicom/schemathesis/issues/115
 .. _#110: https://github.com/kiwicom/schemathesis/issues/110
 .. _#109: https://github.com/kiwicom/schemathesis/issues/109
 .. _#107: https://github.com/kiwicom/schemathesis/issues/107

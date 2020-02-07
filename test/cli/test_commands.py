@@ -11,7 +11,7 @@ from requests import Response
 from schemathesis import Case
 from schemathesis._compat import metadata
 from schemathesis.checks import ALL_CHECKS
-from schemathesis.loaders import from_path
+from schemathesis.loaders import from_path, from_uri
 from schemathesis.models import Endpoint
 from schemathesis.runner import DEFAULT_CHECKS
 
@@ -163,9 +163,9 @@ SCHEMA_URI = "https://example.com/swagger.json"
 @pytest.mark.parametrize(
     "args, expected",
     (
-        ([SCHEMA_URI], {"checks": DEFAULT_CHECKS, "workers_num": 1}),
-        ([SCHEMA_URI, "--checks=all"], {"checks": ALL_CHECKS, "workers_num": 1}),
-        ([SCHEMA_URI, "--exitfirst"], {"checks": DEFAULT_CHECKS, "exit_first": True, "workers_num": 1}),
+        ([SCHEMA_URI], {"checks": DEFAULT_CHECKS, "loader": from_uri, "workers_num": 1}),
+        ([SCHEMA_URI, "--checks=all"], {"checks": ALL_CHECKS, "loader": from_uri, "workers_num": 1}),
+        ([SCHEMA_URI, "--exitfirst"], {"checks": DEFAULT_CHECKS, "exit_first": True, "loader": from_uri, "workers_num": 1}),
         (
             [SIMPLE_PATH, "--base-url=http://127.0.0.1"],
             {
@@ -180,6 +180,8 @@ SCHEMA_URI = "https://example.com/swagger.json"
             {
                 "checks": DEFAULT_CHECKS,
                 "api_options": {"auth": ("test", "test"), "auth_type": "basic"},
+                "loader": from_uri,
+                "loader_options": {"auth": ("test", "test"), "auth_type": "basic"},
                 "workers_num": 1,
             },
         ),
@@ -188,6 +190,8 @@ SCHEMA_URI = "https://example.com/swagger.json"
             {
                 "checks": DEFAULT_CHECKS,
                 "api_options": {"auth": ("test", "test"), "auth_type": "digest"},
+                "loader": from_uri,
+                "loader_options": {"auth": ("test", "test"), "auth_type": "digest"},
                 "workers_num": 1,
             },
         ),
@@ -196,35 +200,50 @@ SCHEMA_URI = "https://example.com/swagger.json"
             {
                 "checks": DEFAULT_CHECKS,
                 "api_options": {"auth": ("test", "test"), "auth_type": "digest"},
+                "loader": from_uri,
+                "loader_options": {"auth": ("test", "test"), "auth_type": "digest"},
                 "workers_num": 1,
             },
         ),
         (
             [SCHEMA_URI, "--header=Authorization:Bearer 123"],
-            {"checks": DEFAULT_CHECKS, "api_options": {"headers": {"Authorization": "Bearer 123"}}, "workers_num": 1},
+            {
+                "checks": DEFAULT_CHECKS,
+                "api_options": {"headers": {"Authorization": "Bearer 123"}},
+                "loader": from_uri,
+                "loader_options": {"headers": {"Authorization": "Bearer 123"}},
+                "workers_num": 1,
+            },
         ),
         (
             [SCHEMA_URI, "--header=Authorization:  Bearer 123 "],
-            {"checks": DEFAULT_CHECKS, "api_options": {"headers": {"Authorization": "Bearer 123 "}}, "workers_num": 1},
+            {
+                "checks": DEFAULT_CHECKS,
+                "api_options": {"headers": {"Authorization": "Bearer 123 "}},
+                "loader": from_uri,
+                "loader_options": {"headers": {"Authorization": "Bearer 123 "}},
+                "workers_num": 1,
+            },
         ),
         (
             [SCHEMA_URI, "--method=POST", "--method", "GET"],
-            {"checks": DEFAULT_CHECKS, "loader_options": {"method": ("POST", "GET")}, "workers_num": 1},
+            {"checks": DEFAULT_CHECKS, "loader": from_uri, "loader_options": {"method": ("POST", "GET")}, "workers_num": 1},
         ),
         (
             [SCHEMA_URI, "--endpoint=users"],
-            {"checks": DEFAULT_CHECKS, "loader_options": {"endpoint": ("users",)}, "workers_num": 1},
+            {"checks": DEFAULT_CHECKS, "loader": from_uri, "loader_options": {"endpoint": ("users",)}, "workers_num": 1},
         ),
-        ([SCHEMA_URI, "--tag=foo"], {"checks": DEFAULT_CHECKS, "loader_options": {"tag": ("foo",)}, "workers_num": 1}),
+        ([SCHEMA_URI, "--tag=foo"], {"checks": DEFAULT_CHECKS, "loader": from_uri, "loader_options": {"tag": ("foo",)}, "workers_num": 1}),
         (
             [SCHEMA_URI, "--base-url=https://example.com/api/v1test"],
             {
                 "checks": DEFAULT_CHECKS,
+                "loader": from_uri,
                 "loader_options": {"base_url": "https://example.com/api/v1test"},
                 "workers_num": 1,
             },
         ),
-        ([SCHEMA_URI, "--hypothesis-seed=123"], {"checks": DEFAULT_CHECKS, "seed": 123, "workers_num": 1}),
+        ([SCHEMA_URI, "--hypothesis-seed=123"], {"checks": DEFAULT_CHECKS, "loader": from_uri, "seed": 123, "workers_num": 1}),
         (
             [
                 SCHEMA_URI,
@@ -247,12 +266,13 @@ SCHEMA_URI = "https://example.com/swagger.json"
                     "suppress_health_check": [HealthCheck.too_slow, HealthCheck.filter_too_much],
                     "verbosity": Verbosity.normal,
                 },
+                "loader": from_uri,
                 "workers_num": 1,
             },
         ),
         (
             [SCHEMA_URI, "--hypothesis-deadline=None"],
-            {"checks": DEFAULT_CHECKS, "hypothesis_options": {"deadline": None}, "workers_num": 1},
+            {"checks": DEFAULT_CHECKS, "hypothesis_options": {"deadline": None}, "loader": from_uri, "workers_num": 1},
         ),
     ),
 )
