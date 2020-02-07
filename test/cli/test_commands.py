@@ -165,7 +165,10 @@ SCHEMA_URI = "https://example.com/swagger.json"
     (
         ([SCHEMA_URI], {"checks": DEFAULT_CHECKS, "loader": from_uri, "workers_num": 1}),
         ([SCHEMA_URI, "--checks=all"], {"checks": ALL_CHECKS, "loader": from_uri, "workers_num": 1}),
-        ([SCHEMA_URI, "--exitfirst"], {"checks": DEFAULT_CHECKS, "exit_first": True, "loader": from_uri, "workers_num": 1}),
+        (
+            [SCHEMA_URI, "--exitfirst"],
+            {"checks": DEFAULT_CHECKS, "exit_first": True, "loader": from_uri, "workers_num": 1},
+        ),
         (
             [SIMPLE_PATH, "--base-url=http://127.0.0.1"],
             {
@@ -227,13 +230,26 @@ SCHEMA_URI = "https://example.com/swagger.json"
         ),
         (
             [SCHEMA_URI, "--method=POST", "--method", "GET"],
-            {"checks": DEFAULT_CHECKS, "loader": from_uri, "loader_options": {"method": ("POST", "GET")}, "workers_num": 1},
+            {
+                "checks": DEFAULT_CHECKS,
+                "loader": from_uri,
+                "loader_options": {"method": ("POST", "GET")},
+                "workers_num": 1,
+            },
         ),
         (
             [SCHEMA_URI, "--endpoint=users"],
-            {"checks": DEFAULT_CHECKS, "loader": from_uri, "loader_options": {"endpoint": ("users",)}, "workers_num": 1},
+            {
+                "checks": DEFAULT_CHECKS,
+                "loader": from_uri,
+                "loader_options": {"endpoint": ("users",)},
+                "workers_num": 1,
+            },
         ),
-        ([SCHEMA_URI, "--tag=foo"], {"checks": DEFAULT_CHECKS, "loader": from_uri, "loader_options": {"tag": ("foo",)}, "workers_num": 1}),
+        (
+            [SCHEMA_URI, "--tag=foo"],
+            {"checks": DEFAULT_CHECKS, "loader": from_uri, "loader_options": {"tag": ("foo",)}, "workers_num": 1},
+        ),
         (
             [SCHEMA_URI, "--base-url=https://example.com/api/v1test"],
             {
@@ -243,7 +259,10 @@ SCHEMA_URI = "https://example.com/swagger.json"
                 "workers_num": 1,
             },
         ),
-        ([SCHEMA_URI, "--hypothesis-seed=123"], {"checks": DEFAULT_CHECKS, "loader": from_uri, "seed": 123, "workers_num": 1}),
+        (
+            [SCHEMA_URI, "--hypothesis-seed=123"],
+            {"checks": DEFAULT_CHECKS, "loader": from_uri, "seed": 123, "workers_num": 1},
+        ),
         (
             [
                 SCHEMA_URI,

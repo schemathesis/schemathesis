@@ -446,6 +446,8 @@ def prepare(  # pylint: disable=too-many-arguments
 
     if "base_url" not in loader_options:
         loader_options["base_url"] = get_base_url(schema_uri)
+    if loader is from_uri and loader_options.get("auth"):
+        loader_options["auth"] = get_requests_auth(loader_options["auth"], loader_options.pop("auth_type", None))
     schema = loader(schema_uri, **loader_options)
     return execute_from_schema(
         schema,
