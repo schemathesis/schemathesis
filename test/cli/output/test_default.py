@@ -210,7 +210,8 @@ def test_after_execution_attributes(execution_context, after_execution):
     assert execution_context.current_line_length == 2
 
 
-def test_display_single_error(capsys, swagger_20, endpoint):
+@pytest.mark.parametrize("show_errors_tracebacks", (True, False))
+def test_display_single_error(capsys, swagger_20, endpoint, execution_context, show_errors_tracebacks):
     # Given exception is multiline
     exception = None
     try:
@@ -221,14 +222,23 @@ def test_display_single_error(capsys, swagger_20, endpoint):
     result = models.TestResult(endpoint)
     result.add_error(exception)
     # When the related test result is displayed
-    default.display_single_error(result)
+    execution_context.show_errors_tracebacks = show_errors_tracebacks
+    default.display_single_error(execution_context, result)
     lines = capsys.readouterr().out.strip().split("\n")
     # Then it should be correctly formatted and displayed in red color
     if sys.version_info <= (3, 8):
         expected = '  File "<string>", line 1\n    some invalid code\n               ^\nSyntaxError: invalid syntax\n'
     else:
         expected = '  File "<string>", line 1\n    some invalid code\n         ^\nSyntaxError: invalid syntax\n'
-    assert "\n".join(lines[1:6]) == click.style(expected, fg="red")
+    if show_errors_tracebacks:
+        lines = click.unstyle("\n".join(lines)).split("\n")
+        assert lines[1] == "Traceback (most recent call last):"
+        # There is a path on the next line, it is simpler to not check it since it doesn't give much value
+        # But presence of traceback itself is checked
+        expected = f'    exec("some invalid code")\n{expected}'
+        assert "\n".join(lines[3:8]) == expected.strip("\n")
+    else:
+        assert "\n".join(lines[1:6]) == click.style(expected, fg="red")
 
 
 def test_display_failures(swagger_20, capsys, results_set):
@@ -251,17 +261,24 @@ def test_display_failures(swagger_20, capsys, results_set):
     assert "requests.get('http://127.0.0.1:8080/api/failure')" in out
 
 
-def test_display_errors(swagger_20, capsys, results_set):
+@pytest.mark.parametrize("show_errors_tracebacks", (True, False))
+def test_display_errors(swagger_20, capsys, results_set, execution_context, show_errors_tracebacks):
     # Given two test results - success and error
     endpoint = models.Endpoint("/api/error", "GET", {}, swagger_20)
     error = models.TestResult(endpoint, seed=123)
     error.add_error(ConnectionError("Connection refused!"), models.Case(endpoint, query={"a": 1}))
     results_set.append(error)
     # When the errors are displayed
-    default.display_errors(results_set)
+    execution_context.show_errors_tracebacks = show_errors_tracebacks
+    default.display_errors(execution_context, results_set)
     out = capsys.readouterr().out.strip()
     # Then section title is displayed
     assert " ERRORS " in out
+    help_message_exists = (
+        "Add this option to your command line parameters to " "see full tracebacks: --show-error-tracebacks" in out
+    )
+    # And help message is displayed only if tracebacks are not shown
+    assert help_message_exists is not show_errors_tracebacks
     # And endpoint with an error is displayed as a subsection
     assert " GET: /api/error " in out
     # And the error itself is displayed

@@ -94,7 +94,9 @@ def capture_hypothesis_output() -> Generator[List[str], None, None]:
         yield output
 
 
-def format_exception(error: Exception) -> str:
+def format_exception(error: Exception, include_traceback: bool = False) -> str:
+    if include_traceback:
+        return "".join(traceback.format_exception(type(error), error, error.__traceback__))
     return "".join(traceback.format_exception_only(type(error), error))
 
 

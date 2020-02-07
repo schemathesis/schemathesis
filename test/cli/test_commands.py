@@ -135,6 +135,7 @@ def test_commands_run_help(cli):
         "  --request-timeout INTEGER       Timeout in milliseconds for network requests",
         "                                  during the test run.",
         "  --validate-schema BOOLEAN       Enable or disable validation of input schema.",
+        "  --show-errors-tracebacks        Show full tracebacks for internal errors.",
         "  --hypothesis-deadline INTEGER   Duration in milliseconds that each individual",
         "                                  example with a test is not allowed to exceed.",
         "  --hypothesis-derandomize        Use Hypothesis's deterministic mode.",

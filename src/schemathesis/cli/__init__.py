@@ -99,6 +99,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 @click.option("--app", help="WSGI application to test", type=str, callback=callbacks.validate_app)
 @click.option("--request-timeout", help="Timeout in milliseconds for network requests during the test run.", type=int)
 @click.option("--validate-schema", help="Enable or disable validation of input schema.", type=bool, default=True)
+@click.option("--show-errors-tracebacks", help="Show full tracebacks for internal errors.", is_flag=True, default=False)
 @click.option(
     "--hypothesis-deadline",
     help="Duration in milliseconds that each individual example with a test is not allowed to exceed.",
@@ -141,6 +142,7 @@ def run(  # pylint: disable=too-many-arguments
     app: Any = None,
     request_timeout: Optional[int] = None,
     validate_schema: bool = True,
+    show_errors_tracebacks: bool = False,
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
     hypothesis_derandomize: Optional[bool] = None,
     hypothesis_max_examples: Optional[int] = None,
@@ -198,7 +200,7 @@ def run(  # pylint: disable=too-many-arguments
             # the given app
             options["loader"] = get_loader_for_app(app)
         prepared_runner = runner.prepare(schema, **options)
-    execute(prepared_runner, workers_num)
+    execute(prepared_runner, workers_num, show_errors_tracebacks)
 
 
 def get_output_handler(workers_num: int) -> Callable[[events.ExecutionContext, events.ExecutionEvent], None]:
@@ -245,9 +247,11 @@ class OutputStyle(Enum):
     short = output.short.handle_event
 
 
-def execute(prepared_runner: Generator[events.ExecutionEvent, None, None], workers_num: int) -> None:
+def execute(
+    prepared_runner: Generator[events.ExecutionEvent, None, None], workers_num: int, show_errors_tracebacks: bool
+) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handler = get_output_handler(workers_num)
-    context = events.ExecutionContext(workers_num=workers_num)
+    context = events.ExecutionContext(workers_num=workers_num, show_errors_tracebacks=show_errors_tracebacks)
     for event in prepared_runner:
         handler(context, event)
