@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- CLI crash on Windows and Python < 3.8 when the schema path contains characters unrepresentable at the OS level. `#400`_
+
 `0.24.0`_ - 2020-02-07
 ----------------------
 
@@ -678,6 +683,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#400: https://github.com/kiwicom/schemathesis/issues/400
 .. _#394: https://github.com/kiwicom/schemathesis/issues/394
 .. _#391: https://github.com/kiwicom/schemathesis/issues/391
 .. _#386: https://github.com/kiwicom/schemathesis/issues/386
