@@ -113,7 +113,11 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     callback=callbacks.validate_base_url,
 )
 @click.option("--app", help="WSGI application to test", type=str, callback=callbacks.validate_app)
-@click.option("--request-timeout", help="Timeout in milliseconds for network requests during the test run.", type=int)
+@click.option(
+    "--request-timeout",
+    help="Timeout in milliseconds for network requests during the test run.",
+    type=click.IntRange(1),
+)
 @click.option("--validate-schema", help="Enable or disable validation of input schema.", type=bool, default=True)
 @click.option("--show-errors-tracebacks", help="Show full tracebacks for internal errors.", is_flag=True, default=False)
 @click.option(

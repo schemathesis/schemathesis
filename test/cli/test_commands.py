@@ -60,6 +60,14 @@ def test_commands_version(cli):
         (("run", SIMPLE_PATH, "--base-url=test"), "Error: Invalid base URL"),
         (("run", SIMPLE_PATH, "--base-url=127.0.0.1:8080"), "Error: Invalid base URL"),
         (
+            ("run", "http://127.0.0.1", "--request-timeout=-5"),
+            'Error: Invalid value for "--request-timeout": -5 is smaller than the minimum valid value 1.',
+        ),
+        (
+            ("run", "http://127.0.0.1", "--request-timeout=0"),
+            'Error: Invalid value for "--request-timeout": 0 is smaller than the minimum valid value 1.',
+        ),
+        (
             ("run", "http://127.0.0.1", "--method=+"),
             'Error: Invalid value for "--method" / "-M": Invalid regex: nothing to repeat at position 0',
         ),
@@ -157,7 +165,8 @@ def test_commands_run_help(cli):
         "  -b, --base-url TEXT             Base URL address of the API, required for",
         "                                  SCHEMA if specified by file.",
         "  --app TEXT                      WSGI application to test",
-        "  --request-timeout INTEGER       Timeout in milliseconds for network requests",
+        "  --request-timeout INTEGER RANGE",
+        "                                  Timeout in milliseconds for network requests",
         "                                  during the test run.",
         "  --validate-schema BOOLEAN       Enable or disable validation of input schema.",
         "  --show-errors-tracebacks        Show full tracebacks for internal errors.",
