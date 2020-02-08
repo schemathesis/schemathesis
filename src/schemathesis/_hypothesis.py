@@ -9,8 +9,6 @@ from urllib.parse import quote_plus
 import hypothesis
 import hypothesis.strategies as st
 from hypothesis_jsonschema import from_schema
-from requests.exceptions import InvalidHeader  # type: ignore
-from requests.utils import check_header_validity  # type: ignore
 
 from . import utils
 from ._compat import handle_warnings
@@ -91,24 +89,12 @@ def add_examples(test: Callable, endpoint: Endpoint) -> Callable:
     return test
 
 
-# Adapted from http.client._is_illegal_header_value
-INVALID_HEADER_RE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])")  # pragma: no mutate
-
-
-def _has_invalid_characters(name: str, value: str) -> bool:
-    try:
-        check_header_validity((name, value))
-        return bool(INVALID_HEADER_RE.search(value))
-    except InvalidHeader:
-        return True
-
-
 def is_valid_header(headers: Dict[str, str]) -> bool:
     """Verify if the generated headers are valid."""
     for name, value in headers.items():
         if not utils.is_latin_1_encodable(value):
             return False
-        if _has_invalid_characters(name, value):
+        if utils.has_invalid_characters(name, value):
             return False
     return True
 

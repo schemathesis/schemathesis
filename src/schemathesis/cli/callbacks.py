@@ -88,6 +88,8 @@ def validate_headers(
             raise click.BadParameter("Header name should be latin-1 encodable")
         if not utils.is_latin_1_encodable(value):
             raise click.BadParameter("Header value should be latin-1 encodable")
+        if utils.has_invalid_characters(key, value):
+            raise click.BadParameter("Invalid return character or leading space in header")
         headers[key] = value
     return headers
 
