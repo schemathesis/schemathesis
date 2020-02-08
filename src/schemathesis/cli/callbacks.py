@@ -71,6 +71,17 @@ def validate_headers(
     return headers
 
 
+def validate_regex(ctx: click.core.Context, param: click.core.Parameter, raw_value: Tuple[str, ...]) -> Tuple[str, ...]:
+    if not raw_value:
+        return raw_value
+    for value in raw_value:
+        try:
+            re.compile(value)
+        except re.error as exc:
+            raise click.BadParameter(f"Invalid regex: {exc.args[0]}")
+    return raw_value
+
+
 def convert_verbosity(
     ctx: click.core.Context, param: click.core.Parameter, value: Optional[str]
 ) -> Optional[hypothesis.Verbosity]:

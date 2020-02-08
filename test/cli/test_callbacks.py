@@ -46,3 +46,9 @@ def test_reraise_format_error():
     with pytest.raises(click.BadParameter, match="Should be in KEY:VALUE format. Got: bla"):
         with callbacks.reraise_format_error("bla"):
             raise ValueError
+
+
+@pytest.mark.parametrize("value", ("+", "\\", "[",))
+def test_validate_regex(value):
+    with pytest.raises(click.BadParameter, match="Invalid regex: "):
+        callbacks.validate_regex(None, None, (value,))
