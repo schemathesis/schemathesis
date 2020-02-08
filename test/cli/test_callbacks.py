@@ -39,6 +39,9 @@ def test_validate_app(value):
 
 @given(value=st.lists(st.text(), min_size=1).map(tuple))
 @example((":",))
+@example(("0:Ā",))
+@example(("Ā:0",))
+@example((" :test",))
 def test_validate_header(value):
     with pytest.raises(click.BadParameter):
         callbacks.validate_headers(None, None, value)

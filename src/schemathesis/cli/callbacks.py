@@ -69,9 +69,15 @@ def validate_headers(
     for header in raw_value:
         with reraise_format_error(header):
             key, value = header.split(":")
+        value = value.lstrip()
+        key = key.strip()
         if not key:
             raise click.BadParameter("Header name should not be empty")
-        headers[key] = value.lstrip()
+        if not utils.is_latin_1_encodable(key):
+            raise click.BadParameter("Header name should be latin-1 encodable")
+        if not utils.is_latin_1_encodable(value):
+            raise click.BadParameter("Header value should be latin-1 encodable")
+        headers[key] = value
     return headers
 
 
