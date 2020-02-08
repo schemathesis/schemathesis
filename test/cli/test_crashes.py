@@ -49,7 +49,6 @@ def paths(draw):
 
 # The following strategies generate CLI parameters, for example "--workers=5" or "--exitfirst"
 @given(
-    schema=st.text(),
     params=st.fixed_dictionaries(
         {},
         optional={
@@ -74,8 +73,9 @@ def paths(draw):
         },
     ).map(lambda params: [f"--{key}={value}" for key, values in params.items() for value in values]),
 )
+@example(params=[], flags=[], multiple_params=["--header=0:0\r"])
 @pytest.mark.usefixtures("mocked_schema")
-def test_valid_parameters_combos(cli, schema_url, schema, params, flags, multiple_params):
+def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params):
     result = cli.run(schema_url, *params, *multiple_params, *flags)
     check_result(result)
 

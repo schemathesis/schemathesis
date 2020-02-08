@@ -1,5 +1,6 @@
 import cgi
 import pathlib
+import re
 import traceback
 import warnings
 from contextlib import contextmanager
@@ -9,6 +10,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 import yaml
 from hypothesis.reporting import with_reporter
+from requests.exceptions import InvalidHeader  # type: ignore
+from requests.utils import check_header_validity  # type: ignore
 from werkzeug.wrappers import Response as BaseResponse
 from werkzeug.wrappers.json import JSONMixin
 
@@ -32,6 +35,18 @@ def is_latin_1_encodable(value: str) -> bool:
         return True
     except UnicodeEncodeError:
         return False
+
+
+# Adapted from http.client._is_illegal_header_value
+INVALID_HEADER_RE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])")  # pragma: no mutate
+
+
+def has_invalid_characters(name: str, value: str) -> bool:
+    try:
+        check_header_validity((name, value))
+        return bool(INVALID_HEADER_RE.search(value))
+    except InvalidHeader:
+        return True
 
 
 def deprecated(func: Callable, message: str) -> Callable:
