@@ -54,6 +54,10 @@ def validate_auth(
             user, password = tuple(raw_value.split(":"))
         if not user:
             raise click.BadParameter("Username should not be empty")
+        if not utils.is_latin_1_encodable(user):
+            raise click.BadParameter("Username should be latin-1 encodable")
+        if not utils.is_latin_1_encodable(password):
+            raise click.BadParameter("Password should be latin-1 encodable")
         return user, password
     return None
 

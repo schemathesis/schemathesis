@@ -10,6 +10,7 @@ Fixed
 ~~~~~
 
 - Crash on invalid regular expressions in ``method``, ``endpoint`` and ``tag`` CLI options. `#403`_
+- Crash on non latin-1 encodable value in ``auth`` CLI option. `#404`_
 
 `0.24.1`_ - 2020-02-08
 ----------------------
@@ -692,6 +693,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#404: https://github.com/kiwicom/schemathesis/issues/404
 .. _#403: https://github.com/kiwicom/schemathesis/issues/403
 .. _#400: https://github.com/kiwicom/schemathesis/issues/400
 .. _#394: https://github.com/kiwicom/schemathesis/issues/394

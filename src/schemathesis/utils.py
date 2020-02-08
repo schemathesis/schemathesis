@@ -25,6 +25,15 @@ def file_exists(path: str) -> bool:
         return False
 
 
+def is_latin_1_encodable(value: str) -> bool:
+    """Header values are encoded to latin-1 before sending."""
+    try:
+        value.encode("latin-1")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
 def deprecated(func: Callable, message: str) -> Callable:
     """Emit a warning if the given function is used."""
 
