@@ -77,9 +77,26 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     type=str,
     multiple=True,
     help=r"Filter schemathesis test by endpoint pattern. Example: users/\d+",
+    callback=callbacks.validate_regex,
 )
-@click.option("--method", "-M", "methods", type=str, multiple=True, help="Filter schemathesis test by HTTP method.")
-@click.option("--tag", "-T", "tags", type=str, multiple=True, help="Filter schemathesis test by schema tag pattern.")
+@click.option(
+    "--method",
+    "-M",
+    "methods",
+    type=str,
+    multiple=True,
+    help="Filter schemathesis test by HTTP method.",
+    callback=callbacks.validate_regex,
+)
+@click.option(
+    "--tag",
+    "-T",
+    "tags",
+    type=str,
+    multiple=True,
+    help="Filter schemathesis test by schema tag pattern.",
+    callback=callbacks.validate_regex,
+)
 @click.option(
     "--workers",
     "-w",
