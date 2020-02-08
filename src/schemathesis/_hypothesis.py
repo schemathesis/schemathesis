@@ -12,6 +12,7 @@ from hypothesis_jsonschema import from_schema
 from requests.exceptions import InvalidHeader  # type: ignore
 from requests.utils import check_header_validity  # type: ignore
 
+from . import utils
 from ._compat import handle_warnings
 from .exceptions import InvalidSchema
 from .hooks import get_hook
@@ -94,18 +95,6 @@ def add_examples(test: Callable, endpoint: Endpoint) -> Callable:
 INVALID_HEADER_RE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])")  # pragma: no mutate
 
 
-def _is_latin_1_encodable(value: str) -> bool:
-    """Header values are encoded to latin-1 before sending.
-
-    We need to generate valid payload.
-    """
-    try:
-        value.encode("latin-1")
-        return True
-    except UnicodeEncodeError:
-        return False
-
-
 def _has_invalid_characters(name: str, value: str) -> bool:
     try:
         check_header_validity((name, value))
@@ -117,7 +106,7 @@ def _has_invalid_characters(name: str, value: str) -> bool:
 def is_valid_header(headers: Dict[str, str]) -> bool:
     """Verify if the generated headers are valid."""
     for name, value in headers.items():
-        if not _is_latin_1_encodable(value):
+        if not utils.is_latin_1_encodable(value):
             return False
         if _has_invalid_characters(name, value):
             return False

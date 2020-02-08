@@ -24,6 +24,8 @@ def test_validate_schema_path_without_base_url():
 
 @given(value=st.text().filter(lambda x: x.count(":") != 1))
 @example(":")
+@example("0:Ā")
+@example("Ā:0")
 def test_validate_auth(value):
     with pytest.raises(click.BadParameter):
         callbacks.validate_auth(None, None, value)
