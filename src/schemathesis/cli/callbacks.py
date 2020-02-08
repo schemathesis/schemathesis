@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 import click
 import hypothesis
+from requests import PreparedRequest, RequestException
 
 from .. import utils
 
@@ -16,7 +17,16 @@ def validate_schema(ctx: click.core.Context, param: click.core.Parameter, raw_va
             raise click.UsageError("Invalid SCHEMA, must be a valid URL or file path.")
         if "base_url" not in ctx.params:
             raise click.UsageError('Missing argument, "--base-url" is required for SCHEMA specified by file.')
+    else:
+        _validate_url(raw_value)
     return raw_value
+
+
+def _validate_url(value: str) -> None:
+    try:
+        PreparedRequest().prepare_url(value, {})  # type: ignore
+    except RequestException:
+        raise click.UsageError("Invalid SCHEMA, must be a valid URL or file path.")
 
 
 def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
