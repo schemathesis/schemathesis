@@ -99,11 +99,14 @@ def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params
     check_result(result)
 
 
-@given(schema=urls() | paths() | st.text())
-@example("//bla")
+@given(schema=urls() | paths() | st.text(), base_url=urls() | paths() | st.text() | st.none())
+@example(schema="//bla", base_url=None)
 @pytest.mark.usefixtures("mocked_schema")
-def test_schema_validity(cli, schema):
-    result = cli.run(schema)
+def test_schema_validity(cli, schema, base_url):
+    args = ()
+    if base_url:
+        args = (f"--base-url={base_url}",)
+    result = cli.run(schema, *args)
     check_result(result)
 
 
