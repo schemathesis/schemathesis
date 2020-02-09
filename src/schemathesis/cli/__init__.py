@@ -130,7 +130,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 @click.option(
     "--hypothesis-max-examples",
     help="Maximum number of generated examples per each method/endpoint combination.",
-    type=int,
+    type=click.IntRange(1),
 )
 @click.option("--hypothesis-phases", help="Control which phases should be run.", type=CSVOption(hypothesis.Phase))
 @click.option(
