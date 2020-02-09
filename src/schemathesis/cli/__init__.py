@@ -101,7 +101,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     "--workers",
     "-w",
     "workers_num",
-    help="Number of workers to run tests",
+    help="Number of workers to run tests.",
     type=click.IntRange(1, MAX_WORKERS),
     default=DEFAULT_WORKERS,
 )
@@ -112,7 +112,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     type=str,
     callback=callbacks.validate_base_url,
 )
-@click.option("--app", help="WSGI application to test", type=str, callback=callbacks.validate_app)
+@click.option("--app", help="WSGI application to test.", type=str, callback=callbacks.validate_app)
 @click.option(
     "--request-timeout",
     help="Timeout in milliseconds for network requests during the test run.",
@@ -143,7 +143,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 )
 @click.option(
     "--hypothesis-verbosity",
-    help="Verbosity level of Hypothesis messages",
+    help="Verbosity level of Hypothesis messages.",
     type=click.Choice([item.name for item in hypothesis.Verbosity]),
     callback=callbacks.convert_verbosity,
 )
