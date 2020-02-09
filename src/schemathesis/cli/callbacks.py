@@ -95,8 +95,6 @@ def validate_headers(
 
 
 def validate_regex(ctx: click.core.Context, param: click.core.Parameter, raw_value: Tuple[str, ...]) -> Tuple[str, ...]:
-    if not raw_value:
-        return raw_value
     for value in raw_value:
         try:
             re.compile(value)
