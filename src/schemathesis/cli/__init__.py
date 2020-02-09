@@ -123,7 +123,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 @click.option(
     "--hypothesis-deadline",
     help="Duration in milliseconds that each individual example with a test is not allowed to exceed.",
-    type=OptionalInt(),
+    type=OptionalInt(1),
 )
 @click.option("--hypothesis-derandomize", help="Use Hypothesis's deterministic mode.", is_flag=True, default=None)
 @click.option(

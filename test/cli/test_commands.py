@@ -113,6 +113,10 @@ def test_commands_version(cli):
             'Error: Invalid value for "--hypothesis-deadline": wrong is not a valid integer or None',
         ),
         (
+            ("run", "http://127.0.0.1", "--hypothesis-deadline=0"),
+            'Error: Invalid value for "--hypothesis-deadline": 0 is smaller than the minimum valid value 1.',
+        ),
+        (
             ("run", "http://127.0.0.1", "--header=тест:test"),
             'Error: Invalid value for "--header" / "-H": Header name should be latin-1 encodable',
         ),
@@ -170,7 +174,8 @@ def test_commands_run_help(cli):
         "                                  during the test run.",
         "  --validate-schema BOOLEAN       Enable or disable validation of input schema.",
         "  --show-errors-tracebacks        Show full tracebacks for internal errors.",
-        "  --hypothesis-deadline INTEGER   Duration in milliseconds that each individual",
+        "  --hypothesis-deadline INTEGER RANGE",
+        "                                  Duration in milliseconds that each individual",
         "                                  example with a test is not allowed to exceed.",
         "  --hypothesis-derandomize        Use Hypothesis's deterministic mode.",
         "  --hypothesis-max-examples INTEGER",

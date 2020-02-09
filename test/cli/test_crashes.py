@@ -57,6 +57,7 @@ def paths(draw):
             "workers": st.integers(min_value=1, max_value=64),
             "request-timeout": st.integers(),
             "validate-schema": st.booleans(),
+            "hypothesis-deadline": st.integers() | st.none(),
         },
     ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
     flags=st.fixed_dictionaries(
@@ -74,6 +75,7 @@ def paths(draw):
     ).map(lambda params: [f"--{key}={value}" for key, values in params.items() for value in values]),
 )
 @example(params=[], flags=[], multiple_params=["--header=0:0\r"])
+@example(params=["--hypothesis-deadline=0"], flags=[], multiple_params=[])
 @pytest.mark.usefixtures("mocked_schema")
 def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params):
     result = cli.run(schema_url, *params, *multiple_params, *flags)

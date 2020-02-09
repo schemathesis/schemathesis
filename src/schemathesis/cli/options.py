@@ -29,13 +29,14 @@ class NotSet:
 not_set = NotSet()
 
 
-class OptionalInt(click.types.IntParamType):
+class OptionalInt(click.types.IntRange):
     def convert(  # type: ignore
         self, value: str, param: Optional[click.core.Parameter], ctx: Optional[click.core.Context]
     ) -> Union[int, NotSet]:
         if value == "None":
             return not_set
         try:
-            return int(value)
+            int(value)
+            return super().convert(value, param, ctx)
         except (ValueError, UnicodeError):
             self.fail("%s is not a valid integer or None" % value, param, ctx)
