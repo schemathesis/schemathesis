@@ -58,6 +58,7 @@ def paths(draw):
             "request-timeout": st.integers(),
             "validate-schema": st.booleans(),
             "hypothesis-deadline": st.integers() | st.none(),
+            "hypothesis-max-examples": st.integers(),
         },
     ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
     flags=st.fixed_dictionaries(
@@ -77,6 +78,7 @@ def paths(draw):
 @example(params=[], flags=[], multiple_params=["--header=0:0\r"])
 @example(params=["--hypothesis-deadline=0"], flags=[], multiple_params=[])
 @example(params=["--hypothesis-deadline=86399999999999993"], flags=[], multiple_params=[])
+@example(params=["--hypothesis-max-examples=0"], flags=[], multiple_params=[])
 @pytest.mark.usefixtures("mocked_schema")
 def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params):
     result = cli.run(schema_url, *params, *multiple_params, *flags)

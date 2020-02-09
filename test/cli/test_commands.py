@@ -178,7 +178,7 @@ def test_commands_run_help(cli):
         "                                  Duration in milliseconds that each individual",
         "                                  example with a test is not allowed to exceed.",
         "  --hypothesis-derandomize        Use Hypothesis's deterministic mode.",
-        "  --hypothesis-max-examples INTEGER",
+        "  --hypothesis-max-examples INTEGER RANGE",
         "                                  Maximum number of generated examples per each",
         "                                  method/endpoint combination.",
         f"  --hypothesis-phases [{PHASES.replace(', ', '|')}]",
