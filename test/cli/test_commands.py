@@ -114,7 +114,7 @@ def test_commands_version(cli):
         ),
         (
             ("run", "http://127.0.0.1", "--hypothesis-deadline=0"),
-            'Error: Invalid value for "--hypothesis-deadline": 0 is smaller than the minimum valid value 1.',
+            'Error: Invalid value for "--hypothesis-deadline": 0 is not in the valid range of 1 to 86399999913600000.',
         ),
         (
             ("run", "http://127.0.0.1", "--header=тест:test"),
