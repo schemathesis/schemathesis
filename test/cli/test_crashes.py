@@ -59,13 +59,13 @@ def paths(draw):
             "validate-schema": st.booleans(),
         },
     ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
-    flags=st.fixed_dictionaries({}, optional={"show-errors-tracebacks": st.booleans(), "exitfirst": st.booleans()}).map(
-        lambda flags: [f"--{flag}" for flag in flags]
-    ),
+    flags=st.fixed_dictionaries(
+        {}, optional={key: st.booleans() for key in ("show-errors-tracebacks", "exitfirst", "hypothesis-derandomize")}
+    ).map(lambda flags: [f"--{flag}" for flag in flags]),
     multiple_params=st.fixed_dictionaries(
         {},
         optional={
-            "checks": st.lists(st.sampled_from(ALL_CHECKS_NAMES)),
+            "checks": st.lists(st.sampled_from(ALL_CHECKS_NAMES + ("all",))),
             "header": st.lists(delimited()),
             "endpoint": st.lists(st.text(min_size=1)),
             "method": st.lists(st.text(min_size=1)),
