@@ -161,10 +161,10 @@ def test_commands_run_help(cli):
         "  -M, --method TEXT               Filter schemathesis test by HTTP method.",
         "  -T, --tag TEXT                  Filter schemathesis test by schema tag",
         "                                  pattern.",
-        "  -w, --workers INTEGER RANGE     Number of workers to run tests",
+        "  -w, --workers INTEGER RANGE     Number of workers to run tests.",
         "  -b, --base-url TEXT             Base URL address of the API, required for",
         "                                  SCHEMA if specified by file.",
-        "  --app TEXT                      WSGI application to test",
+        "  --app TEXT                      WSGI application to test.",
         "  --request-timeout INTEGER RANGE",
         "                                  Timeout in milliseconds for network requests",
         "                                  during the test run.",
@@ -186,7 +186,7 @@ def test_commands_run_help(cli):
         "                                  Comma-separated list of health checks to",
         "                                  disable.",
         "  --hypothesis-verbosity [quiet|normal|verbose|debug]",
-        "                                  Verbosity level of Hypothesis messages",
+        "                                  Verbosity level of Hypothesis messages.",
         "  -h, --help                      Show this message and exit.",
     ]
 
