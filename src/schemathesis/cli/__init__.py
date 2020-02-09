@@ -123,7 +123,8 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 @click.option(
     "--hypothesis-deadline",
     help="Duration in milliseconds that each individual example with a test is not allowed to exceed.",
-    type=OptionalInt(1),
+    # max value to avoid overflow. It is maximum amount of days in milliseconds
+    type=OptionalInt(1, 999999999 * 24 * 3600 * 1000),
 )
 @click.option("--hypothesis-derandomize", help="Use Hypothesis's deterministic mode.", is_flag=True, default=None)
 @click.option(
