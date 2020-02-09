@@ -1,7 +1,7 @@
 from unittest import mock
 
 import pytest
-from hypothesis import example, given
+from hypothesis import HealthCheck, Phase, Verbosity, example, given
 from hypothesis import strategies as st
 from hypothesis.provisional import urls
 from requests import Response
@@ -47,6 +47,10 @@ def paths(draw):
     return "/" + path
 
 
+def csv_strategy(enum):
+    return st.lists(st.sampled_from([item.name for item in enum]), min_size=1).map(",".join)
+
+
 # The following strategies generate CLI parameters, for example "--workers=5" or "--exitfirst"
 @given(
     params=st.fixed_dictionaries(
@@ -59,6 +63,9 @@ def paths(draw):
             "validate-schema": st.booleans(),
             "hypothesis-deadline": st.integers() | st.none(),
             "hypothesis-max-examples": st.integers(),
+            "hypothesis-report-multiple-bugs": st.booleans(),
+            "hypothesis-seed": st.integers(),
+            "hypothesis-verbosity": st.sampled_from([item.name for item in Verbosity]),
         },
     ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
     flags=st.fixed_dictionaries(
@@ -67,21 +74,28 @@ def paths(draw):
     multiple_params=st.fixed_dictionaries(
         {},
         optional={
-            "checks": st.lists(st.sampled_from(ALL_CHECKS_NAMES + ("all",))),
-            "header": st.lists(delimited()),
+            "checks": st.lists(st.sampled_from(ALL_CHECKS_NAMES + ("all",)), min_size=1),
+            "header": st.lists(delimited(), min_size=1),
             "endpoint": st.lists(st.text(min_size=1)),
             "method": st.lists(st.text(min_size=1)),
             "tag": st.lists(st.text(min_size=1)),
         },
     ).map(lambda params: [f"--{key}={value}" for key, values in params.items() for value in values]),
+    csv_params=st.fixed_dictionaries(
+        {},
+        optional={
+            "hypothesis-suppress-health-check": csv_strategy(HealthCheck),
+            "hypothesis-phases": csv_strategy(Phase),
+        },
+    ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
 )
-@example(params=[], flags=[], multiple_params=["--header=0:0\r"])
-@example(params=["--hypothesis-deadline=0"], flags=[], multiple_params=[])
-@example(params=["--hypothesis-deadline=86399999999999993"], flags=[], multiple_params=[])
-@example(params=["--hypothesis-max-examples=0"], flags=[], multiple_params=[])
+@example(params=[], flags=[], multiple_params=["--header=0:0\r"], csv_params=[])
+@example(params=["--hypothesis-deadline=0"], flags=[], multiple_params=[], csv_params=[])
+@example(params=["--hypothesis-deadline=86399999999999993"], flags=[], multiple_params=[], csv_params=[])
+@example(params=["--hypothesis-max-examples=0"], flags=[], multiple_params=[], csv_params=[])
 @pytest.mark.usefixtures("mocked_schema")
-def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params):
-    result = cli.run(schema_url, *params, *multiple_params, *flags)
+def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params):
+    result = cli.run(schema_url, *params, *multiple_params, *flags, *csv_params)
     check_result(result)
 
 
