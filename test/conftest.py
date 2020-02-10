@@ -128,9 +128,10 @@ def testdir(testdir):
         pytest_plugins=("aiohttp.pytest_plugin",),
         validate_schema=True,
         schema=None,
+        schema_name="simple_swagger.yaml",
         **kwargs,
     ):
-        schema = schema or make_schema(**kwargs)
+        schema = schema or make_schema(schema_name=schema_name, **kwargs)
         preparation = dedent(
             """
         import pytest

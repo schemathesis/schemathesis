@@ -26,7 +26,7 @@ from .converter import to_json_schema
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .models import Endpoint, empty_object
-from .types import Filter, Hook
+from .types import Filter, Hook, NotSet
 from .utils import NOT_SET, StringDatesYAMLLoader
 
 
@@ -98,7 +98,11 @@ class BaseSchema(Mapping):
             yield endpoint, test
 
     def parametrize(
-        self, method: Optional[Filter] = NOT_SET, endpoint: Optional[Filter] = NOT_SET, tag: Optional[Filter] = NOT_SET
+        self,
+        method: Optional[Filter] = NOT_SET,
+        endpoint: Optional[Filter] = NOT_SET,
+        tag: Optional[Filter] = NOT_SET,
+        validate_schema: Union[bool, NotSet] = NOT_SET,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
         if method is NOT_SET:
@@ -107,10 +111,17 @@ class BaseSchema(Mapping):
             endpoint = self.endpoint
         if tag is NOT_SET:
             tag = self.tag
+        if validate_schema is NOT_SET:
+            validate_schema = self.validate_schema
 
         def wrapper(func: Callable) -> Callable:
             func._schemathesis_test = self.__class__(  # type: ignore
-                self.raw_schema, base_url=self.base_url, method=method, endpoint=endpoint, tag=tag
+                self.raw_schema,
+                base_url=self.base_url,
+                method=method,
+                endpoint=endpoint,
+                tag=tag,
+                validate_schema=validate_schema,  # type: ignore
             )
             return func
 
