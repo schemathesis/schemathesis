@@ -105,6 +105,20 @@ class BaseSchema(Mapping):
         validate_schema: Union[bool, NotSet] = NOT_SET,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
+
+        def wrapper(func: Callable) -> Callable:
+            func._schemathesis_test = self.clone(method, endpoint, tag, validate_schema)  # type: ignore
+            return func
+
+        return wrapper
+
+    def clone(
+        self,
+        method: Optional[Filter] = NOT_SET,
+        endpoint: Optional[Filter] = NOT_SET,
+        tag: Optional[Filter] = NOT_SET,
+        validate_schema: Union[bool, NotSet] = NOT_SET,
+    ) -> "BaseSchema":
         if method is NOT_SET:
             method = self.method
         if endpoint is NOT_SET:
@@ -114,21 +128,17 @@ class BaseSchema(Mapping):
         if validate_schema is NOT_SET:
             validate_schema = self.validate_schema
 
-        def wrapper(func: Callable) -> Callable:
-            func._schemathesis_test = self.__class__(  # type: ignore
-                self.raw_schema,
-                location=self.location,
-                base_url=self.base_url,
-                method=method,
-                endpoint=endpoint,
-                tag=tag,
-                app=self.app,
-                hooks=self.hooks,
-                validate_schema=validate_schema,  # type: ignore
-            )
-            return func
-
-        return wrapper
+        return self.__class__(
+            self.raw_schema,
+            location=self.location,
+            base_url=self.base_url,
+            method=method,
+            endpoint=endpoint,
+            tag=tag,
+            app=self.app,
+            hooks=self.hooks,
+            validate_schema=validate_schema,  # type: ignore
+        )
 
     def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Extract response schema from `responses`."""
