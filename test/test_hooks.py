@@ -62,3 +62,41 @@ def test_hooks_combination(schema, schema_url):
         assert int(case.query["id"]) % 2 == 0
 
     test()
+
+
+def test_hooks_via_parametrize(testdir):
+    testdir.make_test(
+        """
+def extra(st):
+    return st.filter(lambda x: x["id"].isdigit() and int(x["id"]) % 2 == 0)
+
+schema.register_hook("query", extra)
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test(case):
+    assert case.endpoint.schema.get_hook("query") is extra
+    assert int(case.query["id"]) % 2 == 0
+    """,
+        schema={
+            "openapi": "3.0.2",
+            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+            "paths": {
+                "/query": {
+                    "get": {
+                        "parameters": [
+                            {
+                                "name": "id",
+                                "in": "query",
+                                "required": True,
+                                "schema": {"type": "string", "minLength": 1},
+                            }
+                        ],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        },
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)

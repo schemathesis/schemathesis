@@ -117,10 +117,13 @@ class BaseSchema(Mapping):
         def wrapper(func: Callable) -> Callable:
             func._schemathesis_test = self.__class__(  # type: ignore
                 self.raw_schema,
+                location=self.location,
                 base_url=self.base_url,
                 method=method,
                 endpoint=endpoint,
                 tag=tag,
+                app=self.app,
+                hooks=self.hooks,
                 validate_schema=validate_schema,  # type: ignore
             )
             return func

@@ -117,3 +117,30 @@ def test_binary_body(mocker, flask_app):
         assert response.json == {"size": mocker.ANY}
 
     test()
+
+
+def test_app_with_parametrize(testdir):
+    # Regression - missed argument inside "wrapper" in `BaseSchema.parametrize`
+    testdir.makepyfile(
+        """
+    import schemathesis
+    from test.apps._flask.app import app
+    from hypothesis import settings
+
+    schema = schemathesis.from_wsgi("/swagger.yaml", app)
+
+    called = False
+
+    @schema.parametrize()
+    @settings(max_examples=1)
+    def test(case):
+        global called
+        called = True
+        assert case.endpoint.schema.app is app
+
+    def test_two():
+        assert called
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=3)
