@@ -1,3 +1,5 @@
+import pytest
+
 from .utils import integer
 
 
@@ -345,6 +347,40 @@ def test_(request, case):
     # Then collection phase should fail with error
     result.assert_outcomes(error=1)
     result.stdout.re_match_lines([r".*Error during collection$"])
+
+
+@pytest.mark.parametrize("as_kwarg", (True, False))
+def test_invalid_schema_with_parametrize(testdir, as_kwarg):
+    # When the given schema is not valid but validation is disabled via validate_schema=False argument
+    testdir.make_test(
+        """
+@schema.parametrize({})
+@settings(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+""".format(
+            "" if not as_kwarg else "validate_schema=False"
+        ),
+        validate_schema=False,
+        schema_name="simple_openapi.yaml",
+        paths={
+            "/users": {
+                "get": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+    )
+    result = testdir.runpytest()
+    # Then test should be executed
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
 def test_exception_during_test(testdir):
