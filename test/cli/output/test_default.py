@@ -10,6 +10,8 @@ import schemathesis
 from schemathesis import models, runner, utils
 from schemathesis.cli.output import default
 
+from ...utils import strip_style_win32
+
 
 @pytest.fixture(autouse=True)
 def click_context():
@@ -56,7 +58,7 @@ def test_display_section_name(capsys, title, separator, printed, expected):
     # It should fit into the terminal width
     assert len(click.unstyle(out)) == terminal_width
     # And the section name should be bold
-    assert click.style(click.unstyle(out), bold=True) == out
+    assert strip_style_win32(click.style(click.unstyle(out), bold=True)) == out
     assert expected in out
 
 
@@ -76,7 +78,7 @@ def test_handle_initialized(capsys, execution_context, results_set, swagger_20):
     # And current directory
     assert f"rootdir: {os.getcwd()}" in lines
     # And number of collected endpoints
-    assert click.style("collected endpoints: 1", bold=True) in lines
+    assert strip_style_win32(click.style("collected endpoints: 1", bold=True)) in lines
     # And the output has an empty line in the end
     assert out.endswith("\n\n")
 
@@ -93,10 +95,10 @@ def test_display_statistic(capsys, swagger_20, endpoint):
     default.display_statistic(results)
 
     lines = [line for line in capsys.readouterr().out.split("\n") if line]
-    failed = click.style("FAILED", bold=True, fg="red")
-    not_a_server_error = click.style("not_a_server_error", bold=True)
-    different_check = click.style("different_check", bold=True)
-    passed = click.style("PASSED", bold=True, fg="green")
+    failed = strip_style_win32(click.style("FAILED", bold=True, fg="red"))
+    not_a_server_error = strip_style_win32(click.style("not_a_server_error", bold=True))
+    different_check = strip_style_win32(click.style("different_check", bold=True))
+    passed = strip_style_win32(click.style("PASSED", bold=True, fg="green"))
     # Then all check results should be properly displayed with relevant colors
     assert lines[1:3] == [
         f"{not_a_server_error}            3 / 5 passed          {failed} ",
@@ -106,7 +108,9 @@ def test_display_statistic(capsys, swagger_20, endpoint):
 
 def test_display_statistic_empty(capsys, results_set):
     default.display_statistic(results_set)
-    assert capsys.readouterr().out.split("\n")[2] == click.style("No checks were performed.", bold=True)
+    assert capsys.readouterr().out.split("\n")[2] == strip_style_win32(
+        click.style("No checks were performed.", bold=True)
+    )
 
 
 def test_capture_hypothesis_output():
@@ -137,7 +141,7 @@ def test_display_percentage(
     # Then the whole line fits precisely to the terminal width
     assert len(click.unstyle(out)) + current_line_length == default.get_terminal_width()
     # And the percentage displayed as expected in cyan color
-    assert out.strip() == click.style(percentage, fg="cyan")
+    assert out.strip() == strip_style_win32(click.style(percentage, fg="cyan"))
 
 
 def test_display_hypothesis_output(capsys):
@@ -147,7 +151,7 @@ def test_display_hypothesis_output(capsys):
     # Then the relevant section title is displayed
     assert " HYPOTHESIS OUTPUT" in lines[0]
     # And the output is displayed as separate lines in red color
-    assert " ".join(lines[1:3]) == click.style("foo bar", fg="red")
+    assert " ".join(lines[1:3]) == strip_style_win32(click.style("foo bar", fg="red"))
 
 
 @pytest.mark.parametrize("body", ({}, {"foo": "bar"}, None))
@@ -165,12 +169,12 @@ def test_display_single_failure(capsys, swagger_20, endpoint, body):
     # Then the endpoint name is displayed as a subsection
     assert " GET: /success " in lines[0]
     # And check name is displayed in red
-    assert lines[1] == click.style("Check           : not_a_server_error", fg="red")
+    assert lines[1] == strip_style_win32(click.style("Check           : not_a_server_error", fg="red"))
     # And body should be displayed if it is not None
     if body is None:
         assert "Body" not in out
     else:
-        assert click.style(f"Body            : {body}", fg="red") in lines
+        assert strip_style_win32(click.style(f"Body            : {body}", fg="red")) in lines
     # And empty parameters are not present in the output
     assert "Path parameters" not in out
     # And not needed attributes are not displayed
@@ -192,9 +196,9 @@ def test_handle_after_execution(capsys, execution_context, after_execution, stat
     lines = capsys.readouterr().out.strip().split("\n")
     symbol, percentage = lines[0].split()
     # Then the symbol corresponding to the status is displayed with a proper color
-    assert click.style(expected_symbol, fg=color) == symbol
+    assert strip_style_win32(click.style(expected_symbol, fg=color)) == symbol
     # And percentage is displayed in cyan color
-    assert click.style("[100%]", fg="cyan") == percentage
+    assert strip_style_win32(click.style("[100%]", fg="cyan")) == percentage
 
 
 def test_after_execution_attributes(execution_context, after_execution):
@@ -238,7 +242,7 @@ def test_display_single_error(capsys, swagger_20, endpoint, execution_context, s
         expected = f'    exec("some invalid code")\n{expected}'
         assert "\n".join(lines[3:8]) == expected.strip("\n")
     else:
-        assert "\n".join(lines[1:6]) == click.style(expected, fg="red")
+        assert "\n".join(lines[1:6]) == strip_style_win32(click.style(expected, fg="red"))
 
 
 def test_display_failures(swagger_20, capsys, results_set):
@@ -305,4 +309,4 @@ def test_display_summary(capsys, results_set, swagger_20):
     # Then number of total tests & total running time should be displayed
     assert "=== 1 passed in 1.26s ===" in out
     # And it should be in green & bold style
-    assert click.style(click.unstyle(out), fg="green", bold=True) == out
+    assert strip_style_win32(click.style(click.unstyle(out), fg="green", bold=True)) == out
