@@ -66,10 +66,11 @@ jobs:
   tests:
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python: [3.6, 3.7, 3.8]
 
-    name: tests_${{ matrix.python }}
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }}/tests_${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v1
         with:
@@ -101,14 +102,15 @@ jobs:
   hypothesis-tests:
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest]
         tox_job:
           - py3-hypothesis-4.40
           - py3-hypothesis-4.50
           - py3-hypothesis-5.0
           - py3-hypothesis-5.1
 
-    name: tests_${{ matrix.tox_job }}
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }}/tests_${{ matrix.tox_job }}
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v1
       with:
