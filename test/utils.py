@@ -1,8 +1,10 @@
 import datetime
 import os
+import platform
 from functools import lru_cache
 from typing import Any, Callable, Dict, Type
 
+import click
 import pytest
 import requests
 import yaml
@@ -117,3 +119,14 @@ def assert_requests_call(case: Case):
     """Verify that all generated input parameters are usable by requests."""
     with pytest.raises(requests.exceptions.ConnectionError):
         case.call(base_url="http://127.0.0.1:1")
+
+
+def strip_style_win32(styled_output: str) -> str:
+    """Strip text style on Windows.
+
+    `click.style` produces ANSI sequences, however they were not supported
+    by PowerShell untill recently and colored output is created differently.
+    """
+    if platform.system() == "Windows":
+        return click.unstyle(styled_output)
+    return styled_output
