@@ -502,7 +502,7 @@ def test_hypothesis_failed_event(cli, cli_args, workers):
 @pytest.mark.parametrize("workers", (1, 2))
 def test_connection_timeout(cli, server, schema_url, workers):
     # When connection timeout is specified in the CLI and the request fails because of it
-    result = cli.run(schema_url, "--request-timeout=10", f"--workers={workers}")
+    result = cli.run(schema_url, "--request-timeout=80", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
     # And the given endpoint should be displayed as an error
@@ -516,7 +516,7 @@ def test_connection_timeout(cli, server, schema_url, workers):
     # And the proper error message should be displayed
     assert (
         f"requests.exceptions.ReadTimeout: HTTPConnectionPool(host='127.0.0.1', port={server['port']}): "
-        "Read timed out. (read timeout=0.01)" in result.stdout
+        "Read timed out. (read timeout=0.08)" in result.stdout
     )
 
 
