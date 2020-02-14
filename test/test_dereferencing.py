@@ -1,3 +1,5 @@
+import platform
+
 import pytest
 import yaml
 
@@ -484,6 +486,7 @@ COMMON_RESPONSES = {
 }
 
 
+@pytest.mark.xfail(platform.system() == "Windows", reason="Resolving is currently not supported on Windows.")
 def test_complex_dereference(testdir):
     # This tests includes:
     #   - references to other files
