@@ -1,4 +1,5 @@
 import os
+import platform
 import time
 from test.utils import HERE, SIMPLE_PATH
 
@@ -882,6 +883,7 @@ def test_hypothesis_output_capture(mocker, cli, cli_args, workers):
     assert "Falsifying example" in result.stdout
 
 
+@pytest.mark.xfail(platform.system() == "Windows", reason="Resolving is currently not supported on Windows.")
 async def test_multiple_files_schema(app, testdir, cli, base_url):
     # When the schema contains references to other files
     schema = {
