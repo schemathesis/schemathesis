@@ -1,7 +1,7 @@
 from unittest import mock
 
 import pytest
-from hypothesis import HealthCheck, Phase, Verbosity, example, given
+from hypothesis import HealthCheck, Phase, Verbosity, example, given, settings
 from hypothesis import strategies as st
 from hypothesis.provisional import urls
 from requests import Response
@@ -52,6 +52,7 @@ def csv_strategy(enum):
 
 
 # The following strategies generate CLI parameters, for example "--workers=5" or "--exitfirst"
+@settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
 @given(
     params=st.fixed_dictionaries(
         {},
@@ -99,6 +100,7 @@ def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params
     check_result(result)
 
 
+@settings(deadline=None)
 @given(schema=urls() | paths() | st.text(), base_url=urls() | paths() | st.text() | st.none())
 @example(schema="//bla", base_url=None)
 @pytest.mark.usefixtures("mocked_schema")
