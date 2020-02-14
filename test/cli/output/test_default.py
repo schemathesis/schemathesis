@@ -242,7 +242,7 @@ def test_display_single_error(capsys, swagger_20, endpoint, execution_context, s
         expected = f'    exec("some invalid code")\n{expected}'
         assert "\n".join(lines[3:8]) == expected.strip("\n")
     else:
-        assert "\n".join(lines[1:6]) == strip_style_win32(click.style(expected, fg="red"))
+        assert "\n".join(lines[1:6]) == strip_style_win32(click.style(expected, fg="red")).rstrip("\n")
 
 
 def test_display_failures(swagger_20, capsys, results_set):

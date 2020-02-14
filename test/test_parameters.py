@@ -13,7 +13,7 @@ def test_headers(testdir):
     testdir.make_test(
         """
 @schema.parametrize()
-@settings(suppress_health_check=[HealthCheck.filter_too_much])
+@settings(suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
 def test_(case):
     assert_str(case.headers["api_key"])
     assert_requests_call(case)
@@ -29,7 +29,7 @@ def test_cookies(testdir):
     testdir.make_test(
         """
 @schema.parametrize()
-@settings(suppress_health_check=[HealthCheck.filter_too_much])
+@settings(suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
 def test_(case):
     assert_str(case.cookies["token"])
     assert_requests_call(case)
@@ -46,7 +46,7 @@ def test_body(testdir):
     testdir.make_test(
         """
 @schema.parametrize(method="POST")
-@settings(max_examples=3)
+@settings(max_examples=3, deadline=None)
 def test_(case):
     assert_int(case.body)
     assert_requests_call(case)
@@ -69,7 +69,7 @@ def test_path(testdir):
     testdir.make_test(
         """
 @schema.parametrize(endpoint="/users/{user_id}")
-@settings(max_examples=3)
+@settings(max_examples=3, deadline=None)
 def test_(case):
     assert_int(case.path_parameters["user_id"])
     assert_requests_call(case)
@@ -92,7 +92,7 @@ def test_form_data(testdir):
     testdir.make_test(
         """
 @schema.parametrize()
-@settings(max_examples=1)
+@settings(max_examples=1, deadline=None)
 def test_(case):
     assert_str(case.form_data["status"])
     assert_requests_call(case)
