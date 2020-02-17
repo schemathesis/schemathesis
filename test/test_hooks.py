@@ -20,6 +20,7 @@ def schema(flask_app):
     return schemathesis.from_wsgi("/swagger.yaml", flask_app)
 
 
+@pytest.mark.hypothesis_nested
 @pytest.mark.endpoints("custom_format")
 @pytest.mark.usefixtures("query_hook")
 def test_global_query_hook(schema, schema_url):
@@ -33,6 +34,7 @@ def test_global_query_hook(schema, schema_url):
     test()
 
 
+@pytest.mark.hypothesis_nested
 @pytest.mark.endpoints("custom_format")
 def test_schema_query_hook(schema, schema_url):
     schema.register_hook("query", hook)
@@ -46,6 +48,7 @@ def test_schema_query_hook(schema, schema_url):
     test()
 
 
+@pytest.mark.hypothesis_nested
 @pytest.mark.usefixtures("query_hook")
 @pytest.mark.endpoints("custom_format")
 def test_hooks_combination(schema, schema_url):
