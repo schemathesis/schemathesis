@@ -11,6 +11,7 @@ def schema(flask_app):
     return schemathesis.from_wsgi("/swagger.yaml", flask_app)
 
 
+@pytest.mark.hypothesis_nested
 def test_call(schema, simple_schema):
     strategy = schema.endpoints["/api/success"]["GET"].as_strategy()
 
@@ -23,6 +24,7 @@ def test_call(schema, simple_schema):
     test()
 
 
+@pytest.mark.hypothesis_nested
 def test_cookies(flask_app):
     @flask_app.route("/cookies", methods=["GET"])
     def cookies():
@@ -63,6 +65,7 @@ def test_cookies(flask_app):
     test()
 
 
+@pytest.mark.hypothesis_nested
 @pytest.mark.endpoints("multipart")
 def test_form_data(schema):
     strategy = schema.endpoints["/api/multipart"]["POST"].as_strategy()
@@ -89,6 +92,7 @@ def test_not_wsgi(schema):
         case.call_wsgi()
 
 
+@pytest.mark.hypothesis_nested
 def test_binary_body(mocker, flask_app):
     schema = schemathesis.from_dict(
         {

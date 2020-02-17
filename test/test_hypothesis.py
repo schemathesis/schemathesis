@@ -61,6 +61,7 @@ def test_invalid_body_in_get(swagger_20):
         get_case_strategy(endpoint)
 
 
+@pytest.mark.hypothesis_nested
 def test_invalid_body_in_get_disable_validation(simple_schema):
     schema = schemathesis.from_dict(simple_schema, validate_schema=False)
     endpoint = Endpoint(
@@ -160,6 +161,7 @@ def test_invalid_custom_strategy(values, error):
     assert error in str(exc.value)
 
 
+@pytest.mark.hypothesis_nested
 def test_valid_headers(base_url, swagger_20):
     endpoint = Endpoint(
         "/api/success",
@@ -176,7 +178,7 @@ def test_valid_headers(base_url, swagger_20):
     )
 
     @given(case=get_case_strategy(endpoint))
-    @settings(suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def inner(case):
         case.call()
 
@@ -188,6 +190,7 @@ def test_is_valid_query(value, expected):
     assert is_valid_query(value) == expected
 
 
+@pytest.mark.hypothesis_nested
 def test_is_valid_query_strategy():
     strategy = strategies.sampled_from([{"key": "1"}, {"key": "\udcff"}]).filter(is_valid_query)
 

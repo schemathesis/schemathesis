@@ -1,5 +1,6 @@
 import datetime
 
+import pytest
 import yaml
 from hypothesis import HealthCheck, given, settings
 
@@ -120,6 +121,7 @@ def test_(case):
     testdir.run_and_assert(passed=1)
 
 
+@pytest.mark.hypothesis_nested
 def test_date_deserializing(testdir):
     # When dates in schema are written without quotes (achieved by dumping the schema with date instances)
     schema = {
