@@ -2,6 +2,7 @@ from textwrap import dedent
 
 import pytest
 from click.testing import CliRunner
+from hypothesis import settings
 
 import schemathesis.cli
 from schemathesis.extra._aiohttp import run_server
@@ -10,6 +11,11 @@ from .apps import _aiohttp, _flask
 from .utils import make_schema
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
+
+
+# Register Hypothesis profile. Could be used as
+# `pytest test -m hypothesis --hypothesis-profile <profile-name>`
+settings.register_profile("CI", max_examples=10000)
 
 
 def pytest_configure(config):

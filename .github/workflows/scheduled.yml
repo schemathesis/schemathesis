@@ -56,3 +56,19 @@ jobs:
             sqlite3 .mutmut-cache
               "select id from Mutant where status in ('bad_survived', 'bad_timeout', 'ok_suspicious');"
             );
+
+  hypothesis-tests:
+    name: Hypothesis tests with CI profile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+
+      - run: pip install poetry
+      - run: poetry install
+      - run: poetry run pytest -m hypothesis -m hypothesis_nested --hypothesis-profile CI
