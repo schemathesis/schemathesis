@@ -1,5 +1,5 @@
 # pylint: disable=too-many-arguments
-import os
+import pathlib
 from typing import IO, Any, Callable, Dict, Optional, Union
 from urllib.parse import urljoin
 
@@ -32,7 +32,7 @@ def from_path(
     with open(path) as fd:
         return from_file(
             fd,
-            location=os.path.abspath(path),
+            location=pathlib.Path(path).absolute().as_uri(),
             base_url=base_url,
             method=method,
             endpoint=endpoint,

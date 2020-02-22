@@ -1,7 +1,7 @@
-import os
-import platform
+import pathlib
 import time
 from test.utils import HERE, SIMPLE_PATH
+from urllib.parse import urljoin
 
 import pytest
 import yaml
@@ -883,9 +883,9 @@ def test_hypothesis_output_capture(mocker, cli, cli_args, workers):
     assert "Falsifying example" in result.stdout
 
 
-@pytest.mark.xfail(platform.system() == "Windows", reason="Resolving is currently not supported on Windows.")
 async def test_multiple_files_schema(app, testdir, cli, base_url):
     # When the schema contains references to other files
+    uri = pathlib.Path(HERE).as_uri() + "/"
     schema = {
         "swagger": "2.0",
         "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},
@@ -899,8 +899,8 @@ async def test_multiple_files_schema(app, testdir, cli, base_url):
                     "parameters": [
                         {
                             # during the CLI run we have a different working directory,
-                            # so specifying an absolute file path
-                            "schema": {"$ref": os.path.join(HERE, "data/petstore_v2.yaml#/definitions/Pet")},
+                            # so specifying an absolute uri
+                            "schema": {"$ref": urljoin(uri, "data/petstore_v2.yaml#/definitions/Pet")},
                             "in": "body",
                             "name": "user",
                             "required": True,

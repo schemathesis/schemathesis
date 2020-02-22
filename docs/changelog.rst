@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Resolving references when schema is loaded from a file on Windows. `#418`_
+
 `0.24.3`_ - 2020-02-10
 ----------------------
 
@@ -712,6 +717,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#418: https://github.com/kiwicom/schemathesis/issues/418
 .. _#416: https://github.com/kiwicom/schemathesis/issues/416
 .. _#412: https://github.com/kiwicom/schemathesis/issues/412
 .. _#410: https://github.com/kiwicom/schemathesis/issues/410
