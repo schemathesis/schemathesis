@@ -13,6 +13,7 @@ from copy import deepcopy
 from functools import lru_cache
 from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Tuple, Union, overload
 from urllib.parse import urljoin, urlsplit
+from urllib.request import urlopen
 
 import attr
 import hypothesis
@@ -30,11 +31,22 @@ from .types import Filter, Hook, NotSet
 from .utils import NOT_SET, StringDatesYAMLLoader
 
 
+def load_file_impl(location: str, opener: Callable) -> Dict[str, Any]:
+    """Load a schema from the given file."""
+    with opener(location) as fd:
+        return yaml.load(fd, StringDatesYAMLLoader)
+
+
 @lru_cache()
 def load_file(location: str) -> Dict[str, Any]:
     """Load a schema from the given file."""
-    with open(location) as fd:
-        return yaml.load(fd, StringDatesYAMLLoader)
+    return load_file_impl(location, open)
+
+
+@lru_cache()
+def load_file_uri(location: str) -> Dict[str, Any]:
+    """Load a schema from the given file uri."""
+    return load_file_impl(location, urlopen)
 
 
 @attr.s()  # pragma: no mutate
@@ -78,7 +90,9 @@ class BaseSchema(Mapping):
     def resolver(self) -> jsonschema.RefResolver:
         if not hasattr(self, "_resolver"):
             # pylint: disable=attribute-defined-outside-init
-            self._resolver = jsonschema.RefResolver(self.location or "", self.raw_schema, handlers={"": load_file})
+            self._resolver = jsonschema.RefResolver(
+                self.location or "", self.raw_schema, handlers={"file": load_file_uri, "": load_file}
+            )
         return self._resolver
 
     @property
