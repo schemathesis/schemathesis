@@ -20,6 +20,7 @@ settings.register_profile("CI", max_examples=10000)
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "endpoints(*names): add only specified endpoints to the test application.")
+    config.addinivalue_line("markers", "hypothesis_nested: mark tests with nested Hypothesis tests.")
 
 
 @pytest.fixture(scope="session")
