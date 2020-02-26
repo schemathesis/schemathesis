@@ -5,7 +5,7 @@ from hypothesis import HealthCheck, given, settings, strategies
 
 import schemathesis
 from schemathesis import Case, register_string_format
-from schemathesis._hypothesis import PARAMETERS, get_case_strategy, get_examples, is_valid_query
+from schemathesis._hypothesis import PARAMETERS, get_case_strategy, get_example, is_valid_query
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Endpoint
 
@@ -29,7 +29,7 @@ def test_get_examples(name, swagger_20):
             }
         },
     )
-    assert list(get_examples(endpoint)) == [Case(endpoint, **{name: example})]
+    assert get_example(endpoint) == Case(endpoint, **{name: example})
 
 
 def test_no_body_in_get(swagger_20):
@@ -46,7 +46,7 @@ def test_no_body_in_get(swagger_20):
             "example": {"name": "John"},
         },
     )
-    assert list(get_examples(endpoint))[0].body is None
+    assert get_example(endpoint).body is None
 
 
 def test_invalid_body_in_get(swagger_20):
@@ -85,7 +85,7 @@ def test_warning(swagger_20):
     example = {"name": "John"}
     endpoint = make_endpoint(swagger_20, query={"example": example})
     with pytest.warns(None) as record:
-        assert list(get_examples(endpoint)) == [Case(endpoint, query=example)]
+        assert get_example(endpoint) == Case(endpoint, query=example)
     assert not record
 
 
