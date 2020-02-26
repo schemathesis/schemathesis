@@ -6,6 +6,12 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+~~~~~~~
+
+- Handling of explicit examples from schemas. Now if there are examples for multiple locations
+  (e.g. for body and for query) then they will be combined into a single example. `#424`_
+
 `0.24.5`_ - 2020-02-26
 ----------------------
 
@@ -731,6 +737,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#429: https://github.com/kiwicom/schemathesis/issues/429
+.. _#424: https://github.com/kiwicom/schemathesis/issues/424
 .. _#418: https://github.com/kiwicom/schemathesis/issues/418
 .. _#416: https://github.com/kiwicom/schemathesis/issues/416
 .. _#412: https://github.com/kiwicom/schemathesis/issues/412

@@ -3,7 +3,7 @@ import asyncio
 import re
 from base64 import b64encode
 from functools import partial
-from typing import Any, Callable, Dict, Generator, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 from urllib.parse import quote_plus
 
 import hypothesis
@@ -68,24 +68,28 @@ def make_async_test(test: Callable) -> Callable:
     return async_run
 
 
-def get_examples(endpoint: Endpoint) -> Generator[Case, None, None]:
+def get_example(endpoint: Endpoint) -> Optional[Case]:
+    static_parameters = {}
     for name in PARAMETERS:
         parameter = getattr(endpoint, name)
         if parameter is not None and "example" in parameter:
-            with handle_warnings():
-                strategies = {
-                    other: from_schema(getattr(endpoint, other))
-                    for other in PARAMETERS - {name}
-                    if getattr(endpoint, other) is not None
-                }
-                static_parameters = {name: parameter["example"]}
-                yield _get_case_strategy(endpoint, static_parameters, strategies).example()
+            static_parameters[name] = parameter["example"]
+    if static_parameters:
+        with handle_warnings():
+            strategies = {
+                other: from_schema(getattr(endpoint, other))
+                for other in PARAMETERS - set(static_parameters)
+                if getattr(endpoint, other) is not None
+            }
+            return _get_case_strategy(endpoint, static_parameters, strategies).example()
+    return None
 
 
 def add_examples(test: Callable, endpoint: Endpoint) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
-    for case in get_examples(endpoint):
-        test = hypothesis.example(case=case)(test)
+    example = get_example(endpoint)
+    if example:
+        test = hypothesis.example(case=example)(test)
     return test
 
 

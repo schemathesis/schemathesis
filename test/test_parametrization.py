@@ -306,6 +306,52 @@ def test(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
+def test_multiple_examples(testdir):
+    # When there are examples for different locations (e.g. body and query)
+    testdir.make_test(
+        """
+from hypothesis import Phase
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.explicit])
+def test(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.body == {"name": "John"}
+    assert case.query == {"age": 35}
+""",
+        schema={
+            "openapi": "3.0.2",
+            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+            "paths": {
+                "/body": {
+                    "post": {
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"name": {"type": "string"}},
+                                        "required": ["name"],
+                                        "example": {"name": "NOT John"},
+                                    },
+                                    "example": {"name": "John"},
+                                }
+                            }
+                        },
+                        "parameters": [{"in": "query", "name": "age", "schema": {"type": "integer"}, "example": 35}],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        },
+    )
+
+    result = testdir.runpytest("-v", "-s")
+    # Then these examples should be used in tests as a part of a single request, i.e combined
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+
+
 def test_deselecting(testdir):
     # When pytest selecting is applied via "-k" option
     testdir.make_test(
