@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Error during ``pytest`` collection on objects that have custom ``__getattr__`` method and therefore pass ``is_schemathesis`` check. `#429`_
+
 `0.24.4`_ - 2020-02-22
 ----------------------
 
@@ -721,6 +726,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#429: https://github.com/kiwicom/schemathesis/issues/429
 .. _#418: https://github.com/kiwicom/schemathesis/issues/418
 .. _#416: https://github.com/kiwicom/schemathesis/issues/416
 .. _#412: https://github.com/kiwicom/schemathesis/issues/412
