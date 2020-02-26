@@ -63,7 +63,11 @@ def deprecated(func: Callable, message: str) -> Callable:
 def is_schemathesis_test(func: Callable) -> bool:
     """Check whether test is parametrized with schemathesis."""
     try:
-        return hasattr(func, "_schemathesis_test")
+        from .schemas import BaseSchema  # pylint: disable=import-outside-toplevel
+
+        item = getattr(func, "_schemathesis_test", None)
+        # Comparison is needed to avoid false-positives when mocks are collected by pytest
+        return isinstance(item, BaseSchema)
     except Exception:
         return False
 

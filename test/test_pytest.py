@@ -78,3 +78,19 @@ class TestAPI:
             r"Hypothesis calls: 4",
         ]
     )
+
+
+def test_pytest_collection_regression(testdir):
+    # See #429.
+    # When in a module scope there is an object that has custom `__getattr__` (a mock for example)
+    testdir.make_test(
+        """
+from unittest.mock import call
+
+def test_schemathesis():
+    assert True
+""",
+    )
+    result = testdir.runpytest()
+    # It shouldn't be collected as a test
+    result.assert_outcomes(passed=1)
