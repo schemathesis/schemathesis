@@ -45,6 +45,7 @@ jobs:
             --backup
             --paths-to-mutate "src/"
             --tests-dir "test/"
+            --paths-to-exclude=spec_schemas.py
             --runner "poetry run pytest -n auto -x --tb=no -q"
 
       - name: Display survived mutations
