@@ -38,17 +38,17 @@ def get_hypothesis_settings(hypothesis_options: Optional[Dict[str, Any]] = None)
 
 
 # pylint: disable=too-many-instance-attributes
-@attr.s
+@attr.s  # pragma: no mutate
 class BaseRunner:
-    schema: BaseSchema = attr.ib()
-    checks: Iterable[Check] = attr.ib()
-    hypothesis_settings: hypothesis.settings = attr.ib(converter=get_hypothesis_settings)
-    auth: Optional[RawAuth] = attr.ib(default=None)
-    auth_type: Optional[str] = attr.ib(default=None)
-    headers: Optional[Dict[str, Any]] = attr.ib(default=None)
-    request_timeout: Optional[int] = attr.ib(default=None)
-    seed: Optional[int] = attr.ib(default=None)
-    exit_first: bool = attr.ib(default=False)
+    schema: BaseSchema = attr.ib()  # pragma: no mutate
+    checks: Iterable[Check] = attr.ib()  # pragma: no mutate
+    hypothesis_settings: hypothesis.settings = attr.ib(converter=get_hypothesis_settings)  # pragma: no mutate
+    auth: Optional[RawAuth] = attr.ib(default=None)  # pragma: no mutate
+    auth_type: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    headers: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
+    request_timeout: Optional[int] = attr.ib(default=None)  # pragma: no mutate
+    seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
+    exit_first: bool = attr.ib(default=False)  # pragma: no mutate
 
     def execute(self,) -> Generator[events.ExecutionEvent, None, None]:
         """Common logic for all runners."""
@@ -74,7 +74,7 @@ class BaseRunner:
         raise NotImplementedError
 
 
-@attr.s(slots=True)
+@attr.s(slots=True)  # pragma: no mutate
 class SingleThreadRunner(BaseRunner):
     """Fast runner that runs tests sequentially in the main thread."""
 
@@ -96,7 +96,7 @@ class SingleThreadRunner(BaseRunner):
                         return
 
 
-@attr.s(slots=True)
+@attr.s(slots=True)  # pragma: no mutate
 class SingleThreadWSGIRunner(SingleThreadRunner):
     def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         for endpoint, test in self.schema.get_all_tests(wsgi_test, self.hypothesis_settings, self.seed):
@@ -183,11 +183,11 @@ class ThreadInterrupted(Exception):
     """Special exception when worker thread received SIGINT."""
 
 
-@attr.s(slots=True)
+@attr.s(slots=True)  # pragma: no mutate
 class ThreadPoolRunner(BaseRunner):
     """Spread different tests among multiple worker threads."""
 
-    workers_num: int = attr.ib(default=2)
+    workers_num: int = attr.ib(default=2)  # pragma: no mutate
 
     def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         """All events come from a queue where different workers push their events."""

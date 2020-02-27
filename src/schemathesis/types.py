@@ -21,4 +21,4 @@ class NotSet:
 # A filter for endpoint / method
 Filter = Union[str, List[str], Tuple[str], Set[str], NotSet]  # pragma: no mutate
 
-Hook = Callable[[SearchStrategy], SearchStrategy]
+Hook = Callable[[SearchStrategy], SearchStrategy]  # pragma: no mutate

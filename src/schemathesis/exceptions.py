@@ -54,7 +54,7 @@ class InvalidSchema(Exception):
     """Schema associated with an endpoint contains an error."""
 
 
-@attr.s
+@attr.s  # pragma: no mutate
 class HTTPError(Exception):
-    response: Union[requests.Response, WSGIResponse] = attr.ib()
-    url: str = attr.ib()
+    response: Union[requests.Response, WSGIResponse] = attr.ib()  # pragma: no mutate
+    url: str = attr.ib()  # pragma: no mutate
