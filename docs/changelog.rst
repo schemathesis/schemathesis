@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+~~~~~~~
+
+- Allow ``werkzeug`` >= 1.0.0. `#433`_
+
 `0.25.0`_ - 2020-02-27
 ----------------------
 
@@ -740,6 +745,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#433: https://github.com/kiwicom/schemathesis/issues/433
 .. _#429: https://github.com/kiwicom/schemathesis/issues/429
 .. _#424: https://github.com/kiwicom/schemathesis/issues/424
 .. _#418: https://github.com/kiwicom/schemathesis/issues/418

@@ -55,75 +55,75 @@ def test_commands_version(cli):
 @pytest.mark.parametrize(
     "args, error",
     (
-        (("run",), 'Error: Missing argument "SCHEMA".'),
+        (("run",), "Error: Missing argument 'SCHEMA'."),
         (("run", "not-url"), "Error: Invalid SCHEMA, must be a valid URL or file path."),
         (("run", SIMPLE_PATH), 'Error: Missing argument, "--base-url" is required for SCHEMA specified by file.'),
         (("run", SIMPLE_PATH, "--base-url=test"), "Error: Invalid base URL"),
         (("run", SIMPLE_PATH, "--base-url=127.0.0.1:8080"), "Error: Invalid base URL"),
         (
             ("run", "http://127.0.0.1", "--request-timeout=-5"),
-            'Error: Invalid value for "--request-timeout": -5 is smaller than the minimum valid value 1.',
+            "Error: Invalid value for '--request-timeout': -5 is smaller than the minimum valid value 1.",
         ),
         (
             ("run", "http://127.0.0.1", "--request-timeout=0"),
-            'Error: Invalid value for "--request-timeout": 0 is smaller than the minimum valid value 1.',
+            "Error: Invalid value for '--request-timeout': 0 is smaller than the minimum valid value 1.",
         ),
         (
             ("run", "http://127.0.0.1", "--method=+"),
-            'Error: Invalid value for "--method" / "-M": Invalid regex: nothing to repeat at position 0',
+            "Error: Invalid value for '--method' / '-M': Invalid regex: nothing to repeat at position 0",
         ),
         (
             ("run", "http://127.0.0.1", "--auth=123"),
-            'Error: Invalid value for "--auth" / "-a": Should be in KEY:VALUE format. Got: 123',
+            "Error: Invalid value for '--auth' / '-a': Should be in KEY:VALUE format. Got: 123",
         ),
         (
             ("run", "http://127.0.0.1", "--auth=:pass"),
-            'Error: Invalid value for "--auth" / "-a": Username should not be empty',
+            "Error: Invalid value for '--auth' / '-a': Username should not be empty",
         ),
         (
             ("run", "http://127.0.0.1", "--auth=тест:pass"),
-            'Error: Invalid value for "--auth" / "-a": Username should be latin-1 encodable',
+            "Error: Invalid value for '--auth' / '-a': Username should be latin-1 encodable",
         ),
         (
             ("run", "http://127.0.0.1", "--auth=user:тест"),
-            'Error: Invalid value for "--auth" / "-a": Password should be latin-1 encodable',
+            "Error: Invalid value for '--auth' / '-a': Password should be latin-1 encodable",
         ),
         (
             ("run", "http://127.0.0.1", "--auth-type=random"),
-            'Error: Invalid value for "--auth-type" / "-A": invalid choice: random. (choose from basic, digest)',
+            "Error: Invalid value for '--auth-type' / '-A': invalid choice: random. (choose from basic, digest)",
         ),
         (
             ("run", "http://127.0.0.1", "--header=123"),
-            'Error: Invalid value for "--header" / "-H": Should be in KEY:VALUE format. Got: 123',
+            "Error: Invalid value for '--header' / '-H': Should be in KEY:VALUE format. Got: 123",
         ),
         (
             ("run", "http://127.0.0.1", "--header=:"),
-            'Error: Invalid value for "--header" / "-H": Header name should not be empty',
+            "Error: Invalid value for '--header' / '-H': Header name should not be empty",
         ),
         (
             ("run", "http://127.0.0.1", "--header= :"),
-            'Error: Invalid value for "--header" / "-H": Header name should not be empty',
+            "Error: Invalid value for '--header' / '-H': Header name should not be empty",
         ),
         (
             ("run", "http://127.0.0.1", "--hypothesis-phases=explicit,first,second"),
-            'Error: Invalid value for "--hypothesis-phases": invalid choice(s): first, second. '
+            "Error: Invalid value for '--hypothesis-phases': invalid choice(s): first, second. "
             f"Choose from {PHASES}",
         ),
         (
             ("run", "http://127.0.0.1", "--hypothesis-deadline=wrong"),
-            'Error: Invalid value for "--hypothesis-deadline": wrong is not a valid integer or None',
+            "Error: Invalid value for '--hypothesis-deadline': wrong is not a valid integer or None",
         ),
         (
             ("run", "http://127.0.0.1", "--hypothesis-deadline=0"),
-            'Error: Invalid value for "--hypothesis-deadline": 0 is not in the valid range of 1 to 86399999913600000.',
+            "Error: Invalid value for '--hypothesis-deadline': 0 is not in the valid range of 1 to 86399999913600000.",
         ),
         (
             ("run", "http://127.0.0.1", "--header=тест:test"),
-            'Error: Invalid value for "--header" / "-H": Header name should be latin-1 encodable',
+            "Error: Invalid value for '--header' / '-H': Header name should be latin-1 encodable",
         ),
         (
             ("run", "http://127.0.0.1", "--header=test:тест"),
-            'Error: Invalid value for "--header" / "-H": Header value should be latin-1 encodable',
+            "Error: Invalid value for '--header' / '-H': Header value should be latin-1 encodable",
         ),
         (("run", "//test",), "Error: Invalid SCHEMA, must be a valid URL or file path."),
     ),
@@ -141,6 +141,7 @@ def test_commands_run_help(cli):
     result_help = cli.main("run", "--help")
 
     assert result_help.exit_code == ExitCode.OK
+    print(result_help.stdout.strip().split("\n"))
     assert result_help.stdout.strip().split("\n") == [
         "Usage: schemathesis run [OPTIONS] SCHEMA",
         "",
@@ -156,41 +157,52 @@ def test_commands_run_help(cli):
         "  -x, --exitfirst                 Exit instantly on first error or failed test.",
         "  -a, --auth TEXT                 Server user and password. Example:",
         "                                  USER:PASSWORD",
+        "",
         "  -A, --auth-type [basic|digest]  The authentication mechanism to be used.",
         "                                  Defaults to 'basic'.",
+        "",
         "  -H, --header TEXT               Custom header in a that will be used in all",
-        r"                                  requests to the server. Example:",
+        "                                  requests to the server. Example:",
         r"                                  Authorization: Bearer\ 123",
-        r"  -E, --endpoint TEXT             Filter schemathesis test by endpoint pattern.",
+        "",
+        "  -E, --endpoint TEXT             Filter schemathesis test by endpoint pattern.",
         r"                                  Example: users/\d+",
+        "",
         "  -M, --method TEXT               Filter schemathesis test by HTTP method.",
         "  -T, --tag TEXT                  Filter schemathesis test by schema tag",
         "                                  pattern.",
+        "",
         "  -w, --workers INTEGER RANGE     Number of workers to run tests.",
         "  -b, --base-url TEXT             Base URL address of the API, required for",
         "                                  SCHEMA if specified by file.",
+        "",
         "  --app TEXT                      WSGI application to test.",
         "  --request-timeout INTEGER RANGE",
         "                                  Timeout in milliseconds for network requests",
         "                                  during the test run.",
+        "",
         "  --validate-schema BOOLEAN       Enable or disable validation of input schema.",
         "  --show-errors-tracebacks        Show full tracebacks for internal errors.",
         "  --hypothesis-deadline INTEGER RANGE",
         "                                  Duration in milliseconds that each individual",
         "                                  example with a test is not allowed to exceed.",
+        "",
         "  --hypothesis-derandomize        Use Hypothesis's deterministic mode.",
         "  --hypothesis-max-examples INTEGER RANGE",
         "                                  Maximum number of generated examples per each",
         "                                  method/endpoint combination.",
+        "",
         f"  --hypothesis-phases [{PHASES.replace(', ', '|')}]",
         "                                  Control which phases should be run.",
         "  --hypothesis-report-multiple-bugs BOOLEAN",
         "                                  Raise only the exception with the smallest",
         "                                  minimal example.",
+        "",
         "  --hypothesis-seed INTEGER       Set a seed to use for all Hypothesis tests.",
         f"  --hypothesis-suppress-health-check [{HEALTH_CHECKS}]",
         "                                  Comma-separated list of health checks to",
         "                                  disable.",
+        "",
         "  --hypothesis-verbosity [quiet|normal|verbose|debug]",
         "                                  Verbosity level of Hypothesis messages.",
         "  -h, --help                      Show this message and exit.",
@@ -961,7 +973,7 @@ def test_wsgi_app_missing(testdir, cli):
     assert result.exit_code == ExitCode.INTERRUPTED
     assert (
         result.stdout.strip().split("\n")[-1]
-        == 'Error: Invalid value for "--app": Can not import application from the given module'
+        == "Error: Invalid value for '--app': Can not import application from the given module"
     )
 
 
