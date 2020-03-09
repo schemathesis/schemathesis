@@ -45,7 +45,7 @@ class SchemathesisCase(PyCollector):
         metafunc = self._parametrize(cls, definition, fixtureinfo)
 
         if not metafunc._calls:
-            yield SchemathesisFunction(name, parent=self.parent, callobj=funcobj, fixtureinfo=fixtureinfo, `input_type=input_type)
+            yield SchemathesisFunction(name, parent=self.parent, callobj=funcobj, fixtureinfo=fixtureinfo, input_type=input_type)
         else:
             fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)
             fixtureinfo.prune_dependency_tree()

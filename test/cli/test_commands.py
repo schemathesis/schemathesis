@@ -82,11 +82,11 @@ def test_commands_version(cli):
         ),
         (
             ("run", "http://127.0.0.1", "--auth=тест:pass"),
-            'Error: Invalid value for "--auth" / "-a": Username should be latin-1 encodable',
+            'Error: Invalid value for "--auth" / "-a": Username should be ASCII encodable',
         ),
         (
             ("run", "http://127.0.0.1", "--auth=user:тест"),
-            'Error: Invalid value for "--auth" / "-a": Password should be latin-1 encodable',
+            'Error: Invalid value for "--auth" / "-a": Password should be ASCII encodable',
         ),
         (
             ("run", "http://127.0.0.1", "--auth-type=random"),
@@ -119,11 +119,11 @@ def test_commands_version(cli):
         ),
         (
             ("run", "http://127.0.0.1", "--header=тест:test"),
-            'Error: Invalid value for "--header" / "-H": Header name should be latin-1 encodable',
+            'Error: Invalid value for "--header" / "-H": Header name should be ASCII encodable',
         ),
         (
             ("run", "http://127.0.0.1", "--header=test:тест"),
-            'Error: Invalid value for "--header" / "-H": Header value should be latin-1 encodable',
+            'Error: Invalid value for "--header" / "-H": Header value should be ASCII encodable',
         ),
         (("run", "//test",), "Error: Invalid SCHEMA, must be a valid URL or file path."),
     ),
@@ -133,7 +133,8 @@ def test_commands_run_errors(cli, args, error):
     result = cli.main(*args)
 
     # Then an appropriate error should be displayed
-    assert result.exit_code == ExitCode.INTERRUPTED
+    print("FOO", result.stdout)
+    assert result.exit_code == ExitCode.INTERRUPTED, result.stderr
     assert result.stdout.strip().split("\n")[-1] == error
 
 
@@ -174,8 +175,8 @@ def test_commands_run_help(cli):
         "                                  Timeout in milliseconds for network requests",
         "                                  during the test run.",
         "  --validate-schema BOOLEAN       Enable or disable validation of input schema.",
-        "  --input-types [valid|invalid]   Input type to be generated",
         "  --show-errors-tracebacks        Show full tracebacks for internal errors.",
+        "  --input-types [valid|invalid]   Input type to be generated",
         "  --hypothesis-deadline INTEGER RANGE",
         "                                  Duration in milliseconds that each individual",
         "                                  example with a test is not allowed to exceed.",
@@ -879,6 +880,7 @@ def test_hypothesis_output_capture(mocker, cli, cli_args, workers):
 
     result = cli.run(*cli_args, f"--workers={workers}")
     assert result.exit_code == ExitCode.TESTS_FAILED
+    print("FOO", result.stdout)
     assert "= HYPOTHESIS OUTPUT =" in result.stdout
     assert "Falsifying example" in result.stdout
 

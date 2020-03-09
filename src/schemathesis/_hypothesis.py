@@ -3,7 +3,7 @@ import asyncio
 import re
 from base64 import b64encode
 from functools import partial
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Mapping, Optional, Union, Sequence
 from urllib.parse import quote_plus
 
 import hypothesis
@@ -121,17 +121,6 @@ def add_examples(test: Callable, endpoint: Endpoint) -> Callable:
     return test
 
 
-# Adapted from http.client._is_illegal_header_value
-VALID_HEADER_NAME = re.compile(r"[^:\s][^:\r\n]*|^[\r\n]$")  # pragma: no mutate
-INVALID_HEADER_VALUE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])|^[\r\n]$")  # pragma: no mutate
-
-def _has_invalid_characters(name: str, value: str) -> bool:
-    try:
-        check_header_validity((name, value))
-        return bool(VALID_HEADER_NAME.fullmatch(name)) and bool(INVALID_HEADER_VALUE.search(value))
-    except InvalidHeader:
-        return True
-
 def is_valid_header(headers: Any) -> bool:
     """Verify if the generated headers are valid."""
     # Data could be of any type
@@ -143,7 +132,7 @@ def is_valid_header(headers: Any) -> bool:
             return False
         if not name or not value:
             return False
-        if not _is_ascii_encodable(name) or not _is_ascii_encodable(value):
+        if not utils.is_ascii_encodable(name) or not utils.is_ascii_encodable(value):
             return False
         if utils.has_invalid_characters(name, value):
             return False
@@ -173,9 +162,19 @@ def is_valid_cookie(cookies: Any) -> bool:
     for name, value in cookies.items():
         if not isinstance(name, str) or not isinstance(value, str):
             return False
-        if not _is_latin_1_encodable(name) or not _is_latin_1_encodable(value):
+        if not utils.is_ascii_encodable(name) or not utils.is_ascii_encodable(value):
             return False
     return True
+
+
+def is_valid_form_data(form_data: Any) -> bool:
+    if isinstance(form_data, Mapping):
+        return all(isinstance(key, str) and isinstance(value, (bytes, str, int)) for key, value in form_data.items())
+
+    def is_valid_item(item: Any) -> bool:
+        return isinstance(item, Sequence) and len(item) == 2 and isinstance(item[0], str) and isinstance(item[1], (bytes, str, int))
+
+    return isinstance(form_data, (tuple, list, set)) and all(is_valid_item(item) for item in form_data)
 
 
 def get_schema_strategy(value: Any, input_type: InputType) -> st.SearchStrategy:
@@ -203,6 +202,8 @@ def get_case_strategy(endpoint: Endpoint, input_type: InputType = InputType.vali
                     strategies[parameter] = strategy.filter(is_valid_query)  # type: ignore
                 elif parameter == "cookies":
                     strategies[parameter] = strategy.filter(is_valid_cookie)  # type: ignore
+                elif parameter == "form_data":
+                    strategies[parameter] = strategy.filter(is_valid_form_data)  # type: ignore
                 else:
                     strategies[parameter] = strategy  # type: ignore
             else:

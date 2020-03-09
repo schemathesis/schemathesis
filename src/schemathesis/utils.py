@@ -28,23 +28,24 @@ def file_exists(path: str) -> bool:
         return False
 
 
-def is_latin_1_encodable(value: str) -> bool:
+def is_ascii_encodable(value: str) -> bool:
     """Header values are encoded to latin-1 before sending."""
     try:
-        value.encode("latin-1")
+        value.encode("ascii")
         return True
     except UnicodeEncodeError:
         return False
 
 
 # Adapted from http.client._is_illegal_header_value
-INVALID_HEADER_RE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])")  # pragma: no mutate
+VALID_HEADER_NAME = re.compile(r"[^:\s][^:\r\n]*|^[\r\n]$")  # pragma: no mutate
+INVALID_HEADER_VALUE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])|^[\r\n]$")  # pragma: no mutate
 
 
 def has_invalid_characters(name: str, value: str) -> bool:
     try:
         check_header_validity((name, value))
-        return bool(INVALID_HEADER_RE.search(value))
+        return bool(VALID_HEADER_NAME.fullmatch(name)) and bool(INVALID_HEADER_VALUE.search(value))
     except InvalidHeader:
         return True
 
@@ -103,7 +104,7 @@ IGNORED_PATTERNS = (
 
 
 @contextmanager
-def capture_hypothesis_output(pattern=IGNORED_PATTERNS) -> Generator[List[str], None, None]:
+def capture_hypothesis_output() -> Generator[List[str], None, None]:
     """Capture all output of Hypothesis into a list of strings.
 
     It allows us to have more granular control over Schemathesis output.
@@ -122,7 +123,7 @@ def capture_hypothesis_output(pattern=IGNORED_PATTERNS) -> Generator[List[str], 
 
     def get_output(value: str) -> None:
         # Drop messages that could be confusing in the Schemathesis context
-        if value.startswith(pattern):
+        if value.startswith(IGNORED_PATTERNS):
             return
         output.append(value)
 

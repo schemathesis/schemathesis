@@ -4,27 +4,28 @@ import pytest
 
 
 @pytest.mark.parametrize(
-    "parameter",
+    "parameter, result",
     (
-        # {"type": "string", "in": "query", "name": "id"},
-        {"type": "string", "in": "formData", "name": "id"},
-        {"type": "string", "in": "header", "name": "id"},
-        # {"schema": {"type": "string"}, "name": "id", "in": "body"},
+        ({"type": "string", "in": "query", "name": "id"}, {"passed": 1}),
+        ({"type": "string", "in": "formData", "name": "id"}, {"passed": 1}),
+        ({"type": "string", "in": "header", "name": "id"}, {"skipped": 1}),
+        ({"schema": {"type": "string"}, "name": "id", "in": "body"}, {"passed": 1}),
     ),
 )
-def test_simple_places(testdir, parameter):
+def test_simple_places(testdir, parameter, result):
     testdir.make_test(
         """
 @schema.parametrize(input_types=[InputType.invalid], method="POST")
-@settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow])
+@settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow], report_multiple_bugs=False)
 def test_(case):
+    print("FOO", case)
     assert case.path == "/v1/users"
     assert case.method == "POST"
     assert_requests_call(case)
         """,
         paths={"/users": {"post": {"parameters": [parameter], "responses": {"200": {"description": "OK"}}}}},
     )
-    testdir.run_and_assert("-s", skipped=1)
+    testdir.run_and_assert("-s", **result)
 
 
 def test_path_parameters(testdir):

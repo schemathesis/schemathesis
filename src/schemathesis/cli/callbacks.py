@@ -65,10 +65,10 @@ def validate_auth(
             user, password = tuple(raw_value.split(":"))
         if not user:
             raise click.BadParameter("Username should not be empty")
-        if not utils.is_latin_1_encodable(user):
-            raise click.BadParameter("Username should be latin-1 encodable")
-        if not utils.is_latin_1_encodable(password):
-            raise click.BadParameter("Password should be latin-1 encodable")
+        if not utils.is_ascii_encodable(user):
+            raise click.BadParameter("Username should be ASCII encodable")
+        if not utils.is_ascii_encodable(password):
+            raise click.BadParameter("Password should be ASCII encodable")
         return user, password
     return None
 
@@ -84,10 +84,10 @@ def validate_headers(
         key = key.strip()
         if not key:
             raise click.BadParameter("Header name should not be empty")
-        if not utils.is_latin_1_encodable(key):
-            raise click.BadParameter("Header name should be latin-1 encodable")
-        if not utils.is_latin_1_encodable(value):
-            raise click.BadParameter("Header value should be latin-1 encodable")
+        if not utils.is_ascii_encodable(key):
+            raise click.BadParameter("Header name should be ASCII encodable")
+        if not utils.is_ascii_encodable(value):
+            raise click.BadParameter("Header value should be ASCII encodable")
         if utils.has_invalid_characters(key, value):
             raise click.BadParameter("Invalid return character or leading space in header")
         headers[key] = value

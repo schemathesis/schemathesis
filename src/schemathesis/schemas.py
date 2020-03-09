@@ -124,7 +124,7 @@ class BaseSchema(Mapping):
         """Mark a test function as a parametrized one."""
 
         def wrapper(func: Callable) -> Callable:
-            func._schemathesis_test = self.clone(method, endpoint, tag, validate_schema)  # type: ignore
+            func._schemathesis_test = self.clone(method, endpoint, tag, validate_schema, input_types)  # type: ignore
             return func
 
         return wrapper
@@ -158,7 +158,7 @@ class BaseSchema(Mapping):
             method=method,
             endpoint=endpoint,
             tag=tag,
-            input_types=input_types,
+            input_types=input_types_,
             app=self.app,
             hooks=self.hooks,
             validate_schema=validate_schema,  # type: ignore
