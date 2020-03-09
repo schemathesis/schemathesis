@@ -8,8 +8,10 @@ from urllib.parse import quote_plus
 
 import hypothesis
 import hypothesis.strategies as st
+from hypothesis.errors import Unsatisfiable
 from hypothesis_jsonschema import from_schema
 from hypothesis_jsonschema_unfit import not_from_schema
+from pytest import skip
 
 from . import utils
 from ._compat import handle_warnings
@@ -35,11 +37,27 @@ def create_test(
     if seed is not None:
         wrapped_test = hypothesis.seed(seed)(wrapped_test)
     original_test = get_original_test(test)
+    #
+    # def skip_unsatisfiable_invalid_test(*args, **kwargs):
+    #     try:
+    #         original_test(*args, **kwargs)
+    #     except Unsatisfiable:
+    #         if input_type is InputType.invalid:
+    #             skip("No invalid could be generated for this case.")
+    #         raise
+
     if asyncio.iscoroutinefunction(original_test):
         wrapped_test.hypothesis.inner_test = make_async_test(original_test)  # type: ignore
     if settings is not None:
         wrapped_test = settings(wrapped_test)
     return add_examples(wrapped_test, endpoint)
+
+
+def skip_unsatisfiable_invalid_test():
+    try:
+        pass
+    except Unsatisfiable:
+        skip("No invalid could be generated for this case.")
 
 
 def make_test_or_exception(
@@ -103,10 +121,14 @@ def add_examples(test: Callable, endpoint: Endpoint) -> Callable:
     return test
 
 
+# Adapted from http.client._is_illegal_header_value
+VALID_HEADER_NAME = re.compile(r"[^:\s][^:\r\n]*|^[\r\n]$")  # pragma: no mutate
+INVALID_HEADER_VALUE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])|^[\r\n]$")  # pragma: no mutate
+
 def _has_invalid_characters(name: str, value: str) -> bool:
     try:
         check_header_validity((name, value))
-        return bool(INVALID_HEADER_RE.search(value))
+        return bool(VALID_HEADER_NAME.fullmatch(name)) and bool(INVALID_HEADER_VALUE.search(value))
     except InvalidHeader:
         return True
 
@@ -119,7 +141,9 @@ def is_valid_header(headers: Any) -> bool:
         # only string values can be sent by clients to the app
         if not isinstance(name, str) or not isinstance(value, str):
             return False
-        if not utils.is_latin_1_encodable(value):
+        if not name or not value:
+            return False
+        if not _is_ascii_encodable(name) or not _is_ascii_encodable(value):
             return False
         if utils.has_invalid_characters(name, value):
             return False

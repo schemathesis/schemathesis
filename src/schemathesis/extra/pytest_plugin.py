@@ -6,13 +6,14 @@ from _pytest import fixtures, nodes
 from _pytest.config import hookimpl
 from _pytest.fixtures import FuncFixtureInfo
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
-from hypothesis.errors import InvalidArgument  # pylint: disable=ungrouped-imports
+from hypothesis.errors import InvalidArgument, Unsatisfiable  # pylint: disable=ungrouped-imports
+from hypothesis.reporting import base_report
 
 from .._hypothesis import create_test
 from ..constants import InputType
 from ..exceptions import InvalidSchema
 from ..models import Endpoint
-from ..utils import is_schemathesis_test
+from ..utils import is_schemathesis_test, capture_hypothesis_output
 
 
 class SchemathesisCase(PyCollector):
@@ -44,7 +45,7 @@ class SchemathesisCase(PyCollector):
         metafunc = self._parametrize(cls, definition, fixtureinfo)
 
         if not metafunc._calls:
-            yield SchemathesisFunction(name, parent=self.parent, callobj=funcobj, fixtureinfo=fixtureinfo)
+            yield SchemathesisFunction(name, parent=self.parent, callobj=funcobj, fixtureinfo=fixtureinfo, `input_type=input_type)
         else:
             fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)
             fixtureinfo.prune_dependency_tree()
@@ -59,6 +60,7 @@ class SchemathesisCase(PyCollector):
                     fixtureinfo=fixtureinfo,
                     keywords={callspec.id: True},
                     originalname=name,
+                    input_type=input_type,
                 )
 
     def _get_class_parent(self) -> Optional[Type]:
@@ -99,6 +101,11 @@ class SchemathesisCase(PyCollector):
 
 
 class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
+    
+    def __init__(self, *args, input_type, **kwargs):
+        self.input_type = input_type
+        super().__init__(*args, **kwargs)
+    
     def _getobj(self) -> partial:
         """Tests defined as methods require `self` as the first argument.
 
@@ -123,7 +130,13 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
 
     For example - kwargs validation is failed for some strategy.
     """
-    outcome = yield
+    with capture_hypothesis_output() as output:
+        outcome = yield
+    if isinstance(pyfuncitem, SchemathesisFunction) and pyfuncitem.input_type is InputType.invalid and outcome.excinfo and isinstance(outcome.excinfo[1], Unsatisfiable):
+        pytest.skip("BAR")
+    else:
+        for text in output:
+            base_report(text)
     try:
         outcome.get_result()
     except InvalidArgument as exc:

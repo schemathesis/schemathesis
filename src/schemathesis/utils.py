@@ -103,7 +103,7 @@ IGNORED_PATTERNS = (
 
 
 @contextmanager
-def capture_hypothesis_output() -> Generator[List[str], None, None]:
+def capture_hypothesis_output(pattern=IGNORED_PATTERNS) -> Generator[List[str], None, None]:
     """Capture all output of Hypothesis into a list of strings.
 
     It allows us to have more granular control over Schemathesis output.
@@ -122,7 +122,7 @@ def capture_hypothesis_output() -> Generator[List[str], None, None]:
 
     def get_output(value: str) -> None:
         # Drop messages that could be confusing in the Schemathesis context
-        if value.startswith(IGNORED_PATTERNS):
+        if value.startswith(pattern):
             return
         output.append(value)
 
