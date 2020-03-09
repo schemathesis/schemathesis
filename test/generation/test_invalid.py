@@ -18,7 +18,6 @@ def test_simple_places(testdir, parameter, result):
 @schema.parametrize(input_types=[InputType.invalid], method="POST")
 @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow], report_multiple_bugs=False)
 def test_(case):
-    print("FOO", case)
     assert case.path == "/v1/users"
     assert case.method == "POST"
     assert_requests_call(case)

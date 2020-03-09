@@ -113,7 +113,7 @@ class BaseSchema(Mapping):
                 test = make_test_or_exception(endpoint, func, settings, seed, input_type=input_type)
                 yield endpoint, test
 
-    def parametrize(
+    def parametrize(  # pylint: disable=too-many-arguments
         self,
         method: Optional[Filter] = NOT_SET,
         endpoint: Optional[Filter] = NOT_SET,
@@ -129,7 +129,7 @@ class BaseSchema(Mapping):
 
         return wrapper
 
-    def clone(
+    def clone(  # pylint: disable=too-many-arguments
         self,
         method: Optional[Filter] = NOT_SET,
         endpoint: Optional[Filter] = NOT_SET,

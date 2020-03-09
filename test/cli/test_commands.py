@@ -133,7 +133,6 @@ def test_commands_run_errors(cli, args, error):
     result = cli.main(*args)
 
     # Then an appropriate error should be displayed
-    print("FOO", result.stdout)
     assert result.exit_code == ExitCode.INTERRUPTED, result.stderr
     assert result.stdout.strip().split("\n")[-1] == error
 
@@ -880,7 +879,6 @@ def test_hypothesis_output_capture(mocker, cli, cli_args, workers):
 
     result = cli.run(*cli_args, f"--workers={workers}")
     assert result.exit_code == ExitCode.TESTS_FAILED
-    print("FOO", result.stdout)
     assert "= HYPOTHESIS OUTPUT =" in result.stdout
     assert "Falsifying example" in result.stdout
 

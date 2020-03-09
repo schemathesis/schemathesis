@@ -3,7 +3,7 @@ import asyncio
 import re
 from base64 import b64encode
 from functools import partial
-from typing import Any, Callable, Dict, Mapping, Optional, Union, Sequence
+from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Union
 from urllib.parse import quote_plus
 
 import hypothesis
@@ -53,7 +53,7 @@ def create_test(
     return add_examples(wrapped_test, endpoint)
 
 
-def skip_unsatisfiable_invalid_test():
+def skip_unsatisfiable_invalid_test() -> None:
     try:
         pass
     except Unsatisfiable:
@@ -169,10 +169,18 @@ def is_valid_cookie(cookies: Any) -> bool:
 
 def is_valid_form_data(form_data: Any) -> bool:
     if isinstance(form_data, Mapping):
-        return all(isinstance(key, str) and isinstance(value, (bytes, str, int)) for key, value in form_data.items())
+        return all(
+            isinstance(key, str) and utils.is_ascii_encodable(key) and isinstance(value, (bytes, str, int))
+            for key, value in form_data.items()
+        )
 
     def is_valid_item(item: Any) -> bool:
-        return isinstance(item, Sequence) and len(item) == 2 and isinstance(item[0], str) and isinstance(item[1], (bytes, str, int))
+        return (
+            isinstance(item, Sequence)
+            and len(item) == 2
+            and isinstance(item[0], str)
+            and isinstance(item[1], (bytes, str, int))
+        )
 
     return isinstance(form_data, (tuple, list, set)) and all(is_valid_item(item) for item in form_data)
 

@@ -13,7 +13,7 @@ from .._hypothesis import create_test
 from ..constants import InputType
 from ..exceptions import InvalidSchema
 from ..models import Endpoint
-from ..utils import is_schemathesis_test, capture_hypothesis_output
+from ..utils import capture_hypothesis_output, is_schemathesis_test
 
 
 class SchemathesisCase(PyCollector):
@@ -45,7 +45,9 @@ class SchemathesisCase(PyCollector):
         metafunc = self._parametrize(cls, definition, fixtureinfo)
 
         if not metafunc._calls:
-            yield SchemathesisFunction(name, parent=self.parent, callobj=funcobj, fixtureinfo=fixtureinfo, input_type=input_type)
+            yield SchemathesisFunction(
+                name, parent=self.parent, callobj=funcobj, fixtureinfo=fixtureinfo, input_type=input_type
+            )
         else:
             fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)
             fixtureinfo.prune_dependency_tree()
@@ -101,11 +103,10 @@ class SchemathesisCase(PyCollector):
 
 
 class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
-    
-    def __init__(self, *args, input_type, **kwargs):
+    def __init__(self, *args: Any, input_type: InputType, **kwargs: Any) -> None:
         self.input_type = input_type
         super().__init__(*args, **kwargs)
-    
+
     def _getobj(self) -> partial:
         """Tests defined as methods require `self` as the first argument.
 
@@ -132,7 +133,12 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     """
     with capture_hypothesis_output() as output:
         outcome = yield
-    if isinstance(pyfuncitem, SchemathesisFunction) and pyfuncitem.input_type is InputType.invalid and outcome.excinfo and isinstance(outcome.excinfo[1], Unsatisfiable):
+    if (
+        isinstance(pyfuncitem, SchemathesisFunction)
+        and pyfuncitem.input_type is InputType.invalid
+        and outcome.excinfo
+        and isinstance(outcome.excinfo[1], Unsatisfiable)
+    ):
         pytest.skip("BAR")
     else:
         for text in output:
