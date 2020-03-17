@@ -289,6 +289,17 @@ SCHEMA_URI = "https://example.com/swagger.json"
                 "workers_num": 1,
             },
         ),
+        # Test loader_options update
+        (
+            [SCHEMA_URI, "--method=POST", "--auth=test:test"],
+            {
+                "checks": DEFAULT_CHECKS,
+                "api_options": {"auth": ("test", "test"), "auth_type": "basic"},
+                "loader_options": {"auth": ("test", "test"), "auth_type": "basic", "method": ("POST",)},
+                "loader": from_uri,
+                "workers_num": 1,
+            },
+        ),
         (
             [SCHEMA_URI, "--endpoint=users"],
             {

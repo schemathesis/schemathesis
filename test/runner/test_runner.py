@@ -418,3 +418,9 @@ def test_exit_first(args):
     results = list(results)
     assert results[-1].results.has_failures is True
     assert results[-1].results.failed_count == 1
+
+
+def test_auth_loader_options(base_url, schema_url, app):
+    execute(schema_url, loader_options={"base_url": base_url, "auth": ("test", "test"), "auth_type": "basic"})
+    schema_request = get_schema_requests(app)
+    assert schema_request[0].headers["Authorization"] == "Basic dGVzdDp0ZXN0"
