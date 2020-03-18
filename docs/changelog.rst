@@ -9,6 +9,7 @@ Changelog
 Fixed
 ~~~~~
 
+- Filter invalid empty `""` path template variables. `#439`_
 - Typo in a help message in the CLI output. `#436`_
 
 `0.25.1`_ - 2020-03-09
