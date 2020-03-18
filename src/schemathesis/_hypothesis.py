@@ -149,16 +149,28 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
 def filter_path_parameters(parameters: Dict[str, Any]) -> bool:
     """Single "." chars and empty strings "" are excluded from path by urllib3.
 
+    A path containing to "/" or "%2F" will lead to ambigious path resolution in
+    many frameworks and libraries, such behaviour have been observed in both
+    WSGI and ASGI applications.
+
     In this case one variable in the path template will be empty, which will lead to 404 in most of the cases.
     Because of it this case doesn't bring much value and might lead to false positives results of Schemathesis runs.
     """
 
     path_parameter_blacklist = (
         ".",
+        "/",
         "",
     )
 
-    return not any(value in path_parameter_blacklist for value in parameters.values())
+    return not any(
+        (
+            value in path_parameter_blacklist
+            or isinstance(value, str)
+            and path_parameter_blacklist[1] in value
+        )
+        for value in parameters.values()
+    )
 
 
 def quote_all(parameters: Dict[str, Any]) -> Dict[str, Any]:
