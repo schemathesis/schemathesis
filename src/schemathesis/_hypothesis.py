@@ -147,12 +147,18 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
 
 
 def filter_path_parameters(parameters: Dict[str, Any]) -> bool:
-    """Single "." chars are excluded from path by urllib3.
+    """Single "." chars and empty strings "" are excluded from path by urllib3.
 
     In this case one variable in the path template will be empty, which will lead to 404 in most of the cases.
     Because of it this case doesn't bring much value and might lead to false positives results of Schemathesis runs.
     """
-    return not any(value == "." for value in parameters.values())
+
+    path_parameter_blacklist = (
+        ".",
+        "",
+    )
+
+    return not any(value in path_parameter_blacklist for value in parameters.values())
 
 
 def quote_all(parameters: Dict[str, Any]) -> Dict[str, Any]:
