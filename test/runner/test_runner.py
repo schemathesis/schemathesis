@@ -309,9 +309,10 @@ def test_response_conformance_malformed_json(args):
 @pytest.fixture()
 def filter_path_parameters():
     # ".." and "." strings are treated specially, but this behavior is outside of the test's scope
+    # "" shouldn't be allowed as a valid path parameter
 
     def schema_filter(strategy):
-        return strategy.filter(lambda x: x["key"] not in ("..", "."))
+        return strategy.filter(lambda x: x["key"] not in ("..", ".", ""))
 
     schemathesis.hooks.register("path_parameters", schema_filter)
     yield
