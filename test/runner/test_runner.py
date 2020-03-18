@@ -312,7 +312,10 @@ def filter_path_parameters():
     # "" shouldn't be allowed as a valid path parameter
 
     def schema_filter(strategy):
-        return strategy.filter(lambda x: x["key"] not in ("..", ".", ""))
+        return strategy.filter(
+            lambda x: x["key"] not in ("..", ".", "", "/")
+            and not (isinstance(x["key"], str) and "/" in x["key"])
+        )
 
     schemathesis.hooks.register("path_parameters", schema_filter)
     yield
@@ -322,7 +325,7 @@ def filter_path_parameters():
 @pytest.mark.endpoints("path_variable")
 @pytest.mark.usefixtures("filter_path_parameters")
 def test_path_parameters_encoding(schema_url):
-    # NOTE. Flask still decodes %2F as / and returns 404
+    # NOTE. WSGI and ASGI applications decodes %2F as / and returns 404
     # When endpoint has a path parameter
     results = execute(schema_url, checks=(status_code_conformance,), hypothesis_options={"derandomize": True})
     # Then there should be no failures
