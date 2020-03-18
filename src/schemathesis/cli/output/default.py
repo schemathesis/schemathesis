@@ -114,7 +114,7 @@ def display_errors(context: events.ExecutionContext, results: TestResultSet) -> 
         display_single_error(context, result)
     if not context.show_errors_tracebacks:
         click.secho(
-            "Add this option to your command line parameters to see full tracebacks: --show-error-tracebacks", fg="red"
+            "Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks", fg="red"
         )
 
 

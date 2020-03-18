@@ -279,7 +279,7 @@ def test_display_errors(swagger_20, capsys, results_set, execution_context, show
     # Then section title is displayed
     assert " ERRORS " in out
     help_message_exists = (
-        "Add this option to your command line parameters to " "see full tracebacks: --show-error-tracebacks" in out
+        "Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks" in out
     )
     # And help message is displayed only if tracebacks are not shown
     assert help_message_exists is not show_errors_tracebacks
