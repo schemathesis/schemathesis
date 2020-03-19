@@ -313,8 +313,7 @@ def filter_path_parameters():
 
     def schema_filter(strategy):
         return strategy.filter(
-            lambda x: x["key"] not in ("..", ".", "", "/")
-            and not (isinstance(x["key"], str) and "/" in x["key"])
+            lambda x: x["key"] not in ("..", ".", "", "/") and not (isinstance(x["key"], str) and "/" in x["key"])
         )
 
     schemathesis.hooks.register("path_parameters", schema_filter)
