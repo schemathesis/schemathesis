@@ -9,8 +9,8 @@ Changelog
 Fixed
 ~~~~~
 
-- Filter problematic path template variables containing `"/"`, or `"%2F"` url encoded. `#440`_
-- Filter invalid empty `""` path template variables. `#439`_
+- Filter problematic path template variables containing ``"/"``, or ``"%2F"`` url encoded. `#440`_
+- Filter invalid empty ``""`` path template variables. `#439`_
 - Typo in a help message in the CLI output. `#436`_
 
 `0.25.1`_ - 2020-03-09
@@ -755,6 +755,8 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#440: https://github.com/kiwicom/schemathesis/issues/440
+.. _#439: https://github.com/kiwicom/schemathesis/issues/439
 .. _#436: https://github.com/kiwicom/schemathesis/issues/436
 .. _#433: https://github.com/kiwicom/schemathesis/issues/433
 .. _#429: https://github.com/kiwicom/schemathesis/issues/429
