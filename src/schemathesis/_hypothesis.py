@@ -164,11 +164,7 @@ def filter_path_parameters(parameters: Dict[str, Any]) -> bool:
     )
 
     return not any(
-        (
-            value in path_parameter_blacklist
-            or isinstance(value, str)
-            and path_parameter_blacklist[1] in value
-        )
+        (value in path_parameter_blacklist or isinstance(value, str) and path_parameter_blacklist[1] in value)
         for value in parameters.values()
     )
 
