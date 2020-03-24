@@ -12,7 +12,7 @@ Changelog
 Fixed
 ~~~~~
 
-- Limited recursion depth while resolving json schema to handle recursive  without breaking
+- Limit recursion depth while resolving JSON schema to handle recursion without breaking. `#435`_
 
 `0.26.0`_ - 2020-03-19
 ----------------------
@@ -771,6 +771,7 @@ Fixed
 .. _#440: https://github.com/kiwicom/schemathesis/issues/440
 .. _#439: https://github.com/kiwicom/schemathesis/issues/439
 .. _#436: https://github.com/kiwicom/schemathesis/issues/436
+.. _#435: https://github.com/kiwicom/schemathesis/issues/435
 .. _#433: https://github.com/kiwicom/schemathesis/issues/433
 .. _#429: https://github.com/kiwicom/schemathesis/issues/429
 .. _#424: https://github.com/kiwicom/schemathesis/issues/424
