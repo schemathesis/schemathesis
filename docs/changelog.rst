@@ -712,7 +712,8 @@ Fixed
 
 - Initial public release
 
-.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.26.0...HEAD
+.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v0.26.1...HEAD
+.. _0.26.1: https://github.com/kiwicom/schemathesis/compare/v0.26.0...v0.26.1
 .. _0.26.0: https://github.com/kiwicom/schemathesis/compare/v0.25.1...v0.26.0
 .. _0.25.1: https://github.com/kiwicom/schemathesis/compare/v0.25.0...v0.25.1
 .. _0.25.0: https://github.com/kiwicom/schemathesis/compare/v0.24.5...v0.25.0
