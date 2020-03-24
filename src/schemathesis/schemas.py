@@ -291,18 +291,20 @@ class SwaggerV20(BaseSchema):
         pass
 
     # pylint: disable=function-redefined
-    def resolve(self, item: Union[Dict[str, Any], List]) -> Union[Dict[str, Any], List]:
+    def resolve(self, item: Union[Dict[str, Any], List], recursion_level=0) -> Union[Dict[str, Any], List]:
         """Recursively resolve all references in the given object."""
+        if recursion_level > 100:
+            return item
         if isinstance(item, dict):
             item = self.prepare(item)
             if "$ref" in item:
                 with self.resolver.resolving(item["$ref"]) as resolved:
-                    return self.resolve(resolved)
+                    return self.resolve(resolved, recursion_level+1)
             for key, sub_item in item.items():
-                item[key] = self.resolve(sub_item)
+                item[key] = self.resolve(sub_item, recursion_level)
         elif isinstance(item, list):
             for idx, sub_item in enumerate(item):
-                item[idx] = self.resolve(sub_item)
+                item[idx] = self.resolve(sub_item, recursion_level)
         return item
 
     def prepare(self, item: Dict[str, Any]) -> Dict[str, Any]:
