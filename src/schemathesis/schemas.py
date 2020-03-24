@@ -283,7 +283,9 @@ class SwaggerV20(BaseSchema):
         }
 
     @overload  # pragma: no mutate
-    def resolve(self, item: Dict[str, Any], recursion_level: int = 0) -> Dict[str, Any]:  # pylint: disable=function-redefined
+    def resolve(
+        self, item: Dict[str, Any], recursion_level: int = 0
+    ) -> Dict[str, Any]:  # pylint: disable=function-redefined
         pass
 
     @overload  # pragma: no mutate
