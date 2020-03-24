@@ -6,6 +6,14 @@ Changelog
 `Unreleased`_
 -------------
 
+`0.26.1`_ - 2020-03-24
+----------------------
+
+Fixed
+~~~~~
+
+- Limited recursion depth while resolving json schema to handle recursive  without breaking
+
 `0.26.0`_ - 2020-03-19
 ----------------------
 
