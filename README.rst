@@ -344,7 +344,7 @@ For convenience you can explore the schemas and strategies manually:
         form_data={}
     )
 
-Schema instances implement `Mapping` protocol.
+Schema instances implement ``Mapping`` protocol.
 
 If you want to customize how data is generated, then you can use hooks of two types:
 
@@ -415,7 +415,16 @@ It can run tests against the given schema URI and will do some simple checks for
 
     from schemathesis import runner
 
-    runner.execute("http://127.0.0.1:8080/swagger.json")
+    events = runner.prepare("http://127.0.0.1:8080/swagger.json")
+    for event in events:
+        # do something with event
+
+``runner.prepare`` creates a generator that yields events of different kinds - ``BeforeExecution``, ``AfterExecution``, etc.
+They provide a lot of useful information about what happens during tests, but handling of these events is your responsibility.
+You can take some inspiration from Schemathesis `CLI implementation <https://github.com/kiwicom/schemathesis/blob/master/src/schemathesis/cli/__init__.py#L230>`_.
+See full description of events in the source code `here <https://github.com/kiwicom/schemathesis/blob/master/src/schemathesis/runner/events.py>`_.
+
+If you want to use Schemathesis CLI with your custom checks, look at `this section <https://github.com/kiwicom/schemathesis/tree/dd/deprecate-execute#registering-custom-checks-for-cli>`_
 
 The built-in checks list includes the following:
 
@@ -434,7 +443,9 @@ You can provide your custom checks to the execute function, the check is a calla
     def not_too_long(response, case: models.Case):
         assert response.elapsed < timedelta(milliseconds=300)
 
-    runner.execute("http://127.0.0.1:8080/swagger.json", checks=[not_too_long])
+    events = runner.prepare("http://127.0.0.1:8080/swagger.json", checks=[not_too_long])
+    for event in events:
+        # do something with event
 
 Custom string strategies
 ########################

@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Deprecated
+~~~~~~~~~~
+
+- ``runner.execute`` should not be used, since ``runner.prepare`` provides a more flexible interface to test execution.
+
 Removed
 ~~~~~~~
 
