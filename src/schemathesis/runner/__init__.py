@@ -2,6 +2,7 @@ import ctypes
 import logging
 import threading
 import time
+import warnings
 from contextlib import contextmanager
 from queue import Queue
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union, cast
@@ -416,6 +417,7 @@ def execute(  # pylint: disable=too-many-arguments
     hypothesis_options: Optional[Dict[str, Any]] = None,
     loader: Callable = from_uri,
 ) -> TestResultSet:
+    warnings.warn("`execute` is deprecated, use `prepare` instead.", DeprecationWarning)
     generator = prepare(
         schema_uri=schema_uri,
         checks=checks,
