@@ -15,7 +15,7 @@ from .exceptions import HTTPError
 from .lazy import LazySchema
 from .schemas import BaseSchema, OpenApi30, SwaggerV20
 from .types import Filter, PathLike
-from .utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, deprecated, get_base_url
+from .utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, get_base_url
 
 
 def from_path(
@@ -211,9 +211,3 @@ def from_aiohttp(
     if not base_url:
         base_url = app_url
     return from_uri(url, base_url=base_url, method=method, endpoint=endpoint, tag=tag, validate_schema=validate_schema)
-
-
-# Backward compatibility
-class Parametrizer:
-    from_path = deprecated(from_path, "`Parametrizer.from_path` is deprecated, use `schemathesis.from_path` instead.")
-    from_uri = deprecated(from_uri, "`Parametrizer.from_uri` is deprecated, use `schemathesis.from_uri` instead.")

@@ -2,9 +2,7 @@ import cgi
 import pathlib
 import re
 import traceback
-import warnings
 from contextlib import contextmanager
-from functools import wraps
 from typing import Any, Callable, Dict, Generator, List, Set, Tuple, Type, Union
 from urllib.parse import urlsplit, urlunsplit
 
@@ -47,17 +45,6 @@ def has_invalid_characters(name: str, value: str) -> bool:
         return bool(INVALID_HEADER_RE.search(value))
     except InvalidHeader:
         return True
-
-
-def deprecated(func: Callable, message: str) -> Callable:
-    """Emit a warning if the given function is used."""
-
-    @wraps(func)  # pragma: no mutate
-    def inner(*args: Any, **kwargs: Any) -> Any:
-        warnings.warn(message, DeprecationWarning)
-        return func(*args, **kwargs)
-
-    return inner
 
 
 def is_schemathesis_test(func: Callable) -> bool:

@@ -36,20 +36,6 @@ def test_base_url_override(schema_url, url):
     assert endpoint.base_url == "http://example.com"
 
 
-def test_backward_compatibility_path_loader(simple_schema):
-    # The deprecated loaders should emit deprecation warnings
-    message = r"^`Parametrizer.from_path` is deprecated, use `schemathesis.from_path` instead.\Z"
-    with pytest.warns(DeprecationWarning, match=message):
-        assert schemathesis.Parametrizer.from_path(SIMPLE_PATH).raw_schema == simple_schema
-
-
-def test_backward_compatibility_uri_loader(schema_url, app_schema):
-    # The deprecated loaders should emit deprecation warnings
-    message = r"^`Parametrizer.from_uri` is deprecated, use `schemathesis.from_uri` instead.\Z"
-    with pytest.warns(DeprecationWarning, match=message):
-        assert schemathesis.Parametrizer.from_uri(schema_url).raw_schema == app_schema
-
-
 def test_unsupported_type():
     with pytest.raises(ValueError, match="^Unsupported schema type$"):
         schemathesis.from_dict({})

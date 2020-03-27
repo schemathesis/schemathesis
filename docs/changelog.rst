@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Removed
+~~~~~~~
+
+- Deprecated ``Parametrizer`` class. Use ``schemathesis.from_path`` as a replacement for ``Parametrizer.from_path``.
+
 `0.26.1`_ - 2020-03-24
 ----------------------
 
