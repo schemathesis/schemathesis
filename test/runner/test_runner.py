@@ -8,12 +8,33 @@ from hypothesis import Phase
 from requests.auth import HTTPDigestAuth
 
 import schemathesis
-from schemathesis import from_wsgi
-from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
+from schemathesis import from_uri, from_wsgi
+from schemathesis.checks import (
+    DEFAULT_CHECKS,
+    content_type_conformance,
+    response_schema_conformance,
+    status_code_conformance,
+)
 from schemathesis.constants import __version__
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Status
-from schemathesis.runner import events, execute, get_base_url, get_requests_auth, get_wsgi_auth, prepare
+from schemathesis.runner import events, get_base_url, get_requests_auth, get_wsgi_auth, prepare
+
+
+def execute(
+    schema_uri, checks=DEFAULT_CHECKS, api_options=None, loader_options=None, hypothesis_options=None, loader=from_uri
+):
+    generator = prepare(
+        schema_uri=schema_uri,
+        checks=checks,
+        api_options=api_options,
+        loader_options=loader_options,
+        hypothesis_options=hypothesis_options,
+        loader=loader,
+    )
+    all_events = list(generator)
+    finished = all_events[-1]
+    return finished.results
 
 
 def assert_request(
