@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Handling of schemas, that use `x-*` custom properties. `#448`_
+
 Removed
 ~~~~~~~
 
@@ -788,6 +793,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#448: https://github.com/kiwicom/schemathesis/issues/448
 .. _#440: https://github.com/kiwicom/schemathesis/issues/440
 .. _#439: https://github.com/kiwicom/schemathesis/issues/439
 .. _#436: https://github.com/kiwicom/schemathesis/issues/436

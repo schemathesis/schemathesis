@@ -375,6 +375,23 @@ def test_b(request, case):
     result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST:/v1/pets\]", r"Hypothesis calls: 2"])
 
 
+def test_custom_properties(testdir):
+    # When custom properties are present in endpoint definitions
+    testdir.make_test(
+        """
+@schema.parametrize()
+@settings(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    """,
+        paths={"/users": {"x-handler": "foo"}},
+    )
+    result = testdir.runpytest("-s")
+    # Then it should be correctly processed
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+
+
 def test_invalid_schema(testdir):
     # When the given schema is not valid
     testdir.makepyfile(
