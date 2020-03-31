@@ -2,7 +2,6 @@ import ctypes
 import logging
 import threading
 import time
-import warnings
 from contextlib import contextmanager
 from queue import Queue
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union, cast
@@ -407,28 +406,6 @@ def run_test(
     yield events.AfterExecution(
         results=results, schema=schema, endpoint=endpoint, status=status, hypothesis_output=hypothesis_output
     )
-
-
-def execute(  # pylint: disable=too-many-arguments
-    schema_uri: str,
-    checks: Iterable[Check] = DEFAULT_CHECKS,
-    api_options: Optional[Dict[str, Any]] = None,
-    loader_options: Optional[Dict[str, Any]] = None,
-    hypothesis_options: Optional[Dict[str, Any]] = None,
-    loader: Callable = from_uri,
-) -> TestResultSet:
-    warnings.warn("`execute` is deprecated, use `prepare` instead.", DeprecationWarning)
-    generator = prepare(
-        schema_uri=schema_uri,
-        checks=checks,
-        api_options=api_options,
-        loader_options=loader_options,
-        hypothesis_options=hypothesis_options,
-        loader=loader,
-    )
-    all_events = list(generator)
-    finished = all_events[-1]
-    return finished.results
 
 
 def prepare(  # pylint: disable=too-many-arguments

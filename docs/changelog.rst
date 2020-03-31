@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Removed
+~~~~~~~
+
+- Deprecated ``runner.execute``. Use ``runner.prepare`` instead.
+
 `0.27.0`_ - 2020-03-31
 ----------------------
 
