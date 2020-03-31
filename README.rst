@@ -422,7 +422,7 @@ It can run tests against the given schema URI and will do some simple checks for
 ``runner.prepare`` creates a generator that yields events of different kinds - ``BeforeExecution``, ``AfterExecution``, etc.
 They provide a lot of useful information about what happens during tests, but handling of these events is your responsibility.
 You can take some inspiration from Schemathesis `CLI implementation <https://github.com/kiwicom/schemathesis/blob/master/src/schemathesis/cli/__init__.py#L230>`_.
-See full description of events in the source code `here <https://github.com/kiwicom/schemathesis/blob/master/src/schemathesis/runner/events.py>`_.
+See full description of events in the `source code <https://github.com/kiwicom/schemathesis/blob/master/src/schemathesis/runner/events.py>`_.
 
 If you want to use Schemathesis CLI with your custom checks, look at `this section <https://github.com/kiwicom/schemathesis/tree/dd/deprecate-execute#registering-custom-checks-for-cli>`_
 
