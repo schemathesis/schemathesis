@@ -204,8 +204,10 @@ class SwaggerV20(BaseSchema):
                 methods = self.resolve(methods)
                 common_parameters = get_common_parameters(methods)
                 for method, definition in methods.items():
+                    # Only method definitions are parsed
                     if (
                         method == "parameters"
+                        or method.startswith("x-")
                         or should_skip_method(method, self.method)
                         or should_skip_by_tag(definition.get("tags"), self.tag)
                     ):
