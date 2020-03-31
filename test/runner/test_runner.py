@@ -21,17 +21,8 @@ from schemathesis.models import Status
 from schemathesis.runner import events, get_base_url, get_requests_auth, get_wsgi_auth, prepare
 
 
-def execute(
-    schema_uri, checks=DEFAULT_CHECKS, api_options=None, loader_options=None, hypothesis_options=None, loader=from_uri
-):
-    generator = prepare(
-        schema_uri=schema_uri,
-        checks=checks,
-        api_options=api_options,
-        loader_options=loader_options,
-        hypothesis_options=hypothesis_options,
-        loader=loader,
-    )
+def execute(schema_uri, checks=DEFAULT_CHECKS, loader=from_uri, **options):
+    generator = prepare(schema_uri=schema_uri, checks=checks, loader=loader, **options)
     all_events = list(generator)
     finished = all_events[-1]
     return finished.results
@@ -94,13 +85,13 @@ def args(request):
         app = request.getfixturevalue("app")
     else:
         app = request.getfixturevalue("flask_app")
-        kwargs = {"schema_uri": "/swagger.yaml", "loader_options": {"app": app}, "loader": from_wsgi}
+        kwargs = {"schema_uri": "/swagger.yaml", "app": app, "loader": from_wsgi}
     return app, kwargs
 
 
 def test_execute_base_url_not_found(base_url, schema_url, app):
     # When base URL is pointing to an unknown location
-    execute(schema_url, loader_options={"base_url": f"{base_url}/404/"})
+    execute(schema_url, base_url=f"{base_url}/404/")
     # Then the runner should use this base
     # And they will not reach the application
     assert_incoming_requests_num(app, 0)
@@ -108,7 +99,7 @@ def test_execute_base_url_not_found(base_url, schema_url, app):
 
 def test_execute_base_url_found(base_url, schema_url, app):
     # When base_url is specified
-    execute(schema_url, loader_options={"base_url": base_url})
+    execute(schema_url, base_url=base_url)
     # Then it should be used by the runner
     assert_incoming_requests_num(app, 3)
 
@@ -135,8 +126,8 @@ def test_execute(args):
 
 def test_auth(args):
     app, kwargs = args
-    # When auth is specified in `api_options` as a tuple of 2 strings
-    execute(**kwargs, api_options={"auth": ("test", "test")})
+    # When auth is specified as a tuple of 2 strings
+    execute(**kwargs, auth=("test", "test"))
 
     # Then each request should contain corresponding basic auth header
     assert_incoming_requests_num(app, 3)
@@ -150,7 +141,7 @@ def test_auth(args):
 def test_base_url(base_url, schema_url, app, converter):
     base_url = converter(base_url)
     # When `base_url` is specified explicitly with or without trailing slash
-    execute(schema_url, loader_options={"base_url": base_url})
+    execute(schema_url, base_url=base_url)
 
     # Then each request should reach the app in both cases
     assert_incoming_requests_num(app, 3)
@@ -163,7 +154,7 @@ def test_execute_with_headers(args):
     app, kwargs = args
     # When headers are specified for the `execute` call
     headers = {"Authorization": "Bearer 123"}
-    execute(**kwargs, api_options={"headers": headers})
+    execute(**kwargs, headers=headers)
 
     # Then each request should contain these headers
     assert_incoming_requests_num(app, 3)
@@ -174,8 +165,8 @@ def test_execute_with_headers(args):
 
 def test_execute_filter_endpoint(args):
     app, kwargs = args
-    # When `endpoint` is passed in `loader_options` in the `execute` call
-    kwargs.setdefault("loader_options", {})["endpoint"] = ["success"]
+    # When `endpoint` is passed in the `execute` call
+    kwargs.setdefault("endpoint", ["success"])
     execute(**kwargs)
 
     # Then the runner will make calls only to the specified endpoint
@@ -186,8 +177,8 @@ def test_execute_filter_endpoint(args):
 
 def test_execute_filter_method(args):
     app, kwargs = args
-    # When `method` passed in `loader_options` corresponds to a method that is not defined in the app schema
-    kwargs.setdefault("loader_options", {})["method"] = ["POST"]
+    # When `method` corresponds to a method that is not defined in the app schema
+    kwargs.setdefault("method", "POST")
     execute(**kwargs)
     # Then runner will not make any requests
     assert_incoming_requests_num(app, 0)
@@ -196,8 +187,8 @@ def test_execute_filter_method(args):
 @pytest.mark.endpoints("slow")
 def test_hypothesis_deadline(args):
     app, kwargs = args
-    # When `deadline` is passed in `hypothesis_options` in the `execute` call
-    execute(**kwargs, hypothesis_options={"deadline": 500})
+    # When `hypothesis_deadline` is passed in the `execute` call
+    execute(**kwargs, hypothesis_deadline=500)
     assert_incoming_requests_num(app, 1)
     assert_request(app, 0, "GET", "/api/slow")
 
@@ -219,7 +210,7 @@ def test_form_data(args):
 
     # When endpoint specifies parameters with `in=formData`
     # Then responses should have 200 status, and not 415 (unsupported media type)
-    results = execute(**kwargs, checks=(is_ok, check_content), hypothesis_options={"max_examples": 3})
+    results = execute(**kwargs, checks=(is_ok, check_content), hypothesis_max_examples=3)
     # And there should be no errors or failures
     assert not results.has_errors
     assert not results.has_failures
@@ -235,7 +226,7 @@ def test_unknown_response_code(args):
     app, kwargs = args
     # When endpoint returns a status code, that is not listed in "responses"
     # And "status_code_conformance" is specified
-    results = execute(**kwargs, checks=(status_code_conformance,), hypothesis_options={"max_examples": 1})
+    results = execute(**kwargs, checks=(status_code_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
     assert results.has_failures
     check = results.results[0].checks[0]
@@ -248,7 +239,7 @@ def test_unknown_response_code_with_default(args):
     app, kwargs = args
     # When endpoint returns a status code, that is not listed in "responses", but there is a "default" response
     # And "status_code_conformance" is specified
-    results = execute(**kwargs, checks=(status_code_conformance,), hypothesis_options={"max_examples": 1})
+    results = execute(**kwargs, checks=(status_code_conformance,), hypothesis_max_examples=1)
     # Then there should be no failure
     assert not results.has_failures
     check = results.results[0].checks[0]
@@ -261,7 +252,7 @@ def test_unknown_content_type(args):
     app, kwargs = args
     # When endpoint returns a response with content type, not specified in "produces"
     # And "content_type_conformance" is specified
-    results = execute(**kwargs, checks=(content_type_conformance,), hypothesis_options={"max_examples": 1})
+    results = execute(**kwargs, checks=(content_type_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
     assert results.has_failures
     check = results.results[0].checks[0]
@@ -274,7 +265,7 @@ def test_known_content_type(args):
     app, kwargs = args
     # When endpoint returns a response with a proper content type
     # And "content_type_conformance" is specified
-    results = execute(**kwargs, checks=(content_type_conformance,), hypothesis_options={"max_examples": 1})
+    results = execute(**kwargs, checks=(content_type_conformance,), hypothesis_max_examples=1)
     # Then there should be no a failures
     assert not results.has_failures
 
@@ -284,7 +275,7 @@ def test_response_conformance_invalid(args):
     app, kwargs = args
     # When endpoint returns a response that doesn't conform to the schema
     # And "response_schema_conformance" is specified
-    results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_options={"max_examples": 1})
+    results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
     assert results.has_failures
     lines = results.results[0].checks[-1].message.split("\n")
@@ -298,7 +289,7 @@ def test_response_conformance_valid(args):
     app, kwargs = args
     # When endpoint returns a response that conforms to the schema
     # And "response_schema_conformance" is specified
-    results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_options={"max_examples": 1})
+    results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
     # Then there should be no failures or errors
     assert not results.has_failures
     assert not results.has_errors
@@ -309,7 +300,7 @@ def test_response_conformance_text(args):
     app, kwargs = args
     # When endpoint returns a response that is not JSON
     # And "response_schema_conformance" is specified
-    results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_options={"max_examples": 1})
+    results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
     # Then the check should be ignored if the response headers are not application/json
     assert not results.has_failures
     assert not results.has_errors
@@ -320,7 +311,7 @@ def test_response_conformance_malformed_json(args):
     app, kwargs = args
     # When endpoint returns a response that contains a malformed JSON, but has a valid content type header
     # And "response_schema_conformance" is specified
-    results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_options={"max_examples": 1})
+    results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
     assert results.has_errors
     error = results.results[-1].errors[-1][0]
@@ -347,16 +338,14 @@ def filter_path_parameters():
 def test_path_parameters_encoding(schema_url):
     # NOTE. WSGI and ASGI applications decodes %2F as / and returns 404
     # When endpoint has a path parameter
-    results = execute(schema_url, checks=(status_code_conformance,), hypothesis_options={"derandomize": True})
+    results = execute(schema_url, checks=(status_code_conformance,), hypothesis_derandomize=True)
     # Then there should be no failures
     # since all path parameters are quoted
     assert not results.has_errors
     assert not results.has_failures
 
 
-@pytest.mark.parametrize(
-    "options", ({"loader_options": {"base_url": "http://127.0.0.1:1/"}}, {"hypothesis_options": {"deadline": 1}})
-)
+@pytest.mark.parametrize("options", ({"base_url": "http://127.0.0.1:1/"}, {"hypothesis_deadline": 1}))
 @pytest.mark.endpoints("slow")
 def test_exceptions(schema_url, app, options):
     results = prepare(schema_url, **options)
@@ -379,7 +368,7 @@ def test_flaky_exceptions(args, mocker):
     # And Hypothesis consider this test as a flaky one
     mocker.patch("schemathesis.Case.call", side_effect=flaky)
     mocker.patch("schemathesis.Case.call_wsgi", side_effect=flaky)
-    results = execute(**kwargs, hypothesis_options={"max_examples": 3, "derandomize": True})
+    results = execute(**kwargs, hypothesis_max_examples=3, hypothesis_derandomize=True)
     # Then the execution result should indicate errors
     assert results.has_errors
     assert results.results[0].errors[0][0].args[0].startswith("Tests on this endpoint produce unreliable results:")
@@ -389,7 +378,7 @@ def test_flaky_exceptions(args, mocker):
 async def test_payload_explicit_example(args):
     # When endpoint has an example specified
     app, kwargs = args
-    kwargs.setdefault("hypothesis_options", {})["phases"] = [Phase.explicit]
+    kwargs.setdefault("hypothesis_phases", [Phase.explicit])
     result = execute(**kwargs)
     # Then run should be successful
     assert not result.has_errors
@@ -445,6 +434,6 @@ def test_exit_first(args):
 
 
 def test_auth_loader_options(base_url, schema_url, app):
-    execute(schema_url, loader_options={"base_url": base_url, "auth": ("test", "test"), "auth_type": "basic"})
+    execute(schema_url, base_url=base_url, auth=("test", "test"), auth_type="basic")
     schema_request = get_schema_requests(app)
     assert schema_request[0].headers["Authorization"] == "Basic dGVzdDp0ZXN0"

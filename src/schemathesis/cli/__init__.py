@@ -184,50 +184,31 @@ def run(  # pylint: disable=too-many-arguments
     else:
         selected_checks = tuple(check for check in checks_module.ALL_CHECKS if check.__name__ in checks)
 
-    if auth is None:
-        # Auth type doesn't matter if auth is not passed
-        auth_type = None  # type: ignore
-
-    options = dict_true_values(
-        api_options=dict_true_values(auth=auth, auth_type=auth_type, headers=headers, request_timeout=request_timeout),
-        loader_options=dict_true_values(base_url=base_url, endpoint=endpoints, method=methods, tag=tags, app=app),
-        hypothesis_options=dict_not_none_values(
-            derandomize=hypothesis_derandomize,
-            max_examples=hypothesis_max_examples,
-            phases=hypothesis_phases,
-            report_multiple_bugs=hypothesis_report_multiple_bugs,
-            suppress_health_check=hypothesis_suppress_health_check,
-            verbosity=hypothesis_verbosity,
-        ),
-        seed=hypothesis_seed,
-        exit_first=exit_first,
-    )
-    if validate_schema is False:
-        options.setdefault("loader_options", {})["validate_schema"] = validate_schema
-    # `deadline` is special, since Hypothesis allows to pass `None`
-    if hypothesis_deadline is not None:
-        options.setdefault("hypothesis_options", {})
-        if isinstance(hypothesis_deadline, NotSet):
-            options["hypothesis_options"]["deadline"] = None
-        else:
-            options["hypothesis_options"]["deadline"] = hypothesis_deadline
-
     with abort_on_network_errors():
-        options.update({"checks": selected_checks, "workers_num": workers_num})
-        if utils.file_exists(schema):
-            options["loader"] = from_path
-        elif app is not None and not urlparse(schema).netloc:
-            # If `schema` is not an existing filesystem path or an URL then it is considered as an endpoint with
-            # the given app
-            options["loader"] = get_loader_for_app(app)
-        else:
-            options["loader"] = from_uri
-            loader_options = dict_true_values(headers=headers, auth=auth, auth_type=auth_type)
-            if options.get("loader_options") and loader_options:
-                options["loader_options"].update(loader_options)
-            elif loader_options:
-                options["loader_options"] = loader_options
-        prepared_runner = runner.prepare(schema, **options)
+        prepared_runner = runner.prepare(
+            schema,
+            auth=auth,
+            auth_type=auth_type,
+            headers=headers,
+            request_timeout=request_timeout,
+            base_url=base_url,
+            endpoint=endpoints,
+            method=methods,
+            tag=tags,
+            app=app,
+            seed=hypothesis_seed,
+            exit_first=exit_first,
+            checks=selected_checks,
+            workers_num=workers_num,
+            validate_schema=validate_schema,
+            hypothesis_deadline=hypothesis_deadline,
+            hypothesis_derandomize=hypothesis_derandomize,
+            hypothesis_max_examples=hypothesis_max_examples,
+            hypothesis_phases=hypothesis_phases,
+            hypothesis_report_multiple_bugs=hypothesis_report_multiple_bugs,
+            hypothesis_suppress_health_check=hypothesis_suppress_health_check,
+            hypothesis_verbosity=hypothesis_verbosity,
+        )
     execute(prepared_runner, workers_num, show_errors_tracebacks)
 
 

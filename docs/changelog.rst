@@ -6,6 +6,14 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+~~~~~~~
+
+- Move processing of ``runner`` parameters to ``runner.prepare``. This change will provide better code reusage, since
+  all users of ``runner`` (e.g. if you extended it in your project`) need some kind of input parameters handling, which
+  was implemented only in Schemathesis CLI. It is not backward-compatible. If you didn't use ``runner`` directly, then
+  this change should not have a visible effect for your use-case.
+
 `0.28.0`_ - 2020-03-31
 ----------------------
 

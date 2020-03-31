@@ -3,6 +3,8 @@ from typing import List, Optional, Type, Union
 
 import click
 
+from ..types import NotSet
+
 
 class CSVOption(click.Choice):
     def __init__(self, choices: Type[Enum]):
@@ -20,10 +22,6 @@ class CSVOption(click.Choice):
         sorted_options = ", ".join(sorted(invalid_options, key=items.index))
         available_options = ", ".join(self.choices)
         self.fail(f"invalid choice(s): {sorted_options}. Choose from {available_options}")
-
-
-class NotSet:
-    pass
 
 
 not_set = NotSet()

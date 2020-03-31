@@ -5,6 +5,7 @@ import time
 from contextlib import contextmanager
 from queue import Queue
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union, cast
+from urllib.parse import urlparse
 
 import attr
 import hypothesis
@@ -13,14 +14,22 @@ import requests
 from _pytest.logging import LogCaptureHandler, catching_logs
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
+from .. import loaders
 from .._hypothesis import make_test_or_exception
 from ..checks import DEFAULT_CHECKS
 from ..constants import USER_AGENT
 from ..exceptions import InvalidSchema, get_grouped_exception
-from ..loaders import from_uri
 from ..models import Case, Endpoint, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
-from ..utils import WSGIResponse, capture_hypothesis_output, get_base_url
+from ..types import Filter, NotSet
+from ..utils import (
+    WSGIResponse,
+    capture_hypothesis_output,
+    dict_not_none_values,
+    dict_true_values,
+    file_exists,
+    get_base_url,
+)
 from . import events
 
 DEFAULT_DEADLINE = 500  # pragma: no mutate
@@ -29,12 +38,10 @@ GenericResponse = Union[requests.Response, WSGIResponse]  # pragma: no mutate
 Check = Callable[[GenericResponse, Case], None]  # pragma: no mutate
 
 
-def get_hypothesis_settings(hypothesis_options: Optional[Dict[str, Any]] = None) -> hypothesis.settings:
+def get_hypothesis_settings(hypothesis_options: Dict[str, Any]) -> hypothesis.settings:
     # Default settings, used as a parent settings object below
-    settings = hypothesis.settings(deadline=DEFAULT_DEADLINE)
-    if hypothesis_options is not None:
-        settings = hypothesis.settings(settings, **hypothesis_options)
-    return settings
+    hypothesis_options.setdefault("deadline", DEFAULT_DEADLINE)
+    return hypothesis.settings(**hypothesis_options)
 
 
 # pylint: disable=too-many-instance-attributes
@@ -284,7 +291,7 @@ def execute_from_schema(
     checks: Iterable[Check],
     *,
     workers_num: int = 1,
-    hypothesis_options: Optional[Dict[str, Any]] = None,
+    hypothesis_options: Dict[str, Any],
     auth: Optional[RawAuth] = None,
     auth_type: Optional[str] = None,
     headers: Optional[Dict[str, Any]] = None,
@@ -410,24 +417,62 @@ def run_test(
 
 def prepare(  # pylint: disable=too-many-arguments
     schema_uri: str,
+    *,
+    # Runtime behavior
     checks: Iterable[Check] = DEFAULT_CHECKS,
     workers_num: int = 1,
-    api_options: Optional[Dict[str, Any]] = None,
-    loader_options: Optional[Dict[str, Any]] = None,
-    hypothesis_options: Optional[Dict[str, Any]] = None,
-    loader: Callable = from_uri,
     seed: Optional[int] = None,
     exit_first: bool = False,
+    # Schema loading
+    loader: Callable = loaders.from_uri,
+    base_url: Optional[str] = None,
+    auth: Optional[Tuple[str, str]] = None,
+    auth_type: Optional[str] = None,
+    headers: Optional[Dict[str, str]] = None,
+    request_timeout: Optional[int] = None,
+    endpoint: Optional[Filter] = None,
+    method: Optional[Filter] = None,
+    tag: Optional[Filter] = None,
+    app: Any = None,
+    validate_schema: bool = True,
+    # Hypothesis-specific configuration
+    hypothesis_deadline: Optional[Union[int, NotSet]] = None,
+    hypothesis_derandomize: Optional[bool] = None,
+    hypothesis_max_examples: Optional[int] = None,
+    hypothesis_phases: Optional[List[hypothesis.Phase]] = None,
+    hypothesis_report_multiple_bugs: Optional[bool] = None,
+    hypothesis_suppress_health_check: Optional[List[hypothesis.HealthCheck]] = None,
+    hypothesis_verbosity: Optional[hypothesis.Verbosity] = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Prepare a generator that will run test cases against the given API definition."""
-    api_options = api_options or {}
-    loader_options = loader_options or {}
+    # pylint: disable=too-many-locals
 
-    if "base_url" not in loader_options:
-        loader_options["base_url"] = get_base_url(schema_uri)
-    if loader is from_uri and loader_options.get("auth"):
-        loader_options["auth"] = get_requests_auth(loader_options["auth"], loader_options.pop("auth_type", None))
-    schema = loader(schema_uri, **loader_options)
+    if auth is None:
+        # Auth type doesn't matter if auth is not passed
+        auth_type = None  # type: ignore
+
+    schema = load_schema(
+        schema_uri,
+        base_url=base_url,
+        loader=loader,
+        app=app,
+        validate_schema=validate_schema,
+        auth=auth,
+        auth_type=auth_type,
+        headers=headers,
+        endpoint=endpoint,
+        method=method,
+        tag=tag,
+    )
+    hypothesis_options = prepare_hypothesis_options(
+        deadline=hypothesis_deadline,
+        derandomize=hypothesis_derandomize,
+        max_examples=hypothesis_max_examples,
+        phases=hypothesis_phases,
+        report_multiple_bugs=hypothesis_report_multiple_bugs,
+        suppress_health_check=hypothesis_suppress_health_check,
+        verbosity=hypothesis_verbosity,
+    )
     return execute_from_schema(
         schema,
         checks,
@@ -435,8 +480,73 @@ def prepare(  # pylint: disable=too-many-arguments
         seed=seed,
         workers_num=workers_num,
         exit_first=exit_first,
-        **api_options,
+        auth=auth,
+        auth_type=auth_type,
+        headers=headers,
+        request_timeout=request_timeout,
     )
+
+
+def load_schema(
+    schema_uri: str,
+    *,
+    base_url: Optional[str] = None,
+    loader: Callable = loaders.from_uri,
+    app: Any = None,
+    validate_schema: bool = True,
+    # Network request parameters
+    auth: Optional[Tuple[str, str]] = None,
+    auth_type: Optional[str] = None,
+    headers: Optional[Dict[str, str]] = None,
+    # Schema filters
+    endpoint: Optional[Filter] = None,
+    method: Optional[Filter] = None,
+    tag: Optional[Filter] = None,
+) -> BaseSchema:
+    """Load schema via specified loader and parameters."""
+    loader_options = dict_true_values(base_url=base_url, endpoint=endpoint, method=method, tag=tag, app=app)
+
+    if file_exists(schema_uri):
+        loader = loaders.from_path
+    elif app is not None and not urlparse(schema_uri).netloc:
+        # If `schema` is not an existing filesystem path or an URL then it is considered as an endpoint with
+        # the given app
+        loader = loaders.get_loader_for_app(app)
+    else:
+        loader_options.update(dict_true_values(headers=headers, auth=auth, auth_type=auth_type))
+
+    if "base_url" not in loader_options:
+        loader_options["base_url"] = get_base_url(schema_uri)
+    if loader is loaders.from_uri and loader_options.get("auth"):
+        loader_options["auth"] = get_requests_auth(loader_options["auth"], loader_options.pop("auth_type", None))
+
+    return loader(schema_uri, validate_schema=validate_schema, **loader_options)
+
+
+def prepare_hypothesis_options(  # pylint: disable=too-many-arguments
+    deadline: Optional[Union[int, NotSet]] = None,
+    derandomize: Optional[bool] = None,
+    max_examples: Optional[int] = None,
+    phases: Optional[List[hypothesis.Phase]] = None,
+    report_multiple_bugs: Optional[bool] = None,
+    suppress_health_check: Optional[List[hypothesis.HealthCheck]] = None,
+    verbosity: Optional[hypothesis.Verbosity] = None,
+) -> Dict[str, Any]:
+    options = dict_not_none_values(
+        derandomize=derandomize,
+        max_examples=max_examples,
+        phases=phases,
+        report_multiple_bugs=report_multiple_bugs,
+        suppress_health_check=suppress_health_check,
+        verbosity=verbosity,
+    )
+    # `deadline` is special, since Hypothesis allows to pass `None`
+    if deadline is not None:
+        if isinstance(deadline, NotSet):
+            options["deadline"] = None
+        else:
+            options["deadline"] = deadline
+    return options
 
 
 def network_test(
