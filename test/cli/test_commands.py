@@ -1,9 +1,11 @@
+import json
 import pathlib
 import time
 from test.utils import HERE, SIMPLE_PATH
 from urllib.parse import urljoin
 
 import pytest
+import requests
 import yaml
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
@@ -12,7 +14,7 @@ from requests import Response
 from schemathesis import Case
 from schemathesis._compat import metadata
 from schemathesis.checks import ALL_CHECKS
-from schemathesis.loaders import from_path, from_uri
+from schemathesis.loaders import from_uri
 from schemathesis.models import Endpoint
 from schemathesis.runner import DEFAULT_CHECKS
 
@@ -141,7 +143,6 @@ def test_commands_run_help(cli):
     result_help = cli.main("run", "--help")
 
     assert result_help.exit_code == ExitCode.OK
-    print(result_help.stdout.strip().split("\n"))
     assert result_help.stdout.strip().split("\n") == [
         "Usage: schemathesis run [OPTIONS] SCHEMA",
         "",
@@ -215,117 +216,10 @@ SCHEMA_URI = "https://example.com/swagger.json"
 @pytest.mark.parametrize(
     "args, expected",
     (
-        ([SCHEMA_URI], {"checks": DEFAULT_CHECKS, "loader": from_uri, "workers_num": 1}),
-        ([SCHEMA_URI, "--checks=all"], {"checks": ALL_CHECKS, "loader": from_uri, "workers_num": 1}),
-        (
-            [SCHEMA_URI, "--exitfirst"],
-            {"checks": DEFAULT_CHECKS, "exit_first": True, "loader": from_uri, "workers_num": 1},
-        ),
-        (
-            [SIMPLE_PATH, "--base-url=http://127.0.0.1"],
-            {
-                "checks": DEFAULT_CHECKS,
-                "loader_options": {"base_url": "http://127.0.0.1"},
-                "loader": from_path,
-                "workers_num": 1,
-            },
-        ),
-        (
-            [SCHEMA_URI, "--auth=test:test"],
-            {
-                "checks": DEFAULT_CHECKS,
-                "api_options": {"auth": ("test", "test"), "auth_type": "basic"},
-                "loader": from_uri,
-                "loader_options": {"auth": ("test", "test"), "auth_type": "basic"},
-                "workers_num": 1,
-            },
-        ),
-        (
-            [SCHEMA_URI, "--auth=test:test", "--auth-type=digest"],
-            {
-                "checks": DEFAULT_CHECKS,
-                "api_options": {"auth": ("test", "test"), "auth_type": "digest"},
-                "loader": from_uri,
-                "loader_options": {"auth": ("test", "test"), "auth_type": "digest"},
-                "workers_num": 1,
-            },
-        ),
-        (
-            [SCHEMA_URI, "--auth=test:test", "--auth-type=DIGEST"],
-            {
-                "checks": DEFAULT_CHECKS,
-                "api_options": {"auth": ("test", "test"), "auth_type": "digest"},
-                "loader": from_uri,
-                "loader_options": {"auth": ("test", "test"), "auth_type": "digest"},
-                "workers_num": 1,
-            },
-        ),
-        (
-            [SCHEMA_URI, "--header=Authorization:Bearer 123"],
-            {
-                "checks": DEFAULT_CHECKS,
-                "api_options": {"headers": {"Authorization": "Bearer 123"}},
-                "loader": from_uri,
-                "loader_options": {"headers": {"Authorization": "Bearer 123"}},
-                "workers_num": 1,
-            },
-        ),
-        (
-            [SCHEMA_URI, "--header=Authorization:  Bearer 123 "],
-            {
-                "checks": DEFAULT_CHECKS,
-                "api_options": {"headers": {"Authorization": "Bearer 123 "}},
-                "loader": from_uri,
-                "loader_options": {"headers": {"Authorization": "Bearer 123 "}},
-                "workers_num": 1,
-            },
-        ),
-        (
-            [SCHEMA_URI, "--method=POST", "--method", "GET"],
-            {
-                "checks": DEFAULT_CHECKS,
-                "loader": from_uri,
-                "loader_options": {"method": ("POST", "GET")},
-                "workers_num": 1,
-            },
-        ),
-        # Test loader_options update
-        (
-            [SCHEMA_URI, "--method=POST", "--auth=test:test"],
-            {
-                "checks": DEFAULT_CHECKS,
-                "api_options": {"auth": ("test", "test"), "auth_type": "basic"},
-                "loader_options": {"auth": ("test", "test"), "auth_type": "basic", "method": ("POST",)},
-                "loader": from_uri,
-                "workers_num": 1,
-            },
-        ),
-        (
-            [SCHEMA_URI, "--endpoint=users"],
-            {
-                "checks": DEFAULT_CHECKS,
-                "loader": from_uri,
-                "loader_options": {"endpoint": ("users",)},
-                "workers_num": 1,
-            },
-        ),
-        (
-            [SCHEMA_URI, "--tag=foo"],
-            {"checks": DEFAULT_CHECKS, "loader": from_uri, "loader_options": {"tag": ("foo",)}, "workers_num": 1},
-        ),
-        (
-            [SCHEMA_URI, "--base-url=https://example.com/api/v1test"],
-            {
-                "checks": DEFAULT_CHECKS,
-                "loader": from_uri,
-                "loader_options": {"base_url": "https://example.com/api/v1test"},
-                "workers_num": 1,
-            },
-        ),
-        (
-            [SCHEMA_URI, "--hypothesis-seed=123"],
-            {"checks": DEFAULT_CHECKS, "loader": from_uri, "seed": 123, "workers_num": 1},
-        ),
+        ([SCHEMA_URI], {}),
+        ([SCHEMA_URI, "--exitfirst"], {"exit_first": True},),
+        ([SCHEMA_URI, "--workers=2"], {"workers_num": 2},),
+        ([SCHEMA_URI, "--hypothesis-seed=123"], {"seed": 123},),
         (
             [
                 SCHEMA_URI,
@@ -338,7 +232,6 @@ SCHEMA_URI = "https://example.com/swagger.json"
                 "--hypothesis-verbosity=normal",
             ],
             {
-                "checks": DEFAULT_CHECKS,
                 "hypothesis_options": {
                     "deadline": 1000,
                     "derandomize": True,
@@ -348,23 +241,84 @@ SCHEMA_URI = "https://example.com/swagger.json"
                     "suppress_health_check": [HealthCheck.too_slow, HealthCheck.filter_too_much],
                     "verbosity": Verbosity.normal,
                 },
-                "loader": from_uri,
-                "workers_num": 1,
             },
         ),
-        (
-            [SCHEMA_URI, "--hypothesis-deadline=None"],
-            {"checks": DEFAULT_CHECKS, "hypothesis_options": {"deadline": None}, "loader": from_uri, "workers_num": 1},
-        ),
+        ([SCHEMA_URI, "--hypothesis-deadline=None"], {"hypothesis_options": {"deadline": None}},),
     ),
 )
-def test_execute_arguments(cli, mocker, args, expected):
-    m_execute = mocker.patch("schemathesis.runner.prepare", autospec=True)
+def test_execute_arguments(cli, mocker, simple_schema, args, expected):
+    response = requests.Response()
+    response.status_code = 200
+    response._content = json.dumps(simple_schema).encode()
+    mocker.patch("schemathesis.loaders.requests.get", return_value=response)
+    execute = mocker.patch("schemathesis.runner.execute_from_schema", autospec=True)
 
     result = cli.run(*args)
 
+    expected = {
+        "hypothesis_options": {},
+        "workers_num": 1,
+        "exit_first": False,
+        "auth": None,
+        "auth_type": None,
+        "headers": {},
+        "request_timeout": None,
+        "seed": None,
+        **expected,
+    }
+
     assert result.exit_code == ExitCode.OK
-    m_execute.assert_called_once_with(args[0], **expected)
+    assert execute.call_args[1] == expected
+    assert execute.call_args[0][1] == DEFAULT_CHECKS
+
+
+@pytest.mark.parametrize(
+    "args, expected",
+    (
+        ([SCHEMA_URI, "--auth=test:test"], {"auth": ("test", "test"), "auth_type": "basic"}),
+        ([SCHEMA_URI, "--auth=test:test", "--auth-type=digest"], {"auth": ("test", "test"), "auth_type": "digest"}),
+        ([SCHEMA_URI, "--auth=test:test", "--auth-type=DIGEST"], {"auth": ("test", "test"), "auth_type": "digest"}),
+        ([SCHEMA_URI, "--header=Authorization:Bearer 123"], {"headers": {"Authorization": "Bearer 123"}}),
+        ([SCHEMA_URI, "--header=Authorization:  Bearer 123 "], {"headers": {"Authorization": "Bearer 123 "}}),
+        ([SCHEMA_URI, "--method=POST", "--method", "GET"], {"method": ("POST", "GET")}),
+        (
+            [SCHEMA_URI, "--method=POST", "--auth=test:test"],
+            {"auth": ("test", "test"), "auth_type": "basic", "method": ("POST",)},
+        ),
+        ([SCHEMA_URI, "--endpoint=users"], {"endpoint": ("users",)}),
+        ([SCHEMA_URI, "--tag=foo"], {"tag": ("foo",)}),
+        ([SCHEMA_URI, "--base-url=https://example.com/api/v1test"], {"base_url": "https://example.com/api/v1test"}),
+    ),
+)
+def test_load_schema_arguments(cli, mocker, args, expected):
+    mocker.patch("schemathesis.runner.execute_from_schema", autospec=True)
+    load_schema = mocker.patch("schemathesis.runner.load_schema", autospec=True)
+
+    result = cli.run(*args)
+    expected = {
+        "app": None,
+        "base_url": None,
+        "auth": None,
+        "auth_type": None,
+        "endpoint": (),
+        "headers": {},
+        "loader": from_uri,
+        "method": (),
+        "tag": (),
+        "validate_schema": True,
+        **expected,
+    }
+
+    assert result.exit_code == ExitCode.OK
+    assert load_schema.call_args[1] == expected
+
+
+def test_all_checks(cli, mocker):
+    mocker.patch("schemathesis.runner.load_schema", autospec=True)
+    execute = mocker.patch("schemathesis.runner.execute_from_schema", autospec=True)
+    result = cli.run(SCHEMA_URI, "--checks=all")
+    assert result.exit_code == ExitCode.OK
+    assert execute.call_args[0][1] == ALL_CHECKS
 
 
 @pytest.mark.endpoints()
