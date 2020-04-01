@@ -363,12 +363,14 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     def add_parameter(self, container: Optional[Dict[str, Any]], parameter: Dict[str, Any]) -> Dict[str, Any]:
         container = super().add_parameter(container, parameter)
         if "example" in parameter["schema"]:
-            container["example"] = {parameter["name"]: parameter["schema"]["example"]}
+            examples = container.setdefault("example", {})  # examples should be merged together
+            examples[parameter["name"]] = parameter["schema"]["example"]
         # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#parameter-object
         # > Furthermore, if referencing a schema which contains an example,
         # > the example value SHALL override the example provided by the schema
         if "example" in parameter:
-            container["example"] = {parameter["name"]: parameter["example"]}
+            examples = container.setdefault("example", {})  # examples should be merged together
+            examples[parameter["name"]] = parameter["example"]
         return container
 
     def process_cookie(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:

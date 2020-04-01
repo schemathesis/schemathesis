@@ -306,7 +306,7 @@ def test(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
-def test_multiple_examples(testdir):
+def test_multiple_examples_different_locations(testdir):
     # When there are examples for different locations (e.g. body and query)
     testdir.make_test(
         """
@@ -348,6 +348,49 @@ def test(request, case):
 
     result = testdir.runpytest("-v", "-s")
     # Then these examples should be used in tests as a part of a single request, i.e combined
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+
+
+def test_multiple_examples_same_location(testdir):
+    # When there are multiple examples in parameters under the same place
+    testdir.make_test(
+        """
+from hypothesis import Phase
+
+@schema.parametrize(method="POST")
+@settings(max_examples=1, phases=[Phase.explicit])
+def test(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.formatted_path == "/v1/users/1/2"
+""",
+        schema_name="simple_openapi.yaml",
+        paths={
+            "/users/{a}/{b}": {
+                "post": {
+                    "parameters": [
+                        {
+                            "schema": {"type": "integer", "example": 42},  # This example should be overridden
+                            "in": "path",
+                            "name": "a",
+                            "required": True,
+                            "example": 1,
+                        },
+                        {
+                            "schema": {"type": "integer", "example": 43},  # and this one too
+                            "in": "path",
+                            "name": "b",
+                            "required": True,
+                            "example": 2,
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    result = testdir.runpytest("-v", "-s")
+    # Then these examples should be used combined in tests
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
