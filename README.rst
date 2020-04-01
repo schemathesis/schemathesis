@@ -316,7 +316,23 @@ If the schema contains parameters examples, then they will be additionally inclu
 With this Swagger schema example, there will be a case with body ``{"name": "Doggo"}``.  Examples handled with
 ``example`` decorator from Hypothesis, more info about its behavior is `here`_.
 
-NOTE. Schemathesis supports only examples in ``parameters`` at the moment, examples of individual properties are not supported.
+If you'd like to test only examples provided in the schema, you could utilize ``--hypothesis-phases=explicit`` CLI option:
+
+.. code:: bash
+
+    $ schemathesis run --hypothesis-phases=explicit https://example.com/api/swagger.json
+
+Or add this decorator to your test if you use Schemathesis in your Python tests:
+
+.. code:: python
+
+    from hypothesis import settings, Phase
+
+    ...
+    @schema.parametrize()
+    @settings(phases=[Phase.explicit])
+    def test_api(case):
+        ...
 
 Direct strategies access
 ~~~~~~~~~~~~~~~~~~~~~~~~
