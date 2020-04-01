@@ -88,6 +88,33 @@ def test_(case):
     testdir.run_and_assert(passed=1)
 
 
+def test_multiple_path_variables(testdir):
+    # When there are multiple parameters for "path"
+    testdir.make_test(
+        """
+@schema.parametrize(endpoint="/users/{user_id}/{event_id}")
+@settings(max_examples=3, deadline=None)
+def test_(case):
+    assert_int(case.path_parameters["user_id"])
+    assert_int(case.path_parameters["event_id"])
+    assert_requests_call(case)
+        """,
+        paths={
+            "/users/{user_id}/{event_id}": {
+                "get": {
+                    "parameters": [
+                        {"name": "user_id", "required": True, "in": "path", "type": "integer"},
+                        {"name": "event_id", "required": True, "in": "path", "type": "integer"},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    # Then the generated test case should contain them its `path_parameters` attribute
+    testdir.run_and_assert(passed=1)
+
+
 def test_form_data(testdir):
     # When parameter is specified for "form_data"
     testdir.make_test(
