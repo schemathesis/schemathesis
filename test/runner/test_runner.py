@@ -18,7 +18,8 @@ from schemathesis.checks import (
 from schemathesis.constants import __version__
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Status
-from schemathesis.runner import events, get_base_url, get_requests_auth, get_wsgi_auth, prepare
+from schemathesis.runner import events, get_base_url, get_requests_auth, prepare
+from schemathesis.runner.impl.core import get_wsgi_auth
 
 
 def execute(schema_uri, checks=DEFAULT_CHECKS, loader=from_uri, **options):
