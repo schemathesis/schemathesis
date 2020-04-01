@@ -14,7 +14,7 @@ from hypothesis.strategies import SearchStrategy
 from .checks import ALL_CHECKS
 from .exceptions import InvalidSchema
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
-from .utils import WSGIResponse
+from .utils import GenericResponse, WSGIResponse
 
 if TYPE_CHECKING:
     from .schemas import BaseSchema
@@ -331,3 +331,6 @@ class TestResultSet:
     def append(self, item: TestResult) -> None:
         """Add a new item to the results list."""
         self.results.append(item)
+
+
+CheckFunction = Callable[[GenericResponse, Case], None]  # pragma: no mutate
