@@ -838,7 +838,7 @@ def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
             raise KeyboardInterrupt
         return original(*args, **kwargs)
 
-    mocker.patch("schemathesis.runner.time.sleep", autospec=True, wraps=mocked)
+    mocker.patch("schemathesis.runner.impl.threadpool.time.sleep", autospec=True, wraps=mocked)
     result = cli.run(*cli_args, "--workers=2")
     # the exit status depends on what thread finished first
     assert result.exit_code in (ExitCode.OK, ExitCode.TESTS_FAILED)

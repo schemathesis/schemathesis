@@ -3,17 +3,19 @@ import pathlib
 import re
 import traceback
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Generator, List, Set, Tuple, Type, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Type, Union
 from urllib.parse import urlsplit, urlunsplit
 
+import requests
 import yaml
 from hypothesis.reporting import with_reporter
+from requests.auth import HTTPDigestAuth
 from requests.exceptions import InvalidHeader  # type: ignore
 from requests.utils import check_header_validity  # type: ignore
 from werkzeug.wrappers import Response as BaseResponse
 from werkzeug.wrappers.json import JSONMixin
 
-from .types import Filter, NotSet
+from .types import Filter, NotSet, RawAuth
 
 NOT_SET = NotSet()
 
@@ -151,3 +153,12 @@ StringDatesYAMLLoader = make_loader("tag:yaml.org,2002:timestamp")
 
 class WSGIResponse(BaseResponse, JSONMixin):  # pylint: disable=too-many-ancestors
     pass
+
+
+def get_requests_auth(auth: Optional[RawAuth], auth_type: Optional[str]) -> Optional[Union[HTTPDigestAuth, RawAuth]]:
+    if auth and auth_type == "digest":
+        return HTTPDigestAuth(*auth)
+    return auth
+
+
+GenericResponse = Union[requests.Response, WSGIResponse]  # pragma: no mutate
