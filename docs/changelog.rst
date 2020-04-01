@@ -6,6 +6,12 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Processing of explicit examples in Open API 3.0 when there are multiple parameters in the same location (e.g. ``path``)
+  contain ``example`` value. They are properly combined now. `#450`_
+
 `1.0.0`_ - 2020-03-31
 ---------------------
 
@@ -809,6 +815,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#450: https://github.com/kiwicom/schemathesis/issues/450
 .. _#448: https://github.com/kiwicom/schemathesis/issues/448
 .. _#440: https://github.com/kiwicom/schemathesis/issues/440
 .. _#439: https://github.com/kiwicom/schemathesis/issues/439
