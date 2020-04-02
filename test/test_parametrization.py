@@ -418,8 +418,15 @@ def test_b(request, case):
     result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST:/v1/pets\]", r"Hypothesis calls: 2"])
 
 
-def test_custom_properties(testdir):
-    # When custom properties are present in endpoint definitions
+@pytest.mark.parametrize(
+    "schema_name, endpoint",
+    (
+        ("simple_swagger.yaml", {"/users": {"x-handler": "foo"}}),
+        ("simple_openapi.yaml", {"/users": {"x-handler": "foo", "description": "Text"}}),
+    ),
+)
+def test_custom_properties(testdir, schema_name, endpoint):
+    # When custom properties are present in endpoint definitions (e.g. vendor extensions or some other allowed fields)
     testdir.make_test(
         """
 @schema.parametrize()
@@ -427,7 +434,8 @@ def test_custom_properties(testdir):
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     """,
-        paths={"/users": {"x-handler": "foo"}},
+        schema_name=schema_name,
+        paths=endpoint,
     )
     result = testdir.runpytest("-s")
     # Then it should be correctly processed
