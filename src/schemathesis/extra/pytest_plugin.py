@@ -7,11 +7,14 @@ from _pytest.config import hookimpl
 from _pytest.fixtures import FuncFixtureInfo
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from hypothesis.errors import InvalidArgument  # pylint: disable=ungrouped-imports
+from packaging import version
 
 from .._hypothesis import create_test
 from ..exceptions import InvalidSchema
 from ..models import Endpoint
 from ..utils import is_schemathesis_test
+
+USE_FROM_PARENT = version.parse(pytest.__version__) >= version.parse("5.4.0")
 
 
 class SchemathesisCase(PyCollector):
@@ -36,7 +39,11 @@ class SchemathesisCase(PyCollector):
         funcobj = self._make_test(endpoint)
 
         cls = self._get_class_parent()
-        definition = FunctionDefinition(name=self.name, parent=self.parent, callobj=funcobj)
+        if USE_FROM_PARENT:
+            create_definition = FunctionDefinition.from_parent
+        else:
+            create_definition = FunctionDefinition
+        definition = create_definition(name=self.name, parent=self.parent, callobj=funcobj)
         fixturemanager = self.session._fixturemanager
         fixtureinfo = fixturemanager.getfixtureinfo(definition, funcobj, cls)
 
@@ -50,7 +57,11 @@ class SchemathesisCase(PyCollector):
 
             for callspec in metafunc._calls:
                 subname = "{}[{}]".format(name, callspec.id)
-                yield SchemathesisFunction(
+                if USE_FROM_PARENT:
+                    create_function = SchemathesisFunction.from_parent
+                else:
+                    create_function = SchemathesisFunction
+                yield create_function(
                     name=subname,
                     parent=self.parent,
                     callspec=callspec,
@@ -108,7 +119,11 @@ def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
     outcome = yield
     if is_schemathesis_test(obj):
-        outcome.force_result(SchemathesisCase(obj, name, collector))
+        if USE_FROM_PARENT:
+            create_case = SchemathesisCase.from_parent
+        else:
+            create_case = SchemathesisCase
+        outcome.force_result(create_case(parent=collector, test_function=obj, name=name))
     else:
         outcome.get_result()
 

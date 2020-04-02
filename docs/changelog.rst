@@ -10,6 +10,7 @@ Fixed
 ~~~~~
 
 - Handling of fields in ``paths`` that are not operations, but allowed by the Open API spec. `#457`_
+- Pytest 5.4 warning about deprecated ``Node`` initialization usage. `#451`_
 
 `1.0.1`_ - 2020-04-01
 ---------------------
@@ -825,6 +826,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#457: https://github.com/kiwicom/schemathesis/issues/457
+.. _#451: https://github.com/kiwicom/schemathesis/issues/451
 .. _#450: https://github.com/kiwicom/schemathesis/issues/450
 .. _#448: https://github.com/kiwicom/schemathesis/issues/448
 .. _#440: https://github.com/kiwicom/schemathesis/issues/440
