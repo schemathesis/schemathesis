@@ -64,7 +64,7 @@ multi_line_output = 3
 default_section = "THIRDPARTY"
 include_trailing_comma = true
 known_first_party = "schemathesis"
-known_third_party = ["_pytest", "aiohttp", "attr", "click", "flask", "hypothesis", "hypothesis_jsonschema", "jsonschema", "pytest", "pytest_subtests", "requests", "schemathesis", "werkzeug", "yaml"]
+known_third_party = ["_pytest", "aiohttp", "attr", "click", "flask", "hypothesis", "hypothesis_jsonschema", "jsonschema", "packaging", "pytest", "pytest_subtests", "requests", "schemathesis", "werkzeug", "yaml"]
 
 [build-system]
 requires = ["poetry>=0.12"]

@@ -136,3 +136,38 @@ jobs:
         file: ./coverage.xml
         flags: unittests
         name: codecov-py36
+
+  pytest-legacy:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        tox_job:
+          - py3-pytest53
+
+    name: ${{ matrix.os }}/tests_${{ matrix.tox_job }}
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v1
+      with:
+        fetch-depth: 1
+
+    - uses: actions/setup-python@v1
+      with:
+        python-version: 3.x
+
+    - run: pip install tox coverage
+
+    - name: Run ${{ matrix.tox_job }} tox job
+      run: tox -e ${{ matrix.tox_job }}
+
+    - run: coverage combine
+    - run: coverage report
+    - run: coverage xml -i
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1.0.5
+      with:
+        token: ${{secrets.CODECOV_TOKEN}}
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-py36-legacy-pytest
