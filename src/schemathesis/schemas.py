@@ -169,6 +169,7 @@ class BaseSchema(Mapping):
 
 class SwaggerV20(BaseSchema):
     nullable_name = "x-nullable"
+    operations: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
 
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
@@ -206,8 +207,7 @@ class SwaggerV20(BaseSchema):
                 for method, definition in methods.items():
                     # Only method definitions are parsed
                     if (
-                        method == "parameters"
-                        or method.startswith("x-")
+                        method not in self.operations
                         or should_skip_method(method, self.method)
                         or should_skip_by_tag(definition.get("tags"), self.tag)
                     ):
@@ -321,6 +321,7 @@ class SwaggerV20(BaseSchema):
 
 class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     nullable_name = "nullable"
+    operations = SwaggerV20.operations + ("trace",)
 
     @property
     def spec_version(self) -> str:
