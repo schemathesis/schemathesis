@@ -6,6 +6,12 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Open API 3. Handling of endpoints that contain ``multipart/form-data`` media types.
+  Previously only file upload endpoints were working correctly. `#473`_
+
 `1.0.4`_ - 2020-04-03
 ---------------------
 
@@ -850,6 +856,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#473: https://github.com/kiwicom/schemathesis/issues/473
 .. _#469: https://github.com/kiwicom/schemathesis/issues/469
 .. _#463: https://github.com/kiwicom/schemathesis/issues/463
 .. _#461: https://github.com/kiwicom/schemathesis/issues/461
