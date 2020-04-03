@@ -334,6 +334,33 @@ Or add this decorator to your test if you use Schemathesis in your Python tests:
     def test_api(case):
         ...
 
+**NOTE**. Schemathesis does not support examples in individual properties that are specified inside Schema Object.
+But examples in `Parameter Object <https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#parameter-object>`_, `Media Type Object <https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#mediaTypeObject>`_ and `Schema Object <https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#schema-object>`_ are supported.
+See below:
+
+.. code:: yaml
+
+    ...
+    paths:
+      /users:
+        parameters:
+          - in: query
+            name: foo
+            example: bar  # SUPPORTED!
+            schema:
+              type: string
+              example: spam  # SUPPORTED!
+        post:
+          requestBody:
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    foo:
+                      type: string
+                      example: bar  # NOT SUPPORTED!
+
 Direct strategies access
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
