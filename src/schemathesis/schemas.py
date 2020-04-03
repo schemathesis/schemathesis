@@ -28,7 +28,7 @@ from .exceptions import InvalidSchema
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .models import Endpoint, empty_object
 from .types import Filter, Hook, NotSet
-from .utils import NOT_SET, StringDatesYAMLLoader
+from .utils import NOT_SET, GenericResponse, StringDatesYAMLLoader
 
 
 def load_file_impl(location: str, opener: Callable) -> Dict[str, Any]:
@@ -165,6 +165,10 @@ class BaseSchema(Mapping):
     def get_hook(self, place: str) -> Optional[Hook]:
         key = HookLocation[place]
         return self.hooks.get(key)
+
+    def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
+        """Content types available for this endpoint."""
+        raise NotImplementedError
 
 
 class SwaggerV20(BaseSchema):
@@ -318,6 +322,12 @@ class SwaggerV20(BaseSchema):
     def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return definition.get("schema")
 
+    def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
+        produces = endpoint.definition.get("produces", None)
+        if produces:
+            return produces
+        return self.raw_schema.get("produces", [])
+
 
 class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     nullable_name = "nullable"
@@ -398,6 +408,16 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         if option:
             return option["schema"]
         return None
+
+    def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
+        try:
+            responses = endpoint.definition["responses"]
+        except KeyError:
+            # Possible to get if `validate_schema=False` is passed during schema creation
+            raise InvalidSchema("Schema parsing failed. Please check your schema.")
+        definitions = responses.get(str(response.status_code), {}).values()
+        content_types = [list(definition.keys()) for definition in definitions]
+        return list(itertools.chain(*content_types))
 
 
 def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
