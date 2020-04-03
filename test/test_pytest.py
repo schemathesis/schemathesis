@@ -100,12 +100,16 @@ def test_pytest_warning(testdir):
     testdir.make_test(
         """
 @schema.parametrize()
+def test_a(case):
+    assert True
+
+@schema.parametrize()
 @pytest.mark.parametrize("a", (1, 2))
-def test_schemathesis(case, a):
+def test_b(case, a):
     assert True
 """,
     )
     # When a test is run with treating warnings as errors
     result = testdir.runpytest("-Werror")
     # There should be no errors. There are no warnings from Schemathesis pytest plugin
-    result.assert_outcomes(passed=2)
+    result.assert_outcomes(passed=3)

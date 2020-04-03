@@ -12,6 +12,7 @@ Fixed
 - Precedence of ``produces`` keywords for Swagger 2.0 schemas. Now, operation-level ``produces`` overrides
   schema-level ``produces`` as specified in the specification. `#463`_
 - Content Type conformance check for Open API 3.0 schemas. `#461`_
+- Pytest 5.4 warning for test functions without parametrization. `#451`_
 
 `1.0.2`_ - 2020-04-02
 ---------------------
