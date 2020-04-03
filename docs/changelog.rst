@@ -11,6 +11,7 @@ Fixed
 
 - Precedence of ``produces`` keywords for Swagger 2.0 schemas. Now, operation-level ``produces`` overrides
   schema-level ``produces`` as specified in the specification. `#463`_
+- Content Type conformance check for Open API 3.0 schemas. `#461`_
 
 `1.0.2`_ - 2020-04-02
 ---------------------
@@ -836,6 +837,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#463: https://github.com/kiwicom/schemathesis/issues/463
+.. _#461: https://github.com/kiwicom/schemathesis/issues/461
 .. _#457: https://github.com/kiwicom/schemathesis/issues/457
 .. _#451: https://github.com/kiwicom/schemathesis/issues/451
 .. _#450: https://github.com/kiwicom/schemathesis/issues/450
