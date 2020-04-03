@@ -77,15 +77,14 @@ def test_content_type_conformance_valid(spec, response, case):
     assert content_type_conformance(response, case) is None
 
 
-@pytest.mark.parametrize("content_type, is_error", (("application/json", False), ("application/xml", True),))
-def test_global_produces_override(content_type, is_error):
-    # When "produces" is specified on the schema level and on the operation level
-    schema = schemathesis.from_dict(
+@pytest.mark.parametrize(
+    "raw_schema",
+    (
         {
             "swagger": "2.0",
             "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
             "host": "api.example.com",
-            "basePath": "/v1",
+            "basePath": "/",
             "schemes": ["https"],
             "produces": ["application/xml"],
             "paths": {
@@ -98,9 +97,29 @@ def test_global_produces_override(content_type, is_error):
                     }
                 }
             },
-        }
-    )
-    endpoint = schema.endpoints["/v1/users"]["get"]
+        },
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+            "paths": {
+                "/users": {
+                    "get": {
+                        "responses": {
+                            "200": {
+                                "description": "OK",
+                                "content": {"application/json": {"schema": {"type": "object"}}},
+                            }
+                        },
+                    }
+                }
+            },
+        },
+    ),
+)
+@pytest.mark.parametrize("content_type, is_error", (("application/json", False), ("application/xml", True),))
+def test_content_type_conformance_integration(raw_schema, content_type, is_error):
+    schema = schemathesis.from_dict(raw_schema)
+    endpoint = schema.endpoints["/users"]["get"]
     case = models.Case(endpoint)
     response = make_response(content_type=content_type)
     if not is_error:

@@ -415,9 +415,8 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         except KeyError:
             # Possible to get if `validate_schema=False` is passed during schema creation
             raise InvalidSchema("Schema parsing failed. Please check your schema.")
-        definitions = responses.get(str(response.status_code), {}).values()
-        content_types = [list(definition.keys()) for definition in definitions]
-        return list(itertools.chain(*content_types))
+        definitions = responses.get(str(response.status_code), {}).get("content", {})
+        return list(definitions.keys())
 
 
 def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
