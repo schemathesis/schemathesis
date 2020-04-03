@@ -3,6 +3,7 @@ from typing import Any, Dict
 import pytest
 import requests
 
+import schemathesis
 from schemathesis import models
 from schemathesis.checks import (
     content_type_conformance,
@@ -47,6 +48,39 @@ def case(request, swagger_20) -> models.Case:
 )
 def test_content_type_conformance_valid(response, case):
     assert content_type_conformance(response, case) is None
+
+
+@pytest.mark.parametrize("content_type, is_error", (("application/json", False), ("application/xml", True),))
+def test_global_produces_override(content_type, is_error):
+    # When "produces" is specified on the schema level and on the operation level
+    schema = schemathesis.from_dict(
+        {
+            "swagger": "2.0",
+            "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
+            "host": "api.example.com",
+            "basePath": "/v1",
+            "schemes": ["https"],
+            "produces": ["application/xml"],
+            "paths": {
+                "/users": {
+                    "get": {
+                        "summary": "Returns a list of users.",
+                        "description": "Optional extended description in Markdown.",
+                        "produces": ["application/json"],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        }
+    )
+    endpoint = schema.endpoints["/v1/users"]["get"]
+    case = models.Case(endpoint)
+    response = make_response(content_type=content_type)
+    if not is_error:
+        assert content_type_conformance(response, case) is None
+    else:
+        with pytest.raises(AssertionError):
+            content_type_conformance(response, case)
 
 
 @pytest.mark.parametrize("value", (500, 502))
