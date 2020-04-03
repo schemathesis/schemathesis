@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- ``OpenApi30.get_content_types`` behavior, introduced in `8aeee1a <https://github.com/kiwicom/schemathesis/commit/8aeee1ab2c6c97d94272dde4790f5efac3951aed>`_. `#469`_
+
 `1.0.3`_ - 2020-04-03
 ---------------------
 
@@ -841,6 +846,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#469: https://github.com/kiwicom/schemathesis/issues/469
 .. _#463: https://github.com/kiwicom/schemathesis/issues/463
 .. _#461: https://github.com/kiwicom/schemathesis/issues/461
 .. _#457: https://github.com/kiwicom/schemathesis/issues/457
