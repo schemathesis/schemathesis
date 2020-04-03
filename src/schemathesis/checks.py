@@ -45,11 +45,10 @@ def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, N
 
 
 def content_type_conformance(response: GenericResponse, case: "Case") -> None:
+    produces = case.endpoint.definition.get("produces", None)
     global_produces = case.endpoint.schema.raw_schema.get("produces", None)
-    if global_produces:
+    if global_produces and not produces:
         produces = global_produces
-    else:
-        produces = case.endpoint.definition.get("produces", None)
     if not produces:
         return
     content_type = response.headers["Content-Type"]
