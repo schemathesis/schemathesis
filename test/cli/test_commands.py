@@ -984,3 +984,59 @@ def test_wsgi_app_path_schema(testdir, cli, loadable_flask_app):
     # Then the schema should be loaded from that path
     assert result.exit_code == ExitCode.OK
     assert "1 passed in" in result.stdout
+
+
+def test_multipart_upload(testdir, base_url, cli):
+    # When requestBody has a binary field or an array of binary items
+    responses = {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}}
+    schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
+        "paths": {
+            "/property": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"file": {"type": "string", "format": "binary"}},
+                                    "required": ["file"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": responses,
+                }
+            },
+            "/array": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "files": {"type": "array", "items": {"type": "string", "format": "binary"}}
+                                    },
+                                    "required": ["files"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": responses,
+                }
+            },
+        },
+        "servers": [{"url": "https://api.example.com/{basePath}", "variables": {"basePath": {"default": "v1"}}}],
+    }
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
+    result = cli.run(
+        str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=5", "--show-errors-tracebacks"
+    )
+    # Then it should be correctly sent to the server
+    assert result.exit_code == ExitCode.OK
+    assert "= ERRORS =" not in result.stdout
+    # NOTE, that the actual endpoint is not checked in this test

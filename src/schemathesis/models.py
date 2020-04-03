@@ -96,7 +96,7 @@ class Case:
         extra: Dict[str, Optional[Union[Dict, bytes]]]
         if self.form_data:
             extra = {"files": self.form_data}
-        elif isinstance(self.body, bytes):
+        elif is_multipart(self.body):
             extra = {"data": self.body}
         else:
             extra = {"json": self.body}
@@ -134,7 +134,7 @@ class Case:
             extra = {"data": self.form_data}
             headers = headers or {}
             headers.setdefault("Content-Type", "multipart/form-data")
-        elif isinstance(self.body, bytes):
+        elif is_multipart(self.body):
             extra = {"data": self.body}
         else:
             extra = {"json": self.body}
@@ -174,6 +174,27 @@ class Case:
                 errors.append(exc.args[0])
         if errors:
             raise AssertionError(*errors)
+
+
+def is_multipart(item: Optional[Union[bytes, Dict[str, Any], List[Any]]]) -> bool:
+    """A poor detection if the body should be a multipart request.
+
+    It traverses the structure and if it contains bytes in any value, then it is a multipart request, because
+    it may happen only if there was `format: binary`, which usually is in multipart payloads.
+    Probably a better way would be checking actual content types defined in `requestBody` and drive behavior based on
+    that fact.
+    """
+    if isinstance(item, bytes):
+        return True
+    if isinstance(item, dict):
+        for value in item.values():
+            if is_multipart(value):
+                return True
+    if isinstance(item, list):
+        for value in item:
+            if is_multipart(value):
+                return True
+    return False
 
 
 @contextmanager
