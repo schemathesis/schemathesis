@@ -45,14 +45,11 @@ def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, N
 
 
 def content_type_conformance(response: GenericResponse, case: "Case") -> None:
-    produces = case.endpoint.definition.get("produces", None)
-    global_produces = case.endpoint.schema.raw_schema.get("produces", None)
-    if global_produces and not produces:
-        produces = global_produces
-    if not produces:
+    content_types = case.endpoint.get_content_types(response)
+    if not content_types:
         return
     content_type = response.headers["Content-Type"]
-    for option in produces:
+    for option in content_types:
         if are_content_types_equal(option, content_type):
             return
         expected_main, expected_sub = parse_content_type(option)
@@ -61,7 +58,7 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> None:
     raise exc_class(
         f"Received a response with '{content_type}' Content-Type, "
         f"but it is not declared in the schema.\n\n"
-        f"Defined content types: {', '.join(produces)}"
+        f"Defined content types: {', '.join(content_types)}"
     )
 
 

@@ -215,6 +215,10 @@ class Endpoint:
 
         return get_case_strategy(self)
 
+    def get_content_types(self, response: GenericResponse) -> List[str]:
+        """Content types available for this endpoint."""
+        return self.schema.get_content_types(self, response)
+
 
 class Status(IntEnum):
     """Status of an action or multiple actions."""

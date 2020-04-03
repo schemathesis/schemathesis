@@ -11,6 +11,7 @@ from schemathesis.checks import (
     response_schema_conformance,
     status_code_conformance,
 )
+from schemathesis.exceptions import InvalidSchema
 from schemathesis.schemas import BaseSchema
 
 
@@ -28,15 +29,41 @@ def make_response(content=b"{}", content_type="application/json") -> requests.Re
 
 
 @pytest.fixture()
+def spec(request):
+    param = getattr(request, "param", None)
+    if param == "swagger":
+        return request.getfixturevalue("swagger_20")
+    elif param == "openapi":
+        return request.getfixturevalue("openapi_30")
+    return request.getfixturevalue("swagger_20")
+
+
+@pytest.fixture()
 def response(request):
     return make_response(content_type=request.param)
 
 
 @pytest.fixture()
-def case(request, swagger_20) -> models.Case:
-    return make_case(swagger_20, {"produces": request.param})
+def case(request, spec) -> models.Case:
+    if "swagger" in spec.raw_schema:
+        data = {"produces": request.param}
+    else:
+        data = {
+            "responses": {
+                "200": {
+                    "content": {
+                        # There should be a content type in OAS3. But in test below it is omitted
+                        # For simplicity a default value is implemented here
+                        key: {"schema": {"type": "string"}}
+                        for key in request.param or ["application/json"]
+                    }
+                }
+            }
+        }
+    return make_case(spec, data)
 
 
+@pytest.mark.parametrize("spec", ("swagger", "openapi"), indirect=["spec"])
 @pytest.mark.parametrize(
     "response, case",
     (
@@ -46,7 +73,7 @@ def case(request, swagger_20) -> models.Case:
     ),
     indirect=["response", "case"],
 )
-def test_content_type_conformance_valid(response, case):
+def test_content_type_conformance_valid(spec, response, case):
     assert content_type_conformance(response, case) is None
 
 
@@ -111,12 +138,13 @@ def test_status_code_conformance_invalid(value, swagger_20):
     assert exc_info.type.__name__ == f"StatusCodeError{value}"
 
 
+@pytest.mark.parametrize("spec", ("swagger", "openapi"), indirect=["spec"])
 @pytest.mark.parametrize(
     "response, case",
     (("plain/text", ["application/json"]), ("plain/text;charset=utf-8", ["application/json"])),
     indirect=["response", "case"],
 )
-def test_content_type_conformance_invalid(response, case):
+def test_content_type_conformance_invalid(spec, response, case):
     message = (
         f"^Received a response with '{response.headers['Content-Type']}' Content-Type, "
         "but it is not declared in the schema.\n\nDefined content types: application/json$"
@@ -124,6 +152,24 @@ def test_content_type_conformance_invalid(response, case):
     with pytest.raises(AssertionError, match=message) as exc_info:
         content_type_conformance(response, case)
     assert "SchemaValidationError" in exc_info.type.__name__
+
+
+def test_invalid_schema_on_content_type_check():
+    # When schema validation is disabled and it doesn't contain "responses" key
+    schema = schemathesis.from_dict(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+            "paths": {"/users": {"get": {}}},
+        },
+        validate_schema=False,
+    )
+    endpoint = schema.endpoints["/users"]["get"]
+    case = models.Case(endpoint)
+    response = make_response(content_type="application/json")
+    # Then an error should be risen
+    with pytest.raises(InvalidSchema):
+        content_type_conformance(response, case)
 
 
 SUCCESS_SCHEMA = {"type": "object", "properties": {"success": {"type": "boolean"}}, "required": ["success"]}
