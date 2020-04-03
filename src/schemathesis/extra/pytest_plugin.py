@@ -58,7 +58,6 @@ class SchemathesisCase(PyCollector):
         else:
             fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)
             fixtureinfo.prune_dependency_tree()
-
             for callspec in metafunc._calls:
                 subname = "{}[{}]".format(name, callspec.id)
                 yield create_function(
@@ -115,7 +114,7 @@ class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
 
 
 @hookimpl(hookwrapper=True)  # type:ignore # pragma: no mutate
-def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> None:
+def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> Generator[None, Any, None]:
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
     outcome = yield
     if is_schemathesis_test(obj):
