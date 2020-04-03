@@ -49,18 +49,18 @@ class SchemathesisCase(PyCollector):
 
         metafunc = self._parametrize(cls, definition, fixtureinfo)
 
+        if USE_FROM_PARENT:
+            create_function = SchemathesisFunction.from_parent
+        else:
+            create_function = SchemathesisFunction
         if not metafunc._calls:
-            yield SchemathesisFunction(name, parent=self.parent, callobj=funcobj, fixtureinfo=fixtureinfo)
+            yield create_function(name=name, parent=self.parent, callobj=funcobj, fixtureinfo=fixtureinfo)
         else:
             fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)
             fixtureinfo.prune_dependency_tree()
 
             for callspec in metafunc._calls:
                 subname = "{}[{}]".format(name, callspec.id)
-                if USE_FROM_PARENT:
-                    create_function = SchemathesisFunction.from_parent
-                else:
-                    create_function = SchemathesisFunction
                 yield create_function(
                     name=subname,
                     parent=self.parent,
