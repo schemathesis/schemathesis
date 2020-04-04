@@ -1,5 +1,3 @@
-import os
-import shutil
 import time
 from typing import Callable, Iterable, List
 
@@ -8,18 +6,6 @@ import hypothesis
 
 from ..models import Endpoint, Status, TestResultSet
 from ..schemas import BaseSchema
-
-
-@attr.s(slots=True)  # pragma: no mutate
-class ExecutionContext:
-    """Storage for the current context of the execution."""
-
-    hypothesis_output: List[str] = attr.ib(factory=list)  # pragma: no mutate
-    workers_num: int = attr.ib(default=1)  # pragma: no mutate
-    show_errors_tracebacks: bool = attr.ib(default=False)  # pragma: no mutate
-    endpoints_processed: int = attr.ib(default=0)  # pragma: no mutate
-    current_line_length: int = attr.ib(default=0)  # pragma: no mutate
-    terminal_size: os.terminal_size = attr.ib(factory=shutil.get_terminal_size)  # pragma: no mutate
 
 
 @attr.s()  # pragma: no mutate

@@ -7,6 +7,7 @@ import pytest
 from hypothesis.reporting import report
 
 import schemathesis
+import schemathesis.cli.context
 from schemathesis import models, runner, utils
 from schemathesis.cli.output import default
 
@@ -22,7 +23,7 @@ def click_context():
 
 @pytest.fixture()
 def execution_context():
-    return runner.events.ExecutionContext([])
+    return schemathesis.cli.context.ExecutionContext([])
 
 
 @pytest.fixture

@@ -15,6 +15,7 @@ from ..runner import events
 from ..types import Filter
 from ..utils import WSGIResponse
 from . import callbacks, output
+from .context import ExecutionContext
 from .options import CSVOption, NotSet, OptionalInt
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
@@ -210,12 +211,12 @@ def run(  # pylint: disable=too-many-arguments
     execute(prepared_runner, workers_num, show_errors_tracebacks)
 
 
-def get_output_handler(workers_num: int) -> Callable[[events.ExecutionContext, events.ExecutionEvent], None]:
+def get_output_handler(workers_num: int) -> Callable[[ExecutionContext, events.ExecutionEvent], None]:
     if workers_num > 1:
         output_style = OutputStyle.short
     else:
         output_style = OutputStyle.default
-    return cast(Callable[[events.ExecutionContext, events.ExecutionEvent], None], output_style)
+    return cast(Callable[[ExecutionContext, events.ExecutionEvent], None], output_style)
 
 
 def load_hook(module_name: str) -> None:
@@ -259,6 +260,6 @@ def execute(
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handler = get_output_handler(workers_num)
-    context = events.ExecutionContext(workers_num=workers_num, show_errors_tracebacks=show_errors_tracebacks)
+    context = ExecutionContext(workers_num=workers_num, show_errors_tracebacks=show_errors_tracebacks)
     for event in prepared_runner:
         handler(context, event)
