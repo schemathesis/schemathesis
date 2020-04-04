@@ -2,7 +2,6 @@ import traceback
 from contextlib import contextmanager
 from enum import Enum
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union, cast
-from urllib.parse import urlparse
 
 import click
 import hypothesis
@@ -12,10 +11,9 @@ from requests import exceptions
 from .. import checks as checks_module
 from .. import models, runner, utils
 from ..exceptions import HTTPError
-from ..loaders import from_path, from_uri, get_loader_for_app
 from ..runner import events
 from ..types import Filter
-from ..utils import WSGIResponse, dict_not_none_values, dict_true_values
+from ..utils import WSGIResponse
 from . import callbacks, output
 from .options import CSVOption, NotSet, OptionalInt
 
