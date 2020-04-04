@@ -1,17 +1,18 @@
 import click
 
 from ...runner import events
+from ..context import ExecutionContext
 from . import default
 
 
-def handle_after_execution(context: events.ExecutionContext, event: events.AfterExecution) -> None:
+def handle_after_execution(context: ExecutionContext, event: events.AfterExecution) -> None:
     context.endpoints_processed += 1
     default.display_execution_result(context, event)
     if context.endpoints_processed == event.schema.endpoints_count:
         click.echo()
 
 
-def handle_event(context: events.ExecutionContext, event: events.ExecutionEvent) -> None:
+def handle_event(context: ExecutionContext, event: events.ExecutionEvent) -> None:
     """Short output style shows single symbols in the progress bar.
 
     Otherwise, identical to the default output style.

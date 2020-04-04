@@ -13,6 +13,7 @@ from ...constants import __version__
 from ...models import Case, Check, Status, TestResult, TestResultSet
 from ...runner import events
 from .. import utils
+from ..context import ExecutionContext
 
 
 def get_terminal_width() -> int:
@@ -37,7 +38,7 @@ def get_percentage(position: int, length: int) -> str:
     return f"[{percentage_message}]"
 
 
-def display_execution_result(context: events.ExecutionContext, event: events.AfterExecution) -> None:
+def display_execution_result(context: ExecutionContext, event: events.AfterExecution) -> None:
     """Display an appropriate symbol for the given event's execution result."""
     symbol, color = {Status.success: (".", "green"), Status.failure: ("F", "red"), Status.error: ("E", "red")}[
         event.status
@@ -46,7 +47,7 @@ def display_execution_result(context: events.ExecutionContext, event: events.Aft
     click.secho(symbol, nl=False, fg=color)
 
 
-def display_percentage(context: events.ExecutionContext, event: events.AfterExecution) -> None:
+def display_percentage(context: ExecutionContext, event: events.AfterExecution) -> None:
     """Add the current progress in % to the right side of the current line."""
     padding = 1
     current_percentage = get_percentage(context.endpoints_processed, event.schema.endpoints_count)
@@ -102,7 +103,7 @@ def display_hypothesis_output(hypothesis_output: List[str]) -> None:
         click.secho(output, fg="red")
 
 
-def display_errors(context: events.ExecutionContext, results: TestResultSet) -> None:
+def display_errors(context: ExecutionContext, results: TestResultSet) -> None:
     """Display all errors in the test run."""
     if not results.has_errors:
         return
@@ -118,7 +119,7 @@ def display_errors(context: events.ExecutionContext, results: TestResultSet) -> 
         )
 
 
-def display_single_error(context: events.ExecutionContext, result: TestResult) -> None:
+def display_single_error(context: ExecutionContext, result: TestResult) -> None:
     display_subsection(result)
     for error, example in result.errors:
         message = utils.format_exception(error, include_traceback=context.show_errors_tracebacks)
@@ -253,7 +254,7 @@ def display_check_result(check_name: str, results: Dict[Union[str, Status], int]
     )
 
 
-def handle_initialized(context: events.ExecutionContext, event: events.Initialized) -> None:
+def handle_initialized(context: ExecutionContext, event: events.Initialized) -> None:
     """Display information about the test session."""
     display_section_name("Schemathesis test session starts")
     versions = (
@@ -281,21 +282,21 @@ def handle_initialized(context: events.ExecutionContext, event: events.Initializ
         click.echo()
 
 
-def handle_before_execution(context: events.ExecutionContext, event: events.BeforeExecution) -> None:
+def handle_before_execution(context: ExecutionContext, event: events.BeforeExecution) -> None:
     """Display what method / endpoint will be tested next."""
     message = f"{event.endpoint.method} {event.endpoint.path} "
     context.current_line_length = len(message)
     click.echo(message, nl=False)
 
 
-def handle_after_execution(context: events.ExecutionContext, event: events.AfterExecution) -> None:
+def handle_after_execution(context: ExecutionContext, event: events.AfterExecution) -> None:
     """Display the execution result + current progress at the same line with the method / endpoint names."""
     context.endpoints_processed += 1
     display_execution_result(context, event)
     display_percentage(context, event)
 
 
-def handle_finished(context: events.ExecutionContext, event: events.Finished) -> None:
+def handle_finished(context: ExecutionContext, event: events.Finished) -> None:
     """Show the outcome of the whole testing session."""
     click.echo()
     display_hypothesis_output(context.hypothesis_output)
@@ -307,12 +308,12 @@ def handle_finished(context: events.ExecutionContext, event: events.Finished) ->
     display_summary(event)
 
 
-def handle_interrupted(context: events.ExecutionContext, event: events.Interrupted) -> None:
+def handle_interrupted(context: ExecutionContext, event: events.Interrupted) -> None:
     click.echo()
     display_section_name("KeyboardInterrupt", "!", bold=False)
 
 
-def handle_event(context: events.ExecutionContext, event: events.ExecutionEvent) -> None:
+def handle_event(context: ExecutionContext, event: events.ExecutionEvent) -> None:
     """Choose and execute a proper handler for the given event."""
     if isinstance(event, events.Initialized):
         handle_initialized(context, event)
