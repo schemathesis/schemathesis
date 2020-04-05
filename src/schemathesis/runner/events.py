@@ -27,7 +27,7 @@ class Initialized(ExecutionEvent):
     # Settings for `hypothesis` tests
     hypothesis_settings: hypothesis.settings = attr.ib()  # pragma: no mutate
     # Timestamp of test run start
-    start_time: float = attr.ib(factory=time.time)
+    start_time: float = attr.ib(factory=time.monotonic)
 
 
 @attr.s(slots=True)  # pragma: no mutate

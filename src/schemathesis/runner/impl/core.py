@@ -57,7 +57,9 @@ class BaseRunner:
                 break
             yield event
 
-        yield events.Finished(results=results, schema=self.schema, running_time=time.time() - initialized.start_time)
+        yield events.Finished(
+            results=results, schema=self.schema, running_time=time.monotonic() - initialized.start_time
+        )
 
     def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         raise NotImplementedError
