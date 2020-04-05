@@ -4,7 +4,7 @@ version = "1.0.5"
 description = "Hypothesis strategies for Open API / Swagger schemas"
 keywords = ["pytest", "hypothesis", "openapi", "swagger", "testing"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Framework :: Pytest",
     "Framework :: Hypothesis",
