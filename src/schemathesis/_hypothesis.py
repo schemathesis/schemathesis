@@ -150,7 +150,7 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
 def filter_path_parameters(parameters: Dict[str, Any]) -> bool:
     """Single "." chars and empty strings "" are excluded from path by urllib3.
 
-    A path containing to "/" or "%2F" will lead to ambigious path resolution in
+    A path containing to "/" or "%2F" will lead to ambiguous path resolution in
     many frameworks and libraries, such behaviour have been observed in both
     WSGI and ASGI applications.
 
