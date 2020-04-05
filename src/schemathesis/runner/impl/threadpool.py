@@ -120,7 +120,7 @@ class ThreadPoolRunner(BaseRunner):
             stop_workers()
         except KeyboardInterrupt:
             stop_workers()
-            yield events.Interrupted(results=results, schema=self.schema)
+            yield events.Interrupted()
 
     def _get_tasks_queue(self) -> Queue:
         """All endpoints are distributed among all workers via a queue."""

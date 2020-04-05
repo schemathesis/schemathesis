@@ -16,17 +16,15 @@ from schemathesis.checks import (
     status_code_conformance,
 )
 from schemathesis.constants import __version__
-from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Status
 from schemathesis.runner import events, get_base_url, get_requests_auth, prepare
 from schemathesis.runner.impl.core import get_wsgi_auth
 
 
-def execute(schema_uri, checks=DEFAULT_CHECKS, loader=from_uri, **options):
+def execute(schema_uri, checks=DEFAULT_CHECKS, loader=from_uri, **options) -> events.Finished:
     generator = prepare(schema_uri=schema_uri, checks=checks, loader=loader, **options)
     all_events = list(generator)
-    finished = all_events[-1]
-    return finished.results
+    return all_events[-1]
 
 
 def assert_request(
@@ -79,14 +77,17 @@ def pytest_generate_tests(metafunc):
 
 
 @pytest.fixture
-def args(request):
+def args(request, mocker):
     if request.param == "real":
         schema_url = request.getfixturevalue("schema_url")
         kwargs = {"schema_uri": schema_url}
         app = request.getfixturevalue("app")
     else:
         app = request.getfixturevalue("flask_app")
-        kwargs = {"schema_uri": "/swagger.yaml", "app": app, "loader": from_wsgi}
+        app_path = request.getfixturevalue("loadable_flask_app")
+        # To have simpler tests it is easier to reuse already imported application for inspection
+        mocker.patch("schemathesis.runner.import_app", return_value=app)
+        kwargs = {"schema_uri": "/swagger.yaml", "app": app_path, "loader": from_wsgi}
     return app, kwargs
 
 
@@ -315,8 +316,8 @@ def test_response_conformance_malformed_json(args):
     results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
     assert results.has_errors
-    error = results.results[-1].errors[-1][0]
-    assert "Expecting property name enclosed in double quotes" in str(error)
+    error = results.results[-1].errors[-1].exception
+    assert "Expecting property name enclosed in double quotes" in error
 
 
 @pytest.fixture()
@@ -372,7 +373,7 @@ def test_flaky_exceptions(args, mocker):
     results = execute(**kwargs, hypothesis_max_examples=3, hypothesis_derandomize=True)
     # Then the execution result should indicate errors
     assert results.has_errors
-    assert results.results[0].errors[0][0].args[0].startswith("Tests on this endpoint produce unreliable results:")
+    assert "Tests on this endpoint produce unreliable results:" in results.results[0].errors[0].exception
 
 
 @pytest.mark.endpoints("payload")
@@ -409,11 +410,9 @@ def test_get_base_url(url, base_url):
 @pytest.mark.endpoints("invalid_path_parameter")
 def test_invalid_path_parameter(args):
     app, kwargs = args
-    results = execute(**kwargs)
-    assert results.has_errors
-    error, _ = results.results[0].errors[0]
-    assert isinstance(error, InvalidSchema)
-    assert str(error) == "Missing required property `required: true`"
+    event = execute(**kwargs)
+    assert event.has_errors
+    assert "schemathesis.exceptions.InvalidSchema: Missing required property" in event.results[0].errors[0].exception
 
 
 def test_get_requests_auth():
@@ -430,8 +429,8 @@ def test_exit_first(args):
     app, kwargs = args
     results = prepare(**kwargs, exit_first=True)
     results = list(results)
-    assert results[-1].results.has_failures is True
-    assert results[-1].results.failed_count == 1
+    assert results[-1].has_failures is True
+    assert results[-1].failed_count == 1
 
 
 def test_auth_loader_options(base_url, schema_url, app):

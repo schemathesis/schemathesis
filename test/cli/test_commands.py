@@ -216,13 +216,12 @@ SCHEMA_URI = "https://example.com/swagger.json"
 @pytest.mark.parametrize(
     "args, expected",
     (
-        ([SCHEMA_URI], {}),
-        ([SCHEMA_URI, "--exitfirst"], {"exit_first": True},),
-        ([SCHEMA_URI, "--workers=2"], {"workers_num": 2},),
-        ([SCHEMA_URI, "--hypothesis-seed=123"], {"seed": 123},),
+        ([], {}),
+        (["--exitfirst"], {"exit_first": True},),
+        (["--workers=2"], {"workers_num": 2},),
+        (["--hypothesis-seed=123"], {"seed": 123},),
         (
             [
-                SCHEMA_URI,
                 "--hypothesis-deadline=1000",
                 "--hypothesis-derandomize",
                 "--hypothesis-max-examples=1000",
@@ -243,7 +242,7 @@ SCHEMA_URI = "https://example.com/swagger.json"
                 },
             },
         ),
-        ([SCHEMA_URI, "--hypothesis-deadline=None"], {"hypothesis_options": {"deadline": None}},),
+        (["--hypothesis-deadline=None"], {"hypothesis_options": {"deadline": None}},),
     ),
 )
 def test_execute_arguments(cli, mocker, simple_schema, args, expected):
@@ -253,9 +252,18 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
     mocker.patch("schemathesis.loaders.requests.get", return_value=response)
     execute = mocker.patch("schemathesis.runner.execute_from_schema", autospec=True)
 
-    result = cli.run(*args)
+    result = cli.run(SCHEMA_URI, *args)
 
     expected = {
+        "app": None,
+        "base_url": None,
+        "checks": DEFAULT_CHECKS,
+        "endpoint": (),
+        "method": (),
+        "tag": (),
+        "schema_uri": SCHEMA_URI,
+        "validate_schema": True,
+        "loader": from_uri,
         "hypothesis_options": {},
         "workers_num": 1,
         "exit_first": False,
@@ -269,32 +277,28 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
 
     assert result.exit_code == ExitCode.OK
     assert execute.call_args[1] == expected
-    assert execute.call_args[0][1] == DEFAULT_CHECKS
 
 
 @pytest.mark.parametrize(
     "args, expected",
     (
-        ([SCHEMA_URI, "--auth=test:test"], {"auth": ("test", "test"), "auth_type": "basic"}),
-        ([SCHEMA_URI, "--auth=test:test", "--auth-type=digest"], {"auth": ("test", "test"), "auth_type": "digest"}),
-        ([SCHEMA_URI, "--auth=test:test", "--auth-type=DIGEST"], {"auth": ("test", "test"), "auth_type": "digest"}),
-        ([SCHEMA_URI, "--header=Authorization:Bearer 123"], {"headers": {"Authorization": "Bearer 123"}}),
-        ([SCHEMA_URI, "--header=Authorization:  Bearer 123 "], {"headers": {"Authorization": "Bearer 123 "}}),
-        ([SCHEMA_URI, "--method=POST", "--method", "GET"], {"method": ("POST", "GET")}),
-        (
-            [SCHEMA_URI, "--method=POST", "--auth=test:test"],
-            {"auth": ("test", "test"), "auth_type": "basic", "method": ("POST",)},
-        ),
-        ([SCHEMA_URI, "--endpoint=users"], {"endpoint": ("users",)}),
-        ([SCHEMA_URI, "--tag=foo"], {"tag": ("foo",)}),
-        ([SCHEMA_URI, "--base-url=https://example.com/api/v1test"], {"base_url": "https://example.com/api/v1test"}),
+        (["--auth=test:test"], {"auth": ("test", "test"), "auth_type": "basic"}),
+        (["--auth=test:test", "--auth-type=digest"], {"auth": ("test", "test"), "auth_type": "digest"}),
+        (["--auth=test:test", "--auth-type=DIGEST"], {"auth": ("test", "test"), "auth_type": "digest"}),
+        (["--header=Authorization:Bearer 123"], {"headers": {"Authorization": "Bearer 123"}}),
+        (["--header=Authorization:  Bearer 123 "], {"headers": {"Authorization": "Bearer 123 "}}),
+        (["--method=POST", "--method", "GET"], {"method": ("POST", "GET")}),
+        (["--method=POST", "--auth=test:test"], {"auth": ("test", "test"), "auth_type": "basic", "method": ("POST",)},),
+        (["--endpoint=users"], {"endpoint": ("users",)}),
+        (["--tag=foo"], {"tag": ("foo",)}),
+        (["--base-url=https://example.com/api/v1test"], {"base_url": "https://example.com/api/v1test"}),
     ),
 )
 def test_load_schema_arguments(cli, mocker, args, expected):
-    mocker.patch("schemathesis.runner.execute_from_schema", autospec=True)
+    mocker.patch("schemathesis.runner.SingleThreadRunner.execute", autospec=True)
     load_schema = mocker.patch("schemathesis.runner.load_schema", autospec=True)
 
-    result = cli.run(*args)
+    result = cli.run(SCHEMA_URI, *args)
     expected = {
         "app": None,
         "base_url": None,
@@ -314,11 +318,10 @@ def test_load_schema_arguments(cli, mocker, args, expected):
 
 
 def test_all_checks(cli, mocker):
-    mocker.patch("schemathesis.runner.load_schema", autospec=True)
     execute = mocker.patch("schemathesis.runner.execute_from_schema", autospec=True)
     result = cli.run(SCHEMA_URI, "--checks=all")
     assert result.exit_code == ExitCode.OK
-    assert execute.call_args[0][1] == ALL_CHECKS
+    assert execute.call_args[1]["checks"] == ALL_CHECKS
 
 
 @pytest.mark.endpoints()
@@ -378,7 +381,7 @@ def test_cli_run_output_success(cli, cli_args, workers):
     assert "== 1 passed in " in last_line
     # And the running time is a small positive number
     time = float(last_line.split(" ")[-2].replace("s", ""))
-    assert 0 < time < 5
+    assert 0 <= time < 5
 
 
 @pytest.mark.parametrize("workers", (1, 2))

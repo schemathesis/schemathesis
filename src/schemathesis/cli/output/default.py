@@ -1,18 +1,16 @@
-import logging
 import os
 import platform
 import shutil
 from typing import Any, Dict, List, Optional, Set, Tuple, Union, cast
 
 import click
-from attr import Attribute
 from hypothesis import settings
 
 from ..._compat import metadata
 from ...constants import __version__
-from ...models import Case, Check, Status, TestResult, TestResultSet
+from ...models import Status
 from ...runner import events
-from .. import utils
+from ...runner.serialization import SerializedCase, SerializedCheck, SerializedTestResult
 from ..context import ExecutionContext
 
 
@@ -27,8 +25,8 @@ def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> Non
     click.secho(message, **kwargs)
 
 
-def display_subsection(result: TestResult, color: Optional[str] = "red") -> None:
-    section_name = f"{result.endpoint.method}: {result.endpoint.path}"
+def display_subsection(result: SerializedTestResult, color: Optional[str] = "red") -> None:
+    section_name = f"{result.method}: {result.path}"
     display_section_name(section_name, "_", fg=color)
 
 
@@ -50,7 +48,8 @@ def display_execution_result(context: ExecutionContext, event: events.AfterExecu
 def display_percentage(context: ExecutionContext, event: events.AfterExecution) -> None:
     """Add the current progress in % to the right side of the current line."""
     padding = 1
-    current_percentage = get_percentage(context.endpoints_processed, event.schema.endpoints_count)
+    endpoints_count = cast(int, context.endpoints_count)  # is already initialized via `Initialized` event
+    current_percentage = get_percentage(context.endpoints_processed, endpoints_count)
     styled = click.style(current_percentage, fg="cyan")
     # Total length of the message so it will fill to the right border of the terminal minus padding
     length = get_terminal_width() - context.current_line_length + len(styled) - len(current_percentage) - padding
@@ -64,29 +63,29 @@ def display_summary(event: events.Finished) -> None:
     raise click.exceptions.Exit(status_code)
 
 
-def get_summary_message_parts(results: TestResultSet) -> List[str]:
+def get_summary_message_parts(event: events.Finished) -> List[str]:
     parts = []
-    passed = results.passed_count
+    passed = event.passed_count
     if passed:
         parts.append(f"{passed} passed")
-    failed = results.failed_count
+    failed = event.failed_count
     if failed:
         parts.append(f"{failed} failed")
-    errored = results.errored_count
+    errored = event.errored_count
     if errored:
         parts.append(f"{errored} errored")
     return parts
 
 
 def get_summary_output(event: events.Finished) -> Tuple[str, str, int]:
-    parts = get_summary_message_parts(event.results)
+    parts = get_summary_message_parts(event)
     if not parts:
         message = "Empty test suite"
         color = "yellow"
         status_code = 0
     else:
         message = f'{", ".join(parts)} in {event.running_time:.2f}s'
-        if event.results.has_failures or event.results.has_errors:
+        if event.has_failures or event.has_errors:
             color = "red"
             status_code = 1
         else:
@@ -103,13 +102,13 @@ def display_hypothesis_output(hypothesis_output: List[str]) -> None:
         click.secho(output, fg="red")
 
 
-def display_errors(context: ExecutionContext, results: TestResultSet) -> None:
+def display_errors(context: ExecutionContext, event: events.Finished) -> None:
     """Display all errors in the test run."""
-    if not results.has_errors:
+    if not event.has_errors:
         return
 
     display_section_name("ERRORS")
-    for result in results:
+    for result in event.results:
         if not result.has_errors:
             continue
         display_single_error(context, result)
@@ -119,20 +118,23 @@ def display_errors(context: ExecutionContext, results: TestResultSet) -> None:
         )
 
 
-def display_single_error(context: ExecutionContext, result: TestResult) -> None:
+def display_single_error(context: ExecutionContext, result: SerializedTestResult) -> None:
     display_subsection(result)
-    for error, example in result.errors:
-        message = utils.format_exception(error, include_traceback=context.show_errors_tracebacks)
+    for error in result.errors:
+        if context.show_errors_tracebacks:
+            message = error.exception_with_traceback
+        else:
+            message = error.exception
         click.secho(message, fg="red")
-        if example is not None:
-            display_example(example, seed=result.seed)
+        if error.example is not None:
+            display_example(error.example, seed=result.seed)
 
 
-def display_failures(results: TestResultSet) -> None:
+def display_failures(event: events.Finished) -> None:
     """Display all failures in the test run."""
-    if not results.has_failures:
+    if not event.has_failures:
         return
-    relevant_results = [result for result in results if not result.is_errored]
+    relevant_results = [result for result in event.results if not result.is_errored]
     if not relevant_results:
         return
     display_section_name("FAILURES")
@@ -142,7 +144,7 @@ def display_failures(results: TestResultSet) -> None:
         display_failures_for_single_test(result)
 
 
-def display_failures_for_single_test(result: TestResult) -> None:
+def display_failures_for_single_test(result: SerializedTestResult) -> None:
     """Display a failure for a single method / endpoint."""
     display_subsection(result)
     checks = _get_unique_failures(result.checks)
@@ -152,14 +154,14 @@ def display_failures_for_single_test(result: TestResult) -> None:
             message = f"{idx}. {check.message}"
         else:
             message = None
-        example = cast(Case, check.example)  # filtered in `_get_unique_failures`
+        example = cast(SerializedCase, check.example)  # filtered in `_get_unique_failures`
         display_example(example, check.name, message, result.seed)
         # Display every time except the last check
         if idx != len(checks):
             click.echo("\n")
 
 
-def _get_unique_failures(checks: List[Check]) -> List[Check]:
+def _get_unique_failures(checks: List[SerializedCheck]) -> List[SerializedCheck]:
     """Return only unique checks that should be displayed in the output."""
     seen: Set[Tuple[str, Optional[str]]] = set()
     unique_checks = []
@@ -172,15 +174,14 @@ def _get_unique_failures(checks: List[Check]) -> List[Check]:
 
 
 def display_example(
-    case: Case, check_name: Optional[str] = None, message: Optional[str] = None, seed: Optional[int] = None
+    case: SerializedCase, check_name: Optional[str] = None, message: Optional[str] = None, seed: Optional[int] = None
 ) -> None:
     if message is not None:
         click.secho(message, fg="red")
         click.echo()
     output = {
-        make_verbose_name(attribute): getattr(case, attribute.name)
-        for attribute in Case.__attrs_attrs__  # type: ignore
-        if attribute.name not in ("path", "method", "base_url", "app", "endpoint")
+        make_verbose_name(attribute): getattr(case, attribute)
+        for attribute in ("path_parameters", "headers", "cookies", "query", "body", "form_data")
     }
     max_length = max(map(len, output))
     template = f"{{:<{max_length}}} : {{}}"
@@ -190,39 +191,37 @@ def display_example(
         if (key == "Body" and value is not None) or value not in (None, {}):
             click.secho(template.format(key, value), fg="red")
     click.echo()
-    click.secho(f"Run this Python code to reproduce this failure: \n\n    {case.get_code_to_reproduce()}", fg="red")
+    click.secho(f"Run this Python code to reproduce this failure: \n\n    {case.requests_code}", fg="red")
     if seed is not None:
         click.secho(f"\nOr add this option to your command line parameters: --hypothesis-seed={seed}", fg="red")
 
 
-def make_verbose_name(attribute: Attribute) -> str:
-    return attribute.name.capitalize().replace("_", " ")
+def make_verbose_name(attribute: str) -> str:
+    return attribute.capitalize().replace("_", " ")
 
 
-def display_application_logs(statistic: TestResultSet) -> None:
+def display_application_logs(event: events.Finished) -> None:
     """Print logs captured during the application run."""
-    if not statistic.has_logs:
+    if not event.has_logs:
         return
     display_section_name("APPLICATION LOGS")
-    formatter = logging.Formatter("[%(asctime)s] %(levelname)s in %(module)s: %(message)s")
-    for result in statistic:
+    for result in event.results:
         if not result.has_logs:
             continue
-        display_single_log(result, formatter)
+        display_single_log(result)
 
 
-def display_single_log(result: TestResult, formatter: logging.Formatter) -> None:
+def display_single_log(result: SerializedTestResult) -> None:
     display_subsection(result, None)
-    formatted = [formatter.format(record) for record in result.logs]
-    click.echo("\n\n".join(formatted))
+    click.echo("\n\n".join(result.logs))
 
 
-def display_statistic(statistic: TestResultSet) -> None:
+def display_statistic(event: events.Finished) -> None:
     """Format and print statistic collected by :obj:`models.TestResult`."""
     display_section_name("SUMMARY")
     click.echo()
-    total = statistic.total
-    if statistic.is_empty or not total:
+    total = event.total
+    if event.is_empty or not total:
         click.secho("No checks were performed.", bold=True)
         return
 
@@ -256,6 +255,7 @@ def display_check_result(check_name: str, results: Dict[Union[str, Status], int]
 
 def handle_initialized(context: ExecutionContext, event: events.Initialized) -> None:
     """Display information about the test session."""
+    context.endpoints_count = event.endpoints_count
     display_section_name("Schemathesis test session starts")
     versions = (
         f"platform {platform.system()} -- "
@@ -271,20 +271,20 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
         f"hypothesis profile '{settings._current_profile}' "  # type: ignore
         f"-> {settings.get_profile(settings._current_profile).show_changed()}"
     )
-    if event.schema.location is not None:
-        click.echo(f"Schema location: {event.schema.location}")
-    if event.schema.base_url is not None:
-        click.echo(f"Base URL: {event.schema.base_url}")
-    click.echo(f"Specification version: {event.schema.verbose_name}")
+    if event.location is not None:
+        click.echo(f"Schema location: {event.location}")
+    if event.base_url is not None:
+        click.echo(f"Base URL: {event.base_url}")
+    click.echo(f"Specification version: {event.specification_name}")
     click.echo(f"Workers: {context.workers_num}")
-    click.secho(f"collected endpoints: {event.schema.endpoints_count}", bold=True)
-    if event.schema.endpoints_count >= 1:
+    click.secho(f"collected endpoints: {event.endpoints_count}", bold=True)
+    if event.endpoints_count >= 1:
         click.echo()
 
 
 def handle_before_execution(context: ExecutionContext, event: events.BeforeExecution) -> None:
     """Display what method / endpoint will be tested next."""
-    message = f"{event.endpoint.method} {event.endpoint.path} "
+    message = f"{event.method} {event.path} "
     context.current_line_length = len(message)
     click.echo(message, nl=False)
 
@@ -300,10 +300,10 @@ def handle_finished(context: ExecutionContext, event: events.Finished) -> None:
     """Show the outcome of the whole testing session."""
     click.echo()
     display_hypothesis_output(context.hypothesis_output)
-    display_errors(context, event.results)
-    display_failures(event.results)
-    display_application_logs(event.results)
-    display_statistic(event.results)
+    display_errors(context, event)
+    display_failures(event)
+    display_application_logs(event)
+    display_statistic(event)
     click.echo()
     display_summary(event)
 
@@ -311,6 +311,13 @@ def handle_finished(context: ExecutionContext, event: events.Finished) -> None:
 def handle_interrupted(context: ExecutionContext, event: events.Interrupted) -> None:
     click.echo()
     display_section_name("KeyboardInterrupt", "!", bold=False)
+
+
+def handle_internal_error(context: ExecutionContext, event: events.InternalError) -> None:
+    click.secho(event.message, fg="red")
+    if event.exception:
+        click.secho(f"Error: {event.exception}", fg="red")
+    raise click.Abort
 
 
 def handle_event(context: ExecutionContext, event: events.ExecutionEvent) -> None:
@@ -326,3 +333,5 @@ def handle_event(context: ExecutionContext, event: events.ExecutionEvent) -> Non
         handle_finished(context, event)
     if isinstance(event, events.Interrupted):
         handle_interrupted(context, event)
+    if isinstance(event, events.InternalError):
+        handle_internal_error(context, event)

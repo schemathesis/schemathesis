@@ -2,7 +2,6 @@ import os
 import sys
 
 import click
-import hypothesis
 import pytest
 from hypothesis.reporting import report
 
@@ -10,6 +9,8 @@ import schemathesis
 import schemathesis.cli.context
 from schemathesis import models, runner, utils
 from schemathesis.cli.output import default
+from schemathesis.runner.events import Finished
+from schemathesis.runner.serialization import SerializedTestResult
 
 from ...utils import strip_style_win32
 
@@ -23,7 +24,7 @@ def click_context():
 
 @pytest.fixture()
 def execution_context():
-    return schemathesis.cli.context.ExecutionContext([])
+    return schemathesis.cli.context.ExecutionContext([], endpoints_count=1)
 
 
 @pytest.fixture
@@ -39,9 +40,7 @@ def results_set(endpoint):
 
 @pytest.fixture()
 def after_execution(results_set, endpoint, swagger_20):
-    return runner.events.AfterExecution(
-        results=results_set, schema=swagger_20, endpoint=endpoint, status=models.Status.success
-    )
+    return runner.events.AfterExecution(status=models.Status.success)
 
 
 @pytest.mark.parametrize(
@@ -65,9 +64,7 @@ def test_display_section_name(capsys, title, separator, printed, expected):
 
 def test_handle_initialized(capsys, execution_context, results_set, swagger_20):
     # Given Initialized event
-    event = runner.events.Initialized(
-        results=results_set, schema=swagger_20, checks=(), hypothesis_settings=hypothesis.settings()
-    )
+    event = runner.events.Initialized.from_schema(schema=swagger_20)
     # When this even is handled
     default.handle_initialized(execution_context, event)
     out = capsys.readouterr().out
@@ -92,8 +89,9 @@ def test_display_statistic(capsys, swagger_20, endpoint):
         endpoint, [success, success, success, failure, failure, models.Check("different_check", models.Status.success)]
     )
     results = models.TestResultSet([single_test_statistic])
+    event = Finished.from_results(results, running_time=1.0)
     # When test results are displayed
-    default.display_statistic(results)
+    default.display_statistic(event)
 
     lines = [line for line in capsys.readouterr().out.split("\n") if line]
     failed = strip_style_win32(click.style("FAILED", bold=True, fg="red"))
@@ -164,7 +162,7 @@ def test_display_single_failure(capsys, swagger_20, endpoint, body):
         endpoint, [success, success, success, failure, failure, models.Check("different_check", models.Status.success)]
     )
     # When this failure is displayed
-    default.display_failures_for_single_test(test_statistic)
+    default.display_failures_for_single_test(SerializedTestResult.from_test_result(test_statistic))
     out = capsys.readouterr().out
     lines = out.split("\n")
     # Then the endpoint name is displayed as a subsection
@@ -228,7 +226,7 @@ def test_display_single_error(capsys, swagger_20, endpoint, execution_context, s
     result.add_error(exception)
     # When the related test result is displayed
     execution_context.show_errors_tracebacks = show_errors_tracebacks
-    default.display_single_error(execution_context, result)
+    default.display_single_error(execution_context, SerializedTestResult.from_test_result(result))
     lines = capsys.readouterr().out.strip().split("\n")
     # Then it should be correctly formatted and displayed in red color
     if sys.version_info <= (3, 8):
@@ -252,8 +250,9 @@ def test_display_failures(swagger_20, capsys, results_set):
     failure = models.TestResult(endpoint)
     failure.add_failure("test", models.Case(endpoint), "Message")
     results_set.append(failure)
+    event = Finished.from_results(results_set, 1.0)
     # When the failures are displayed
-    default.display_failures(results_set)
+    default.display_failures(event)
     out = capsys.readouterr().out.strip()
     # Then section title is displayed
     assert " FAILURES " in out
@@ -273,9 +272,10 @@ def test_display_errors(swagger_20, capsys, results_set, execution_context, show
     error = models.TestResult(endpoint, seed=123)
     error.add_error(ConnectionError("Connection refused!"), models.Case(endpoint, query={"a": 1}))
     results_set.append(error)
+    event = Finished.from_results(results_set, 1.0)
     # When the errors are displayed
     execution_context.show_errors_tracebacks = show_errors_tracebacks
-    default.display_errors(execution_context, results_set)
+    default.display_errors(execution_context, event)
     out = capsys.readouterr().out.strip()
     # Then section title is displayed
     assert " ERRORS " in out
@@ -293,16 +293,14 @@ def test_display_errors(swagger_20, capsys, results_set, execution_context, show
     assert "Or add this option to your command line parameters: --hypothesis-seed=123" in out
 
 
-@pytest.mark.parametrize(
-    "attribute, expected", ((models.Case.__attrs_attrs__[3], "Cookies"), (models.Case.__attrs_attrs__[4], "Query"))
-)
+@pytest.mark.parametrize("attribute, expected", (("cookies", "Cookies"), ("path_parameters", "Path parameters")))
 def test_make_verbose_name(attribute, expected):
     assert default.make_verbose_name(attribute) == expected
 
 
 def test_display_summary(capsys, results_set, swagger_20):
     # Given the Finished event
-    event = runner.events.Finished(results=results_set, schema=swagger_20, running_time=1.257)
+    event = runner.events.Finished.from_results(results=results_set, running_time=1.257)
     # When `display_summary` is called
     with pytest.raises(click.exceptions.Exit):
         default.display_summary(event)

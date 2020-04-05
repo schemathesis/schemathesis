@@ -8,7 +8,7 @@ from . import default
 def handle_after_execution(context: ExecutionContext, event: events.AfterExecution) -> None:
     context.endpoints_processed += 1
     default.display_execution_result(context, event)
-    if context.endpoints_processed == event.schema.endpoints_count:
+    if context.endpoints_processed == context.endpoints_count:
         click.echo()
 
 
@@ -26,3 +26,5 @@ def handle_event(context: ExecutionContext, event: events.ExecutionEvent) -> Non
         default.handle_finished(context, event)
     if isinstance(event, events.Interrupted):
         default.handle_interrupted(context, event)
+    if isinstance(event, events.InternalError):
+        default.handle_internal_error(context, event)
