@@ -1,9 +1,12 @@
 import json
 import pathlib
+import platform
 import time
+from functools import partial
 from test.utils import HERE, SIMPLE_PATH
 from urllib.parse import urljoin
 
+import attr
 import pytest
 import requests
 import yaml
@@ -11,12 +14,12 @@ from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
 from requests import Response
 
-from schemathesis import Case
+from schemathesis import Case, runner
 from schemathesis._compat import metadata
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.loaders import from_uri
 from schemathesis.models import Endpoint
-from schemathesis.runner import DEFAULT_CHECKS
+from schemathesis.runner import DEFAULT_CHECKS, RunnerExecutionMode
 
 PHASES = "explicit, reuse, generate, target, shrink"
 if metadata.version("hypothesis") < "4.5":
@@ -26,6 +29,21 @@ if metadata.version("hypothesis") < "5.0":
     HEALTH_CHECKS = (
         "data_too_large|filter_too_much|too_slow|return_value|hung_test|large_base_example|not_a_test_method"
     )
+IS_WINDOWS = platform.system() == "Windows"
+
+
+def maybe_not_supported_on_windows(mode):
+    if IS_WINDOWS and mode == RunnerExecutionMode.subprocess:
+        # Because of multiprocessing behavior on Windows some behavior is hard to verify without using mocks
+        pytest.skip("This kind of test doesn't work on Windows")
+
+
+@pytest.fixture(params=[RunnerExecutionMode.inprocess, RunnerExecutionMode.subprocess])
+def runner_mode(request, mocker):
+    """Run tests in sub-process and in-process modes."""
+    new = partial(runner.prepare, execution_mode=request.param)
+    mocker.patch("schemathesis.runner.prepare", new)
+    return request.param
 
 
 def test_commands_help(cli):
@@ -250,17 +268,17 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
     response.status_code = 200
     response._content = json.dumps(simple_schema).encode()
     mocker.patch("schemathesis.loaders.requests.get", return_value=response)
-    execute = mocker.patch("schemathesis.runner.execute_from_schema", autospec=True)
+    execute = mocker.patch("schemathesis.runner.executors.execute_from_schema", autospec=True)
 
     result = cli.run(SCHEMA_URI, *args)
 
     expected = {
         "app": None,
         "base_url": None,
-        "checks": DEFAULT_CHECKS,
-        "endpoint": (),
-        "method": (),
-        "tag": (),
+        "checks": list(DEFAULT_CHECKS),
+        "endpoint": [],
+        "method": [],
+        "tag": [],
         "schema_uri": SCHEMA_URI,
         "validate_schema": True,
         "loader": from_uri,
@@ -276,7 +294,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
     }
 
     assert result.exit_code == ExitCode.OK
-    assert execute.call_args[1] == expected
+    assert attr.asdict(execute.call_args[0][0]) == expected
 
 
 @pytest.mark.parametrize(
@@ -295,8 +313,8 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
     ),
 )
 def test_load_schema_arguments(cli, mocker, args, expected):
-    mocker.patch("schemathesis.runner.SingleThreadRunner.execute", autospec=True)
-    load_schema = mocker.patch("schemathesis.runner.load_schema", autospec=True)
+    mocker.patch("schemathesis.runner.impl.solo.SingleThreadRunner.execute", autospec=True)
+    load_schema = mocker.patch("schemathesis.runner.executors.load_schema", autospec=True)
 
     result = cli.run(SCHEMA_URI, *args)
     expected = {
@@ -318,13 +336,14 @@ def test_load_schema_arguments(cli, mocker, args, expected):
 
 
 def test_all_checks(cli, mocker):
-    execute = mocker.patch("schemathesis.runner.execute_from_schema", autospec=True)
+    execute = mocker.patch("schemathesis.runner.executors.execute_from_schema", autospec=True)
     result = cli.run(SCHEMA_URI, "--checks=all")
     assert result.exit_code == ExitCode.OK
-    assert execute.call_args[1]["checks"] == ALL_CHECKS
+    assert execute.call_args[0][0].checks == ALL_CHECKS
 
 
 @pytest.mark.endpoints()
+@pytest.mark.usefixtures("runner_mode")
 def test_hypothesis_parameters(cli, schema_url):
     # When Hypothesis options are passed via command line
     result = cli.run(
@@ -363,6 +382,7 @@ def cli_args(request):
 
 
 @pytest.mark.endpoints("success")
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_cli_run_output_success(cli, cli_args, workers):
     result = cli.run(*cli_args, f"--workers={workers}")
@@ -384,6 +404,7 @@ def test_cli_run_output_success(cli, cli_args, workers):
     assert 0 <= time < 5
 
 
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_cli_run_output_with_errors(cli, cli_args, workers):
     result = cli.run(*cli_args, f"--workers={workers}")
@@ -397,6 +418,7 @@ def test_cli_run_output_with_errors(cli, cli_args, workers):
     assert f"== 1 passed, 1 failed in " in lines[-1]
 
 
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.endpoints("failure")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_cli_run_only_failure(cli, cli_args, workers):
@@ -410,6 +432,7 @@ def test_cli_run_only_failure(cli, cli_args, workers):
     assert "== 1 failed in " in lines[-1]
 
 
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.endpoints("upload_file")
 def test_cli_binary_body(cli, schema_url):
     result = cli.run(schema_url, "--hypothesis-suppress-health-check=filter_too_much")
@@ -418,6 +441,7 @@ def test_cli_binary_body(cli, schema_url):
 
 
 @pytest.mark.endpoints()
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_cli_run_output_empty(cli, cli_args, workers):
     result = cli.run(*cli_args, f"--workers={workers}")
@@ -431,6 +455,7 @@ def test_cli_run_output_empty(cli, cli_args, workers):
 
 
 @pytest.mark.endpoints()
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_cli_run_changed_base_url(cli, server, cli_args, workers):
     # When the CLI receives custom base URL
@@ -441,6 +466,7 @@ def test_cli_run_changed_base_url(cli, server, cli_args, workers):
     assert lines[-10] == f"Base URL: {base_url}"
 
 
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize(
     "status_code, message",
     (
@@ -449,7 +475,8 @@ def test_cli_run_changed_base_url(cli, server, cli_args, workers):
     ),
 )
 @pytest.mark.parametrize("workers", (1, 2))
-def test_execute_missing_schema(cli, mocker, status_code, message, workers):
+def test_execute_missing_schema(cli, runner_mode, mocker, status_code, message, workers):
+    maybe_not_supported_on_windows(runner_mode)
     response = Response()
     response.status_code = status_code
     mocker.patch("schemathesis.loaders.requests.get", autospec=True, return_value=response)
@@ -459,6 +486,7 @@ def test_execute_missing_schema(cli, mocker, status_code, message, workers):
 
 
 @pytest.mark.endpoints("success", "slow")
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_hypothesis_failed_event(cli, cli_args, workers):
     # When the Hypothesis deadline option is set manually and it is smaller than the response time
@@ -480,6 +508,7 @@ def test_hypothesis_failed_event(cli, cli_args, workers):
 
 
 @pytest.mark.endpoints("success", "slow")
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_connection_timeout(cli, server, schema_url, workers):
     # When connection timeout is specified in the CLI and the request fails because of it
@@ -502,6 +531,7 @@ def test_connection_timeout(cli, server, schema_url, workers):
 
 
 @pytest.mark.endpoints("success", "slow")
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_default_hypothesis_settings(cli, cli_args, workers):
     # When there is a slow endpoint and if it is faster than 500ms
@@ -518,6 +548,7 @@ def test_default_hypothesis_settings(cli, cli_args, workers):
 
 
 @pytest.mark.endpoints("failure")
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_seed(cli, cli_args, workers):
     # When there is a failure
@@ -528,6 +559,7 @@ def test_seed(cli, cli_args, workers):
 
 
 @pytest.mark.endpoints("unsatisfiable")
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_unsatisfiable(cli, cli_args, workers):
     # When the app's schema contains parameters that can't be generated
@@ -550,6 +582,7 @@ def test_unsatisfiable(cli, cli_args, workers):
 
 
 @pytest.mark.endpoints("flaky")
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_flaky(cli, cli_args, workers):
     # When the endpoint fails / succeeds randomly
@@ -579,6 +612,7 @@ def test_flaky(cli, cli_args, workers):
 
 
 @pytest.mark.endpoints("invalid")
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_invalid_endpoint(cli, cli_args, workers):
     # When the app's schema contains errors
@@ -601,6 +635,7 @@ def test_invalid_endpoint(cli, cli_args, workers):
 
 
 @pytest.mark.endpoints("teapot")
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_status_code_conformance(cli, cli_args, workers):
     # When endpoint returns a status code, that is not listed in "responses"
@@ -621,6 +656,7 @@ def test_status_code_conformance(cli, cli_args, workers):
 
 
 @pytest.mark.endpoints("multiple_failures")
+@pytest.mark.usefixtures("runner_mode")
 def test_multiple_failures_single_check(cli, schema_url):
     result = cli.run(schema_url, "--hypothesis-derandomize")
 
@@ -634,6 +670,7 @@ def test_multiple_failures_single_check(cli, schema_url):
 
 
 @pytest.mark.endpoints("multiple_failures")
+@pytest.mark.usefixtures("runner_mode")
 def test_multiple_failures_different_check(cli, schema_url):
     result = cli.run(
         schema_url, "-c", "status_code_conformance", "-c", "not_a_server_error", "--hypothesis-derandomize"
@@ -650,6 +687,7 @@ def test_multiple_failures_different_check(cli, schema_url):
 
 
 @pytest.mark.parametrize("workers", (1, 2))
+@pytest.mark.usefixtures("runner_mode")
 def test_connection_error(cli, schema_url, workers):
     # When the given base_url is unreachable
     result = cli.run(schema_url, "--base-url=http://127.0.0.1:1/", f"--workers={workers}")
@@ -673,6 +711,7 @@ def test_connection_error(cli, schema_url, workers):
 
 
 @pytest.mark.parametrize("workers", (1, 2))
+@pytest.mark.usefixtures("runner_mode")
 def test_schema_not_available(cli, workers):
     # When the given schema is unreachable
     result = cli.run("http://127.0.0.1:1/swagger.yaml", f"--workers={workers}")
@@ -688,6 +727,7 @@ def test_schema_not_available(cli, workers):
     assert lines[-2] == "Aborted!"
 
 
+@pytest.mark.usefixtures("runner_mode")
 def test_schema_not_available_wsgi(cli, loadable_flask_app):
     # When the given schema is unreachable
     result = cli.run("unknown.yaml", f"--app={loadable_flask_app}")
@@ -700,7 +740,9 @@ def test_schema_not_available_wsgi(cli, loadable_flask_app):
 
 
 @pytest.mark.endpoints("custom_format")
-def test_pre_run_hook_valid(testdir, cli, schema_url, app):
+@pytest.mark.usefixtures("runner_mode")
+def test_pre_run_hook_valid(testdir, runner_mode, cli, schema_url, app):
+    maybe_not_supported_on_windows(runner_mode)
     # When `--pre-run` hook is passed to the CLI call
     module = testdir.make_importable_pyfile(
         hook="""
@@ -748,7 +790,9 @@ def test_pre_run_hook_invalid(testdir, cli):
 
 
 @pytest.mark.endpoints("success")
-def test_register_check(testdir, cli, schema_url):
+@pytest.mark.usefixtures("runner_mode")
+def test_register_check(testdir, runner_mode, cli, schema_url):
+    maybe_not_supported_on_windows(runner_mode)
     # When `--pre-run` hook is passed to the CLI call
     # And it contains registering a new check, which always fails for the testing purposes
     module = testdir.make_importable_pyfile(
@@ -791,8 +835,10 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
     assert "== SUMMARY ==" in lines[position]
 
 
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_20, workers):
+def test_keyboard_interrupt(cli, cli_args, runner_mode, base_url, mocker, flask_app, swagger_20, workers):
+    maybe_not_supported_on_windows(runner_mode)
     # When a Schemathesis run in interrupted by keyboard or via SIGINT
     endpoint = Endpoint("/success", "GET", {}, swagger_20, base_url=base_url)
     if len(cli_args) == 2:
@@ -829,6 +875,7 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
         assert_threaded_executor_interruption(lines, ("", "."))
 
 
+@pytest.mark.usefixtures("runner_mode")
 def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
     # When a Schemathesis run in interrupted by keyboard or via SIGINT
     original = time.sleep
@@ -853,8 +900,10 @@ def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
 
 
 @pytest.mark.endpoints("failure")
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_hypothesis_output_capture(mocker, cli, cli_args, workers):
+def test_hypothesis_output_capture(mocker, runner_mode, cli, cli_args, workers):
+    maybe_not_supported_on_windows(runner_mode)
     mocker.patch("schemathesis.utils.IGNORED_PATTERNS", ())
 
     result = cli.run(*cli_args, f"--workers={workers}")
@@ -905,6 +954,7 @@ async def test_multiple_files_schema(app, testdir, cli, base_url):
     assert isinstance(payload["photoUrls"], list)
 
 
+@pytest.mark.usefixtures("runner_mode")
 def test_wsgi_app(testdir, cli):
     module = testdir.make_importable_pyfile(
         location="""
@@ -945,6 +995,7 @@ def test_wsgi_app_missing(testdir, cli):
     )
 
 
+@pytest.mark.usefixtures("runner_mode")
 def test_wsgi_app_internal_exception(testdir, cli, caplog):
     module = testdir.make_importable_pyfile(
         location="""
@@ -962,6 +1013,7 @@ def test_wsgi_app_internal_exception(testdir, cli, caplog):
     assert lines[52] == "ZeroDivisionError: division by zero"
 
 
+@pytest.mark.usefixtures("runner_mode")
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
 def test_aiohttp_app(request, testdir, cli, loadable_aiohttp_app, args):
     # When an URL is passed together with app
@@ -973,6 +1025,7 @@ def test_aiohttp_app(request, testdir, cli, loadable_aiohttp_app, args):
     assert "1 passed, 1 failed in" in result.stdout
 
 
+@pytest.mark.usefixtures("runner_mode")
 def test_wsgi_app_remote_schema(testdir, cli, schema_url, loadable_flask_app):
     # When an URL is passed together with app
     result = cli.run(schema_url, "--app", loadable_flask_app)
@@ -981,6 +1034,7 @@ def test_wsgi_app_remote_schema(testdir, cli, schema_url, loadable_flask_app):
     assert "1 passed, 1 failed in" in result.stdout
 
 
+@pytest.mark.usefixtures("runner_mode")
 def test_wsgi_app_path_schema(testdir, cli, loadable_flask_app):
     # When an existing path to schema is passed together with app
     result = cli.run(SIMPLE_PATH, "--app", loadable_flask_app)

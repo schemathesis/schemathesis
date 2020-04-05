@@ -17,12 +17,15 @@ from schemathesis.checks import (
 )
 from schemathesis.constants import __version__
 from schemathesis.models import Status
-from schemathesis.runner import events, get_base_url, get_requests_auth, prepare
+from schemathesis.runner import RunnerExecutionMode, events, prepare
 from schemathesis.runner.impl.core import get_wsgi_auth
+from schemathesis.utils import get_base_url, get_requests_auth
 
 
 def execute(schema_uri, checks=DEFAULT_CHECKS, loader=from_uri, **options) -> events.Finished:
-    generator = prepare(schema_uri=schema_uri, checks=checks, loader=loader, **options)
+    generator = prepare(
+        schema_uri=schema_uri, execution_mode=RunnerExecutionMode.inprocess, checks=checks, loader=loader, **options
+    )
     all_events = list(generator)
     return all_events[-1]
 
@@ -86,7 +89,7 @@ def args(request, mocker):
         app = request.getfixturevalue("flask_app")
         app_path = request.getfixturevalue("loadable_flask_app")
         # To have simpler tests it is easier to reuse already imported application for inspection
-        mocker.patch("schemathesis.runner.import_app", return_value=app)
+        mocker.patch("schemathesis.runner.executors.import_app", return_value=app)
         kwargs = {"schema_uri": "/swagger.yaml", "app": app_path, "loader": from_wsgi}
     return app, kwargs
 
