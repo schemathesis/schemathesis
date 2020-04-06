@@ -16,17 +16,15 @@ from schemathesis.checks import (
     status_code_conformance,
 )
 from schemathesis.constants import __version__
-from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Status
 from schemathesis.runner import events, get_base_url, get_requests_auth, prepare
 from schemathesis.runner.impl.core import get_wsgi_auth
 
 
-def execute(schema_uri, checks=DEFAULT_CHECKS, loader=from_uri, **options):
+def execute(schema_uri, checks=DEFAULT_CHECKS, loader=from_uri, **options) -> events.Finished:
     generator = prepare(schema_uri=schema_uri, checks=checks, loader=loader, **options)
     all_events = list(generator)
-    finished = all_events[-1]
-    return finished.results
+    return all_events[-1]
 
 
 def assert_request(
@@ -79,14 +77,17 @@ def pytest_generate_tests(metafunc):
 
 
 @pytest.fixture
-def args(request):
+def args(request, mocker):
     if request.param == "real":
         schema_url = request.getfixturevalue("schema_url")
         kwargs = {"schema_uri": schema_url}
         app = request.getfixturevalue("app")
     else:
         app = request.getfixturevalue("flask_app")
-        kwargs = {"schema_uri": "/swagger.yaml", "app": app, "loader": from_wsgi}
+        app_path = request.getfixturevalue("loadable_flask_app")
+        # To have simpler tests it is easier to reuse already imported application for inspection
+        mocker.patch("schemathesis.runner.import_app", return_value=app)
+        kwargs = {"schema_uri": "/swagger.yaml", "app": app_path, "loader": from_wsgi}
     return app, kwargs
 
 
@@ -227,10 +228,10 @@ def test_unknown_response_code(args):
     app, kwargs = args
     # When endpoint returns a status code, that is not listed in "responses"
     # And "status_code_conformance" is specified
-    results = execute(**kwargs, checks=(status_code_conformance,), hypothesis_max_examples=1)
+    init, *others, finished = prepare(**kwargs, checks=(status_code_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
-    assert results.has_failures
-    check = results.results[0].checks[0]
+    assert finished.has_failures
+    check = others[1].result.checks[0]
     assert check.name == "status_code_conformance"
     assert check.value == Status.failure
 
@@ -240,10 +241,10 @@ def test_unknown_response_code_with_default(args):
     app, kwargs = args
     # When endpoint returns a status code, that is not listed in "responses", but there is a "default" response
     # And "status_code_conformance" is specified
-    results = execute(**kwargs, checks=(status_code_conformance,), hypothesis_max_examples=1)
+    init, *others, finished = prepare(**kwargs, checks=(status_code_conformance,), hypothesis_max_examples=1)
     # Then there should be no failure
-    assert not results.has_failures
-    check = results.results[0].checks[0]
+    assert not finished.has_failures
+    check = others[1].result.checks[0]
     assert check.name == "status_code_conformance"
     assert check.value == Status.success
 
@@ -253,10 +254,10 @@ def test_unknown_content_type(args):
     app, kwargs = args
     # When endpoint returns a response with content type, not specified in "produces"
     # And "content_type_conformance" is specified
-    results = execute(**kwargs, checks=(content_type_conformance,), hypothesis_max_examples=1)
+    init, *others, finished = prepare(**kwargs, checks=(content_type_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
-    assert results.has_failures
-    check = results.results[0].checks[0]
+    assert finished.has_failures
+    check = others[1].result.checks[0]
     assert check.name == "content_type_conformance"
     assert check.value == Status.failure
 
@@ -266,9 +267,9 @@ def test_known_content_type(args):
     app, kwargs = args
     # When endpoint returns a response with a proper content type
     # And "content_type_conformance" is specified
-    results = execute(**kwargs, checks=(content_type_conformance,), hypothesis_max_examples=1)
+    *_, finished = prepare(**kwargs, checks=(content_type_conformance,), hypothesis_max_examples=1)
     # Then there should be no a failures
-    assert not results.has_failures
+    assert not finished.has_failures
 
 
 @pytest.mark.endpoints("invalid_response")
@@ -276,10 +277,10 @@ def test_response_conformance_invalid(args):
     app, kwargs = args
     # When endpoint returns a response that doesn't conform to the schema
     # And "response_schema_conformance" is specified
-    results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
+    init, *others, finished = prepare(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
-    assert results.has_failures
-    lines = results.results[0].checks[-1].message.split("\n")
+    assert finished.has_failures
+    lines = others[1].result.checks[-1].message.split("\n")
     assert lines[0] == "The received response does not conform to the defined schema!"
     assert lines[2] == "Details: "
     assert lines[4] == "'success' is a required property"
@@ -312,11 +313,11 @@ def test_response_conformance_malformed_json(args):
     app, kwargs = args
     # When endpoint returns a response that contains a malformed JSON, but has a valid content type header
     # And "response_schema_conformance" is specified
-    results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
+    init, *others, finished = prepare(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
-    assert results.has_errors
-    error = results.results[-1].errors[-1][0]
-    assert "Expecting property name enclosed in double quotes" in str(error)
+    assert finished.has_errors
+    error = others[1].result.errors[-1].exception
+    assert "Expecting property name enclosed in double quotes" in error
 
 
 @pytest.fixture()
@@ -369,10 +370,10 @@ def test_flaky_exceptions(args, mocker):
     # And Hypothesis consider this test as a flaky one
     mocker.patch("schemathesis.Case.call", side_effect=flaky)
     mocker.patch("schemathesis.Case.call_wsgi", side_effect=flaky)
-    results = execute(**kwargs, hypothesis_max_examples=3, hypothesis_derandomize=True)
+    init, *others, finished = prepare(**kwargs, hypothesis_max_examples=3, hypothesis_derandomize=True)
     # Then the execution result should indicate errors
-    assert results.has_errors
-    assert results.results[0].errors[0][0].args[0].startswith("Tests on this endpoint produce unreliable results:")
+    assert finished.has_errors
+    assert "Tests on this endpoint produce unreliable results:" in others[1].result.errors[0].exception
 
 
 @pytest.mark.endpoints("payload")
@@ -409,11 +410,9 @@ def test_get_base_url(url, base_url):
 @pytest.mark.endpoints("invalid_path_parameter")
 def test_invalid_path_parameter(args):
     app, kwargs = args
-    results = execute(**kwargs)
-    assert results.has_errors
-    error, _ = results.results[0].errors[0]
-    assert isinstance(error, InvalidSchema)
-    assert str(error) == "Missing required property `required: true`"
+    init, *others, finished = prepare(**kwargs)
+    assert finished.has_errors
+    assert "schemathesis.exceptions.InvalidSchema: Missing required property" in others[1].result.errors[0].exception
 
 
 def test_get_requests_auth():
@@ -430,8 +429,8 @@ def test_exit_first(args):
     app, kwargs = args
     results = prepare(**kwargs, exit_first=True)
     results = list(results)
-    assert results[-1].results.has_failures is True
-    assert results[-1].results.failed_count == 1
+    assert results[-1].has_failures is True
+    assert results[-1].failed_count == 1
 
 
 def test_auth_loader_options(base_url, schema_url, app):

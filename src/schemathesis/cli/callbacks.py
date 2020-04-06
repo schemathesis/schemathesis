@@ -1,7 +1,6 @@
 import re
-import sys
 from contextlib import contextmanager
-from typing import Any, Dict, Generator, Optional, Tuple
+from typing import Dict, Generator, Optional, Tuple
 from urllib.parse import urlparse
 
 import click
@@ -36,25 +35,21 @@ def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_
     return raw_value
 
 
-def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]) -> Any:
+def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]) -> Optional[str]:
     if raw_value is None:
         return raw_value
-    path, name = (re.split(r":(?![\\/])", raw_value, 1) + [None])[:2]  # type: ignore
     try:
-        __import__(path)
-    except (ImportError, ValueError):
+        utils.import_app(raw_value)
+        # String is returned instead of an app because it might be passed to a subprocess
+        # Since most of app instances are not-transferable to another process, they are passed as strings and
+        # imported in a subprocess
+        return raw_value
+    except (ImportError, ValueError, AttributeError):
         raise click.BadParameter("Can not import application from the given module")
     except Exception as exc:
         message = utils.format_exception(exc)
         click.secho(f"Error: {message}", fg="red")
         raise click.Abort
-    # accessing the module from sys.modules returns a proper module, while `__import__`
-    # may return a parent module (system dependent)
-    module = sys.modules[path]
-    try:
-        return getattr(module, name)
-    except AttributeError:
-        raise click.BadParameter("Can not import application from the given module")
 
 
 def validate_auth(

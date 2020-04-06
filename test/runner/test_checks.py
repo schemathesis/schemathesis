@@ -116,7 +116,7 @@ def test_content_type_conformance_valid(spec, response, case):
         },
     ),
 )
-@pytest.mark.parametrize("content_type, is_error", (("application/json", False), ("application/xml", True),))
+@pytest.mark.parametrize("content_type, is_error", (("application/json", False), ("application/xml", True)))
 def test_content_type_conformance_integration(raw_schema, content_type, is_error):
     schema = schemathesis.from_dict(raw_schema)
     endpoint = schema.endpoints["/users"]["get"]

@@ -6,6 +6,19 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+~~~~~~~
+
+- App loading in ``runner``. Now it accepts application as an importable string, rather than an instance. It is done
+  to make it possible to execute runner in a subprocess. Otherwise apps can't be easily serialized and transferred into
+  another process.
+- Runner events structure. All data in events is static from now, there are no references to ``BaseSchema``, ``Endpoint`` or
+  similar objects that may calculate data dynamically. This is done to make events serializable and not tied to Python
+  object which decouples any ``runner`` consumer from implementation details and will help make ``runner`` usable in
+  more cases (e.g. web application), since events can be serialized to JSON and used in any environment.
+  Another related change is that Python exceptions are not propagated anymore - they are replaced with ``InternalError``
+  event that should be handled accordingly.
+
 `1.0.5`_ - 2020-04-03
 ---------------------
 

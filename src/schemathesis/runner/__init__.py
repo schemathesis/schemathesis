@@ -8,7 +8,7 @@ from ..checks import DEFAULT_CHECKS
 from ..models import CheckFunction
 from ..schemas import BaseSchema
 from ..types import Filter, NotSet, RawAuth
-from ..utils import dict_not_none_values, dict_true_values, file_exists, get_base_url, get_requests_auth
+from ..utils import dict_not_none_values, dict_true_values, file_exists, get_base_url, get_requests_auth, import_app
 from . import events
 from .impl import BaseRunner, SingleThreadRunner, SingleThreadWSGIRunner, ThreadPoolRunner, ThreadPoolWSGIRunner
 
@@ -31,7 +31,7 @@ def prepare(  # pylint: disable=too-many-arguments
     endpoint: Optional[Filter] = None,
     method: Optional[Filter] = None,
     tag: Optional[Filter] = None,
-    app: Any = None,
+    app: Optional[str] = None,
     validate_schema: bool = True,
     # Hypothesis-specific configuration
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
@@ -48,20 +48,6 @@ def prepare(  # pylint: disable=too-many-arguments
     if auth is None:
         # Auth type doesn't matter if auth is not passed
         auth_type = None  # type: ignore
-
-    schema = load_schema(
-        schema_uri,
-        base_url=base_url,
-        loader=loader,
-        app=app,
-        validate_schema=validate_schema,
-        auth=auth,
-        auth_type=auth_type,
-        headers=headers,
-        endpoint=endpoint,
-        method=method,
-        tag=tag,
-    )
     hypothesis_options = prepare_hypothesis_options(
         deadline=hypothesis_deadline,
         derandomize=hypothesis_derandomize,
@@ -72,8 +58,15 @@ def prepare(  # pylint: disable=too-many-arguments
         verbosity=hypothesis_verbosity,
     )
     return execute_from_schema(
-        schema,
-        checks,
+        schema_uri=schema_uri,
+        loader=loader,
+        base_url=base_url,
+        endpoint=endpoint,
+        method=method,
+        tag=tag,
+        app=app,
+        validate_schema=validate_schema,
+        checks=checks,
         hypothesis_options=hypothesis_options,
         seed=seed,
         workers_num=workers_num,
@@ -86,9 +79,16 @@ def prepare(  # pylint: disable=too-many-arguments
 
 
 def execute_from_schema(
-    schema: BaseSchema,
-    checks: Iterable[CheckFunction],
     *,
+    schema_uri: str,
+    loader: Callable = loaders.from_uri,
+    base_url: Optional[str] = None,
+    endpoint: Optional[Filter] = None,
+    method: Optional[Filter] = None,
+    tag: Optional[Filter] = None,
+    app: Optional[str] = None,
+    validate_schema: bool = True,
+    checks: Iterable[CheckFunction],
     workers_num: int = 1,
     hypothesis_options: Dict[str, Any],
     auth: Optional[RawAuth] = None,
@@ -102,58 +102,77 @@ def execute_from_schema(
 
     Provides the main testing loop and preparation step.
     """
-    runner: BaseRunner
-    if workers_num > 1:
-        if schema.app:
-            runner = ThreadPoolWSGIRunner(
-                schema=schema,
-                checks=checks,
-                hypothesis_settings=hypothesis_options,
-                auth=auth,
-                auth_type=auth_type,
-                headers=headers,
-                seed=seed,
-                workers_num=workers_num,
-                exit_first=exit_first,
-            )
-        else:
-            runner = ThreadPoolRunner(
-                schema=schema,
-                checks=checks,
-                hypothesis_settings=hypothesis_options,
-                auth=auth,
-                auth_type=auth_type,
-                headers=headers,
-                seed=seed,
-                request_timeout=request_timeout,
-                exit_first=exit_first,
-            )
-    else:
-        if schema.app:
-            runner = SingleThreadWSGIRunner(
-                schema=schema,
-                checks=checks,
-                hypothesis_settings=hypothesis_options,
-                auth=auth,
-                auth_type=auth_type,
-                headers=headers,
-                seed=seed,
-                exit_first=exit_first,
-            )
-        else:
-            runner = SingleThreadRunner(
-                schema=schema,
-                checks=checks,
-                hypothesis_settings=hypothesis_options,
-                auth=auth,
-                auth_type=auth_type,
-                headers=headers,
-                seed=seed,
-                request_timeout=request_timeout,
-                exit_first=exit_first,
-            )
+    # pylint: disable=too-many-locals
+    try:
+        if app is not None:
+            app = import_app(app)
+        schema = load_schema(
+            schema_uri,
+            base_url=base_url,
+            loader=loader,
+            app=app,
+            validate_schema=validate_schema,
+            auth=auth,
+            auth_type=auth_type,
+            headers=headers,
+            endpoint=endpoint,
+            method=method,
+            tag=tag,
+        )
 
-    yield from runner.execute()
+        runner: BaseRunner
+        if workers_num > 1:
+            if schema.app:
+                runner = ThreadPoolWSGIRunner(
+                    schema=schema,
+                    checks=checks,
+                    hypothesis_settings=hypothesis_options,
+                    auth=auth,
+                    auth_type=auth_type,
+                    headers=headers,
+                    seed=seed,
+                    workers_num=workers_num,
+                    exit_first=exit_first,
+                )
+            else:
+                runner = ThreadPoolRunner(
+                    schema=schema,
+                    checks=checks,
+                    hypothesis_settings=hypothesis_options,
+                    auth=auth,
+                    auth_type=auth_type,
+                    headers=headers,
+                    seed=seed,
+                    request_timeout=request_timeout,
+                    exit_first=exit_first,
+                )
+        else:
+            if schema.app:
+                runner = SingleThreadWSGIRunner(
+                    schema=schema,
+                    checks=checks,
+                    hypothesis_settings=hypothesis_options,
+                    auth=auth,
+                    auth_type=auth_type,
+                    headers=headers,
+                    seed=seed,
+                    exit_first=exit_first,
+                )
+            else:
+                runner = SingleThreadRunner(
+                    schema=schema,
+                    checks=checks,
+                    hypothesis_settings=hypothesis_options,
+                    auth=auth,
+                    auth_type=auth_type,
+                    headers=headers,
+                    seed=seed,
+                    request_timeout=request_timeout,
+                    exit_first=exit_first,
+                )
+        yield from runner.execute()
+    except Exception as exc:
+        yield events.InternalError.from_exc(exc)
 
 
 def load_schema(

@@ -39,13 +39,11 @@ class BaseRunner:
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
     exit_first: bool = attr.ib(default=False)  # pragma: no mutate
 
-    def execute(self,) -> Generator[events.ExecutionEvent, None, None]:
+    def execute(self) -> Generator[events.ExecutionEvent, None, None]:
         """Common logic for all runners."""
         results = TestResultSet()
 
-        initialized = events.Initialized(
-            results=results, schema=self.schema, checks=self.checks, hypothesis_settings=self.hypothesis_settings
-        )
+        initialized = events.Initialized.from_schema(schema=self.schema)
         yield initialized
 
         for event in self._execute(results):
@@ -57,9 +55,7 @@ class BaseRunner:
                 break
             yield event
 
-        yield events.Finished(
-            results=results, schema=self.schema, running_time=time.monotonic() - initialized.start_time
-        )
+        yield events.Finished.from_results(results=results, running_time=time.monotonic() - initialized.start_time)
 
     def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         raise NotImplementedError
@@ -76,7 +72,7 @@ def run_test(
     """A single test run with all error handling needed."""
     # pylint: disable=too-many-arguments
     result = TestResult(endpoint=endpoint)
-    yield events.BeforeExecution(results=results, schema=schema, endpoint=endpoint)
+    yield events.BeforeExecution.from_endpoint(endpoint=endpoint)
     hypothesis_output: List[str] = []
     try:
         if isinstance(test, InvalidSchema):
@@ -108,7 +104,7 @@ def run_test(
         status = Status.error
         result.add_error(hypothesis.errors.Unsatisfiable("Unable to satisfy schema parameters for this endpoint"))
     except KeyboardInterrupt:
-        yield events.Interrupted(results=results, schema=schema)
+        yield events.Interrupted()
         return
     except Exception as error:
         status = Status.error
@@ -118,9 +114,7 @@ def run_test(
         test, "_hypothesis_internal_use_generated_seed", None
     )
     results.append(result)
-    yield events.AfterExecution(
-        results=results, schema=schema, endpoint=endpoint, status=status, hypothesis_output=hypothesis_output
-    )
+    yield events.AfterExecution.from_result(result=result, status=status, hypothesis_output=hypothesis_output)
 
 
 def run_checks(case: Case, checks: Iterable[CheckFunction], result: TestResult, response: GenericResponse) -> None:
