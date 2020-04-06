@@ -9,7 +9,6 @@ import requests
 import yaml
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
-from requests import Response
 
 from schemathesis import Case
 from schemathesis._compat import metadata
@@ -439,18 +438,16 @@ def test_cli_run_changed_base_url(cli, server, cli_args, workers):
 
 
 @pytest.mark.parametrize(
-    "status_code, message",
+    "url, message",
     (
-        (404, f"Schema was not found at {SCHEMA_URI}"),
-        (500, f"Failed to load schema, code 500 was returned from {SCHEMA_URI}"),
+        ("/api/doesnt_exist", f"Schema was not found at http://127.0.0.1"),
+        ("/api/failure", f"Failed to load schema, code 500 was returned from http://127.0.0.1"),
     ),
 )
+@pytest.mark.endpoints("failure")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_execute_missing_schema(cli, mocker, status_code, message, workers):
-    response = Response()
-    response.status_code = status_code
-    mocker.patch("schemathesis.loaders.requests.get", autospec=True, return_value=response)
-    result = cli.run(SCHEMA_URI, f"--workers={workers}")
+def test_execute_missing_schema(cli, base_url, url, message, workers):
+    result = cli.run(f"{base_url}{url}", f"--workers={workers}")
     assert result.exit_code == ExitCode.TESTS_FAILED
     assert message in result.stdout
 
