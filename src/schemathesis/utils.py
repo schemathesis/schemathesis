@@ -1,6 +1,7 @@
 import cgi
 import pathlib
 import re
+import sys
 import traceback
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Type, Union
@@ -162,3 +163,13 @@ def get_requests_auth(auth: Optional[RawAuth], auth_type: Optional[str]) -> Opti
 
 
 GenericResponse = Union[requests.Response, WSGIResponse]  # pragma: no mutate
+
+
+def import_app(path: str) -> Any:
+    """Import an application from a string."""
+    path, name = (re.split(r":(?![\\/])", path, 1) + [None])[:2]  # type: ignore
+    __import__(path)
+    # accessing the module from sys.modules returns a proper module, while `__import__`
+    # may return a parent module (system dependent)
+    module = sys.modules[path]
+    return getattr(module, name)

@@ -1,16 +1,13 @@
 import traceback
-from contextlib import contextmanager
 from enum import Enum
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union, cast
+from typing import Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union, cast
 
 import click
 import hypothesis
 import requests
-from requests import exceptions
 
 from .. import checks as checks_module
-from .. import models, runner, utils
-from ..exceptions import HTTPError
+from .. import models, runner
 from ..runner import events
 from ..types import Filter
 from ..utils import WSGIResponse
@@ -159,7 +156,7 @@ def run(  # pylint: disable=too-many-arguments
     tags: Optional[Filter] = None,
     workers_num: int = DEFAULT_WORKERS,
     base_url: Optional[str] = None,
-    app: Any = None,
+    app: Optional[str] = None,
     request_timeout: Optional[int] = None,
     validate_schema: bool = True,
     show_errors_tracebacks: bool = False,
@@ -183,31 +180,30 @@ def run(  # pylint: disable=too-many-arguments
     else:
         selected_checks = tuple(check for check in checks_module.ALL_CHECKS if check.__name__ in checks)
 
-    with abort_on_network_errors():
-        prepared_runner = runner.prepare(
-            schema,
-            auth=auth,
-            auth_type=auth_type,
-            headers=headers,
-            request_timeout=request_timeout,
-            base_url=base_url,
-            endpoint=endpoints,
-            method=methods,
-            tag=tags,
-            app=app,
-            seed=hypothesis_seed,
-            exit_first=exit_first,
-            checks=selected_checks,
-            workers_num=workers_num,
-            validate_schema=validate_schema,
-            hypothesis_deadline=hypothesis_deadline,
-            hypothesis_derandomize=hypothesis_derandomize,
-            hypothesis_max_examples=hypothesis_max_examples,
-            hypothesis_phases=hypothesis_phases,
-            hypothesis_report_multiple_bugs=hypothesis_report_multiple_bugs,
-            hypothesis_suppress_health_check=hypothesis_suppress_health_check,
-            hypothesis_verbosity=hypothesis_verbosity,
-        )
+    prepared_runner = runner.prepare(
+        schema,
+        auth=auth,
+        auth_type=auth_type,
+        headers=headers,
+        request_timeout=request_timeout,
+        base_url=base_url,
+        endpoint=endpoints,
+        method=methods,
+        tag=tags,
+        app=app,
+        seed=hypothesis_seed,
+        exit_first=exit_first,
+        checks=selected_checks,
+        workers_num=workers_num,
+        validate_schema=validate_schema,
+        hypothesis_deadline=hypothesis_deadline,
+        hypothesis_derandomize=hypothesis_derandomize,
+        hypothesis_max_examples=hypothesis_max_examples,
+        hypothesis_phases=hypothesis_phases,
+        hypothesis_report_multiple_bugs=hypothesis_report_multiple_bugs,
+        hypothesis_suppress_health_check=hypothesis_suppress_health_check,
+        hypothesis_verbosity=hypothesis_verbosity,
+    )
     execute(prepared_runner, workers_num, show_errors_tracebacks)
 
 
@@ -228,24 +224,6 @@ def load_hook(module_name: str) -> None:
         message = traceback.format_exc()
         click.secho(message, fg="red")
         raise click.Abort()
-
-
-@contextmanager
-def abort_on_network_errors() -> Generator[None, None, None]:
-    """Abort on network errors during the schema loading."""
-    try:
-        yield
-    except exceptions.ConnectionError as exc:
-        click.secho(f"Failed to load schema from {exc.request.url}", fg="red")
-        message = utils.format_exception(exc)
-        click.secho(f"Error: {message}", fg="red")
-        raise click.Abort
-    except HTTPError as exc:
-        if exc.response.status_code == 404:
-            click.secho(f"Schema was not found at {exc.url}", fg="red")
-            raise click.Abort
-        click.secho(f"Failed to load schema, code {exc.response.status_code} was returned from {exc.url}", fg="red")
-        raise click.Abort
 
 
 class OutputStyle(Enum):

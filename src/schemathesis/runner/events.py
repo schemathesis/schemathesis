@@ -1,33 +1,43 @@
+# pylint: disable=too-many-instance-attributes
 import time
-from typing import Callable, Iterable, List
+from typing import Dict, List, Optional, Union
 
 import attr
-import hypothesis
+from requests import exceptions
 
-from ..models import Endpoint, Status, TestResultSet
+from ..exceptions import HTTPError
+from ..models import Endpoint, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
+from ..utils import format_exception
+from .serialization import SerializedTestResult
 
 
 @attr.s()  # pragma: no mutate
 class ExecutionEvent:
     """Generic execution event."""
 
-    # Holder for all tests results in a particular run
-    results: TestResultSet = attr.ib()  # pragma: no mutate
-    # Schema that is being tested
-    schema: BaseSchema = attr.ib()  # pragma: no mutate
-
 
 @attr.s(slots=True)  # pragma: no mutate
 class Initialized(ExecutionEvent):
     """Runner is initialized, settings are prepared, requests session is ready."""
 
-    # List of checks that will be used during the run
-    checks: Iterable[Callable] = attr.ib()  # pragma: no mutate
-    # Settings for `hypothesis` tests
-    hypothesis_settings: hypothesis.settings = attr.ib()  # pragma: no mutate
+    # Total number of endpoints in the schema
+    endpoints_count: int = attr.ib()  # pragma: no mutate
+    location: Optional[str] = attr.ib()  # pragma: no mutate
+    base_url: Optional[str] = attr.ib()  # pragma: no mutate
+    specification_name: str = attr.ib()  # pragma: no mutate
     # Timestamp of test run start
-    start_time: float = attr.ib(factory=time.monotonic)
+    start_time: float = attr.ib(factory=time.monotonic)  # pragma: no mutate
+
+    @classmethod
+    def from_schema(cls, *, schema: BaseSchema) -> "Initialized":
+        """Computes all needed data from a schema instance."""
+        return cls(
+            endpoints_count=schema.endpoints_count,
+            location=schema.location,
+            base_url=schema.base_url,
+            specification_name=schema.verbose_name,
+        )
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -37,24 +47,59 @@ class BeforeExecution(ExecutionEvent):
     It happens before a single hypothesis test, that may contain many examples inside.
     """
 
-    # Endpoint being tested
-    endpoint: Endpoint = attr.ib()  # pragma: no mutate
+    method: str = attr.ib()  # pragma: no mutate
+    path: str = attr.ib()  # pragma: no mutate
+
+    @classmethod
+    def from_endpoint(cls, endpoint: Endpoint) -> "BeforeExecution":
+        return cls(method=endpoint.method, path=endpoint.path)
 
 
 @attr.s(slots=True)  # pragma: no mutate
 class AfterExecution(ExecutionEvent):
     """Happens after each examined endpoint."""
 
-    endpoint: Endpoint = attr.ib()  # pragma: no mutate
     # Endpoint test status - success / failure / error
     status: Status = attr.ib()  # pragma: no mutate
+    result: SerializedTestResult = attr.ib()  # pragma: no mutate
     # Captured hypothesis stdout
     hypothesis_output: List[str] = attr.ib(factory=list)  # pragma: no mutate
+
+    @classmethod
+    def from_result(cls, result: TestResult, status: Status, hypothesis_output: List[str]) -> "AfterExecution":
+        return cls(
+            result=SerializedTestResult.from_test_result(result), status=status, hypothesis_output=hypothesis_output,
+        )
 
 
 @attr.s(slots=True)  # pragma: no mutate
 class Interrupted(ExecutionEvent):
     """If execution was interrupted by Ctrl-C or a received SIGTERM."""
+
+
+@attr.s(slots=True)  # pragma: no mutate
+class InternalError(ExecutionEvent):
+    """An error that happened inside the runner."""
+
+    message: str = attr.ib()  # pragma: no mutate
+    exception: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    exception_with_traceback: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+
+    @classmethod
+    def from_exc(cls, exc: Exception) -> "InternalError":
+        if isinstance(exc, HTTPError):
+            if exc.response.status_code == 404:
+                message = f"Schema was not found at {exc.url}"
+            else:
+                message = f"Failed to load schema, code {exc.response.status_code} was returned from {exc.url}"
+            return cls(message=message)
+        exception = format_exception(exc)
+        exception_with_traceback = format_exception(exc, include_traceback=True)
+        if isinstance(exc, exceptions.ConnectionError):
+            message = f"Failed to load schema from {exc.request.url}"
+        else:
+            message = "An internal error happened during a test run"
+        return cls(message=message, exception=exception, exception_with_traceback=exception_with_traceback)
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -64,5 +109,30 @@ class Finished(ExecutionEvent):
     No more events after this point.
     """
 
+    passed_count: int = attr.ib()  # pragma: no mutate
+    failed_count: int = attr.ib()  # pragma: no mutate
+    errored_count: int = attr.ib()  # pragma: no mutate
+
+    has_failures: bool = attr.ib()  # pragma: no mutate
+    has_errors: bool = attr.ib()  # pragma: no mutate
+    has_logs: bool = attr.ib()  # pragma: no mutate
+    is_empty: bool = attr.ib()  # pragma: no mutate
+
+    total: Dict[str, Dict[Union[str, Status], int]] = attr.ib()  # pragma: no mutate
+
     # Total test run execution time
-    running_time: float = attr.ib()
+    running_time: float = attr.ib()  # pragma: no mutate
+
+    @classmethod
+    def from_results(cls, results: TestResultSet, running_time: float) -> "Finished":
+        return cls(
+            passed_count=results.passed_count,
+            failed_count=results.failed_count,
+            errored_count=results.errored_count,
+            has_failures=results.has_failures,
+            has_errors=results.has_errors,
+            has_logs=results.has_logs,
+            is_empty=results.is_empty,
+            total=results.total,
+            running_time=running_time,
+        )

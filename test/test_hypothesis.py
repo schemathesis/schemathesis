@@ -185,7 +185,7 @@ def test_valid_headers(base_url, swagger_20):
     inner()
 
 
-@pytest.mark.parametrize("value, expected", (({"key": "1"}, True), ({"key": 1}, True), ({"key": "\udcff"}, False),))
+@pytest.mark.parametrize("value, expected", (({"key": "1"}, True), ({"key": 1}, True), ({"key": "\udcff"}, False)))
 def test_is_valid_query(value, expected):
     assert is_valid_query(value) == expected
 
