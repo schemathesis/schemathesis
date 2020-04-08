@@ -30,6 +30,9 @@ from .models import Endpoint, empty_object
 from .types import Filter, Hook, NotSet
 from .utils import NOT_SET, GenericResponse, StringDatesYAMLLoader
 
+# Reference resolving will stop after this depth
+RECURSION_DEPTH_LIMIT = 100
+
 
 def load_file_impl(location: str, opener: Callable) -> Dict[str, Any]:
     """Load a schema from the given file."""
@@ -301,7 +304,7 @@ class SwaggerV20(BaseSchema):
     # pylint: disable=function-redefined
     def resolve(self, item: Union[Dict[str, Any], List], recursion_level: int = 0) -> Union[Dict[str, Any], List]:
         """Recursively resolve all references in the given object."""
-        if recursion_level > 100:
+        if recursion_level > RECURSION_DEPTH_LIMIT:
             return item
         if isinstance(item, dict):
             item = self.prepare(item)

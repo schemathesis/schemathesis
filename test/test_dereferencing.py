@@ -65,6 +65,60 @@ def test_resolve(petstore, ref, expected):
     assert petstore.resolve(ref) == expected
 
 
+def test_recursive_reference(mocker):
+    mocker.patch("schemathesis.schemas.RECURSION_DEPTH_LIMIT", 1)
+    reference = {"$ref": "#/components/schemas/Node"}
+    raw_schema = {
+        "info": {"description": "Test", "title": "Test", "version": "1.0.0"},
+        "openapi": "3.0.2",
+        "paths": {
+            "/events": {
+                "get": {
+                    "description": "Test",
+                    "responses": {
+                        "200": {
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Response"}}},
+                            "description": "Test",
+                        },
+                    },
+                    "summary": "Test",
+                }
+            }
+        },
+        "components": {
+            "schemas": {
+                "Response": {
+                    "description": "Test",
+                    "properties": {"data": reference},
+                    "required": ["data"],
+                    "type": "object",
+                },
+                "Node": {
+                    "description": "Test",
+                    "properties": {"children": {"items": reference, "type": "array"}},
+                    "type": "object",
+                },
+            }
+        },
+        "servers": [{"url": "/abc"}],
+    }
+    schema = schemathesis.from_dict(raw_schema)
+    assert schema.resolve(reference) == {
+        "description": "Test",
+        "properties": {
+            "children": {
+                "items": {
+                    "description": "Test",
+                    "properties": {"children": {"items": reference, "type": "array"}},
+                    "type": "object",
+                },
+                "type": "array",
+            }
+        },
+        "type": "object",
+    }
+
+
 def test_simple_dereference(testdir):
     # When a given parameter contains a JSON reference
     testdir.make_test(
