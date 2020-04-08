@@ -3,7 +3,7 @@ default_language_version:
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v2.3.0
+    rev: v2.5.0
     hooks:
       - id: check-yaml
       - id: end-of-file-fixer
@@ -15,22 +15,22 @@ repos:
       - id: check-merge-conflict
 
   - repo: https://github.com/jorisroovers/gitlint
-    rev: v0.12.0
+    rev: v0.13.1
     hooks:
       - id: gitlint
 
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.17.0
+    rev: v1.21.0
     hooks:
       - id: yamllint
 
   - repo: https://github.com/PyCQA/pydocstyle
-    rev: 4.0.1
+    rev: 5.0.2
     hooks:
       - id: pydocstyle
 
   - repo: https://github.com/codingjoe/relint
-    rev: 1.1.0
+    rev: 1.2.1
     hooks:
       - id: relint
 
@@ -41,7 +41,7 @@ repos:
         types: [python]
 
   - repo: https://github.com/asottile/seed-isort-config
-    rev: v1.9.2
+    rev: v2.1.0
     hooks:
       - id: seed-isort-config
 
@@ -52,7 +52,7 @@ repos:
         additional_dependencies: ["isort[pyproject]"]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v0.761
+    rev: v0.770
     hooks:
       - id: mypy
         exclude: ^(docs/|test/).*$
