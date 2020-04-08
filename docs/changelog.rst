@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Response schema check for recursive schemas. `#468`_
+
 Changed
 ~~~~~~~
 
@@ -875,6 +880,7 @@ Fixed
 
 .. _#473: https://github.com/kiwicom/schemathesis/issues/473
 .. _#469: https://github.com/kiwicom/schemathesis/issues/469
+.. _#468: https://github.com/kiwicom/schemathesis/issues/468
 .. _#463: https://github.com/kiwicom/schemathesis/issues/463
 .. _#461: https://github.com/kiwicom/schemathesis/issues/461
 .. _#457: https://github.com/kiwicom/schemathesis/issues/457

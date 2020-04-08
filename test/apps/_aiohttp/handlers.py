@@ -23,6 +23,10 @@ async def teapot(request: web.Request) -> web.Response:
     return web.json_response({"success": True}, status=418)
 
 
+async def recursive(request: web.Request) -> web.Response:
+    return web.json_response({"children": [{"children": [{"children": []}]}]})
+
+
 async def text(request: web.Request) -> web.Response:
     return web.Response(body="Text response", content_type="text/plain")
 

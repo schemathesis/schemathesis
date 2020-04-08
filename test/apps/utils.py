@@ -12,6 +12,7 @@ class Endpoint(Enum):
     unsatisfiable = ("POST", "/api/unsatisfiable")
     invalid = ("POST", "/api/invalid")
     flaky = ("GET", "/api/flaky")
+    recursive = ("GET", "/api/recursive")
     multipart = ("POST", "/api/multipart")
     upload_file = ("POST", "/api/upload_file")
     teapot = ("POST", "/api/teapot")
@@ -42,7 +43,16 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
     for endpoint in endpoints:
         method, path = Endpoint[endpoint].value
         path = path.replace(template["basePath"], "")
-        if endpoint == "payload":
+        reference = {"$ref": "#/definitions/Node"}
+        if endpoint == "recursive":
+            schema = {"responses": {"200": {"description": "OK", "schema": reference}}}
+            definitions = template.setdefault("definitions", {})
+            definitions["Node"] = {
+                "description": "Recursive!",
+                "type": "object",
+                "properties": {"children": {"type": "array", "items": reference}},
+            }
+        elif endpoint == "payload":
             schema = {
                 "parameters": [
                     {
