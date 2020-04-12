@@ -88,7 +88,7 @@ def response_schema_conformance(response: GenericResponse, case: "Case") -> None
     else:
         data = response.json
     try:
-        jsonschema.validate(data, schema, resolver=case.endpoint.schema.resolver)
+        jsonschema.validate(data, schema, cls=jsonschema.Draft4Validator, resolver=case.endpoint.schema.resolver)
     except jsonschema.ValidationError as exc:
         exc_class = get_schema_validation_error(exc)
         raise exc_class(f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}")

@@ -10,6 +10,7 @@ Fixed
 ~~~~~
 
 - Mistakenly applied Open API -> JSON Schema Draft 7 conversion. It should be Draft 4. `#489`_
+- Using wrong validator in ``response_schema_conformance`` check. It should be Draft 4 validator. `#468`_
 
 `1.1.0`_ - 2020-04-08
 ---------------------

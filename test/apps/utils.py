@@ -50,7 +50,10 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
             definitions["Node"] = {
                 "description": "Recursive!",
                 "type": "object",
-                "properties": {"children": {"type": "array", "items": reference}},
+                "properties": {
+                    "children": {"type": "array", "items": reference},
+                    "value": {"type": "integer", "maximum": 4, "exclusiveMaximum": True},
+                },
             }
         elif endpoint == "payload":
             schema = {
