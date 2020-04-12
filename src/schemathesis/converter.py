@@ -3,7 +3,10 @@ from typing import Any, Dict
 
 
 def to_json_schema(schema: Dict[str, Any], nullable_name: str) -> Dict[str, Any]:
-    """Convert Open API parameters to JSON Schema."""
+    """Convert Open API parameters to JSON Schema.
+
+    NOTE. This function is applied to all keywords (including nested) during schema resolving, thus it is not recursive
+    """
     schema = deepcopy(schema)
     if schema.get(nullable_name) is True:
         del schema[nullable_name]
