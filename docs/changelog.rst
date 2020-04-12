@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Mistakenly applied Open API -> JSON Schema Draft 7 conversion. It should be Draft 4. `#489`_
+
 `1.1.0`_ - 2020-04-08
 ---------------------
 
@@ -882,6 +887,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#489: https://github.com/kiwicom/schemathesis/issues/489
 .. _#473: https://github.com/kiwicom/schemathesis/issues/473
 .. _#469: https://github.com/kiwicom/schemathesis/issues/469
 .. _#468: https://github.com/kiwicom/schemathesis/issues/468
