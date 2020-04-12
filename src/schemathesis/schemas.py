@@ -323,7 +323,10 @@ class SwaggerV20(BaseSchema):
         return to_json_schema(item, self.nullable_name)
 
     def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        return definition.get("schema")
+        schema = definition.get("schema")
+        if not schema:
+            return None
+        return to_json_schema(schema, self.nullable_name)
 
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
         produces = endpoint.definition.get("produces", None)
@@ -409,7 +412,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
         if option:
-            return option["schema"]
+            return to_json_schema(option["schema"], self.nullable_name)
         return None
 
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
