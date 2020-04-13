@@ -62,7 +62,6 @@ class BaseRunner:
 
 
 def run_test(
-    schema: BaseSchema,
     endpoint: Endpoint,
     test: Union[Callable, InvalidSchema],
     checks: Iterable[CheckFunction],
