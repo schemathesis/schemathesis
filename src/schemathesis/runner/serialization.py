@@ -80,6 +80,7 @@ class SerializedTestResult:
     checks: List[SerializedCheck] = attr.ib()  # pragma: no mutate
     logs: List[str] = attr.ib()  # pragma: no mutate
     errors: List[SerializedError] = attr.ib()  # pragma: no mutate
+    dep_results: List = attr.ib(factory=list)  # pragma: no mutate
 
     @classmethod
     def from_test_result(cls, result: TestResult) -> "SerializedTestResult":
@@ -95,4 +96,5 @@ class SerializedTestResult:
             checks=[SerializedCheck.from_check(check) for check in result.checks],
             logs=[formatter.format(record) for record in result.logs],
             errors=[SerializedError.from_error(*error) for error in result.errors],
+            dep_results=[cls.from_test_result(result) for result in result.dep_results],
         )

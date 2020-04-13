@@ -90,13 +90,24 @@ class SchemathesisCase(PyCollector):
 
     def _make_test(self, endpoint: Endpoint) -> Callable:
         try:
-            return create_test(endpoint, self.test_function)
+            return create_test(endpoint, self.test_function, stateful=self.schemathesis_case.stateful)
         except InvalidSchema:
             return lambda: pytest.fail("Invalid schema for endpoint")
 
     def collect(self) -> List[Function]:  # type: ignore
         """Generate different test items for all endpoints available in the given schema."""
-        try:
+        try:  # pylint: disable=too-many-nested-blocks
+            if self.schemathesis_case.stateful:
+                items = []
+                for endpoint in self.schemathesis_case.get_all_endpoints():
+                    for dependencies in endpoint.dependencies.values():
+                        if dependencies:
+                            for dependent_endpoint in self.schemathesis_case.sort_by_requirements(dependencies):
+                                for item in self._gen_items(dependent_endpoint):
+                                    items.append(item)
+                    for item in self._gen_items(endpoint):
+                        items.append(item)
+                return items
             return [
                 item for endpoint in self.schemathesis_case.get_all_endpoints() for item in self._gen_items(endpoint)
             ]

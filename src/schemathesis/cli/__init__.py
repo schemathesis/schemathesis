@@ -144,6 +144,9 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     type=click.Choice([item.name for item in hypothesis.Verbosity]),
     callback=callbacks.convert_verbosity,
 )
+@click.option(
+    "--stateful", help="Create tests chaining endpoint's dependencies.", type=bool, default=False, is_flag=True,
+)
 def run(  # pylint: disable=too-many-arguments
     schema: str,
     auth: Optional[Tuple[str, str]],
@@ -168,6 +171,7 @@ def run(  # pylint: disable=too-many-arguments
     hypothesis_suppress_health_check: Optional[List[hypothesis.HealthCheck]] = None,
     hypothesis_seed: Optional[int] = None,
     hypothesis_verbosity: Optional[hypothesis.Verbosity] = None,
+    stateful: bool = False,
 ) -> None:
     """Perform schemathesis test against an API specified by SCHEMA.
 
@@ -196,6 +200,7 @@ def run(  # pylint: disable=too-many-arguments
         checks=selected_checks,
         workers_num=workers_num,
         validate_schema=validate_schema,
+        stateful=stateful,
         hypothesis_deadline=hypothesis_deadline,
         hypothesis_derandomize=hypothesis_derandomize,
         hypothesis_max_examples=hypothesis_max_examples,

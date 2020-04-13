@@ -23,14 +23,15 @@ def _run_task(
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
+    stateful: bool,
     **kwargs: Any,
 ) -> None:
     # pylint: disable=too-many-arguments
     with capture_hypothesis_output():
         while not tasks_queue.empty():
             endpoint = tasks_queue.get()
-            test = make_test_or_exception(endpoint, test_template, settings, seed)
-            for event in run_test(endpoint, test, checks, results, **kwargs):
+            test = make_test_or_exception(endpoint, test_template, settings, seed, stateful=stateful)
+            for event in run_test(endpoint, test, checks, results, stateful=stateful, **kwargs):
                 events_queue.put(event)
 
 
@@ -44,6 +45,7 @@ def thread_task(
     headers: Optional[Dict[str, Any]],
     seed: Optional[int],
     results: TestResultSet,
+    stateful: bool,
     kwargs: Any,
 ) -> None:
     """A single task, that threads do.
@@ -53,7 +55,18 @@ def thread_task(
     # pylint: disable=too-many-arguments
     prepared_auth = get_requests_auth(auth, auth_type)
     with get_session(prepared_auth, headers) as session:
-        _run_task(network_test, tasks_queue, events_queue, checks, settings, seed, results, session=session, **kwargs)
+        _run_task(
+            network_test,
+            tasks_queue,
+            events_queue,
+            checks,
+            settings,
+            seed,
+            results,
+            stateful,
+            session=session,
+            **kwargs,
+        )
 
 
 def wsgi_thread_task(
@@ -63,10 +76,11 @@ def wsgi_thread_task(
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
+    stateful: bool,
     kwargs: Any,
 ) -> None:
     # pylint: disable=too-many-arguments
-    _run_task(wsgi_test, tasks_queue, events_queue, checks, settings, seed, results, **kwargs)
+    _run_task(wsgi_test, tasks_queue, events_queue, checks, settings, seed, results, stateful, **kwargs)
 
 
 def stop_worker(thread_id: int) -> None:
@@ -148,6 +162,7 @@ class ThreadPoolRunner(BaseRunner):
             "headers": self.headers,
             "seed": self.seed,
             "results": results,
+            "stateful": False,  # Parameter is needed for `network_test`, can not run stateful tests in threads
             "kwargs": {"request_timeout": self.request_timeout},
         }
 
@@ -164,6 +179,7 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
             "settings": self.hypothesis_settings,
             "seed": self.seed,
             "results": results,
+            "stateful": False,  # Parameter is needed for `network_test`, can not run stateful tests in threads
             "kwargs": {"auth": self.auth, "auth_type": self.auth_type, "headers": self.headers},
         }
 

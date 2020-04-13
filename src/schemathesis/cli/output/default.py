@@ -138,20 +138,31 @@ def display_failures(context: ExecutionContext, event: events.Finished) -> None:
     if not relevant_results:
         return
     display_section_name("FAILURES")
+    relevant_results = sorted(relevant_results, key=lambda x: bool(x.dep_results), reverse=True)
+    seen = []
     for result in relevant_results:
         if not result.has_failures:
             continue
-        display_failures_for_single_test(result)
+        unique_checks = _get_unique_failures(result.checks)
+        if (result.path, result.method, unique_checks) not in seen:
+            display_failures_for_single_test(result, unique_checks)
+            seen.append((result.path, result.method, unique_checks))
 
 
-def display_failures_for_single_test(result: SerializedTestResult) -> None:
+def display_failures_for_single_test(result: SerializedTestResult, checks: List[SerializedCheck]) -> None:
     """Display a failure for a single method / endpoint."""
     display_subsection(result)
-    checks = _get_unique_failures(result.checks)
     for idx, check in enumerate(checks, 1):
         message: Optional[str]
+        prev_endpoints: str = ""
+        if result.dep_results:
+            prev_endpoints = "Previous endpoints:"
+            for id_dep, res in enumerate(reversed(result.dep_results), 1):
+                prev_endpoints += f"\n\t{id_dep}. {res.method}: {res.path}"
         if check.message:
             message = f"{idx}. {check.message}"
+            if prev_endpoints:
+                message += f"\n\n{prev_endpoints}"
         else:
             message = None
         example = cast(SerializedCase, check.example)  # filtered in `_get_unique_failures`

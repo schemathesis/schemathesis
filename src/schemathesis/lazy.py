@@ -13,6 +13,7 @@ from .types import Filter, NotSet
 from .utils import NOT_SET
 
 
+# pylint: disable=too-many-arguments
 @attr.s(slots=True)  # pragma: no mutate
 class LazySchema:
     fixture_name: str = attr.ib()  # pragma: no mutate
@@ -20,6 +21,7 @@ class LazySchema:
     endpoint: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
     tag: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
+    stateful: bool = attr.ib(default=False)  # pragma: no mutate
 
     def parametrize(
         self,
@@ -27,6 +29,7 @@ class LazySchema:
         endpoint: Optional[Filter] = NOT_SET,
         tag: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
+        stateful: Union[bool, NotSet] = NOT_SET,
     ) -> Callable:
         if method is NOT_SET:
             method = self.method
@@ -34,11 +37,13 @@ class LazySchema:
             endpoint = self.endpoint
         if tag is NOT_SET:
             tag = self.tag
+        if stateful is NOT_SET:
+            stateful = self.stateful
 
         def wrapper(func: Callable) -> Callable:
             def test(request: FixtureRequest, subtests: SubTests) -> None:
                 """The actual test, which is executed by pytest."""
-                schema = get_schema(request, self.fixture_name, method, endpoint, tag, validate_schema)
+                schema = get_schema(request, self.fixture_name, method, endpoint, tag, validate_schema, stateful)
                 fixtures = get_fixtures(func, request)
                 # Changing the node id is required for better reporting - the method and endpoint will appear there
                 node_id = subtests.item._nodeid
@@ -87,13 +92,14 @@ def get_schema(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     validate_schema: Union[bool, NotSet] = NOT_SET,
+    stateful: Union[bool, NotSet] = NOT_SET,
 ) -> BaseSchema:
     """Loads a schema from the fixture."""
     # pylint: disable=too-many-arguments
     schema = request.getfixturevalue(name)
     if not isinstance(schema, BaseSchema):
         raise ValueError(f"The given schema must be an instance of BaseSchema, got: {type(schema)}")
-    return schema.clone(method=method, endpoint=endpoint, tag=tag, validate_schema=validate_schema)
+    return schema.clone(method=method, endpoint=endpoint, tag=tag, validate_schema=validate_schema, stateful=stateful)
 
 
 def get_fixtures(func: Callable, request: FixtureRequest) -> Dict[str, Any]:

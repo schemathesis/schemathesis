@@ -15,7 +15,7 @@ from .exceptions import HTTPError
 from .lazy import LazySchema
 from .schemas import BaseSchema, OpenApi30, SwaggerV20
 from .types import Filter, PathLike
-from .utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, get_base_url
+from .utils import NOT_SET, NotSet, StringDatesYAMLLoader, WSGIResponse, get_base_url
 
 
 def from_path(
@@ -27,6 +27,7 @@ def from_path(
     *,
     app: Any = None,
     validate_schema: bool = True,
+    stateful: bool = False,
 ) -> BaseSchema:
     """Load a file from OS path and parse to schema instance."""
     with open(path) as fd:
@@ -39,6 +40,7 @@ def from_path(
             tag=tag,
             app=app,
             validate_schema=validate_schema,
+            stateful=stateful,
         )
 
 
@@ -51,6 +53,7 @@ def from_uri(
     *,
     app: Any = None,
     validate_schema: bool = True,
+    stateful: bool = False,
     **kwargs: Any,
 ) -> BaseSchema:
     """Load a remote resource and parse to schema instance."""
@@ -71,6 +74,7 @@ def from_uri(
         tag=tag,
         app=app,
         validate_schema=validate_schema,
+        stateful=stateful,
     )
 
 
@@ -84,6 +88,7 @@ def from_file(
     *,
     app: Any = None,
     validate_schema: bool = True,
+    stateful: bool = False,
     **kwargs: Any,  # needed in runner to have compatible API across all loaders
 ) -> BaseSchema:
     """Load a file content and parse to schema instance.
@@ -100,6 +105,7 @@ def from_file(
         tag=tag,
         app=app,
         validate_schema=validate_schema,
+        stateful=stateful,
     )
 
 
@@ -113,6 +119,7 @@ def from_dict(
     *,
     app: Any = None,
     validate_schema: bool = True,
+    stateful: bool = False,
 ) -> BaseSchema:
     """Get a proper abstraction for the given raw schema."""
     if "swagger" in raw_schema:
@@ -126,6 +133,7 @@ def from_dict(
             tag=tag,
             app=app,
             validate_schema=validate_schema,
+            stateful=stateful,
         )
 
     if "openapi" in raw_schema:
@@ -139,6 +147,7 @@ def from_dict(
             tag=tag,
             app=app,
             validate_schema=validate_schema,
+            stateful=stateful,
         )
     raise ValueError("Unsupported schema type")
 
@@ -156,9 +165,10 @@ def from_pytest_fixture(
     method: Optional[Filter] = NOT_SET,
     endpoint: Optional[Filter] = NOT_SET,
     tag: Optional[Filter] = NOT_SET,
+    stateful: Union[bool, NotSet] = NOT_SET,
 ) -> LazySchema:
     """Needed for a consistent library API."""
-    return LazySchema(fixture_name, method=method, endpoint=endpoint, tag=tag)
+    return LazySchema(fixture_name, method=method, endpoint=endpoint, tag=tag, stateful=stateful)  # type: ignore
 
 
 def from_wsgi(
@@ -169,6 +179,7 @@ def from_wsgi(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     validate_schema: bool = True,
+    stateful: bool = False,
     **kwargs: Any,
 ) -> BaseSchema:
     kwargs.setdefault("headers", {}).setdefault("User-Agent", USER_AGENT)
@@ -187,6 +198,7 @@ def from_wsgi(
         tag=tag,
         app=app,
         validate_schema=validate_schema,
+        stateful=stateful,
     )
 
 
@@ -205,6 +217,7 @@ def from_aiohttp(
     tag: Optional[Filter] = None,
     *,
     validate_schema: bool = True,
+    stateful: bool = False,
     **kwargs: Any,
 ) -> BaseSchema:
     from .extra._aiohttp import run_server  # pylint: disable=import-outside-toplevel
@@ -215,5 +228,12 @@ def from_aiohttp(
     if not base_url:
         base_url = app_url
     return from_uri(
-        url, base_url=base_url, method=method, endpoint=endpoint, tag=tag, validate_schema=validate_schema, **kwargs
+        url,
+        base_url=base_url,
+        method=method,
+        endpoint=endpoint,
+        tag=tag,
+        validate_schema=validate_schema,
+        stateful=stateful,
+        **kwargs,
     )

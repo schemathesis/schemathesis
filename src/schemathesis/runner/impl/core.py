@@ -1,6 +1,7 @@
 import logging
 import time
 from contextlib import contextmanager
+from json import JSONDecodeError
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Union
 
 import attr
@@ -15,9 +16,11 @@ from ...models import Case, CheckFunction, Endpoint, Status, TestResult, TestRes
 from ...runner import events
 from ...schemas import BaseSchema
 from ...types import RawAuth
-from ...utils import GenericResponse, capture_hypothesis_output
+from ...utils import GenericResponse, capture_hypothesis_output, json_traverse
 
 DEFAULT_DEADLINE = 500  # pragma: no mutate
+MAX_REQUIREMENTS = 5  # pragma: no mutate
+MAX_SUBSEQUENT_404 = 5  # pragma: no mutate
 
 
 def get_hypothesis_settings(hypothesis_options: Dict[str, Any]) -> hypothesis.settings:
@@ -112,6 +115,11 @@ def run_test(
     result.seed = getattr(test, "_hypothesis_internal_use_seed", None) or getattr(
         test, "_hypothesis_internal_use_generated_seed", None
     )
+    # Add results from dependencies
+    for res in reversed(results.results):
+        if not res.endpoint.is_dependency:
+            break
+        result.dep_results.append(res)
     results.append(result)
     yield events.AfterExecution.from_result(result=result, status=status, hypothesis_output=hypothesis_output)
 
@@ -132,18 +140,74 @@ def run_checks(case: Case, checks: Iterable[CheckFunction], result: TestResult, 
         raise get_grouped_exception(*errors)
 
 
+# pylint: disable=too-many-branches
+def update_state(case: Case, response: GenericResponse, result: Optional[TestResult] = None) -> None:
+    requirements = case.endpoint.schema.state.requirements
+    if result:
+        result.status_code = response.status_code
+        case.endpoint.schema.state.prev_result = result
+    if not requirements:
+        return
+    if (response.status_code - 200) < 100:
+        try:
+            for key, value in json_traverse(response.json()):
+                if value and key in requirements:
+                    if value in requirements[key].values:
+                        continue
+                    if len(requirements[key]) > MAX_REQUIREMENTS:
+                        requirements[key].values = requirements[key].values[-(MAX_REQUIREMENTS // 2) :]
+                    if value is list:
+                        requirements[key].extend(value)
+                    else:
+                        requirements[key].append(value)
+            if case.endpoint.is_dependency:
+                for req in case.endpoint.requirements:
+                    if requirements[req].is_fuzzable:
+                        requirements[req].confidence //= 2
+        except JSONDecodeError:
+            pass
+    if response.status_code == 404 and case.endpoint.is_dependency:
+        for req in case.endpoint.requirements:
+            if requirements[req].is_fuzzable:
+                requirements[req].confidence += 5
+                requirements[req].confidence *= 2
+
+
+def _should_skip_case(case: Case) -> bool:
+    state = case.endpoint.schema.state
+    prev_result = state.prev_result
+    if (
+        prev_result
+        and prev_result.status_code == 404
+        and case.endpoint.is_dependency
+        and prev_result.endpoint.path == case.endpoint.path
+        and prev_result.endpoint.method == case.endpoint.method
+    ):
+        state.subsequent_404s += 1
+        if state.subsequent_404s > MAX_SUBSEQUENT_404:
+            prev_result.endpoint.path = case.endpoint.path
+            prev_result.endpoint.method = case.endpoint.method
+            return True
+    return False
+
+
 def network_test(
     case: Case,
     checks: Iterable[CheckFunction],
     result: TestResult,
     session: requests.Session,
     request_timeout: Optional[int],
+    stateful: bool,
 ) -> None:
     """A single test body that will be executed against the target."""
     # pylint: disable=too-many-arguments
+    if stateful and _should_skip_case(case):
+        return
     timeout = prepare_timeout(request_timeout)
     response = case.call(session=session, timeout=timeout)
     run_checks(case, checks, result, response)
+    if stateful:
+        update_state(case, response, result)
 
 
 @contextmanager
@@ -174,13 +238,18 @@ def wsgi_test(
     auth: Optional[RawAuth],
     auth_type: Optional[str],
     headers: Optional[Dict[str, Any]],
+    stateful: bool,
 ) -> None:
     # pylint: disable=too-many-arguments
+    if stateful and _should_skip_case(case):
+        return
     headers = _prepare_wsgi_headers(headers, auth, auth_type)
     with catching_logs(LogCaptureHandler(), level=logging.DEBUG) as recorded:
         response = case.call_wsgi(headers=headers)
     result.logs.extend(recorded.records)
     run_checks(case, checks, result, response)
+    if stateful:
+        update_state(case, response, result)
 
 
 def _prepare_wsgi_headers(

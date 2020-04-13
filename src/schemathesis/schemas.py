@@ -26,7 +26,7 @@ from .constants import HookLocation
 from .converter import to_json_schema
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
-from .models import Endpoint, empty_object
+from .models import Endpoint, Requirement, State, empty_object
 from .types import Filter, Hook, NotSet
 from .utils import NOT_SET, GenericResponse, StringDatesYAMLLoader
 
@@ -65,6 +65,12 @@ class BaseSchema(Mapping):
     app: Any = attr.ib(default=None)  # pragma: no mutate
     hooks: Dict[HookLocation, Hook] = attr.ib(factory=dict)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
+    stateful: bool = attr.ib(default=False)  # pragma: no mutate
+    state: State = attr.ib()  # pragma: no mutate
+
+    @state.default
+    def _init_with_requirements(self) -> State:
+        return State(requirements={x: Requirement(fuzz=True) for x in self.get_all_requirements()})
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.endpoints)
@@ -104,39 +110,74 @@ class BaseSchema(Mapping):
     def endpoints_count(self) -> int:
         return len(list(self.get_all_endpoints()))
 
-    def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
+    def get_all_endpoints(self, filtered: bool = True) -> Generator[Endpoint, None, None]:
         raise NotImplementedError
 
+    def get_all_requirements(self) -> List[str]:
+        return [req for endpoint in self.get_all_endpoints() for req in endpoint.requirements]
+
+    def sort_by_requirements(self, endpoint_list: List[Endpoint]) -> List[Endpoint]:
+        if not endpoint_list:
+            return []
+        return sorted(endpoint_list, key=lambda x: (len(x.requirements), -x.dependency_count))
+
+    def _all_stateful_tests(
+        self, endpoint: Endpoint, func: Callable, settings: Optional[hypothesis.settings], seed: Optional[int]
+    ) -> Generator[Tuple[Endpoint, Union[Callable, InvalidSchema]], None, None]:
+        seen = set()
+        for dependencies in endpoint.dependencies.values():
+            dependencies.extend(endpoint.same_requirements)
+            for dep_endpoint in self.sort_by_requirements(dependencies):
+                if (dep_endpoint.path, dep_endpoint.method) in seen:
+                    continue
+                dep_endpoint.is_dependency = True
+                test = make_test_or_exception(dep_endpoint, func, settings, seed, self.stateful)
+                yield dep_endpoint, test
+                seen.add((dep_endpoint.path, dep_endpoint.method))
+        endpoint.is_dependency = False
+        test = make_test_or_exception(endpoint, func, settings, seed, self.stateful)
+        yield endpoint, test
+
     def get_all_tests(
-        self, func: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
+        self, func: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None,
     ) -> Generator[Tuple[Endpoint, Union[Callable, InvalidSchema]], None, None]:
         """Generate all endpoints and Hypothesis tests for them."""
         test: Union[Callable, InvalidSchema]
+        # pylint: disable=too-many-nested-blocks
         for endpoint in self.get_all_endpoints():
+            endpoint.is_dependency = False
             test = make_test_or_exception(endpoint, func, settings, seed)
             yield endpoint, test
+            if self.stateful:
+                yield from self._all_stateful_tests(endpoint, func, settings, seed)
 
+    # pylint: disable=too-many-arguments
     def parametrize(
         self,
         method: Optional[Filter] = NOT_SET,
         endpoint: Optional[Filter] = NOT_SET,
         tag: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
+        stateful: Union[bool, NotSet] = NOT_SET,
+        state: Union[State, NotSet] = NOT_SET,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
 
         def wrapper(func: Callable) -> Callable:
-            func._schemathesis_test = self.clone(method, endpoint, tag, validate_schema)  # type: ignore
+            func._schemathesis_test = self.clone(method, endpoint, tag, validate_schema, stateful, state)  # type: ignore
             return func
 
         return wrapper
 
+    # pylint: disable=too-many-arguments
     def clone(
         self,
         method: Optional[Filter] = NOT_SET,
         endpoint: Optional[Filter] = NOT_SET,
         tag: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
+        stateful: Union[bool, NotSet] = NOT_SET,
+        state: Union[State, NotSet] = NOT_SET,
     ) -> "BaseSchema":
         if method is NOT_SET:
             method = self.method
@@ -146,6 +187,10 @@ class BaseSchema(Mapping):
             tag = self.tag
         if validate_schema is NOT_SET:
             validate_schema = self.validate_schema
+        if stateful is NOT_SET:
+            stateful = self.stateful
+        if state is NOT_SET:
+            state = self.state
 
         return self.__class__(
             self.raw_schema,
@@ -157,6 +202,8 @@ class BaseSchema(Mapping):
             app=self.app,
             hooks=self.hooks,
             validate_schema=validate_schema,  # type: ignore
+            stateful=stateful,  # type: ignore
+            state=state,  # type: ignore
         )
 
     def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -219,18 +266,18 @@ class SwaggerV20(BaseSchema):
         """Compute full path for the given path."""
         return urljoin(self.base_path, path.lstrip("/"))  # pragma: no mutate
 
-    def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
+    def get_all_endpoints(self, filtered: bool = True) -> Generator[Endpoint, None, None]:
         try:
             paths = self.raw_schema["paths"]  # pylint: disable=unsubscriptable-object
             for path, methods in paths.items():
                 full_path = self.get_full_path(path)
-                if should_skip_endpoint(full_path, self.endpoint):
+                if filtered and should_skip_endpoint(full_path, self.endpoint):
                     continue
                 methods = self.resolve(methods)
                 common_parameters = get_common_parameters(methods)
                 for method, definition in methods.items():
                     # Only method definitions are parsed
-                    if (
+                    if filtered and (
                         method not in self.operations
                         or should_skip_method(method, self.method)
                         or should_skip_by_tag(definition.get("tags"), self.tag)
@@ -276,6 +323,7 @@ class SwaggerV20(BaseSchema):
 
     def process_path(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         endpoint.path_parameters = self.add_parameter(endpoint.path_parameters, parameter)
+        endpoint.modified_path_parameters = deepcopy(endpoint.path_parameters)
 
     def process_header(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         endpoint.headers = self.add_parameter(endpoint.headers, parameter)
@@ -286,6 +334,7 @@ class SwaggerV20(BaseSchema):
     def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         # "schema" is a required field
         endpoint.body = parameter["schema"]
+        endpoint.modified_body = deepcopy(endpoint.body)
 
     def process_form_data(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         endpoint.form_data = self.add_parameter(endpoint.form_data, parameter)
@@ -346,7 +395,8 @@ class SwaggerV20(BaseSchema):
         return to_json_schema(item, self.nullable_name)
 
     def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        schema = definition.get("schema")
+        response_200 = definition.get("responses", {}).get("200", {})
+        schema = definition.get("schema") or response_200.get("schema")
         if not schema:
             return None
         return to_json_schema(schema, self.nullable_name)
@@ -420,8 +470,8 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#media-type-object
         # > Furthermore, if referencing a schema which contains an example,
         # > the example value SHALL override the example provided by the schema
-        if "example" in parameter:
-            parameter["schema"]["example"] = parameter["example"]
+        if "example" in parameter or "x-example" in parameter:
+            parameter["schema"]["example"] = parameter.get("example") or parameter.get("x-example")
         super().process_body(endpoint, parameter)
 
     def parameter_to_json_schema(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -429,7 +479,8 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         return super().parameter_to_json_schema(data["schema"])
 
     def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        options = iter(definition.get("content", {}).values())
+        response_200 = definition.get("responses", {}).get("200", {})
+        options = iter((definition.get("content", {}) or response_200.get("content", {})).values())
         option = next(options, None)
         if option:
             return to_json_schema(option["schema"], self.nullable_name)

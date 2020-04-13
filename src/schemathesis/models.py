@@ -1,9 +1,10 @@
 # pylint: disable=too-many-instance-attributes
 from collections import Counter
 from contextlib import contextmanager
+from copy import deepcopy
 from enum import IntEnum
 from logging import LogRecord
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, Iterator, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, Iterator, List, Optional, Set, Tuple, Union
 from urllib.parse import urljoin
 
 import attr
@@ -14,10 +15,13 @@ from hypothesis.strategies import SearchStrategy
 from .checks import ALL_CHECKS
 from .exceptions import InvalidSchema
 from .types import Body, Cookies, FormData, Headers, Hook, PathParameters, Query
-from .utils import GenericResponse, WSGIResponse
+from .utils import GenericResponse, WSGIResponse, json_traverse
 
 if TYPE_CHECKING:
     from .schemas import BaseSchema
+
+RESPONSE_COMMON_KEYS = ("additionalProperties", "type", "items")
+CONFIDENCE_THRESHOLD = 70
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -230,6 +234,17 @@ class Endpoint:
     query: Optional[Query] = attr.ib(default=None)  # pragma: no mutate
     body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
     form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
+    is_dependency: bool = attr.ib(default=False, eq=False)  # pragma: no mutate
+    modified_path_parameters: Optional[PathParameters] = attr.ib()  # pragma: no mutate
+    modified_body: Optional[Body] = attr.ib()  # pragma: no mutate
+
+    @modified_path_parameters.default
+    def _copy_path_parameters(self) -> Optional[PathParameters]:
+        return deepcopy(self.path_parameters)
+
+    @modified_body.default
+    def _copy_body(self) -> Optional[Body]:
+        return deepcopy(self.body)
 
     def as_strategy(self, hooks: Optional[Dict[str, Hook]] = None) -> SearchStrategy:
         from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel
@@ -239,6 +254,52 @@ class Endpoint:
     def get_content_types(self, response: GenericResponse) -> List[str]:
         """Content types available for this endpoint."""
         return self.schema.get_content_types(self, response)
+
+    def _get_response_params(self) -> Set[str]:
+        """Parameters in response."""
+        response_schema = self.schema._get_response_schema(self.definition)
+        if response_schema:
+            return {key for key, _ in json_traverse(response_schema) if key not in RESPONSE_COMMON_KEYS}
+        return set()
+
+    @property
+    def requirements(self) -> Set[str]:
+        path_or_body = (self.body if self.body else self.path_parameters) or {}
+        if isinstance(path_or_body, bytes):
+            return set()
+        return set(path_or_body.get("required", []))
+
+    @property
+    def same_requirements(self) -> List[Any]:
+        """List of endpoints having subset of `self.requirements`."""
+        same = []
+        for endpoint in self.schema.get_all_endpoints(filtered=False):
+            if (
+                endpoint.path != self.path
+                and endpoint.method != self.method
+                and self.requirements.intersection(endpoint.requirements)
+            ):
+                same.append(endpoint)
+        return same
+
+    @property
+    def dependencies(self) -> Dict[str, List]:
+        """Dictionary of required values and list of Endpoints providing required input parameters."""
+        dependencies: Dict[str, List] = {req: [] for req in self.requirements}
+        if not dependencies:
+            return {}
+        for endpoint in self.schema.get_all_endpoints(filtered=False):
+            if endpoint.path == self.path and endpoint.method == self.method:
+                continue
+            for param in endpoint._get_response_params():
+                if param in dependencies:
+                    dependencies[param].append(endpoint)
+        return dependencies
+
+    @property
+    def dependency_count(self) -> int:
+        """Number of dependencies."""
+        return len([x for dep in self.dependencies.values() for x in dep])
 
 
 class Status(IntEnum):
@@ -269,6 +330,9 @@ class TestResult:
     logs: List[LogRecord] = attr.ib(factory=list)  # pragma: no mutate
     is_errored: bool = attr.ib(default=False)  # pragma: no mutate
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
+    json: Optional[dict] = attr.ib(default={})  # pragma: no mutate
+    status_code: Optional[int] = attr.ib(default=None)  # pragma: no mutate
+    dep_results: List = attr.ib(factory=list)  # pragma: no mutate
 
     def mark_errored(self) -> None:
         self.is_errored = True
@@ -356,6 +420,52 @@ class TestResultSet:
     def append(self, item: TestResult) -> None:
         """Add a new item to the results list."""
         self.results.append(item)
+
+    @property
+    def last(self) -> Union[TestResult, None]:
+        if self.results:
+            return self.results[-1]
+        return None
+
+
+@attr.s
+class Requirement:
+    confidence: int = attr.ib(default=0)  # pragma: no mutate
+    values: List[Any] = attr.ib(factory=list)  # pragma: no mutate
+    fuzz: Optional[bool] = attr.ib(default=False)  # pragma: no mutate
+
+    @property
+    def is_fuzzable(self) -> bool:
+        """Fuzzability of a requirement based on its confidence as a requirement.
+
+        Don't fuzz even if `self.fuzz == True` if it causes 404s
+        example:
+            `id` parameter in the body is a requirement with confidence = 100
+            invalid `id` returns 404
+            other parameter in the body may be fuzzable, it won't cause 404
+
+        """
+        if self.fuzz:
+            return self.confidence < CONFIDENCE_THRESHOLD
+        return False
+
+    def append(self, value: List) -> None:
+        """Append value to Requirement.values list."""
+        self.values.append(value)
+
+    def extend(self, value: List) -> None:
+        """Extend Requirement.values."""
+        self.values.extend(value)
+
+    def __len__(self) -> int:
+        return len(self.values)
+
+
+@attr.s
+class State:
+    prev_result: Optional[TestResult] = attr.ib(default=None)  # pragma: no mutate
+    requirements: Optional[Dict[str, Requirement]] = attr.ib(default=None)  # pragma: no mutate
+    subsequent_404s: int = attr.ib(default=0)  # pragma: no mutate
 
 
 CheckFunction = Callable[[GenericResponse, Case], None]  # pragma: no mutate

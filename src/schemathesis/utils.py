@@ -4,6 +4,7 @@ import re
 import sys
 import traceback
 from contextlib import contextmanager
+from json import JSONDecodeError
 from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Type, Union
 from urllib.parse import urlsplit, urlunsplit
 
@@ -81,6 +82,28 @@ def dict_true_values(**kwargs: Any) -> Dict[str, Any]:
 
 def dict_not_none_values(**kwargs: Any) -> Dict[str, Any]:
     return {key: value for key, value in kwargs.items() if value is not None}
+
+
+def json_traverse(json: Dict[str, Any]) -> Generator[Tuple[str, Any], None, None]:
+    if not isinstance(json, dict):
+        raise JSONDecodeError
+
+    def _list_traverse(key: str, array: List) -> Generator[Tuple[str, Any], None, None]:
+        for x in array:
+            if isinstance(x, dict):
+                yield from json_traverse(x)
+            else:
+                yield (key, array)
+
+    for key, value in json.items():
+        if isinstance(value, list):
+            yield (key, value)
+            yield from _list_traverse(key, value)
+        if isinstance(value, dict):
+            yield (key, value)
+            yield from json_traverse(value)
+        else:
+            yield (key, value)
 
 
 IGNORED_PATTERNS = (
