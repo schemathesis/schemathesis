@@ -45,7 +45,7 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> Flask:
 
     @app.route("/api/payload", methods=["POST"])
     def payload():
-        return jsonify({"success": request.json})
+        return jsonify(request.json)
 
     @app.route("/api/failure", methods=["GET"])
     def failure():

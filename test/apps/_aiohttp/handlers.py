@@ -8,7 +8,7 @@ async def success(request: web.Request) -> web.Response:
 
 
 async def payload(request: web.Request) -> web.Response:
-    return web.json_response({"success": await request.json()})
+    return web.json_response(await request.json())
 
 
 async def invalid_response(request: web.Request) -> web.Response:
