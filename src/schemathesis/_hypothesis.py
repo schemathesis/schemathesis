@@ -22,10 +22,11 @@ SLASH = "/"
 
 
 def create_test(
-    endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
+    endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None,
 ) -> Callable:
     """Create a Hypothesis test."""
-    strategy = endpoint.as_strategy()
+    hooks = getattr(test, "_schemathesis_hooks", None)
+    strategy = endpoint.as_strategy(hooks=hooks)
     wrapped_test = hypothesis.given(case=strategy)(test)
     if seed is not None:
         wrapped_test = hypothesis.seed(seed)(wrapped_test)
@@ -119,7 +120,7 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
     return True
 
 
-def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
+def get_case_strategy(endpoint: Endpoint, hooks: Optional[Dict[str, Hook]] = None) -> st.SearchStrategy:
     """Create a strategy for a complete test case.
 
     Path & endpoint are static, the others are JSON schemas.
@@ -142,7 +143,7 @@ def get_case_strategy(endpoint: Endpoint) -> st.SearchStrategy:
                     strategies[parameter] = from_schema(value)  # type: ignore
             else:
                 static_kwargs[parameter] = None
-        return _get_case_strategy(endpoint, static_kwargs, strategies)
+        return _get_case_strategy(endpoint, static_kwargs, strategies, hooks)
     except AssertionError:
         raise InvalidSchema("Invalid schema for this endpoint")
 
@@ -175,7 +176,10 @@ def quote_all(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _get_case_strategy(
-    endpoint: Endpoint, extra_static_parameters: Dict[str, Any], strategies: Dict[str, st.SearchStrategy]
+    endpoint: Endpoint,
+    extra_static_parameters: Dict[str, Any],
+    strategies: Dict[str, st.SearchStrategy],
+    hooks: Optional[Dict[str, Hook]] = None,
 ) -> st.SearchStrategy:
     static_parameters: Dict[str, Any] = {"endpoint": endpoint, **extra_static_parameters}
     if endpoint.schema.validate_schema and endpoint.method == "GET":
@@ -185,6 +189,8 @@ def _get_case_strategy(
         strategies.pop("body", None)
     _apply_hooks(strategies, get_hook)
     _apply_hooks(strategies, endpoint.schema.get_hook)
+    if hooks is not None:
+        _apply_hooks(strategies, hooks.get)
     return st.builds(partial(Case, **static_parameters), **strategies)
 
 
