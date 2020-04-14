@@ -56,21 +56,30 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
                 },
             }
         elif endpoint == "payload":
-            schema = {
-                "parameters": [
-                    {
-                        "name": "body",
-                        "in": "body",
-                        "required": True,
-                        "schema": {
-                            "type": "object",
-                            "properties": {"name": {"type": "string"}},
-                            "required": ["name"],
-                            "example": {"name": "John"},
+            payload = {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "age": {"type": "integer", "minimum": 0, "exclusiveMinimum": True},
+                    "boolean": {"type": "boolean"},
+                    "nested": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": True,
+                            "maximum": 10,
+                            "exclusiveMaximum": True,
                         },
-                    }
-                ],
-                "responses": {"200": {"description": "OK"}},
+                    },
+                },
+                "required": ["name"],
+                "example": {"name": "John"},
+                "additionalProperties": False,
+            }
+            schema = {
+                "parameters": [{"name": "body", "in": "body", "required": True, "schema": payload,}],
+                "responses": {"200": {"description": "OK", "schema": payload}},
             }
         elif endpoint == "unsatisfiable":
             schema = {
