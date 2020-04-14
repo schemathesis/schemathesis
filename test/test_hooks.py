@@ -67,6 +67,80 @@ def test_hooks_combination(schema, schema_url):
     test()
 
 
+SIMPLE_SCHEMA = {
+    "openapi": "3.0.2",
+    "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+    "paths": {
+        "/query": {
+            "get": {
+                "parameters": [
+                    {"name": "id", "in": "query", "required": True, "schema": {"type": "string", "minLength": 1}},
+                    {"name": "value", "in": "header", "required": True, "schema": {"type": "string"}},
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    },
+}
+
+
+def test_per_test_hooks(testdir):
+    testdir.make_test(
+        """
+from hypothesis import strategies as st
+
+def replacement(strategy):
+    return st.just({"id": "foobar"})
+
+@schema.with_hook("query", replacement)
+@schema.parametrize()
+@settings(max_examples=1)
+def test_a(case):
+    assert case.query["id"] == "foobar"
+
+@schema.parametrize()
+@schema.with_hook("query", replacement)
+@settings(max_examples=1)
+def test_b(case):
+    assert case.query["id"] == "foobar"
+
+def another_replacement(strategy):
+    return st.just({"id": "foobaz"})
+
+def third_replacement(strategy):
+    return st.just({"value": "spam"})
+
+@schema.parametrize()
+@schema.with_hook("query", another_replacement)  # Higher priority
+@schema.with_hook("query", replacement)
+@schema.with_hook("headers", third_replacement)
+@settings(max_examples=1)
+def test_c(case):
+    assert case.query["id"] == "foobaz"
+    assert case.headers["value"] == "spam"
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_d(case):
+    assert case.query["id"] != "foobar"
+    """,
+        schema=SIMPLE_SCHEMA,
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=4)
+
+
+def test_invalid_hook(schema):
+    def foo(strategy):
+        pass
+
+    with pytest.raises(KeyError, match="wrong"):
+
+        @schema.with_hook("wrong", foo)
+        def test(case):
+            pass
+
+
 def test_hooks_via_parametrize(testdir):
     testdir.make_test(
         """
@@ -81,25 +155,7 @@ def test(case):
     assert case.endpoint.schema.get_hook("query") is extra
     assert int(case.query["id"]) % 2 == 0
     """,
-        schema={
-            "openapi": "3.0.2",
-            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-            "paths": {
-                "/query": {
-                    "get": {
-                        "parameters": [
-                            {
-                                "name": "id",
-                                "in": "query",
-                                "required": True,
-                                "schema": {"type": "string", "minLength": 1},
-                            }
-                        ],
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
-            },
-        },
+        schema=SIMPLE_SCHEMA,
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)

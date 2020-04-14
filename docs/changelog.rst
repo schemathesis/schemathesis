@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Per-test hooks for modification of data generation strategies. `#492`_
+
 `1.1.2`_ - 2020-04-14
 ---------------------
 
@@ -904,6 +909,7 @@ Fixed
 
 .. _#497: https://github.com/kiwicom/schemathesis/issues/497
 .. _#496: https://github.com/kiwicom/schemathesis/issues/496
+.. _#492: https://github.com/kiwicom/schemathesis/issues/492
 .. _#489: https://github.com/kiwicom/schemathesis/issues/489
 .. _#473: https://github.com/kiwicom/schemathesis/issues/473
 .. _#469: https://github.com/kiwicom/schemathesis/issues/469
