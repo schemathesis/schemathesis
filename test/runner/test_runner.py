@@ -421,7 +421,7 @@ def test_get_base_url(url, base_url):
 @pytest.mark.endpoints("invalid_path_parameter")
 def test_invalid_path_parameter(args):
     app, kwargs = args
-    init, *others, finished = prepare(**kwargs)
+    init, *others, finished = prepare(validate_schema=False, **kwargs)
     assert finished.has_errors
     assert "schemathesis.exceptions.InvalidSchema: Missing required property" in others[1].result.errors[0].exception
 

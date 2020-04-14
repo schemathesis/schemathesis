@@ -120,7 +120,7 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
             }
         elif endpoint == "teapot":
             schema = {"produces": ["application/json"], "responses": {"200": {"description": "OK"}}}
-        elif endpoint == "invalid_path_parameter/{id}":
+        elif endpoint == "invalid_path_parameter":
             schema = {
                 "parameters": [{"name": "id", "in": "path", "required": False, "type": "integer"}],
                 "responses": {"200": {"description": "OK"}},
