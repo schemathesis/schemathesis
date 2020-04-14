@@ -14,7 +14,7 @@ from .impl import BaseRunner, SingleThreadRunner, SingleThreadWSGIRunner, Thread
 
 
 def prepare(  # pylint: disable=too-many-arguments
-    schema_uri: str,
+    schema_uri: Union[str, Dict[str, Any]],
     *,
     # Runtime behavior
     checks: Iterable[CheckFunction] = DEFAULT_CHECKS,
@@ -80,7 +80,7 @@ def prepare(  # pylint: disable=too-many-arguments
 
 def execute_from_schema(
     *,
-    schema_uri: str,
+    schema_uri: Union[str, Dict[str, Any]],
     loader: Callable = loaders.from_uri,
     base_url: Optional[str] = None,
     endpoint: Optional[Filter] = None,
@@ -176,7 +176,7 @@ def execute_from_schema(
 
 
 def load_schema(
-    schema_uri: str,
+    schema_uri: Union[str, Dict[str, Any]],
     *,
     base_url: Optional[str] = None,
     loader: Callable = loaders.from_uri,
@@ -194,7 +194,9 @@ def load_schema(
     """Load schema via specified loader and parameters."""
     loader_options = dict_true_values(base_url=base_url, endpoint=endpoint, method=method, tag=tag, app=app)
 
-    if file_exists(schema_uri):
+    if isinstance(schema_uri, dict):
+        loader = loaders.from_dict
+    elif file_exists(schema_uri):
         loader = loaders.from_path
     elif app is not None and not urlparse(schema_uri).netloc:
         # If `schema` is not an existing filesystem path or an URL then it is considered as an endpoint with
@@ -203,7 +205,7 @@ def load_schema(
     else:
         loader_options.update(dict_true_values(headers=headers, auth=auth, auth_type=auth_type))
 
-    if "base_url" not in loader_options:
+    if "base_url" not in loader_options and not isinstance(schema_uri, dict):
         loader_options["base_url"] = get_base_url(schema_uri)
     if loader is loaders.from_uri and loader_options.get("auth"):
         loader_options["auth"] = get_requests_auth(loader_options["auth"], loader_options.pop("auth_type", None))

@@ -84,6 +84,7 @@ def from_file(
     *,
     app: Any = None,
     validate_schema: bool = True,
+    **kwargs: Any,  # needed in runner to have compatible API across all loaders
 ) -> BaseSchema:
     """Load a file content and parse to schema instance.
 
@@ -168,6 +169,7 @@ def from_wsgi(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     validate_schema: bool = True,
+    **kwargs: Any,
 ) -> BaseSchema:
     client = Client(app, WSGIResponse)
     response = client.get(schema_path, headers={"User-Agent": USER_AGENT})
@@ -202,6 +204,7 @@ def from_aiohttp(
     tag: Optional[Filter] = None,
     *,
     validate_schema: bool = True,
+    **kwargs: Any,
 ) -> BaseSchema:
     from .extra._aiohttp import run_server  # pylint: disable=import-outside-toplevel
 
@@ -210,4 +213,6 @@ def from_aiohttp(
     url = urljoin(app_url, schema_path)
     if not base_url:
         base_url = app_url
-    return from_uri(url, base_url=base_url, method=method, endpoint=endpoint, tag=tag, validate_schema=validate_schema)
+    return from_uri(
+        url, base_url=base_url, method=method, endpoint=endpoint, tag=tag, validate_schema=validate_schema, **kwargs
+    )
