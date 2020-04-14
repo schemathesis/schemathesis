@@ -62,6 +62,7 @@ def csv_strategy(enum):
             "workers": st.integers(min_value=1, max_value=64),
             "request-timeout": st.integers(),
             "validate-schema": st.booleans(),
+            "stateful": st.booleans(),
             "hypothesis-deadline": st.integers() | st.none(),
             "hypothesis-max-examples": st.integers(),
             "hypothesis-report-multiple-bugs": st.booleans(),

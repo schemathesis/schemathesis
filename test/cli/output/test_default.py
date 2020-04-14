@@ -165,7 +165,9 @@ def test_display_single_failure(capsys, swagger_20, endpoint, body):
         endpoint, [success, success, success, failure, failure, models.Check("different_check", models.Status.success)]
     )
     # When this failure is displayed
-    default.display_failures_for_single_test(SerializedTestResult.from_test_result(test_statistic))
+    result = SerializedTestResult.from_test_result(test_statistic)
+    checks = default._get_unique_failures(result.checks)
+    default.display_failures_for_single_test(result, checks)
     out = capsys.readouterr().out
     lines = out.split("\n")
     # Then the endpoint name is displayed as a subsection

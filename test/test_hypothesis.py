@@ -14,7 +14,7 @@ def make_endpoint(schema, **kwargs) -> Endpoint:
     return Endpoint("/users", "POST", definition={}, schema=schema, **kwargs)
 
 
-@pytest.mark.parametrize("name", sorted(PARAMETERS))
+@pytest.mark.parametrize("name", sorted(PARAMETERS - {"modified_path_parameters", "modified_body"}))
 def test_get_examples(name, swagger_20):
     example = {"name": "John"}
     endpoint = make_endpoint(

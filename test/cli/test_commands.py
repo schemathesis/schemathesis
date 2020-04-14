@@ -205,6 +205,7 @@ def test_commands_run_help(cli):
         "",
         "  --hypothesis-verbosity [quiet|normal|verbose|debug]",
         "                                  Verbosity level of Hypothesis messages.",
+        "  --stateful                      Create tests chaining endpoint's dependencies.",
         "  -h, --help                      Show this message and exit.",
     ]
 
@@ -262,6 +263,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "tag": (),
         "schema_uri": SCHEMA_URI,
         "validate_schema": True,
+        "stateful": False,
         "loader": from_uri,
         "hypothesis_options": {},
         "workers_num": 1,
@@ -309,6 +311,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
         "method": (),
         "tag": (),
         "validate_schema": True,
+        "stateful": False,
         **expected,
     }
 

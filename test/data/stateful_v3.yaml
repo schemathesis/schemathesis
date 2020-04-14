@@ -1,0 +1,96 @@
+openapi: '3.0.0'
+
+info:
+  version: '0.0.1'
+  title: REST API
+
+paths:
+  /systems:
+    get:
+      description: Get systems
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/systems'
+    patch:
+      description: Change system's name and fqdn
+      requestBody:
+        description: Input json
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/system_request'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/updated'
+  '/systems/{id}':
+    get:
+      deprecated: true
+      description: Get fqdn of a system
+      parameters:
+        - name: id
+          description: System id
+          required: true
+          schema:
+            type: string
+          in: path
+          x-example: 03708698-7921-11ea-b755-48a4720be785
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/systems_fqdn'
+components:
+  schemas:
+    systems:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              attributes:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  fqdn:
+                    type: string
+    systems_fqdn:
+      type: object
+      properties:
+        id:
+          type: string
+        fqdn:
+          type: string
+    updated:
+      type: object
+      properties:
+        updated:
+          type: string
+    system_request:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        fqdn:
+          type: string
+      required:
+        - id
+        - name
+        - fqdn

@@ -1,0 +1,96 @@
+swagger: '2.0'
+info:
+  title: REST API
+  version: 0.0.1
+paths:
+  /systems:
+    get:
+      produces:
+        - application/json
+      parameters: []
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/systems'
+      description: Get systems
+    patch:
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - description: Input json
+          in: body
+          name: body
+          required: true
+          schema:
+            $ref: '#/definitions/system_request'
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/updated'
+      description: Change system's name and fqdn
+  '/systems/{id}':
+    get:
+      produces:
+        - application/json
+      parameters:
+        - description: System id
+          in: path
+          name: id
+          required: true
+          type: string
+          x-example: 03708698-7921-11ea-b755-48a4720be785
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/systems_fqdn'
+      deprecated: true
+      description: Get fqdn of a system
+definitions:
+  system_request:
+    properties:
+      fqdn:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    required:
+      - id
+      - name
+      - fqdn
+    type: object
+  systems:
+    properties:
+      data:
+        items:
+          properties:
+            attributes:
+              properties:
+                fqdn:
+                  type: string
+                name:
+                  type: string
+              type: object
+            id:
+              type: string
+          type: object
+        type: array
+    type: object
+  systems_fqdn:
+    properties:
+      fqdn:
+        type: string
+      id:
+        type: string
+    type: object
+  updated:
+    properties:
+      updated:
+        type: string
+    type: object
+x-components: {}
