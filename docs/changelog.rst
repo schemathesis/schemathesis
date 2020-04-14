@@ -10,6 +10,7 @@ Fixed
 ~~~~~
 
 - Support for custom loaders in ``runner``. Now all built-in loaders are supported as an argument to ``runner.prepare``. `#496`_
+- ``from_wsgi`` loader accept custom keyword arguments that will be passed to ``client.get`` when accessing the schema. `#497`_
 
 `1.1.1`_ - 2020-04-12
 ---------------------
@@ -897,6 +898,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#497: https://github.com/kiwicom/schemathesis/issues/497
 .. _#496: https://github.com/kiwicom/schemathesis/issues/496
 .. _#489: https://github.com/kiwicom/schemathesis/issues/489
 .. _#473: https://github.com/kiwicom/schemathesis/issues/473

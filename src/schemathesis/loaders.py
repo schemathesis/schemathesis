@@ -171,8 +171,9 @@ def from_wsgi(
     validate_schema: bool = True,
     **kwargs: Any,
 ) -> BaseSchema:
+    kwargs.setdefault("headers", {}).setdefault("User-Agent", USER_AGENT)
     client = Client(app, WSGIResponse)
-    response = client.get(schema_path, headers={"User-Agent": USER_AGENT})
+    response = client.get(schema_path, **kwargs)
     # Raising exception to provide unified behavior
     # E.g. it will be handled in CLI - a proper error message will be shown
     if 400 <= response.status_code < 600:
