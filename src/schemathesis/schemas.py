@@ -32,6 +32,8 @@ from .utils import NOT_SET, GenericResponse, StringDatesYAMLLoader
 
 # Reference resolving will stop after this depth
 RECURSION_DEPTH_LIMIT = 100
+# Generic test with any arguments and no return
+GenericTest = Callable[..., None]  # pragma: no mutate
 
 
 def load_file_impl(location: str, opener: Callable) -> Dict[str, Any]:
@@ -164,6 +166,20 @@ class BaseSchema(Mapping):
     def register_hook(self, place: str, hook: Hook) -> None:
         key = HookLocation[place]
         self.hooks[key] = hook
+
+    def with_hook(self, place: str, hook: Hook) -> Callable[[GenericTest], GenericTest]:
+        """Register a hook for a specific test."""
+        if place not in HookLocation.__members__:
+            raise KeyError(place)
+
+        def wrapper(func: GenericTest) -> GenericTest:
+            if not hasattr(func, "_schemathesis_hooks"):
+                func._schemathesis_hooks = {}  # type: ignore
+            # a string key is simpler to use later
+            func._schemathesis_hooks[place] = hook  # type: ignore
+            return func
+
+        return wrapper
 
     def get_hook(self, place: str) -> Optional[Hook]:
         key = HookLocation[place]

@@ -389,10 +389,14 @@ For convenience you can explore the schemas and strategies manually:
 
 Schema instances implement ``Mapping`` protocol.
 
-If you want to customize how data is generated, then you can use hooks of two types:
+Changing data generation behavior
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you want to customize how data is generated, then you can use hooks of three types:
 
 - Global, which are applied to all schemas;
 - Schema-local, which are applied only for specific schema instance;
+- Test function specific, they are applied only for a specific test function;
 
 Each hook accepts a Hypothesis strategy and should return a Hypothesis strategy:
 
@@ -411,6 +415,14 @@ Each hook accepts a Hypothesis strategy and should return a Hypothesis strategy:
         return strategy.filter(lambda x: int(x["id"]) % 2 == 0)
 
     schema.register_hook("query", schema_hook)
+
+    def function_hook(strategy):
+        return strategy.filter(lambda x: len(x["id"]) > 5)
+
+    @schema.with_hook("query", function_hook)
+    @schema.parametrize()
+    def test_api(case):
+        ...
 
 There are 6 places, where hooks can be applied and you need to pass it as the first argument to ``schemathesis.hooks.register`` or ``schema.register_hook``:
 
