@@ -1,3 +1,4 @@
+import json
 from typing import Dict, Optional
 
 import pytest
@@ -8,7 +9,7 @@ from hypothesis import Phase
 from requests.auth import HTTPDigestAuth
 
 import schemathesis
-from schemathesis import from_uri, from_wsgi
+from schemathesis import loaders
 from schemathesis.checks import (
     DEFAULT_CHECKS,
     content_type_conformance,
@@ -21,7 +22,7 @@ from schemathesis.runner import events, get_base_url, get_requests_auth, prepare
 from schemathesis.runner.impl.core import get_wsgi_auth
 
 
-def execute(schema_uri, checks=DEFAULT_CHECKS, loader=from_uri, **options) -> events.Finished:
+def execute(schema_uri, checks=DEFAULT_CHECKS, loader=loaders.from_uri, **options) -> events.Finished:
     generator = prepare(schema_uri=schema_uri, checks=checks, loader=loader, **options)
     all_events = list(generator)
     return all_events[-1]
@@ -87,7 +88,7 @@ def args(request, mocker):
         app_path = request.getfixturevalue("loadable_flask_app")
         # To have simpler tests it is easier to reuse already imported application for inspection
         mocker.patch("schemathesis.runner.import_app", return_value=app)
-        kwargs = {"schema_uri": "/swagger.yaml", "app": app_path, "loader": from_wsgi}
+        kwargs = {"schema_uri": "/swagger.yaml", "app": app_path, "loader": loaders.from_wsgi}
     return app, kwargs
 
 
@@ -448,3 +449,50 @@ def test_auth_loader_options(base_url, schema_url, app):
     execute(schema_url, base_url=base_url, auth=("test", "test"), auth_type="basic")
     schema_request = get_schema_requests(app)
     assert schema_request[0].headers["Authorization"] == "Basic dGVzdDp0ZXN0"
+
+
+@pytest.fixture()
+def raw_schema(app):
+    return app["config"]["schema_data"]
+
+
+@pytest.fixture()
+def json_string(raw_schema):
+    return json.dumps(raw_schema)
+
+
+@pytest.fixture()
+def schema_path(json_string, tmp_path):
+    path = tmp_path / "schema.json"
+    path.write_text(json_string)
+    return str(path)
+
+
+@pytest.fixture()
+def relative_schema_url():
+    return "/swagger.yaml"
+
+
+@pytest.mark.parametrize(
+    "loader, fixture",
+    (
+        (loaders.from_dict, "raw_schema"),
+        (loaders.from_file, "json_string"),
+        (loaders.from_path, "schema_path"),
+        (loaders.from_wsgi, "relative_schema_url"),
+        (loaders.from_aiohttp, "relative_schema_url"),
+    ),
+)
+@pytest.mark.endpoints("success")
+def test_custom_loader(request, loader, fixture):
+    schema = request.getfixturevalue(fixture)
+    kwargs = {}
+    if loader is loaders.from_wsgi:
+        kwargs["app"] = request.getfixturevalue("loadable_flask_app")
+    else:
+        if loader is loaders.from_aiohttp:
+            kwargs["app"] = request.getfixturevalue("loadable_aiohttp_app")
+        kwargs["base_url"] = request.getfixturevalue("base_url")
+    init, *others, finished = prepare(schema, loader=loader, headers={"TEST": "foo"}, **kwargs)
+    assert not finished.has_errors
+    assert not finished.has_failures
