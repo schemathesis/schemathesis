@@ -484,7 +484,7 @@ def relative_schema_url():
     ),
 )
 @pytest.mark.endpoints("success")
-def test_custom_loader(request, loader, fixture):
+def test_non_default_loader(request, loader, fixture):
     schema = request.getfixturevalue(fixture)
     kwargs = {}
     if loader is loaders.from_wsgi:
@@ -494,5 +494,30 @@ def test_custom_loader(request, loader, fixture):
             kwargs["app"] = request.getfixturevalue("loadable_aiohttp_app")
         kwargs["base_url"] = request.getfixturevalue("base_url")
     init, *others, finished = prepare(schema, loader=loader, headers={"TEST": "foo"}, **kwargs)
+    assert not finished.has_errors
+    assert not finished.has_failures
+
+
+FROM_DICT_ERROR_MESSAGE = "Dictionary as a schema is allowed only with `from_dict` loader"
+
+
+@pytest.mark.parametrize(
+    "loader, schema, message",
+    (
+        (loaders.from_uri, {}, FROM_DICT_ERROR_MESSAGE),
+        (loaders.from_dict, "", "Schema should be a dictionary for `from_dict` loader"),
+        (loaders.from_wsgi, {}, FROM_DICT_ERROR_MESSAGE),
+        (loaders.from_file, {}, FROM_DICT_ERROR_MESSAGE),
+        (loaders.from_path, {}, FROM_DICT_ERROR_MESSAGE),
+    ),
+)
+def test_validation(loader, schema, message):
+    with pytest.raises(ValueError, match=message):
+        list(prepare(schema, loader=loader))
+
+
+def test_custom_loader(swagger_20, base_url):
+    swagger_20.base_url = base_url
+    *others, finished = list(prepare({}, loader=lambda *args, **kwargs: swagger_20))
     assert not finished.has_errors
     assert not finished.has_failures
