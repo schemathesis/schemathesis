@@ -11,6 +11,7 @@ Added
 
 - Per-test hooks for modification of data generation strategies. `#492`_
 - Support for ``x-example`` vendor extension in Open API 2.0. `#504`_
+- Sanity validation for the input schema & loader in ``runner.prepare``. `#499`_
 
 `1.1.2`_ - 2020-04-14
 ---------------------
@@ -909,6 +910,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#504: https://github.com/kiwicom/schemathesis/issues/504
+.. _#499: https://github.com/kiwicom/schemathesis/issues/499
 .. _#497: https://github.com/kiwicom/schemathesis/issues/497
 .. _#496: https://github.com/kiwicom/schemathesis/issues/496
 .. _#492: https://github.com/kiwicom/schemathesis/issues/492

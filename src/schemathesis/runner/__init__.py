@@ -45,6 +45,8 @@ def prepare(  # pylint: disable=too-many-arguments
     """Prepare a generator that will run test cases against the given API definition."""
     # pylint: disable=too-many-locals
 
+    validate_loader(loader, schema_uri)
+
     if auth is None:
         # Auth type doesn't matter if auth is not passed
         auth_type = None  # type: ignore
@@ -76,6 +78,25 @@ def prepare(  # pylint: disable=too-many-arguments
         headers=headers,
         request_timeout=request_timeout,
     )
+
+
+def validate_loader(loader: Callable, schema_uri: Union[str, Dict[str, Any]]) -> None:
+    """Sanity checking for input schema & loader."""
+    if loader not in (
+        loaders.from_uri,
+        loaders.from_aiohttp,
+        loaders.from_dict,
+        loaders.from_file,
+        loaders.from_path,
+        loaders.from_wsgi,
+    ):
+        # Custom loaders are not checked
+        return
+    if isinstance(schema_uri, dict):
+        if loader is not loaders.from_dict:
+            raise ValueError("Dictionary as a schema is allowed only with `from_dict` loader")
+    elif loader is loaders.from_dict:
+        raise ValueError("Schema should be a dictionary for `from_dict` loader")
 
 
 def execute_from_schema(
@@ -194,16 +215,15 @@ def load_schema(
     """Load schema via specified loader and parameters."""
     loader_options = dict_true_values(base_url=base_url, endpoint=endpoint, method=method, tag=tag, app=app)
 
-    if isinstance(schema_uri, dict):
-        loader = loaders.from_dict
-    elif file_exists(schema_uri):
-        loader = loaders.from_path
-    elif app is not None and not urlparse(schema_uri).netloc:
-        # If `schema` is not an existing filesystem path or an URL then it is considered as an endpoint with
-        # the given app
-        loader = loaders.get_loader_for_app(app)
-    else:
-        loader_options.update(dict_true_values(headers=headers, auth=auth, auth_type=auth_type))
+    if not isinstance(schema_uri, dict):
+        if file_exists(schema_uri):
+            loader = loaders.from_path
+        elif app is not None and not urlparse(schema_uri).netloc:
+            # If `schema` is not an existing filesystem path or an URL then it is considered as an endpoint with
+            # the given app
+            loader = loaders.get_loader_for_app(app)
+        else:
+            loader_options.update(dict_true_values(headers=headers, auth=auth, auth_type=auth_type))
 
     if "base_url" not in loader_options and not isinstance(schema_uri, dict):
         loader_options["base_url"] = get_base_url(schema_uri)
