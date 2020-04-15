@@ -183,19 +183,10 @@ def test(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
-def test_specified_example_query(testdir):
-    # When the given query parameter contains an example in the "schema" field
-    testdir.make_test(
-        """
-from hypothesis import Phase
-
-@schema.parametrize()
-@settings(max_examples=1, phases=[Phase.explicit])
-def test(request, case):
-    request.config.HYPOTHESIS_CASES += 1
-    assert case.query == {"id": "test"}
-""",
-        schema={
+@pytest.mark.parametrize(
+    "schema",
+    (
+        {
             "openapi": "3.0.2",
             "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
             "paths": {
@@ -214,6 +205,38 @@ def test(request, case):
                 }
             },
         },
+        {
+            "swagger": "2.0",
+            "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
+            "host": "api.example.com",
+            "basePath": "/",
+            "schemes": ["https"],
+            "paths": {
+                "/query": {
+                    "get": {
+                        "parameters": [
+                            {"name": "id", "in": "query", "required": True, "type": "string", "x-example": "test"}
+                        ],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        },
+    ),
+)
+def test_specified_example_query(testdir, schema):
+    # When the given query parameter contains an example
+    testdir.make_test(
+        """
+from hypothesis import Phase
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.explicit])
+def test(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.query == {"id": "test"}
+""",
+        schema=schema,
     )
 
     result = testdir.runpytest("-v", "-s")

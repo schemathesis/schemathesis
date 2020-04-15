@@ -192,6 +192,7 @@ class BaseSchema(Mapping):
 
 class SwaggerV20(BaseSchema):
     nullable_name = "x-nullable"
+    example_field = "x-example"
     operations: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
 
     def __repr__(self) -> str:
@@ -296,6 +297,12 @@ class SwaggerV20(BaseSchema):
         container["properties"][name] = self.parameter_to_json_schema(parameter)
         if parameter.get("required", False):
             container["required"].append(name)
+        return self.add_examples(container, parameter)
+
+    def add_examples(self, container: Dict[str, Any], parameter: Dict[str, Any]) -> Dict[str, Any]:
+        if self.example_field in parameter:
+            examples = container.setdefault("example", {})  # examples should be merged together
+            examples[parameter["name"]] = parameter[self.example_field]
         return container
 
     def parameter_to_json_schema(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -353,6 +360,7 @@ class SwaggerV20(BaseSchema):
 
 class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     nullable_name = "nullable"
+    example_field = "example"
     operations = SwaggerV20.operations + ("trace",)
 
     @property
@@ -393,18 +401,14 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         else:
             super().process_by_type(endpoint, parameter)
 
-    def add_parameter(self, container: Optional[Dict[str, Any]], parameter: Dict[str, Any]) -> Dict[str, Any]:
-        container = super().add_parameter(container, parameter)
-        if "example" in parameter["schema"]:
+    def add_examples(self, container: Dict[str, Any], parameter: Dict[str, Any]) -> Dict[str, Any]:
+        if self.example_field in parameter["schema"]:
             examples = container.setdefault("example", {})  # examples should be merged together
-            examples[parameter["name"]] = parameter["schema"]["example"]
+            examples[parameter["name"]] = parameter["schema"][self.example_field]
         # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#parameter-object
         # > Furthermore, if referencing a schema which contains an example,
         # > the example value SHALL override the example provided by the schema
-        if "example" in parameter:
-            examples = container.setdefault("example", {})  # examples should be merged together
-            examples[parameter["name"]] = parameter["example"]
-        return container
+        return super().add_examples(container, parameter)
 
     def process_cookie(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         endpoint.cookies = self.add_parameter(endpoint.cookies, parameter)
