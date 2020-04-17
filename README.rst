@@ -39,6 +39,13 @@ To install Schemathesis via ``pip`` run the following command:
 
 Gitter: https://gitter.im/kiwicom/schemathesis
 
+Documentation
+-------------
+
+For the full documentation, please see https://schemathesis.readthedocs.io/en/latest/ (WIP)
+
+Or you can look at the ``docs/`` directory in the repository.
+
 Usage
 -----
 
@@ -546,13 +553,6 @@ Schema validation
 
 To avoid obscure and hard to debug errors during test runs Schemathesis validates input schemas for conformance with the relevant spec.
 If you'd like to disable this behavior use ``--validate-schema=false`` in CLI and ``validate_schema=False`` argument in loaders.
-
-Documentation
--------------
-
-For the full documentation, please see https://schemathesis.readthedocs.io/en/latest/ (WIP)
-
-Or you can look at the ``docs/`` directory in the repository.
 
 Local development
 -----------------
