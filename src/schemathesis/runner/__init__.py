@@ -222,6 +222,7 @@ def load_schema(
             # If `schema` is not an existing filesystem path or an URL then it is considered as an endpoint with
             # the given app
             loader = loaders.get_loader_for_app(app)
+            loader_options.update(dict_true_values(headers=headers))
         else:
             loader_options.update(dict_true_values(headers=headers, auth=auth, auth_type=auth_type))
 

@@ -7,6 +7,8 @@ import jsonschema
 import requests
 import yaml
 from jsonschema import ValidationError
+from starlette.testclient import TestClient as ASGIClient
+from starlette.applications import Starlette
 from werkzeug.test import Client
 
 from . import spec_schemas
@@ -191,6 +193,8 @@ def from_wsgi(
 
 
 def get_loader_for_app(app: Any) -> Callable:
+    if isinstance(app, Starlette):
+        return from_asgi
     if app.__class__.__module__.startswith("aiohttp."):
         return from_aiohttp
     return from_wsgi
@@ -216,4 +220,33 @@ def from_aiohttp(
         base_url = app_url
     return from_uri(
         url, base_url=base_url, method=method, endpoint=endpoint, tag=tag, validate_schema=validate_schema, **kwargs
+    )
+
+
+def from_asgi(
+    schema_path: str,
+    app: Any,
+    base_url: Optional[str] = None,
+    method: Optional[Filter] = None,
+    endpoint: Optional[Filter] = None,
+    tag: Optional[Filter] = None,
+    validate_schema: bool = True,
+    **kwargs: Any,
+) -> BaseSchema:
+    kwargs.setdefault("headers", {}).setdefault("User-Agent", USER_AGENT)
+    client = ASGIClient(app)
+    response = client.get(schema_path, **kwargs)
+    # Raising exception to provide unified behavior
+    # E.g. it will be handled in CLI - a proper error message will be shown
+    if 400 <= response.status_code < 600:
+        raise HTTPError(response=response, url=schema_path)
+    return from_file(
+        response.text,
+        location=schema_path,
+        base_url=base_url,
+        method=method,
+        endpoint=endpoint,
+        tag=tag,
+        app=app,
+        validate_schema=validate_schema,
     )

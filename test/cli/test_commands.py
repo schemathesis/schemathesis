@@ -176,7 +176,7 @@ def test_commands_run_help(cli):
         "  -b, --base-url TEXT             Base URL address of the API, required for",
         "                                  SCHEMA if specified by file.",
         "",
-        "  --app TEXT                      WSGI application to test.",
+        "  --app TEXT                      WSGI/ASGI application to test.",
         "  --request-timeout INTEGER RANGE",
         "                                  Timeout in milliseconds for network requests",
         "                                  during the test run.",

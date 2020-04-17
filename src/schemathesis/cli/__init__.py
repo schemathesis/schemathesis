@@ -108,7 +108,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     type=str,
     callback=callbacks.validate_base_url,
 )
-@click.option("--app", help="WSGI application to test.", type=str, callback=callbacks.validate_app)
+@click.option("--app", help="WSGI/ASGI application to test.", type=str, callback=callbacks.validate_app)
 @click.option(
     "--request-timeout",
     help="Timeout in milliseconds for network requests during the test run.",
