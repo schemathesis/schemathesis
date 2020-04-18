@@ -619,7 +619,7 @@ def test_status_code_conformance(cli, cli_args, workers):
 
 @pytest.mark.endpoints("multiple_failures")
 def test_multiple_failures_single_check(cli, schema_url):
-    result = cli.run(schema_url, "--hypothesis-derandomize")
+    result = cli.run(schema_url, "--hypothesis-seed=1", "--hypothesis-derandomize")
 
     assert "= HYPOTHESIS OUTPUT =" not in result.stdout
     assert "Hypothesis found 2 distinct failures" not in result.stdout
@@ -633,7 +633,13 @@ def test_multiple_failures_single_check(cli, schema_url):
 @pytest.mark.endpoints("multiple_failures")
 def test_multiple_failures_different_check(cli, schema_url):
     result = cli.run(
-        schema_url, "-c", "status_code_conformance", "-c", "not_a_server_error", "--hypothesis-derandomize"
+        schema_url,
+        "-c",
+        "status_code_conformance",
+        "-c",
+        "not_a_server_error",
+        "--hypothesis-derandomize",
+        "--hypothesis-seed=1",
     )
 
     assert "= HYPOTHESIS OUTPUT =" not in result.stdout
