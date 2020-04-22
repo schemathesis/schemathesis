@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+~~~~~~~
+
+- Added indentation & section name to the ``SUMMARY`` CLI block.
+
 `1.2.0`_ - 2020-04-15
 ---------------------
 
