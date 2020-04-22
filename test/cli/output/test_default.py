@@ -102,9 +102,9 @@ def test_display_statistic(capsys, swagger_20, endpoint):
     different_check = strip_style_win32(click.style("different_check", bold=True))
     passed = strip_style_win32(click.style("PASSED", bold=True, fg="green"))
     # Then all check results should be properly displayed with relevant colors
-    assert lines[1:3] == [
-        f"{not_a_server_error}            3 / 5 passed          {failed} ",
-        f"{different_check}               1 / 1 passed          {passed} ",
+    assert lines[2:4] == [
+        f"    {not_a_server_error}            3 / 5 passed          {failed} ",
+        f"    {different_check}               1 / 1 passed          {passed} ",
     ]
 
 
