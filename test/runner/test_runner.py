@@ -1,6 +1,8 @@
+import base64
 import json
 from typing import Dict, Optional
 
+import attr
 import pytest
 from aiohttp import web
 from aiohttp.streams import EmptyStreamReader
@@ -10,20 +12,15 @@ from requests.auth import HTTPDigestAuth
 
 import schemathesis
 from schemathesis import loaders
-from schemathesis.checks import (
-    DEFAULT_CHECKS,
-    content_type_conformance,
-    response_schema_conformance,
-    status_code_conformance,
-)
+from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.constants import __version__
 from schemathesis.models import Status
 from schemathesis.runner import events, get_base_url, get_requests_auth, prepare
 from schemathesis.runner.impl.core import get_wsgi_auth
 
 
-def execute(schema_uri, checks=DEFAULT_CHECKS, loader=loaders.from_uri, **options) -> events.Finished:
-    generator = prepare(schema_uri=schema_uri, checks=checks, loader=loader, **options)
+def execute(schema_uri, loader=loaders.from_uri, **options) -> events.Finished:
+    generator = prepare(schema_uri=schema_uri, loader=loader, **options)
     all_events = list(generator)
     return all_events[-1]
 
@@ -125,6 +122,62 @@ def test_execute(args):
 
     # And statistic is showing the breakdown of cases types
     assert stats.total == {"not_a_server_error": {Status.success: 1, Status.failure: 2, "total": 3}}
+
+
+@pytest.mark.parametrize("workers", (1, 2))
+def test_interactions(request, args, workers):
+    app, kwargs = args
+    init, *others, finished = prepare(**kwargs, workers_num=workers, store_interactions=True)
+    base_url = "http://localhost" if isinstance(app, Flask) else request.getfixturevalue("base_url")
+
+    # failure
+    interactions = [
+        event for event in others if isinstance(event, events.AfterExecution) and event.status == Status.failure
+    ][0].result.interactions
+    assert len(interactions) == 2
+    failure = interactions[0]
+    assert attr.asdict(failure.request) == {
+        "uri": f"{base_url}/api/failure",
+        "method": "GET",
+        "body": "",
+        "headers": {
+            "Accept": ["*/*"],
+            "Accept-Encoding": ["gzip, deflate"],
+            "Connection": ["keep-alive"],
+            "User-agent": ["schemathesis/1.2.0"],
+        },
+    }
+    assert failure.response.status_code == 500
+    assert failure.response.message == "Internal Server Error"
+    if isinstance(app, Flask):
+        assert failure.response.headers == {"Content-Type": ["text/html; charset=utf-8"], "Content-Length": ["290"]}
+    else:
+        assert failure.response.headers["Content-Type"] == ["text/plain; charset=utf-8"]
+        assert failure.response.headers["Content-Length"] == ["26"]
+    # success
+    interactions = [
+        event for event in others if isinstance(event, events.AfterExecution) and event.status == Status.success
+    ][0].result.interactions
+    assert len(interactions) == 1
+    success = interactions[0]
+    assert attr.asdict(success.request) == {
+        "uri": f"{base_url}/api/success",
+        "method": "GET",
+        "body": "",
+        "headers": {
+            "Accept": ["*/*"],
+            "Accept-Encoding": ["gzip, deflate"],
+            "Connection": ["keep-alive"],
+            "User-agent": ["schemathesis/1.2.0"],
+        },
+    }
+    assert success.response.status_code == 200
+    assert success.response.message == "OK"
+    assert json.loads(base64.b64decode(success.response.body)) == {"success": True}
+    if isinstance(app, Flask):
+        assert success.response.headers == {"Content-Type": ["application/json"], "Content-Length": ["17"]}
+    else:
+        assert success.response.headers["Content-Type"] == ["application/json; charset=utf-8"]
 
 
 def test_auth(args):

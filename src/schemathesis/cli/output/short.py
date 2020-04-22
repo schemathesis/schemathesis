@@ -2,6 +2,7 @@ import click
 
 from ...runner import events
 from ..context import ExecutionContext
+from ..handlers import EventHandler
 from . import default
 
 
@@ -14,18 +15,19 @@ def handle_after_execution(context: ExecutionContext, event: events.AfterExecuti
         click.echo()
 
 
-def handle_event(context: ExecutionContext, event: events.ExecutionEvent) -> None:
-    """Short output style shows single symbols in the progress bar.
+class ShortOutputStyleHandler(EventHandler):
+    def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
+        """Short output style shows single symbols in the progress bar.
 
-    Otherwise, identical to the default output style.
-    """
-    if isinstance(event, events.Initialized):
-        default.handle_initialized(context, event)
-    if isinstance(event, events.AfterExecution):
-        handle_after_execution(context, event)
-    if isinstance(event, events.Finished):
-        default.handle_finished(context, event)
-    if isinstance(event, events.Interrupted):
-        default.handle_interrupted(context, event)
-    if isinstance(event, events.InternalError):
-        default.handle_internal_error(context, event)
+        Otherwise, identical to the default output style.
+        """
+        if isinstance(event, events.Initialized):
+            default.handle_initialized(context, event)
+        if isinstance(event, events.AfterExecution):
+            handle_after_execution(context, event)
+        if isinstance(event, events.Finished):
+            default.handle_finished(context, event)
+        if isinstance(event, events.Interrupted):
+            default.handle_interrupted(context, event)
+        if isinstance(event, events.InternalError):
+            default.handle_internal_error(context, event)

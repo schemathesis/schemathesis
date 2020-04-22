@@ -1,6 +1,6 @@
 import traceback
 from enum import Enum
-from typing import Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union, cast
+from typing import Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
 
 import click
 import hypothesis
@@ -11,8 +11,9 @@ from .. import models, runner
 from ..runner import events
 from ..types import Filter
 from ..utils import WSGIResponse
-from . import callbacks, output
+from . import callbacks, cassettes, output
 from .context import ExecutionContext
+from .handlers import EventHandler
 from .options import CSVOption, NotSet, OptionalInt
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
@@ -116,6 +117,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 )
 @click.option("--validate-schema", help="Enable or disable validation of input schema.", type=bool, default=True)
 @click.option("--show-errors-tracebacks", help="Show full tracebacks for internal errors.", is_flag=True, default=False)
+@click.option("--store-network-log", help="Store requests and responses into a file", type=click.File("w"))
 @click.option(
     "--hypothesis-deadline",
     help="Duration in milliseconds that each individual example with a test is not allowed to exceed.",
@@ -160,6 +162,7 @@ def run(  # pylint: disable=too-many-arguments
     request_timeout: Optional[int] = None,
     validate_schema: bool = True,
     show_errors_tracebacks: bool = False,
+    store_network_log: Optional[click.utils.LazyFile] = None,
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
     hypothesis_derandomize: Optional[bool] = None,
     hypothesis_max_examples: Optional[int] = None,
@@ -193,6 +196,7 @@ def run(  # pylint: disable=too-many-arguments
         app=app,
         seed=hypothesis_seed,
         exit_first=exit_first,
+        store_interactions=store_network_log is not None,
         checks=selected_checks,
         workers_num=workers_num,
         validate_schema=validate_schema,
@@ -204,15 +208,15 @@ def run(  # pylint: disable=too-many-arguments
         hypothesis_suppress_health_check=hypothesis_suppress_health_check,
         hypothesis_verbosity=hypothesis_verbosity,
     )
-    execute(prepared_runner, workers_num, show_errors_tracebacks)
+    execute(prepared_runner, workers_num, show_errors_tracebacks, store_network_log)
 
 
-def get_output_handler(workers_num: int) -> Callable[[ExecutionContext, events.ExecutionEvent], None]:
+def get_output_handler(workers_num: int) -> EventHandler:
     if workers_num > 1:
         output_style = OutputStyle.short
     else:
         output_style = OutputStyle.default
-    return cast(Callable[[ExecutionContext, events.ExecutionEvent], None], output_style)
+    return output_style.value()
 
 
 def load_hook(module_name: str) -> None:
@@ -229,15 +233,26 @@ def load_hook(module_name: str) -> None:
 class OutputStyle(Enum):
     """Provide different output styles."""
 
-    default = output.default.handle_event
-    short = output.short.handle_event
+    default = output.default.DefaultOutputStyleHandler
+    short = output.short.ShortOutputStyleHandler
 
 
 def execute(
-    prepared_runner: Generator[events.ExecutionEvent, None, None], workers_num: int, show_errors_tracebacks: bool
+    prepared_runner: Generator[events.ExecutionEvent, None, None],
+    workers_num: int,
+    show_errors_tracebacks: bool,
+    store_network_log: Optional[click.utils.LazyFile],
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
-    handler = get_output_handler(workers_num)
-    context = ExecutionContext(workers_num=workers_num, show_errors_tracebacks=show_errors_tracebacks)
+    handlers = [get_output_handler(workers_num)]
+    if store_network_log is not None:
+        # This handler should be first to have logs writing completed when the output handler will display statistic
+        handlers.insert(0, cassettes.CassetteWriter(store_network_log))
+    context = ExecutionContext(
+        workers_num=workers_num,
+        show_errors_tracebacks=show_errors_tracebacks,
+        cassette_file_name=store_network_log.name if store_network_log is not None else None,
+    )
     for event in prepared_runner:
-        handler(context, event)
+        for handler in handlers:
+            handler.handle_event(context, event)

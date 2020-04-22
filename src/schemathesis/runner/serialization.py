@@ -8,7 +8,7 @@ from typing import List, Optional
 
 import attr
 
-from ..models import Case, Check, Status, TestResult
+from ..models import Case, Check, Interaction, Status, TestResult
 from ..types import Body, Cookies, FormData, Headers, PathParameters, Query
 from ..utils import format_exception
 
@@ -80,6 +80,7 @@ class SerializedTestResult:
     checks: List[SerializedCheck] = attr.ib()  # pragma: no mutate
     logs: List[str] = attr.ib()  # pragma: no mutate
     errors: List[SerializedError] = attr.ib()  # pragma: no mutate
+    interactions: List[Interaction] = attr.ib()  # pragma: no mutate
 
     @classmethod
     def from_test_result(cls, result: TestResult) -> "SerializedTestResult":
@@ -95,4 +96,5 @@ class SerializedTestResult:
             checks=[SerializedCheck.from_check(check) for check in result.checks],
             logs=[formatter.format(record) for record in result.logs],
             errors=[SerializedError.from_error(*error) for error in result.errors],
+            interactions=result.interactions,
         )

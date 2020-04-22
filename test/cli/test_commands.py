@@ -1,3 +1,4 @@
+import base64
 import json
 import pathlib
 import time
@@ -183,6 +184,7 @@ def test_commands_run_help(cli):
         "",
         "  --validate-schema BOOLEAN       Enable or disable validation of input schema.",
         "  --show-errors-tracebacks        Show full tracebacks for internal errors.",
+        "  --store-network-log FILENAME    Store requests and responses into a file",
         "  --hypothesis-deadline INTEGER RANGE",
         "                                  Duration in milliseconds that each individual",
         "                                  example with a test is not allowed to exceed.",
@@ -270,6 +272,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "auth_type": None,
         "headers": {},
         "request_timeout": None,
+        "store_interactions": False,
         "seed": None,
         **expected,
     }
@@ -393,7 +396,7 @@ def test_cli_run_output_with_errors(cli, cli_args, workers):
     lines = result.stdout.strip().split("\n")
     assert "1. Received a response with 5xx status code: 500" in lines
     assert "Performed checks:" in lines
-    assert "    not_a_server_error            1 / 3 passed          FAILED " in lines
+    assert "    not_a_server_error                    1 / 3 passed          FAILED " in lines
     assert f"== 1 passed, 1 failed in " in lines[-1]
 
 
@@ -406,7 +409,7 @@ def test_cli_run_only_failure(cli, cli_args, workers):
     assert " SUMMARY " in result.stdout
 
     lines = result.stdout.strip().split("\n")
-    assert "    not_a_server_error            0 / 2 passed          FAILED " in lines
+    assert "    not_a_server_error                    0 / 2 passed          FAILED " in lines
     assert "== 1 failed in " in lines[-1]
 
 
@@ -612,7 +615,7 @@ def test_status_code_conformance(cli, cli_args, workers):
         assert lines[10].startswith("POST /api/teapot F")
     else:
         assert lines[10] == "F"
-    assert "status_code_conformance            0 / 2 passed          FAILED" in result.stdout
+    assert "status_code_conformance                    0 / 2 passed          FAILED" in result.stdout
     lines = result.stdout.split("\n")
     assert "1. Received a response with a status code, which is not defined in the schema: 418" in lines
     assert lines[16].strip() == "Declared status codes: 200"
@@ -993,7 +996,8 @@ def test_wsgi_app_path_schema(testdir, cli, loadable_flask_app):
     assert "1 passed in" in result.stdout
 
 
-def test_multipart_upload(testdir, base_url, cli):
+def test_multipart_upload(testdir, tmp_path, base_url, cli):
+    cassette_path = tmp_path / "output.yaml"
     # When requestBody has a binary field or an array of binary items
     responses = {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}}
     schema = {
@@ -1041,9 +1045,18 @@ def test_multipart_upload(testdir, base_url, cli):
     }
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
     result = cli.run(
-        str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=5", "--show-errors-tracebacks"
+        str(schema_file),
+        f"--base-url={base_url}",
+        "--hypothesis-max-examples=5",
+        "--show-errors-tracebacks",
+        f"--store-network-log={cassette_path}",
     )
     # Then it should be correctly sent to the server
     assert result.exit_code == ExitCode.OK
     assert "= ERRORS =" not in result.stdout
+
+    with cassette_path.open() as fd:
+        cassette = yaml.safe_load(fd)
+    data = base64.b64decode(cassette["http_interactions"][-1]["request"]["body"]["base64_string"])
+    assert data.startswith(b"file=")
     # NOTE, that the actual endpoint is not checked in this test

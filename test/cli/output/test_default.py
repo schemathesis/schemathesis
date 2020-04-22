@@ -84,7 +84,7 @@ def test_handle_initialized(capsys, execution_context, results_set, swagger_20):
     assert out.endswith("\n\n")
 
 
-def test_display_statistic(capsys, swagger_20, endpoint):
+def test_display_statistic(capsys, swagger_20, execution_context, endpoint):
     # Given multiple successful & failed checks in a single test
     success = models.Check("not_a_server_error", models.Status.success)
     failure = models.Check("not_a_server_error", models.Status.failure)
@@ -94,22 +94,20 @@ def test_display_statistic(capsys, swagger_20, endpoint):
     results = models.TestResultSet([single_test_statistic])
     event = Finished.from_results(results, running_time=1.0)
     # When test results are displayed
-    default.display_statistic(event)
+    default.display_statistic(execution_context, event)
 
     lines = [line for line in capsys.readouterr().out.split("\n") if line]
     failed = strip_style_win32(click.style("FAILED", bold=True, fg="red"))
-    not_a_server_error = strip_style_win32(click.style("not_a_server_error", bold=True))
-    different_check = strip_style_win32(click.style("different_check", bold=True))
     passed = strip_style_win32(click.style("PASSED", bold=True, fg="green"))
     # Then all check results should be properly displayed with relevant colors
     assert lines[2:4] == [
-        f"    {not_a_server_error}            3 / 5 passed          {failed} ",
-        f"    {different_check}               1 / 1 passed          {passed} ",
+        f"    not_a_server_error                    3 / 5 passed          {failed} ",
+        f"    different_check                       1 / 1 passed          {passed} ",
     ]
 
 
-def test_display_statistic_empty(capsys, results_set):
-    default.display_statistic(results_set)
+def test_display_statistic_empty(capsys, execution_context, results_set):
+    default.display_statistic(execution_context, results_set)
     assert capsys.readouterr().out.split("\n")[2] == strip_style_win32(
         click.style("No checks were performed.", bold=True)
     )

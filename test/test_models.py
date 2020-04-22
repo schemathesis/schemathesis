@@ -4,7 +4,7 @@ import pytest
 import requests
 
 import schemathesis
-from schemathesis.models import Case, Endpoint
+from schemathesis.models import Case, Endpoint, Response
 
 
 def test_path(swagger_20):
@@ -115,3 +115,13 @@ def test_(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+
+
+@pytest.mark.endpoints()
+def test_response_from_requests(base_url):
+    response = requests.get(f"{base_url}/cookies")
+    serialized = Response.from_requests(response)
+    assert serialized.status_code == 200
+    assert serialized.http_version == "1.1"
+    assert serialized.message == "OK"
+    assert serialized.headers["Set-Cookie"] == ["foo=bar; Path=/", "baz=spam; Path=/"]

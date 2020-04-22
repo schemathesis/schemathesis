@@ -36,6 +36,7 @@ class BaseRunner:
     auth_type: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     headers: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
     request_timeout: Optional[int] = attr.ib(default=None)  # pragma: no mutate
+    store_interactions: bool = attr.ib(default=False)  # pragma: no mutate
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
     exit_first: bool = attr.ib(default=False)  # pragma: no mutate
 
@@ -138,11 +139,14 @@ def network_test(
     result: TestResult,
     session: requests.Session,
     request_timeout: Optional[int],
+    store_interactions: bool,
 ) -> None:
     """A single test body that will be executed against the target."""
     # pylint: disable=too-many-arguments
     timeout = prepare_timeout(request_timeout)
     response = case.call(session=session, timeout=timeout)
+    if store_interactions:
+        result.store_requests_response(response)
     run_checks(case, checks, result, response)
 
 
@@ -174,11 +178,16 @@ def wsgi_test(
     auth: Optional[RawAuth],
     auth_type: Optional[str],
     headers: Optional[Dict[str, Any]],
+    store_interactions: bool,
 ) -> None:
     # pylint: disable=too-many-arguments
     headers = _prepare_wsgi_headers(headers, auth, auth_type)
     with catching_logs(LogCaptureHandler(), level=logging.DEBUG) as recorded:
+        start = time.monotonic()
         response = case.call_wsgi(headers=headers)
+        elapsed = time.monotonic() - start
+    if store_interactions:
+        result.store_wsgi_response(case, response, headers, elapsed)
     result.logs.extend(recorded.records)
     run_checks(case, checks, result, response)
 

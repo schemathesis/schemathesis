@@ -148,7 +148,7 @@ class ThreadPoolRunner(BaseRunner):
             "headers": self.headers,
             "seed": self.seed,
             "results": results,
-            "kwargs": {"request_timeout": self.request_timeout},
+            "kwargs": {"request_timeout": self.request_timeout, "store_interactions": self.store_interactions},
         }
 
 
@@ -164,7 +164,12 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
             "settings": self.hypothesis_settings,
             "seed": self.seed,
             "results": results,
-            "kwargs": {"auth": self.auth, "auth_type": self.auth_type, "headers": self.headers},
+            "kwargs": {
+                "auth": self.auth,
+                "auth_type": self.auth_type,
+                "headers": self.headers,
+                "store_interactions": self.store_interactions,
+            },
         }
 
 

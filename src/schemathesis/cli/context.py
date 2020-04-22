@@ -21,3 +21,4 @@ class ExecutionContext:
     current_line_length: int = attr.ib(default=0)  # pragma: no mutate
     terminal_size: os.terminal_size = attr.ib(factory=shutil.get_terminal_size)  # pragma: no mutate
     results: List[SerializedTestResult] = attr.ib(factory=list)  # pragma: no mutate
+    cassette_file_name: Optional[str] = attr.ib(default=None)  # pragma: no mutate

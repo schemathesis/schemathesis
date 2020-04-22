@@ -21,6 +21,7 @@ def prepare(  # pylint: disable=too-many-arguments
     workers_num: int = 1,
     seed: Optional[int] = None,
     exit_first: bool = False,
+    store_interactions: bool = False,
     # Schema loading
     loader: Callable = loaders.from_uri,
     base_url: Optional[str] = None,
@@ -77,6 +78,7 @@ def prepare(  # pylint: disable=too-many-arguments
         auth_type=auth_type,
         headers=headers,
         request_timeout=request_timeout,
+        store_interactions=store_interactions,
     )
 
 
@@ -118,6 +120,7 @@ def execute_from_schema(
     request_timeout: Optional[int] = None,
     seed: Optional[int] = None,
     exit_first: bool = False,
+    store_interactions: bool = False,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Execute tests for the given schema.
 
@@ -154,6 +157,7 @@ def execute_from_schema(
                     seed=seed,
                     workers_num=workers_num,
                     exit_first=exit_first,
+                    store_interactions=store_interactions,
                 )
             else:
                 runner = ThreadPoolRunner(
@@ -166,6 +170,7 @@ def execute_from_schema(
                     seed=seed,
                     request_timeout=request_timeout,
                     exit_first=exit_first,
+                    store_interactions=store_interactions,
                 )
         else:
             if schema.app:
@@ -178,6 +183,7 @@ def execute_from_schema(
                     headers=headers,
                     seed=seed,
                     exit_first=exit_first,
+                    store_interactions=store_interactions,
                 )
             else:
                 runner = SingleThreadRunner(
@@ -190,6 +196,7 @@ def execute_from_schema(
                     seed=seed,
                     request_timeout=request_timeout,
                     exit_first=exit_first,
+                    store_interactions=store_interactions,
                 )
         yield from runner.execute()
     except Exception as exc:
