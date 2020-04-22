@@ -392,7 +392,8 @@ def test_cli_run_output_with_errors(cli, cli_args, workers):
 
     lines = result.stdout.strip().split("\n")
     assert "1. Received a response with 5xx status code: 500" in lines
-    assert "not_a_server_error            1 / 3 passed          FAILED " in lines
+    assert "Performed checks:" in lines
+    assert "    not_a_server_error            1 / 3 passed          FAILED " in lines
     assert f"== 1 passed, 1 failed in " in lines[-1]
 
 
@@ -405,7 +406,7 @@ def test_cli_run_only_failure(cli, cli_args, workers):
     assert " SUMMARY " in result.stdout
 
     lines = result.stdout.strip().split("\n")
-    assert "not_a_server_error            0 / 2 passed          FAILED " in lines
+    assert "    not_a_server_error            0 / 2 passed          FAILED " in lines
     assert "== 1 failed in " in lines[-1]
 
 

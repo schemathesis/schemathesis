@@ -230,7 +230,9 @@ def display_statistic(event: events.Finished) -> None:
     col2_len = len(str(max(total.values(), key=lambda v: v["total"])["total"])) * 2 + padding
     col3_len = padding
 
-    template = f"{{:{col1_len}}}{{:{col2_len}}}{{:{col3_len}}}"
+    click.echo("Performed checks:")
+
+    template = f"    {{:{col1_len}}}{{:{col2_len}}}{{:{col3_len}}}"
 
     for check_name, results in total.items():
         display_check_result(check_name, results, template)
