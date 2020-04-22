@@ -357,7 +357,7 @@ def test_(request, case):
         **as_param(integer(name="id", required=True, **{"x-nullable": True})),
     )
     # Then it should be correctly resolved and used in the generated case
-    result = testdir.runpytest("-v", "-s")
+    result = testdir.runpytest("-v", "-s", "--hypothesis-seed=1")
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
@@ -479,7 +479,7 @@ def test_(request, case):
         **as_param(integer(name="id", required=True, enum=[1, 2], **{"x-nullable": True})),
     )
     # Then it should be correctly resolved and used in the generated case
-    result = testdir.runpytest("-v", "-s")
+    result = testdir.runpytest("-v", "-s", "--hypothesis-seed=1")
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
