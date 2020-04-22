@@ -6,6 +6,13 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Storing network logs with ``--store-network-log=<filename.yaml>``.
+  The stored cassettes are based on the `VCR format <https://relishapp.com/vcr/vcr/v/5-1-0/docs/cassettes/cassette-format>`_
+  and contain extra information from the Schemathesis internals. `#379`_
+
 Fixed
 ~~~~~
 
@@ -961,6 +968,7 @@ Fixed
 .. _#386: https://github.com/kiwicom/schemathesis/issues/386
 .. _#383: https://github.com/kiwicom/schemathesis/issues/383
 .. _#381: https://github.com/kiwicom/schemathesis/issues/381
+.. _#379: https://github.com/kiwicom/schemathesis/issues/379
 .. _#378: https://github.com/kiwicom/schemathesis/issues/378
 .. _#376: https://github.com/kiwicom/schemathesis/issues/376
 .. _#374: https://github.com/kiwicom/schemathesis/issues/374

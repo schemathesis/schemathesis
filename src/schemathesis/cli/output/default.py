@@ -12,6 +12,7 @@ from ...models import Status
 from ...runner import events
 from ...runner.serialization import SerializedCase, SerializedCheck, SerializedTestResult
 from ..context import ExecutionContext
+from ..handlers import EventHandler
 
 
 def get_terminal_width() -> int:
@@ -216,7 +217,7 @@ def display_single_log(result: SerializedTestResult) -> None:
     click.echo("\n\n".join(result.logs))
 
 
-def display_statistic(event: events.Finished) -> None:
+def display_statistic(context: ExecutionContext, event: events.Finished) -> None:
     """Format and print statistic collected by :obj:`models.TestResult`."""
     display_section_name("SUMMARY")
     click.echo()
@@ -230,12 +231,17 @@ def display_statistic(event: events.Finished) -> None:
     col2_len = len(str(max(total.values(), key=lambda v: v["total"])["total"])) * 2 + padding
     col3_len = padding
 
-    click.echo("Performed checks:")
+    click.secho("Performed checks:", bold=True)
 
     template = f"    {{:{col1_len}}}{{:{col2_len}}}{{:{col3_len}}}"
 
     for check_name, results in total.items():
         display_check_result(check_name, results, template)
+
+    if context.cassette_file_name:
+        click.echo()
+        category = click.style("Network log", bold=True)
+        click.secho(f"{category}: {context.cassette_file_name}")
 
 
 def display_check_result(check_name: str, results: Dict[Union[str, Status], int], template: str) -> None:
@@ -248,11 +254,7 @@ def display_check_result(check_name: str, results: Dict[Union[str, Status], int]
         color = "green"
     success = results.get(Status.success, 0)
     total = results.get("total", 0)
-    click.echo(
-        template.format(
-            click.style(check_name, bold=True), f"{success} / {total} passed", click.style(verdict, fg=color, bold=True)
-        )
-    )
+    click.echo(template.format(check_name, f"{success} / {total} passed", click.style(verdict, fg=color, bold=True)))
 
 
 def display_internal_error(context: ExecutionContext, event: events.InternalError) -> None:
@@ -316,7 +318,7 @@ def handle_finished(context: ExecutionContext, event: events.Finished) -> None:
     display_errors(context, event)
     display_failures(context, event)
     display_application_logs(context, event)
-    display_statistic(event)
+    display_statistic(context, event)
     click.echo()
     display_summary(event)
 
@@ -331,18 +333,19 @@ def handle_internal_error(context: ExecutionContext, event: events.InternalError
     raise click.Abort
 
 
-def handle_event(context: ExecutionContext, event: events.ExecutionEvent) -> None:
-    """Choose and execute a proper handler for the given event."""
-    if isinstance(event, events.Initialized):
-        handle_initialized(context, event)
-    if isinstance(event, events.BeforeExecution):
-        handle_before_execution(context, event)
-    if isinstance(event, events.AfterExecution):
-        context.hypothesis_output.extend(event.hypothesis_output)
-        handle_after_execution(context, event)
-    if isinstance(event, events.Finished):
-        handle_finished(context, event)
-    if isinstance(event, events.Interrupted):
-        handle_interrupted(context, event)
-    if isinstance(event, events.InternalError):
-        handle_internal_error(context, event)
+class DefaultOutputStyleHandler(EventHandler):
+    def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
+        """Choose and execute a proper handler for the given event."""
+        if isinstance(event, events.Initialized):
+            handle_initialized(context, event)
+        if isinstance(event, events.BeforeExecution):
+            handle_before_execution(context, event)
+        if isinstance(event, events.AfterExecution):
+            context.hypothesis_output.extend(event.hypothesis_output)
+            handle_after_execution(context, event)
+        if isinstance(event, events.Finished):
+            handle_finished(context, event)
+        if isinstance(event, events.Interrupted):
+            handle_interrupted(context, event)
+        if isinstance(event, events.InternalError):
+            handle_internal_error(context, event)

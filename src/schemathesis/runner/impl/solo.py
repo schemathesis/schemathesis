@@ -18,7 +18,13 @@ class SingleThreadRunner(BaseRunner):
         with get_session(auth, self.headers) as session:
             for endpoint, test in self.schema.get_all_tests(network_test, self.hypothesis_settings, self.seed):
                 for event in run_test(
-                    endpoint, test, self.checks, results, session=session, request_timeout=self.request_timeout,
+                    endpoint,
+                    test,
+                    self.checks,
+                    results,
+                    session=session,
+                    request_timeout=self.request_timeout,
+                    store_interactions=self.store_interactions,
                 ):
                     yield event
                     if isinstance(event, events.Interrupted):
@@ -30,7 +36,14 @@ class SingleThreadWSGIRunner(SingleThreadRunner):
     def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         for endpoint, test in self.schema.get_all_tests(wsgi_test, self.hypothesis_settings, self.seed):
             for event in run_test(
-                endpoint, test, self.checks, results, auth=self.auth, auth_type=self.auth_type, headers=self.headers,
+                endpoint,
+                test,
+                self.checks,
+                results,
+                auth=self.auth,
+                auth_type=self.auth_type,
+                headers=self.headers,
+                store_interactions=self.store_interactions,
             ):
                 yield event
                 if isinstance(event, events.Interrupted):
