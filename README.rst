@@ -78,6 +78,13 @@ CLI supports passing options to ``hypothesis.settings``. All of them are prefixe
 
     schemathesis run --hypothesis-max-examples=1000 https://example.com/api/swagger.json
 
+To minimize number of 404 errros and ability to catch issues caused by other endpoints accessing/modifying the same resource
+you can run stateful tests by passing CLI option ``--stateful``.
+
+.. code:: bash
+
+    schemathesis run --stateful https://example.com/api/swagger.json
+
 To speed up the testing process Schemathesis provides ``-w/--workers`` option for concurrent test execution:
 
 .. code:: bash
@@ -206,6 +213,39 @@ It consists of four main parts:
 4. Verifying a property you'd like to test; In the example, we verify that any app response will not indicate a server-side error (HTTP codes 5xx).
 
 **NOTE**. Look for ``from_wsgi`` usage `below <https://github.com/kiwicom/schemathesis#wsgi>`_
+
+If you would like to run stateful tests, you need to provide ``stateful=True`` parameter either in schema preparation step
+
+.. code:: python
+
+    schema = schemathesis.from_uri("http://0.0.0.0:8080/swagger.json", stateful=True)
+
+or parametrize your tests with
+
+.. code:: python
+
+    @schema.parametrize(stateful=True)
+    def test_no_server_errors(case):
+        ...
+
+For stateful test you would also need to update the current state based on the actual test result.
+The example of a stateful test could look as follows:
+
+.. code:: python
+
+    import schemathesis
+
+    schema = schemathesis.from_uri("http://0.0.0.0:8080/swagger.json")
+
+    @schema.parametrize(stateful=True)
+    def test_no_server_errors(case):
+        response = case.call()
+        # Update state - gather examples for required properties of endpoints
+        schemathesis.update_state(case, response)
+        # You could use built-in checks
+        case.validate_response(response)
+        # Or assert the response manually
+        assert response.status_code < 500
 
 Run the tests:
 

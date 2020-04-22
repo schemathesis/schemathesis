@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Stateful testing by inferring endpoint's dependencies
+
 Changed
 ~~~~~~~
 
