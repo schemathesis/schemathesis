@@ -65,7 +65,13 @@ ENDPOINT = Endpoint("/api/success", "GET", {}, base_url="http://example.com", sc
 @pytest.mark.parametrize(
     "case, expected",
     (
+        # Body can be of any primitive type supported by Open API
         (Case(ENDPOINT, body={"test": 1}), "requests.get('http://example.com/api/success', json={'test': 1})"),
+        (Case(ENDPOINT, body=["foo"]), "requests.get('http://example.com/api/success', json=['foo'])"),
+        (Case(ENDPOINT, body="foo"), "requests.get('http://example.com/api/success', json='foo')"),
+        (Case(ENDPOINT, body=1), "requests.get('http://example.com/api/success', json=1)"),
+        (Case(ENDPOINT, body=1.1), "requests.get('http://example.com/api/success', json=1.1)"),
+        (Case(ENDPOINT, body=True), "requests.get('http://example.com/api/success', json=True)"),
         (Case(ENDPOINT), "requests.get('http://example.com/api/success')"),
         (Case(ENDPOINT, query={"a": 1}), "requests.get('http://example.com/api/success', params={'a': 1})"),
     ),
