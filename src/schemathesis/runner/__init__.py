@@ -11,6 +11,7 @@ from ..types import Filter, NotSet, RawAuth
 from ..utils import dict_not_none_values, dict_true_values, file_exists, get_base_url, get_requests_auth, import_app
 from . import events
 from .impl import BaseRunner, SingleThreadRunner, SingleThreadWSGIRunner, ThreadPoolRunner, ThreadPoolWSGIRunner
+from .targeted import DEFAULT_TARGETS, Target
 
 
 def prepare(  # pylint: disable=too-many-arguments
@@ -18,6 +19,7 @@ def prepare(  # pylint: disable=too-many-arguments
     *,
     # Runtime behavior
     checks: Iterable[CheckFunction] = DEFAULT_CHECKS,
+    targets: Iterable[Target] = DEFAULT_TARGETS,
     workers_num: int = 1,
     seed: Optional[int] = None,
     exit_first: bool = False,
@@ -70,6 +72,7 @@ def prepare(  # pylint: disable=too-many-arguments
         app=app,
         validate_schema=validate_schema,
         checks=checks,
+        targets=targets,
         hypothesis_options=hypothesis_options,
         seed=seed,
         workers_num=workers_num,
@@ -112,6 +115,7 @@ def execute_from_schema(
     app: Optional[str] = None,
     validate_schema: bool = True,
     checks: Iterable[CheckFunction],
+    targets: Iterable[Target],
     workers_num: int = 1,
     hypothesis_options: Dict[str, Any],
     auth: Optional[RawAuth] = None,
@@ -150,6 +154,7 @@ def execute_from_schema(
                 runner = ThreadPoolWSGIRunner(
                     schema=schema,
                     checks=checks,
+                    targets=targets,
                     hypothesis_settings=hypothesis_options,
                     auth=auth,
                     auth_type=auth_type,
@@ -163,6 +168,7 @@ def execute_from_schema(
                 runner = ThreadPoolRunner(
                     schema=schema,
                     checks=checks,
+                    targets=targets,
                     hypothesis_settings=hypothesis_options,
                     auth=auth,
                     auth_type=auth_type,
@@ -177,6 +183,7 @@ def execute_from_schema(
                 runner = SingleThreadWSGIRunner(
                     schema=schema,
                     checks=checks,
+                    targets=targets,
                     hypothesis_settings=hypothesis_options,
                     auth=auth,
                     auth_type=auth_type,
@@ -189,6 +196,7 @@ def execute_from_schema(
                 runner = SingleThreadRunner(
                     schema=schema,
                     checks=checks,
+                    targets=targets,
                     hypothesis_settings=hypothesis_options,
                     auth=auth,
                     auth_type=auth_type,

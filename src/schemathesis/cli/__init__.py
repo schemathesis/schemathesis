@@ -9,6 +9,7 @@ import requests
 from .. import checks as checks_module
 from .. import models, runner
 from ..runner import events
+from ..runner.targeted import DEFAULT_TARGETS_NAMES, Target
 from ..types import Filter
 from ..utils import WSGIResponse
 from . import callbacks, cassettes, output
@@ -44,6 +45,15 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 @click.argument("schema", type=str, callback=callbacks.validate_schema)
 @click.option(
     "--checks", "-c", multiple=True, help="List of checks to run.", type=CHECKS_TYPE, default=DEFAULT_CHECKS_NAMES
+)
+@click.option(
+    "--target",
+    "-t",
+    "targets",
+    multiple=True,
+    help="Targets for input generation.",
+    type=click.Choice([target.name for target in Target]),
+    default=DEFAULT_TARGETS_NAMES,
 )
 @click.option(
     "-x", "--exitfirst", "exit_first", is_flag=True, default=False, help="Exit instantly on first error or failed test."
@@ -152,6 +162,7 @@ def run(  # pylint: disable=too-many-arguments
     auth_type: str,
     headers: Dict[str, str],
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
+    targets: Iterable[str] = DEFAULT_TARGETS_NAMES,
     exit_first: bool = False,
     endpoints: Optional[Filter] = None,
     methods: Optional[Filter] = None,
@@ -177,6 +188,7 @@ def run(  # pylint: disable=too-many-arguments
     SCHEMA must be a valid URL or file path pointing to an Open API / Swagger specification.
     """
     # pylint: disable=too-many-locals
+    selected_targets = tuple(target for target in Target if target.name in targets)
 
     if "all" in checks:
         selected_checks = checks_module.ALL_CHECKS
@@ -198,6 +210,7 @@ def run(  # pylint: disable=too-many-arguments
         exit_first=exit_first,
         store_interactions=store_network_log is not None,
         checks=selected_checks,
+        targets=selected_targets,
         workers_num=workers_num,
         validate_schema=validate_schema,
         hypothesis_deadline=hypothesis_deadline,

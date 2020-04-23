@@ -14,6 +14,7 @@ Welcome to schemathesis's documentation!
    :caption: Contents:
 
    usage
+   targeted
    faq
    changelog
 
