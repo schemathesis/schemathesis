@@ -23,9 +23,10 @@ import datetime
 import os
 import sys
 
-import schemathesis
-
 sys.path.insert(0, os.path.abspath("../src/schemathesis"))
+
+# isort:imports-firstparty
+import schemathesis
 
 
 # -- General configuration ------------------------------------------------
