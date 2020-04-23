@@ -67,7 +67,7 @@ class Case:
             return value == default_value
 
         printed_kwargs = ", ".join(
-            f"{key}={value}"
+            f"{key}={repr(value)}"
             for key, value in kwargs.items()
             if key not in ("method", "url") and not are_defaults(key, value)
         )
@@ -93,7 +93,7 @@ class Case:
         formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
         url = urljoin(base_url + "/", formatted_path)
         # Form data and body are mutually exclusive
-        extra: Dict[str, Optional[Union[Dict, bytes]]]
+        extra: Dict[str, Optional[Body]]
         if self.form_data:
             extra = {"files": self.form_data}
         elif is_multipart(self.body):
@@ -129,7 +129,7 @@ class Case:
     def as_werkzeug_kwargs(self) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
         headers = self.headers
-        extra: Dict[str, Optional[Union[Dict, bytes]]]
+        extra: Dict[str, Optional[Body]]
         if self.form_data:
             extra = {"data": self.form_data}
             headers = headers or {}
@@ -176,7 +176,7 @@ class Case:
             raise AssertionError(*errors)
 
 
-def is_multipart(item: Optional[Union[bytes, Dict[str, Any], List[Any]]]) -> bool:
+def is_multipart(item: Optional[Body]) -> bool:
     """A poor detection if the body should be a multipart request.
 
     It traverses the structure and if it contains bytes in any value, then it is a multipart request, because
