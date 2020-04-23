@@ -12,6 +12,7 @@ from ...models import CheckFunction, TestResultSet
 from ...types import RawAuth
 from ...utils import capture_hypothesis_output, get_requests_auth
 from .. import events
+from ..targeted import Target
 from .core import BaseRunner, get_session, network_test, run_test, wsgi_test
 
 
@@ -20,6 +21,7 @@ def _run_task(
     tasks_queue: Queue,
     events_queue: Queue,
     checks: Iterable[CheckFunction],
+    targets: Iterable[Target],
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
@@ -30,7 +32,7 @@ def _run_task(
         while not tasks_queue.empty():
             endpoint = tasks_queue.get()
             test = make_test_or_exception(endpoint, test_template, settings, seed)
-            for event in run_test(endpoint, test, checks, results, **kwargs):
+            for event in run_test(endpoint, test, checks, targets, results, **kwargs):
                 events_queue.put(event)
 
 
@@ -38,6 +40,7 @@ def thread_task(
     tasks_queue: Queue,
     events_queue: Queue,
     checks: Iterable[CheckFunction],
+    targets: Iterable[Target],
     settings: hypothesis.settings,
     auth: Optional[RawAuth],
     auth_type: Optional[str],
@@ -53,20 +56,23 @@ def thread_task(
     # pylint: disable=too-many-arguments
     prepared_auth = get_requests_auth(auth, auth_type)
     with get_session(prepared_auth, headers) as session:
-        _run_task(network_test, tasks_queue, events_queue, checks, settings, seed, results, session=session, **kwargs)
+        _run_task(
+            network_test, tasks_queue, events_queue, checks, targets, settings, seed, results, session=session, **kwargs
+        )
 
 
 def wsgi_thread_task(
     tasks_queue: Queue,
     events_queue: Queue,
     checks: Iterable[CheckFunction],
+    targets: Iterable[Target],
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
     kwargs: Any,
 ) -> None:
     # pylint: disable=too-many-arguments
-    _run_task(wsgi_test, tasks_queue, events_queue, checks, settings, seed, results, **kwargs)
+    _run_task(wsgi_test, tasks_queue, events_queue, checks, targets, settings, seed, results, **kwargs)
 
 
 def stop_worker(thread_id: int) -> None:
@@ -142,6 +148,7 @@ class ThreadPoolRunner(BaseRunner):
             "tasks_queue": tasks_queue,
             "events_queue": events_queue,
             "checks": self.checks,
+            "targets": self.targets,
             "settings": self.hypothesis_settings,
             "auth": self.auth,
             "auth_type": self.auth_type,
@@ -161,6 +168,7 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
             "tasks_queue": tasks_queue,
             "events_queue": events_queue,
             "checks": self.checks,
+            "targets": self.targets,
             "settings": self.hypothesis_settings,
             "seed": self.seed,
             "results": results,

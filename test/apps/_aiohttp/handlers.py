@@ -44,6 +44,18 @@ async def slow(request: web.Request) -> web.Response:
     return web.json_response({"slow": True})
 
 
+async def performance(request: web.Request) -> web.Response:
+    # Emulate bad performance on certain input type
+    # This endpoint is for Schemathesis targeted testing, the failure should be discovered
+    decoded = await request.json()
+    number = str(decoded).count("0")
+    if number > 0:
+        await asyncio.sleep(0.01 * number)
+    if number > 10:
+        raise web.HTTPInternalServerError
+    return web.json_response({"slow": True})
+
+
 async def unsatisfiable(request: web.Request) -> web.Response:
     return web.json_response({"result": "IMPOSSIBLE!"})
 
