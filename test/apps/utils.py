@@ -10,6 +10,7 @@ class Endpoint(Enum):
     slow = ("GET", "/api/slow")
     path_variable = ("GET", "/api/path_variable/{key}")
     unsatisfiable = ("POST", "/api/unsatisfiable")
+    performance = ("POST", "/api/performance")
     invalid = ("POST", "/api/invalid")
     flaky = ("GET", "/api/flaky")
     recursive = ("GET", "/api/recursive")
@@ -92,6 +93,11 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
                         "schema": {"allOf": [{"type": "integer"}, {"type": "string"}]},
                     }
                 ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif endpoint == "performance":
+            schema = {
+                "parameters": [{"name": "data", "in": "body", "required": True, "schema": {"type": "integer"},}],
                 "responses": {"200": {"description": "OK"}},
             }
         elif endpoint in ("flaky", "multiple_failures"):

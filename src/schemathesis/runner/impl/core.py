@@ -16,6 +16,7 @@ from ...runner import events
 from ...schemas import BaseSchema
 from ...types import RawAuth
 from ...utils import GenericResponse, capture_hypothesis_output
+from ..targeted import Target
 
 DEFAULT_DEADLINE = 500  # pragma: no mutate
 
@@ -31,6 +32,7 @@ def get_hypothesis_settings(hypothesis_options: Dict[str, Any]) -> hypothesis.se
 class BaseRunner:
     schema: BaseSchema = attr.ib()  # pragma: no mutate
     checks: Iterable[CheckFunction] = attr.ib()  # pragma: no mutate
+    targets: Iterable[Target] = attr.ib()  # pragma: no mutate
     hypothesis_settings: hypothesis.settings = attr.ib(converter=get_hypothesis_settings)  # pragma: no mutate
     auth: Optional[RawAuth] = attr.ib(default=None)  # pragma: no mutate
     auth_type: Optional[str] = attr.ib(default=None)  # pragma: no mutate
@@ -66,6 +68,7 @@ def run_test(
     endpoint: Endpoint,
     test: Union[Callable, InvalidSchema],
     checks: Iterable[CheckFunction],
+    targets: Iterable[Target],
     results: TestResultSet,
     **kwargs: Any,
 ) -> Generator[events.ExecutionEvent, None, None]:
@@ -80,7 +83,7 @@ def run_test(
             result.add_error(test)
         else:
             with capture_hypothesis_output() as hypothesis_output:
-                test(checks, result, **kwargs)
+                test(checks, targets, result, **kwargs)
             status = Status.success
     except (AssertionError, hypothesis.errors.MultipleFailures):
         status = Status.failure
@@ -133,9 +136,16 @@ def run_checks(case: Case, checks: Iterable[CheckFunction], result: TestResult, 
         raise get_grouped_exception(*errors)
 
 
+def run_targets(targets: Iterable[Target], elapsed: float) -> None:
+    for target in targets:
+        if target == Target.response_time:
+            hypothesis.target(elapsed, label="response_time")
+
+
 def network_test(
     case: Case,
     checks: Iterable[CheckFunction],
+    targets: Iterable[Target],
     result: TestResult,
     session: requests.Session,
     request_timeout: Optional[int],
@@ -145,6 +155,7 @@ def network_test(
     # pylint: disable=too-many-arguments
     timeout = prepare_timeout(request_timeout)
     response = case.call(session=session, timeout=timeout)
+    run_targets(targets, response.elapsed.total_seconds())
     if store_interactions:
         result.store_requests_response(response)
     run_checks(case, checks, result, response)
@@ -174,6 +185,7 @@ def prepare_timeout(timeout: Optional[int]) -> Optional[float]:
 def wsgi_test(
     case: Case,
     checks: Iterable[CheckFunction],
+    targets: Iterable[Target],
     result: TestResult,
     auth: Optional[RawAuth],
     auth_type: Optional[str],
@@ -186,6 +198,7 @@ def wsgi_test(
         start = time.monotonic()
         response = case.call_wsgi(headers=headers)
         elapsed = time.monotonic() - start
+    run_targets(targets, elapsed)
     if store_interactions:
         result.store_wsgi_response(case, response, headers, elapsed)
     result.logs.extend(recorded.records)

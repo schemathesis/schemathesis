@@ -5,6 +5,7 @@ import time
 from test.utils import HERE, SIMPLE_PATH
 from urllib.parse import urljoin
 
+import hypothesis
 import pytest
 import requests
 import yaml
@@ -16,7 +17,7 @@ from schemathesis._compat import metadata
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.loaders import from_uri
 from schemathesis.models import Endpoint
-from schemathesis.runner import DEFAULT_CHECKS
+from schemathesis.runner import DEFAULT_CHECKS, DEFAULT_TARGETS
 
 PHASES = "explicit, reuse, generate, target, shrink"
 if metadata.version("hypothesis") < "4.5":
@@ -155,6 +156,7 @@ def test_commands_run_help(cli):
         "  -c, --checks [not_a_server_error|status_code_conformance|"
         "content_type_conformance|response_schema_conformance|all]",
         "                                  List of checks to run.",
+        "  -t, --target [response_time]    Targets for input generation.",
         "  -x, --exitfirst                 Exit instantly on first error or failed test.",
         "  -a, --auth TEXT                 Server user and password. Example:",
         "                                  USER:PASSWORD",
@@ -259,6 +261,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "app": None,
         "base_url": None,
         "checks": DEFAULT_CHECKS,
+        "targets": DEFAULT_TARGETS,
         "endpoint": (),
         "method": (),
         "tag": (),
@@ -1060,3 +1063,12 @@ def test_multipart_upload(testdir, tmp_path, base_url, cli):
     data = base64.b64decode(cassette["http_interactions"][-1]["request"]["body"]["base64_string"])
     assert data.startswith(b"file=")
     # NOTE, that the actual endpoint is not checked in this test
+
+
+@pytest.mark.parametrize("workers", (1, 2))
+@pytest.mark.endpoints("success")
+def test_targeted(mocker, cli, cli_args, workers):
+    target = mocker.spy(hypothesis, "target")
+    result = cli.run(*cli_args, f"--workers={workers}", "--target=response_time")
+    assert result.exit_code == ExitCode.OK
+    target.assert_called_with(mocker.ANY, label="response_time")
