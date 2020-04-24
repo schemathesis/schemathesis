@@ -26,6 +26,7 @@ Changed
 - Added indentation & section name to the ``SUMMARY`` CLI block.
 - Use C-extension for YAML loading when it is possible. It can cause more than 10x speedup on schema parsing.
 - Do not show Click's "Aborted!" message when an error occurs during schema loading in CLI.
+- Add a help message to the CLI output when an internal exception happens. `#529`_
 
 `1.2.0`_ - 2020-04-15
 ---------------------
@@ -934,6 +935,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#529: https://github.com/kiwicom/schemathesis/issues/529
 .. _#521: https://github.com/kiwicom/schemathesis/issues/521
 .. _#513: https://github.com/kiwicom/schemathesis/issues/513
 .. _#504: https://github.com/kiwicom/schemathesis/issues/504
