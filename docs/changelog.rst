@@ -12,7 +12,7 @@ Added
 - Storing network logs with ``--store-network-log=<filename.yaml>``.
   The stored cassettes are based on the `VCR format <https://relishapp.com/vcr/vcr/v/5-1-0/docs/cassettes/cassette-format>`_
   and contain extra information from the Schemathesis internals. `#379`_
-- Targeted property-based testing in CLI and runner. It only supports `response_time` target at the moment. `#104`_
+- Targeted property-based testing in CLI and runner. It only supports ``response_time`` target at the moment. `#104`_
 
 Fixed
 ~~~~~
