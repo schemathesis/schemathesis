@@ -53,7 +53,14 @@ class CassetteWriter(EventHandler):
             self.queue.put(Process(status=event.status.name.upper(), seed=seed, interactions=event.result.interactions))
         if isinstance(event, events.Finished):
             self.queue.put(Finalize())
-            self.worker.join(WRITER_WORKER_JOIN_TIMEOUT)
+            self._stop_worker()
+
+    def shutdown(self) -> None:
+        self.queue.put(Shutdown())
+        self._stop_worker()
+
+    def _stop_worker(self) -> None:
+        self.worker.join(WRITER_WORKER_JOIN_TIMEOUT)
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -68,6 +75,11 @@ class Process:
     status: str = attr.ib()  # pragma: no mutate
     seed: int = attr.ib()  # pragma: no mutate
     interactions: List[Interaction] = attr.ib()  # pragma: no mutate
+
+
+@attr.s(slots=True)  # pragma: no mutate
+class Shutdown:
+    """There is an exception in the main process and the worker should be shut down immediately."""
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -137,6 +149,11 @@ def worker(file_handle: click.utils.LazyFile, queue: Queue) -> None:
         for event in yaml_events:
             dumper.emit(event)  # type: ignore
 
+    def close_dumper() -> None:
+        # C-extension is not introspectable
+        dumper.close()  # type: ignore
+        dumper.dispose()  # type: ignore
+
     @contextmanager
     def mapping() -> Generator[None, None, None]:
         emit(yaml.MappingStartEvent(anchor=None, tag=None, implicit=True))
@@ -188,9 +205,11 @@ def worker(file_handle: click.utils.LazyFile, queue: Queue) -> None:
                     serialize_mapping("request", interaction.request.asdict())
                     serialize_mapping("response", interaction.response.asdict())
                 current_id += 1
+        elif isinstance(item, Shutdown):
+            close_dumper()
+            break
         else:
             emit(yaml.SequenceEndEvent(), yaml.MappingEndEvent(), yaml.DocumentEndEvent())
-            # C-extension is not introspectable
-            dumper.close()  # type: ignore
-            dumper.dispose()  # type: ignore
+            close_dumper()
             break
+    file_handle.close()
