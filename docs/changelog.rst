@@ -18,6 +18,7 @@ Fixed
 ~~~~~
 
 - Code samples for schemas where ``body`` is defined as ``{"type": "string"}``. `#521`_
+- Showing error causes on internal ``jsonschema`` errors during input schema validation. `#513`_
 
 Changed
 ~~~~~~~
@@ -933,6 +934,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#521: https://github.com/kiwicom/schemathesis/issues/521
+.. _#513: https://github.com/kiwicom/schemathesis/issues/513
 .. _#504: https://github.com/kiwicom/schemathesis/issues/504
 .. _#499: https://github.com/kiwicom/schemathesis/issues/499
 .. _#497: https://github.com/kiwicom/schemathesis/issues/497
