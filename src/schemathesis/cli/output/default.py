@@ -264,7 +264,11 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
             message = event.exception_with_traceback
         else:
             message = event.exception
-        click.secho(f"Error: {message}", fg="red")
+        click.secho(
+            f"Error: {message}\n"
+            f"Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks",
+            fg="red",
+        )
 
 
 def handle_initialized(context: ExecutionContext, event: events.Initialized) -> None:
