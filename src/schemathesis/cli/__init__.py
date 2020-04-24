@@ -266,6 +266,13 @@ def execute(
         show_errors_tracebacks=show_errors_tracebacks,
         cassette_file_name=store_network_log.name if store_network_log is not None else None,
     )
-    for event in prepared_runner:
+    try:
+        for event in prepared_runner:
+            for handler in handlers:
+                handler.handle_event(context, event)
+    except click.exceptions.Exit:
+        raise
+    except Exception:
         for handler in handlers:
-            handler.handle_event(context, event)
+            handler.shutdown()
+        raise
