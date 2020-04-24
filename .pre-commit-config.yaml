@@ -57,6 +57,7 @@ repos:
       - id: mypy
         exclude: ^(docs/|test/).*$
         args: ["--ignore-missing-imports"]
+        additional_dependencies: [attrs~=19.3]
 
   - repo: https://github.com/pre-commit/mirrors-pylint
     rev: v2.4.4
