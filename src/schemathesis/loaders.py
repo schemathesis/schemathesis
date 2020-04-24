@@ -147,8 +147,8 @@ def _maybe_validate_schema(instance: Dict[str, Any], schema: Dict[str, Any], val
     if validate_schema:
         try:
             jsonschema.validate(instance, schema)
-        except TypeError:
-            raise ValidationError("Invalid schema")
+        except TypeError as exc:
+            raise ValidationError("Invalid schema") from exc
 
 
 def from_pytest_fixture(

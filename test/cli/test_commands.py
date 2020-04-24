@@ -1072,3 +1072,28 @@ def test_targeted(mocker, cli, cli_args, workers):
     result = cli.run(*cli_args, f"--workers={workers}", "--target=response_time")
     assert result.exit_code == ExitCode.OK
     target.assert_called_with(mocker.ANY, label="response_time")
+
+
+def test_chained_internal_exception(testdir, cli, base_url):
+    # When schema contains an error that causes an internal error in `jsonschema`
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {
+                        # Response code should be a string
+                        200: {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}},}
+                    },
+                }
+            }
+        },
+    }
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(raw_schema))
+    result = cli.run(
+        str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=1", "--show-errors-tracebacks",
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    lines = result.stdout.splitlines()
+    assert "The above exception was the direct cause of the following exception:" in lines
