@@ -13,6 +13,7 @@ Added
   The stored cassettes are based on the `VCR format <https://relishapp.com/vcr/vcr/v/5-1-0/docs/cassettes/cassette-format>`_
   and contain extra information from the Schemathesis internals. `#379`_
 - Targeted property-based testing in CLI and runner. It only supports ``response_time`` target at the moment. `#104`_
+- Export CLI test results to JUnit.xml with ``--junit-xml=<filename.xml>``. `#427`_
 
 Fixed
 ~~~~~
@@ -959,6 +960,7 @@ Fixed
 .. _#435: https://github.com/kiwicom/schemathesis/issues/435
 .. _#433: https://github.com/kiwicom/schemathesis/issues/433
 .. _#429: https://github.com/kiwicom/schemathesis/issues/429
+.. _#427: https://github.com/kiwicom/schemathesis/issues/427
 .. _#424: https://github.com/kiwicom/schemathesis/issues/424
 .. _#418: https://github.com/kiwicom/schemathesis/issues/418
 .. _#416: https://github.com/kiwicom/schemathesis/issues/416

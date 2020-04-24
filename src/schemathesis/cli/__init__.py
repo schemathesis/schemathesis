@@ -16,6 +16,7 @@ from ..utils import WSGIResponse
 from . import callbacks, cassettes, output
 from .context import ExecutionContext
 from .handlers import EventHandler
+from .junitxml import JunitXMLHandler
 from .options import CSVOption, NotSet, OptionalInt
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
@@ -134,6 +135,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     type=click.IntRange(1),
 )
 @click.option("--validate-schema", help="Enable or disable validation of input schema.", type=bool, default=True)
+@click.option("--junit-xml", help="Create junit-xml style report file at given path.", type=click.File("w"))
 @click.option("--show-errors-tracebacks", help="Show full tracebacks for internal errors.", is_flag=True, default=False)
 @click.option("--store-network-log", help="Store requests and responses into a file", type=click.File("w"))
 @click.option(
@@ -180,6 +182,7 @@ def run(  # pylint: disable=too-many-arguments
     app: Optional[str] = None,
     request_timeout: Optional[int] = None,
     validate_schema: bool = True,
+    junit_xml: Optional[click.utils.LazyFile] = None,
     show_errors_tracebacks: bool = False,
     store_network_log: Optional[click.utils.LazyFile] = None,
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
@@ -229,7 +232,7 @@ def run(  # pylint: disable=too-many-arguments
         hypothesis_suppress_health_check=hypothesis_suppress_health_check,
         hypothesis_verbosity=hypothesis_verbosity,
     )
-    execute(prepared_runner, workers_num, show_errors_tracebacks, store_network_log)
+    execute(prepared_runner, workers_num, show_errors_tracebacks, store_network_log, junit_xml)
 
 
 def get_output_handler(workers_num: int) -> EventHandler:
@@ -263,9 +266,12 @@ def execute(
     workers_num: int,
     show_errors_tracebacks: bool,
     store_network_log: Optional[click.utils.LazyFile],
+    junit_xml: Optional[click.utils.LazyFile],
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handlers = [get_output_handler(workers_num)]
+    if junit_xml is not None:
+        handlers.insert(0, JunitXMLHandler(junit_xml))
     if store_network_log is not None:
         # This handler should be first to have logs writing completed when the output handler will display statistic
         handlers.insert(0, cassettes.CassetteWriter(store_network_log))
@@ -273,6 +279,7 @@ def execute(
         workers_num=workers_num,
         show_errors_tracebacks=show_errors_tracebacks,
         cassette_file_name=store_network_log.name if store_network_log is not None else None,
+        junit_xml_file=junit_xml.name if junit_xml is not None else None,
     )
     try:
         for event in prepared_runner:

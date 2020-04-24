@@ -42,7 +42,7 @@ def results_set(endpoint):
 @pytest.fixture()
 def after_execution(results_set, endpoint, swagger_20):
     return runner.events.AfterExecution.from_result(
-        result=results_set.results[0], status=models.Status.success, hypothesis_output=[]
+        result=results_set.results[0], status=models.Status.success, hypothesis_output=[], elapsed_time=1.0
     )
 
 
@@ -110,6 +110,15 @@ def test_display_statistic_empty(capsys, execution_context, results_set):
     default.display_statistic(execution_context, results_set)
     assert capsys.readouterr().out.split("\n")[2] == strip_style_win32(
         click.style("No checks were performed.", bold=True)
+    )
+
+
+def test_display_statistic_junitxml(capsys, execution_context, results_set):
+    xml_path = "/tmp/junit.xml"
+    execution_context.junit_xml_file = xml_path
+    default.display_statistic(execution_context, results_set)
+    assert capsys.readouterr().out.split("\n")[3] == strip_style_win32(
+        click.style("JUnit XML file", bold=True) + click.style(f": {xml_path}")
     )
 
 

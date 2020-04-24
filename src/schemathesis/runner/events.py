@@ -62,13 +62,20 @@ class AfterExecution(ExecutionEvent):
     # Endpoint test status - success / failure / error
     status: Status = attr.ib()  # pragma: no mutate
     result: SerializedTestResult = attr.ib()  # pragma: no mutate
+    # Test running time
+    elapsed_time: float = attr.ib()  # pragma: no mutate
     # Captured hypothesis stdout
     hypothesis_output: List[str] = attr.ib(factory=list)  # pragma: no mutate
 
     @classmethod
-    def from_result(cls, result: TestResult, status: Status, hypothesis_output: List[str]) -> "AfterExecution":
+    def from_result(
+        cls, result: TestResult, status: Status, elapsed_time: float, hypothesis_output: List[str]
+    ) -> "AfterExecution":
         return cls(
-            result=SerializedTestResult.from_test_result(result), status=status, hypothesis_output=hypothesis_output,
+            result=SerializedTestResult.from_test_result(result),
+            status=status,
+            elapsed_time=elapsed_time,
+            hypothesis_output=hypothesis_output,
         )
 
 

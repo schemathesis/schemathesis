@@ -71,3 +71,52 @@ Check payload in requests to ``/api/upload_file``:
 
 
     --7d4db38ad065994d913cb02b2982e3ba--
+
+Export CLI test results to JUnit.xml
+------------------------------------
+
+It is possible to export test results to format, acceptable by such tools as Jenkins.
+
+.. code:: bash
+
+    $ schemathesis run --junit-xml=/path/junit.xml
+
+This command will create an XML at given path as in example below.
+
+.. code:: xml
+
+    <?xml version="1.0" ?>
+    <testsuites disabled="0" errors="1" failures="1" tests="3" time="0.10743043999536894">
+        <testsuite disabled="0" errors="1" failures="1" name="schemathesis" skipped="0" tests="3" time="0.10743043999536894" hostname="bespin">
+            <testcase name="GET /api/failure" time="0.089057">
+                <failure type="failure" message="2. Received a response with 5xx status code: 500"/>
+            </testcase>
+            <testcase name="GET /api/malformed_json" time="0.011977">
+                <error type="error" message="json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+    ">Traceback (most recent call last):
+      File &quot;/home/user/work/schemathesis/src/schemathesis/runner/impl/core.py&quot;, line 87, in run_test
+        test(checks, targets, result, **kwargs)
+      File &quot;/home/user/work/schemathesis/src/schemathesis/runner/impl/core.py&quot;, line 150, in network_test
+        case: Case,
+      File &quot;/home/user/.pyenv/versions/3.8.0/envs/schemathesis/lib/python3.8/site-packages/hypothesis/core.py&quot;, line 1095, in wrapped_test
+        raise the_error_hypothesis_found
+      File &quot;/home/user/work/schemathesis/src/schemathesis/runner/impl/core.py&quot;, line 165, in network_test
+        run_checks(case, checks, result, response)
+      File &quot;/home/user/work/schemathesis/src/schemathesis/runner/impl/core.py&quot;, line 133, in run_checks
+        check(response, case)
+      File &quot;/home/user/work/schemathesis/src/schemathesis/checks.py&quot;, line 87, in response_schema_conformance
+        data = response.json()
+      File &quot;/home/user/.pyenv/versions/3.8.0/envs/schemathesis/lib/python3.8/site-packages/requests/models.py&quot;, line 889, in json
+        return complexjson.loads(
+      File &quot;/home/user/.pyenv/versions/3.8.0/lib/python3.8/json/__init__.py&quot;, line 357, in loads
+        return _default_decoder.decode(s)
+      File &quot;/home/user/.pyenv/versions/3.8.0/lib/python3.8/json/decoder.py&quot;, line 337, in decode
+        obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+      File &quot;/home/user/.pyenv/versions/3.8.0/lib/python3.8/json/decoder.py&quot;, line 353, in raw_decode
+        obj, end = self.scan_once(s, idx)
+    json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+    </error>
+            </testcase>
+            <testcase name="GET /api/success" time="0.006397"/>
+        </testsuite>
+    </testsuites>

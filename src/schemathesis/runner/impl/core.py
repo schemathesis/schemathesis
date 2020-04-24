@@ -77,6 +77,7 @@ def run_test(
     result = TestResult(endpoint=endpoint)
     yield events.BeforeExecution.from_endpoint(endpoint=endpoint)
     hypothesis_output: List[str] = []
+    test_start_time = time.monotonic()
     try:
         if isinstance(test, InvalidSchema):
             status = Status.error
@@ -112,12 +113,15 @@ def run_test(
     except Exception as error:
         status = Status.error
         result.add_error(error)
+    test_elapsed_time = time.monotonic() - test_start_time
     # Fetch seed value, hypothesis generates it during test execution
     result.seed = getattr(test, "_hypothesis_internal_use_seed", None) or getattr(
         test, "_hypothesis_internal_use_generated_seed", None
     )
     results.append(result)
-    yield events.AfterExecution.from_result(result=result, status=status, hypothesis_output=hypothesis_output)
+    yield events.AfterExecution.from_result(
+        result=result, status=status, elapsed_time=test_elapsed_time, hypothesis_output=hypothesis_output
+    )
 
 
 def run_checks(case: Case, checks: Iterable[CheckFunction], result: TestResult, response: GenericResponse) -> None:
