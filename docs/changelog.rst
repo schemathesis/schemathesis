@@ -23,6 +23,7 @@ Changed
 ~~~~~~~
 
 - Added indentation & section name to the ``SUMMARY`` CLI block.
+- Use C-extension for YAML loading when it is possible. It can cause more than 10x speedup on schema parsing.
 
 `1.2.0`_ - 2020-04-15
 ---------------------
