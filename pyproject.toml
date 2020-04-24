@@ -36,6 +36,7 @@ requests = "^2.22"
 click = "^7.0"
 importlib_metadata = { version = "^1.1", python = "<3.8" }
 werkzeug = ">0.16.0"
+junit-xml = "^1.9"
 
 [tool.poetry.dev-dependencies]
 coverage = "^4.5"
@@ -64,7 +65,7 @@ multi_line_output = 3
 default_section = "THIRDPARTY"
 include_trailing_comma = true
 known_first_party = "schemathesis"
-known_third_party = ["_pytest", "aiohttp", "attr", "click", "flask", "hypothesis", "hypothesis_jsonschema", "jsonschema", "packaging", "pytest", "pytest_subtests", "requests", "schemathesis", "werkzeug", "yaml"]
+known_third_party = ["_pytest", "aiohttp", "attr", "click", "flask", "hypothesis", "hypothesis_jsonschema", "jsonschema", "junit_xml", "packaging", "pytest", "pytest_subtests", "requests", "schemathesis", "werkzeug", "yaml"]
 
 [build-system]
 requires = ["poetry>=0.12"]
