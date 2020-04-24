@@ -1,3 +1,4 @@
+import sys
 import traceback
 from enum import Enum
 from typing import Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
@@ -272,7 +273,10 @@ def execute(
                 handler.handle_event(context, event)
     except click.exceptions.Exit:
         raise
-    except Exception:
+    except Exception as exc:
         for handler in handlers:
             handler.shutdown()
+        if isinstance(exc, click.Abort):
+            # To avoid showing "Aborted!" message, which is the default behavior in Click
+            sys.exit(1)
         raise

@@ -695,7 +695,6 @@ def test_schema_not_available(cli, workers):
         "Error: requests.exceptions.ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=1): "
         "Max retries exceeded with url: /swagger.yaml"
     )
-    assert lines[-2] == "Aborted!"
 
 
 def test_schema_not_available_wsgi(cli, loadable_flask_app):
@@ -706,7 +705,6 @@ def test_schema_not_available_wsgi(cli, loadable_flask_app):
     # And error message is displayed
     lines = result.stdout.split("\n")
     assert lines[0] == "Schema was not found at unknown.yaml"
-    assert lines[1] == "Aborted!"
 
 
 @pytest.mark.endpoints("custom_format")

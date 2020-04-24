@@ -25,6 +25,7 @@ Changed
 
 - Added indentation & section name to the ``SUMMARY`` CLI block.
 - Use C-extension for YAML loading when it is possible. It can cause more than 10x speedup on schema parsing.
+- Do not show Click's "Aborted!" message when an error occurs during schema loading in CLI.
 
 `1.2.0`_ - 2020-04-15
 ---------------------
