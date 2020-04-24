@@ -1,7 +1,7 @@
 import os
 import platform
 import shutil
-from typing import Any, Dict, List, Optional, Set, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import click
 from hypothesis import settings
@@ -10,9 +10,9 @@ from ..._compat import metadata
 from ...constants import __version__
 from ...models import Status
 from ...runner import events
-from ...runner.serialization import SerializedCase, SerializedCheck, SerializedTestResult
+from ...runner.serialization import SerializedCase, SerializedTestResult
 from ..context import ExecutionContext
-from ..handlers import EventHandler
+from ..handlers import EventHandler, get_unique_failures
 
 
 def get_terminal_width() -> int:
@@ -148,7 +148,7 @@ def display_failures(context: ExecutionContext, event: events.Finished) -> None:
 def display_failures_for_single_test(result: SerializedTestResult) -> None:
     """Display a failure for a single method / endpoint."""
     display_subsection(result)
-    checks = _get_unique_failures(result.checks)
+    checks = get_unique_failures(result.checks)
     for idx, check in enumerate(checks, 1):
         message: Optional[str]
         if check.message:
@@ -160,18 +160,6 @@ def display_failures_for_single_test(result: SerializedTestResult) -> None:
         # Display every time except the last check
         if idx != len(checks):
             click.echo("\n")
-
-
-def _get_unique_failures(checks: List[SerializedCheck]) -> List[SerializedCheck]:
-    """Return only unique checks that should be displayed in the output."""
-    seen: Set[Tuple[str, Optional[str]]] = set()
-    unique_checks = []
-    for check in reversed(checks):
-        # There are also could be checks that didn't fail
-        if check.example is not None and check.value == Status.failure and (check.name, check.message) not in seen:
-            unique_checks.append(check)
-            seen.add((check.name, check.message))
-    return unique_checks
 
 
 def display_example(
@@ -224,24 +212,29 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
     total = event.total
     if event.is_empty or not total:
         click.secho("No checks were performed.", bold=True)
-        return
 
-    padding = 20
-    col1_len = max(map(len, total.keys())) + padding
-    col2_len = len(str(max(total.values(), key=lambda v: v["total"])["total"])) * 2 + padding
-    col3_len = padding
-
-    click.secho("Performed checks:", bold=True)
-
-    template = f"    {{:{col1_len}}}{{:{col2_len}}}{{:{col3_len}}}"
-
-    for check_name, results in total.items():
-        display_check_result(check_name, results, template)
+    if total:
+        display_checks_statistics(total)
 
     if context.cassette_file_name:
         click.echo()
         category = click.style("Network log", bold=True)
         click.secho(f"{category}: {context.cassette_file_name}")
+
+    if context.junit_xml_file:
+        category = click.style("JUnit XML file", bold=True)
+        click.secho(f"{category}: {context.junit_xml_file}")
+
+
+def display_checks_statistics(total: Dict[str, Dict[Union[str, Status], int]]) -> None:
+    padding = 20
+    col1_len = max(map(len, total.keys())) + padding
+    col2_len = len(str(max(total.values(), key=lambda v: v["total"])["total"])) * 2 + padding
+    col3_len = padding
+    click.secho("Performed checks:", bold=True)
+    template = f"    {{:{col1_len}}}{{:{col2_len}}}{{:{col3_len}}}"
+    for check_name, results in total.items():
+        display_check_result(check_name, results, template)
 
 
 def display_check_result(check_name: str, results: Dict[Union[str, Status], int], template: str) -> None:
