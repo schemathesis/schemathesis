@@ -298,15 +298,6 @@ class Request:
             body=base64.b64encode(body).decode(),
         )
 
-    def asdict(self) -> Dict[str, Union[str, Dict[str, str]]]:
-        """For compatibility with VCR we need to adjust the structure a bit."""
-        return {
-            "uri": self.uri,
-            "method": self.method,
-            "headers": self.headers,
-            "body": {"encoding": "utf-8", "base64_string": self.body},
-        }
-
 
 def serialize_payload(payload: bytes) -> str:
     return base64.b64encode(payload).decode()
@@ -354,14 +345,6 @@ class Response:
             http_version="1.1",
             elapsed=elapsed,
         )
-
-    def asdict(self) -> Dict[str, Union[str, Dict[str, str], Dict[str, List[str]]]]:
-        return {
-            "status": {"code": str(self.status_code), "message": self.message},
-            "headers": self.headers,
-            "body": {"encoding": self.encoding, "base64_string": self.body},
-            "http_version": self.http_version,
-        }
 
 
 @attr.s(slots=True)  # pragma: no mutate
