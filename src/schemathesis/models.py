@@ -318,7 +318,7 @@ class Response:
 
     status_code: int = attr.ib()  # pragma: no mutate
     message: str = attr.ib()  # pragma: no mutate
-    headers: Dict[str, str] = attr.ib()  # pragma: no mutate
+    headers: Dict[str, List[str]] = attr.ib()  # pragma: no mutate
     body: str = attr.ib()  # pragma: no mutate
     encoding: str = attr.ib()  # pragma: no mutate
     http_version: str = attr.ib()  # pragma: no mutate
@@ -355,7 +355,7 @@ class Response:
             elapsed=elapsed,
         )
 
-    def asdict(self) -> Dict[str, Union[str, Dict[str, str]]]:
+    def asdict(self) -> Dict[str, Union[str, Dict[str, str], Dict[str, List[str]]]]:
         return {
             "status": {"code": str(self.status_code), "message": self.message},
             "headers": self.headers,
