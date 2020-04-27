@@ -79,7 +79,7 @@ Saved cassettes can be replayed with ``schemathesis replay`` command. Additional
 replay by these parameters:
 
 - ``id``. Specific, unique ID;
-- ``status``. Replay only interactions with this status (``SUCCESS``, ``FAILURE`` or``ERROR``);
+- ``status``. Replay only interactions with this status (``SUCCESS``, ``FAILURE`` or ``ERROR``);
 - ``uri``. A regular expression for request URI;
 - ``method``. A regular expression for request method;
 
