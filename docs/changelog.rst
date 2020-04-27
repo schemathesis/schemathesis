@@ -20,6 +20,9 @@ Fixed
 
 - Code samples for schemas where ``body`` is defined as ``{"type": "string"}``. `#521`_
 - Showing error causes on internal ``jsonschema`` errors during input schema validation. `#513`_
+- Recursion error in ``response_schema_conformance`` check. Because of this change ``Endpoint.definition`` contains
+  a definition where references are not resolved. In this way it makes possible to avoid recursion errors
+  in ``jsonschema`` validation. `#468`_
 
 Changed
 ~~~~~~~
