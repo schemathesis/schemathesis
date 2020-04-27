@@ -6,8 +6,17 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Show exceptions if they happened during loading a WSGI application. Option ``--show-errors-tracebacks`` will display a
+  full traceback.
+
 `1.3.1`_ - 2020-04-27
 ---------------------
+
+Fixed
+~~~~~
 
 - Packaging issue
 
