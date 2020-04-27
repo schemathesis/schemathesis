@@ -12,6 +12,7 @@ Added
 - Storing network logs with ``--store-network-log=<filename.yaml>``.
   The stored cassettes are based on the `VCR format <https://relishapp.com/vcr/vcr/v/5-1-0/docs/cassettes/cassette-format>`_
   and contain extra information from the Schemathesis internals. `#379`_
+- Replaying of cassettes stored in VCR format. `#519`_
 - Targeted property-based testing in CLI and runner. It only supports ``response_time`` target at the moment. `#104`_
 - Export CLI test results to JUnit.xml with ``--junit-xml=<filename.xml>``. `#427`_
 
@@ -941,6 +942,7 @@ Fixed
 
 .. _#529: https://github.com/kiwicom/schemathesis/issues/529
 .. _#521: https://github.com/kiwicom/schemathesis/issues/521
+.. _#519: https://github.com/kiwicom/schemathesis/issues/519
 .. _#513: https://github.com/kiwicom/schemathesis/issues/513
 .. _#504: https://github.com/kiwicom/schemathesis/issues/504
 .. _#499: https://github.com/kiwicom/schemathesis/issues/499

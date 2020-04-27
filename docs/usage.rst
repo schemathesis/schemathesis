@@ -72,6 +72,36 @@ Check payload in requests to ``/api/upload_file``:
 
     --7d4db38ad065994d913cb02b2982e3ba--
 
+Replaying interactions
+----------------------
+
+Saved cassettes can be replayed with ``schemathesis replay`` command. Additionally, you may filter what interactions to
+replay by these parameters:
+
+- ``id``. Specific, unique ID;
+- ``status``. Replay only interactions with this status (``SUCCESS``, ``FAILURE`` or``ERROR``);
+- ``uri``. A regular expression for request URI;
+- ``method``. A regular expression for request method;
+
+During replaying Schemathesis will output interactions being replayed together with the response codes from the initial and
+current execution:
+
+.. code:: bash
+
+    $ schemathesis replay foo.yaml --status=FAILURE
+    Replaying cassette: foo.yaml
+    Total interactions: 4005
+
+      ID              : 0
+      URI             : http://127.0.0.1:8081/api/failure
+      Old status code : 500
+      New status code : 500
+
+      ID              : 1
+      URI             : http://127.0.0.1:8081/api/failure
+      Old status code : 500
+      New status code : 500
+
 Export CLI test results to JUnit.xml
 ------------------------------------
 
