@@ -137,7 +137,7 @@ def get_command_representation() -> str:
 
 def worker(file_handle: click.utils.LazyFile, queue: Queue) -> None:
     """Write YAML to a file in an incremental manner."""
-    current_id = 0
+    current_id = 1
     stream = file_handle.open()
     dumper = StringDumper(stream, sort_keys=False)  # type: ignore
     StringSerializer.__init__(dumper)  # type: ignore
