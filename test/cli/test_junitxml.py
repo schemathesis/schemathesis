@@ -43,7 +43,10 @@ def test_junitxml_file(cli, schema_url, tmp_path):
     assert testcases[0].attrib["name"] == "GET /api/failure"
     assert testcases[0][0].tag == "failure"
     assert testcases[0][0].attrib["type"] == "failure"
-    assert testcases[0][0].attrib["message"] == "2. Received a response with 5xx status code: 500"
+    assert (
+        testcases[0][0].attrib["message"] == "1. Received a response with 'text/plain; charset=utf-8' Content-Type, "
+        "but it is not declared in the schema.  Defined content types: application/json"
+    )
     # Inspect testcase with an error
     assert testcases[1].attrib["name"] == "GET /api/malformed_json"
     assert testcases[1][0].tag == "error"

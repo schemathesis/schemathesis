@@ -20,16 +20,18 @@ class JunitXMLHandler(EventHandler):
         if isinstance(event, events.Initialized):
             self.start_time = event.start_time
         if isinstance(event, events.AfterExecution):
-            test_case = TestCase(f"{event.result.method} {event.result.path}", elapsed_sec=event.elapsed_time)
+            test_case = TestCase(
+                f"{event.result.method} {event.result.path}",
+                elapsed_sec=event.elapsed_time,
+                allow_multiple_subelements=True,
+            )
             if event.status == Status.failure:
                 checks = get_unique_failures(event.result.checks)
                 for idx, check in enumerate(checks, 1):
-                    message: Optional[str]
+                    message: Optional[str] = None
                     if check.message:
                         message = f"{idx}. {check.message}"
-                    else:
-                        message = None
-                test_case.add_failure_info(message=message)
+                    test_case.add_failure_info(message=message)
             if event.status == Status.error:
                 test_case.add_error_info(
                     message=event.result.errors[-1].exception, output=event.result.errors[-1].exception_with_traceback
