@@ -25,8 +25,8 @@ def test_store_cassette(cli, schema_url, cassette_path):
     assert result.exit_code == ExitCode.OK
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) == 3
-    assert cassette["http_interactions"][0]["id"] == "0"
-    assert cassette["http_interactions"][1]["id"] == "1"
+    assert cassette["http_interactions"][0]["id"] == "1"
+    assert cassette["http_interactions"][1]["id"] == "2"
     assert cassette["http_interactions"][0]["status"] == "SUCCESS"
     assert cassette["http_interactions"][0]["seed"] == "1"
     assert float(cassette["http_interactions"][0]["elapsed"]) >= 0
