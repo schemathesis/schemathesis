@@ -44,12 +44,16 @@ def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value
         # Since most of app instances are not-transferable to another process, they are passed as strings and
         # imported in a subprocess
         return raw_value
-    except (ImportError, ValueError, AttributeError):
-        raise click.BadParameter("Can not import application from the given module")
     except Exception as exc:
-        message = utils.format_exception(exc)
-        click.secho(f"Error: {message}", fg="red")
-        raise click.Abort
+        show_errors_tracebacks = ctx.params["show_errors_tracebacks"]
+        message = utils.format_exception(exc, show_errors_tracebacks)
+        click.secho(f"{message}\nCan not import application from the given module", fg="red")
+        if not show_errors_tracebacks:
+            click.secho(
+                "Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks",
+                fg="red",
+            )
+        raise click.exceptions.Exit(1)
 
 
 def validate_auth(

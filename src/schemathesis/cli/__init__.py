@@ -144,7 +144,13 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 )
 @click.option("--validate-schema", help="Enable or disable validation of input schema.", type=bool, default=True)
 @click.option("--junit-xml", help="Create junit-xml style report file at given path.", type=click.File("w"))
-@click.option("--show-errors-tracebacks", help="Show full tracebacks for internal errors.", is_flag=True, default=False)
+@click.option(
+    "--show-errors-tracebacks",
+    help="Show full tracebacks for internal errors.",
+    is_flag=True,
+    is_eager=True,
+    default=False,
+)
 @click.option("--store-network-log", help="Store requests and responses into a file", type=click.File("w"))
 @click.option(
     "--hypothesis-deadline",

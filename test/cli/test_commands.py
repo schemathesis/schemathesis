@@ -951,9 +951,10 @@ def test_wsgi_app_exception(testdir, cli):
         1 / 0
         """
     )
-    result = cli.run("/swagger.yaml", "--app", f"{module.purebasename}:app")
+    result = cli.run("/swagger.yaml", "--app", f"{module.purebasename}:app", "--show-errors-tracebacks")
     assert result.exit_code == ExitCode.TESTS_FAILED
-    assert result.stdout == "Error: ZeroDivisionError: division by zero\n\nAborted!\n"
+    assert "Traceback (most recent call last):" in result.stdout
+    assert "ZeroDivisionError: division by zero" in result.stdout
 
 
 def test_wsgi_app_missing(testdir, cli):
@@ -963,11 +964,10 @@ def test_wsgi_app_missing(testdir, cli):
         """
     )
     result = cli.run("/swagger.yaml", "--app", f"{module.purebasename}:app")
-    assert result.exit_code == ExitCode.INTERRUPTED
-    assert (
-        result.stdout.strip().split("\n")[-1]
-        == "Error: Invalid value for '--app': Can not import application from the given module"
-    )
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    lines = result.stdout.strip().split("\n")
+    assert "AttributeError: module 'location' has no attribute 'app'" in lines
+    assert "Can not import application from the given module" in lines
 
 
 def test_wsgi_app_internal_exception(testdir, cli, caplog):
