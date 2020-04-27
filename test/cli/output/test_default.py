@@ -117,7 +117,7 @@ def test_display_statistic_junitxml(capsys, execution_context, results_set):
     xml_path = "/tmp/junit.xml"
     execution_context.junit_xml_file = xml_path
     default.display_statistic(execution_context, results_set)
-    assert capsys.readouterr().out.split("\n")[3] == strip_style_win32(
+    assert capsys.readouterr().out.split("\n")[4] == strip_style_win32(
         click.style("JUnit XML file", bold=True) + click.style(f": {xml_path}")
     )
 
