@@ -168,7 +168,7 @@ def test_interactions(request, args, workers):
             "Accept": ["*/*"],
             "Accept-Encoding": ["gzip, deflate"],
             "Connection": ["keep-alive"],
-            "User-agent": ["schemathesis/1.2.0"],
+            "User-agent": [USER_AGENT],
         },
     }
     assert success.response.status_code == 200
