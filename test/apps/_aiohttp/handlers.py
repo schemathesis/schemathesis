@@ -1,4 +1,7 @@
 import asyncio
+import cgi
+import io
+from typing import Dict
 
 from aiohttp import web
 
@@ -8,7 +11,11 @@ async def success(request: web.Request) -> web.Response:
 
 
 async def payload(request: web.Request) -> web.Response:
-    return web.json_response(await request.json())
+    if request.can_read_body:
+        data = await request.read()
+    else:
+        data = None
+    return web.json_response(data)
 
 
 async def invalid_response(request: web.Request) -> web.Response:
@@ -77,10 +84,20 @@ async def multiple_failures(request: web.Request) -> web.Response:
     return web.json_response({"result": "OK"})
 
 
+def _decode_multipart(content: bytes, content_type: str) -> Dict[str, str]:
+    # a simplified version of multipart encoding that satisfies testing purposes
+    _, options = cgi.parse_header(content_type)
+    options["boundary"] = options["boundary"].encode()
+    options["CONTENT-LENGTH"] = len(content)
+    return {key: value[0].decode() for key, value in cgi.parse_multipart(io.BytesIO(content), options).items()}
+
+
 async def multipart(request: web.Request) -> web.Response:
     if not request.headers["Content-Type"].startswith("multipart/"):
         raise web.HTTPUnsupportedMediaType
-    data = {field.name: (await field.read()).decode() async for field in await request.multipart()}
+    # We need to have payload stored in the request, thus can't use `request.multipart` that consumes the reader
+    content = await request.read()
+    data = _decode_multipart(content, request.headers["Content-Type"])
     return web.json_response(data)
 
 
@@ -88,6 +105,7 @@ async def upload_file(request: web.Request) -> web.Response:
     return web.json_response({"size": request.content_length})
 
 
+get_payload = payload
 path_variable = success
 invalid = success
 invalid_path_parameter = success
