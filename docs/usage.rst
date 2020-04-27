@@ -109,7 +109,7 @@ It is possible to export test results to format, acceptable by such tools as Jen
 
 .. code:: bash
 
-    $ schemathesis run --junit-xml=/path/junit.xml
+    $ schemathesis run --junit-xml=/path/junit.xml http://127.0.0.1/schema.yaml
 
 This command will create an XML at given path as in example below.
 
