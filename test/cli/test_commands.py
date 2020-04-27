@@ -35,7 +35,8 @@ def test_commands_help(cli):
 
     assert result.exit_code == ExitCode.OK
     lines = result.stdout.split("\n")
-    assert lines[11] == "  run  Perform schemathesis test."
+    assert lines[11] == "  replay  Replay requests from a saved cassette."
+    assert lines[12] == "  run     Perform schemathesis test."
 
     result_help = cli.main("--help")
     result_h = cli.main("-h")

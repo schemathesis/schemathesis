@@ -6,6 +6,7 @@ from typing import Callable, Dict, Generator, Iterable, List, Optional, Tuple, U
 import click
 import hypothesis
 import requests
+import yaml
 
 from .. import checks as checks_module
 from .. import models, runner
@@ -18,6 +19,13 @@ from .context import ExecutionContext
 from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
 from .options import CSVOption, NotSet, OptionalInt
+
+try:
+    from yaml import CSafeLoader as SafeLoader
+except ImportError:
+    # pylint: disable=unused-import
+    from yaml import SafeLoader  # type: ignore
+
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
@@ -295,3 +303,36 @@ def execute(
             # To avoid showing "Aborted!" message, which is the default behavior in Click
             sys.exit(1)
         raise
+
+
+@schemathesis.command(short_help="Replay requests from a saved cassette.")
+@click.argument("cassette_path", type=click.Path(exists=True))
+@click.option("--id", "id_", help="ID of interaction to replay.", type=str)
+@click.option("--status", help="Status of interactions to replay.", type=str)
+@click.option("--uri", help="A regexp that filters interactions by their request URI.", type=str)
+@click.option("--method", help="A regexp that filters interactions by their request method.", type=str)
+def replay(
+    cassette_path: str,
+    id_: Optional[str],
+    status: Optional[str] = None,
+    uri: Optional[str] = None,
+    method: Optional[str] = None,
+) -> None:
+    """Replay a cassette.
+
+    Cassettes in VCR-compatible format can be replayed.
+    For example, ones that are recorded with ``store-network-log`` option of `schemathesis run` command.
+    """
+    click.secho(f"{bold('Replaying cassette')}: {cassette_path}")
+    with open(cassette_path) as fd:
+        cassette = yaml.load(fd, Loader=SafeLoader)
+    click.secho(f"{bold('Total interactions')}: {len(cassette['http_interactions'])}\n")
+    for replayed in cassettes.replay(cassette, id_=id_, status=status, uri=uri, method=method):
+        click.secho(f"  {bold('ID')}              : {replayed.interaction['id']}")
+        click.secho(f"  {bold('URI')}             : {replayed.interaction['request']['uri']}")
+        click.secho(f"  {bold('Old status code')} : {replayed.interaction['response']['status']['code']}")
+        click.secho(f"  {bold('New status code')} : {replayed.response.status_code}\n")
+
+
+def bold(message: str) -> str:
+    return click.style(message, bold=True)

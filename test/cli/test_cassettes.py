@@ -1,13 +1,16 @@
 import base64
 
 import pytest
+import requests
 import yaml
 from _pytest.main import ExitCode
+from urllib3._collections import HTTPHeaderDict
 
-from schemathesis.cli.cassettes import get_command_representation
+from schemathesis.cli.cassettes import filter_cassette, get_command_representation, get_prepared_request
+from schemathesis.models import Request
 
 
-@pytest.fixture()
+@pytest.fixture
 def cassette_path(tmp_path):
     return tmp_path / "output.yaml"
 
@@ -68,3 +71,78 @@ def test_main_process_error(cli, schema_url, cassette_path):
     # And no cassette
     cassette = load_cassette(cassette_path)
     assert cassette is None
+
+
+@pytest.mark.endpoints("__all__")
+async def test_replay(cli, schema_url, app, reset_app, cassette_path):
+    # Record a cassette
+    result = cli.run(
+        schema_url,
+        f"--store-network-log={cassette_path}",
+        "--hypothesis-max-examples=1",
+        "--hypothesis-seed=1",
+        "--validate-schema=false",
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    # these requests are not needed
+    reset_app()
+    assert not app["incoming_requests"]
+    # When a valid cassette is replayed
+    result = cli.replay(str(cassette_path))
+    assert result.exit_code == ExitCode.OK
+    cassette = load_cassette(cassette_path)
+    interactions = cassette["http_interactions"]
+    # Then there should be the same number of requests made to the app as there are in the cassette
+    assert len(app["incoming_requests"]) == len(interactions)
+    for interaction, request in zip(interactions, app["incoming_requests"]):
+        # And these requests should be equal
+        serialized = interaction["request"]
+        assert request.method == serialized["method"]
+        assert str(request.url) == serialized["uri"]
+        content = await request.read()
+        assert content == base64.b64decode(serialized["body"]["base64_string"])
+        compare_headers(request, serialized["headers"])
+
+
+def test_multiple_cookies(base_url):
+    response = requests.get(f"{base_url}/api/success", cookies={"foo": "bar", "baz": "spam"})
+    request = Request.from_prepared_request(response.request)
+    serialized = {
+        "uri": request.uri,
+        "method": request.method,
+        "headers": request.headers,
+        "body": {"encoding": "utf-8", "base64_string": request.body},
+    }
+    prepared = get_prepared_request(serialized)
+    compare_headers(prepared, serialized["headers"])
+
+
+def compare_headers(request, serialized):
+    headers = HTTPHeaderDict()
+    for name, value in serialized.items():
+        for sub in value:
+            headers.add(name, sub)
+        assert request.headers[name] == headers[name]
+
+
+@pytest.mark.parametrize(
+    "filters, expected",
+    (
+        ({"id_": "1"}, ["1"]),
+        ({"id_": "2"}, ["2"]),
+        ({"status": "SUCCESS"}, ["1"]),
+        ({"status": "success"}, ["1"]),
+        ({"status": "ERROR"}, ["2"]),
+        ({"uri": "succe.*"}, ["1"]),
+        ({"method": "PO"}, ["2"]),
+        ({"uri": "error|failure"}, ["2", "3"]),
+        ({"uri": "error|failure", "method": "POST"}, ["2"]),
+    ),
+)
+def test_filter_cassette(filters, expected):
+    cassette = [
+        {"id": "1", "status": "SUCCESS", "request": {"uri": "http://127.0.0.1/api/success", "method": "GET"}},
+        {"id": "2", "status": "ERROR", "request": {"uri": "http://127.0.0.1/api/error", "method": "POST"}},
+        {"id": "3", "status": "FAILURE", "request": {"uri": "http://127.0.0.1/api/failure", "method": "PUT"}},
+    ]
+    assert list(filter_cassette(cassette, **filters)) == [item for item in cassette if item["id"] in expected]

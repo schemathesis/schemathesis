@@ -6,6 +6,8 @@ class Endpoint(Enum):
     success = ("GET", "/api/success")
     failure = ("GET", "/api/failure")
     payload = ("POST", "/api/payload")
+    # Not compliant, but used by some tools like Elasticsearch
+    get_payload = ("GET", "/api/get_payload")
     multiple_failures = ("GET", "/api/multiple_failures")
     slow = ("GET", "/api/slow")
     path_variable = ("GET", "/api/path_variable/{key}")
@@ -56,7 +58,7 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
                     "value": {"type": "integer", "maximum": 4, "exclusiveMaximum": True},
                 },
             }
-        elif endpoint == "payload":
+        elif endpoint in ("payload", "get_payload"):
             payload = {
                 "type": "object",
                 "properties": {

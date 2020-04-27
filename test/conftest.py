@@ -7,7 +7,7 @@ from hypothesis import settings
 import schemathesis.cli
 from schemathesis.extra._aiohttp import run_server
 
-from .apps import _aiohttp, _flask
+from .apps import Endpoint, _aiohttp, _flask
 from .utils import make_schema
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
@@ -33,19 +33,30 @@ def _app():
 def endpoints(request):
     marker = request.node.get_closest_marker("endpoints")
     if marker:
-        endpoints = marker.args
+        if marker.args and marker.args[0] == "__all__":
+            endpoints = tuple(Endpoint.__members__)
+        else:
+            endpoints = marker.args
     else:
         endpoints = ("success", "failure")
     return endpoints
 
 
+@pytest.fixture
+def reset_app(_app, endpoints):
+    def inner():
+        _aiohttp.reset_app(_app, endpoints)
+
+    return inner
+
+
 @pytest.fixture()
-def app(_app, endpoints):
+def app(_app, reset_app):
     """Set up the global app for a specific test.
 
     NOTE. It might cause race conditions when `pytest-xdist` is used, but they have very low probability.
     """
-    _aiohttp.reset_app(_app, endpoints)
+    reset_app()
     return _app
 
 
@@ -80,6 +91,10 @@ def cli():
         @staticmethod
         def run(*args, **kwargs):
             return cli_runner.invoke(schemathesis.cli.run, args, **kwargs)
+
+        @staticmethod
+        def replay(*args, **kwargs):
+            return cli_runner.invoke(schemathesis.cli.replay, args, **kwargs)
 
         @staticmethod
         def main(*args, **kwargs):
