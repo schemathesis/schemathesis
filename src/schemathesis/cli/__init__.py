@@ -33,6 +33,13 @@ def register_check(function: Callable[[Union[requests.Response, WSGIResponse], m
     CHECKS_TYPE.choices += (function.__name__,)  # type: ignore
 
 
+def reset_checks() -> None:
+    """Get checks list to their default state."""
+    # Useful in tests
+    checks_module.ALL_CHECKS = checks_module.DEFAULT_CHECKS + checks_module.OPTIONAL_CHECKS
+    CHECKS_TYPE.choices = tuple(check.__name__ for check in checks_module.ALL_CHECKS) + ("all",)
+
+
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.option("--pre-run", help="A module to execute before the running the tests.", type=str)
 @click.version_option()

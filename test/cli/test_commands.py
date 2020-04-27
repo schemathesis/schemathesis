@@ -15,6 +15,7 @@ from hypothesis import HealthCheck, Phase, Verbosity
 from schemathesis import Case
 from schemathesis._compat import metadata
 from schemathesis.checks import ALL_CHECKS
+from schemathesis.cli import reset_checks
 from schemathesis.loaders import from_uri
 from schemathesis.models import Endpoint
 from schemathesis.runner import DEFAULT_CHECKS, DEFAULT_TARGETS
@@ -755,21 +756,33 @@ def test_pre_run_hook_invalid(testdir, cli):
     assert lines[9] == "Aborted!"
 
 
-@pytest.mark.endpoints("success")
-def test_register_check(testdir, cli, schema_url):
-    # When `--pre-run` hook is passed to the CLI call
-    # And it contains registering a new check, which always fails for the testing purposes
+@pytest.fixture()
+def new_check(testdir, cli):
     module = testdir.make_importable_pyfile(
         hook="""
-        import schemathesis
+            import schemathesis
 
-        @schemathesis.register_check
-        def new_check(response, result):
-            raise AssertionError("Custom check failed!")
-        """
+            @schemathesis.register_check
+            def new_check(response, result):
+                raise AssertionError("Custom check failed!")
+            """
+    )
+    yield module
+    reset_checks()
+    # To verify that "new_check" is unregistered
+    result = cli.run("--help")
+    lines = result.stdout.splitlines()
+    assert (
+        "  -c, --checks [not_a_server_error|status_code_conformance|content_type_conformance|"
+        "response_schema_conformance|all]" in lines
     )
 
-    result = cli.main("--pre-run", module.purebasename, "run", "-c", "new_check", schema_url)
+
+@pytest.mark.endpoints("success")
+def test_register_check(new_check, cli, schema_url):
+    # When `--pre-run` hook is passed to the CLI call
+    # And it contains registering a new check, which always fails for the testing purposes
+    result = cli.main("--pre-run", new_check.purebasename, "run", "-c", "new_check", schema_url)
 
     # Then CLI run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED
