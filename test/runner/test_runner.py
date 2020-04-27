@@ -13,7 +13,7 @@ from requests.auth import HTTPDigestAuth
 import schemathesis
 from schemathesis import loaders
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
-from schemathesis.constants import __version__
+from schemathesis.constants import USER_AGENT
 from schemathesis.models import Status
 from schemathesis.runner import events, get_base_url, get_requests_auth, prepare
 from schemathesis.runner.impl.core import get_wsgi_auth
@@ -111,7 +111,7 @@ def test_execute(args):
 
     # Then there are three executed cases
     # Two errors - the second one is a flakiness check
-    headers = {"User-Agent": f"schemathesis/{__version__}"}
+    headers = {"User-Agent": USER_AGENT}
     assert_schema_requests_num(app, 1)
     schema_requests = get_schema_requests(app)
     assert schema_requests[0].headers.get("User-Agent") == headers["User-Agent"]
@@ -144,7 +144,7 @@ def test_interactions(request, args, workers):
             "Accept": ["*/*"],
             "Accept-Encoding": ["gzip, deflate"],
             "Connection": ["keep-alive"],
-            "User-agent": ["schemathesis/1.2.0"],
+            "User-agent": [USER_AGENT],
         },
     }
     assert failure.response.status_code == 500
