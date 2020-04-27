@@ -269,12 +269,13 @@ def execute(
     junit_xml: Optional[click.utils.LazyFile],
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
-    handlers = [get_output_handler(workers_num)]
+    handlers: List[EventHandler] = []
     if junit_xml is not None:
-        handlers.insert(0, JunitXMLHandler(junit_xml))
+        handlers.append(JunitXMLHandler(junit_xml))
     if store_network_log is not None:
         # This handler should be first to have logs writing completed when the output handler will display statistic
-        handlers.insert(0, cassettes.CassetteWriter(store_network_log))
+        handlers.append(cassettes.CassetteWriter(store_network_log))
+    handlers.append(get_output_handler(workers_num))
     context = ExecutionContext(
         workers_num=workers_num,
         show_errors_tracebacks=show_errors_tracebacks,
