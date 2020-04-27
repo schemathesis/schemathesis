@@ -226,30 +226,46 @@ class SwaggerV20(BaseSchema):
                 full_path = self.get_full_path(path)
                 if should_skip_endpoint(full_path, self.endpoint):
                     continue
+                # Only one level is resolved for `raw_methods` so method names are available, but everything deeper
+                # is not resolved.
+                raw_methods = self.resolve(deepcopy(methods), RECURSION_DEPTH_LIMIT)
                 methods = self.resolve(methods)
                 common_parameters = get_common_parameters(methods)
-                for method, definition in methods.items():
+                for method, resolved_definition in methods.items():
                     # Only method definitions are parsed
                     if (
                         method not in self.operations
                         or should_skip_method(method, self.method)
-                        or should_skip_by_tag(definition.get("tags"), self.tag)
+                        or should_skip_by_tag(resolved_definition.get("tags"), self.tag)
                     ):
                         continue
-                    parameters = itertools.chain(definition.get("parameters", ()), common_parameters)
-                    yield self.make_endpoint(full_path, method, parameters, definition)
+                    parameters = itertools.chain(resolved_definition.get("parameters", ()), common_parameters)
+                    # To prevent recursion errors we need to pass not resolved schema as well
+                    # It could be used for response validation
+                    raw_definition = raw_methods[method]
+                    yield self.make_endpoint(full_path, method, parameters, resolved_definition, raw_definition)
         except (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError):
             raise InvalidSchema("Schema parsing failed. Please check your schema.")
 
-    def make_endpoint(
-        self, full_path: str, method: str, parameters: Iterator[Dict[str, Any]], definition: Dict[str, Any]
+    def make_endpoint(  # pylint: disable=too-many-arguments
+        self,
+        full_path: str,
+        method: str,
+        parameters: Iterator[Dict[str, Any]],
+        resolved_definition: Dict[str, Any],
+        raw_definition: Dict[str, Any],
     ) -> Endpoint:
         """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
         base_url = self.base_url
         if base_url is not None:
             base_url = base_url.rstrip("/")  # pragma: no mutate
         endpoint = Endpoint(
-            path=full_path, method=method.upper(), definition=definition, base_url=base_url, app=self.app, schema=self
+            path=full_path,
+            method=method.upper(),
+            definition=raw_definition,
+            base_url=base_url,
+            app=self.app,
+            schema=self,
         )
         for parameter in parameters:
             self.process_parameter(endpoint, parameter)
@@ -386,13 +402,18 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
             path += "/"
         return path
 
-    def make_endpoint(
-        self, full_path: str, method: str, parameters: Iterator[Dict[str, Any]], definition: Dict[str, Any]
+    def make_endpoint(  # pylint: disable=too-many-arguments
+        self,
+        full_path: str,
+        method: str,
+        parameters: Iterator[Dict[str, Any]],
+        resolved_definition: Dict[str, Any],
+        raw_definition: Dict[str, Any],
     ) -> Endpoint:
         """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
-        endpoint = super().make_endpoint(full_path, method, parameters, definition)
-        if "requestBody" in definition:
-            self.process_body(endpoint, definition["requestBody"])
+        endpoint = super().make_endpoint(full_path, method, parameters, resolved_definition, raw_definition)
+        if "requestBody" in resolved_definition:
+            self.process_body(endpoint, resolved_definition["requestBody"])
         return endpoint
 
     def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:

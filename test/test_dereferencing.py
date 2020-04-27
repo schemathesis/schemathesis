@@ -560,43 +560,12 @@ def test_complex_dereference(testdir):
         definition={
             "requestBody": {
                 "content": {
-                    "application/json": {
-                        "schema": {
-                            "additionalProperties": False,
-                            "description": "Test",
-                            "properties": {
-                                "profile": {
-                                    "additionalProperties": False,
-                                    "description": "Test",
-                                    "properties": {"id": {"type": "integer"}},
-                                    "required": ["id"],
-                                    "type": "object",
-                                },
-                                "username": {"type": "string"},
-                            },
-                            "required": ["username", "profile"],
-                            "type": "object",
-                        }
-                    }
+                    "application/json": {"schema": {"$ref": "../schemas/teapot/create.yaml#/TeapotCreateRequest"}}
                 },
                 "description": "Test.",
                 "required": True,
             },
-            "responses": {
-                "default": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "additionalProperties": False,
-                                "properties": {"key": {"type": "string"}},
-                                "required": ["key"],
-                                "type": "object",
-                            }
-                        }
-                    },
-                    "description": "Probably an error",
-                }
-            },
+            "responses": {"default": {"$ref": "../../common/responses.yaml#/DefaultError"}},
             "summary": "Test",
             "tags": ["ancillaries"],
         },

@@ -352,8 +352,7 @@ def test_response_conformance_valid(args):
 
 
 @pytest.mark.endpoints("recursive")
-def test_response_conformance_recursive_valid(mocker, schema_url):
-    mocker.patch("schemathesis.schemas.RECURSION_DEPTH_LIMIT", 1)
+def test_response_conformance_recursive_valid(schema_url):
     # When endpoint contains a response that have recursive references
     # And "response_schema_conformance" is specified
     results = execute(schema_url, checks=(response_schema_conformance,), hypothesis_max_examples=1)
