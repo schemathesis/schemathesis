@@ -31,7 +31,7 @@ hypothesis_jsonschema = ">=0.9.13,<1.0"
 jsonschema = "^3.0.0"
 pytest = ">4.6.4"
 pyyaml = "^5.1"
-pytest-subtests = "^0.2.1"
+pytest-subtests = ">=0.2.1,<1.0"
 requests = "^2.22"
 click = "^7.0"
 importlib_metadata = { version = "^1.1", python = "<3.8" }

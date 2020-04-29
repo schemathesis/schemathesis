@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+~~~~~~~
+
+- Update ``pytest-subtests`` pin to ``>=0.2.1,<1.0``. `#537`_
+
 `1.3.2`_ - 2020-04-27
 ---------------------
 
@@ -962,6 +967,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#537: https://github.com/kiwicom/schemathesis/issues/537
 .. _#529: https://github.com/kiwicom/schemathesis/issues/529
 .. _#521: https://github.com/kiwicom/schemathesis/issues/521
 .. _#519: https://github.com/kiwicom/schemathesis/issues/519
