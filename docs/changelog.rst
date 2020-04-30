@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Add missing ``validate_schema`` argument to ``loaders.from_pytest_fixture``.
+
 `1.3.4`_ - 2020-04-30
 ---------------------
 
