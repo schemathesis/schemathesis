@@ -23,7 +23,7 @@ from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
 from .constants import HookLocation
-from .converter import to_json_schema
+from .converter import to_json_schema, to_json_schema_recursive
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .models import Endpoint, empty_object
@@ -365,7 +365,7 @@ class SwaggerV20(BaseSchema):
         schema = definition.get("schema")
         if not schema:
             return None
-        return to_json_schema(schema, self.nullable_name)
+        return to_json_schema_recursive(schema, self.nullable_name)
 
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
         produces = endpoint.definition.get("produces", None)
@@ -453,7 +453,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
         if option:
-            return to_json_schema(option["schema"], self.nullable_name)
+            return to_json_schema_recursive(option["schema"], self.nullable_name)
         return None
 
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:

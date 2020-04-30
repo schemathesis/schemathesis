@@ -228,6 +228,25 @@ def test_response_schema_conformance_swagger_no_content_header(swagger_20):
         (b'{"success": true}', {"responses": {"200": {"description": "text"}}}),
         (b'{"random": "text"}', {"responses": {"200": {"description": "text"}}}),
         (
+            b'{"success": null}',
+            {
+                "responses": {
+                    "200": {
+                        "description": "text",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"success": {"type": "boolean", "nullable": True}},
+                                    "required": ["success"],
+                                }
+                            }
+                        },
+                    }
+                }
+            },
+        ),
+        (
             b'{"success": true}',
             {
                 "responses": {

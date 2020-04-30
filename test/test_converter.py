@@ -20,3 +20,38 @@ from schemathesis import converter
 )
 def test_to_jsonschema(schema, expected):
     assert converter.to_json_schema(schema, "x-nullable") == expected
+
+
+@pytest.mark.parametrize(
+    "schema, expected",
+    (
+        (
+            {
+                "type": "object",
+                "properties": {"success": {"type": "boolean", "x-nullable": True}},
+                "required": ["success"],
+            },
+            {
+                "type": "object",
+                "properties": {"success": {"anyOf": [{"type": "boolean"}, {"type": "null"}]}},
+                "required": ["success"],
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"success": {"type": "array", "items": [{"type": "boolean", "x-nullable": True}]}},
+                "required": ["success"],
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "success": {"type": "array", "items": [{"anyOf": [{"type": "boolean"}, {"type": "null"}]}]}
+                },
+                "required": ["success"],
+            },
+        ),
+    ),
+)
+def test_to_jsonschema_recursive(schema, expected):
+    assert converter.to_json_schema_recursive(schema, "x-nullable") == expected
