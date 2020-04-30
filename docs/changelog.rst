@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Validation of nullable properties in ``response_schema_conformance`` check introduced in ``1.3.0``. `#542`_
+
 `1.3.3`_ - 2020-04-29
 ---------------------
 
@@ -970,6 +975,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#542: https://github.com/kiwicom/schemathesis/issues/542
 .. _#537: https://github.com/kiwicom/schemathesis/issues/537
 .. _#529: https://github.com/kiwicom/schemathesis/issues/529
 .. _#521: https://github.com/kiwicom/schemathesis/issues/521
