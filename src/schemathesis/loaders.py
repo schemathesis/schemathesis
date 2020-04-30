@@ -156,9 +156,10 @@ def from_pytest_fixture(
     method: Optional[Filter] = NOT_SET,
     endpoint: Optional[Filter] = NOT_SET,
     tag: Optional[Filter] = NOT_SET,
+    validate_schema: bool = True,
 ) -> LazySchema:
     """Needed for a consistent library API."""
-    return LazySchema(fixture_name, method=method, endpoint=endpoint, tag=tag)
+    return LazySchema(fixture_name, method=method, endpoint=endpoint, tag=tag, validate_schema=validate_schema)
 
 
 def from_wsgi(
