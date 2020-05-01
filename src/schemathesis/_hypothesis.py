@@ -1,9 +1,10 @@
 """Provide strategies for given endpoint(s) definition."""
 import asyncio
+import inspect
 import re
 from base64 import b64encode
 from functools import partial
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 from urllib.parse import quote_plus
 
 import hypothesis
@@ -13,7 +14,7 @@ from hypothesis_jsonschema import from_schema
 from . import utils
 from ._compat import handle_warnings
 from .exceptions import InvalidSchema
-from .hooks import get_hook
+from .hooks import HookContext, get_hook
 from .models import Case, Endpoint
 from .types import Hook
 
@@ -187,18 +188,31 @@ def _get_case_strategy(
             raise InvalidSchema("Body parameters are defined for GET request.")
         static_parameters["body"] = None
         strategies.pop("body", None)
-    _apply_hooks(strategies, get_hook)
-    _apply_hooks(strategies, endpoint.schema.get_hook)
+    context = HookContext(endpoint)
+    _apply_hooks(strategies, get_hook, context)
+    _apply_hooks(strategies, endpoint.schema.get_hook, context)
     if hooks is not None:
-        _apply_hooks(strategies, hooks.get)
+        _apply_hooks(strategies, hooks.get, context)
     return st.builds(partial(Case, **static_parameters), **strategies)
 
 
-def _apply_hooks(strategies: Dict[str, st.SearchStrategy], getter: Callable[[str], Optional[Hook]]) -> None:
+def _apply_hooks(
+    strategies: Dict[str, st.SearchStrategy], getter: Callable[[str], Optional[Hook]], context: HookContext
+) -> None:
     for key, strategy in strategies.items():
         hook = getter(key)
         if hook is not None:
-            strategies[key] = hook(strategy)
+            args: Union[Tuple[st.SearchStrategy], Tuple[st.SearchStrategy, HookContext]]
+            if _accepts_context(hook):
+                args = (strategy, context)
+            else:
+                args = (strategy,)
+            strategies[key] = hook(*args)
+
+
+def _accepts_context(hook: Hook) -> bool:
+    # There are no restrictions on the second argument's name and we don't check its name here.
+    return len(inspect.signature(hook).parameters) == 2
 
 
 def register_string_format(name: str, strategy: st.SearchStrategy) -> None:

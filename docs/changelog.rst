@@ -6,6 +6,17 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- ``context`` argument for hook functions to provide an additional context for hooks. A deprecation warning is emitted
+  for hook functions that do not accept this argument.
+
+Deprecated
+~~~~~~~~~~
+
+- Hook functions that do not accept ``context`` as their second argument. They will become not supported in Schemathesis 2.0.
+
 Fixed
 ~~~~~
 
