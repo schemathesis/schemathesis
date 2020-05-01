@@ -26,6 +26,7 @@ from .constants import HookLocation
 from .converter import to_json_schema, to_json_schema_recursive
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
+from .hooks import warn_deprecated_hook
 from .models import Endpoint, empty_object
 from .types import Filter, Hook, NotSet
 from .utils import NOT_SET, GenericResponse, StringDatesYAMLLoader
@@ -164,11 +165,13 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def register_hook(self, place: str, hook: Hook) -> None:
+        warn_deprecated_hook(hook)
         key = HookLocation[place]
         self.hooks[key] = hook
 
     def with_hook(self, place: str, hook: Hook) -> Callable[[GenericTest], GenericTest]:
         """Register a hook for a specific test."""
+        warn_deprecated_hook(hook)
         if place not in HookLocation.__members__:
             raise KeyError(place)
 
