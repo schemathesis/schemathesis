@@ -1,7 +1,10 @@
 from pathlib import Path
-from typing import Any, Callable, Dict, List, NewType, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, NewType, Set, Tuple, Union
 
 from hypothesis.strategies import SearchStrategy
+
+if TYPE_CHECKING:
+    from .hooks import HookContext
 
 Schema = NewType("Schema", Dict[str, Any])  # pragma: no mutate
 PathLike = Union[Path, str]  # pragma: no mutate
@@ -22,6 +25,8 @@ class NotSet:
 # A filter for endpoint / method
 Filter = Union[str, List[str], Tuple[str], Set[str], NotSet]  # pragma: no mutate
 
-Hook = Callable[[SearchStrategy], SearchStrategy]  # pragma: no mutate
+Hook = Union[
+    Callable[[SearchStrategy], SearchStrategy], Callable[[SearchStrategy, "HookContext"], SearchStrategy]
+]  # pragma: no mutate
 
 RawAuth = Tuple[str, str]  # pragma: no mutate

@@ -4,7 +4,7 @@ from hypothesis import given, settings
 import schemathesis
 
 
-def hook(strategy):
+def hook(strategy, context):
     return strategy.filter(lambda x: x["id"].isdigit())
 
 
@@ -52,7 +52,8 @@ def test_schema_query_hook(schema, schema_url):
 @pytest.mark.usefixtures("query_hook")
 @pytest.mark.endpoints("custom_format")
 def test_hooks_combination(schema, schema_url):
-    def extra(st):
+    def extra(st, context):
+        assert context.endpoint == schema.endpoints["/api/custom_format"]["GET"]
         return st.filter(lambda x: int(x["id"]) % 2 == 0)
 
     schema.register_hook("query", extra)
@@ -89,7 +90,7 @@ def test_per_test_hooks(testdir):
         """
 from hypothesis import strategies as st
 
-def replacement(strategy):
+def replacement(strategy, context):
     return st.just({"id": "foobar"})
 
 @schema.with_hook("query", replacement)
@@ -104,10 +105,10 @@ def test_a(case):
 def test_b(case):
     assert case.query["id"] == "foobar"
 
-def another_replacement(strategy):
+def another_replacement(strategy, context):
     return st.just({"id": "foobaz"})
 
-def third_replacement(strategy):
+def third_replacement(strategy, context):
     return st.just({"value": "spam"})
 
 @schema.parametrize()
@@ -131,7 +132,7 @@ def test_d(case):
 
 
 def test_invalid_hook(schema):
-    def foo(strategy):
+    def foo(strategy, context):
         pass
 
     with pytest.raises(KeyError, match="wrong"):
@@ -144,7 +145,7 @@ def test_invalid_hook(schema):
 def test_hooks_via_parametrize(testdir):
     testdir.make_test(
         """
-def extra(st):
+def extra(st, context):
     return st.filter(lambda x: x["id"].isdigit() and int(x["id"]) % 2 == 0)
 
 schema.register_hook("query", extra)
@@ -159,3 +160,26 @@ def test(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.endpoints("custom_format")
+def test_deprecated_hook(recwarn, schema):
+    def deprecated_hook(strategy):
+        return strategy.filter(lambda x: x["id"].isdigit())
+
+    schema.register_hook("query", deprecated_hook)
+    assert (
+        str(recwarn.list[0].message) == "Hook functions that do not accept `context` argument are deprecated and "
+        "support will be removed in Schemathesis 2.0."
+    )
+
+    strategy = schema.endpoints["/api/custom_format"]["GET"].as_strategy()
+
+    @given(case=strategy)
+    @settings(max_examples=3)
+    def test(case):
+        assert case.query["id"].isdigit()
+        assert int(case.query["id"]) % 2 == 0
+
+    test()

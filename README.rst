@@ -405,25 +405,29 @@ If you want to customize how data is generated, then you can use hooks of three 
 - Schema-local, which are applied only for specific schema instance;
 - Test function specific, they are applied only for a specific test function;
 
-Each hook accepts a Hypothesis strategy and should return a Hypothesis strategy:
+Each hook accepts a Hypothesis strategy and a hook context. Hook context provides additional info that might be helpful to
+construct a new strategy, for example ``context.endpoint`` attribute is a reference to the currently tested endpoint.
+For more information look at ``schemathesis.hooks.HookContext`` class.
+
+Hooks should return a Hypothesis strategy:
 
 .. code:: python
 
     import schemathesis
 
-    def global_hook(strategy):
+    def global_hook(strategy, context):
         return strategy.filter(lambda x: x["id"].isdigit())
 
     schemathesis.hooks.register("query", hook)
 
     schema = schemathesis.from_uri("http://0.0.0.0:8080/swagger.json")
 
-    def schema_hook(strategy):
+    def schema_hook(strategy, context):
         return strategy.filter(lambda x: int(x["id"]) % 2 == 0)
 
     schema.register_hook("query", schema_hook)
 
-    def function_hook(strategy):
+    def function_hook(strategy, context):
         return strategy.filter(lambda x: len(x["id"]) > 5)
 
     @schema.with_hook("query", function_hook)
