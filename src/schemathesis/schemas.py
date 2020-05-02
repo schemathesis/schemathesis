@@ -26,15 +26,13 @@ from .constants import HookLocation
 from .converter import to_json_schema, to_json_schema_recursive
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
-from .hooks import warn_deprecated_hook
+from .hooks import HookDispatcher, warn_deprecated_hook
 from .models import Endpoint, empty_object
-from .types import Filter, Hook, NotSet
-from .utils import NOT_SET, GenericResponse, StringDatesYAMLLoader
+from .types import Filter, GenericTest, Hook, NotSet
+from .utils import NOT_SET, GenericResponse, StringDatesYAMLLoader, deprecated
 
 # Reference resolving will stop after this depth
 RECURSION_DEPTH_LIMIT = 100
-# Generic test with any arguments and no return
-GenericTest = Callable[..., None]  # pragma: no mutate
 
 
 def load_file_impl(location: str, opener: Callable) -> Dict[str, Any]:
@@ -64,7 +62,8 @@ class BaseSchema(Mapping):
     endpoint: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     tag: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
-    hooks: Dict[HookLocation, Hook] = attr.ib(factory=dict)  # pragma: no mutate
+    hooks: HookDispatcher = attr.ib(factory=HookDispatcher)  # pragma: no mutate
+    test_function: Optional[GenericTest] = attr.ib(default=None)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
 
     def __iter__(self) -> Iterator[str]:
@@ -126,14 +125,16 @@ class BaseSchema(Mapping):
     ) -> Callable:
         """Mark a test function as a parametrized one."""
 
-        def wrapper(func: Callable) -> Callable:
-            func._schemathesis_test = self.clone(method, endpoint, tag, validate_schema)  # type: ignore
+        def wrapper(func: GenericTest) -> GenericTest:
+            HookDispatcher.add_dispatcher(func)
+            func._schemathesis_test = self.clone(func, method, endpoint, tag, validate_schema)  # type: ignore
             return func
 
         return wrapper
 
-    def clone(
+    def clone(  # pylint: disable=too-many-arguments
         self,
+        test_function: Optional[GenericTest] = None,
         method: Optional[Filter] = NOT_SET,
         endpoint: Optional[Filter] = NOT_SET,
         tag: Optional[Filter] = NOT_SET,
@@ -157,6 +158,7 @@ class BaseSchema(Mapping):
             tag=tag,
             app=self.app,
             hooks=self.hooks,
+            test_function=test_function,
             validate_schema=validate_schema,  # type: ignore
         )
 
@@ -164,29 +166,21 @@ class BaseSchema(Mapping):
         """Extract response schema from `responses`."""
         raise NotImplementedError
 
+    @deprecated("'register_hook` is deprecated, use `hooks.register' instead")
     def register_hook(self, place: str, hook: Hook) -> None:
         warn_deprecated_hook(hook)
-        key = HookLocation[place]
-        self.hooks[key] = hook
+        if place not in HookLocation.__members__:
+            raise KeyError(place)
+        self.hooks.register_hook_with_name(f"before_generate_{place}", hook, skip_validation=True)
 
+    @deprecated("'with_hook` is deprecated, use `hooks.apply' instead")
     def with_hook(self, place: str, hook: Hook) -> Callable[[GenericTest], GenericTest]:
         """Register a hook for a specific test."""
         warn_deprecated_hook(hook)
         if place not in HookLocation.__members__:
             raise KeyError(place)
 
-        def wrapper(func: GenericTest) -> GenericTest:
-            if not hasattr(func, "_schemathesis_hooks"):
-                func._schemathesis_hooks = {}  # type: ignore
-            # a string key is simpler to use later
-            func._schemathesis_hooks[place] = hook  # type: ignore
-            return func
-
-        return wrapper
-
-    def get_hook(self, place: str) -> Optional[Hook]:
-        key = HookLocation[place]
-        return self.hooks.get(key)
+        return self.hooks.apply(f"before_generate_{place}", hook, skip_validation=True)
 
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
         """Content types available for this endpoint."""

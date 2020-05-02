@@ -30,3 +30,5 @@ Hook = Union[
 ]  # pragma: no mutate
 
 RawAuth = Tuple[str, str]  # pragma: no mutate
+# Generic test with any arguments and no return
+GenericTest = Callable[..., None]  # pragma: no mutate

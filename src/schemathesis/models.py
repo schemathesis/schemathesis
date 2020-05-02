@@ -16,11 +16,12 @@ from hypothesis.strategies import SearchStrategy
 
 from .checks import ALL_CHECKS
 from .exceptions import InvalidSchema
-from .types import Body, Cookies, FormData, Headers, Hook, PathParameters, Query
+from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse
 
 if TYPE_CHECKING:
     from .schemas import BaseSchema
+    from .hooks import HookDispatcher
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -233,7 +234,7 @@ class Endpoint:
     body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
     form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
 
-    def as_strategy(self, hooks: Optional[Dict[str, Hook]] = None) -> SearchStrategy:
+    def as_strategy(self, hooks: Optional["HookDispatcher"] = None) -> SearchStrategy:
         from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel
 
         return get_case_strategy(self, hooks)
