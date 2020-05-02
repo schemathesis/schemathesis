@@ -11,11 +11,14 @@ Added
 
 - ``context`` argument for hook functions to provide an additional context for hooks. A deprecation warning is emitted
   for hook functions that do not accept this argument.
+- A new hook system that allows generic hook dispatching. It comes with new hook locations. For more details see "Customization" section in our documentation.
 
 Deprecated
 ~~~~~~~~~~
 
-- Hook functions that do not accept ``context`` as their second argument. They will become not supported in Schemathesis 2.0.
+- Hook functions that do not accept ``context`` as their first argument. They will become not supported in Schemathesis 2.0.
+- Registering hooks by name and function. Use ``register`` decorators instead, for more details see "Customization" section in our documentation.
+- ``BaseSchema.with_hook`` and ``BaseSchema.register_hook``. Use ``BaseSchema.hooks.apply`` and ``BaseSchema.hooks.register`` instead.
 
 Fixed
 ~~~~~

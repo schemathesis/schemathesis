@@ -14,7 +14,7 @@ from hypothesis_jsonschema import from_schema
 from . import utils
 from ._compat import handle_warnings
 from .exceptions import InvalidSchema
-from .hooks import HookContext, get_hook
+from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import Case, Endpoint
 from .types import Hook
 
@@ -23,11 +23,11 @@ SLASH = "/"
 
 
 def create_test(
-    endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None,
+    endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
 ) -> Callable:
     """Create a Hypothesis test."""
-    hooks = getattr(test, "_schemathesis_hooks", None)
-    strategy = endpoint.as_strategy(hooks=hooks)
+    hook_dispatcher = getattr(test, "_schemathesis_hooks", None)
+    strategy = endpoint.as_strategy(hooks=hook_dispatcher)
     wrapped_test = hypothesis.given(case=strategy)(test)
     if seed is not None:
         wrapped_test = hypothesis.seed(seed)(wrapped_test)
@@ -121,7 +121,7 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
     return True
 
 
-def get_case_strategy(endpoint: Endpoint, hooks: Optional[Dict[str, Hook]] = None) -> st.SearchStrategy:
+def get_case_strategy(endpoint: Endpoint, hooks: Optional[HookDispatcher] = None) -> st.SearchStrategy:
     """Create a strategy for a complete test case.
 
     Path & endpoint are static, the others are JSON schemas.
@@ -160,11 +160,7 @@ def filter_path_parameters(parameters: Dict[str, Any]) -> bool:
     Because of it this case doesn't bring much value and might lead to false positives results of Schemathesis runs.
     """
 
-    path_parameter_blacklist = (
-        ".",
-        SLASH,
-        "",
-    )
+    path_parameter_blacklist = (".", SLASH, "")
 
     return not any(
         (value in path_parameter_blacklist or isinstance(value, str) and SLASH in value)
@@ -180,7 +176,7 @@ def _get_case_strategy(
     endpoint: Endpoint,
     extra_static_parameters: Dict[str, Any],
     strategies: Dict[str, st.SearchStrategy],
-    hooks: Optional[Dict[str, Hook]] = None,
+    hook_dispatcher: Optional[HookDispatcher] = None,
 ) -> st.SearchStrategy:
     static_parameters: Dict[str, Any] = {"endpoint": endpoint, **extra_static_parameters}
     if endpoint.schema.validate_schema and endpoint.method == "GET":
@@ -189,29 +185,28 @@ def _get_case_strategy(
         static_parameters["body"] = None
         strategies.pop("body", None)
     context = HookContext(endpoint)
-    _apply_hooks(strategies, get_hook, context)
-    _apply_hooks(strategies, endpoint.schema.get_hook, context)
-    if hooks is not None:
-        _apply_hooks(strategies, hooks.get, context)
+    _apply_hooks(strategies, GLOBAL_HOOK_DISPATCHER, context)
+    _apply_hooks(strategies, endpoint.schema.hooks, context)
+    if hook_dispatcher is not None:
+        _apply_hooks(strategies, hook_dispatcher, context)
     return st.builds(partial(Case, **static_parameters), **strategies)
 
 
-def _apply_hooks(
-    strategies: Dict[str, st.SearchStrategy], getter: Callable[[str], Optional[Hook]], context: HookContext
-) -> None:
-    for key, strategy in strategies.items():
-        hook = getter(key)
-        if hook is not None:
-            args: Union[Tuple[st.SearchStrategy], Tuple[st.SearchStrategy, HookContext]]
+def _apply_hooks(strategies: Dict[str, st.SearchStrategy], dispatcher: HookDispatcher, context: HookContext) -> None:
+    for key in strategies:
+        for hook in dispatcher.get_hooks(f"before_generate_{key}"):
+            # Get the strategy on each hook to pass the first hook output as an input to the next one
+            strategy = strategies[key]
+            args: Union[Tuple[st.SearchStrategy], Tuple[HookContext, st.SearchStrategy]]
             if _accepts_context(hook):
-                args = (strategy, context)
+                args = (context, strategy)
             else:
                 args = (strategy,)
             strategies[key] = hook(*args)
 
 
 def _accepts_context(hook: Hook) -> bool:
-    # There are no restrictions on the second argument's name and we don't check its name here.
+    # There are no restrictions on the first argument's name and we don't check its name here.
     return len(inspect.signature(hook).parameters) == 2
 
 
