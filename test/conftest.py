@@ -125,6 +125,25 @@ def simple_schema():
 
 
 @pytest.fixture(scope="session")
+def simple_openapi():
+    return {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/query": {
+                "get": {
+                    "parameters": [
+                        {"name": "id", "in": "query", "required": True, "schema": {"type": "string", "minLength": 1}},
+                        {"name": "value", "in": "header", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+
+
+@pytest.fixture(scope="session")
 def swagger_20(simple_schema):
     return schemathesis.from_dict(simple_schema)
 

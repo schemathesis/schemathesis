@@ -396,59 +396,6 @@ For convenience you can explore the schemas and strategies manually:
 
 Schema instances implement ``Mapping`` protocol.
 
-Changing data generation behavior
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-If you want to customize how data is generated, then you can use hooks of three types:
-
-- Global, which are applied to all schemas;
-- Schema-local, which are applied only for specific schema instance;
-- Test function specific, they are applied only for a specific test function;
-
-Each hook accepts a Hypothesis strategy and a hook context. Hook context provides additional info that might be helpful to
-construct a new strategy, for example ``context.endpoint`` attribute is a reference to the currently tested endpoint.
-For more information look at ``schemathesis.hooks.HookContext`` class.
-
-Hooks should return a Hypothesis strategy:
-
-.. code:: python
-
-    import schemathesis
-
-    def global_hook(strategy, context):
-        return strategy.filter(lambda x: x["id"].isdigit())
-
-    schemathesis.hooks.register("query", hook)
-
-    schema = schemathesis.from_uri("http://0.0.0.0:8080/swagger.json")
-
-    def schema_hook(strategy, context):
-        return strategy.filter(lambda x: int(x["id"]) % 2 == 0)
-
-    schema.register_hook("query", schema_hook)
-
-    def function_hook(strategy, context):
-        return strategy.filter(lambda x: len(x["id"]) > 5)
-
-    @schema.with_hook("query", function_hook)
-    @schema.parametrize()
-    def test_api(case):
-        ...
-
-There are 6 places, where hooks can be applied and you need to pass it as the first argument to ``schemathesis.hooks.register`` or ``schema.register_hook``:
-
-- path_parameters
-- headers
-- cookies
-- query
-- body
-- form_data
-
-It might be useful if you want to exclude certain cases that you don't want to test, or modify the generated data, so it
-will be more meaningful for the application - add existing IDs from the database, custom auth header, etc.
-
-**NOTE**. Global hooks are applied first.
-
 Lazy loading
 ~~~~~~~~~~~~
 

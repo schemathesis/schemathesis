@@ -1,10 +1,11 @@
+"""These tests ensure backward compatibility with the old hooks system."""
 import pytest
 from hypothesis import given, settings
 
 import schemathesis
 
 
-def hook(strategy, context):
+def hook(context, strategy):
     return strategy.filter(lambda x: x["id"].isdigit())
 
 
@@ -52,7 +53,7 @@ def test_schema_query_hook(schema, schema_url):
 @pytest.mark.usefixtures("query_hook")
 @pytest.mark.endpoints("custom_format")
 def test_hooks_combination(schema, schema_url):
-    def extra(st, context):
+    def extra(context, st):
         assert context.endpoint == schema.endpoints["/api/custom_format"]["GET"]
         return st.filter(lambda x: int(x["id"]) % 2 == 0)
 
@@ -68,29 +69,12 @@ def test_hooks_combination(schema, schema_url):
     test()
 
 
-SIMPLE_SCHEMA = {
-    "openapi": "3.0.2",
-    "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-    "paths": {
-        "/query": {
-            "get": {
-                "parameters": [
-                    {"name": "id", "in": "query", "required": True, "schema": {"type": "string", "minLength": 1}},
-                    {"name": "value", "in": "header", "required": True, "schema": {"type": "string"}},
-                ],
-                "responses": {"200": {"description": "OK"}},
-            }
-        }
-    },
-}
-
-
-def test_per_test_hooks(testdir):
+def test_per_test_hooks(testdir, simple_openapi):
     testdir.make_test(
         """
 from hypothesis import strategies as st
 
-def replacement(strategy, context):
+def replacement(context, strategy):
     return st.just({"id": "foobar"})
 
 @schema.with_hook("query", replacement)
@@ -105,10 +89,10 @@ def test_a(case):
 def test_b(case):
     assert case.query["id"] == "foobar"
 
-def another_replacement(strategy, context):
+def another_replacement(context, strategy):
     return st.just({"id": "foobaz"})
 
-def third_replacement(strategy, context):
+def third_replacement(context, strategy):
     return st.just({"value": "spam"})
 
 @schema.parametrize()
@@ -125,14 +109,24 @@ def test_c(case):
 def test_d(case):
     assert case.query["id"] != "foobar"
     """,
-        schema=SIMPLE_SCHEMA,
+        schema=simple_openapi,
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=4)
 
 
-def test_invalid_hook(schema):
-    def foo(strategy, context):
+def test_invalid_global_hook():
+    with pytest.raises(KeyError, match="wrong"):
+        schemathesis.hooks.register("wrong", lambda x: x)
+
+
+def test_invalid_schema_hook(schema):
+    with pytest.raises(KeyError, match="wrong"):
+        schema.register_hook("wrong", lambda x: x)
+
+
+def test_invalid_local_hook(schema):
+    def foo(context, strategy):
         pass
 
     with pytest.raises(KeyError, match="wrong"):
@@ -142,10 +136,10 @@ def test_invalid_hook(schema):
             pass
 
 
-def test_hooks_via_parametrize(testdir):
+def test_hooks_via_parametrize(testdir, simple_openapi):
     testdir.make_test(
         """
-def extra(st, context):
+def extra(context, st):
     return st.filter(lambda x: x["id"].isdigit() and int(x["id"]) % 2 == 0)
 
 schema.register_hook("query", extra)
@@ -153,10 +147,10 @@ schema.register_hook("query", extra)
 @schema.parametrize()
 @settings(max_examples=1)
 def test(case):
-    assert case.endpoint.schema.get_hook("query") is extra
+    assert case.endpoint.schema.hooks.get_hooks("before_generate_query")[0] is extra
     assert int(case.query["id"]) % 2 == 0
     """,
-        schema=SIMPLE_SCHEMA,
+        schema=simple_openapi,
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
@@ -170,7 +164,7 @@ def test_deprecated_hook(recwarn, schema):
 
     schema.register_hook("query", deprecated_hook)
     assert (
-        str(recwarn.list[0].message) == "Hook functions that do not accept `context` argument are deprecated and "
+        str(recwarn.list[1].message) == "Hook functions that do not accept `context` argument are deprecated and "
         "support will be removed in Schemathesis 2.0."
     )
 
@@ -180,6 +174,10 @@ def test_deprecated_hook(recwarn, schema):
     @settings(max_examples=3)
     def test(case):
         assert case.query["id"].isdigit()
-        assert int(case.query["id"]) % 2 == 0
 
     test()
+
+
+def test_register_wrong_number_of_argument():
+    with pytest.raises(TypeError, match="Invalid number of arguments. Please, use `register` as a decorator."):
+        schemathesis.hooks.register("a", "b", "c")
