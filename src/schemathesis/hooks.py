@@ -184,42 +184,42 @@ all_scopes = HookDispatcher.register_spec(list(HookScope))
 
 @all_scopes
 def before_generate_path_parameters(strategy: st.SearchStrategy, context: HookContext) -> st.SearchStrategy:
-    pass
+    """Called on a strategy that generates values for ``path_parameters``."""
 
 
 @all_scopes
 def before_generate_headers(strategy: st.SearchStrategy, context: HookContext) -> st.SearchStrategy:
-    pass
+    """Called on a strategy that generates values for ``headers``."""
 
 
 @all_scopes
 def before_generate_cookies(strategy: st.SearchStrategy, context: HookContext) -> st.SearchStrategy:
-    pass
+    """Called on a strategy that generates values for ``cookies``."""
 
 
 @all_scopes
 def before_generate_query(strategy: st.SearchStrategy, context: HookContext) -> st.SearchStrategy:
-    pass
+    """Called on a strategy that generates values for ``query``."""
 
 
 @all_scopes
 def before_generate_body(strategy: st.SearchStrategy, context: HookContext) -> st.SearchStrategy:
-    pass
+    """Called on a strategy that generates values for ``body``."""
 
 
 @all_scopes
 def before_generate_form_data(strategy: st.SearchStrategy, context: HookContext) -> st.SearchStrategy:
-    pass
+    """Called on a strategy that generates values for ``form_data``."""
 
 
 @all_scopes
 def before_process_path(context: HookContext, path: str, methods: Dict[str, Any]) -> None:
-    pass
+    """Called before API path is processed."""
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
 def before_load_schema(context: HookContext, raw_schema: Dict[str, Any]) -> None:
-    pass
+    """Called before schema instance is created."""
 
 
 GLOBAL_HOOK_DISPATCHER = HookDispatcher(scope=HookScope.GLOBAL)

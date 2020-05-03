@@ -806,7 +806,6 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
     if not optional_interrupt:
         assert "!! KeyboardInterrupt !!" in lines[11]
     if "F" in lines[10]:
-        # assert "=== FAILURES ===" in lines[12]
         if "!! KeyboardInterrupt !!" not in lines[11]:
             assert "=== FAILURES ===" in lines[12]
             position = 23
