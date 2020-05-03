@@ -12,6 +12,7 @@ Added
 - ``context`` argument for hook functions to provide an additional context for hooks. A deprecation warning is emitted
   for hook functions that do not accept this argument.
 - A new hook system that allows generic hook dispatching. It comes with new hook locations. For more details see "Customization" section in our documentation.
+- New ``before_process_path`` hook.
 
 Deprecated
 ~~~~~~~~~~
