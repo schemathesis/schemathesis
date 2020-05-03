@@ -6,11 +6,11 @@ Customization
 Often you need to modify certain aspects of Schemathesis behavior, adjust data generation, modify requests before
 sending, and so on. Schemathesis offers a hook mechanism which is similar to the pytest's one.
 
-Basing on the scope of the changes there are three levels of hooks:
+Basing on the scope of the changes there are three scopes of hooks:
 
 - Global. These hooks applied to all schemas in the test run;
-- Schema-local. Applied only for specific schema instance;
-- Test function specific. Applied only for a specific test function;
+- Schema. Applied only for specific schema instance;
+- Test. Applied only for a specific test function;
 
 To register a new hook function you need to use special decorators - ``register`` for global and schema-local hooks and ``apply`` for test-specific ones:
 
@@ -42,7 +42,7 @@ By default ``register`` functions will check the registered hook name to determi
 Also, these decorators will check the signature of your hook function to match the specification.
 Each hook should accept ``context`` as the first argument, that provides additional context for hook execution.
 
-Hooks registered on the same level will be applied in the order of registration. When there are multiple hooks in the same hook location, then the global ones will be applied first.
+Hooks registered on the same scope will be applied in the order of registration. When there are multiple hooks in the same hook location, then the global ones will be applied first.
 
 Common hooks
 ------------

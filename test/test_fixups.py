@@ -14,7 +14,7 @@ schema = schemathesis.from_dict({schema})
 
 def teardown_module(module):
     schemathesis.fixups.uninstall()
-    assert schemathesis.hooks.get_hooks("before_load_schema") == []
+    assert schemathesis.hooks.get_all_by_name("before_load_schema") == []
 
 @schema.parametrize()
 @settings(max_examples=1)
