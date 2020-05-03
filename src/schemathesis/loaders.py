@@ -12,6 +12,7 @@ from werkzeug.test import Client
 from . import spec_schemas
 from .constants import USER_AGENT
 from .exceptions import HTTPError
+from .hooks import HookContext, dispatch
 from .lazy import LazySchema
 from .schemas import BaseSchema, OpenApi30, SwaggerV20
 from .types import Filter, PathLike
@@ -115,6 +116,7 @@ def from_dict(
     validate_schema: bool = True,
 ) -> BaseSchema:
     """Get a proper abstraction for the given raw schema."""
+    dispatch("before_load_schema", HookContext(), raw_schema)
     if "swagger" in raw_schema:
         _maybe_validate_schema(raw_schema, spec_schemas.SWAGGER_20, validate_schema)
         return SwaggerV20(

@@ -9,6 +9,7 @@ Welcome to schemathesis's documentation!
    :caption: Contents:
 
    usage
+   compatibility
    customization
    targeted
    faq

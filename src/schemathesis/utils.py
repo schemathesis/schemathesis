@@ -6,7 +6,7 @@ import traceback
 import warnings
 from contextlib import contextmanager
 from functools import wraps
-from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Type, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Type, Union, overload
 from urllib.parse import urlsplit, urlunsplit
 
 import requests
@@ -196,3 +196,38 @@ def import_app(path: str) -> Any:
     # may return a parent module (system dependent)
     module = sys.modules[path]
     return getattr(module, name)
+
+
+Schema = Union[Dict[str, Any], List, str, float, int]
+
+
+@overload
+def traverse_schema(schema: Dict[str, Any], callback: Callable, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    pass
+
+
+@overload
+def traverse_schema(schema: List, callback: Callable, *args: Any, **kwargs: Any) -> List:
+    pass
+
+
+@overload
+def traverse_schema(schema: str, callback: Callable, *args: Any, **kwargs: Any) -> str:
+    pass
+
+
+@overload
+def traverse_schema(schema: float, callback: Callable, *args: Any, **kwargs: Any) -> float:
+    pass
+
+
+def traverse_schema(schema: Schema, callback: Callable[..., Dict[str, Any]], *args: Any, **kwargs: Any) -> Schema:
+    """Apply callback recursively to the given schema."""
+    if isinstance(schema, dict):
+        schema = callback(schema, *args, **kwargs)
+        for key, sub_item in schema.items():
+            schema[key] = traverse_schema(sub_item, callback, *args, **kwargs)
+    elif isinstance(schema, list):
+        for idx, sub_item in enumerate(schema):
+            schema[idx] = traverse_schema(sub_item, callback, *args, **kwargs)
+    return schema

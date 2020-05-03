@@ -12,7 +12,7 @@ import yaml
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
 
-from schemathesis import Case
+from schemathesis import Case, fixups
 from schemathesis._compat import metadata
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.cli import reset_checks
@@ -191,7 +191,8 @@ def test_commands_run_help(cli):
         "                                  path.",
         "",
         "  --show-errors-tracebacks        Show full tracebacks for internal errors.",
-        "  --store-network-log FILENAME    Store requests and responses into a file",
+        "  --store-network-log FILENAME    Store requests and responses into a file.",
+        "  --fixups [fast_api|all]         Install specified compatibility fixups.",
         "  --hypothesis-deadline INTEGER RANGE",
         "                                  Duration in milliseconds that each individual",
         "                                  example with a test is not allowed to exceed.",
@@ -276,6 +277,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "hypothesis_options": {},
         "workers_num": 1,
         "exit_first": False,
+        "fixups": (),
         "auth": None,
         "auth_type": None,
         "headers": {},
@@ -1112,3 +1114,16 @@ def test_chained_internal_exception(testdir, cli, base_url):
     assert result.exit_code == ExitCode.TESTS_FAILED
     lines = result.stdout.splitlines()
     assert "The above exception was the direct cause of the following exception:" in lines
+
+
+@pytest.fixture()
+def fast_api_fixup():
+    yield
+    fixups.uninstall()
+
+
+def test_fast_api_fixup(testdir, cli, base_url, fast_api_schema, fast_api_fixup):
+    # When schema contains Draft 7 definitions as ones from FastAPI may contain
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(fast_api_schema))
+    result = cli.run(str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=1", "--fixups=all")
+    assert result.exit_code == ExitCode.OK
