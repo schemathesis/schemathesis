@@ -1,6 +1,7 @@
 import pytest
 
 from schemathesis import converter
+from schemathesis.utils import traverse_schema
 
 
 @pytest.mark.parametrize(
@@ -54,4 +55,4 @@ def test_to_jsonschema(schema, expected):
     ),
 )
 def test_to_jsonschema_recursive(schema, expected):
-    assert converter.to_json_schema_recursive(schema, "x-nullable") == expected
+    assert traverse_schema(schema, converter.to_json_schema, "x-nullable") == expected

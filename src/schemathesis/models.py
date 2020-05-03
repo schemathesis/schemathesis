@@ -218,12 +218,25 @@ def empty_object() -> Dict[str, Any]:
 
 
 @attr.s(slots=True)  # pragma: no mutate
+class EndpointDefinition:
+    """A wrapper to store not resolved endpoint definitions.
+
+    To prevent recursion errors we need to store definitions without resolving references. But endpoint definitions
+    itself can be behind a reference (when there is a ``$ref`` in ``paths`` values), therefore we need to store this
+    scope change to have a proper reference resolving later.
+    """
+
+    raw: Dict[str, Any] = attr.ib()  # pragma: no mutate
+    scope: Optional[str] = attr.ib()  # pragma: no mutate
+
+
+@attr.s(slots=True)  # pragma: no mutate
 class Endpoint:
     """A container that could be used for test cases generation."""
 
     path: str = attr.ib()  # pragma: no mutate
     method: str = attr.ib()  # pragma: no mutate
-    definition: Dict[str, Any] = attr.ib()  # pragma: no mutate
+    definition: EndpointDefinition = attr.ib()  # pragma: no mutate
     schema: "BaseSchema" = attr.ib()  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate

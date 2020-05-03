@@ -26,6 +26,7 @@ Fixed
 ~~~~~
 
 - Add missing ``validate_schema`` argument to ``loaders.from_pytest_fixture``.
+- Reference resolving during response schema conformance check. `#539`_
 
 `1.3.4`_ - 2020-04-30
 ---------------------
@@ -1003,6 +1004,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#542: https://github.com/kiwicom/schemathesis/issues/542
+.. _#539: https://github.com/kiwicom/schemathesis/issues/539
 .. _#537: https://github.com/kiwicom/schemathesis/issues/537
 .. _#529: https://github.com/kiwicom/schemathesis/issues/529
 .. _#521: https://github.com/kiwicom/schemathesis/issues/521
