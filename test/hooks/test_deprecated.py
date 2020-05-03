@@ -147,7 +147,7 @@ schema.register_hook("query", extra)
 @schema.parametrize()
 @settings(max_examples=1)
 def test(case):
-    assert case.endpoint.schema.hooks.get_hooks("before_generate_query")[0] is extra
+    assert case.endpoint.schema.hooks.get_all_by_name("before_generate_query")[0] is extra
     assert int(case.query["id"]) % 2 == 0
     """,
         schema=simple_openapi,

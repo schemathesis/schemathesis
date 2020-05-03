@@ -2,7 +2,7 @@ import pytest
 from hypothesis import given, settings
 
 import schemathesis
-from schemathesis.hooks import HookDispatcher
+from schemathesis.hooks import HookDispatcher, HookScope
 
 
 @pytest.fixture(params=["direct", "named"])
@@ -30,7 +30,7 @@ def schema(flask_app):
 
 @pytest.fixture()
 def dispatcher():
-    return HookDispatcher()
+    return HookDispatcher(scope=HookScope.SCHEMA)
 
 
 @pytest.mark.hypothesis_nested
@@ -140,7 +140,7 @@ def extra(context, st):
 @schema.parametrize()
 @settings(max_examples=1)
 def test(case):
-    assert case.endpoint.schema.hooks.get_hooks("before_generate_query")[0] is extra
+    assert case.endpoint.schema.hooks.get_all_by_name("before_generate_query")[0] is extra
     assert int(case.query["id"]) % 2 == 0
     """,
         schema=simple_openapi,
@@ -177,6 +177,8 @@ def test_save_test_function(schema):
 
 @pytest.mark.parametrize("apply_first", (True, False))
 def test_local_dispatcher(schema, apply_first):
+    assert schema.hooks.scope == HookScope.SCHEMA
+
     # When there are schema-level hooks
     @schema.hooks.register("before_generate_query")
     def schema_hook(context, strategy):
@@ -200,12 +202,13 @@ def test_local_dispatcher(schema, apply_first):
 
     # Then a hook dispatcher instance is attached to the test function
     assert isinstance(test._schemathesis_hooks, HookDispatcher)
+    assert test._schemathesis_hooks.scope == HookScope.TEST
     # And this dispatcher contains only local hooks
-    assert test._schemathesis_hooks.get_hooks("before_generate_cookies") == [local_hook]
-    assert test._schemathesis_hooks.get_hooks("before_generate_query") == []
+    assert test._schemathesis_hooks.get_all_by_name("before_generate_cookies") == [local_hook]
+    assert test._schemathesis_hooks.get_all_by_name("before_generate_query") == []
     # And the schema-level dispatcher still contains only schema-level hooks
-    assert test._schemathesis_test.hooks.get_hooks("before_generate_query") == [schema_hook]
-    assert test._schemathesis_test.hooks.get_hooks("before_generate_cookies") == []
+    assert test._schemathesis_test.hooks.get_all_by_name("before_generate_query") == [schema_hook]
+    assert test._schemathesis_test.hooks.get_all_by_name("before_generate_cookies") == []
 
 
 @pytest.mark.hypothesis_nested
@@ -219,7 +222,7 @@ def test_multiple_hooks_per_spec(schema):
     def second_hook(context, strategy):
         return strategy.filter(lambda x: int(x["id"]) % 2 == 0)
 
-    assert schema.hooks.get_hooks("before_generate_query") == [first_hook, second_hook]
+    assert schema.hooks.get_all_by_name("before_generate_query") == [first_hook, second_hook]
 
     strategy = schema.endpoints["/api/custom_format"]["GET"].as_strategy()
 
@@ -248,3 +251,16 @@ def test_before_process_path_hook(schema):
         assert case.query == {"foo": "bar"}
 
     test()
+
+
+def test_register_wrong_scope(schema):
+
+    with pytest.raises(
+        ValueError,
+        match=r"Can not register hook 'before_load_schema' on SCHEMA scope dispatcher. "
+        r"Use a dispatcher with GLOBAL scope\(s\) instead",
+    ):
+
+        @schema.hooks.register
+        def before_load_schema(ctx, raw_schema):
+            pass

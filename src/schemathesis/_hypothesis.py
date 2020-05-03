@@ -194,7 +194,7 @@ def _get_case_strategy(
 
 def _apply_hooks(strategies: Dict[str, st.SearchStrategy], dispatcher: HookDispatcher, context: HookContext) -> None:
     for key in strategies:
-        for hook in dispatcher.get_hooks(f"before_generate_{key}"):
+        for hook in dispatcher.get_all_by_name(f"before_generate_{key}"):
             # Get the strategy on each hook to pass the first hook output as an input to the next one
             strategy = strategies[key]
             args: Union[Tuple[st.SearchStrategy], Tuple[HookContext, st.SearchStrategy]]
