@@ -54,6 +54,24 @@ The ``case`` object, that is injected in each test can be modified, assuming you
     def test_api(case):
         case.path_parameters["user_id"] = 42
 
+Why does Schemathesis fail to parse my API schema generate by FastAPI?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Because FastAPI uses JSON Draft 7 under the hood (via ``pydantic``) which is not compatible with JSON drafts defined by
+the Open API 2 / 3.0.x versions. It is a `known issue <https://github.com/tiangolo/fastapi/issues/240>`_ on the FastAPI side.
+Schemathesis is more strict in schema handling by default, but we provide optional fixups for this case:
+
+.. code:: python
+
+    import schemathesis
+
+    # will install all available compatibility fixups.
+    schemathesis.fixups.install()
+    # You can also provide a list of fixup names as the first argument
+    # schemathesis.fixups.install(["fastapi"])
+
+For more information, take a look into the "Compatibility" section.
+
 Working with API schemas
 ------------------------
 

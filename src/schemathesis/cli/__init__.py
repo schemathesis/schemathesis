@@ -10,6 +10,7 @@ import yaml
 
 from .. import checks as checks_module
 from .. import models, runner
+from ..fixups import ALL_FIXUPS
 from ..runner import events
 from ..runner.targeted import DEFAULT_TARGETS_NAMES, Target
 from ..types import Filter
@@ -151,7 +152,13 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     is_eager=True,
     default=False,
 )
-@click.option("--store-network-log", help="Store requests and responses into a file", type=click.File("w"))
+@click.option("--store-network-log", help="Store requests and responses into a file.", type=click.File("w"))
+@click.option(
+    "--fixups",
+    help="Install specified compatibility fixups.",
+    multiple=True,
+    type=click.Choice(list(ALL_FIXUPS) + ["all"]),
+)
 @click.option(
     "--hypothesis-deadline",
     help="Duration in milliseconds that each individual example with a test is not allowed to exceed.",
@@ -199,6 +206,7 @@ def run(  # pylint: disable=too-many-arguments
     junit_xml: Optional[click.utils.LazyFile] = None,
     show_errors_tracebacks: bool = False,
     store_network_log: Optional[click.utils.LazyFile] = None,
+    fixups: Tuple[str] = (),  # type: ignore
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
     hypothesis_derandomize: Optional[bool] = None,
     hypothesis_max_examples: Optional[int] = None,
@@ -238,6 +246,7 @@ def run(  # pylint: disable=too-many-arguments
         targets=selected_targets,
         workers_num=workers_num,
         validate_schema=validate_schema,
+        fixups=fixups,
         hypothesis_deadline=hypothesis_deadline,
         hypothesis_derandomize=hypothesis_derandomize,
         hypothesis_max_examples=hypothesis_max_examples,

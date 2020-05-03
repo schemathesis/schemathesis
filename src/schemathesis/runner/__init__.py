@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 
 import hypothesis.errors
 
+from .. import fixups as _fixups
 from .. import loaders
 from ..checks import DEFAULT_CHECKS
 from ..models import CheckFunction
@@ -24,6 +25,7 @@ def prepare(  # pylint: disable=too-many-arguments
     seed: Optional[int] = None,
     exit_first: bool = False,
     store_interactions: bool = False,
+    fixups: Iterable[str] = (),
     # Schema loading
     loader: Callable = loaders.from_uri,
     base_url: Optional[str] = None,
@@ -82,6 +84,7 @@ def prepare(  # pylint: disable=too-many-arguments
         headers=headers,
         request_timeout=request_timeout,
         store_interactions=store_interactions,
+        fixups=fixups,
     )
 
 
@@ -125,6 +128,7 @@ def execute_from_schema(
     seed: Optional[int] = None,
     exit_first: bool = False,
     store_interactions: bool = False,
+    fixups: Iterable[str] = (),
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Execute tests for the given schema.
 
@@ -132,6 +136,12 @@ def execute_from_schema(
     """
     # pylint: disable=too-many-locals
     try:
+        if fixups:
+            if "all" in fixups:
+                _fixups.install()
+            else:
+                _fixups.install(fixups)
+
         if app is not None:
             app = import_app(app)
         schema = load_schema(

@@ -13,6 +13,7 @@ Added
   for hook functions that do not accept this argument.
 - A new hook system that allows generic hook dispatching. It comes with new hook locations. For more details see "Customization" section in our documentation.
 - New ``before_process_path`` hook.
+- Third-party compatibility fixups mechanism. Currently there is one fixup for `FastAPI <https://github.com/tiangolo/fastapi>`_. `#503`_
 
 Deprecated
 ~~~~~~~~~~
@@ -1008,6 +1009,7 @@ Fixed
 .. _#519: https://github.com/kiwicom/schemathesis/issues/519
 .. _#513: https://github.com/kiwicom/schemathesis/issues/513
 .. _#504: https://github.com/kiwicom/schemathesis/issues/504
+.. _#503: https://github.com/kiwicom/schemathesis/issues/503
 .. _#499: https://github.com/kiwicom/schemathesis/issues/499
 .. _#497: https://github.com/kiwicom/schemathesis/issues/497
 .. _#496: https://github.com/kiwicom/schemathesis/issues/496
