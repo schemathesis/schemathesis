@@ -1,6 +1,7 @@
 from textwrap import dedent
 
 import pytest
+import yaml
 from click.testing import CliRunner
 from hypothesis import settings
 
@@ -165,6 +166,79 @@ def fast_api_schema():
             }
         },
     }
+
+
+ROOT_SCHEMA = {
+    "openapi": "3.0.2",
+    "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},
+    "paths": {"/teapot": {"$ref": "paths/teapot.yaml#/TeapotCreatePath"}},
+}
+TEAPOT_PATHS = {
+    "TeapotCreatePath": {
+        "post": {
+            "summary": "Test",
+            "requestBody": {
+                "description": "Test.",
+                "content": {
+                    "application/json": {"schema": {"$ref": "../schemas/teapot/create.yaml#/TeapotCreateRequest"}}
+                },
+                "required": True,
+            },
+            "responses": {"default": {"$ref": "../../common/responses.yaml#/DefaultError"}},
+            "tags": ["ancillaries"],
+        }
+    }
+}
+TEAPOT_CREATE_SCHEMAS = {
+    "TeapotCreateRequest": {
+        "type": "object",
+        "description": "Test",
+        "additionalProperties": False,
+        "properties": {"username": {"type": "string"}, "profile": {"$ref": "#/Profile"}},
+        "required": ["username", "profile"],
+    },
+    "Profile": {
+        "type": "object",
+        "description": "Test",
+        "additionalProperties": False,
+        "properties": {"id": {"type": "integer"}},
+        "required": ["id"],
+    },
+}
+COMMON_RESPONSES = {
+    "DefaultError": {
+        "description": "Probably an error",
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"key": {"type": "string"}},
+                    "required": ["key"],
+                }
+            }
+        },
+    }
+}
+
+
+@pytest.fixture()
+def complex_schema(testdir):
+    # This schema includes:
+    #   - references to other files
+    #   - local references in referenced files
+    #   - different directories - relative paths to other files
+    schema_root = testdir.mkdir("root")
+    common = testdir.mkdir("common")
+    paths = schema_root.mkdir("paths")
+    schemas = schema_root.mkdir("schemas")
+    teapot_schemas = schemas.mkdir("teapot")
+    root = schema_root / "root.yaml"
+    root.write_text(yaml.dump(ROOT_SCHEMA), "utf8")
+    (paths / "teapot.yaml").write_text(yaml.dump(TEAPOT_PATHS), "utf8")
+    (teapot_schemas / "create.yaml").write_text(yaml.dump(TEAPOT_CREATE_SCHEMAS), "utf8")
+    (common / "responses.yaml").write_text(yaml.dump(COMMON_RESPONSES), "utf8")
+    return str(root)
 
 
 @pytest.fixture(scope="session")

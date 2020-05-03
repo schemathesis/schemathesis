@@ -22,11 +22,11 @@ import yaml
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
-from .converter import to_json_schema, to_json_schema_recursive
+from .converter import to_json_schema
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .hooks import HookContext, HookDispatcher, HookLocation, HookScope, dispatch, warn_deprecated_hook
-from .models import Endpoint, empty_object
+from .models import Endpoint, EndpointDefinition, empty_object
 from .types import Filter, GenericTest, Hook, NotSet
 from .utils import NOT_SET, GenericResponse, StringDatesYAMLLoader, deprecated
 
@@ -161,7 +161,7 @@ class BaseSchema(Mapping):
             validate_schema=validate_schema,  # type: ignore
         )
 
-    def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _get_response_schema(self, definition: Dict[str, Any], scope: Optional[str]) -> Optional[Dict[str, Any]]:
         """Extract response schema from `responses`."""
         raise NotImplementedError
 
@@ -239,9 +239,13 @@ class SwaggerV20(BaseSchema):
                 if should_skip_endpoint(full_path, self.endpoint):
                     continue
                 self.dispatch_hook("before_process_path", context, path, methods)
-                # Only one level is resolved for `raw_methods` so method names are available, but everything deeper
-                # is not resolved.
-                raw_methods = self.resolve(deepcopy(methods), RECURSION_DEPTH_LIMIT)
+                # We need to know a proper scope in what methods are.
+                # It will allow us to provide a proper reference resolving in `response_schema_conformance` and avoid
+                # recursion errors
+                if "$ref" in methods:
+                    scope, raw_methods = deepcopy(self.resolver.resolve(methods["$ref"]))
+                else:
+                    raw_methods, scope = deepcopy(methods), None
                 methods = self.resolve(methods)
                 common_parameters = get_common_parameters(methods)
                 for method, resolved_definition in methods.items():
@@ -255,7 +259,7 @@ class SwaggerV20(BaseSchema):
                     parameters = itertools.chain(resolved_definition.get("parameters", ()), common_parameters)
                     # To prevent recursion errors we need to pass not resolved schema as well
                     # It could be used for response validation
-                    raw_definition = raw_methods[method]
+                    raw_definition = EndpointDefinition(raw_methods[method], scope)
                     yield self.make_endpoint(full_path, method, parameters, resolved_definition, raw_definition)
         except (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError):
             raise InvalidSchema("Schema parsing failed. Please check your schema.")
@@ -266,7 +270,7 @@ class SwaggerV20(BaseSchema):
         method: str,
         parameters: Iterator[Dict[str, Any]],
         resolved_definition: Dict[str, Any],
-        raw_definition: Dict[str, Any],
+        raw_definition: EndpointDefinition,
     ) -> Endpoint:
         """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
         base_url = self.base_url
@@ -370,18 +374,25 @@ class SwaggerV20(BaseSchema):
                 item[idx] = self.resolve(sub_item, recursion_level)
         return item
 
+    def resolve_in_scope(self, item: Dict[str, Any], scope: Optional[str], recursion_level: int = 0) -> Dict[str, Any]:
+        if scope is not None:
+            with self.resolver.in_scope(scope):
+                return self.resolve(item, recursion_level)
+        return self.resolve(item, recursion_level)
+
     def prepare(self, item: Dict[str, Any]) -> Dict[str, Any]:
         """Parse schema extension, e.g. "x-nullable" field."""
         return to_json_schema(item, self.nullable_name)
 
-    def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _get_response_schema(self, definition: Dict[str, Any], scope: Optional[str]) -> Optional[Dict[str, Any]]:
+        definition = self.resolve_in_scope(deepcopy(definition), scope, RECURSION_DEPTH_LIMIT)
         schema = definition.get("schema")
         if not schema:
             return None
-        return to_json_schema_recursive(schema, self.nullable_name)
+        return to_json_schema(schema, self.nullable_name)
 
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
-        produces = endpoint.definition.get("produces", None)
+        produces = endpoint.definition.raw.get("produces", None)
         if produces:
             return produces
         return self.raw_schema.get("produces", [])
@@ -421,7 +432,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         method: str,
         parameters: Iterator[Dict[str, Any]],
         resolved_definition: Dict[str, Any],
-        raw_definition: Dict[str, Any],
+        raw_definition: EndpointDefinition,
     ) -> Endpoint:
         """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
         endpoint = super().make_endpoint(full_path, method, parameters, resolved_definition, raw_definition)
@@ -462,16 +473,17 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         # "schema" field is required for all parameters in Open API 3.0
         return super().parameter_to_json_schema(data["schema"])
 
-    def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _get_response_schema(self, definition: Dict[str, Any], scope: Optional[str]) -> Optional[Dict[str, Any]]:
+        definition = self.resolve_in_scope(deepcopy(definition), scope, RECURSION_DEPTH_LIMIT)
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
         if option:
-            return to_json_schema_recursive(option["schema"], self.nullable_name)
+            return to_json_schema(option["schema"], self.nullable_name)
         return None
 
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
         try:
-            responses = endpoint.definition["responses"]
+            responses = endpoint.definition.raw["responses"]
         except KeyError:
             # Possible to get if `validate_schema=False` is passed during schema creation
             raise InvalidSchema("Schema parsing failed. Please check your schema.")

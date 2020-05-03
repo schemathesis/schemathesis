@@ -1,7 +1,9 @@
+import json
 from typing import Any, Dict
 
 import pytest
 import requests
+from hypothesis import given, settings
 
 import schemathesis
 from schemathesis import models
@@ -12,11 +14,12 @@ from schemathesis.checks import (
     status_code_conformance,
 )
 from schemathesis.exceptions import InvalidSchema
+from schemathesis.models import EndpointDefinition
 from schemathesis.schemas import BaseSchema
 
 
 def make_case(schema: BaseSchema, definition: Dict[str, Any]) -> models.Case:
-    endpoint = models.Endpoint("/path", "GET", definition=definition, schema=schema)
+    endpoint = models.Endpoint("/path", "GET", definition=EndpointDefinition(definition, None), schema=schema)
     return models.Case(endpoint)
 
 
@@ -311,3 +314,30 @@ def test_response_schema_conformance_invalid_openapi(openapi_30, content, defini
     case = make_case(openapi_30, definition)
     with pytest.raises(AssertionError):
         response_schema_conformance(response, case)
+
+
+@pytest.mark.hypothesis_nested
+def test_response_schema_conformance_references_invalid(complex_schema):
+    schema = schemathesis.from_path(complex_schema)
+
+    @given(case=schema.endpoints["/teapot"]["POST"].as_strategy())
+    @settings(max_examples=3)
+    def test(case):
+        response = make_response(json.dumps({"foo": 1}).encode())
+        with pytest.raises(AssertionError):
+            case.validate_response(response)
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+def test_response_schema_conformance_references_valid(complex_schema):
+    schema = schemathesis.from_path(complex_schema)
+
+    @given(case=schema.endpoints["/teapot"]["POST"].as_strategy())
+    @settings(max_examples=3)
+    def test(case):
+        response = make_response(json.dumps({"key": "foo"}).encode())
+        case.validate_response(response)
+
+    test()

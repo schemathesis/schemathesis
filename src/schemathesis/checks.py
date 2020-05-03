@@ -22,7 +22,7 @@ def not_a_server_error(response: GenericResponse, case: "Case") -> None:
 
 
 def status_code_conformance(response: GenericResponse, case: "Case") -> None:
-    responses = case.endpoint.definition.get("responses", {})
+    responses = case.endpoint.definition.raw.get("responses", {})
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
     if "default" in responses:
         return
@@ -71,7 +71,7 @@ def response_schema_conformance(response: GenericResponse, case: "Case") -> None
     if not content_type.startswith("application/json"):
         return
     # the keys should be strings
-    responses = {str(key): value for key, value in case.endpoint.definition.get("responses", {}).items()}
+    responses = {str(key): value for key, value in case.endpoint.definition.raw.get("responses", {}).items()}
     status_code = str(response.status_code)
     if status_code in responses:
         definition = responses[status_code]
@@ -80,7 +80,7 @@ def response_schema_conformance(response: GenericResponse, case: "Case") -> None
     else:
         # No response defined for the received response status code
         return
-    schema = case.endpoint.schema._get_response_schema(definition)
+    schema = case.endpoint.schema._get_response_schema(definition, case.endpoint.definition.scope)
     if not schema:
         return
     if isinstance(response, requests.Response):
