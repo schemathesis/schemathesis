@@ -1,7 +1,7 @@
 import inspect
 import warnings
 from collections import defaultdict
-from typing import Callable, DefaultDict, Dict, List, Union, cast
+from typing import Any, Callable, DefaultDict, Dict, List, Optional, Union, cast
 
 import attr
 from hypothesis import strategies as st
@@ -25,7 +25,7 @@ def warn_deprecated_hook(hook: Hook) -> None:
 class HookContext:
     """A context that is passed to some hook functions."""
 
-    endpoint: Endpoint = attr.ib()  # pragma: no mutate
+    endpoint: Optional[Endpoint] = attr.ib(default=None)  # pragma: no mutate
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -126,6 +126,11 @@ class HookDispatcher:
         """Get a list of hooks registered for name."""
         return self._hooks.get(name, [])
 
+    def dispatch(self, name: str, context: HookContext, *args: Any, **kwargs: Any) -> None:
+        """Run all hooks for the given name."""
+        for hook in self.get_hooks(name):
+            hook(context, *args, **kwargs)
+
     def unregister_all(self) -> None:
         """Remove all registered hooks.
 
@@ -164,7 +169,13 @@ def before_generate_form_data(strategy: st.SearchStrategy, context: HookContext)
     pass
 
 
+@HookDispatcher.register_spec
+def before_process_path(context: HookContext, path: str, methods: Dict[str, Any]) -> None:
+    pass
+
+
 GLOBAL_HOOK_DISPATCHER = HookDispatcher()
+dispatch = GLOBAL_HOOK_DISPATCHER.dispatch
 get_hooks = GLOBAL_HOOK_DISPATCHER.get_hooks
 unregister_all = GLOBAL_HOOK_DISPATCHER.unregister_all
 

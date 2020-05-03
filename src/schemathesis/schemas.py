@@ -26,7 +26,7 @@ from .constants import HookLocation
 from .converter import to_json_schema, to_json_schema_recursive
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
-from .hooks import HookDispatcher, warn_deprecated_hook
+from .hooks import HookContext, HookDispatcher, dispatch, warn_deprecated_hook
 from .models import Endpoint, empty_object
 from .types import Filter, GenericTest, Hook, NotSet
 from .utils import NOT_SET, GenericResponse, StringDatesYAMLLoader, deprecated
@@ -182,6 +182,21 @@ class BaseSchema(Mapping):
 
         return self.hooks.apply(f"before_generate_{place}", hook, skip_validation=True)
 
+    def get_local_hook_dispatcher(self) -> Optional[HookDispatcher]:
+        """Get a HookDispatcher instance bound to the test if present."""
+        # It might be not present when it is used without pytest via `Endpoint.as_strategy()`
+        if self.test_function is not None:
+            return self.test_function._schemathesis_hooks  # type: ignore
+        return None
+
+    def dispatch_hook(self, name: str, context: HookContext, *args: Any, **kwargs: Any) -> None:
+        """Dispatch a hook via all available dispatchers."""
+        dispatch(name, context, *args, **kwargs)
+        self.hooks.dispatch(name, context, *args, **kwargs)
+        local_dispatcher = self.get_local_hook_dispatcher()
+        if local_dispatcher is not None:
+            local_dispatcher.dispatch(name, context, *args, **kwargs)
+
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
         """Content types available for this endpoint."""
         raise NotImplementedError
@@ -219,10 +234,12 @@ class SwaggerV20(BaseSchema):
     def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
         try:
             paths = self.raw_schema["paths"]  # pylint: disable=unsubscriptable-object
+            context = HookContext()
             for path, methods in paths.items():
                 full_path = self.get_full_path(path)
                 if should_skip_endpoint(full_path, self.endpoint):
                     continue
+                self.dispatch_hook("before_process_path", context, path, methods)
                 # Only one level is resolved for `raw_methods` so method names are available, but everything deeper
                 # is not resolved.
                 raw_methods = self.resolve(deepcopy(methods), RECURSION_DEPTH_LIMIT)
