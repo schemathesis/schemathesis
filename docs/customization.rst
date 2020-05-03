@@ -79,3 +79,37 @@ Then your hook might look like this:
 
     def before_generate_query(context, strategy):
         return strategy.filter(lambda x: str(x["id"]).count("1") >= 3)
+
+``before_process_path``
+~~~~~~~~~~~~~~~~~~~~~~~
+
+This hook is called before each API path is processed (if it is selected by filters). You can use it to modify the schema
+before processing - set some parameters as constants, update schema syntax, etc.
+
+Let's say you have the following schema:
+
+.. code:: yaml
+
+    /orders/{order_id}:
+      get:
+        parameters:
+          - description: Order ID to retrieve
+            in: path
+            name: order_id
+            required: true
+            schema:
+              format: int64
+              type: integer
+
+Then, with this hook you can query the database for some existing order and set its ID as a constant in the endpoint definition:
+
+.. code:: python
+
+    def before_process_path(
+        context: schemathesis.hooks.HookContext,
+        path: str,
+        methods: Dict[str, Any]
+    ) -> None:
+        if path == "/orders/{order_id}":
+            order_id = database.get_orders().first().id
+            methods["get"]["parameters"][0]["schema"]["const"] = order_id

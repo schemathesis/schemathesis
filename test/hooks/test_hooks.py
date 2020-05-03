@@ -230,3 +230,21 @@ def test_multiple_hooks_per_spec(schema):
         assert int(case.query["id"]) % 2 == 0
 
     test()
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.endpoints("custom_format")
+def test_before_process_path_hook(schema):
+    @schema.hooks.register
+    def before_process_path(context, path, methods):
+        methods["get"]["parameters"][0]["name"] = "foo"
+        methods["get"]["parameters"][0]["const"] = "bar"
+
+    strategy = schema.endpoints["/api/custom_format"]["GET"].as_strategy()
+
+    @given(case=strategy)
+    @settings(max_examples=3)
+    def test(case):
+        assert case.query == {"foo": "bar"}
+
+    test()
