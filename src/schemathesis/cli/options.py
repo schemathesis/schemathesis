@@ -36,5 +36,5 @@ class OptionalInt(click.types.IntRange):
         try:
             int(value)
             return super().convert(value, param, ctx)
-        except (ValueError, UnicodeError):
+        except ValueError:
             self.fail("%s is not a valid integer or None" % value, param, ctx)
