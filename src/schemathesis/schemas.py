@@ -22,11 +22,10 @@ import yaml
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
-from .constants import HookLocation
 from .converter import to_json_schema, to_json_schema_recursive
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
-from .hooks import HookContext, HookDispatcher, dispatch, warn_deprecated_hook
+from .hooks import HookContext, HookDispatcher, HookLocation, HookScope, dispatch, warn_deprecated_hook
 from .models import Endpoint, empty_object
 from .types import Filter, GenericTest, Hook, NotSet
 from .utils import NOT_SET, GenericResponse, StringDatesYAMLLoader, deprecated
@@ -62,7 +61,7 @@ class BaseSchema(Mapping):
     endpoint: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     tag: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
-    hooks: HookDispatcher = attr.ib(factory=HookDispatcher)  # pragma: no mutate
+    hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
     test_function: Optional[GenericTest] = attr.ib(default=None)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
 
