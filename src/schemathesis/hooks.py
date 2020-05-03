@@ -131,6 +131,12 @@ class HookDispatcher:
         for hook in self.get_hooks(name):
             hook(context, *args, **kwargs)
 
+    def unregister(self, hook: Callable) -> None:
+        """Unregister a specific hook."""
+        # It removes this function from all places
+        for hooks in self._hooks.values():
+            hooks[:] = [item for item in hooks if item is not hook]
+
     def unregister_all(self) -> None:
         """Remove all registered hooks.
 
@@ -174,9 +180,15 @@ def before_process_path(context: HookContext, path: str, methods: Dict[str, Any]
     pass
 
 
+@HookDispatcher.register_spec
+def before_load_schema(context: HookContext, raw_schema: Dict[str, Any]) -> None:
+    pass
+
+
 GLOBAL_HOOK_DISPATCHER = HookDispatcher()
 dispatch = GLOBAL_HOOK_DISPATCHER.dispatch
 get_hooks = GLOBAL_HOOK_DISPATCHER.get_hooks
+unregister = GLOBAL_HOOK_DISPATCHER.unregister
 unregister_all = GLOBAL_HOOK_DISPATCHER.unregister_all
 
 
