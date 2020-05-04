@@ -113,3 +113,18 @@ Then, with this hook you can query the database for some existing order and set 
         if path == "/orders/{order_id}":
             order_id = database.get_orders().first().id
             methods["get"]["parameters"][0]["schema"]["const"] = order_id
+
+``before_load_schema``
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Called just before schema instance is created. Takes a raw schema representation as a dictionary:
+
+.. code:: python
+
+    def before_generate_query(
+        context: schemathesis.hooks.HookContext,
+        raw_schema: Dict[str, Any],
+    ) -> hypothesis.strategies.SearchStrategy:
+        ...
+
+This hook allows you to modify schema before loading.
