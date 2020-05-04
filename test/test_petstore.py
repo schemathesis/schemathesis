@@ -141,7 +141,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore(tests_num=1)
+    testdir.assert_petstore(tests_num=5)
 
 
 def test_create_order(testdir):

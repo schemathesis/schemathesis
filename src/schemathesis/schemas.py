@@ -207,7 +207,7 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
 
-class SwaggerV20(BaseSchema):
+class SwaggerV20(BaseSchema):  # pylint: disable=too-many-public-methods
     nullable_name = "x-nullable"
     example_field = "x-example"
     operations: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
@@ -293,7 +293,59 @@ class SwaggerV20(BaseSchema):
         )
         for parameter in parameters:
             self.process_parameter(endpoint, parameter)
+        self.process_security_definitions(endpoint)
         return endpoint
+
+    def get_security_definitions(self) -> Dict[str, Any]:
+        """Extract security definitions from the schema."""
+        return self.raw_schema.get("securityDefinitions", {})
+
+    def get_security_requirements(self, endpoint: Endpoint) -> List[str]:
+        # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#operation-object
+        # > This definition overrides any declared top-level security.
+        # > To remove a top-level security declaration, an empty array can be used.
+        global_requirements = self.raw_schema.get("security", [])
+        local_requirements = endpoint.definition.raw.get("security", None)
+        if local_requirements is not None:
+            requirements = local_requirements
+        else:
+            requirements = global_requirements
+        return [key for requirement in requirements for key in requirement]
+
+    def process_security_definitions(self, endpoint: Endpoint) -> None:
+        """Add relevant security parameters to data generation."""
+        definitions = self.get_security_definitions()
+        requirements = self.get_security_requirements(endpoint)
+        for name, definition in definitions.items():
+            if name in requirements:
+                if definition["type"] == "apiKey":
+                    self.process_api_key_security_definition(definition, endpoint)
+                self.process_http_security_definition(definition, endpoint)
+
+    def process_api_key_security_definition(self, definition: Dict[str, Any], endpoint: Endpoint) -> None:
+        if definition["in"] == "query":
+            endpoint.query = self.add_security_definition(endpoint.query, definition)
+        elif definition["in"] == "header":
+            endpoint.headers = self.add_security_definition(endpoint.headers, definition)
+
+    def process_http_security_definition(self, definition: Dict[str, Any], endpoint: Endpoint) -> None:
+        if definition["type"] == "basic":
+            endpoint.headers = self.add_http_auth_definition(endpoint.headers)
+
+    def add_security_definition(
+        self, container: Optional[Dict[str, Any]], definition: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        name = definition["name"]
+        container = container or empty_object()
+        container["properties"][name] = {"name": name, "type": "string"}
+        container["required"].append(name)
+        return container
+
+    def add_http_auth_definition(self, container: Optional[Dict[str, Any]], scheme: str = "basic") -> Dict[str, Any]:
+        container = container or empty_object()
+        container["properties"]["Authorization"] = {"type": "string", "format": f"_{scheme}_auth"}
+        container["required"].append("Authorization")
+        return container
 
     def process_parameter(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         """Convert each Parameter object to a JSON schema."""
@@ -446,6 +498,20 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         if "requestBody" in resolved_definition:
             self.process_body(endpoint, resolved_definition["requestBody"])
         return endpoint
+
+    def get_security_definitions(self) -> Dict[str, Any]:
+        components = self.raw_schema.get("components", {})
+        security_schemes = components.get("securitySchemes", {})
+        return self.resolve(security_schemes, RECURSION_DEPTH_LIMIT)
+
+    def process_api_key_security_definition(self, definition: Dict[str, Any], endpoint: Endpoint) -> None:
+        if definition["in"] == "cookie":
+            endpoint.cookies = self.add_security_definition(endpoint.cookies, definition)
+        super().process_api_key_security_definition(definition, endpoint)
+
+    def process_http_security_definition(self, definition: Dict[str, Any], endpoint: Endpoint) -> None:
+        if definition["type"] == "http":
+            endpoint.headers = self.add_http_auth_definition(endpoint.headers, scheme=definition["scheme"].lower())
 
     def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         if parameter["in"] == "cookie":
