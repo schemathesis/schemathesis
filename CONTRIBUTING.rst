@@ -55,6 +55,7 @@ Submitting Pull Requests
    The test environments above are usually enough to cover most cases locally.
 
 #. Write an entry to `changelog.rst <https://github.com/kiwicom/schemathesis/blob/master/docs/changelog.rst>`_
+#. Format your commit message according to the Conventional Commits `specification <https://www.conventionalcommits.org/en/>`_
 
 For each pull request, we aim to review it as soon as possible.
 If you wait a few days without a reply, please feel free to ping the thread by adding a new comment.
