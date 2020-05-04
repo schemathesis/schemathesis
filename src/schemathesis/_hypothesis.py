@@ -10,6 +10,7 @@ from urllib.parse import quote_plus
 import hypothesis
 import hypothesis.strategies as st
 from hypothesis_jsonschema import from_schema
+from requests.auth import _basic_auth_str
 
 from . import utils
 from ._compat import handle_warnings
@@ -223,3 +224,9 @@ def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
 def init_default_strategies() -> None:
     register_string_format("binary", st.binary())
     register_string_format("byte", st.binary().map(lambda x: b64encode(x).decode()))
+
+    def make_basic_auth_str(item: Tuple[str, str]) -> str:
+        return _basic_auth_str(*item)
+
+    register_string_format("_basic_auth", st.tuples(st.text(), st.text()).map(make_basic_auth_str))  # type: ignore
+    register_string_format("_bearer_auth", st.text().map("Bearer {}".format))

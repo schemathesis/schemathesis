@@ -11,6 +11,9 @@ Added
 
 - Display a suggestion to disable schema validation on schema loading errors in CLI. `#531`_
 - Filtration of endpoints by ``operationId`` via ``operation_id`` parameter to ``schema.parametrize`` or ``-O`` command-line option. `#546`_
+- Generation of security-related parameters. They are taken from ``securityDefinitions`` / ``securitySchemes`` and injected
+  to the generated data. It supports generating API keys in headers or query parameters and generating data for HTTP
+  authentication schemes as well. `#540`_
 
 `1.4.0`_ - 2020-05-03
 ---------------------
@@ -1015,6 +1018,7 @@ Fixed
 
 .. _#546: https://github.com/kiwicom/schemathesis/issues/546
 .. _#542: https://github.com/kiwicom/schemathesis/issues/542
+.. _#540: https://github.com/kiwicom/schemathesis/issues/540
 .. _#539: https://github.com/kiwicom/schemathesis/issues/539
 .. _#537: https://github.com/kiwicom/schemathesis/issues/537
 .. _#531: https://github.com/kiwicom/schemathesis/issues/531
