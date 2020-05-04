@@ -136,3 +136,54 @@ def test_b(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=2)
     result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
+
+
+def test_operation_id_filter(testdir):
+    parameters = {"responses": {"200": {"description": "OK"}}}
+    testdir.make_test(
+        """
+@schema.parametrize(operation_id="bar_get")
+@settings(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/bar"
+    assert case.method == "GET"
+""",
+        paths={
+            "/foo": {"get": {**parameters, "operationId": "foo_get"}},
+            "/bar": {"get": {**parameters, "operationId": "bar_get"}},
+        },
+        schema_name="simple_openapi.yaml",
+    )
+
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+
+    result.stdout.re_match_lines([r"test_operation_id_filter.py::test_[GET:/v1/bar] PASSED"])
+
+
+def test_operation_id_list_filter(testdir):
+    parameters = {"responses": {"200": {"description": "OK"}}}
+    testdir.make_test(
+        """
+@schema.parametrize(operation_id=["foo_get", "foo_post"])
+@settings(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/foo"
+""",
+        paths={
+            "/foo": {
+                "get": {**parameters, "operationId": "foo_get"},
+                "post": {**parameters, "operationId": "foo_post"},
+            },
+            "/bar": {"get": {**parameters, "operationId": "bar_get"}},
+        },
+        schema_name="simple_openapi.yaml",
+    )
+
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=2)
+
+    result.stdout.re_match_lines([r"test_operation_id_list_filter.py::test_[GET:/v1/foo] PASSED"])
+    result.stdout.re_match_lines([r"test_operation_id_list_filter.py::test_[POST:/v1/foo] PASSED"])

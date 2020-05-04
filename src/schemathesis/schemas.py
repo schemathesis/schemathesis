@@ -24,7 +24,7 @@ from requests.structures import CaseInsensitiveDict
 from ._hypothesis import make_test_or_exception
 from .converter import to_json_schema
 from .exceptions import InvalidSchema
-from .filters import should_skip_by_tag, should_skip_endpoint, should_skip_method
+from .filters import should_skip_by_operation_id, should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .hooks import HookContext, HookDispatcher, HookLocation, HookScope, dispatch, warn_deprecated_hook
 from .models import Endpoint, EndpointDefinition, empty_object
 from .types import Filter, GenericTest, Hook, NotSet
@@ -60,6 +60,7 @@ class BaseSchema(Mapping):
     method: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     endpoint: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     tag: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
+    operation_id: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
     test_function: Optional[GenericTest] = attr.ib(default=None)  # pragma: no mutate
@@ -115,18 +116,19 @@ class BaseSchema(Mapping):
             test = make_test_or_exception(endpoint, func, settings, seed)
             yield endpoint, test
 
-    def parametrize(
+    def parametrize(  # pylint: disable=too-many-arguments
         self,
         method: Optional[Filter] = NOT_SET,
         endpoint: Optional[Filter] = NOT_SET,
         tag: Optional[Filter] = NOT_SET,
+        operation_id: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
 
         def wrapper(func: GenericTest) -> GenericTest:
             HookDispatcher.add_dispatcher(func)
-            func._schemathesis_test = self.clone(func, method, endpoint, tag, validate_schema)  # type: ignore
+            func._schemathesis_test = self.clone(func, method, endpoint, tag, operation_id, validate_schema)  # type: ignore
             return func
 
         return wrapper
@@ -137,6 +139,7 @@ class BaseSchema(Mapping):
         method: Optional[Filter] = NOT_SET,
         endpoint: Optional[Filter] = NOT_SET,
         tag: Optional[Filter] = NOT_SET,
+        operation_id: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
     ) -> "BaseSchema":
         if method is NOT_SET:
@@ -145,6 +148,8 @@ class BaseSchema(Mapping):
             endpoint = self.endpoint
         if tag is NOT_SET:
             tag = self.tag
+        if operation_id is NOT_SET:
+            operation_id = self.operation_id
         if validate_schema is NOT_SET:
             validate_schema = self.validate_schema
 
@@ -155,6 +160,7 @@ class BaseSchema(Mapping):
             method=method,
             endpoint=endpoint,
             tag=tag,
+            operation_id=operation_id,
             app=self.app,
             hooks=self.hooks,
             test_function=test_function,
@@ -254,6 +260,7 @@ class SwaggerV20(BaseSchema):
                         method not in self.operations
                         or should_skip_method(method, self.method)
                         or should_skip_by_tag(resolved_definition.get("tags"), self.tag)
+                        or should_skip_by_operation_id(resolved_definition.get("operationId"), self.operation_id)
                     ):
                         continue
                     parameters = itertools.chain(resolved_definition.get("parameters", ()), common_parameters)

@@ -10,6 +10,7 @@ Added
 ~~~~~
 
 - Display a suggestion to disable schema validation on schema loading errors in CLI. `#531`_
+- ``operation_id`` argument can get operations accurately by operationId . `#546`_
 
 `1.4.0`_ - 2020-05-03
 ---------------------
@@ -1012,6 +1013,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#546: https://github.com/kiwicom/schemathesis/issues/546
 .. _#542: https://github.com/kiwicom/schemathesis/issues/542
 .. _#539: https://github.com/kiwicom/schemathesis/issues/539
 .. _#537: https://github.com/kiwicom/schemathesis/issues/537
