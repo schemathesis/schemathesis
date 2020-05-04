@@ -26,3 +26,10 @@ def should_skip_by_tag(tags: Optional[List[str]], pattern: Optional[Filter]) -> 
         return True
     patterns = force_tuple(pattern)
     return not any(re.search(item, tag) for item in patterns for tag in tags)
+
+
+def should_skip_by_operation_id(operation_id: str, pattern: Optional[Filter]) -> bool:
+    if pattern is None:
+        return False
+    patterns = force_tuple(pattern)
+    return not any(re.search(item, operation_id) for item in patterns)

@@ -3,7 +3,7 @@ import pytest
 import schemathesis
 from schemathesis.constants import USER_AGENT
 
-from .utils import SIMPLE_PATH
+from .utils import SIMPLE_PATH, make_schema
 
 
 def test_path_loader(simple_schema):
@@ -39,3 +39,25 @@ def test_base_url_override(schema_url, url):
 def test_unsupported_type():
     with pytest.raises(ValueError, match="^Unsupported schema type$"):
         schemathesis.from_dict({})
+
+
+@pytest.mark.parametrize("operation_id", ("bar_get", "bar_post"))
+def test_operation_id(operation_id):
+    parameters = {"responses": {"200": {"description": "OK"}}}
+    raw = make_schema(
+        "simple_openapi.yaml",
+        paths={
+            "/foo": {"get": {**parameters, "operationId": "foo_get"}},
+            "/bar": {
+                "get": {**parameters, "operationId": "bar_get"},
+                "post": {**parameters, "operationId": "bar_post"},
+            },
+        },
+    )
+    schema = schemathesis.from_dict(raw, operation_id=operation_id)
+
+    assert schema.operation_id == operation_id
+
+    assert len(list(schema.get_all_endpoints())) == 1
+    for endpoint in schema.get_all_endpoints():
+        assert endpoint.definition.raw["operationId"] == operation_id

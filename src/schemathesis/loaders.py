@@ -25,6 +25,7 @@ def from_path(
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
+    operation_id: Optional[Filter] = None,
     *,
     app: Any = None,
     validate_schema: bool = True,
@@ -38,6 +39,7 @@ def from_path(
             method=method,
             endpoint=endpoint,
             tag=tag,
+            operation_id=operation_id,
             app=app,
             validate_schema=validate_schema,
         )
@@ -49,6 +51,7 @@ def from_uri(
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
+    operation_id: Optional[Filter] = None,
     *,
     app: Any = None,
     validate_schema: bool = True,
@@ -70,6 +73,7 @@ def from_uri(
         method=method,
         endpoint=endpoint,
         tag=tag,
+        operation_id=operation_id,
         app=app,
         validate_schema=validate_schema,
     )
@@ -82,6 +86,7 @@ def from_file(
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
+    operation_id: Optional[Filter] = None,
     *,
     app: Any = None,
     validate_schema: bool = True,
@@ -99,6 +104,7 @@ def from_file(
         method=method,
         endpoint=endpoint,
         tag=tag,
+        operation_id=operation_id,
         app=app,
         validate_schema=validate_schema,
     )
@@ -111,6 +117,7 @@ def from_dict(
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
+    operation_id: Optional[Filter] = None,
     *,
     app: Any = None,
     validate_schema: bool = True,
@@ -126,6 +133,7 @@ def from_dict(
             method=method,
             endpoint=endpoint,
             tag=tag,
+            operation_id=operation_id,
             app=app,
             validate_schema=validate_schema,
         )
@@ -139,6 +147,7 @@ def from_dict(
             method=method,
             endpoint=endpoint,
             tag=tag,
+            operation_id=operation_id,
             app=app,
             validate_schema=validate_schema,
         )
@@ -158,10 +167,18 @@ def from_pytest_fixture(
     method: Optional[Filter] = NOT_SET,
     endpoint: Optional[Filter] = NOT_SET,
     tag: Optional[Filter] = NOT_SET,
+    operation_id: Optional[Filter] = NOT_SET,
     validate_schema: bool = True,
 ) -> LazySchema:
     """Needed for a consistent library API."""
-    return LazySchema(fixture_name, method=method, endpoint=endpoint, tag=tag, validate_schema=validate_schema)
+    return LazySchema(
+        fixture_name,
+        method=method,
+        endpoint=endpoint,
+        tag=tag,
+        operation_id=operation_id,
+        validate_schema=validate_schema,
+    )
 
 
 def from_wsgi(
@@ -171,6 +188,7 @@ def from_wsgi(
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
+    operation_id: Optional[Filter] = None,
     validate_schema: bool = True,
     **kwargs: Any,
 ) -> BaseSchema:
@@ -188,6 +206,7 @@ def from_wsgi(
         method=method,
         endpoint=endpoint,
         tag=tag,
+        operation_id=operation_id,
         app=app,
         validate_schema=validate_schema,
     )
@@ -206,6 +225,7 @@ def from_aiohttp(
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
+    operation_id: Optional[Filter] = None,
     *,
     validate_schema: bool = True,
     **kwargs: Any,
@@ -218,5 +238,12 @@ def from_aiohttp(
     if not base_url:
         base_url = app_url
     return from_uri(
-        url, base_url=base_url, method=method, endpoint=endpoint, tag=tag, validate_schema=validate_schema, **kwargs
+        url,
+        base_url=base_url,
+        method=method,
+        endpoint=endpoint,
+        tag=tag,
+        operation_id=operation_id,
+        validate_schema=validate_schema,
+        **kwargs,
     )
