@@ -89,24 +89,31 @@ class InternalError(ExecutionEvent):
     """An error that happened inside the runner."""
 
     message: str = attr.ib()  # pragma: no mutate
+    exception_type: str = attr.ib()  # pragma: no mutate
     exception: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     exception_with_traceback: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
     @classmethod
     def from_exc(cls, exc: Exception) -> "InternalError":
+        exception_type = f"{exc.__class__.__module__}.{exc.__class__.__qualname__}"
         if isinstance(exc, HTTPError):
             if exc.response.status_code == 404:
                 message = f"Schema was not found at {exc.url}"
             else:
                 message = f"Failed to load schema, code {exc.response.status_code} was returned from {exc.url}"
-            return cls(message=message)
+            return cls(message=message, exception_type=exception_type)
         exception = format_exception(exc)
         exception_with_traceback = format_exception(exc, include_traceback=True)
         if isinstance(exc, exceptions.ConnectionError):
             message = f"Failed to load schema from {exc.request.url}"
         else:
             message = "An internal error happened during a test run"
-        return cls(message=message, exception=exception, exception_with_traceback=exception_with_traceback)
+        return cls(
+            message=message,
+            exception_type=exception_type,
+            exception=exception,
+            exception_with_traceback=exception_with_traceback,
+        )
 
 
 @attr.s(slots=True)  # pragma: no mutate

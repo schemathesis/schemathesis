@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Display a suggestion to disable schema validation on schema loading errors in CLI. `#531`_
+
 `1.4.0`_ - 2020-05-03
 ---------------------
 
@@ -1010,6 +1015,7 @@ Fixed
 .. _#542: https://github.com/kiwicom/schemathesis/issues/542
 .. _#539: https://github.com/kiwicom/schemathesis/issues/539
 .. _#537: https://github.com/kiwicom/schemathesis/issues/537
+.. _#531: https://github.com/kiwicom/schemathesis/issues/531
 .. _#529: https://github.com/kiwicom/schemathesis/issues/529
 .. _#521: https://github.com/kiwicom/schemathesis/issues/521
 .. _#519: https://github.com/kiwicom/schemathesis/issues/519

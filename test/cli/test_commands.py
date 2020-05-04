@@ -611,6 +611,19 @@ def test_invalid_endpoint(cli, cli_args, workers):
     assert "schemathesis.exceptions.InvalidSchema: Invalid schema for this endpoint" in lines
 
 
+@pytest.mark.endpoints("invalid")
+def test_invalid_endpoint_suggestion(cli, cli_args):
+    # When the app's schema contains errors
+    result = cli.run(*cli_args)
+    # Then the whole Schemathesis run should fail
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    # And there should be a suggestion to disable schema validation
+    expected = """You can disable input schema validation with --validate-schema=false command-line option
+In this case, Schemathesis can not guarantee proper behavior during the test run
+"""
+    assert expected in result.stdout
+
+
 @pytest.mark.endpoints("teapot")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_status_code_conformance(cli, cli_args, workers):

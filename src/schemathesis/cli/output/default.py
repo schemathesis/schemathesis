@@ -259,10 +259,18 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
             message = event.exception_with_traceback
         else:
             message = event.exception
-        click.secho(
+        message = (
             f"Error: {message}\n"
-            f"Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks",
-            fg="red",
+            f"Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks"
+        )
+        if event.exception_type == "jsonschema.exceptions.ValidationError":
+            message += (
+                "\n\nYou can disable input schema validation with --validate-schema=false "
+                "command-line option\nIn this case, Schemathesis can not guarantee proper"
+                " behavior during the test run"
+            )
+        click.secho(
+            message, fg="red",
         )
 
 
