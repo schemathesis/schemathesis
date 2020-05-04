@@ -8,6 +8,7 @@ paths:
     get:
       summary: Returns a list of users.
       description: Optional extended description in Markdown.
+      operationId: users_get
       responses:
         "200":
           description: OK

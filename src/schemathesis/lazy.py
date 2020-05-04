@@ -19,13 +19,15 @@ class LazySchema:
     method: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
     endpoint: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
     tag: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
+    operation_id: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
 
-    def parametrize(
+    def parametrize(  # pylint: disable=too-many-arguments
         self,
         method: Optional[Filter] = NOT_SET,
         endpoint: Optional[Filter] = NOT_SET,
         tag: Optional[Filter] = NOT_SET,
+        operation_id: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
     ) -> Callable:
         if method is NOT_SET:
@@ -34,11 +36,13 @@ class LazySchema:
             endpoint = self.endpoint
         if tag is NOT_SET:
             tag = self.tag
+        if operation_id is NOT_SET:
+            operation_id = self.operation_id
 
         def wrapper(func: Callable) -> Callable:
             def test(request: FixtureRequest, subtests: SubTests) -> None:
                 """The actual test, which is executed by pytest."""
-                schema = get_schema(request, self.fixture_name, method, endpoint, tag, validate_schema)
+                schema = get_schema(request, self.fixture_name, method, endpoint, tag, operation_id, validate_schema)
                 fixtures = get_fixtures(func, request)
                 # Changing the node id is required for better reporting - the method and endpoint will appear there
                 node_id = subtests.item._nodeid
@@ -86,6 +90,7 @@ def get_schema(
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
+    operation_id: Optional[Filter] = None,
     validate_schema: Union[bool, NotSet] = NOT_SET,
 ) -> BaseSchema:
     """Loads a schema from the fixture."""
@@ -93,7 +98,9 @@ def get_schema(
     schema = request.getfixturevalue(name)
     if not isinstance(schema, BaseSchema):
         raise ValueError(f"The given schema must be an instance of BaseSchema, got: {type(schema)}")
-    return schema.clone(method=method, endpoint=endpoint, tag=tag, validate_schema=validate_schema)
+    return schema.clone(
+        method=method, endpoint=endpoint, tag=tag, operation_id=operation_id, validate_schema=validate_schema
+    )
 
 
 def get_fixtures(func: Callable, request: FixtureRequest) -> Dict[str, Any]:
