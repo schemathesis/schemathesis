@@ -3,8 +3,9 @@ import asyncio
 import inspect
 import re
 from base64 import b64encode
+from copy import deepcopy
 from functools import partial
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 from urllib.parse import quote_plus
 
 import hypothesis
@@ -15,7 +16,7 @@ from requests.auth import _basic_auth_str
 from . import utils
 from ._compat import handle_warnings
 from .exceptions import InvalidSchema
-from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
+from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, get_all_by_name
 from .models import Case, Endpoint
 from .types import Hook
 
@@ -23,30 +24,54 @@ PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"
 SLASH = "/"
 
 
-def create_test(
-    endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
-) -> Callable:
+def generate_tests(
+    endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None,
+) -> Generator[Callable, None, None]:
     """Create a Hypothesis test."""
     hook_dispatcher = getattr(test, "_schemathesis_hooks", None)
-    strategy = endpoint.as_strategy(hooks=hook_dispatcher)
-    wrapped_test = hypothesis.given(case=strategy)(test)
-    if seed is not None:
-        wrapped_test = hypothesis.seed(seed)(wrapped_test)
-    original_test = get_original_test(test)
-    if asyncio.iscoroutinefunction(original_test):
-        wrapped_test.hypothesis.inner_test = make_async_test(original_test)  # type: ignore
-    if settings is not None:
-        wrapped_test = settings(wrapped_test)
-    return add_examples(wrapped_test, endpoint, hook_dispatcher=hook_dispatcher)
+    base_strategy = endpoint.as_strategy(hooks=hook_dispatcher)
+    strategies = get_additional_strategies(base_strategy, endpoint, hook_dispatcher)
+    for strategy in strategies:
+        wrapped_test = hypothesis.given(case=strategy)(test)
+        if seed is not None:
+            wrapped_test = hypothesis.seed(seed)(wrapped_test)
+        original_test = get_original_test(test)
+        if asyncio.iscoroutinefunction(original_test):
+            wrapped_test.hypothesis.inner_test = make_async_test(original_test)  # type: ignore
+        if settings is not None:
+            wrapped_test = settings(wrapped_test)
+        yield add_examples(wrapped_test, endpoint, hook_dispatcher=hook_dispatcher)
 
 
-def make_test_or_exception(
-    endpoint: Endpoint, func: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
-) -> Union[Callable, InvalidSchema]:
+def make_tests_or_exception(
+    endpoint: Endpoint, func: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None,
+) -> List[Union[Callable, InvalidSchema]]:
     try:
-        return create_test(endpoint, func, settings, seed=seed)
+        return list(generate_tests(endpoint, func, settings, seed=seed))
     except InvalidSchema as exc:
-        return exc
+        return [exc]
+
+
+def get_additional_strategies(
+    base_strategy: st.SearchStrategy, endpoint: Endpoint, hook_dispatcher: HookDispatcher
+) -> List[st.SearchStrategy]:
+    hook_name = "generate_test_per_endpoint"
+
+    global_strategies = (
+        gen_hook(HookContext(endpoint), deepcopy(base_strategy)) for gen_hook in get_all_by_name(hook_name)
+    )
+    schema_strategies = (
+        gen_hook(HookContext(endpoint), deepcopy(base_strategy))
+        for gen_hook in endpoint.schema.hooks.get_all_by_name(hook_name)
+    )
+    if hook_dispatcher:
+        test_strategies = (
+            gen_hook(HookContext(endpoint), deepcopy(base_strategy))
+            for gen_hook in hook_dispatcher.get_all_by_name(hook_name)
+        )
+    else:
+        test_strategies = (_ for _ in ())  # empty generator
+    return [base_strategy, *global_strategies, *schema_strategies, *test_strategies]
 
 
 def get_original_test(test: Callable) -> Callable:

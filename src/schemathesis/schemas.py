@@ -14,7 +14,7 @@ import attr
 import hypothesis
 from requests.structures import CaseInsensitiveDict
 
-from ._hypothesis import make_test_or_exception
+from ._hypothesis import make_tests_or_exception
 from .exceptions import InvalidSchema
 from .hooks import HookContext, HookDispatcher, HookLocation, HookScope, dispatch, warn_deprecated_hook
 from .models import Endpoint
@@ -64,10 +64,9 @@ class BaseSchema(Mapping):
         self, func: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
     ) -> Generator[Tuple[Endpoint, Union[Callable, InvalidSchema]], None, None]:
         """Generate all endpoints and Hypothesis tests for them."""
-        test: Union[Callable, InvalidSchema]
         for endpoint in self.get_all_endpoints():
-            test = make_test_or_exception(endpoint, func, settings, seed)
-            yield endpoint, test
+            for test in make_tests_or_exception(endpoint, func, settings, seed):
+                yield endpoint, test
 
     def parametrize(  # pylint: disable=too-many-arguments
         self,

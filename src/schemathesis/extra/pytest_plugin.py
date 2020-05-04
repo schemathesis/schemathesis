@@ -10,7 +10,7 @@ from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module
 from hypothesis.errors import InvalidArgument  # pylint: disable=ungrouped-imports
 from packaging import version
 
-from .._hypothesis import create_test
+from .._hypothesis import generate_tests
 from ..exceptions import InvalidSchema
 from ..models import Endpoint
 from ..utils import is_schemathesis_test
@@ -43,32 +43,39 @@ class SchemathesisCase(PyCollector):
         to produce tests out of hypothesis ones.
         """
         name = self._get_test_name(endpoint)
-        funcobj = self._make_test(endpoint)
 
         cls = self._get_class_parent()
-        definition = create(FunctionDefinition, name=self.name, parent=self.parent, callobj=funcobj)
-        fixturemanager = self.session._fixturemanager
-        fixtureinfo = fixturemanager.getfixtureinfo(definition, funcobj, cls)
 
-        metafunc = self._parametrize(cls, definition, fixtureinfo)
+        for hypothesis_test in self._make_tests(endpoint):
+            definition = create(FunctionDefinition, name=self.name, parent=self.parent, callobj=hypothesis_test)
+            fixturemanager = self.session._fixturemanager
+            fixtureinfo = fixturemanager.getfixtureinfo(definition, hypothesis_test, cls)
 
-        if not metafunc._calls:
-            yield create(SchemathesisFunction, name=name, parent=self.parent, callobj=funcobj, fixtureinfo=fixtureinfo)
-        else:
-            fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)
-            fixtureinfo.prune_dependency_tree()
-            for callspec in metafunc._calls:
-                subname = "{}[{}]".format(name, callspec.id)
+            metafunc = self._parametrize(cls, definition, fixtureinfo)
+
+            if not metafunc._calls:
                 yield create(
                     SchemathesisFunction,
-                    name=subname,
+                    name=name,
                     parent=self.parent,
-                    callspec=callspec,
-                    callobj=funcobj,
+                    callobj=hypothesis_test,
                     fixtureinfo=fixtureinfo,
-                    keywords={callspec.id: True},
-                    originalname=name,
                 )
+            else:
+                fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)
+                fixtureinfo.prune_dependency_tree()
+                for callspec in metafunc._calls:
+                    subname = "{}[{}]".format(name, callspec.id)
+                    yield create(
+                        SchemathesisFunction,
+                        name=subname,
+                        parent=self.parent,
+                        callspec=callspec,
+                        callobj=hypothesis_test,
+                        fixtureinfo=fixtureinfo,
+                        keywords={callspec.id: True},
+                        originalname=name,
+                    )
 
     def _get_class_parent(self) -> Optional[Type]:
         clscol = self.getparent(Class)
@@ -88,11 +95,11 @@ class SchemathesisCase(PyCollector):
         self.ihook.pytest_generate_tests.call_extra(methods, {"metafunc": metafunc})
         return metafunc
 
-    def _make_test(self, endpoint: Endpoint) -> Callable:
+    def _make_tests(self, endpoint: Endpoint) -> List[Callable]:
         try:
-            return create_test(endpoint, self.test_function)
+            return list(generate_tests(endpoint, self.test_function))
         except InvalidSchema:
-            return lambda: pytest.fail("Invalid schema for endpoint")
+            return [lambda: pytest.fail("Invalid schema for endpoint")]
 
     def collect(self) -> List[Function]:  # type: ignore
         """Generate different test items for all endpoints available in the given schema."""

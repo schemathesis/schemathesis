@@ -213,6 +213,11 @@ def before_generate_form_data(context: HookContext, strategy: st.SearchStrategy)
 
 
 @all_scopes
+def generate_test_per_endpoint(context: HookContext, strategy: st.SearchStrategy) -> st.SearchStrategy:
+    """Creates an additional test for user to modify."""
+
+
+@all_scopes
 def before_process_path(context: HookContext, path: str, methods: Dict[str, Any]) -> None:
     """Called before API path is processed."""
 

@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, cas
 import attr
 import hypothesis
 
-from ..._hypothesis import make_test_or_exception
+from ..._hypothesis import make_tests_or_exception
 from ...models import CheckFunction, TestResultSet
 from ...types import RawAuth
 from ...utils import capture_hypothesis_output, get_requests_auth
@@ -31,9 +31,9 @@ def _run_task(
     with capture_hypothesis_output():
         while not tasks_queue.empty():
             endpoint = tasks_queue.get()
-            test = make_test_or_exception(endpoint, test_template, settings, seed)
-            for event in run_test(endpoint, test, checks, targets, results, **kwargs):
-                events_queue.put(event)
+            for test in make_tests_or_exception(endpoint, test_template, settings, seed):
+                for event in run_test(endpoint, test, checks, targets, results, **kwargs):
+                    events_queue.put(event)
 
 
 def thread_task(
