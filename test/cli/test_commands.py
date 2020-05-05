@@ -177,6 +177,9 @@ def test_commands_run_help(cli):
         "  -T, --tag TEXT                  Filter schemathesis test by schema tag",
         "                                  pattern.",
         "",
+        "  -O, --operation-id TEXT         Filter schemathesis test by operationId",
+        "                                  pattern.",
+        "",
         "  -w, --workers INTEGER RANGE     Number of workers to run tests.",
         "  -b, --base-url TEXT             Base URL address of the API, required for",
         "                                  SCHEMA if specified by file.",
@@ -271,6 +274,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "endpoint": (),
         "method": (),
         "tag": (),
+        "operation_id": (),
         "schema_uri": SCHEMA_URI,
         "validate_schema": True,
         "loader": from_uri,
@@ -303,6 +307,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         (["--method=POST", "--auth=test:test"], {"auth": ("test", "test"), "auth_type": "basic", "method": ("POST",)},),
         (["--endpoint=users"], {"endpoint": ("users",)}),
         (["--tag=foo"], {"tag": ("foo",)}),
+        (["--operation-id=getUser"], {"operation_id": ("getUser",)}),
         (["--base-url=https://example.com/api/v1test"], {"base_url": "https://example.com/api/v1test"}),
     ),
 )
@@ -321,6 +326,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
         "loader": from_uri,
         "method": (),
         "tag": (),
+        "operation_id": (),
         "validate_schema": True,
         **expected,
     }

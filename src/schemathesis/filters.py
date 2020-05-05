@@ -15,8 +15,7 @@ def should_skip_method(method: str, pattern: Optional[Filter]) -> bool:
 def should_skip_endpoint(endpoint: str, pattern: Optional[Filter]) -> bool:
     if pattern is None:
         return False
-    patterns = force_tuple(pattern)
-    return not any(re.search(item, endpoint) for item in patterns)
+    return not _match_any_pattern(endpoint, pattern)
 
 
 def should_skip_by_tag(tags: Optional[List[str]], pattern: Optional[Filter]) -> bool:
@@ -28,8 +27,14 @@ def should_skip_by_tag(tags: Optional[List[str]], pattern: Optional[Filter]) -> 
     return not any(re.search(item, tag) for item in patterns for tag in tags)
 
 
-def should_skip_by_operation_id(operation_id: str, pattern: Optional[Filter]) -> bool:
+def should_skip_by_operation_id(operation_id: Optional[str], pattern: Optional[Filter]) -> bool:
     if pattern is None:
         return False
+    if not operation_id:
+        return True
+    return not _match_any_pattern(operation_id, pattern)
+
+
+def _match_any_pattern(target: str, pattern: Filter) -> bool:
     patterns = force_tuple(pattern)
-    return not any(re.search(item, operation_id) for item in patterns)
+    return any(re.search(item, target) for item in patterns)

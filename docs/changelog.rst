@@ -10,7 +10,7 @@ Added
 ~~~~~
 
 - Display a suggestion to disable schema validation on schema loading errors in CLI. `#531`_
-- ``operation_id`` argument can get operations accurately by operationId . `#546`_
+- Filtration of endpoints by ``operationId`` via ``operation_id`` parameter to ``schema.parametrize`` or ``-O`` command-line option. `#546`_
 
 `1.4.0`_ - 2020-05-03
 ---------------------
