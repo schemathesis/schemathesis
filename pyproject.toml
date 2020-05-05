@@ -47,6 +47,7 @@ pytest-asyncio = "^0.11.0"
 pytest-xdist = "^1.30"
 typing_extensions = "^3.7"
 flask = "^1.1"
+sphinx = "^3.0.3"
 
 [tool.poetry.plugins]
 pytest11 = {schemathesis = "schemathesis.extra.pytest_plugin"}
