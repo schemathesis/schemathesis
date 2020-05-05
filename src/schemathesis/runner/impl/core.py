@@ -154,11 +154,14 @@ def network_test(
     session: requests.Session,
     request_timeout: Optional[int],
     store_interactions: bool,
+    headers: Optional[Dict[str, Any]],
 ) -> None:
     """A single test body that will be executed against the target."""
     # pylint: disable=too-many-arguments
+    headers = headers or {}
+    headers.setdefault("User-Agent", USER_AGENT)
     timeout = prepare_timeout(request_timeout)
-    response = case.call(session=session, timeout=timeout)
+    response = case.call(session=session, headers=headers, timeout=timeout)
     run_targets(targets, response.elapsed.total_seconds())
     if store_interactions:
         result.store_requests_response(response)
@@ -166,15 +169,10 @@ def network_test(
 
 
 @contextmanager
-def get_session(
-    auth: Optional[Union[HTTPDigestAuth, RawAuth]] = None, headers: Optional[Dict[str, Any]] = None
-) -> Generator[requests.Session, None, None]:
+def get_session(auth: Optional[Union[HTTPDigestAuth, RawAuth]] = None) -> Generator[requests.Session, None, None]:
     with requests.Session() as session:
         if auth is not None:
             session.auth = auth
-        session.headers["User-agent"] = USER_AGENT
-        if headers is not None:
-            session.headers.update(**headers)
         yield session
 
 
@@ -213,7 +211,7 @@ def _prepare_wsgi_headers(
     headers: Optional[Dict[str, Any]], auth: Optional[RawAuth], auth_type: Optional[str]
 ) -> Dict[str, Any]:
     headers = headers or {}
-    headers.setdefault("User-agent", USER_AGENT)
+    headers.setdefault("User-Agent", USER_AGENT)
     wsgi_auth = get_wsgi_auth(auth, auth_type)
     if wsgi_auth:
         headers["Authorization"] = wsgi_auth

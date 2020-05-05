@@ -15,6 +15,11 @@ Added
   to the generated data. It supports generating API keys in headers or query parameters and generating data for HTTP
   authentication schemes as well. `#540`_
 
+Fixed
+~~~~~
+
+- Overriding header values in CLI and runner when headers are provided explicitly clash with ones defined in the schema. `#559`_
+
 `1.4.0`_ - 2020-05-03
 ---------------------
 
@@ -1016,6 +1021,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#559: https://github.com/kiwicom/schemathesis/issues/559
 .. _#546: https://github.com/kiwicom/schemathesis/issues/546
 .. _#542: https://github.com/kiwicom/schemathesis/issues/542
 .. _#540: https://github.com/kiwicom/schemathesis/issues/540
