@@ -1,6 +1,7 @@
 import string
+from contextlib import ExitStack, contextmanager
 from itertools import product
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Tuple, Union
 
 import jsonschema
 import requests
@@ -80,7 +81,7 @@ def response_schema_conformance(response: GenericResponse, case: "Case") -> None
     else:
         # No response defined for the received response status code
         return
-    schema = case.endpoint.schema._get_response_schema(definition, case.endpoint.definition.scope)
+    scopes, schema = case.endpoint.schema._get_response_schema(definition, case.endpoint.definition.scope)
     if not schema:
         return
     if isinstance(response, requests.Response):
@@ -88,10 +89,26 @@ def response_schema_conformance(response: GenericResponse, case: "Case") -> None
     else:
         data = response.json
     try:
-        jsonschema.validate(data, schema, cls=jsonschema.Draft4Validator, resolver=case.endpoint.schema.resolver)
+        resolver = case.endpoint.schema.resolver
+        with in_scopes(resolver, scopes):
+            jsonschema.validate(data, schema, cls=jsonschema.Draft4Validator, resolver=resolver)
     except jsonschema.ValidationError as exc:
         exc_class = get_schema_validation_error(exc)
         raise exc_class(f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}")
+
+
+@contextmanager
+def in_scopes(resolver: jsonschema.RefResolver, scopes: List[str]) -> Generator[None, None, None]:
+    """Push all available scopes into the resolver.
+
+    There could be an additional scope change during schema resolving in `_get_response_schema`, so in total there
+    could be a stack of two scopes maximum. This context manager handles both cases (1 or 2 scope changes) in the same
+    way.
+    """
+    with ExitStack() as stack:
+        for scope in scopes:
+            stack.enter_context(resolver.in_scope(scope))
+        yield
 
 
 DEFAULT_CHECKS = (not_a_server_error,)

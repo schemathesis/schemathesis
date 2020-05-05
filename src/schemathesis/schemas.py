@@ -22,7 +22,7 @@ import yaml
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
-from .converter import to_json_schema
+from .converter import to_json_schema, to_json_schema_recursive
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_operation_id, should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .hooks import HookContext, HookDispatcher, HookLocation, HookScope, dispatch, warn_deprecated_hook
@@ -167,7 +167,9 @@ class BaseSchema(Mapping):
             validate_schema=validate_schema,  # type: ignore
         )
 
-    def _get_response_schema(self, definition: Dict[str, Any], scope: Optional[str]) -> Optional[Dict[str, Any]]:
+    def _get_response_schema(
+        self, definition: Dict[str, Any], scope: str
+    ) -> Tuple[List[str], Optional[Dict[str, Any]]]:
         """Extract response schema from `responses`."""
         raise NotImplementedError
 
@@ -251,7 +253,7 @@ class SwaggerV20(BaseSchema):  # pylint: disable=too-many-public-methods
                 if "$ref" in methods:
                     scope, raw_methods = deepcopy(self.resolver.resolve(methods["$ref"]))
                 else:
-                    raw_methods, scope = deepcopy(methods), None
+                    raw_methods, scope = deepcopy(methods), self.resolver.resolution_scope
                 methods = self.resolve(methods)
                 common_parameters = get_common_parameters(methods)
                 for method, resolved_definition in methods.items():
@@ -433,22 +435,28 @@ class SwaggerV20(BaseSchema):  # pylint: disable=too-many-public-methods
                 item[idx] = self.resolve(sub_item, recursion_level)
         return item
 
-    def resolve_in_scope(self, item: Dict[str, Any], scope: Optional[str], recursion_level: int = 0) -> Dict[str, Any]:
-        if scope is not None:
+    def resolve_in_scope(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Dict[str, Any]]:
+        scopes = [scope]
+        # if there is `$ref` then we have a scope change that should be used during validation later to
+        # resolve nested references correctly
+        if "$ref" in definition:
             with self.resolver.in_scope(scope):
-                return self.resolve(item, recursion_level)
-        return self.resolve(item, recursion_level)
+                new_scope, definition = deepcopy(self.resolver.resolve(definition["$ref"]))
+            scopes.append(new_scope)
+        return scopes, definition
 
     def prepare(self, item: Dict[str, Any]) -> Dict[str, Any]:
         """Parse schema extension, e.g. "x-nullable" field."""
         return to_json_schema(item, self.nullable_name)
 
-    def _get_response_schema(self, definition: Dict[str, Any], scope: Optional[str]) -> Optional[Dict[str, Any]]:
-        definition = self.resolve_in_scope(deepcopy(definition), scope, RECURSION_DEPTH_LIMIT)
+    def _get_response_schema(
+        self, definition: Dict[str, Any], scope: str
+    ) -> Tuple[List[str], Optional[Dict[str, Any]]]:
+        scopes, definition = self.resolve_in_scope(deepcopy(definition), scope)
         schema = definition.get("schema")
         if not schema:
-            return None
-        return to_json_schema(schema, self.nullable_name)
+            return scopes, None
+        return scopes, to_json_schema_recursive(schema, self.nullable_name)
 
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
         produces = endpoint.definition.raw.get("produces", None)
@@ -546,13 +554,15 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         # "schema" field is required for all parameters in Open API 3.0
         return super().parameter_to_json_schema(data["schema"])
 
-    def _get_response_schema(self, definition: Dict[str, Any], scope: Optional[str]) -> Optional[Dict[str, Any]]:
-        definition = self.resolve_in_scope(deepcopy(definition), scope, RECURSION_DEPTH_LIMIT)
+    def _get_response_schema(
+        self, definition: Dict[str, Any], scope: str
+    ) -> Tuple[List[str], Optional[Dict[str, Any]]]:
+        scopes, definition = self.resolve_in_scope(deepcopy(definition), scope)
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
         if option:
-            return to_json_schema(option["schema"], self.nullable_name)
-        return None
+            return scopes, to_json_schema_recursive(option["schema"], self.nullable_name)
+        return scopes, None
 
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
         try:

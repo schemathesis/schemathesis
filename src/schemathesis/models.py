@@ -234,7 +234,7 @@ class EndpointDefinition:
     """
 
     raw: Dict[str, Any] = attr.ib()  # pragma: no mutate
-    scope: Optional[str] = attr.ib()  # pragma: no mutate
+    scope: str = attr.ib()  # pragma: no mutate
 
 
 @attr.s(slots=True)  # pragma: no mutate
