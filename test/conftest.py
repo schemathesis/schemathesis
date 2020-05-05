@@ -213,7 +213,10 @@ COMMON_RESPONSES = {
                 "schema": {
                     "type": "object",
                     "additionalProperties": False,
-                    "properties": {"key": {"type": "string"}, "referenced": {"$ref": "attributes.yaml#/referenced"}},
+                    "properties": {
+                        "key": {"type": "string", "nullable": True},
+                        "referenced": {"$ref": "attributes.yaml#/referenced"},
+                    },
                     "required": ["key", "referenced"],
                 }
             }
@@ -221,7 +224,7 @@ COMMON_RESPONSES = {
     }
 }
 ATTRIBUTES = {"referenced": {"$ref": "attributes_nested.yaml#/nested_reference"}}
-ATTRIBUTES_NESTED = {"nested_reference": {"type": "string"}}
+ATTRIBUTES_NESTED = {"nested_reference": {"type": "string", "nullable": True}}
 
 
 @pytest.fixture()
