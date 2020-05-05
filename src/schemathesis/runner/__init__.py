@@ -36,6 +36,7 @@ def prepare(  # pylint: disable=too-many-arguments
     endpoint: Optional[Filter] = None,
     method: Optional[Filter] = None,
     tag: Optional[Filter] = None,
+    operation_id: Optional[Filter] = None,
     app: Optional[str] = None,
     validate_schema: bool = True,
     # Hypothesis-specific configuration
@@ -71,6 +72,7 @@ def prepare(  # pylint: disable=too-many-arguments
         endpoint=endpoint,
         method=method,
         tag=tag,
+        operation_id=operation_id,
         app=app,
         validate_schema=validate_schema,
         checks=checks,
@@ -115,6 +117,7 @@ def execute_from_schema(
     endpoint: Optional[Filter] = None,
     method: Optional[Filter] = None,
     tag: Optional[Filter] = None,
+    operation_id: Optional[Filter] = None,
     app: Optional[str] = None,
     validate_schema: bool = True,
     checks: Iterable[CheckFunction],
@@ -156,6 +159,7 @@ def execute_from_schema(
             endpoint=endpoint,
             method=method,
             tag=tag,
+            operation_id=operation_id,
         )
 
         runner: BaseRunner
@@ -236,9 +240,12 @@ def load_schema(
     endpoint: Optional[Filter] = None,
     method: Optional[Filter] = None,
     tag: Optional[Filter] = None,
+    operation_id: Optional[Filter] = None,
 ) -> BaseSchema:
     """Load schema via specified loader and parameters."""
-    loader_options = dict_true_values(base_url=base_url, endpoint=endpoint, method=method, tag=tag, app=app)
+    loader_options = dict_true_values(
+        base_url=base_url, endpoint=endpoint, method=method, tag=tag, operation_id=operation_id, app=app
+    )
 
     if not isinstance(schema_uri, dict):
         if file_exists(schema_uri):

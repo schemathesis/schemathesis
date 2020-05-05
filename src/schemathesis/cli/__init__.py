@@ -123,6 +123,15 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     callback=callbacks.validate_regex,
 )
 @click.option(
+    "--operation-id",
+    "-O",
+    "operation_ids",
+    type=str,
+    multiple=True,
+    help="Filter schemathesis test by operationId pattern.",
+    callback=callbacks.validate_regex,
+)
+@click.option(
     "--workers",
     "-w",
     "workers_num",
@@ -198,6 +207,7 @@ def run(  # pylint: disable=too-many-arguments
     endpoints: Optional[Filter] = None,
     methods: Optional[Filter] = None,
     tags: Optional[Filter] = None,
+    operation_ids: Optional[Filter] = None,
     workers_num: int = DEFAULT_WORKERS,
     base_url: Optional[str] = None,
     app: Optional[str] = None,
@@ -238,6 +248,7 @@ def run(  # pylint: disable=too-many-arguments
         endpoint=endpoints,
         method=methods,
         tag=tags,
+        operation_id=operation_ids,
         app=app,
         seed=hypothesis_seed,
         exit_first=exit_first,

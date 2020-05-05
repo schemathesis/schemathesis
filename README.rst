@@ -70,7 +70,7 @@ The ``schemathesis`` command can be used to perform Schemathesis test cases:
 If your application requires authorization then you can use ``--auth`` option for Basic Auth and ``--header`` to specify
 custom headers to be sent with each request.
 
-To filter your tests by endpoint name, HTTP method or Open API tags you could use ``-E``, ``-M``, ``-T`` options respectively.
+To filter your tests by endpoint name, HTTP method, Open API tags or operationId you could use ``-E``, ``-M``, ``-T``, ``-O`` options respectively.
 
 CLI supports passing options to ``hypothesis.settings``. All of them are prefixed with ``--hypothesis-``:
 
