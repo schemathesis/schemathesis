@@ -15,7 +15,7 @@ class SingleThreadRunner(BaseRunner):
 
     def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         auth = get_requests_auth(self.auth, self.auth_type)
-        with get_session(auth, self.headers) as session:
+        with get_session(auth) as session:
             for endpoint, test in self.schema.get_all_tests(network_test, self.hypothesis_settings, self.seed):
                 for event in run_test(
                     endpoint,
@@ -24,6 +24,7 @@ class SingleThreadRunner(BaseRunner):
                     self.targets,
                     results,
                     session=session,
+                    headers=self.headers,
                     request_timeout=self.request_timeout,
                     store_interactions=self.store_interactions,
                 ):
