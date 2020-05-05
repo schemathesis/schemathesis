@@ -55,9 +55,19 @@ def thread_task(
     """
     # pylint: disable=too-many-arguments
     prepared_auth = get_requests_auth(auth, auth_type)
-    with get_session(prepared_auth, headers) as session:
+    with get_session(prepared_auth) as session:
         _run_task(
-            network_test, tasks_queue, events_queue, checks, targets, settings, seed, results, session=session, **kwargs
+            network_test,
+            tasks_queue,
+            events_queue,
+            checks,
+            targets,
+            settings,
+            seed,
+            results,
+            session=session,
+            headers=headers,
+            **kwargs,
         )
 
 

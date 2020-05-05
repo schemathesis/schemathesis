@@ -144,7 +144,7 @@ def test_interactions(request, args, workers):
             "Accept": ["*/*"],
             "Accept-Encoding": ["gzip, deflate"],
             "Connection": ["keep-alive"],
-            "User-agent": [USER_AGENT],
+            "User-Agent": [USER_AGENT],
         },
     }
     assert failure.response.status_code == 500
@@ -168,7 +168,7 @@ def test_interactions(request, args, workers):
             "Accept": ["*/*"],
             "Accept-Encoding": ["gzip, deflate"],
             "Connection": ["keep-alive"],
-            "User-agent": [USER_AGENT],
+            "User-Agent": [USER_AGENT],
         },
     }
     assert success.response.status_code == 200
@@ -253,10 +253,10 @@ def test_hypothesis_deadline(args):
 def test_form_data(args):
     app, kwargs = args
 
-    def is_ok(response, result):
+    def is_ok(response, case):
         assert response.status_code == 200
 
-    def check_content(response, result):
+    def check_content(response, case):
         if isinstance(app, Flask):
             data = response.json
         else:
@@ -275,6 +275,24 @@ def test_form_data(args):
     # And the Content-Type of incoming requests should be `multipart/form-data`
     incoming_requests = get_incoming_requests(app)
     assert incoming_requests[0].headers["Content-Type"].startswith("multipart/form-data")
+
+
+@pytest.mark.endpoints("headers")
+def test_headers_override(args):
+    app, kwargs = args
+
+    def check_headers(response, case):
+        if isinstance(app, Flask):
+            data = response.json
+        else:
+            data = response.json()
+        assert data["X-Token"] == "test"
+
+    init, *others, finished = prepare(
+        **kwargs, checks=(check_headers,), headers={"X-Token": "test"}, hypothesis_max_examples=1
+    )
+    assert not finished.has_failures
+    assert not finished.has_errors
 
 
 @pytest.mark.endpoints("teapot")

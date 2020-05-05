@@ -24,6 +24,7 @@ class Endpoint(Enum):
     invalid_response = ("GET", "/api/invalid_response")
     custom_format = ("GET", "/api/custom_format")
     invalid_path_parameter = ("GET", "/api/invalid_path_parameter/{id}")
+    headers = ("GET", "/api/headers")
 
 
 def make_schema(endpoints: Tuple[str, ...]) -> Dict:
@@ -42,6 +43,7 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
         "schemes": ["http"],
         "produces": ["application/json"],
         "paths": {},
+        "securityDefinitions": {"api_key": {"type": "apiKey", "name": "X-Token", "in": "header"}},
     }
     for endpoint in endpoints:
         method, path = Endpoint[endpoint].value
@@ -81,7 +83,7 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
                 "additionalProperties": False,
             }
             schema = {
-                "parameters": [{"name": "body", "in": "body", "required": True, "schema": payload,}],
+                "parameters": [{"name": "body", "in": "body", "required": True, "schema": payload}],
                 "responses": {"200": {"description": "OK", "schema": payload}},
             }
         elif endpoint == "unsatisfiable":
@@ -99,7 +101,7 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
             }
         elif endpoint == "performance":
             schema = {
-                "parameters": [{"name": "data", "in": "body", "required": True, "schema": {"type": "integer"},}],
+                "parameters": [{"name": "data", "in": "body", "required": True, "schema": {"type": "integer"}}],
                 "responses": {"200": {"description": "OK"}},
             }
         elif endpoint in ("flaky", "multiple_failures"):
@@ -141,6 +143,14 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
             schema = {
                 "parameters": [{"name": "id", "in": "path", "required": False, "type": "integer"}],
                 "responses": {"200": {"description": "OK"}},
+            }
+        elif endpoint == "headers":
+            schema = {
+                "security": [{"api_key": []}],
+                "responses": {
+                    "200": {"description": "OK", "schema": {"type": "object"}},
+                    "default": {"description": "Default response"},
+                },
             }
         else:
             schema = {

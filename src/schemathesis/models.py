@@ -114,7 +114,11 @@ class Case:
         }
 
     def call(
-        self, base_url: Optional[str] = None, session: Optional[requests.Session] = None, **kwargs: Any
+        self,
+        base_url: Optional[str] = None,
+        session: Optional[requests.Session] = None,
+        headers: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
     ) -> requests.Response:
         """Make a network call with `requests`."""
         if session is None:
@@ -125,7 +129,10 @@ class Case:
 
         base_url = self._get_base_url(base_url)
         data = self.as_requests_kwargs(base_url)
-        response = session.request(**data, **kwargs)  # type: ignore
+        if headers is not None:
+            data["headers"] = {**(data["headers"] or {}), **headers}
+        data.update(kwargs)
+        response = session.request(**data)  # type: ignore
         if close_session:
             session.close()
         return response
