@@ -5,6 +5,7 @@ import pytest
 from _pytest import fixtures, nodes
 from _pytest.config import hookimpl
 from _pytest.fixtures import FuncFixtureInfo
+from _pytest.nodes import Node
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from hypothesis.errors import InvalidArgument  # pylint: disable=ungrouped-imports
 from packaging import version
@@ -15,6 +16,12 @@ from ..models import Endpoint
 from ..utils import is_schemathesis_test
 
 USE_FROM_PARENT = version.parse(pytest.__version__) >= version.parse("5.4.0")
+
+
+def create(cls: Type[Node], *args: Any, **kwargs: Any) -> Node:
+    if USE_FROM_PARENT:
+        return cls.from_parent(*args, **kwargs)
+    return cls(*args, **kwargs)
 
 
 class SchemathesisCase(PyCollector):
@@ -39,28 +46,21 @@ class SchemathesisCase(PyCollector):
         funcobj = self._make_test(endpoint)
 
         cls = self._get_class_parent()
-        if USE_FROM_PARENT:
-            create_definition = FunctionDefinition.from_parent
-        else:
-            create_definition = FunctionDefinition
-        definition = create_definition(name=self.name, parent=self.parent, callobj=funcobj)
+        definition = create(FunctionDefinition, name=self.name, parent=self.parent, callobj=funcobj)
         fixturemanager = self.session._fixturemanager
         fixtureinfo = fixturemanager.getfixtureinfo(definition, funcobj, cls)
 
         metafunc = self._parametrize(cls, definition, fixtureinfo)
 
-        if USE_FROM_PARENT:
-            create_function = SchemathesisFunction.from_parent
-        else:
-            create_function = SchemathesisFunction
         if not metafunc._calls:
-            yield create_function(name=name, parent=self.parent, callobj=funcobj, fixtureinfo=fixtureinfo)
+            yield create(SchemathesisFunction, name=name, parent=self.parent, callobj=funcobj, fixtureinfo=fixtureinfo)
         else:
             fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)
             fixtureinfo.prune_dependency_tree()
             for callspec in metafunc._calls:
                 subname = "{}[{}]".format(name, callspec.id)
-                yield create_function(
+                yield create(
+                    SchemathesisFunction,
                     name=subname,
                     parent=self.parent,
                     callspec=callspec,
@@ -118,11 +118,7 @@ def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
     outcome = yield
     if is_schemathesis_test(obj):
-        if USE_FROM_PARENT:
-            create_case = SchemathesisCase.from_parent
-        else:
-            create_case = SchemathesisCase
-        outcome.force_result(create_case(parent=collector, test_function=obj, name=name))
+        outcome.force_result(create(SchemathesisCase, parent=collector, test_function=obj, name=name))
     else:
         outcome.get_result()
 

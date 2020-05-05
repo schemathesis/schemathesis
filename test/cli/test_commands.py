@@ -1140,8 +1140,9 @@ def fast_api_fixup():
     fixups.uninstall()
 
 
-def test_fast_api_fixup(testdir, cli, base_url, fast_api_schema, fast_api_fixup):
+@pytest.mark.parametrize("fixup", ("all", "fast_api"))
+def test_fast_api_fixup(testdir, cli, base_url, fast_api_schema, fast_api_fixup, fixup):
     # When schema contains Draft 7 definitions as ones from FastAPI may contain
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(fast_api_schema))
-    result = cli.run(str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=1", "--fixups=all")
+    result = cli.run(str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=1", f"--fixups={fixup}")
     assert result.exit_code == ExitCode.OK

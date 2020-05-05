@@ -123,7 +123,7 @@ def test_(request, case, another):
 
 
 def test_with_parametrize_filters(testdir):
-    # When the test uses method / endpoint filter
+    # When the test uses method / endpoint / tag / operation-id filter
     testdir.make_test(
         """
 @pytest.fixture
@@ -147,6 +147,12 @@ def test_c(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/v1/second"
     assert case.method == "GET"
+
+@lazy_schema.parametrize(operation_id="updateThird")
+def test_d(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.path == "/v1/third"
+    assert case.method == "PUT"
 """,
         paths={
             "/first": {
@@ -157,21 +163,23 @@ def test_c(request, case):
                 "post": {"responses": {"200": {"description": "OK"}}},
                 "get": {"tags": ["foo"], "responses": {"200": {"description": "OK"}}},
             },
+            "/third": {"put": {"operationId": "updateThird", "responses": {"200": {"description": "OK"}}},},
         },
         tags=[{"name": "foo"}, {"name": "bar"}],
     )
     result = testdir.runpytest("-v")
     # Then the filters should be applied to the generated tests
-    result.assert_outcomes(passed=3)
+    result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
             r"test_with_parametrize_filters.py::test_a PASSED",
             r"test_with_parametrize_filters.py::test_b PASSED",
             r"test_with_parametrize_filters.py::test_c PASSED",
-            r".*3 passed",
+            r"test_with_parametrize_filters.py::test_d PASSED",
+            r".*4 passed",
         ]
     )
-    result.stdout.re_match_lines([r"Hypothesis calls: 5$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 6$"])
 
 
 def test_with_parametrize_filters_override(testdir):
