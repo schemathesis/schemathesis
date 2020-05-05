@@ -1,6 +1,8 @@
 from copy import deepcopy
 from typing import Any, Dict
 
+from .utils import traverse_schema
+
 
 def to_json_schema(schema: Dict[str, Any], nullable_name: str) -> Dict[str, Any]:
     """Convert Open API parameters to JSON Schema.
@@ -23,3 +25,7 @@ def to_json_schema(schema: Dict[str, Any], nullable_name: str) -> Dict[str, Any]
         schema["type"] = "string"
         schema["format"] = "binary"
     return schema
+
+
+def to_json_schema_recursive(schema: Dict[str, Any], nullable_name: str) -> Dict[str, Any]:
+    return traverse_schema(schema, to_json_schema, nullable_name)

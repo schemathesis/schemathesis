@@ -213,13 +213,15 @@ COMMON_RESPONSES = {
                 "schema": {
                     "type": "object",
                     "additionalProperties": False,
-                    "properties": {"key": {"type": "string"}},
-                    "required": ["key"],
+                    "properties": {"key": {"type": "string"}, "referenced": {"$ref": "attributes.yaml#/referenced"}},
+                    "required": ["key", "referenced"],
                 }
             }
         },
     }
 }
+ATTRIBUTES = {"referenced": {"$ref": "attributes_nested.yaml#/nested_reference"}}
+ATTRIBUTES_NESTED = {"nested_reference": {"type": "string"}}
 
 
 @pytest.fixture()
@@ -238,6 +240,8 @@ def complex_schema(testdir):
     (paths / "teapot.yaml").write_text(yaml.dump(TEAPOT_PATHS), "utf8")
     (teapot_schemas / "create.yaml").write_text(yaml.dump(TEAPOT_CREATE_SCHEMAS), "utf8")
     (common / "responses.yaml").write_text(yaml.dump(COMMON_RESPONSES), "utf8")
+    (common / "attributes.yaml").write_text(yaml.dump(ATTRIBUTES), "utf8")
+    (common / "attributes_nested.yaml").write_text(yaml.dump(ATTRIBUTES_NESTED), "utf8")
     return str(root)
 
 
