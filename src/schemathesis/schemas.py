@@ -28,7 +28,7 @@ from .filters import should_skip_by_operation_id, should_skip_by_tag, should_ski
 from .hooks import HookContext, HookDispatcher, HookLocation, HookScope, dispatch, warn_deprecated_hook
 from .models import Endpoint, EndpointDefinition, empty_object
 from .types import Filter, GenericTest, Hook, NotSet
-from .utils import NOT_SET, GenericResponse, StringDatesYAMLLoader, deprecated
+from .utils import NOT_SET, GenericResponse, StringDatesYAMLLoader, deprecated, traverse_schema
 
 # Reference resolving will stop after this depth
 RECURSION_DEPTH_LIMIT = 100
@@ -52,8 +52,26 @@ def load_file_uri(location: str) -> Dict[str, Any]:
     return load_file_impl(location, urlopen)
 
 
+class ConvertingResolver(jsonschema.RefResolver):
+    """A custom resolver converts resolved OpenAPI schemas to JSON Schema.
+
+    When recursive schemas are validated we need to have resolved documents properly converted.
+    This approach is the simplest one, since this logic isolated in a single place.
+    """
+
+    def __init__(self, *args: Any, conversion_kwargs: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.conversion_kwargs = conversion_kwargs
+
+    def resolve(self, ref: str) -> Tuple[str, Any]:
+        url, document = super().resolve(ref)
+        document = traverse_schema(document, to_json_schema, **self.conversion_kwargs)
+        return url, document
+
+
 @attr.s()  # pragma: no mutate
 class BaseSchema(Mapping):
+    nullable_name: str
     raw_schema: Dict[str, Any] = attr.ib()  # pragma: no mutate
     location: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
@@ -95,8 +113,11 @@ class BaseSchema(Mapping):
     def resolver(self) -> jsonschema.RefResolver:
         if not hasattr(self, "_resolver"):
             # pylint: disable=attribute-defined-outside-init
-            self._resolver = jsonschema.RefResolver(
-                self.location or "", self.raw_schema, handlers={"file": load_file_uri, "": load_file}
+            self._resolver = ConvertingResolver(
+                self.location or "",
+                self.raw_schema,
+                conversion_kwargs={"nullable_name": self.nullable_name},
+                handlers={"file": load_file_uri, "": load_file},
             )
         return self._resolver
 
@@ -456,6 +477,8 @@ class SwaggerV20(BaseSchema):  # pylint: disable=too-many-public-methods
         schema = definition.get("schema")
         if not schema:
             return scopes, None
+        # Extra conversion to JSON Schema is needed here if there was one $ref in the input
+        # because it is not converted
         return scopes, to_json_schema_recursive(schema, self.nullable_name)
 
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
@@ -561,6 +584,8 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
         if option:
+            # Extra conversion to JSON Schema is needed here if there was one $ref in the input
+            # because it is not converted
             return scopes, to_json_schema_recursive(option["schema"], self.nullable_name)
         return scopes, None
 

@@ -331,13 +331,14 @@ def test_response_schema_conformance_references_invalid(complex_schema):
 
 
 @pytest.mark.hypothesis_nested
-def test_response_schema_conformance_references_valid(complex_schema):
+@pytest.mark.parametrize("value", ("foo", None))
+def test_response_schema_conformance_references_valid(complex_schema, value):
     schema = schemathesis.from_path(complex_schema)
 
     @given(case=schema.endpoints["/teapot"]["POST"].as_strategy())
     @settings(max_examples=3)
     def test(case):
-        response = make_response(json.dumps({"key": "foo", "referenced": "foo"}).encode())
+        response = make_response(json.dumps({"key": value, "referenced": value}).encode())
         case.validate_response(response)
 
     test()
