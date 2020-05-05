@@ -18,7 +18,7 @@ Added
 Fixed
 ~~~~~
 
-- Overriding header values in CLI and runner when headers are provided explicitly clash with ones defined in the schema. `#559`_
+- Overriding header values in CLI and runner when headers provided explicitly clash with ones defined in the schema. `#559`_
 
 `1.4.0`_ - 2020-05-03
 ---------------------
