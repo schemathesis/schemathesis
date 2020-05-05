@@ -20,6 +20,7 @@ Fixed
 
 - Overriding header values in CLI and runner when headers provided explicitly clash with ones defined in the schema. `#559`_
 - Nested references resolving in ``response_schema_conformance`` check. `#562`_
+- Nullable parameters handling when they are behind a reference. `#542`_
 
 `1.4.0`_ - 2020-05-03
 ---------------------

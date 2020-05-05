@@ -2,10 +2,11 @@ from copy import deepcopy
 from test.utils import as_param
 
 import pytest
-from jsonschema import RefResolver, ValidationError
+from jsonschema import ValidationError
 
 import schemathesis
 from schemathesis.exceptions import InvalidSchema
+from schemathesis.schemas import ConvertingResolver
 
 
 @pytest.mark.parametrize("base_path", ("/v1", "/v1/"))
@@ -45,13 +46,13 @@ def test_open_api_verbose_name(openapi_30):
 
 def test_resolver_cache(simple_schema, mocker):
     schema = schemathesis.from_dict(simple_schema)
-    spy = mocker.patch("schemathesis.schemas.jsonschema.RefResolver", wraps=RefResolver)
+    spy = mocker.patch("schemathesis.schemas.ConvertingResolver", wraps=ConvertingResolver)
     assert "_resolver" not in schema.__dict__
-    assert isinstance(schema.resolver, RefResolver)
+    assert isinstance(schema.resolver, ConvertingResolver)
     assert spy.call_count == 1
     # Cached
     assert "_resolver" in schema.__dict__
-    assert isinstance(schema.resolver, RefResolver)
+    assert isinstance(schema.resolver, ConvertingResolver)
     assert spy.call_count == 1
 
 
