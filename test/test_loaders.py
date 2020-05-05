@@ -51,6 +51,7 @@ def test_operation_id(operation_id):
             "/bar": {
                 "get": {**parameters, "operationId": "bar_get"},
                 "post": {**parameters, "operationId": "bar_post"},
+                "put": parameters,
             },
         },
     )
