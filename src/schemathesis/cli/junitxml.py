@@ -28,10 +28,8 @@ class JunitXMLHandler(EventHandler):
             if event.status == Status.failure:
                 checks = get_unique_failures(event.result.checks)
                 for idx, check in enumerate(checks, 1):
-                    message: Optional[str] = None
-                    if check.message:
-                        message = f"{idx}. {check.message}"
-                    test_case.add_failure_info(message=message)
+                    # `check.message` is always not empty for events with `failure` status
+                    test_case.add_failure_info(message=f"{idx}. {check.message}")
             if event.status == Status.error:
                 test_case.add_error_info(
                     message=event.result.errors[-1].exception, output=event.result.errors[-1].exception_with_traceback

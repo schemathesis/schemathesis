@@ -114,3 +114,12 @@ def test_schema_validity(cli, schema, base_url):
 
 def check_result(result):
     assert not (result.exception and not isinstance(result.exception, SystemExit)), result.stdout
+
+
+def test_not_handled_error(mocker, cli, schema_url):
+    # When there is an unhandled error in handlers
+    mocker.patch("schemathesis.cli.output.default.handle_finished", side_effect=ValueError("Fail"))
+    result = cli.run(schema_url)
+    # Then it is propagated as it
+    assert isinstance(result.exception, ValueError)
+    assert str(result.exception) == "Fail"
