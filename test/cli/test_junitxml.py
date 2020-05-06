@@ -1,7 +1,7 @@
 from xml.etree import ElementTree
 
 import pytest
-from _pytest.config import ExitCode
+from _pytest.main import ExitCode
 
 
 @pytest.mark.endpoints("success")
