@@ -15,15 +15,25 @@ from ...utils import GenericResponse
 from .converter import to_json_schema_recursive
 from .filters import should_skip_by_operation_id, should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .references import ConvertingResolver
-from .security import OpenAPISecurityProcessor, SwaggerSecurityProcessor
+from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 
 
 class BaseOpenAPISchema(BaseSchema):
     nullable_name: str
+    operations: Tuple[str, ...]
+    security: BaseSecurityProcessor
 
     @property  # pragma: no mutate
     def spec_version(self) -> str:
         raise NotImplementedError
+
+    @property
+    def base_path(self) -> str:
+        raise NotImplementedError
+
+    def get_full_path(self, path: str) -> str:
+        """Compute full path for the given path."""
+        return urljoin(self.base_path, path.lstrip("/"))  # pragma: no mutate
 
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
@@ -36,48 +46,6 @@ class BaseOpenAPISchema(BaseSchema):
             endpoints = self.get_all_endpoints()
             self._endpoints = endpoints_to_dict(endpoints)
         return self._endpoints
-
-    @property
-    def resolver(self) -> ConvertingResolver:
-        if not hasattr(self, "_resolver"):
-            # pylint: disable=attribute-defined-outside-init
-            self._resolver = ConvertingResolver(self.location or "", self.raw_schema, nullable_name=self.nullable_name)
-        return self._resolver
-
-    def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
-        """Content types available for this endpoint."""
-        raise NotImplementedError
-
-    def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
-        """Extract response schema from `responses`."""
-        raise NotImplementedError
-
-
-class SwaggerV20(BaseOpenAPISchema):
-    nullable_name = "x-nullable"
-    example_field = "x-example"
-    operations: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
-    security = SwaggerSecurityProcessor()
-
-    @property
-    def spec_version(self) -> str:
-        return self.raw_schema["swagger"]
-
-    @property
-    def verbose_name(self) -> str:
-        return f"Swagger {self.spec_version}"
-
-    @property
-    def base_path(self) -> str:
-        """Base path for the schema."""
-        path: str = self.raw_schema.get("basePath", "/")  # pragma: no mutate
-        if not path.endswith("/"):
-            path += "/"
-        return path
-
-    def get_full_path(self, path: str) -> str:
-        """Compute full path for the given path."""
-        return urljoin(self.base_path, path.lstrip("/"))  # pragma: no mutate
 
     def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
         try:
@@ -144,6 +112,47 @@ class SwaggerV20(BaseOpenAPISchema):
         parameter = deepcopy(parameter)
         parameter = self.resolver.resolve_all(parameter)
         self.process_by_type(endpoint, parameter)
+
+    def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+        raise NotImplementedError
+
+    @property
+    def resolver(self) -> ConvertingResolver:
+        if not hasattr(self, "_resolver"):
+            # pylint: disable=attribute-defined-outside-init
+            self._resolver = ConvertingResolver(self.location or "", self.raw_schema, nullable_name=self.nullable_name)
+        return self._resolver
+
+    def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
+        """Content types available for this endpoint."""
+        raise NotImplementedError
+
+    def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
+        """Extract response schema from `responses`."""
+        raise NotImplementedError
+
+
+class SwaggerV20(BaseOpenAPISchema):
+    nullable_name = "x-nullable"
+    example_field = "x-example"
+    operations: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
+    security = SwaggerSecurityProcessor()
+
+    @property
+    def spec_version(self) -> str:
+        return self.raw_schema["swagger"]
+
+    @property
+    def verbose_name(self) -> str:
+        return f"Swagger {self.spec_version}"
+
+    @property
+    def base_path(self) -> str:
+        """Base path for the schema."""
+        path: str = self.raw_schema.get("basePath", "/")  # pragma: no mutate
+        if not path.endswith("/"):
+            path += "/"
+        return path
 
     def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         if parameter["in"] == "path":
