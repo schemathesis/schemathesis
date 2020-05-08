@@ -10,64 +10,27 @@ They give only static definitions of endpoints.
 import itertools
 from collections.abc import Mapping
 from copy import deepcopy
-from functools import lru_cache
-from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Tuple, Union, overload
+from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Tuple, Union
 from urllib.parse import urljoin, urlsplit
-from urllib.request import urlopen
 
 import attr
 import hypothesis
 import jsonschema
-import yaml
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
-from .converter import to_json_schema, to_json_schema_recursive
+from .converter import to_json_schema_recursive
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_operation_id, should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .hooks import HookContext, HookDispatcher, HookLocation, HookScope, dispatch, warn_deprecated_hook
 from .models import Endpoint, EndpointDefinition, empty_object
+from .specs.openapi.references import ConvertingResolver
 from .specs.openapi.security import OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .types import Filter, GenericTest, Hook, NotSet
-from .utils import NOT_SET, GenericResponse, StringDatesYAMLLoader, deprecated, traverse_schema
+from .utils import NOT_SET, GenericResponse, deprecated
 
 # Reference resolving will stop after this depth
 RECURSION_DEPTH_LIMIT = 100
-
-
-def load_file_impl(location: str, opener: Callable) -> Dict[str, Any]:
-    """Load a schema from the given file."""
-    with opener(location) as fd:
-        return yaml.load(fd, StringDatesYAMLLoader)
-
-
-@lru_cache()
-def load_file(location: str) -> Dict[str, Any]:
-    """Load a schema from the given file."""
-    return load_file_impl(location, open)
-
-
-@lru_cache()
-def load_file_uri(location: str) -> Dict[str, Any]:
-    """Load a schema from the given file uri."""
-    return load_file_impl(location, urlopen)
-
-
-class ConvertingResolver(jsonschema.RefResolver):
-    """A custom resolver converts resolved OpenAPI schemas to JSON Schema.
-
-    When recursive schemas are validated we need to have resolved documents properly converted.
-    This approach is the simplest one, since this logic isolated in a single place.
-    """
-
-    def __init__(self, *args: Any, conversion_kwargs: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.conversion_kwargs = conversion_kwargs
-
-    def resolve(self, ref: str) -> Tuple[str, Any]:
-        url, document = super().resolve(ref)
-        document = traverse_schema(document, to_json_schema, **self.conversion_kwargs)
-        return url, document
 
 
 @attr.s()  # pragma: no mutate
@@ -111,15 +74,10 @@ class BaseSchema(Mapping):
         return self._endpoints
 
     @property
-    def resolver(self) -> jsonschema.RefResolver:
+    def resolver(self) -> ConvertingResolver:
         if not hasattr(self, "_resolver"):
             # pylint: disable=attribute-defined-outside-init
-            self._resolver = ConvertingResolver(
-                self.location or "",
-                self.raw_schema,
-                conversion_kwargs={"nullable_name": self.nullable_name},
-                handlers={"file": load_file_uri, "": load_file},
-            )
+            self._resolver = ConvertingResolver(self.location or "", self.raw_schema, nullable_name=self.nullable_name,)
         return self._resolver
 
     @property
@@ -277,7 +235,7 @@ class SwaggerV20(BaseSchema):  # pylint: disable=too-many-public-methods
                     scope, raw_methods = deepcopy(self.resolver.resolve(methods["$ref"]))
                 else:
                     raw_methods, scope = deepcopy(methods), self.resolver.resolution_scope
-                methods = self.resolve(methods)
+                methods = self.resolver.resolve_all(methods)
                 common_parameters = get_common_parameters(methods)
                 for method, resolved_definition in methods.items():
                     # Only method definitions are parsed
@@ -324,7 +282,7 @@ class SwaggerV20(BaseSchema):  # pylint: disable=too-many-public-methods
     def process_parameter(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         """Convert each Parameter object to a JSON schema."""
         parameter = deepcopy(parameter)
-        parameter = self.resolve(parameter)
+        parameter = self.resolver.resolve_all(parameter)
         self.process_by_type(endpoint, parameter)
 
     def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
@@ -380,51 +338,10 @@ class SwaggerV20(BaseSchema):  # pylint: disable=too-many-public-methods
             if not (key == "required" and not isinstance(value, list))
         }
 
-    @overload  # pragma: no mutate
-    def resolve(
-        self, item: Dict[str, Any], recursion_level: int = 0
-    ) -> Dict[str, Any]:  # pylint: disable=function-redefined
-        pass
-
-    @overload  # pragma: no mutate
-    def resolve(self, item: List, recursion_level: int = 0) -> List:  # pylint: disable=function-redefined
-        pass
-
-    # pylint: disable=function-redefined
-    def resolve(self, item: Union[Dict[str, Any], List], recursion_level: int = 0) -> Union[Dict[str, Any], List]:
-        """Recursively resolve all references in the given object."""
-        if recursion_level > RECURSION_DEPTH_LIMIT:
-            return item
-        if isinstance(item, dict):
-            item = self.prepare(item)
-            if "$ref" in item:
-                with self.resolver.resolving(item["$ref"]) as resolved:
-                    return self.resolve(resolved, recursion_level + 1)
-            for key, sub_item in item.items():
-                item[key] = self.resolve(sub_item, recursion_level)
-        elif isinstance(item, list):
-            for idx, sub_item in enumerate(item):
-                item[idx] = self.resolve(sub_item, recursion_level)
-        return item
-
-    def resolve_in_scope(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Dict[str, Any]]:
-        scopes = [scope]
-        # if there is `$ref` then we have a scope change that should be used during validation later to
-        # resolve nested references correctly
-        if "$ref" in definition:
-            with self.resolver.in_scope(scope):
-                new_scope, definition = deepcopy(self.resolver.resolve(definition["$ref"]))
-            scopes.append(new_scope)
-        return scopes, definition
-
-    def prepare(self, item: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse schema extension, e.g. "x-nullable" field."""
-        return to_json_schema(item, self.nullable_name)
-
     def _get_response_schema(
         self, definition: Dict[str, Any], scope: str
     ) -> Tuple[List[str], Optional[Dict[str, Any]]]:
-        scopes, definition = self.resolve_in_scope(deepcopy(definition), scope)
+        scopes, definition = self.resolver.resolve_in_scope(deepcopy(definition), scope)
         schema = definition.get("schema")
         if not schema:
             return scopes, None
@@ -518,7 +435,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     def _get_response_schema(
         self, definition: Dict[str, Any], scope: str
     ) -> Tuple[List[str], Optional[Dict[str, Any]]]:
-        scopes, definition = self.resolve_in_scope(deepcopy(definition), scope)
+        scopes, definition = self.resolver.resolve_in_scope(deepcopy(definition), scope)
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
         if option:

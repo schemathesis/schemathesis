@@ -63,11 +63,11 @@ def petstore():
     ),
 )
 def test_resolve(petstore, ref, expected):
-    assert petstore.resolve(ref) == expected
+    assert petstore.resolver.resolve_all(ref) == expected
 
 
 def test_recursive_reference(mocker):
-    mocker.patch("schemathesis.schemas.RECURSION_DEPTH_LIMIT", 1)
+    mocker.patch("schemathesis.specs.openapi.references.RECURSION_DEPTH_LIMIT", 1)
     reference = {"$ref": "#/components/schemas/Node"}
     raw_schema = {
         "info": {"description": "Test", "title": "Test", "version": "1.0.0"},
@@ -104,7 +104,7 @@ def test_recursive_reference(mocker):
         "servers": [{"url": "/abc"}],
     }
     schema = schemathesis.from_dict(raw_schema)
-    assert schema.resolve(reference) == {
+    assert schema.resolver.resolve_all(reference) == {
         "description": "Test",
         "properties": {
             "children": {
@@ -336,12 +336,12 @@ def make_nullable_test_data(spec_version):
 
 @pytest.mark.parametrize("nullable, expected", make_nullable_test_data("swagger"))
 def test_x_nullable(petstore, nullable, expected):
-    assert petstore.resolve(nullable) == expected
+    assert petstore.resolver.resolve_all(nullable) == expected
 
 
 @pytest.mark.parametrize("nullable, expected", make_nullable_test_data("openapi"))
 def test_nullable(openapi_30, nullable, expected):
-    assert openapi_30.resolve(nullable) == expected
+    assert openapi_30.resolver.resolve_all(nullable) == expected
 
 
 def test_nullable_parameters(testdir):
