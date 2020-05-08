@@ -9,12 +9,12 @@ import yaml
 from jsonschema import ValidationError
 from werkzeug.test import Client
 
-from . import spec_schemas
 from .constants import USER_AGENT
 from .exceptions import HTTPError
 from .hooks import HookContext, dispatch
 from .lazy import LazySchema
 from .schemas import BaseSchema, OpenApi30, SwaggerV20
+from .specs.openapi import definitions
 from .types import Filter, PathLike
 from .utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, get_base_url
 
@@ -125,7 +125,7 @@ def from_dict(
     """Get a proper abstraction for the given raw schema."""
     dispatch("before_load_schema", HookContext(), raw_schema)
     if "swagger" in raw_schema:
-        _maybe_validate_schema(raw_schema, spec_schemas.SWAGGER_20, validate_schema)
+        _maybe_validate_schema(raw_schema, definitions.SWAGGER_20, validate_schema)
         return SwaggerV20(
             raw_schema,
             location=location,
@@ -139,7 +139,7 @@ def from_dict(
         )
 
     if "openapi" in raw_schema:
-        _maybe_validate_schema(raw_schema, spec_schemas.OPENAPI_30, validate_schema)
+        _maybe_validate_schema(raw_schema, definitions.OPENAPI_30, validate_schema)
         return OpenApi30(
             raw_schema,
             location=location,
