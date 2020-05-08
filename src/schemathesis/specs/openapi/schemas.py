@@ -8,12 +8,12 @@ import jsonschema
 from requests.structures import CaseInsensitiveDict
 
 from ...exceptions import InvalidSchema
-from ...filters import should_skip_by_operation_id, should_skip_by_tag, should_skip_endpoint, should_skip_method
 from ...hooks import HookContext
 from ...models import Endpoint, EndpointDefinition, empty_object
 from ...schemas import BaseSchema
 from ...utils import GenericResponse
 from .converter import to_json_schema_recursive
+from .filters import should_skip_by_operation_id, should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .references import ConvertingResolver
 from .security import OpenAPISecurityProcessor, SwaggerSecurityProcessor
 
