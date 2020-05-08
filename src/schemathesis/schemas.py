@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes,too-many-public-methods,too-many-ancestors
 """Schema objects provide a convenient interface to raw schemas.
 
 Their responsibilities:
@@ -29,13 +29,9 @@ from .specs.openapi.security import OpenAPISecurityProcessor, SwaggerSecurityPro
 from .types import Filter, GenericTest, Hook, NotSet
 from .utils import NOT_SET, GenericResponse, deprecated
 
-# Reference resolving will stop after this depth
-RECURSION_DEPTH_LIMIT = 100
-
 
 @attr.s()  # pragma: no mutate
 class BaseSchema(Mapping):
-    nullable_name: str
     raw_schema: Dict[str, Any] = attr.ib()  # pragma: no mutate
     location: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
@@ -58,10 +54,6 @@ class BaseSchema(Mapping):
         return len(self.endpoints)
 
     @property  # pragma: no mutate
-    def spec_version(self) -> str:
-        raise NotImplementedError
-
-    @property  # pragma: no mutate
     def verbose_name(self) -> str:
         raise NotImplementedError
 
@@ -72,13 +64,6 @@ class BaseSchema(Mapping):
             endpoints = self.get_all_endpoints()
             self._endpoints = endpoints_to_dict(endpoints)
         return self._endpoints
-
-    @property
-    def resolver(self) -> ConvertingResolver:
-        if not hasattr(self, "_resolver"):
-            # pylint: disable=attribute-defined-outside-init
-            self._resolver = ConvertingResolver(self.location or "", self.raw_schema, nullable_name=self.nullable_name,)
-        return self._resolver
 
     @property
     def endpoints_count(self) -> int:
@@ -147,10 +132,6 @@ class BaseSchema(Mapping):
             validate_schema=validate_schema,  # type: ignore
         )
 
-    def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
-        """Extract response schema from `responses`."""
-        raise NotImplementedError
-
     @deprecated("'register_hook` is deprecated, use `hooks.register' instead")
     def register_hook(self, place: str, hook: Hook) -> None:
         warn_deprecated_hook(hook)
@@ -182,20 +163,39 @@ class BaseSchema(Mapping):
         if local_dispatcher is not None:
             local_dispatcher.dispatch(name, context, *args, **kwargs)
 
-    def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
-        """Content types available for this endpoint."""
+
+class BaseOpenAPISchema(BaseSchema):
+    nullable_name: str
+
+    @property  # pragma: no mutate
+    def spec_version(self) -> str:
         raise NotImplementedError
-
-
-class SwaggerV20(BaseSchema):  # pylint: disable=too-many-public-methods
-    nullable_name = "x-nullable"
-    example_field = "x-example"
-    operations: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
-    security = SwaggerSecurityProcessor()
 
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
         return f"{self.__class__.__name__} for {info['title']} ({info['version']})"
+
+    @property
+    def resolver(self) -> ConvertingResolver:
+        if not hasattr(self, "_resolver"):
+            # pylint: disable=attribute-defined-outside-init
+            self._resolver = ConvertingResolver(self.location or "", self.raw_schema, nullable_name=self.nullable_name)
+        return self._resolver
+
+    def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
+        """Content types available for this endpoint."""
+        raise NotImplementedError
+
+    def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
+        """Extract response schema from `responses`."""
+        raise NotImplementedError
+
+
+class SwaggerV20(BaseOpenAPISchema):
+    nullable_name = "x-nullable"
+    example_field = "x-example"
+    operations: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
+    security = SwaggerSecurityProcessor()
 
     @property
     def spec_version(self) -> str:

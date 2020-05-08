@@ -1,3 +1,4 @@
+# pylint: disable=import-outside-toplevel
 import string
 from contextlib import ExitStack, contextmanager
 from itertools import product
@@ -37,7 +38,11 @@ def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, N
 
 
 def content_type_conformance(response: GenericResponse, case: "Case") -> None:
-    content_types = case.endpoint.get_content_types(response)
+    from ...schemas import BaseOpenAPISchema
+
+    if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
+        raise TypeError("This check can be used only with Open API schemas")
+    content_types = case.endpoint.schema.get_content_types(case.endpoint, response)
     if not content_types:
         return
     content_type = response.headers["Content-Type"]
@@ -55,6 +60,10 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> None:
 
 
 def response_schema_conformance(response: GenericResponse, case: "Case") -> None:
+    from ...schemas import BaseOpenAPISchema
+
+    if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
+        raise TypeError("This check can be used only with Open API schemas")
     try:
         content_type = response.headers["Content-Type"]
     except KeyError:

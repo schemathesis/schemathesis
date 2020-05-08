@@ -13,7 +13,7 @@ from .constants import USER_AGENT
 from .exceptions import HTTPError
 from .hooks import HookContext, dispatch
 from .lazy import LazySchema
-from .schemas import BaseSchema, OpenApi30, SwaggerV20
+from .schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
 from .specs.openapi import definitions
 from .types import Filter, PathLike
 from .utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, get_base_url
@@ -29,7 +29,7 @@ def from_path(
     *,
     app: Any = None,
     validate_schema: bool = True,
-) -> BaseSchema:
+) -> BaseOpenAPISchema:
     """Load a file from OS path and parse to schema instance."""
     with open(path) as fd:
         return from_file(
@@ -56,7 +56,7 @@ def from_uri(
     app: Any = None,
     validate_schema: bool = True,
     **kwargs: Any,
-) -> BaseSchema:
+) -> BaseOpenAPISchema:
     """Load a remote resource and parse to schema instance."""
     kwargs.setdefault("headers", {}).setdefault("User-Agent", USER_AGENT)
     response = requests.get(uri, **kwargs)
@@ -91,7 +91,7 @@ def from_file(
     app: Any = None,
     validate_schema: bool = True,
     **kwargs: Any,  # needed in runner to have compatible API across all loaders
-) -> BaseSchema:
+) -> BaseOpenAPISchema:
     """Load a file content and parse to schema instance.
 
     `file` could be a file descriptor, string or bytes.
@@ -121,7 +121,7 @@ def from_dict(
     *,
     app: Any = None,
     validate_schema: bool = True,
-) -> BaseSchema:
+) -> BaseOpenAPISchema:
     """Get a proper abstraction for the given raw schema."""
     dispatch("before_load_schema", HookContext(), raw_schema)
     if "swagger" in raw_schema:
@@ -191,7 +191,7 @@ def from_wsgi(
     operation_id: Optional[Filter] = None,
     validate_schema: bool = True,
     **kwargs: Any,
-) -> BaseSchema:
+) -> BaseOpenAPISchema:
     kwargs.setdefault("headers", {}).setdefault("User-Agent", USER_AGENT)
     client = Client(app, WSGIResponse)
     response = client.get(schema_path, **kwargs)
@@ -229,7 +229,7 @@ def from_aiohttp(
     *,
     validate_schema: bool = True,
     **kwargs: Any,
-) -> BaseSchema:
+) -> BaseOpenAPISchema:
     from .extra._aiohttp import run_server  # pylint: disable=import-outside-toplevel
 
     port = run_server(app)
