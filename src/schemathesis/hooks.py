@@ -7,7 +7,7 @@ from typing import Any, Callable, DefaultDict, Dict, List, Optional, Union, cast
 import attr
 from hypothesis import strategies as st
 
-from .models import Endpoint
+from .models import Case, Endpoint
 from .types import GenericTest, Hook
 
 
@@ -220,6 +220,14 @@ def before_process_path(context: HookContext, path: str, methods: Dict[str, Any]
 @HookDispatcher.register_spec([HookScope.GLOBAL])
 def before_load_schema(context: HookContext, raw_schema: Dict[str, Any]) -> None:
     """Called before schema instance is created."""
+
+
+@all_scopes
+def before_add_examples(context: HookContext, examples: List[Case]) -> None:
+    """Called before explicit examples are added to a test via `@example` decorator.
+
+    `examples` is a list that could be extended with examples provided by the user.
+    """
 
 
 GLOBAL_HOOK_DISPATCHER = HookDispatcher(scope=HookScope.GLOBAL)

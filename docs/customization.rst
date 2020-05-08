@@ -128,3 +128,19 @@ Called just before schema instance is created. Takes a raw schema representation
         ...
 
 This hook allows you to modify schema before loading.
+
+
+``before_add_examples``
+~~~~~~~~~~~~~~~~~~~~~~~
+
+With this hook you can add additional test cases that will be executed in Hypothesis ``explicit`` phase:
+
+.. code:: python
+
+    def before_add_examples(
+        context: schemathesis.hooks.HookContext,
+        examples: List[Case],
+    ) -> None:
+        examples.append(
+            Case(endpoint=context.endpoint, query={"foo": "bar"})
+        )

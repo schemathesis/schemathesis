@@ -283,7 +283,7 @@ def testdir(testdir):
         import pytest
         import schemathesis
         from test.utils import *
-        from hypothesis import given, settings, HealthCheck
+        from hypothesis import given, settings, HealthCheck, Phase
         raw_schema = {schema}
         schema = schemathesis.from_dict(raw_schema, method={method}, endpoint={endpoint}, tag={tag}, validate_schema={validate_schema})
         """.format(

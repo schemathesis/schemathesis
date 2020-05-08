@@ -37,7 +37,7 @@ def create_test(
         wrapped_test.hypothesis.inner_test = make_async_test(original_test)  # type: ignore
     if settings is not None:
         wrapped_test = settings(wrapped_test)
-    return add_examples(wrapped_test, endpoint)
+    return add_examples(wrapped_test, endpoint, hook_dispatcher=hook_dispatcher)
 
 
 def make_test_or_exception(
@@ -89,10 +89,16 @@ def get_example(endpoint: Endpoint) -> Optional[Case]:
     return None
 
 
-def add_examples(test: Callable, endpoint: Endpoint) -> Callable:
+def add_examples(test: Callable, endpoint: Endpoint, hook_dispatcher: Optional[HookDispatcher] = None) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
     example = get_example(endpoint)
-    if example:
+    examples = [] if example is None else [example]
+    context = HookContext(endpoint)  # context should be passed here instead
+    GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, examples)
+    endpoint.schema.hooks.dispatch("before_add_examples", context, examples)
+    if hook_dispatcher:
+        hook_dispatcher.dispatch("before_add_examples", context, examples)
+    for example in examples:
         test = hypothesis.example(case=example)(test)
     return test
 

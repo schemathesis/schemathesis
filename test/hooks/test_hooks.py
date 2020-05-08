@@ -264,3 +264,46 @@ def test_register_wrong_scope(schema):
         @schema.hooks.register
         def before_load_schema(ctx, raw_schema):
             pass
+
+
+def test_before_add_examples(testdir, simple_openapi):
+    testdir.make_test(
+        """
+@schema.hooks.register
+def before_add_examples(context, examples):
+    new = schemathesis.models.Case(
+        endpoint=context.endpoint,
+        query={"foo": "bar"}
+    )
+    examples.append(new)
+
+@schema.parametrize()
+@settings(phases=[Phase.explicit])
+def test_a(case):
+    assert case.query == {"foo": "bar"}
+
+
+def another_hook(context, examples):
+    new = schemathesis.models.Case(
+        endpoint=context.endpoint,
+        query={"spam": "baz"}
+    )
+    examples.append(new)
+
+IDX = 0
+
+@schema.parametrize()
+@schema.hooks.apply("before_add_examples", another_hook)
+@settings(phases=[Phase.explicit])
+def test_b(case):
+    global IDX
+    if IDX == 0:
+        assert case.query == {"spam": "baz"}
+    if IDX == 1:
+        assert case.query == {"foo": "bar"}
+    IDX += 1
+    """,
+        schema=simple_openapi,
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=2)
