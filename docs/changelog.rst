@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Display proper headers in reproduction code when headers are overridden. `#566`_
+
 `1.5.0`_ - 2020-05-06
 ---------------------
 
@@ -1026,6 +1031,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#566: https://github.com/kiwicom/schemathesis/issues/566
 .. _#562: https://github.com/kiwicom/schemathesis/issues/562
 .. _#559: https://github.com/kiwicom/schemathesis/issues/559
 .. _#546: https://github.com/kiwicom/schemathesis/issues/546

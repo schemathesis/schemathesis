@@ -70,11 +70,12 @@ def run_test(
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
     results: TestResultSet,
+    headers: Optional[Dict[str, Any]],
     **kwargs: Any,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """A single test run with all error handling needed."""
     # pylint: disable=too-many-arguments
-    result = TestResult(endpoint=endpoint)
+    result = TestResult(endpoint=endpoint, overridden_headers=headers)
     yield events.BeforeExecution.from_endpoint(endpoint=endpoint)
     hypothesis_output: List[str] = []
     test_start_time = time.monotonic()
@@ -84,7 +85,7 @@ def run_test(
             result.add_error(test)
         else:
             with capture_hypothesis_output() as hypothesis_output:
-                test(checks, targets, result, **kwargs)
+                test(checks, targets, result, headers=headers, **kwargs)
             status = Status.success
     except (AssertionError, hypothesis.errors.MultipleFailures):
         status = Status.failure
