@@ -13,8 +13,8 @@ from .constants import USER_AGENT
 from .exceptions import HTTPError
 from .hooks import HookContext, dispatch
 from .lazy import LazySchema
-from .schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
 from .specs.openapi import definitions
+from .specs.openapi.schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
 from .types import Filter, PathLike
 from .utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, get_base_url
 

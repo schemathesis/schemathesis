@@ -38,7 +38,7 @@ def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, N
 
 
 def content_type_conformance(response: GenericResponse, case: "Case") -> None:
-    from ...schemas import BaseOpenAPISchema
+    from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
@@ -60,7 +60,7 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> None:
 
 
 def response_schema_conformance(response: GenericResponse, case: "Case") -> None:
-    from ...schemas import BaseOpenAPISchema
+    from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
