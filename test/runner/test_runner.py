@@ -591,3 +591,17 @@ def test_custom_loader(swagger_20, base_url):
     *others, finished = list(prepare({}, loader=lambda *args, **kwargs: swagger_20))
     assert not finished.has_errors
     assert not finished.has_failures
+
+
+@pytest.mark.endpoints("failure")
+def test_reproduce_code_with_overridden_headers(args, base_url):
+    app, kwargs = args
+
+    *_, after, finished = prepare(**kwargs, headers={"X-Token": "test"}, hypothesis_max_examples=1)
+    assert finished.has_failures
+    headers = {"X-Token": "test", "User-Agent": USER_AGENT}
+    if isinstance(app, Flask):
+        expected = f"requests.get('http://localhost/api/failure', headers={headers})"
+    else:
+        expected = f"requests.get('{base_url}/api/failure', headers={headers})"
+    assert after.result.checks[1].example.requests_code == expected

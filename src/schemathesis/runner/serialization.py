@@ -4,7 +4,7 @@ They all consist of primitive types and don't have references to schemas, app, e
 """
 # pylint: disable=too-many-instance-attributes
 import logging
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import attr
 
@@ -24,7 +24,7 @@ class SerializedCase:
     form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
 
     @classmethod
-    def from_case(cls, case: Case) -> "SerializedCase":
+    def from_case(cls, case: Case, headers: Optional[Dict[str, Any]]) -> "SerializedCase":
         return cls(
             path_parameters=case.path_parameters,
             headers=case.headers,
@@ -32,7 +32,7 @@ class SerializedCase:
             query=case.query,
             body=case.body,
             form_data=case.form_data,
-            requests_code=case.get_code_to_reproduce(),
+            requests_code=case.get_code_to_reproduce(headers),
         )
 
 
@@ -44,11 +44,11 @@ class SerializedCheck:
     message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
     @classmethod
-    def from_check(cls, check: Check) -> "SerializedCheck":
+    def from_check(cls, check: Check, headers: Optional[Dict[str, Any]]) -> "SerializedCheck":
         return SerializedCheck(
             name=check.name,
             value=check.value,
-            example=SerializedCase.from_case(check.example) if check.example else None,
+            example=SerializedCase.from_case(check.example, headers) if check.example else None,
             message=check.message,
         )
 
@@ -60,11 +60,13 @@ class SerializedError:
     example: Optional[SerializedCase] = attr.ib()  # pragma: no mutate
 
     @classmethod
-    def from_error(cls, exception: Exception, case: Optional[Case]) -> "SerializedError":
+    def from_error(
+        cls, exception: Exception, case: Optional[Case], headers: Optional[Dict[str, Any]]
+    ) -> "SerializedError":
         return cls(
             exception=format_exception(exception),
             exception_with_traceback=format_exception(exception, True),
-            example=SerializedCase.from_case(case) if case else None,
+            example=SerializedCase.from_case(case, headers) if case else None,
         )
 
 
@@ -93,8 +95,8 @@ class SerializedTestResult:
             has_logs=result.has_logs,
             is_errored=result.is_errored,
             seed=result.seed,
-            checks=[SerializedCheck.from_check(check) for check in result.checks],
+            checks=[SerializedCheck.from_check(check, headers=result.overridden_headers) for check in result.checks],
             logs=[formatter.format(record) for record in result.logs],
-            errors=[SerializedError.from_error(*error) for error in result.errors],
+            errors=[SerializedError.from_error(*error, headers=result.overridden_headers) for error in result.errors],
             interactions=result.interactions,
         )
