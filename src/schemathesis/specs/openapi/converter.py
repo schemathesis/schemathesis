@@ -1,7 +1,7 @@
 from copy import deepcopy
 from typing import Any, Dict
 
-from .utils import traverse_schema
+from ...utils import traverse_schema
 
 
 def to_json_schema(schema: Dict[str, Any], nullable_name: str) -> Dict[str, Any]:
