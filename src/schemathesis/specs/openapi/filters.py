@@ -1,8 +1,8 @@
 import re
 from typing import List, Optional
 
-from .types import Filter
-from .utils import force_tuple
+from ...types import Filter
+from ...utils import force_tuple
 
 
 def should_skip_method(method: str, pattern: Optional[Filter]) -> bool:
