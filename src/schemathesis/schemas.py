@@ -147,9 +147,7 @@ class BaseSchema(Mapping):
             validate_schema=validate_schema,  # type: ignore
         )
 
-    def _get_response_schema(
-        self, definition: Dict[str, Any], scope: str
-    ) -> Tuple[List[str], Optional[Dict[str, Any]]]:
+    def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
         """Extract response schema from `responses`."""
         raise NotImplementedError
 
@@ -338,9 +336,7 @@ class SwaggerV20(BaseSchema):  # pylint: disable=too-many-public-methods
             if not (key == "required" and not isinstance(value, list))
         }
 
-    def _get_response_schema(
-        self, definition: Dict[str, Any], scope: str
-    ) -> Tuple[List[str], Optional[Dict[str, Any]]]:
+    def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
         scopes, definition = self.resolver.resolve_in_scope(deepcopy(definition), scope)
         schema = definition.get("schema")
         if not schema:
@@ -432,9 +428,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         # "schema" field is required for all parameters in Open API 3.0
         return super().parameter_to_json_schema(data["schema"])
 
-    def _get_response_schema(
-        self, definition: Dict[str, Any], scope: str
-    ) -> Tuple[List[str], Optional[Dict[str, Any]]]:
+    def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
         scopes, definition = self.resolver.resolve_in_scope(deepcopy(definition), scope)
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
