@@ -121,10 +121,10 @@ Called just before schema instance is created. Takes a raw schema representation
 
 .. code:: python
 
-    def before_generate_query(
+    def before_load_schema(
         context: schemathesis.hooks.HookContext,
         raw_schema: Dict[str, Any],
-    ) -> hypothesis.strategies.SearchStrategy:
+    ) -> None:
         ...
 
 This hook allows you to modify schema before loading.
