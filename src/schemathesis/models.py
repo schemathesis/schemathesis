@@ -60,10 +60,14 @@ class Case:
         except KeyError:
             raise InvalidSchema("Missing required property `required: true`")
 
-    def get_code_to_reproduce(self) -> str:
+    def get_code_to_reproduce(self, headers: Optional[Dict[str, Any]] = None) -> str:
         """Construct a Python code to reproduce this case with `requests`."""
         base_url = self.base_url or "http://localhost"
         kwargs = self.as_requests_kwargs(base_url)
+        if headers:
+            final_headers = kwargs["headers"] or {}
+            final_headers.update(headers)
+            kwargs["headers"] = final_headers
         method = kwargs["method"].lower()
 
         def are_defaults(key: str, value: Optional[Dict]) -> bool:
@@ -398,6 +402,8 @@ class TestResult:
     logs: List[LogRecord] = attr.ib(factory=list)  # pragma: no mutate
     is_errored: bool = attr.ib(default=False)  # pragma: no mutate
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
+    # To show a proper reproduction code if a failure happens
+    overridden_headers: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
 
     def mark_errored(self) -> None:
         self.is_errored = True
