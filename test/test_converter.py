@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis import converter
+from schemathesis.specs.openapi import converter
 from schemathesis.utils import traverse_schema
 
 
