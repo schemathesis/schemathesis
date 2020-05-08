@@ -6,8 +6,8 @@ from urllib.request import urlopen
 import jsonschema
 import yaml
 
-from ...converter import to_json_schema
 from ...utils import StringDatesYAMLLoader, traverse_schema
+from .converter import to_json_schema
 
 # Reference resolving will stop after this depth
 RECURSION_DEPTH_LIMIT = 100

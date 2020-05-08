@@ -19,11 +19,11 @@ import jsonschema
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
-from .converter import to_json_schema_recursive
 from .exceptions import InvalidSchema
 from .filters import should_skip_by_operation_id, should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .hooks import HookContext, HookDispatcher, HookLocation, HookScope, dispatch, warn_deprecated_hook
 from .models import Endpoint, EndpointDefinition, empty_object
+from .specs.openapi.converter import to_json_schema_recursive
 from .specs.openapi.references import ConvertingResolver
 from .specs.openapi.security import OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .types import Filter, GenericTest, Hook, NotSet
