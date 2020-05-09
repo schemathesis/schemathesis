@@ -28,7 +28,7 @@ def test_uri_loader_custom_kwargs(app, schema_url):
 
 def test_base_url(base_url, schema_url):
     schema = schemathesis.from_uri(schema_url)
-    assert schema.base_url == base_url
+    assert schema.base_url is None
 
 
 @pytest.mark.parametrize("url", ("http://example.com/", "http://example.com"))

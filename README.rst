@@ -380,11 +380,11 @@ For convenience you can explore the schemas and strategies manually:
 
     >>> import schemathesis
     >>> schema = schemathesis.from_uri("http://0.0.0.0:8080/petstore.json")
-    >>> endpoint = schema["/v2/pet"]["POST"]
+    >>> endpoint = schema["/pet"]["POST"]
     >>> strategy = endpoint.as_strategy()
     >>> strategy.example()
     Case(
-        path='/v2/pet',
+        path='/pet',
         method='POST',
         path_parameters={},
         headers={},
@@ -398,6 +398,14 @@ For convenience you can explore the schemas and strategies manually:
     )
 
 Schema instances implement ``Mapping`` protocol.
+
+**NOTE**. Paths are relative to the schema's base path (``host`` + ``basePath`` in Open API 2.0 and ``server.url`` in Open API 3.0):
+
+.. code:: python
+
+    # your ``basePath`` is ``/api/v1``
+    >>> schema["/pet"]["POST"]  # VALID
+    >>> schema["/api/v1/pet"]["POST"]  # INVALID
 
 Lazy loading
 ~~~~~~~~~~~~

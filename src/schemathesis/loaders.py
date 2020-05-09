@@ -18,7 +18,7 @@ from .lazy import LazySchema
 from .specs.openapi import definitions
 from .specs.openapi.schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
 from .types import Filter, PathLike
-from .utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, get_base_url
+from .utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse
 
 
 def from_path(
@@ -66,8 +66,6 @@ def from_uri(
         response.raise_for_status()
     except requests.HTTPError:
         raise HTTPError(response=response, url=uri)
-    if base_url is None:
-        base_url = get_base_url(uri)
     return from_file(
         response.text,
         location=uri,
@@ -239,8 +237,6 @@ def from_aiohttp(
     port = run_server(app)
     app_url = f"http://127.0.0.1:{port}/"
     url = urljoin(app_url, schema_path)
-    if not base_url:
-        base_url = app_url
     return from_uri(
         url,
         base_url=base_url,

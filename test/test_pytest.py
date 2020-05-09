@@ -12,7 +12,7 @@ def param(inner):
 @schema.parametrize()
 def test_(request, param, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.full_path == "/v1/users"
     assert case.method in ("GET", "POST")
 """,
         paths={
@@ -54,7 +54,7 @@ class TestAPI:
     @schema.parametrize()
     def test_(self, request, param, case):
         request.config.HYPOTHESIS_CASES += 1
-        assert case.path == "/v1/users"
+        assert case.full_path == "/v1/users"
         assert case.method in ("GET", "POST")
 """,
         paths={

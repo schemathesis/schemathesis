@@ -13,7 +13,7 @@ def test_endpoint_filter(testdir, endpoint):
 @settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/foo"
+    assert case.full_path == "/v1/foo"
     assert case.method == "GET"
 """.format(
             endpoint
@@ -36,7 +36,7 @@ def test_method_filter(testdir, method):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path in ("/v1/foo", "/v1/users")
+    assert case.full_path in ("/v1/foo", "/v1/users")
     assert case.method == "GET"
 """.format(
             method
@@ -60,7 +60,7 @@ def test_tag_filter(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/bar"
+    assert case.full_path == "/v1/bar"
     assert case.method == "GET"
 """,
         paths={
@@ -82,7 +82,7 @@ def test_loader_filter(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/foo"
+    assert case.full_path == "/v1/foo"
     assert case.method == "POST"
 """,
         paths={
@@ -110,14 +110,14 @@ def test_override_filter(testdir):
 @settings(max_examples=1)
 def test_a(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.full_path == "/v1/users"
     assert case.method == "GET"
 
 @schema.parametrize(method=None, endpoint=None)
 @settings(max_examples=1)
 def test_b(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/foo"
+    assert case.full_path == "/v1/foo"
     assert case.method == "POST"
 """,
         paths={
@@ -146,7 +146,7 @@ def test_operation_id_filter(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/bar"
+    assert case.full_path == "/v1/bar"
     assert case.method == "GET"
 """,
         paths={
@@ -170,7 +170,7 @@ def test_operation_id_list_filter(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/foo"
+    assert case.full_path == "/v1/foo"
 """,
         paths={
             "/foo": {

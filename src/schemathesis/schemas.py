@@ -9,6 +9,7 @@ They give only static definitions of endpoints.
 """
 from collections.abc import Mapping
 from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple, Union
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import attr
 import hypothesis
@@ -50,6 +51,37 @@ class BaseSchema(Mapping):
     @property  # pragma: no mutate
     def verbose_name(self) -> str:
         raise NotImplementedError
+
+    def get_full_path(self, path: str) -> str:
+        """Compute full path for the given path."""
+        return urljoin(self.base_path, path.lstrip("/"))  # pragma: no mutate
+
+    @property
+    def base_path(self) -> str:
+        """Base path for the schema."""
+        # if `base_url` is specified, then it should include base path
+        # Example: http://127.0.0.1:8080/api
+        if self.base_url:
+            path = urlsplit(self.base_url).path
+        else:
+            path = self._get_base_path()
+        if not path.endswith("/"):
+            path += "/"
+        return path
+
+    def _get_base_path(self) -> str:
+        raise NotImplementedError
+
+    def _build_base_url(self) -> str:
+        path = self._get_base_path()
+        parts = urlsplit(self.location or "")[:2] + (path, "", "")
+        return urlunsplit(parts)
+
+    def get_base_url(self) -> str:
+        base_url = self.base_url
+        if base_url is not None:
+            return base_url.rstrip("/")  # pragma: no mutate
+        return self._build_base_url()
 
     @property
     def endpoints(self) -> Dict[str, CaseInsensitiveDict]:

@@ -105,7 +105,7 @@ async def test_replay(cli, schema_url, app, reset_app, cassette_path):
 
 
 def test_multiple_cookies(base_url):
-    response = requests.get(f"{base_url}/api/success", cookies={"foo": "bar", "baz": "spam"})
+    response = requests.get(f"{base_url}/success", cookies={"foo": "bar", "baz": "spam"})
     request = Request.from_prepared_request(response.request)
     serialized = {
         "uri": request.uri,

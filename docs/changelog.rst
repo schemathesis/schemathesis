@@ -6,6 +6,36 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+~~~~~~~
+
+- **BREAKING**. Base URL handling. ``base_url`` now is treated as one with a base path included.
+  You should pass a full base URL now instead:
+
+.. code:: bash
+
+    schemathesis run --base-url=http://127.0.0.1:8080/api/v2 ...
+
+This value will override ``basePath`` / ``servers[0].url`` defined in your schema if you use
+Open API 2.0 / 3.0 respectively. Previously if you pass a base URL like the one above it
+was concatenated with the base path defined in the schema which lead to lack of ability
+to redefine the base path. `#511`_
+
+Fixed
+~~~~~
+
+- Show correct URL in CLI progress when base URL is overridden including the path part. `#511`_
+- Construct valid URL when overriding base URL with base path. `#511`_
+
+**Example**:
+
+.. code:: bash
+
+    Base URL in the schema         : http://0.0.0.0:8081/api/v1
+    `--base-url` value in CLI      : http://0.0.0.0:8081/api/v2
+    Full URLs before this change   : http://0.0.0.0:8081/api/v2/api/v1/users/  # INVALID!
+    Full URLs after  this change   : http://0.0.0.0:8081/api/v2/users/         # VALID!
+
 `1.10.0`_ - 2020-06-28
 ---------------------
 
@@ -1196,6 +1226,7 @@ Fixed
 .. _#519: https://github.com/kiwicom/schemathesis/issues/519
 .. _#513: https://github.com/kiwicom/schemathesis/issues/513
 .. _#512: https://github.com/kiwicom/schemathesis/issues/512
+.. _#511: https://github.com/kiwicom/schemathesis/issues/511
 .. _#504: https://github.com/kiwicom/schemathesis/issues/504
 .. _#503: https://github.com/kiwicom/schemathesis/issues/503
 .. _#499: https://github.com/kiwicom/schemathesis/issues/499
