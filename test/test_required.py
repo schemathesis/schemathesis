@@ -8,7 +8,7 @@ def test_required_parameters(testdir):
 @settings(max_examples=20, suppress_health_check=[HealthCheck.data_too_large])
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.path == "/users"
     assert case.method == "POST"
     assert "id" in case.body
 """,
@@ -40,7 +40,7 @@ def test_not_required_parameters(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.path == "/users"
     assert case.method == "GET"
 """,
         **as_param({"in": "query", "name": "key", "required": False, "type": "string"}),
@@ -57,7 +57,7 @@ def test_without_required(testdir):
 @schema.parametrize()
 @settings(max_examples=1)
 def test_(request, case):
-    assert case.path == "/v1/users"
+    assert case.path == "/users"
     assert case.method == "GET"
     if not case.query:
         request.config.HYPOTHESIS_CASES += 1

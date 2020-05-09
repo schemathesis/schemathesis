@@ -13,7 +13,7 @@ def schema(flask_app):
 
 @pytest.mark.hypothesis_nested
 def test_call(schema, simple_schema):
-    strategy = schema.endpoints["/api/success"]["GET"].as_strategy()
+    strategy = schema.endpoints["/success"]["GET"].as_strategy()
 
     @given(case=strategy)
     def test(case):
@@ -68,7 +68,7 @@ def test_cookies(flask_app):
 @pytest.mark.hypothesis_nested
 @pytest.mark.endpoints("multipart")
 def test_form_data(schema):
-    strategy = schema.endpoints["/api/multipart"]["POST"].as_strategy()
+    strategy = schema.endpoints["/multipart"]["POST"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much])
@@ -82,7 +82,7 @@ def test_form_data(schema):
 
 
 def test_not_wsgi(schema):
-    case = Case(schema.endpoints["/api/success"]["GET"])
+    case = Case(schema.endpoints["/success"]["GET"])
     case.endpoint.app = None
     with pytest.raises(
         RuntimeError,

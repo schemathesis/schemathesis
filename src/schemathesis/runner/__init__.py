@@ -10,7 +10,7 @@ from ..checks import DEFAULT_CHECKS
 from ..models import CheckFunction
 from ..schemas import BaseSchema
 from ..types import Filter, NotSet, RawAuth
-from ..utils import dict_not_none_values, dict_true_values, file_exists, get_base_url, get_requests_auth, import_app
+from ..utils import dict_not_none_values, dict_true_values, file_exists, get_requests_auth, import_app
 from . import events
 from .impl import (
     DEFAULT_STATEFUL_RECURSION_LIMIT,
@@ -316,8 +316,6 @@ def load_schema(
         else:
             loader_options.update(dict_true_values(headers=headers, auth=auth, auth_type=auth_type))
 
-    if "base_url" not in loader_options and not isinstance(schema_uri, dict):
-        loader_options["base_url"] = get_base_url(schema_uri)
     if loader is loaders.from_uri and loader_options.get("auth"):
         loader_options["auth"] = get_requests_auth(loader_options["auth"], loader_options.pop("auth_type", None))
 

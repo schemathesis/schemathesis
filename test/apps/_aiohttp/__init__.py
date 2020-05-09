@@ -50,7 +50,7 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Appli
 
     app = web.Application()
     app.add_routes(
-        [web.get("/swagger.yaml", schema), web.get("/cookies", set_cookies)]
+        [web.get("/swagger.yaml", schema), web.get("/api/cookies", set_cookies)]
         + [web.route(item.value[0], item.value[1], wrapper(item.name)) for item in Endpoint]
     )
     app["users"] = {}

@@ -2,7 +2,7 @@
 import itertools
 from copy import deepcopy
 from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urlsplit
 
 import jsonschema
 from hypothesis.strategies import SearchStrategy
@@ -39,14 +39,6 @@ class BaseOpenAPISchema(BaseSchema):
         if stateful == "links":
             return links.get_links(response, endpoint, field=self.links_field)
         return []
-
-    @property
-    def base_path(self) -> str:
-        raise NotImplementedError
-
-    def get_full_path(self, path: str) -> str:
-        """Compute full path for the given path."""
-        return urljoin(self.base_path, path.lstrip("/"))  # pragma: no mutate
 
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
@@ -85,7 +77,7 @@ class BaseOpenAPISchema(BaseSchema):
                     # To prevent recursion errors we need to pass not resolved schema as well
                     # It could be used for response validation
                     raw_definition = EndpointDefinition(raw_methods[method], resolved_definition, scope)
-                    yield self.make_endpoint(full_path, method, parameters, resolved_definition, raw_definition)
+                    yield self.make_endpoint(path, method, parameters, resolved_definition, raw_definition)
         except (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError):
             raise InvalidSchema("Schema parsing failed. Please check your schema.")
 
@@ -99,23 +91,16 @@ class BaseOpenAPISchema(BaseSchema):
 
     def make_endpoint(  # pylint: disable=too-many-arguments
         self,
-        full_path: str,
+        path: str,
         method: str,
         parameters: Iterator[Dict[str, Any]],
         resolved_definition: Dict[str, Any],
         raw_definition: EndpointDefinition,
     ) -> Endpoint:
         """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
-        base_url = self.base_url
-        if base_url is not None:
-            base_url = base_url.rstrip("/")  # pragma: no mutate
+        base_url = self.get_base_url()
         endpoint = Endpoint(
-            path=full_path,
-            method=method.upper(),
-            definition=raw_definition,
-            base_url=base_url,
-            app=self.app,
-            schema=self,
+            path=path, method=method.upper(), definition=raw_definition, base_url=base_url, app=self.app, schema=self,
         )
         for parameter in parameters:
             self.process_parameter(endpoint, parameter)
@@ -158,7 +143,6 @@ class BaseOpenAPISchema(BaseSchema):
 
     def _group_endpoints_by_operation_id(self) -> Generator[Tuple[str, Endpoint], None, None]:
         for path, methods in self.raw_schema["paths"].items():
-            full_path = self.get_full_path(path)
             scope, raw_methods = self._resolve_methods(methods)
             methods = self.resolver.resolve_all(methods)
             common_parameters = get_common_parameters(methods)
@@ -168,7 +152,7 @@ class BaseOpenAPISchema(BaseSchema):
                 parameters = itertools.chain(resolved_definition.get("parameters", ()), common_parameters)
                 raw_definition = EndpointDefinition(raw_methods[method], resolved_definition, scope)
                 yield resolved_definition["operationId"], self.make_endpoint(
-                    full_path, method, parameters, resolved_definition, raw_definition
+                    path, method, parameters, resolved_definition, raw_definition
                 )
 
     def get_endpoint_by_reference(self, reference: str) -> Endpoint:
@@ -179,14 +163,13 @@ class BaseOpenAPISchema(BaseSchema):
         scope, data = self.resolver.resolve(reference)
         path, method = scope.rsplit("/", maxsplit=2)[-2:]
         path = path.replace("~1", "/").replace("~0", "~")
-        full_path = self.get_full_path(path)
         resolved_definition = self.resolver.resolve_all(data)
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
         _, methods = self.resolver.resolve(parent_ref)
         common_parameters = get_common_parameters(methods)
         parameters = itertools.chain(resolved_definition.get("parameters", ()), common_parameters)
         raw_definition = EndpointDefinition(data, resolved_definition, scope)
-        return self.make_endpoint(full_path, method, parameters, resolved_definition, raw_definition)
+        return self.make_endpoint(path, method, parameters, resolved_definition, raw_definition)
 
 
 class SwaggerV20(BaseOpenAPISchema):
@@ -205,13 +188,8 @@ class SwaggerV20(BaseOpenAPISchema):
     def verbose_name(self) -> str:
         return f"Swagger {self.spec_version}"
 
-    @property
-    def base_path(self) -> str:
-        """Base path for the schema."""
-        path: str = self.raw_schema.get("basePath", "/")  # pragma: no mutate
-        if not path.endswith("/"):
-            path += "/"
-        return path
+    def _get_base_path(self) -> str:
+        return self.raw_schema.get("basePath", "/")
 
     def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
         """Get examples from endpoint."""
@@ -305,31 +283,25 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     def verbose_name(self) -> str:
         return f"Open API {self.spec_version}"
 
-    @property
-    def base_path(self) -> str:
-        """Base path for the schema."""
+    def _get_base_path(self) -> str:
         servers = self.raw_schema.get("servers", [])
         if servers:
             # assume we're the first server in list
             server = servers[0]
             url = server["url"].format(**{k: v["default"] for k, v in server.get("variables", {}).items()})
-            path = urlsplit(url).path
-        else:
-            path = "/"
-        if not path.endswith("/"):
-            path += "/"
-        return path
+            return urlsplit(url).path
+        return "/"
 
     def make_endpoint(  # pylint: disable=too-many-arguments
         self,
-        full_path: str,
+        path: str,
         method: str,
         parameters: Iterator[Dict[str, Any]],
         resolved_definition: Dict[str, Any],
         raw_definition: EndpointDefinition,
     ) -> Endpoint:
         """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
-        endpoint = super().make_endpoint(full_path, method, parameters, resolved_definition, raw_definition)
+        endpoint = super().make_endpoint(path, method, parameters, resolved_definition, raw_definition)
         if "requestBody" in resolved_definition:
             self.process_body(endpoint, resolved_definition["requestBody"])
         return endpoint

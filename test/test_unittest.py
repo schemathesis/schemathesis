@@ -19,9 +19,9 @@ from unittest import TestCase
 
 class TestSchema(TestCase):
 
-    @given(case=schema["/v1/users"]["GET"].as_strategy())
+    @given(case=schema["/users"]["GET"].as_strategy())
     def test_something(self, case):
-        assert case.path == "/v1/users"
+        assert case.full_path == "/v1/users"
         assert case.method == "GET"
 """
     )
@@ -37,7 +37,7 @@ from unittest import TestCase
 
 class TestSchema(TestCase):
 
-    @given(case=schema["/v1/users"]["GET"].as_strategy())
+    @given(case=schema["/users"]["GET"].as_strategy())
     def test_something(self, case):
         assert 0
 """

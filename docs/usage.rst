@@ -150,3 +150,29 @@ This command will create an XML at given path as in example below.
             <testcase name="GET /api/success" time="0.006397"/>
         </testsuite>
     </testsuites>
+
+
+Base URL configuration
+----------------------
+
+If your Open API schema defines ``servers`` (or ``basePath`` in Open API 2.0), then these values will be used to
+construct full endpoint URL during testing. In case of Open API 3.0 the first value from ``servers`` will be used.
+
+However, you may want to run tests against a different base URL. To do this you need to pass ``--base-url`` option in CLI
+or provide ``base_url`` argument to a loader / runner if you use Schemathesis in your code:
+
+.. code:: bash
+
+    schemathesis run --base-url=http://127.0.0.1:8080/api/v2 http://production.com/api/openapi.json
+
+And if your schema defines ``servers`` like this
+
+.. code:: yaml
+
+    servers:
+      - url: https://production.com/api/{basePath}
+        variables:
+          basePath:
+            default: v1
+
+Then the tests will be executed against ``/api/v2`` base path.

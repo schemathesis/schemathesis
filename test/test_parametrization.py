@@ -10,7 +10,7 @@ def test_parametrization(testdir):
 @schema.parametrize()
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.full_path == "/v1/users"
     assert case.method == "GET"
 """
     )
@@ -31,7 +31,7 @@ def test_pytest_parametrize(testdir):
 @schema.parametrize()
 def test_(request, param, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.full_path == "/v1/users"
     assert case.method in ("GET", "POST")
 """,
         paths={
@@ -63,7 +63,7 @@ class TestAPI:
     @schema.parametrize()
     def test_(self, request, case):
         request.config.HYPOTHESIS_CASES += 1
-        assert case.path == "/v1/users"
+        assert case.full_path == "/v1/users"
         assert case.method in ("GET", "POST")
 """,
         paths={
@@ -94,7 +94,7 @@ def test_max_examples(testdir):
 @settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.full_path == "/v1/users"
     assert case.method in ("GET", "POST")
 """,
         paths={"/users": {"get": parameters, "post": parameters}},
@@ -113,7 +113,7 @@ def test_direct_schema(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.full_path == "/v1/users"
     assert case.method == "POST"
     assert_list(case.body)
     assert_str(case.body[0])
@@ -385,7 +385,7 @@ from hypothesis import Phase
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.formatted_path == "/v1/users/1/2"
+    assert case.formatted_path == "/users/1/2"
 """,
         schema_name="simple_openapi.yaml",
         paths={
@@ -607,26 +607,6 @@ def test_(request, case):
     result.assert_outcomes(passed=2)
     result.stdout.re_match_lines([r".*\[GET:/api/failure\]", r".*\[GET:/api/success\]"])
     assert len(app["incoming_requests"]) == 2
-
-
-def test_base_url_not_available(testdir):
-    # When the schema is created NOT out of URI
-    testdir.make_test(
-        """
-@schema.parametrize()
-def test_(request, case):
-    with pytest.raises(
-        ValueError,
-        match="^Base URL is required as `base_url` argument in `call` or should be specified "
-              "in the schema constructor as a part of Schema URL.$"
-    ):
-        case._get_base_url(None)
-"""
-    )
-    result = testdir.runpytest("-v")
-    # Then base URL is not detected automatically
-    # And exception will be risen if there is no base URL specified explicitly
-    result.assert_outcomes(passed=1)
 
 
 def test_exceptions_on_collect(testdir):

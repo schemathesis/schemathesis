@@ -477,7 +477,7 @@ def test_cli_run_output_empty(cli, cli_args, workers):
 @pytest.mark.parametrize("workers", (1, 2))
 def test_cli_run_changed_base_url(cli, server, cli_args, workers):
     # When the CLI receives custom base URL
-    base_url = f"http://127.0.0.1:{server['port']}/api/"
+    base_url = f"http://127.0.0.1:{server['port']}/api"
     result = cli.run(*cli_args, "--base-url", base_url, f"--workers={workers}")
     # Then the base URL should be correctly displayed in the CLI output
     lines = result.stdout.strip().split("\n")
@@ -487,8 +487,8 @@ def test_cli_run_changed_base_url(cli, server, cli_args, workers):
 @pytest.mark.parametrize(
     "url, message",
     (
-        ("/api/doesnt_exist", f"Schema was not found at http://127.0.0.1"),
-        ("/api/failure", f"Failed to load schema, code 500 was returned from http://127.0.0.1"),
+        ("/doesnt_exist", f"Schema was not found at http://127.0.0.1"),
+        ("/failure", f"Failed to load schema, code 500 was returned from http://127.0.0.1"),
     ),
 )
 @pytest.mark.endpoints("failure")
@@ -714,7 +714,7 @@ def test_multiple_failures_different_check(cli, schema_url):
 @pytest.mark.parametrize("workers", (1, 2))
 def test_connection_error(cli, schema_url, workers):
     # When the given base_url is unreachable
-    result = cli.run(schema_url, "--base-url=http://127.0.0.1:1/", f"--workers={workers}")
+    result = cli.run(schema_url, "--base-url=http://127.0.0.1:1/api", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And all collected endpoints should be marked as errored

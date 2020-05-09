@@ -1,11 +1,10 @@
-from copy import deepcopy
 from test.utils import SIMPLE_PATH
 
 import pytest
 import requests
 
 import schemathesis
-from schemathesis.models import Case, Endpoint, Response
+from schemathesis.models import Case, Endpoint, Request, Response
 
 
 def test_path(swagger_20):
@@ -18,7 +17,7 @@ def test_path(swagger_20):
 @pytest.mark.parametrize("converter", (lambda x: x, lambda x: x + "/"))
 def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
     base_url = converter(base_url)
-    endpoint = Endpoint("/api/success", "GET", {}, swagger_20)
+    endpoint = Endpoint("/success", "GET", {}, swagger_20)
     kwargs = {"endpoint": endpoint, "cookies": {"TOKEN": "secret"}}
     if override:
         case = Case(**kwargs)
@@ -43,7 +42,7 @@ def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
 @pytest.mark.parametrize("override", (False, True))
 @pytest.mark.filterwarnings("always")
 def test_call(override, base_url, swagger_20):
-    endpoint = Endpoint("/api/success", "GET", {}, swagger_20)
+    endpoint = Endpoint("/success", "GET", {}, swagger_20)
     kwargs = {"endpoint": endpoint}
     if override:
         case = Case(**kwargs)
@@ -156,3 +155,15 @@ def test_response_from_requests(base_url):
     assert serialized.http_version == "1.1"
     assert serialized.message == "OK"
     assert serialized.headers["Set-Cookie"] == ["foo=bar; Path=/", "baz=spam; Path=/"]
+
+
+@pytest.mark.parametrize(
+    "base_url, expected",
+    ((None, "http://127.0.0.1/api/v3/users/test"), ("http://127.0.0.1/api/v3", "http://127.0.0.1/api/v3/users/test"),),
+)
+def test_from_case(swagger_20, base_url, expected):
+    endpoint = Endpoint("/users/{name}", "GET", {}, swagger_20, base_url="http://127.0.0.1/api/v3")
+    case = Case(endpoint, path_parameters={"name": "test"})
+    session = requests.Session()
+    request = Request.from_case(case, session)
+    assert request.uri == "http://127.0.0.1/api/v3/users/test"

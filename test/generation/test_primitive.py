@@ -30,7 +30,7 @@ validator = {{
 @schema.parametrize()
 @settings(max_examples=3)
 def test_(case):
-    assert case.path == "/v1/users"
+    assert case.path == "/users"
     assert case.method in ("GET", "POST")
     validator(case.query["{name}"])
         """.format(
@@ -76,7 +76,7 @@ validator = {{
 @schema.parametrize()
 @settings(max_examples=3)
 def test_(case):
-    assert case.path == "/v1/users"
+    assert case.path == "/users"
     assert case.method == "GET"
     validator(case.query["{name}"])
         """.format(

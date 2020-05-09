@@ -128,7 +128,7 @@ def test_simple_dereference(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.path == "/users"
     assert case.method == "POST"
     assert_int(case.body)
 """,
@@ -163,7 +163,7 @@ def test_recursive_dereference(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.path == "/users"
     assert case.method == "POST"
     assert_int(case.body["id"])
 """,
@@ -206,7 +206,7 @@ def test_inner_dereference(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.path == "/users"
     assert case.method == "POST"
     assert_int(case.body["id"])
 """,
@@ -245,7 +245,7 @@ def test_inner_dereference_with_lists(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.path == "/users"
     assert case.method == "POST"
     assert_int(case.body["id"]["a"])
     assert_str(case.body["id"]["b"])
@@ -351,7 +351,7 @@ def test_nullable_parameters(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.path == "/users"
     assert case.method == "GET"
     assert case.query["id"] is None
 """,
@@ -369,7 +369,7 @@ def test_nullable_properties(testdir):
 @schema.parametrize(method="POST")
 @settings(max_examples=10)
 def test_(request, case):
-    assert case.path == "/v1/users"
+    assert case.path == "/users"
     assert case.method == "POST"
     if case.body["id"] is None:
         request.config.HYPOTHESIS_CASES += 1
@@ -409,7 +409,7 @@ def test_nullable_ref(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.path == "/users"
     assert case.method == "POST"
     assert case.body is None
 """,
@@ -444,7 +444,7 @@ def test_path_ref(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.path == "/users"
     assert isinstance(case.body, str)
 """,
         paths={"/users": {"$ref": "#/x-paths/UsersPath"}},
@@ -473,7 +473,7 @@ def test_nullable_enum(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path == "/v1/users"
+    assert case.path == "/users"
     assert case.method == "GET"
     assert case.query["id"] is None
 """,
@@ -489,6 +489,7 @@ def test_complex_dereference(testdir, complex_schema):
     schema = schemathesis.from_path(complex_schema)
     path = Path(str(testdir))
     assert schema.endpoints["/teapot"]["POST"] == Endpoint(
+        base_url="file:///",
         path="/teapot",
         method="POST",
         definition=EndpointDefinition(
