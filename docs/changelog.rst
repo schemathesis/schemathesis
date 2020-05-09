@@ -10,6 +10,7 @@ Added
 ~~~~~
 
 - New ``before_add_examples`` hook. `#571`_
+- New ``after_init_cli_run_handlers`` hook. `#575`_
 
 `1.5.1`_ - 2020-05-08
 ---------------------
@@ -1039,6 +1040,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#575: https://github.com/kiwicom/schemathesis/issues/575
 .. _#571: https://github.com/kiwicom/schemathesis/issues/571
 .. _#566: https://github.com/kiwicom/schemathesis/issues/566
 .. _#562: https://github.com/kiwicom/schemathesis/issues/562

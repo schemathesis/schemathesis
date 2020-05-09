@@ -144,3 +144,47 @@ With this hook you can add additional test cases that will be executed in Hypoth
         examples.append(
             Case(endpoint=context.endpoint, query={"foo": "bar"})
         )
+
+CLI hooks
+---------
+
+To load CLI hooks you need to put them into a separate module and pass an importable path to it in ``--pre-run`` CLI option.
+For example, you have your hooks definition in ``myproject/hooks.py``, and ``myproject`` is importable:
+
+.. code:: bash
+
+    schemathesis --pre-run myproject.hooks run http://127.0.0.1/openapi.yaml
+
+
+``after_init_cli_run_handlers``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This hook allows you to extend or redefine a list of CLI handlers that will be used to process runner events:
+
+.. code:: python
+
+    import click
+    import schemathesis
+    from schemathesis.cli.handlers import EventHandler
+    from schemathesis.runner import events
+
+    class SimpleHandler(EventHandler):
+
+        def handle_event(self, context, event):
+            if isinstance(event, events.Finished):
+                click.echo("Done!")
+
+    @schemathesis.hooks.register
+    def after_init_cli_run_handlers(
+        context: HookContext,
+        handlers: List[EventHandler],
+        execution_context: ExecutionContext
+    ) -> None:
+        handlers[:] = [SimpleHandler()]
+
+With this simple handler only ``Done!`` will be displayed at the end of the test run. For example, you can use this hook to:
+
+- Send events over the network
+- Store logs in a custom format
+- Change the output visual style
+- Display additional information in the output

@@ -11,6 +11,7 @@ import yaml
 from .. import checks as checks_module
 from .. import models, runner
 from ..fixups import ALL_FIXUPS
+from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..runner import events
 from ..runner.targeted import DEFAULT_TARGETS_NAMES, Target
 from ..types import Filter
@@ -310,16 +311,17 @@ def execute(
         # This handler should be first to have logs writing completed when the output handler will display statistic
         handlers.append(cassettes.CassetteWriter(store_network_log))
     handlers.append(get_output_handler(workers_num))
-    context = ExecutionContext(
+    execution_context = ExecutionContext(
         workers_num=workers_num,
         show_errors_tracebacks=show_errors_tracebacks,
         cassette_file_name=store_network_log.name if store_network_log is not None else None,
         junit_xml_file=junit_xml.name if junit_xml is not None else None,
     )
+    GLOBAL_HOOK_DISPATCHER.dispatch("after_init_cli_run_handlers", HookContext(), handlers, execution_context)
     try:
         for event in prepared_runner:
             for handler in handlers:
-                handler.handle_event(context, event)
+                handler.handle_event(execution_context, event)
     except click.exceptions.Exit:
         raise
     except Exception as exc:
@@ -362,3 +364,13 @@ def replay(
 
 def bold(message: str) -> str:
     return click.style(message, bold=True)
+
+
+@HookDispatcher.register_spec([HookScope.GLOBAL])
+def after_init_cli_run_handlers(
+    context: HookContext, handlers: List[EventHandler], execution_context: ExecutionContext
+) -> None:
+    """Called after CLI hooks are initialized.
+
+    Might be used to add extra event handlers.
+    """
