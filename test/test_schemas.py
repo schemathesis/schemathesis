@@ -81,7 +81,7 @@ def test_resolving_multiple_files():
         },
     }
     schema = schemathesis.from_dict(raw_schema)
-    assert schema["/api/teapot"]["post"].body == {
+    assert schema["/teapot"]["post"].body == {
         "type": "object",
         "properties": {
             "id": {"type": "integer", "format": "int64"},

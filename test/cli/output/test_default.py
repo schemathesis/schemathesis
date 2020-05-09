@@ -176,7 +176,7 @@ def test_display_single_failure(capsys, swagger_20, execution_context, endpoint,
     out = capsys.readouterr().out
     lines = out.split("\n")
     # Then the endpoint name is displayed as a subsection
-    assert " GET: /success " in lines[0]
+    assert " GET: /v1/success " in lines[0]
     # And check name is displayed in red
     assert lines[1] == strip_style_win32(click.style("Check           : not_a_server_error", fg="red"))
     # And body should be displayed if it is not None
@@ -268,7 +268,7 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set):
     # Then section title is displayed
     assert " FAILURES " in out
     # And endpoint with a failure is displayed as a subsection
-    assert " GET: /api/failure " in out
+    assert " GET: /v1/api/failure " in out
     assert "Message" in out
     # And check name is displayed
     assert "Check           : test" in out
@@ -299,7 +299,7 @@ def test_display_errors(swagger_20, capsys, results_set, execution_context, show
     # And help message is displayed only if tracebacks are not shown
     assert help_message_exists is not show_errors_tracebacks
     # And endpoint with an error is displayed as a subsection
-    assert " GET: /api/error " in out
+    assert " GET: /v1/api/error " in out
     # And the error itself is displayed
     assert "ConnectionError: Connection refused!" in out
     # And the example is displayed

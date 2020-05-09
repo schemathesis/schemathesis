@@ -7,7 +7,6 @@ import warnings
 from contextlib import contextmanager
 from functools import wraps
 from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Type, Union, overload
-from urllib.parse import urlsplit, urlunsplit
 
 import requests
 import yaml
@@ -83,12 +82,6 @@ def is_schemathesis_test(func: Callable) -> bool:
         return isinstance(item, BaseSchema)
     except Exception:
         return False
-
-
-def get_base_url(uri: str) -> str:
-    """Remove the path part off the given uri."""
-    parts = urlsplit(uri)[:2] + ("", "", "")
-    return urlunsplit(parts)
 
 
 def force_tuple(item: Filter) -> Union[List, Set, Tuple]:

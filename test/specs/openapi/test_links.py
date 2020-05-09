@@ -10,7 +10,7 @@ from schemathesis.specs.openapi.links import Link
 from schemathesis.stateful import ParsedData
 
 ENDPOINT = Endpoint(
-    path="/api/users/{user_id}",
+    path="/users/{user_id}",
     method="GET",
     definition=ANY,
     schema=ANY,
@@ -57,7 +57,7 @@ def response():
     "url, expected",
     (
         (
-            "/api/users/",
+            "/users/",
             [
                 LINK,
                 Link(
@@ -75,7 +75,7 @@ def response():
 def test_get_links(base_url, schema_url, url, expected):
     schema = schemathesis.from_uri(schema_url)
     response = requests.post(f"{base_url}{url}", json={"username": "TEST"})
-    assert schema.endpoints["/api/users/"]["POST"].get_stateful_tests(response, "links") == expected
+    assert schema.endpoints["/users/"]["POST"].get_stateful_tests(response, "links") == expected
 
 
 def test_parse(case, response):
@@ -185,7 +185,5 @@ def test_make_endpoint_single():
 
 @pytest.mark.parametrize("parameter", ("wrong.id", "unknown", "header.id"))
 def test_make_endpoint_invalid_location(parameter):
-    with pytest.raises(
-        ValueError, match=f"Parameter `{parameter}` is not defined in endpoint GET /api/users/{{user_id}}"
-    ):
+    with pytest.raises(ValueError, match=f"Parameter `{parameter}` is not defined in endpoint GET /users/{{user_id}}"):
         LINK.make_endpoint([ParsedData({parameter: 4})])

@@ -15,7 +15,7 @@ from schemathesis import loaders
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.constants import USER_AGENT
 from schemathesis.models import Status
-from schemathesis.runner import ThreadPoolRunner, events, get_base_url, get_requests_auth, prepare
+from schemathesis.runner import ThreadPoolRunner, events, get_requests_auth, prepare
 from schemathesis.runner.impl.core import get_wsgi_auth, reraise
 
 
@@ -128,7 +128,7 @@ def test_execute(args):
 def test_interactions(request, args, workers):
     app, kwargs = args
     init, *others, finished = prepare(**kwargs, workers_num=workers, store_interactions=True)
-    base_url = "http://localhost" if isinstance(app, Flask) else request.getfixturevalue("base_url")
+    base_url = "http://localhost/api" if isinstance(app, Flask) else request.getfixturevalue("base_url")
 
     # failure
     interactions = [
@@ -137,7 +137,7 @@ def test_interactions(request, args, workers):
     assert len(interactions) == 2
     failure = interactions[0]
     assert attr.asdict(failure.request) == {
-        "uri": f"{base_url}/api/failure",
+        "uri": f"{base_url}/failure",
         "method": "GET",
         "body": "",
         "headers": {
@@ -161,7 +161,7 @@ def test_interactions(request, args, workers):
     assert len(interactions) == 1
     success = interactions[0]
     assert attr.asdict(success.request) == {
-        "uri": f"{base_url}/api/success",
+        "uri": f"{base_url}/success",
         "method": "GET",
         "body": "",
         "headers": {
@@ -477,18 +477,6 @@ async def test_payload_explicit_example(args):
     assert body == {"name": "John"}
 
 
-@pytest.mark.parametrize(
-    "url, base_url",
-    (
-        ("http://127.0.0.1:8080/swagger.json", "http://127.0.0.1:8080"),
-        ("https://example.com/get", "https://example.com"),
-        ("https://example.com", "https://example.com"),
-    ),
-)
-def test_get_base_url(url, base_url):
-    assert get_base_url(url) == base_url
-
-
 @pytest.mark.endpoints("invalid_path_parameter")
 def test_invalid_path_parameter(args):
     app, kwargs = args
@@ -603,7 +591,7 @@ def test_reproduce_code_with_overridden_headers(args, base_url):
     if isinstance(app, Flask):
         expected = f"requests.get('http://localhost/api/failure', headers={headers})"
     else:
-        expected = f"requests.get('{base_url}/api/failure', headers={headers})"
+        expected = f"requests.get('{base_url}/failure', headers={headers})"
     assert after.result.checks[1].example.requests_code == expected
 
 
@@ -621,3 +609,23 @@ def test_reraise():
     except AssertionError as exc:
         error = reraise(exc)
         assert error.args[0] == "Unknown schema error"
+
+
+@pytest.mark.parametrize("schema_path", ("petstore_v2.yaml", "petstore_v3.yaml"))
+def test_url_joining(server, get_schema_path, base_url, schema_path):
+    path = get_schema_path(schema_path)
+    *_, after_execution, _ = prepare(
+        path, base_url=f"{base_url}/v3", endpoint="/pet/findByStatus", hypothesis_max_examples=1
+    )
+    assert after_execution.result.path == "/api/v3/pet/findByStatus"
+    assert (
+        f"http://127.0.0.1:{server['port']}/api/v3/pet/findByStatus"
+        in after_execution.result.checks[0].example.requests_code
+    )
+
+
+# no base_url specified:
+#   - OAS2. take host from the current one + add basePath
+#   - OAS3. take host from the current one + add path from the first server
+# base url is specified:
+#   - OAS2/3. use it whole

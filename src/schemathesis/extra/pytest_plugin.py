@@ -31,7 +31,7 @@ class SchemathesisCase(PyCollector):
         super().__init__(*args, **kwargs)
 
     def _get_test_name(self, endpoint: Endpoint) -> str:
-        return f"{self.name}[{endpoint.method}:{endpoint.path}]"
+        return f"{self.name}[{endpoint.method}:{endpoint.full_path}]"
 
     def _gen_items(self, endpoint: Endpoint) -> Generator[Function, None, None]:
         """Generate all items for the given endpoint.
