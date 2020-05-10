@@ -15,7 +15,7 @@ from schemathesis import loaders
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.constants import USER_AGENT
 from schemathesis.models import Status
-from schemathesis.runner import events, get_base_url, get_requests_auth, prepare
+from schemathesis.runner import ThreadPoolRunner, events, get_base_url, get_requests_auth, prepare
 from schemathesis.runner.impl.core import get_wsgi_auth
 
 
@@ -605,3 +605,11 @@ def test_reproduce_code_with_overridden_headers(args, base_url):
     else:
         expected = f"requests.get('{base_url}/api/failure', headers={headers})"
     assert after.result.checks[1].example.requests_code == expected
+
+
+@pytest.mark.endpoints("success")
+def test_workers_num_regression(mocker, schema_url):
+    # GH: 579
+    spy = mocker.patch("schemathesis.runner.ThreadPoolRunner", wraps=ThreadPoolRunner)
+    execute(schema_url, workers_num=5)
+    assert spy.call_args[1]["workers_num"] == 5
