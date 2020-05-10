@@ -11,6 +11,7 @@ Welcome to schemathesis's documentation!
    usage
    compatibility
    customization
+   stateful
    targeted
    faq
    changelog

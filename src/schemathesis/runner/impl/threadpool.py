@@ -13,7 +13,7 @@ from ...types import RawAuth
 from ...utils import capture_hypothesis_output, get_requests_auth
 from .. import events
 from ..targeted import Target
-from .core import BaseRunner, get_session, network_test, run_test, wsgi_test
+from .core import BaseRunner, Feedback, get_session, network_test, run_test, wsgi_test
 
 
 def _run_task(
@@ -25,15 +25,29 @@ def _run_task(
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
+    stateful: Optional[str],
+    stateful_recursion_limit: int,
     **kwargs: Any,
 ) -> None:
     # pylint: disable=too-many-arguments
+
+    def _run_tests(maker: Callable, recursion_level: int = 0) -> None:
+        if recursion_level > stateful_recursion_limit:
+            return
+        for _endpoint, test in maker(test_template, settings, seed):
+            feedback = Feedback(stateful, _endpoint)
+            for event in run_test(
+                _endpoint, test, checks, targets, results, recursion_level=recursion_level, feedback=feedback, **kwargs
+            ):
+                events_queue.put(event)
+            _run_tests(feedback.get_stateful_tests, recursion_level + 1)
+
     with capture_hypothesis_output():
         while not tasks_queue.empty():
             endpoint = tasks_queue.get()
-            test = make_test_or_exception(endpoint, test_template, settings, seed)
-            for event in run_test(endpoint, test, checks, targets, results, **kwargs):
-                events_queue.put(event)
+            items = (endpoint, make_test_or_exception(endpoint, test_template, settings, seed))
+            # This lambda ignores the input arguments to support the same interface for `feedback.get_stateful_tests`
+            _run_tests(lambda *_: (items,))
 
 
 def thread_task(
@@ -47,6 +61,8 @@ def thread_task(
     headers: Optional[Dict[str, Any]],
     seed: Optional[int],
     results: TestResultSet,
+    stateful: Optional[str],
+    stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
     """A single task, that threads do.
@@ -65,6 +81,8 @@ def thread_task(
             settings,
             seed,
             results,
+            stateful=stateful,
+            stateful_recursion_limit=stateful_recursion_limit,
             session=session,
             headers=headers,
             **kwargs,
@@ -79,10 +97,24 @@ def wsgi_thread_task(
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
+    stateful: Optional[str],
+    stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
     # pylint: disable=too-many-arguments
-    _run_task(wsgi_test, tasks_queue, events_queue, checks, targets, settings, seed, results, **kwargs)
+    _run_task(
+        wsgi_test,
+        tasks_queue,
+        events_queue,
+        checks,
+        targets,
+        settings,
+        seed,
+        results,
+        stateful=stateful,
+        stateful_recursion_limit=stateful_recursion_limit,
+        **kwargs,
+    )
 
 
 def stop_worker(thread_id: int) -> None:
@@ -165,6 +197,8 @@ class ThreadPoolRunner(BaseRunner):
             "headers": self.headers,
             "seed": self.seed,
             "results": results,
+            "stateful": self.stateful,
+            "stateful_recursion_limit": self.stateful_recursion_limit,
             "kwargs": {"request_timeout": self.request_timeout, "store_interactions": self.store_interactions},
         }
 
@@ -182,6 +216,8 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
             "settings": self.hypothesis_settings,
             "seed": self.seed,
             "results": results,
+            "stateful": self.stateful,
+            "stateful_recursion_limit": self.stateful_recursion_limit,
             "kwargs": {
                 "auth": self.auth,
                 "auth_type": self.auth_type,

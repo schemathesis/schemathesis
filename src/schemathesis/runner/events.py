@@ -49,10 +49,11 @@ class BeforeExecution(ExecutionEvent):
 
     method: str = attr.ib()  # pragma: no mutate
     path: str = attr.ib()  # pragma: no mutate
+    recursion_level: int = attr.ib()  # pragma: no mutate
 
     @classmethod
-    def from_endpoint(cls, endpoint: Endpoint) -> "BeforeExecution":
-        return cls(method=endpoint.method, path=endpoint.path)
+    def from_endpoint(cls, endpoint: Endpoint, recursion_level: int) -> "BeforeExecution":
+        return cls(method=endpoint.method, path=endpoint.path, recursion_level=recursion_level)
 
 
 @attr.s(slots=True)  # pragma: no mutate

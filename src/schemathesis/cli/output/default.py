@@ -306,6 +306,10 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
 def handle_before_execution(context: ExecutionContext, event: events.BeforeExecution) -> None:
     """Display what method / endpoint will be tested next."""
     message = f"{event.method} {event.path} "
+    if event.recursion_level > 0:
+        message = f"{'    ' * event.recursion_level}-> {message}"
+        # This value is not `None` - the value is set in runtime before this line
+        context.endpoints_count += 1  # type: ignore
     context.current_line_length = len(message)
     click.echo(message, nl=False)
 

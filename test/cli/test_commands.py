@@ -198,6 +198,9 @@ def test_commands_run_help(cli):
         "  --show-errors-tracebacks        Show full tracebacks for internal errors.",
         "  --store-network-log FILENAME    Store requests and responses into a file.",
         "  --fixups [fast_api|all]         Install specified compatibility fixups.",
+        "  --stateful [links]              Utilize stateful testing capabilities.",
+        "  --stateful-recursion-limit INTEGER RANGE",
+        "                                  Limit recursion depth for stateful testing.",
         "  --hypothesis-deadline INTEGER RANGE",
         "                                  Duration in milliseconds that each individual",
         "                                  example with a test is not allowed to exceed.",
@@ -284,6 +287,8 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "workers_num": 1,
         "exit_first": False,
         "fixups": (),
+        "stateful": None,
+        "stateful_recursion_limit": 5,
         "auth": None,
         "auth_type": None,
         "headers": {},
@@ -459,7 +464,7 @@ def test_cli_run_changed_base_url(cli, server, cli_args, workers):
     result = cli.run(*cli_args, "--base-url", base_url, f"--workers={workers}")
     # Then the base URL should be correctly displayed in the CLI output
     lines = result.stdout.strip().split("\n")
-    assert lines[-10] == f"Base URL: {base_url}"
+    assert lines[5] == f"Base URL: {base_url}"
 
 
 @pytest.mark.parametrize(
@@ -1172,3 +1177,57 @@ def test_colon_in_headers(cli, schema_url, app):
     result = cli.run(schema_url, f"--header={header}:{value}")
     assert result.exit_code == ExitCode.OK
     assert app["incoming_requests"][0].headers[header] == value
+
+
+@pytest.mark.parametrize("recursion_limit", (1, 5))
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_openapi_links(cli, cli_args, schema_url, recursion_limit):
+    # When the schema contains Open API links or Swagger 2 extension for links
+    # And these links are nested - endpoints in these links contain links to another endpoints
+    result = cli.run(
+        *cli_args,
+        "--hypothesis-max-examples=2",
+        "--hypothesis-seed=1",
+        "--hypothesis-derandomize",
+        "--show-errors-tracebacks",
+        "--stateful=links",
+        f"--stateful-recursion-limit={recursion_limit}",
+    )
+    lines = result.stdout.splitlines()
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # Then these links should be tested
+    # And lines with the results of these tests should be indented
+    assert lines[11].startswith("    -> GET /api/users/{user_id} .")
+    # And percentage should be adjusted appropriately
+    assert lines[11].endswith("[ 50%]")
+    if recursion_limit == 5:
+        assert lines[12].startswith("        -> PATCH /api/users/{user_id} .")
+        assert lines[12].endswith("[ 60%]")
+        assert lines[13].startswith("    -> PATCH /api/users/{user_id} .")
+        assert lines[13].endswith("[ 66%]")
+    else:
+        assert lines[12].startswith("    -> PATCH /api/users/{user_id} .")
+        assert lines[12].endswith("[ 60%]")
+        # No nesting below 1 level
+        assert lines[13].startswith("GET /api/users/{user_id} .")
+        assert lines[13].endswith("[ 80%]")
+
+
+@pytest.mark.parametrize("recursion_limit, expected", ((1, "....."), (5, "......")))
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_limit, expected):
+    # When the schema contains Open API links or Swagger 2 extension for links
+    # And these links are nested - endpoints in these links contain links to another endpoints
+    result = cli.run(
+        *cli_args,
+        "--hypothesis-max-examples=2",
+        "--hypothesis-seed=1",
+        "--hypothesis-derandomize",
+        "--show-errors-tracebacks",
+        "--stateful=links",
+        f"--stateful-recursion-limit={recursion_limit}",
+        "--workers=2",
+    )
+    lines = result.stdout.splitlines()
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert lines[10] == expected

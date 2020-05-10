@@ -11,7 +11,14 @@ from ..schemas import BaseSchema
 from ..types import Filter, NotSet, RawAuth
 from ..utils import dict_not_none_values, dict_true_values, file_exists, get_base_url, get_requests_auth, import_app
 from . import events
-from .impl import BaseRunner, SingleThreadRunner, SingleThreadWSGIRunner, ThreadPoolRunner, ThreadPoolWSGIRunner
+from .impl import (
+    DEFAULT_STATEFUL_RECURSION_LIMIT,
+    BaseRunner,
+    SingleThreadRunner,
+    SingleThreadWSGIRunner,
+    ThreadPoolRunner,
+    ThreadPoolWSGIRunner,
+)
 from .targeted import DEFAULT_TARGETS, Target
 
 
@@ -26,6 +33,8 @@ def prepare(  # pylint: disable=too-many-arguments
     exit_first: bool = False,
     store_interactions: bool = False,
     fixups: Iterable[str] = (),
+    stateful: Optional[str] = None,
+    stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     # Schema loading
     loader: Callable = loaders.from_uri,
     base_url: Optional[str] = None,
@@ -87,6 +96,8 @@ def prepare(  # pylint: disable=too-many-arguments
         request_timeout=request_timeout,
         store_interactions=store_interactions,
         fixups=fixups,
+        stateful=stateful,
+        stateful_recursion_limit=stateful_recursion_limit,
     )
 
 
@@ -132,6 +143,8 @@ def execute_from_schema(
     exit_first: bool = False,
     store_interactions: bool = False,
     fixups: Iterable[str] = (),
+    stateful: Optional[str] = None,
+    stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Execute tests for the given schema.
 
@@ -177,6 +190,8 @@ def execute_from_schema(
                     workers_num=workers_num,
                     exit_first=exit_first,
                     store_interactions=store_interactions,
+                    stateful=stateful,
+                    stateful_recursion_limit=stateful_recursion_limit,
                 )
             else:
                 runner = ThreadPoolRunner(
@@ -192,6 +207,8 @@ def execute_from_schema(
                     request_timeout=request_timeout,
                     exit_first=exit_first,
                     store_interactions=store_interactions,
+                    stateful=stateful,
+                    stateful_recursion_limit=stateful_recursion_limit,
                 )
         else:
             if schema.app:
@@ -206,6 +223,8 @@ def execute_from_schema(
                     seed=seed,
                     exit_first=exit_first,
                     store_interactions=store_interactions,
+                    stateful=stateful,
+                    stateful_recursion_limit=stateful_recursion_limit,
                 )
             else:
                 runner = SingleThreadRunner(
@@ -220,6 +239,8 @@ def execute_from_schema(
                     request_timeout=request_timeout,
                     exit_first=exit_first,
                     store_interactions=store_interactions,
+                    stateful=stateful,
+                    stateful_recursion_limit=stateful_recursion_limit,
                 )
         yield from runner.execute()
     except Exception as exc:

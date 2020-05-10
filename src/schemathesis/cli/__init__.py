@@ -13,7 +13,7 @@ from .. import checks as checks_module
 from .. import models, runner
 from ..fixups import ALL_FIXUPS
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
-from ..runner import events
+from ..runner import DEFAULT_STATEFUL_RECURSION_LIMIT, events
 from ..runner.targeted import DEFAULT_TARGETS_NAMES, Target
 from ..types import Filter
 from ..utils import WSGIResponse
@@ -171,6 +171,15 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     type=click.Choice(list(ALL_FIXUPS) + ["all"]),
 )
 @click.option(
+    "--stateful", help="Utilize stateful testing capabilities.", type=click.Choice(["links"]),
+)
+@click.option(
+    "--stateful-recursion-limit",
+    help="Limit recursion depth for stateful testing.",
+    default=DEFAULT_STATEFUL_RECURSION_LIMIT,
+    type=click.IntRange(1, 100),
+)
+@click.option(
     "--hypothesis-deadline",
     help="Duration in milliseconds that each individual example with a test is not allowed to exceed.",
     # max value to avoid overflow. It is maximum amount of days in milliseconds
@@ -219,6 +228,8 @@ def run(  # pylint: disable=too-many-arguments
     show_errors_tracebacks: bool = False,
     store_network_log: Optional[click.utils.LazyFile] = None,
     fixups: Tuple[str] = (),  # type: ignore
+    stateful: Optional[str] = None,
+    stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
     hypothesis_derandomize: Optional[bool] = None,
     hypothesis_max_examples: Optional[int] = None,
@@ -260,6 +271,8 @@ def run(  # pylint: disable=too-many-arguments
         workers_num=workers_num,
         validate_schema=validate_schema,
         fixups=fixups,
+        stateful=stateful,
+        stateful_recursion_limit=stateful_recursion_limit,
         hypothesis_deadline=hypothesis_deadline,
         hypothesis_derandomize=hypothesis_derandomize,
         hypothesis_max_examples=hypothesis_max_examples,

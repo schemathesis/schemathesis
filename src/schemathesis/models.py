@@ -6,7 +6,7 @@ from collections import Counter
 from contextlib import contextmanager
 from enum import IntEnum
 from logging import LogRecord
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, Iterator, List, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple, Union, cast
 from urllib.parse import urljoin
 
 import attr
@@ -21,6 +21,7 @@ from .utils import GenericResponse, WSGIResponse
 
 if TYPE_CHECKING:
     from .schemas import BaseSchema
+    from .stateful import StatefulTest
     from .hooks import HookDispatcher
 
 
@@ -189,6 +190,14 @@ class Case:
         if errors:
             raise AssertionError(*errors)
 
+    def get_full_url(self) -> str:
+        """Make a full URL to the current endpoint, including query parameters."""
+        base_url = self.base_url or "http://localhost"
+        kwargs = self.as_requests_kwargs(base_url)
+        request = requests.Request(**kwargs)
+        prepared = requests.Session().prepare_request(request)  # type: ignore
+        return prepared.url
+
 
 def is_multipart(item: Optional[Body]) -> bool:
     """A poor detection if the body should be a multipart request.
@@ -262,6 +271,9 @@ class Endpoint:
         from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel
 
         return get_case_strategy(self, hooks)
+
+    def get_stateful_tests(self, response: GenericResponse, stateful: Optional[str]) -> Sequence["StatefulTest"]:
+        return self.schema.get_stateful_tests(response, self, stateful)
 
 
 class Status(IntEnum):

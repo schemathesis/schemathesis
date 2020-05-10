@@ -1,7 +1,7 @@
 import logging
 import time
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Union
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
 
 import attr
 import hypothesis
@@ -9,22 +9,67 @@ import requests
 from _pytest.logging import LogCaptureHandler, catching_logs
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
+from ..._hypothesis import make_test_or_exception
 from ...constants import USER_AGENT
 from ...exceptions import InvalidSchema, get_grouped_exception
 from ...models import Case, CheckFunction, Endpoint, Status, TestResult, TestResultSet
 from ...runner import events
 from ...schemas import BaseSchema
+from ...stateful import ParsedData, StatefulTest
 from ...types import RawAuth
 from ...utils import GenericResponse, capture_hypothesis_output
 from ..targeted import Target
 
 DEFAULT_DEADLINE = 500  # pragma: no mutate
+DEFAULT_STATEFUL_RECURSION_LIMIT = 5  # pragma: no mutate
 
 
 def get_hypothesis_settings(hypothesis_options: Dict[str, Any]) -> hypothesis.settings:
     # Default settings, used as a parent settings object below
     hypothesis_options.setdefault("deadline", DEFAULT_DEADLINE)
     return hypothesis.settings(**hypothesis_options)
+
+
+@attr.s(slots=True)
+class StatefulData:
+    """Storage for data that will be used in later tests."""
+
+    stateful_test: StatefulTest = attr.ib()
+    container: List[ParsedData] = attr.ib(factory=list)
+
+    def make_endpoint(self) -> Endpoint:
+        return self.stateful_test.make_endpoint(self.container)
+
+    def store(self, case: Case, response: GenericResponse) -> None:
+        """Parse and store data for a stateful test."""
+        parsed = self.stateful_test.parse(case, response)
+        self.container.append(parsed)
+
+
+@attr.s(slots=True)
+class Feedback:
+    """Handler for feedback from tests.
+
+    Provides a way to control runner's behavior from tests.
+    """
+
+    stateful: Optional[str] = attr.ib()
+    endpoint: Endpoint = attr.ib()
+    stateful_tests: Dict[str, StatefulData] = attr.ib(factory=dict)
+
+    def add_test_case(self, case: Case, response: GenericResponse) -> None:
+        """Store test data to reuse it in the future additional tests."""
+        for stateful_test in case.endpoint.get_stateful_tests(response, self.stateful):
+            data = self.stateful_tests.setdefault(stateful_test.name, StatefulData(stateful_test))
+            data.store(case, response)
+
+    def get_stateful_tests(
+        self, test: Callable, settings: hypothesis.settings, seed: Optional[int]
+    ) -> Generator[Tuple[Endpoint, Union[Callable, InvalidSchema]], None, None]:
+        """Generate additional tests that use data from the previous ones."""
+        for data in self.stateful_tests.values():
+            endpoint = data.make_endpoint()
+            yield endpoint, make_test_or_exception(endpoint, test, settings, seed)
 
 
 # pylint: disable=too-many-instance-attributes
@@ -41,6 +86,8 @@ class BaseRunner:
     store_interactions: bool = attr.ib(default=False)  # pragma: no mutate
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
     exit_first: bool = attr.ib(default=False)  # pragma: no mutate
+    stateful: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    stateful_recursion_limit: int = attr.ib(default=DEFAULT_STATEFUL_RECURSION_LIMIT)  # pragma: no mutate
 
     def execute(self) -> Generator[events.ExecutionEvent, None, None]:
         """Common logic for all runners."""
@@ -63,6 +110,29 @@ class BaseRunner:
     def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         raise NotImplementedError
 
+    def _run_tests(  # pylint: disable=too-many-arguments
+        self,
+        maker: Callable,
+        template: Callable,
+        settings: hypothesis.settings,
+        seed: Optional[int],
+        recursion_level: int = 0,
+        **kwargs: Any,
+    ) -> Generator[events.ExecutionEvent, None, None]:
+        """Run tests and recursively run additional tests."""
+        if recursion_level > self.stateful_recursion_limit:
+            return
+        for endpoint, test in maker(template, settings, seed):
+            feedback = Feedback(self.stateful, endpoint)
+            for event in run_test(endpoint, test, feedback=feedback, recursion_level=recursion_level, **kwargs):
+                yield event
+                if isinstance(event, events.Interrupted):
+                    return
+            # Additional tests, generated via the `feedback` instance
+            yield from self._run_tests(
+                feedback.get_stateful_tests, template, settings, seed, recursion_level=recursion_level + 1, **kwargs
+            )
+
 
 def run_test(
     endpoint: Endpoint,
@@ -71,12 +141,13 @@ def run_test(
     targets: Iterable[Target],
     results: TestResultSet,
     headers: Optional[Dict[str, Any]],
+    recursion_level: int,
     **kwargs: Any,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """A single test run with all error handling needed."""
     # pylint: disable=too-many-arguments
     result = TestResult(endpoint=endpoint, overridden_headers=headers)
-    yield events.BeforeExecution.from_endpoint(endpoint=endpoint)
+    yield events.BeforeExecution.from_endpoint(endpoint=endpoint, recursion_level=recursion_level)
     hypothesis_output: List[str] = []
     test_start_time = time.monotonic()
     try:
@@ -156,6 +227,7 @@ def network_test(
     request_timeout: Optional[int],
     store_interactions: bool,
     headers: Optional[Dict[str, Any]],
+    feedback: Feedback,
 ) -> None:
     """A single test body that will be executed against the target."""
     # pylint: disable=too-many-arguments
@@ -167,6 +239,7 @@ def network_test(
     if store_interactions:
         result.store_requests_response(response)
     run_checks(case, checks, result, response)
+    feedback.add_test_case(case, response)
 
 
 @contextmanager
@@ -194,6 +267,7 @@ def wsgi_test(
     auth_type: Optional[str],
     headers: Optional[Dict[str, Any]],
     store_interactions: bool,
+    feedback: Feedback,
 ) -> None:
     # pylint: disable=too-many-arguments
     headers = _prepare_wsgi_headers(headers, auth, auth_type)
@@ -206,6 +280,7 @@ def wsgi_test(
         result.store_wsgi_response(case, response, headers, elapsed)
     result.logs.extend(recorded.records)
     run_checks(case, checks, result, response)
+    feedback.add_test_case(case, response)
 
 
 def _prepare_wsgi_headers(
