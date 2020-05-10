@@ -1,7 +1,7 @@
 # pylint: disable=too-many-ancestors
 import itertools
 from copy import deepcopy
-from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Generator, Iterator, List, Optional, Sequence, Tuple
 from urllib.parse import urljoin, urlsplit
 
 import jsonschema
@@ -11,7 +11,9 @@ from ...exceptions import InvalidSchema
 from ...hooks import HookContext
 from ...models import Endpoint, EndpointDefinition, empty_object
 from ...schemas import BaseSchema
+from ...stateful import StatefulTest
 from ...utils import GenericResponse
+from . import links
 from .converter import to_json_schema_recursive
 from .filters import should_skip_by_operation_id, should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .references import ConvertingResolver
@@ -20,12 +22,21 @@ from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSe
 
 class BaseOpenAPISchema(BaseSchema):
     nullable_name: str
+    links_field: str
     operations: Tuple[str, ...]
     security: BaseSecurityProcessor
+    _endpoints_by_operation_id: Dict[str, Endpoint]
 
     @property  # pragma: no mutate
     def spec_version(self) -> str:
         raise NotImplementedError
+
+    def get_stateful_tests(
+        self, response: GenericResponse, endpoint: Endpoint, stateful: Optional[str]
+    ) -> Sequence[StatefulTest]:
+        if stateful == "links":
+            return links.get_links(response, endpoint, field=self.links_field)
+        return []
 
     @property
     def base_path(self) -> str:
@@ -56,13 +67,7 @@ class BaseOpenAPISchema(BaseSchema):
                 if should_skip_endpoint(full_path, self.endpoint):
                     continue
                 self.dispatch_hook("before_process_path", context, path, methods)
-                # We need to know a proper scope in what methods are.
-                # It will allow us to provide a proper reference resolving in `response_schema_conformance` and avoid
-                # recursion errors
-                if "$ref" in methods:
-                    scope, raw_methods = deepcopy(self.resolver.resolve(methods["$ref"]))
-                else:
-                    raw_methods, scope = deepcopy(methods), self.resolver.resolution_scope
+                scope, raw_methods = self._resolve_methods(methods)
                 methods = self.resolver.resolve_all(methods)
                 common_parameters = get_common_parameters(methods)
                 for method, resolved_definition in methods.items():
@@ -81,6 +86,14 @@ class BaseOpenAPISchema(BaseSchema):
                     yield self.make_endpoint(full_path, method, parameters, resolved_definition, raw_definition)
         except (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError):
             raise InvalidSchema("Schema parsing failed. Please check your schema.")
+
+    def _resolve_methods(self, methods: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+        # We need to know a proper scope in what methods are.
+        # It will allow us to provide a proper reference resolving in `response_schema_conformance` and avoid
+        # recursion errors
+        if "$ref" in methods:
+            return deepcopy(self.resolver.resolve(methods["$ref"]))
+        return self.resolver.resolution_scope, deepcopy(methods)
 
     def make_endpoint(  # pylint: disable=too-many-arguments
         self,
@@ -131,12 +144,51 @@ class BaseOpenAPISchema(BaseSchema):
         """Extract response schema from `responses`."""
         raise NotImplementedError
 
+    def get_endpoint_by_operation_id(self, operation_id: str) -> Endpoint:
+        """Get an `Endpoint` instance by its `operationId`."""
+        if not hasattr(self, "_endpoints_by_operation_id"):
+            self._endpoints_by_operation_id = dict(self._group_endpoints_by_operation_id())
+        return self._endpoints_by_operation_id[operation_id]
+
+    def _group_endpoints_by_operation_id(self) -> Generator[Tuple[str, Endpoint], None, None]:
+        for path, methods in self.raw_schema["paths"].items():
+            full_path = self.get_full_path(path)
+            scope, raw_methods = self._resolve_methods(methods)
+            methods = self.resolver.resolve_all(methods)
+            common_parameters = get_common_parameters(methods)
+            for method, resolved_definition in methods.items():
+                if method not in self.operations or "operationId" not in resolved_definition:
+                    continue
+                parameters = itertools.chain(resolved_definition.get("parameters", ()), common_parameters)
+                raw_definition = EndpointDefinition(raw_methods[method], scope)
+                yield resolved_definition["operationId"], self.make_endpoint(
+                    full_path, method, parameters, resolved_definition, raw_definition
+                )
+
+    def get_endpoint_by_reference(self, reference: str) -> Endpoint:
+        """Get local or external `Endpoint` instance by reference.
+
+        Reference example: #/paths/~1users~1{user_id}/patch
+        """
+        scope, data = self.resolver.resolve(reference)
+        path, method = scope.rsplit("/", maxsplit=2)[-2:]
+        path = path.replace("~1", "/").replace("~0", "~")
+        full_path = self.get_full_path(path)
+        resolved_definition = self.resolver.resolve_all(data)
+        parent_ref, _ = reference.rsplit("/", maxsplit=1)
+        _, methods = self.resolver.resolve(parent_ref)
+        common_parameters = get_common_parameters(methods)
+        parameters = itertools.chain(resolved_definition.get("parameters", ()), common_parameters)
+        raw_definition = EndpointDefinition(data, scope)
+        return self.make_endpoint(full_path, method, parameters, resolved_definition, raw_definition)
+
 
 class SwaggerV20(BaseOpenAPISchema):
     nullable_name = "x-nullable"
     example_field = "x-example"
     operations: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
     security = SwaggerSecurityProcessor()
+    links_field = "x-links"
 
     @property
     def spec_version(self) -> str:
@@ -228,6 +280,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     example_field = "example"
     operations = SwaggerV20.operations + ("trace",)
     security = OpenAPISecurityProcessor()
+    links_field = "links"
 
     @property
     def spec_version(self) -> str:

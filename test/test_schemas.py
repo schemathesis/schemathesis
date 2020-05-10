@@ -110,3 +110,22 @@ def test_schema_parsing_error(simple_schema, error_type, validate_schema, expect
     with pytest.raises(expected_exception):
         schema = schemathesis.from_dict(raw_schema, validate_schema=validate_schema)
         list(schema.get_all_endpoints())
+
+
+RESPONSES = {"responses": {"200": {"description": "OK"}}}
+SCHEMA = {
+    "openapi": "3.0.2",
+    "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+    "paths": {
+        "/foo": {"get": {"operationId": "getFoo", **RESPONSES}, "post": {"operationId": "postFoo", **RESPONSES}},
+        "/bar": {"get": {"operationId": "getBar", **RESPONSES}, "post": {"operationId": "postBar", **RESPONSES}},
+    },
+}
+
+
+@pytest.mark.parametrize("operation_id, path, method", (("getFoo", "/foo", "GET"), ("postBar", "/bar", "POST"),))
+def test_get_endpoint_by_operation_id(operation_id, path, method):
+    schema = schemathesis.from_dict(SCHEMA)
+    endpoint = schema.get_endpoint_by_operation_id(operation_id)
+    assert endpoint.path == path
+    assert endpoint.method == method

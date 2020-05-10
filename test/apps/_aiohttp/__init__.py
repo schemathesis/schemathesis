@@ -53,6 +53,7 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Appli
         [web.get("/swagger.yaml", schema), web.get("/cookies", set_cookies)]
         + [web.route(item.value[0], item.value[1], wrapper(item.name)) for item in Endpoint]
     )
+    app["users"] = {}
     app["incoming_requests"] = incoming_requests
     app["schema_requests"] = schema_requests
     app["config"] = {"should_fail": True, "schema_data": make_schema(endpoints)}
@@ -61,6 +62,7 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Appli
 
 def reset_app(app: web.Application, endpoints: Tuple[str, ...] = ("success", "failure")) -> None:
     """Clean up all internal containers of the application and resets its config."""
+    app["users"].clear()
     app["incoming_requests"][:] = []
     app["schema_requests"][:] = []
     app["config"].update({"should_fail": True, "schema_data": make_schema(endpoints)})

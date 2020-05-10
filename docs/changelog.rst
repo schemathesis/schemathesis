@@ -10,6 +10,7 @@ Added
 ~~~~~
 
 - Support for YAML files in references via HTTP & HTTP schemas. `#600`_
+- Stateful testing support via ``Open API links`` syntax. `#548`_
 
 `1.6.3`_ - 2020-05-26
 ---------------------
@@ -1093,6 +1094,7 @@ Fixed
 .. _#566: https://github.com/kiwicom/schemathesis/issues/566
 .. _#562: https://github.com/kiwicom/schemathesis/issues/562
 .. _#559: https://github.com/kiwicom/schemathesis/issues/559
+.. _#548: https://github.com/kiwicom/schemathesis/issues/548
 .. _#546: https://github.com/kiwicom/schemathesis/issues/546
 .. _#542: https://github.com/kiwicom/schemathesis/issues/542
 .. _#540: https://github.com/kiwicom/schemathesis/issues/540

@@ -18,6 +18,7 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> Flask:
     app.config["incoming_requests"] = []
     app.config["schema_requests"] = []
     app.config["internal_exception"] = False
+    app.config["users"] = {}
 
     @app.before_request
     def store_request():
@@ -124,5 +125,29 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> Flask:
     @app.route("/api/invalid_path_parameter/<id>", methods=["GET"])
     def invalid_path_parameter(id):
         return jsonify({"success": True})
+
+    @app.route("/api/users/", methods=["POST"])
+    def create_user():
+        data = request.json
+        user_id = len(app.config["users"]) + 1
+        app.config["users"][user_id] = {**data, "id": user_id}
+        return jsonify({"id": user_id}), 201
+
+    @app.route("/api/users/<int:user_id>", methods=["GET"])
+    def get_user(user_id):
+        try:
+            user = app.config["users"][user_id]
+            return jsonify(user)
+        except KeyError:
+            return jsonify({"message": "Not found"}), 404
+
+    @app.route("/api/users/<int:user_id>", methods=["PATCH"])
+    def update_user(user_id):
+        try:
+            user = app.config["users"][user_id]
+            user["username"] = request.json["username"]
+            return jsonify(user)
+        except KeyError:
+            return jsonify({"message": "Not found"}), 404
 
     return app
