@@ -109,6 +109,33 @@ async def upload_file(request: web.Request) -> web.Response:
     return web.json_response({"size": request.content_length})
 
 
+async def create_user(request: web.Request) -> web.Response:
+    data = await request.json()
+    user_id = len(request.app["users"]) + 1
+    request.app["users"][user_id] = {**data, "id": user_id}
+    return web.json_response({"id": user_id}, status=201)
+
+
+async def get_user(request: web.Request) -> web.Response:
+    user_id = int(request.match_info["user_id"])
+    try:
+        user = request.app["users"][user_id]
+        return web.json_response(user)
+    except KeyError:
+        return web.json_response({"message": "Not found"}, status=404)
+
+
+async def update_user(request: web.Request) -> web.Response:
+    user_id = int(request.match_info["user_id"])
+    try:
+        user = request.app["users"][user_id]
+        data = await request.json()
+        user["username"] = data["username"]
+        return web.json_response(user)
+    except KeyError:
+        return web.json_response({"message": "Not found"}, status=404)
+
+
 get_payload = payload
 path_variable = success
 invalid = success

@@ -248,12 +248,12 @@ def complex_schema(testdir):
     return str(root)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def swagger_20(simple_schema):
     return schemathesis.from_dict(simple_schema)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def openapi_30():
     raw = make_schema("simple_openapi.yaml")
     return schemathesis.from_dict(raw)

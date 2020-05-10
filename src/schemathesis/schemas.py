@@ -8,7 +8,7 @@ Their responsibilities:
 They give only static definitions of endpoints.
 """
 from collections.abc import Mapping
-from typing import Any, Callable, Dict, Generator, Iterator, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, Iterator, Optional, Sequence, Tuple, Union
 
 import attr
 import hypothesis
@@ -18,8 +18,9 @@ from ._hypothesis import make_test_or_exception
 from .exceptions import InvalidSchema
 from .hooks import HookContext, HookDispatcher, HookLocation, HookScope, dispatch, warn_deprecated_hook
 from .models import Endpoint
+from .stateful import StatefulTest
 from .types import Filter, GenericTest, Hook, NotSet
-from .utils import NOT_SET, deprecated
+from .utils import NOT_SET, GenericResponse, deprecated
 
 
 @attr.s()  # pragma: no mutate
@@ -58,6 +59,12 @@ class BaseSchema(Mapping):
         return len(list(self.get_all_endpoints()))
 
     def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
+        raise NotImplementedError
+
+    def get_stateful_tests(
+        self, response: GenericResponse, endpoint: Endpoint, stateful: Optional[str]
+    ) -> Sequence[StatefulTest]:
+        """Get a list of additional tests, that should be executed after this response from the endpoint."""
         raise NotImplementedError
 
     def get_all_tests(

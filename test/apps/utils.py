@@ -26,6 +26,10 @@ class Endpoint(Enum):
     invalid_path_parameter = ("GET", "/api/invalid_path_parameter/{id}")
     headers = ("GET", "/api/headers")
 
+    create_user = ("POST", "/api/users/")
+    get_user = ("GET", "/api/users/{user_id}")
+    update_user = ("PATCH", "/api/users/{user_id}")
+
 
 def make_schema(endpoints: Tuple[str, ...]) -> Dict:
     """Generate a Swagger 2.0 schema with the given endpoints.
@@ -45,6 +49,12 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
         "paths": {},
         "securityDefinitions": {"api_key": {"type": "apiKey", "name": "X-Token", "in": "header"}},
     }
+
+    def add_link(name, definition):
+        components = template.setdefault("x-components", {})
+        links = components.setdefault("x-links", {})
+        links.setdefault(name, definition)
+
     for endpoint in endpoints:
         method, path = Endpoint[endpoint].value
         path = path.replace(template["basePath"], "")
@@ -152,6 +162,87 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
                     "default": {"description": "Default response"},
                 },
             }
+        elif endpoint == "create_user":
+            schema = {
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "body",
+                        "required": True,
+                        "schema": {
+                            "type": "object",
+                            "properties": {"username": {"type": "string", "minLength": 3}},
+                            "required": ["username"],
+                        },
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "OK",
+                        "x-links": {
+                            "GetUserByUserId": {
+                                "operationId": "getUser",
+                                "parameters": {
+                                    "path.user_id": "$response.body#/id",
+                                    "query.user_id": "$response.body#/id",
+                                },
+                            },
+                            "UpdateUserById": {"$ref": "#/x-components/x-links/UpdateUserById"},
+                        },
+                    }
+                },
+            }
+            add_link(
+                "UpdateUserById",
+                {
+                    "operationId": "updateUser",
+                    "parameters": {"user_id": "$response.body#/id"},
+                    "requestBody": {"username": "foo"},
+                },
+            )
+        elif endpoint == "get_user":
+            schema = {
+                "operationId": "getUser",
+                "parameters": [
+                    {"in": "path", "name": "user_id", "required": True, "type": "integer"},
+                    {"in": "query", "name": "code", "required": True, "type": "integer"},
+                    {"in": "query", "name": "user_id", "required": True, "type": "integer"},
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "x-links": {
+                            "UpdateUserById": {
+                                "operationRef": "#/paths/~1users~1{user_id}/patch",
+                                "parameters": {"user_id": "$response.body#/id"},
+                                "requestBody": {"username": "foo"},
+                            }
+                        },
+                    },
+                    "404": {"description": "Not found"},
+                },
+            }
+        elif endpoint == "update_user":
+            schema = {
+                "operationId": "updateUser",
+                "parameters": [
+                    {"in": "path", "name": "user_id", "required": True, "type": "integer"},
+                    {
+                        "in": "body",
+                        "name": "username",
+                        "required": True,
+                        "schema": {
+                            "additionalProperties": False,
+                            "type": "object",
+                            "properties": {"username": {"type": "string"}},
+                            "required": ["username"],
+                        },
+                    },
+                ],
+                "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+            }
+            paths = template["paths"].setdefault(path, {})
+            paths["parameters"] = [{"in": "query", "name": "common", "required": True, "type": "integer"}]
         else:
             schema = {
                 "responses": {
@@ -166,5 +257,6 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
                     "default": {"description": "Default response"},
                 }
             }
-        template["paths"][path] = {method.lower(): schema}
+        template["paths"].setdefault(path, {})
+        template["paths"][path][method.lower()] = schema
     return template
