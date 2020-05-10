@@ -188,6 +188,7 @@ def execute_from_schema(
                     auth_type=auth_type,
                     headers=headers,
                     seed=seed,
+                    workers_num=workers_num,
                     request_timeout=request_timeout,
                     exit_first=exit_first,
                     store_interactions=store_interactions,
