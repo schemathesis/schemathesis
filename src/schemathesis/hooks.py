@@ -183,32 +183,32 @@ all_scopes = HookDispatcher.register_spec(list(HookScope))
 
 
 @all_scopes
-def before_generate_path_parameters(strategy: st.SearchStrategy, context: HookContext) -> st.SearchStrategy:
+def before_generate_path_parameters(context: HookContext, strategy: st.SearchStrategy) -> st.SearchStrategy:
     """Called on a strategy that generates values for ``path_parameters``."""
 
 
 @all_scopes
-def before_generate_headers(strategy: st.SearchStrategy, context: HookContext) -> st.SearchStrategy:
+def before_generate_headers(context: HookContext, strategy: st.SearchStrategy) -> st.SearchStrategy:
     """Called on a strategy that generates values for ``headers``."""
 
 
 @all_scopes
-def before_generate_cookies(strategy: st.SearchStrategy, context: HookContext) -> st.SearchStrategy:
+def before_generate_cookies(context: HookContext, strategy: st.SearchStrategy) -> st.SearchStrategy:
     """Called on a strategy that generates values for ``cookies``."""
 
 
 @all_scopes
-def before_generate_query(strategy: st.SearchStrategy, context: HookContext) -> st.SearchStrategy:
+def before_generate_query(context: HookContext, strategy: st.SearchStrategy) -> st.SearchStrategy:
     """Called on a strategy that generates values for ``query``."""
 
 
 @all_scopes
-def before_generate_body(strategy: st.SearchStrategy, context: HookContext) -> st.SearchStrategy:
+def before_generate_body(context: HookContext, strategy: st.SearchStrategy) -> st.SearchStrategy:
     """Called on a strategy that generates values for ``body``."""
 
 
 @all_scopes
-def before_generate_form_data(strategy: st.SearchStrategy, context: HookContext) -> st.SearchStrategy:
+def before_generate_form_data(context: HookContext, strategy: st.SearchStrategy) -> st.SearchStrategy:
     """Called on a strategy that generates values for ``form_data``."""
 
 
