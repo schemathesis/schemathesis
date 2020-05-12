@@ -781,6 +781,23 @@ def test_pre_run_hook_invalid(testdir, cli):
     assert lines[9] == "Aborted!"
 
 
+def test_pre_run_hook_module_not_found(testdir, cli):
+    import os, sys
+
+    testdir.makepyfile(hook="1 / 0")
+    result = cli.main("--pre-run", "hook", "run", "http://127.0.0.1:1")
+
+    assert os.getcwd() in sys.path
+
+    # Then CLI run should fail
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    assert "ModuleNotFoundError" not in result.stdout
+    lines = result.stdout.strip().split("\n")
+    assert lines[0] == "An exception happened during the hook loading:"
+    assert lines[7] == "ZeroDivisionError: division by zero"
+    assert lines[9] == "Aborted!"
+
+
 @pytest.fixture()
 def new_check(testdir, cli):
     module = testdir.make_importable_pyfile(
