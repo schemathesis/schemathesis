@@ -1,19 +1,15 @@
 - name: Fix it now
   pattern: "[fF][iI][xX][mM][eE]"
-  filename:
-    - "*.py"
+  filePattern: ".*.py$"
 
 - name: IPython debug leftover
   pattern: "IPython\\.embed()"
-  filename:
-    - "*.py"
+  filePattern: ".*.py$"
 
 - name: Leftover print
   pattern: "print\\("
-  filename:
-    - ^(?!.*conftest).*\.py$
+  filePattern: ^(?!.*conftest).*\.py$
 
 - name: Use relative imports
   pattern: "import schemathesis|from schemathesis"
-  filename:
-    - "src/**.py"
+  filePattern: "src/.*.py$"
