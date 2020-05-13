@@ -3,11 +3,6 @@
   filename:
     - "*.py"
 
-- name: No sys.path changes
-  pattern: "sys\\.path\\.append|sys\\.path\\.insert"
-  filename:
-    - "src/**.py"
-
 - name: IPython debug leftover
   pattern: "IPython\\.embed()"
   filename:

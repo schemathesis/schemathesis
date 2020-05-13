@@ -282,7 +282,7 @@ def get_output_handler(workers_num: int) -> EventHandler:
 def load_hook(module_name: str) -> None:
     """Load the given hook by importing it."""
     try:
-        sys.path.extend([os.getcwd()])  # fix ModuleNotFoundError  module in cwd
+        sys.path.append(os.getcwd())  # fix ModuleNotFoundError module in cwd
         __import__(module_name)
     except Exception:
         click.secho("An exception happened during the hook loading:\n", fg="red")
