@@ -3,6 +3,11 @@
 Changelog
 =========
 
+Changed
+~~~~~~~
+
+- Look at the current working directory when loading hooks for CLI. `#586`_
+
 `Unreleased`_
 -------------
 
@@ -1051,6 +1056,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#586: https://github.com/kiwicom/schemathesis/issues/586
 .. _#579: https://github.com/kiwicom/schemathesis/issues/579
 .. _#575: https://github.com/kiwicom/schemathesis/issues/575
 .. _#571: https://github.com/kiwicom/schemathesis/issues/571

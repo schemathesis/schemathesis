@@ -1,6 +1,8 @@
 import base64
 import json
+import os
 import pathlib
+import sys
 import time
 from test.utils import HERE, SIMPLE_PATH
 from urllib.parse import urljoin
@@ -782,8 +784,6 @@ def test_pre_run_hook_invalid(testdir, cli):
 
 
 def test_pre_run_hook_module_not_found(testdir, cli):
-    import os, sys
-
     testdir.makepyfile(hook="1 / 0")
     result = cli.main("--pre-run", "hook", "run", "http://127.0.0.1:1")
 
