@@ -12,6 +12,7 @@ from requests.auth import HTTPDigestAuth, _basic_auth_str
 from ..._hypothesis import make_test_or_exception
 from ...constants import USER_AGENT
 from ...exceptions import InvalidSchema, get_grouped_exception
+from ...hooks import HookContext, get_all_by_name
 from ...models import Case, CheckFunction, Endpoint, Status, TestResult, TestResultSet
 from ...runner import events
 from ...schemas import BaseSchema
@@ -218,6 +219,13 @@ def run_targets(targets: Iterable[Target], elapsed: float) -> None:
             hypothesis.target(elapsed, label="response_time")
 
 
+def add_cases(case: Case, test: Callable, *args: Any) -> None:
+    context = HookContext(case.endpoint)
+    for case_hook in get_all_by_name("add_case"):
+        _case = case_hook(context, case.partial_deepcopy())
+        test(_case, *args)
+
+
 def network_test(
     case: Case,
     checks: Iterable[CheckFunction],
@@ -234,6 +242,22 @@ def network_test(
     headers = headers or {}
     headers.setdefault("User-Agent", USER_AGENT)
     timeout = prepare_timeout(request_timeout)
+    _network_test(case, checks, targets, result, session, timeout, store_interactions, headers, feedback)
+    add_cases(case, _network_test, checks, targets, result, session, timeout, store_interactions, headers, feedback)
+
+
+def _network_test(
+    case: Case,
+    checks: Iterable[CheckFunction],
+    targets: Iterable[Target],
+    result: TestResult,
+    session: requests.Session,
+    timeout: Optional[float],
+    store_interactions: bool,
+    headers: Optional[Dict[str, Any]],
+    feedback: Feedback,
+) -> None:
+    # pylint: disable=too-many-arguments
     response = case.call(session=session, headers=headers, timeout=timeout)
     run_targets(targets, response.elapsed.total_seconds())
     if store_interactions:
@@ -271,6 +295,20 @@ def wsgi_test(
 ) -> None:
     # pylint: disable=too-many-arguments
     headers = _prepare_wsgi_headers(headers, auth, auth_type)
+    _wsgi_test(case, checks, targets, result, headers, store_interactions, feedback)
+    add_cases(case, _wsgi_test, checks, targets, result, headers, store_interactions, feedback)
+
+
+def _wsgi_test(
+    case: Case,
+    checks: Iterable[CheckFunction],
+    targets: Iterable[Target],
+    result: TestResult,
+    headers: Dict[str, Any],
+    store_interactions: bool,
+    feedback: Feedback,
+) -> None:
+    # pylint: disable=too-many-arguments
     with catching_logs(LogCaptureHandler(), level=logging.DEBUG) as recorded:
         start = time.monotonic()
         response = case.call_wsgi(headers=headers)

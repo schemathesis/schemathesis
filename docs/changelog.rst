@@ -11,6 +11,7 @@ Added
 
 - Support for YAML files in references via HTTP & HTTP schemas. `#600`_
 - Stateful testing support via ``Open API links`` syntax. `#548`_
+- New ``add_case`` hook. `#458`_
 
 Changed
 ~~~~~~~
@@ -1124,6 +1125,7 @@ Fixed
 .. _#468: https://github.com/kiwicom/schemathesis/issues/468
 .. _#463: https://github.com/kiwicom/schemathesis/issues/463
 .. _#461: https://github.com/kiwicom/schemathesis/issues/461
+.. _#458: https://github.com/kiwicom/schemathesis/issues/458
 .. _#457: https://github.com/kiwicom/schemathesis/issues/457
 .. _#451: https://github.com/kiwicom/schemathesis/issues/451
 .. _#450: https://github.com/kiwicom/schemathesis/issues/450

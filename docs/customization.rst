@@ -188,3 +188,19 @@ With this simple handler only ``Done!`` will be displayed at the end of the test
 - Store logs in a custom format
 - Change the output visual style
 - Display additional information in the output
+
+``add_case``
+~~~~~~~~~~~~
+
+For each ``add_case`` hook and for each endpoint, we create an additional, duplicate test case. We pass the Case object from the duplicate test to the ``add_case`` hook.
+The user may change the Case object (and therefore the request data) before the request is sent to the server. The ``add_case`` allows the user to target specific
+behavior in the API by changing specific details of the duplicate request.
+
+.. code:: python
+
+    def add_case(context: HookContext, case: Case) -> Case:
+        case.headers["Content-Type"] = "application/json"
+        return case
+
+Note: A partial deep copy of the ``Case`` object is passed to each ``add_case`` hook. ``Case.endpoint.app`` is a reference to the original ``app``, 
+and ``Case.endpoint.schema`` is a shallow copy, so changes to these fields will be reflected in other tests.

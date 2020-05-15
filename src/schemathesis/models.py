@@ -4,6 +4,7 @@ import datetime
 import http
 from collections import Counter
 from contextlib import contextmanager
+from copy import deepcopy
 from enum import IntEnum
 from logging import LogRecord
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple, Union, cast
@@ -198,6 +199,17 @@ class Case:
         prepared = requests.Session().prepare_request(request)  # type: ignore
         return prepared.url
 
+    def partial_deepcopy(self) -> "Case":
+        return self.__class__(
+            endpoint=self.endpoint.partial_deepcopy(),
+            path_parameters=deepcopy(self.path_parameters),
+            headers=deepcopy(self.headers),
+            cookies=deepcopy(self.cookies),
+            query=deepcopy(self.query),
+            body=deepcopy(self.body),
+            form_data=deepcopy(self.form_data),
+        )
+
 
 def is_multipart(item: Optional[Body]) -> bool:
     """A poor detection if the body should be a multipart request.
@@ -274,6 +286,22 @@ class Endpoint:
 
     def get_stateful_tests(self, response: GenericResponse, stateful: Optional[str]) -> Sequence["StatefulTest"]:
         return self.schema.get_stateful_tests(response, self, stateful)
+
+    def partial_deepcopy(self) -> "Endpoint":
+        return self.__class__(
+            path=self.path,  # string, immutable
+            method=self.method,  # string, immutable
+            definition=deepcopy(self.definition),
+            schema=self.schema.clone(),  # shallow copy
+            app=self.app,  # not deepcopyable
+            base_url=self.base_url,  # string, immutable
+            path_parameters=deepcopy(self.path_parameters),
+            headers=deepcopy(self.path_parameters),
+            cookies=deepcopy(self.cookies),
+            query=deepcopy(self.query),
+            body=deepcopy(self.body),
+            form_data=deepcopy(self.form_data),
+        )
 
 
 class Status(IntEnum):
