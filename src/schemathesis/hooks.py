@@ -230,6 +230,14 @@ def before_add_examples(context: HookContext, examples: List[Case]) -> None:
     """
 
 
+@HookDispatcher.register_spec([HookScope.GLOBAL])
+def add_case(context: HookContext, case: Case) -> Case:
+    """Creates an additional test per endpoint.
+
+    Called before request is sent with a copy of the original case object.
+    """
+
+
 GLOBAL_HOOK_DISPATCHER = HookDispatcher(scope=HookScope.GLOBAL)
 dispatch = GLOBAL_HOOK_DISPATCHER.dispatch
 get_all_by_name = GLOBAL_HOOK_DISPATCHER.get_all_by_name

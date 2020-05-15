@@ -1,3 +1,4 @@
+from copy import deepcopy
 from test.utils import SIMPLE_PATH
 
 import pytest
@@ -56,6 +57,36 @@ def test_call(override, base_url, swagger_20):
     with pytest.warns(None) as records:
         del response
     assert not records
+
+
+def test_case_partial_deepcopy(swagger_20):
+    endpoint = Endpoint("/example/path", "GET", {}, swagger_20)
+    original_case = Case(
+        endpoint=endpoint,
+        path_parameters={"test": "test"},
+        headers={"Content-Type": "application/json"},
+        cookies={"TOKEN": "secret"},
+        query={"a": 1},
+        body={"b": 1},
+        form_data={"first": "John", "last": "Doe"},
+    )
+
+    copied_case = original_case.partial_deepcopy()
+    copied_case.endpoint.path = "/overwritten/path"
+    copied_case.path_parameters["test"] = "overwritten"
+    copied_case.headers["Content-Type"] = "overwritten"
+    copied_case.cookies["TOKEN"] = "overwritten"
+    copied_case.query["a"] = "overwritten"
+    copied_case.body["b"] = "overwritten"
+    copied_case.form_data["first"] = "overwritten"
+
+    assert original_case.endpoint.path == "/example/path"
+    assert original_case.path_parameters["test"] == "test"
+    assert original_case.headers["Content-Type"] == "application/json"
+    assert original_case.cookies["TOKEN"] == "secret"
+    assert original_case.query["a"] == 1
+    assert original_case.body["b"] == 1
+    assert original_case.form_data["first"] == "John"
 
 
 schema = schemathesis.from_path(SIMPLE_PATH)
