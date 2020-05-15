@@ -18,6 +18,7 @@ from schemathesis import Case, fixups
 from schemathesis._compat import metadata
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.cli import reset_checks
+from schemathesis.hooks import unregister_all
 from schemathesis.loaders import from_uri
 from schemathesis.models import Endpoint
 from schemathesis.runner import DEFAULT_CHECKS, DEFAULT_TARGETS
@@ -801,6 +802,133 @@ def test_pre_run_hook_module_not_found(testdir, cli):
     assert lines[0] == "An exception happened during the hook loading:"
     assert lines[7] == "ZeroDivisionError: division by zero"
     assert lines[9] == "Aborted!"
+
+
+@pytest.mark.usefixtures("reset_hooks")
+def test_add_case(testdir, cli, schema_url):
+    module = testdir.make_importable_pyfile(
+        hook="""
+            import schemathesis
+            import click
+
+            @schemathesis.hooks.register
+            def add_case(context, case):
+                if not case.headers:
+                    case.headers = {}
+                case.headers["copy"] = "this is a copied case"
+                return case
+
+            @schemathesis.register_check
+            def add_case_check(response, case):
+                if case.headers and case.headers.get("copy") == "this is a copied case":
+                    # we will look for this output
+                    click.echo("The case was added!")
+            """
+    )
+
+    result = cli.main(
+        "--pre-run", module.purebasename, "run", "-c", "add_case_check", schema_url, "--hypothesis-max-examples=1"
+    )
+
+    assert result.exit_code == ExitCode.OK
+    # One additional case created for two endpoints - /api/failure and /api/success.
+    assert result.stdout.count("The case was added!") == 2
+
+
+@pytest.mark.usefixtures("reset_hooks")
+def test_multiple_add_case_hooks(testdir, cli, schema_url):
+    """add_case hooks that mutate the case in place should not affect other cases."""
+
+    module = testdir.make_importable_pyfile(
+        hook="""
+            import schemathesis
+            import click
+
+            @schemathesis.hooks.register("add_case")
+            def add_first_header(context, case):
+                if not case.headers:
+                    case.headers = {}
+                case.headers["first"] = "first header"
+                return case
+
+            @schemathesis.hooks.register("add_case")
+            def add_second_header(context, case):
+                if not case.headers:
+                    case.headers = {}
+                case.headers["second"] = "second header"
+                return case
+
+            @schemathesis.register_check
+            def add_case_check(response, case):
+                if case.headers and case.headers.get("first") == "first header":
+                    # we will look for this output
+                    click.echo("First case added!")
+                if case.headers and case.headers.get("second") == "second header":
+                    # we will look for this output
+                    click.echo("Second case added!")
+            """
+    )
+
+    result = cli.main(
+        "--pre-run", module.purebasename, "run", "-c", "add_case_check", schema_url, "--hypothesis-max-examples=1"
+    )
+
+    assert result.exit_code == ExitCode.OK
+    # Each header should only be duplicated once for each endpoint - /api/failure and /api/success.
+    assert result.stdout.count("First case added!") == 2
+    assert result.stdout.count("Second case added!") == 2
+
+
+@pytest.mark.usefixtures("reset_hooks")
+def test_add_case_output(testdir, cli, schema_url):
+    module = testdir.make_importable_pyfile(
+        hook="""
+            import schemathesis
+            import click
+
+            @schemathesis.hooks.register("add_case")
+            def add_first_header(context, case):
+                if not case.headers:
+                    case.headers = {}
+                case.headers["first"] = "first header"
+                return case
+
+            @schemathesis.hooks.register("add_case")
+            def add_second_header(context, case):
+                if not case.headers:
+                    case.headers = {}
+                case.headers["second"] = "second header"
+                return case
+
+            @schemathesis.register_check
+            def add_case_check(response, case):
+                if (
+                    case.headers and
+                    (
+                        case.headers.get("second") == "second header"
+                    )
+                ):
+                    assert False, "failing cases from second add_case hook"
+            """
+    )
+
+    result = cli.main(
+        "--pre-run", module.purebasename, "run", "-c", "add_case_check", schema_url, "--hypothesis-max-examples=1"
+    )
+
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    assert result.stdout.count("failing cases from second add_case hook") == 2
+    add_case_check_line = next(
+        filter(lambda line: line.strip().startswith("add_case_check"), result.stdout.split("\n"))
+    )
+    assert "8 / 12" in add_case_check_line
+
+
+@pytest.fixture
+def reset_hooks():
+    yield
+    unregister_all()
+    reset_checks()
 
 
 @pytest.fixture()
