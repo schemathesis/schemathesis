@@ -15,6 +15,7 @@ def make_endpoint(schema, **kwargs) -> Endpoint:
 
 
 @pytest.mark.parametrize("name", sorted(PARAMETERS))
+@pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_get_examples(name, swagger_20):
     example = {"name": "John"}
     endpoint = make_endpoint(
@@ -29,9 +30,10 @@ def test_get_examples(name, swagger_20):
             }
         },
     )
-    assert get_example(endpoint) == Case(endpoint, **{name: example})
+    assert get_example(endpoint).example() == Case(endpoint, **{name: example})
 
 
+@pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_no_body_in_get(swagger_20):
     endpoint = Endpoint(
         path="/api/success",
@@ -46,7 +48,7 @@ def test_no_body_in_get(swagger_20):
             "example": {"name": "John"},
         },
     )
-    assert get_example(endpoint).body is None
+    assert get_example(endpoint).example().body is None
 
 
 def test_invalid_body_in_get(swagger_20):
@@ -79,14 +81,6 @@ def test_invalid_body_in_get_disable_validation(simple_schema):
         assert case.body is not None
 
     test()
-
-
-def test_warning(swagger_20):
-    example = {"name": "John"}
-    endpoint = make_endpoint(swagger_20, query={"example": example})
-    with pytest.warns(None) as record:
-        assert get_example(endpoint) == Case(endpoint, query=example)
-    assert not record
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
