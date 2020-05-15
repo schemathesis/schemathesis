@@ -3,6 +3,12 @@
 Changelog
 =========
 
+`Unreleased`_
+-------------
+
+`1.6.2`_ - 2020-05-15
+---------------------
+
 Fixed
 ~~~~~
 
@@ -15,9 +21,6 @@ Changed
 ~~~~~~~
 
 - Look at the current working directory when loading hooks for CLI. `#586`_
-
-`Unreleased`_
--------------
 
 `1.6.0`_ - 2020-05-10
 ---------------------
@@ -986,7 +989,8 @@ Fixed
 
 - Initial public release
 
-.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v1.6.1...HEAD
+.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v1.6.2...HEAD
+.. _1.6.2: https://github.com/kiwicom/schemathesis/compare/v1.6.1...v1.6.2
 .. _1.6.1: https://github.com/kiwicom/schemathesis/compare/v1.6.0...v1.6.1
 .. _1.6.0: https://github.com/kiwicom/schemathesis/compare/v1.5.1...v1.6.0
 .. _1.5.1: https://github.com/kiwicom/schemathesis/compare/v1.5.0...v1.5.1
