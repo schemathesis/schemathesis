@@ -3,6 +3,11 @@
 Changelog
 =========
 
+Fixed
+~~~~~
+
+- Partially generated explicit examples are always valid and can be used in requests. `#582`_
+
 `1.6.1`_ - 2020-05-13
 ---------------------
 
@@ -1061,6 +1066,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#586: https://github.com/kiwicom/schemathesis/issues/586
+.. _#582: https://github.com/kiwicom/schemathesis/issues/582
 .. _#579: https://github.com/kiwicom/schemathesis/issues/579
 .. _#575: https://github.com/kiwicom/schemathesis/issues/575
 .. _#571: https://github.com/kiwicom/schemathesis/issues/571

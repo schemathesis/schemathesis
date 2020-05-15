@@ -4,7 +4,7 @@ import inspect
 import re
 from base64 import b64encode
 from functools import partial
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import quote_plus
 
 import hypothesis
@@ -13,7 +13,6 @@ from hypothesis_jsonschema import from_schema
 from requests.auth import _basic_auth_str
 
 from . import utils
-from ._compat import handle_warnings
 from .exceptions import InvalidSchema
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import Case, Endpoint
@@ -72,27 +71,29 @@ def make_async_test(test: Callable) -> Callable:
     return async_run
 
 
-def get_example(endpoint: Endpoint) -> Optional[Case]:
+def get_example(endpoint: Endpoint) -> Optional[st.SearchStrategy[Case]]:
     static_parameters = {}
     for name in PARAMETERS:
         parameter = getattr(endpoint, name)
         if parameter is not None and "example" in parameter:
             static_parameters[name] = parameter["example"]
     if static_parameters:
-        with handle_warnings():
-            strategies = {
-                other: from_schema(getattr(endpoint, other))
-                for other in PARAMETERS - set(static_parameters)
-                if getattr(endpoint, other) is not None
-            }
-            return _get_case_strategy(endpoint, static_parameters, strategies).example()
+        strategies = {
+            parameter: prepare_strategy(parameter, getattr(endpoint, parameter))
+            for parameter in PARAMETERS - set(static_parameters)
+            if getattr(endpoint, parameter) is not None
+        }
+        return _get_case_strategy(endpoint, static_parameters, strategies)
     return None
 
 
 def add_examples(test: Callable, endpoint: Endpoint, hook_dispatcher: Optional[HookDispatcher] = None) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
-    example = get_example(endpoint)
-    examples = [] if example is None else [example]
+    strategy = get_example(endpoint)
+    if strategy is not None:
+        examples = get_single_example(strategy)
+    else:
+        examples = []
     context = HookContext(endpoint)  # context should be passed here instead
     GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, examples)
     endpoint.schema.hooks.dispatch("before_add_examples", context, examples)
@@ -101,6 +102,24 @@ def add_examples(test: Callable, endpoint: Endpoint, hook_dispatcher: Optional[H
     for example in examples:
         test = hypothesis.example(case=example)(test)
     return test
+
+
+def get_single_example(strategy: st.SearchStrategy[Case]) -> List[Case]:
+    @hypothesis.given(strategy)  # type: ignore
+    @hypothesis.settings(  # type: ignore
+        database=None,
+        max_examples=1,
+        deadline=None,
+        verbosity=hypothesis.Verbosity.quiet,
+        phases=(hypothesis.Phase.generate,),
+        suppress_health_check=hypothesis.HealthCheck.all(),
+    )
+    def example_generating_inner_function(ex: Case) -> None:
+        examples.append(ex)
+
+    examples: List[Case] = []
+    example_generating_inner_function()
+    return examples
 
 
 def is_valid_header(headers: Dict[str, str]) -> bool:
@@ -139,21 +158,22 @@ def get_case_strategy(endpoint: Endpoint, hooks: Optional[HookDispatcher] = None
         for parameter in PARAMETERS:
             value = getattr(endpoint, parameter)
             if value is not None:
-                if parameter == "path_parameters":
-                    strategies[parameter] = (
-                        from_schema(value).filter(filter_path_parameters).map(quote_all)  # type: ignore
-                    )
-                elif parameter in ("headers", "cookies"):
-                    strategies[parameter] = from_schema(value).filter(is_valid_header)  # type: ignore
-                elif parameter == "query":
-                    strategies[parameter] = from_schema(value).filter(is_valid_query)  # type: ignore
-                else:
-                    strategies[parameter] = from_schema(value)  # type: ignore
+                strategies[parameter] = prepare_strategy(parameter, value)
             else:
                 static_kwargs[parameter] = None
         return _get_case_strategy(endpoint, static_kwargs, strategies, hooks)
     except AssertionError:
         raise InvalidSchema("Invalid schema for this endpoint")
+
+
+def prepare_strategy(parameter: str, value: Dict[str, Any]) -> st.SearchStrategy:
+    if parameter == "path_parameters":
+        return from_schema(value).filter(filter_path_parameters).map(quote_all)  # type: ignore
+    if parameter in ("headers", "cookies"):
+        return from_schema(value).filter(is_valid_header)  # type: ignore
+    if parameter == "query":
+        return from_schema(value).filter(is_valid_query)  # type: ignore
+    return from_schema(value)  # type: ignore
 
 
 def filter_path_parameters(parameters: Dict[str, Any]) -> bool:
