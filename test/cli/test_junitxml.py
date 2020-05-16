@@ -10,7 +10,7 @@ def test_junitxml_option(cli, schema_url, tmp_path):
     xml_path = tmp_path / "junit.xml"
     result = cli.run(schema_url, f"--junit-xml={xml_path}", "--hypothesis-max-examples=2", "--hypothesis-seed=1")
     # Command executed successfully
-    assert result.exit_code == ExitCode.OK
+    assert result.exit_code == ExitCode.OK, result.stdout
     # File is created
     assert xml_path.exists()
     # And contains valid xml

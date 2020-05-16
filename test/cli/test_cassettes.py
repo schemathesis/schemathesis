@@ -25,7 +25,7 @@ def test_store_cassette(cli, schema_url, cassette_path):
     result = cli.run(
         schema_url, f"--store-network-log={cassette_path}", "--hypothesis-max-examples=2", "--hypothesis-seed=1"
     )
-    assert result.exit_code == ExitCode.OK
+    assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) == 3
     assert cassette["http_interactions"][0]["id"] == "1"
@@ -66,7 +66,7 @@ def test_main_process_error(cli, schema_url, cassette_path):
     result = cli.run(
         schema_url, f"--store-network-log={cassette_path}", "--hypothesis-max-examples=1", "--hypothesis-seed=1"
     )
-    assert result.exit_code == ExitCode.TESTS_FAILED
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then there should be no hanging threads
     # And no cassette
     cassette = load_cassette(cassette_path)
@@ -83,13 +83,13 @@ async def test_replay(cli, schema_url, app, reset_app, cassette_path):
         "--hypothesis-seed=1",
         "--validate-schema=false",
     )
-    assert result.exit_code == ExitCode.TESTS_FAILED
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # these requests are not needed
     reset_app()
     assert not app["incoming_requests"]
     # When a valid cassette is replayed
     result = cli.replay(str(cassette_path))
-    assert result.exit_code == ExitCode.OK
+    assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
     interactions = cassette["http_interactions"]
     # Then there should be the same number of requests made to the app as there are in the cassette
