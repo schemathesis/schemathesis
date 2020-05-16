@@ -39,6 +39,6 @@ def test_custom_cli_handlers(testdir, cli, schema_url, app):
     result = cli.main("--pre-run", module.purebasename, "run", schema_url)
 
     # Then CLI should run successfully
-    assert result.exit_code == ExitCode.OK
+    assert result.exit_code == ExitCode.OK, result.stdout
     # And the output should contain only the input from the new handler
     assert result.stdout.strip() == "Done!"
