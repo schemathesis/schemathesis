@@ -1163,3 +1163,12 @@ def test_fast_api_fixup(testdir, cli, base_url, fast_api_schema, fast_api_fixup,
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(fast_api_schema))
     result = cli.run(str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=1", f"--fixups={fixup}")
     assert result.exit_code == ExitCode.OK, result.stdout
+
+
+@pytest.mark.endpoints("success")
+def test_colon_in_headers(cli, schema_url, app):
+    header = "X-FOO"
+    value = "bar:spam"
+    result = cli.run(schema_url, f"--header={header}:{value}")
+    assert result.exit_code == ExitCode.OK
+    assert app["incoming_requests"][0].headers[header] == value

@@ -78,7 +78,7 @@ def validate_headers(
     headers = {}
     for header in raw_value:
         with reraise_format_error(header):
-            key, value = header.split(":")
+            key, value = header.split(":", maxsplit=1)
         value = value.lstrip()
         key = key.strip()
         if not key:
