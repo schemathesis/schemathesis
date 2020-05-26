@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Support for a colon symbol (``:``) inside of a header value passed via CLI. `#596`_
+
 `1.6.2`_ - 2020-05-15
 ---------------------
 
@@ -1069,6 +1074,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#596: https://github.com/kiwicom/schemathesis/issues/596
 .. _#586: https://github.com/kiwicom/schemathesis/issues/586
 .. _#582: https://github.com/kiwicom/schemathesis/issues/582
 .. _#579: https://github.com/kiwicom/schemathesis/issues/579
