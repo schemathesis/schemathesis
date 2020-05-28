@@ -31,9 +31,8 @@ def create_test(
     wrapped_test = hypothesis.given(case=strategy)(test)
     if seed is not None:
         wrapped_test = hypothesis.seed(seed)(wrapped_test)
-    original_test = get_original_test(test)
-    if asyncio.iscoroutinefunction(original_test):
-        wrapped_test.hypothesis.inner_test = make_async_test(original_test)  # type: ignore
+    if asyncio.iscoroutinefunction(test):
+        wrapped_test.hypothesis.inner_test = make_async_test(test)  # type: ignore
     if settings is not None:
         wrapped_test = settings(wrapped_test)
     return add_examples(wrapped_test, endpoint, hook_dispatcher=hook_dispatcher)
@@ -46,19 +45,6 @@ def make_test_or_exception(
         return create_test(endpoint, func, settings, seed=seed)
     except InvalidSchema as exc:
         return exc
-
-
-def get_original_test(test: Callable) -> Callable:
-    """Get the original test function even if it is wrapped by `hypothesis.settings` decorator.
-
-    Applies only to Hypothesis pre 4.42.4 versions.
-    """
-    # `settings` decorator is applied
-    if getattr(test, "_hypothesis_internal_settings_applied", False) and hypothesis.__version_info__ < (4, 42, 4):
-        # This behavior was changed due to a bug - https://github.com/HypothesisWorks/hypothesis/issues/2160
-        # And since Hypothesis 4.42.4 is no longer required
-        return test._hypothesis_internal_test_function_without_warning  # type: ignore
-    return test
 
 
 def make_async_test(test: Callable) -> Callable:

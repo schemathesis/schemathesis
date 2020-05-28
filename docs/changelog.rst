@@ -12,6 +12,13 @@ Added
 - Support for YAML files in references via HTTP & HTTP schemas. `#600`_
 - Stateful testing support via ``Open API links`` syntax. `#548`_
 
+Changed
+~~~~~~~
+
+- The minimum required versions for ``Hypothesis`` and ``hypothesis-jsonschema`` are ``5.15.0`` and ``0.11.1`` respectively.
+  The main reason is `this fix <https://github.com/HypothesisWorks/hypothesis/commit/4c7f3fbc55b294f13a503b2d2af0d3221fd37938>`_ that is
+  required for stability of Open API links feature when is executed in multiple threads.
+
 `1.6.3`_ - 2020-05-26
 ---------------------
 
