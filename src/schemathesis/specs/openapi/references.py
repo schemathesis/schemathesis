@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, List, Tuple, Union, overload
 from urllib.request import urlopen
 
 import jsonschema
+import requests
 import yaml
 
 from ...utils import StringDatesYAMLLoader, traverse_schema
@@ -31,6 +32,12 @@ def load_file_uri(location: str) -> Dict[str, Any]:
     return load_file_impl(location, urlopen)
 
 
+def load_remote_uri(uri: str) -> Any:
+    """Load the resource and parse it as YAML / JSON."""
+    response = requests.get(uri)
+    return yaml.load(response.content, StringDatesYAMLLoader)
+
+
 class ConvertingResolver(jsonschema.RefResolver):
     """A custom resolver converts resolved OpenAPI schemas to JSON Schema.
 
@@ -39,7 +46,9 @@ class ConvertingResolver(jsonschema.RefResolver):
     """
 
     def __init__(self, *args: Any, nullable_name: Any, **kwargs: Any) -> None:
-        kwargs.setdefault("handlers", {"file": load_file_uri, "": load_file})
+        kwargs.setdefault(
+            "handlers", {"file": load_file_uri, "": load_file, "http": load_remote_uri, "https": load_remote_uri}
+        )
         super().__init__(*args, **kwargs)
         self.nullable_name = nullable_name
 

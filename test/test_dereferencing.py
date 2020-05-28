@@ -524,3 +524,9 @@ def test_complex_dereference(testdir, complex_schema):
         },
         schema=schema,
     )
+
+
+def test_remote_reference_to_yaml(swagger_20, schema_url):
+    scope, resolved = swagger_20.resolver.resolve(f"{schema_url}#/info/title")
+    assert scope.endswith("#/info/title")
+    assert resolved == "Example API"
