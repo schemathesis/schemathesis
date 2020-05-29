@@ -65,7 +65,9 @@ def get_example(endpoint: Endpoint) -> Optional[st.SearchStrategy[Case]]:
             static_parameters[name] = parameter["example"]
     if static_parameters:
         strategies = {
-            parameter: prepare_strategy(parameter, getattr(endpoint, parameter))
+            parameter: prepare_strategy(
+                parameter, getattr(endpoint, parameter), endpoint.get_hypothesis_conversions(parameter)
+            )
             for parameter in PARAMETERS - set(static_parameters)
             if getattr(endpoint, parameter) is not None
         }
@@ -144,7 +146,12 @@ def get_case_strategy(endpoint: Endpoint, hooks: Optional[HookDispatcher] = None
         for parameter in PARAMETERS:
             value = getattr(endpoint, parameter)
             if value is not None:
-                strategies[parameter] = prepare_strategy(parameter, value)
+                location = {"headers": "header", "cookies": "cookie", "path_parameters": "path"}.get(
+                    parameter, parameter
+                )
+                strategies[parameter] = prepare_strategy(
+                    parameter, value, endpoint.get_hypothesis_conversions(location)
+                )
             else:
                 static_kwargs[parameter] = None
         return _get_case_strategy(endpoint, static_kwargs, strategies, hooks)
@@ -152,14 +159,17 @@ def get_case_strategy(endpoint: Endpoint, hooks: Optional[HookDispatcher] = None
         raise InvalidSchema("Invalid schema for this endpoint")
 
 
-def prepare_strategy(parameter: str, value: Dict[str, Any]) -> st.SearchStrategy:
+def prepare_strategy(parameter: str, value: Dict[str, Any], map_func: Optional[Callable]) -> st.SearchStrategy:
+    strategy = from_schema(value)
+    if map_func is not None:
+        strategy = strategy.map(map_func)
     if parameter == "path_parameters":
-        return from_schema(value).filter(filter_path_parameters).map(quote_all)  # type: ignore
-    if parameter in ("headers", "cookies"):
-        return from_schema(value).filter(is_valid_header)  # type: ignore
-    if parameter == "query":
-        return from_schema(value).filter(is_valid_query)  # type: ignore
-    return from_schema(value)  # type: ignore
+        strategy = strategy.filter(filter_path_parameters).map(quote_all)  # type: ignore
+    elif parameter in ("headers", "cookies"):
+        strategy = strategy.filter(is_valid_header)  # type: ignore
+    elif parameter == "query":
+        strategy = strategy.filter(is_valid_query)  # type: ignore
+    return strategy
 
 
 def filter_path_parameters(parameters: Dict[str, Any]) -> bool:

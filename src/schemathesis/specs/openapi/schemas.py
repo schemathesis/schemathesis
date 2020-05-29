@@ -1,7 +1,7 @@
 # pylint: disable=too-many-ancestors
 import itertools
 from copy import deepcopy
-from typing import Any, Dict, Generator, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple
 from urllib.parse import urljoin, urlsplit
 
 import jsonschema
@@ -13,7 +13,7 @@ from ...models import Endpoint, EndpointDefinition, empty_object
 from ...schemas import BaseSchema
 from ...stateful import StatefulTest
 from ...utils import GenericResponse
-from . import links
+from . import links, serialization
 from .converter import to_json_schema_recursive
 from .filters import should_skip_by_operation_id, should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .references import ConvertingResolver
@@ -274,6 +274,9 @@ class SwaggerV20(BaseOpenAPISchema):
             return produces
         return self.raw_schema.get("produces", [])
 
+    def get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
+        return serialization.serialize_swagger2_parameters(definitions)
+
 
 class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     nullable_name = "nullable"
@@ -370,6 +373,9 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
             raise InvalidSchema("Schema parsing failed. Please check your schema.")
         definitions = responses.get(str(response.status_code), {}).get("content", {})
         return list(definitions.keys())
+
+    def get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
+        return serialization.serialize_openapi3_parameters(definitions)
 
 
 def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
