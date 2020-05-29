@@ -8,7 +8,7 @@ Their responsibilities:
 They give only static definitions of endpoints.
 """
 from collections.abc import Mapping
-from typing import Any, Callable, Dict, Generator, Iterator, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple, Union
 
 import attr
 import hypothesis
@@ -65,6 +65,9 @@ class BaseSchema(Mapping):
         self, response: GenericResponse, endpoint: Endpoint, stateful: Optional[str]
     ) -> Sequence[StatefulTest]:
         """Get a list of additional tests, that should be executed after this response from the endpoint."""
+        raise NotImplementedError
+
+    def get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         raise NotImplementedError
 
     def get_all_tests(
