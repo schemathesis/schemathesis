@@ -287,6 +287,12 @@ class Endpoint:
     def get_stateful_tests(self, response: GenericResponse, stateful: Optional[str]) -> Sequence["StatefulTest"]:
         return self.schema.get_stateful_tests(response, self, stateful)
 
+    def get_hypothesis_conversions(self, location: str) -> Optional[Callable]:
+        definitions = [item for item in self.definition.raw.get("parameters", []) if item["in"] == location]
+        if definitions:
+            return self.schema.get_hypothesis_conversion(definitions)
+        return None
+
     def partial_deepcopy(self) -> "Endpoint":
         return self.__class__(
             path=self.path,  # string, immutable

@@ -12,6 +12,7 @@ Added
 - Support for YAML files in references via HTTP & HTTP schemas. `#600`_
 - Stateful testing support via ``Open API links`` syntax. `#548`_
 - New ``add_case`` hook. `#458`_
+- Support for parameters serialization formats in Open API 2 / 3. For example ``pipeDelimited`` or ``deepObject``. `#599`_
 
 Changed
 ~~~~~~~
@@ -1093,6 +1094,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#600: https://github.com/kiwicom/schemathesis/issues/600
+.. _#599: https://github.com/kiwicom/schemathesis/issues/599
 .. _#596: https://github.com/kiwicom/schemathesis/issues/596
 .. _#586: https://github.com/kiwicom/schemathesis/issues/586
 .. _#582: https://github.com/kiwicom/schemathesis/issues/582
