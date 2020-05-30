@@ -1,9 +1,10 @@
 """Expression nodes description and evaluation logic."""
 import json
 from enum import Enum, unique
-from typing import Any, Optional
+from typing import Any, Dict, Optional, Union
 
 import attr
+from requests.structures import CaseInsensitiveDict
 
 from ....utils import WSGIResponse
 from . import pointers
@@ -76,11 +77,13 @@ class NonBodyRequest(Node):
     parameter: str = attr.ib()  # pragma: no mutate
 
     def evaluate(self, context: ExpressionContext) -> str:
-        container = {
+        container: Union[Dict, CaseInsensitiveDict] = {
             "query": context.case.query,
             "path": context.case.path_parameters,
-            "header": context.case.headers,  # should be case-insensitive
+            "header": context.case.headers,
         }[self.location] or {}
+        if self.location == "header":
+            container = CaseInsensitiveDict(container)
         return str(container[self.parameter])
 
 
