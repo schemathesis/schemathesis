@@ -1,3 +1,4 @@
+import json
 from urllib.parse import quote, unquote
 
 import pytest
@@ -280,3 +281,15 @@ def test_item_is_missing(item, expected):
     # Then the data should not be affected
     # And should be otherwise
     assert item == expected
+
+
+class JSONString(Prefixed):
+    def prepare(self, value):
+        return json.loads(unquote(value))
+
+
+def test_content_serialization():
+    raw_schema = make_openapi_schema(
+        {"in": "query", "name": "filter", "required": True, "content": {"application/json": {"schema": OBJECT_SCHEMA}}}
+    )
+    assert_generates(raw_schema, {"filter": JSONString('{"r":100, "g": 200, "b": 150}')}, "query")

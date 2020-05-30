@@ -1,4 +1,5 @@
 import functools
+import json
 from typing import Any, Callable, Dict, Generator, List, Optional
 
 Generated = Dict[str, Any]
@@ -34,17 +35,25 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Optional[Calla
     """Different collection styles for Open API 3.0."""
     for definition in definitions:
         name = definition["name"]
-        style = definition.get("style")
-        explode = definition.get("explode")
-        type_ = definition.get("schema", {}).get("type")
-        if definition["in"] == "path":
-            yield from _serialize_path_openapi3(name, type_, style, explode)
-        elif definition["in"] == "query":
-            yield from _serialize_query_openapi3(name, type_, style, explode)
-        elif definition["in"] == "header":
-            yield from _serialize_header_openapi3(name, type_, explode)
-        elif definition["in"] == "cookie":
-            yield from _serialize_cookie_openapi3(name, type_, explode)
+        if "content" in definition:
+            # https://swagger.io/docs/specification/describing-parameters/#schema-vs-content
+            options = iter(definition["content"].keys())
+            media_type = next(options, None)
+            if media_type == "application/json":
+                yield to_json(name)
+        else:
+            # Simple serialization
+            style = definition.get("style")
+            explode = definition.get("explode")
+            type_ = definition.get("schema", {}).get("type")
+            if definition["in"] == "path":
+                yield from _serialize_path_openapi3(name, type_, style, explode)
+            elif definition["in"] == "query":
+                yield from _serialize_query_openapi3(name, type_, style, explode)
+            elif definition["in"] == "header":
+                yield from _serialize_header_openapi3(name, type_, explode)
+            elif definition["in"] == "cookie":
+                yield from _serialize_cookie_openapi3(name, type_, explode)
 
 
 def _serialize_path_openapi3(
@@ -160,6 +169,12 @@ def conversion(func: Callable[..., None]) -> Callable:
 
 def make_delimited(data: Dict[str, Any], delimiter: str = ",") -> str:
     return delimiter.join(f"{key}={value}" for key, value in data.items())
+
+
+@conversion
+def to_json(item: Generated, name: str) -> None:
+    """Serialize an item to JSON."""
+    item[name] = json.dumps(item[name])
 
 
 @conversion

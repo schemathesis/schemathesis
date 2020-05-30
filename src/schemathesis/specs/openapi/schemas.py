@@ -329,9 +329,10 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
             super().process_by_type(endpoint, parameter)
 
     def add_examples(self, container: Dict[str, Any], parameter: Dict[str, Any]) -> Dict[str, Any]:
-        if self.example_field in parameter["schema"]:
+        schema = get_schema_from_parameter(parameter)
+        if self.example_field in schema:
             examples = container.setdefault("example", {})  # examples should be merged together
-            examples[parameter["name"]] = parameter["schema"][self.example_field]
+            examples[parameter["name"]] = schema[self.example_field]
         # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#parameter-object
         # > Furthermore, if referencing a schema which contains an example,
         # > the example value SHALL override the example provided by the schema
@@ -348,12 +349,13 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         # > Furthermore, if referencing a schema which contains an example,
         # > the example value SHALL override the example provided by the schema
         if "example" in parameter:
-            parameter["schema"]["example"] = parameter["example"]
+            schema = get_schema_from_parameter(parameter)
+            schema["example"] = parameter["example"]
         super().process_body(endpoint, parameter)
 
     def parameter_to_json_schema(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        # "schema" field is required for all parameters in Open API 3.0
-        return super().parameter_to_json_schema(data["schema"])
+        schema = get_schema_from_parameter(data)
+        return super().parameter_to_json_schema(schema)
 
     def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
         scopes, definition = self.resolver.resolve_in_scope(deepcopy(definition), scope)
@@ -395,3 +397,11 @@ def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, C
         output.setdefault(endpoint.path, CaseInsensitiveDict())
         output[endpoint.path][endpoint.method] = endpoint
     return output
+
+
+def get_schema_from_parameter(data: Dict[str, Any]) -> Dict[str, Any]:
+    # In Open API 3.0 there could be "schema" or "content" field. They are mutually exclusive
+    if "schema" in data:
+        return data["schema"]
+    options = iter(data["content"].values())
+    return next(options)["schema"]
