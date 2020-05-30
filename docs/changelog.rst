@@ -12,7 +12,7 @@ Changelog
 Added
 ~~~~~
 
-- Support for YAML files in references via HTTP & HTTP schemas. `#600`_
+- Support for YAML files in references via HTTPS & HTTP schemas. `#600`_
 - Stateful testing support via ``Open API links`` syntax. `#548`_
 - New ``add_case`` hook. `#458`_
 - Support for parameters serialization formats in Open API 2 / 3. For example ``pipeDelimited`` or ``deepObject``. `#599`_
