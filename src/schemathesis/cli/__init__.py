@@ -170,9 +170,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     multiple=True,
     type=click.Choice(list(ALL_FIXUPS) + ["all"]),
 )
-@click.option(
-    "--stateful", help="Utilize stateful testing capabilities.", type=click.Choice(["links"]),
-)
+@click.option("--stateful", help="Utilize stateful testing capabilities.", type=click.Choice(["links"]))
 @click.option(
     "--stateful-recursion-limit",
     help="Limit recursion depth for stateful testing.",
@@ -207,6 +205,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     type=click.Choice([item.name for item in hypothesis.Verbosity]),
     callback=callbacks.convert_verbosity,
 )
+@click.option("--verbosity", "-v", help="Reduce verbosity of error output.", count=True)
 def run(  # pylint: disable=too-many-arguments
     schema: str,
     auth: Optional[Tuple[str, str]],
@@ -238,6 +237,7 @@ def run(  # pylint: disable=too-many-arguments
     hypothesis_suppress_health_check: Optional[List[hypothesis.HealthCheck]] = None,
     hypothesis_seed: Optional[int] = None,
     hypothesis_verbosity: Optional[hypothesis.Verbosity] = None,
+    verbosity: int = 0,
 ) -> None:
     """Perform schemathesis test against an API specified by SCHEMA.
 
@@ -281,7 +281,7 @@ def run(  # pylint: disable=too-many-arguments
         hypothesis_suppress_health_check=hypothesis_suppress_health_check,
         hypothesis_verbosity=hypothesis_verbosity,
     )
-    execute(prepared_runner, workers_num, show_errors_tracebacks, store_network_log, junit_xml)
+    execute(prepared_runner, workers_num, show_errors_tracebacks, store_network_log, junit_xml, verbosity)
 
 
 def get_output_handler(workers_num: int) -> EventHandler:
@@ -311,12 +311,13 @@ class OutputStyle(Enum):
     short = output.short.ShortOutputStyleHandler
 
 
-def execute(
+def execute(  # pylint: disable=too-many-arguments
     prepared_runner: Generator[events.ExecutionEvent, None, None],
     workers_num: int,
     show_errors_tracebacks: bool,
     store_network_log: Optional[click.utils.LazyFile],
     junit_xml: Optional[click.utils.LazyFile],
+    verbosity: int,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handlers: List[EventHandler] = []
@@ -331,6 +332,7 @@ def execute(
         show_errors_tracebacks=show_errors_tracebacks,
         cassette_file_name=store_network_log.name if store_network_log is not None else None,
         junit_xml_file=junit_xml.name if junit_xml is not None else None,
+        verbosity=verbosity,
     )
     GLOBAL_HOOK_DISPATCHER.dispatch("after_init_cli_run_handlers", HookContext(), handlers, execution_context)
     try:

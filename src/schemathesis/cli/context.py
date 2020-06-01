@@ -23,3 +23,4 @@ class ExecutionContext:
     results: List[SerializedTestResult] = attr.ib(factory=list)  # pragma: no mutate
     cassette_file_name: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     junit_xml_file: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    verbosity: int = attr.ib(default=0)  # pragma: no mutate

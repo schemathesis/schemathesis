@@ -224,6 +224,7 @@ def test_commands_run_help(cli):
         "",
         "  --hypothesis-verbosity [quiet|normal|verbose|debug]",
         "                                  Verbosity level of Hypothesis messages.",
+        "  -v, --verbosity                 Reduce verbosity of error output.",
         "  -h, --help                      Show this message and exit.",
     ]
 
@@ -257,7 +258,7 @@ SCHEMA_URI = "https://example.com/swagger.json"
                     "report_multiple_bugs": False,
                     "suppress_health_check": [HealthCheck.too_slow, HealthCheck.filter_too_much],
                     "verbosity": Verbosity.normal,
-                },
+                }
             },
         ),
         (["--hypothesis-deadline=None"], {"hypothesis_options": {"deadline": None}}),
@@ -312,7 +313,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         (["--header=Authorization:Bearer 123"], {"headers": {"Authorization": "Bearer 123"}}),
         (["--header=Authorization:  Bearer 123 "], {"headers": {"Authorization": "Bearer 123 "}}),
         (["--method=POST", "--method", "GET"], {"method": ("POST", "GET")}),
-        (["--method=POST", "--auth=test:test"], {"auth": ("test", "test"), "auth_type": "basic", "method": ("POST",)},),
+        (["--method=POST", "--auth=test:test"], {"auth": ("test", "test"), "auth_type": "basic", "method": ("POST",)}),
         (["--endpoint=users"], {"endpoint": ("users",)}),
         (["--tag=foo"], {"tag": ("foo",)}),
         (["--operation-id=getUser"], {"operation_id": ("getUser",)}),
@@ -1266,15 +1267,15 @@ def test_chained_internal_exception(testdir, cli, base_url):
                 "get": {
                     "responses": {
                         # Response code should be a string
-                        200: {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}},}
-                    },
+                        200: {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}
+                    }
                 }
             }
         },
     }
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(raw_schema))
     result = cli.run(
-        str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=1", "--show-errors-tracebacks",
+        str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=1", "--show-errors-tracebacks"
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
@@ -1361,7 +1362,7 @@ def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_lim
 def test_get_request_with_body(testdir, cli, base_url, schema_with_get_payload):
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema_with_get_payload))
     result = cli.run(
-        str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=1", "--show-errors-tracebacks",
+        str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=1", "--show-errors-tracebacks"
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
