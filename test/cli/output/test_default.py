@@ -164,7 +164,7 @@ def test_display_hypothesis_output(capsys):
 
 
 @pytest.mark.parametrize("body", ({}, {"foo": "bar"}, None))
-def test_display_single_failure(capsys, swagger_20, endpoint, body):
+def test_display_single_failure(capsys, swagger_20, execution_context, endpoint, body):
     # Given a single test result with multiple successful & failed checks
     success = models.Check("not_a_server_error", models.Status.success)
     failure = models.Check("not_a_server_error", models.Status.failure, models.Case(endpoint, body=body))
@@ -172,7 +172,7 @@ def test_display_single_failure(capsys, swagger_20, endpoint, body):
         endpoint, [success, success, success, failure, failure, models.Check("different_check", models.Status.success)]
     )
     # When this failure is displayed
-    default.display_failures_for_single_test(SerializedTestResult.from_test_result(test_statistic))
+    default.display_failures_for_single_test(execution_context, SerializedTestResult.from_test_result(test_statistic))
     out = capsys.readouterr().out
     lines = out.split("\n")
     # Then the endpoint name is displayed as a subsection
@@ -276,8 +276,10 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set):
     assert "requests.get('http://127.0.0.1:8080/api/failure')" in out
 
 
+@pytest.mark.parametrize("verbosity", (0, 1))
 @pytest.mark.parametrize("show_errors_tracebacks", (True, False))
-def test_display_errors(swagger_20, capsys, results_set, execution_context, show_errors_tracebacks):
+def test_display_errors(swagger_20, capsys, results_set, execution_context, show_errors_tracebacks, verbosity):
+    execution_context.verbosity = verbosity
     # Given two test results - success and error
     endpoint = models.Endpoint("/api/error", "GET", {}, swagger_20)
     error = models.TestResult(endpoint, seed=123)
@@ -334,3 +336,26 @@ def test_display_summary(capsys, results_set, swagger_20):
     assert "=== 1 passed in 1.26s ===" in out
     # And it should be in green & bold style
     assert strip_style_win32(click.style(click.unstyle(out), fg="green", bold=True)) == out
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    (
+        ("message", "message"),
+        (
+            """Details:
+
+'apikey' is a required property
+
+Failed validating 'required' in schema:
+    {'description': 'Response body format for service ID V1 REST requests',""",
+            """Details:
+
+'apikey' is a required property
+
+Failed validating 'required' in schema""",
+        ),
+    ),
+)
+def test_reduce_schema_error(value, expected):
+    assert default.reduce_schema_error(value) == expected

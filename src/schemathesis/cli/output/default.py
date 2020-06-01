@@ -128,7 +128,7 @@ def display_single_error(context: ExecutionContext, result: SerializedTestResult
             message = error.exception
         click.secho(message, fg="red")
         if error.example is not None:
-            display_example(error.example, seed=result.seed)
+            display_example(context, error.example, seed=result.seed)
 
 
 def display_failures(context: ExecutionContext, event: events.Finished) -> None:
@@ -142,10 +142,10 @@ def display_failures(context: ExecutionContext, event: events.Finished) -> None:
     for result in relevant_results:
         if not result.has_failures:
             continue
-        display_failures_for_single_test(result)
+        display_failures_for_single_test(context, result)
 
 
-def display_failures_for_single_test(result: SerializedTestResult) -> None:
+def display_failures_for_single_test(context: ExecutionContext, result: SerializedTestResult) -> None:
     """Display a failure for a single method / endpoint."""
     display_subsection(result)
     checks = get_unique_failures(result.checks)
@@ -156,16 +156,30 @@ def display_failures_for_single_test(result: SerializedTestResult) -> None:
         else:
             message = None
         example = cast(SerializedCase, check.example)  # filtered in `_get_unique_failures`
-        display_example(example, check.name, message, result.seed)
+        display_example(context, example, check.name, message, result.seed)
         # Display every time except the last check
         if idx != len(checks):
             click.echo("\n")
 
 
+def reduce_schema_error(message: str) -> str:
+    """Reduce the error schema output."""
+    end_of_message_index = message.find(":", message.find("Failed validating"))
+    if end_of_message_index != -1:
+        return message[:end_of_message_index]
+    return message
+
+
 def display_example(
-    case: SerializedCase, check_name: Optional[str] = None, message: Optional[str] = None, seed: Optional[int] = None
+    context: ExecutionContext,
+    case: SerializedCase,
+    check_name: Optional[str] = None,
+    message: Optional[str] = None,
+    seed: Optional[int] = None,
 ) -> None:
     if message is not None:
+        if not context.verbosity:
+            message = reduce_schema_error(message)
         click.secho(message, fg="red")
         click.echo()
     output = {
@@ -269,9 +283,7 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
                 "command-line option\nIn this case, Schemathesis can not guarantee proper"
                 " behavior during the test run"
             )
-        click.secho(
-            message, fg="red",
-        )
+        click.secho(message, fg="red")
 
 
 def handle_initialized(context: ExecutionContext, event: events.Initialized) -> None:
