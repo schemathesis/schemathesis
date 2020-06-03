@@ -84,10 +84,7 @@ def dict_not_none_values(**kwargs: Any) -> Dict[str, Any]:
     return {key: value for key, value in kwargs.items() if value is not None}
 
 
-def json_traverse(json: Dict[str, Any]) -> Generator[Tuple[str, Any], None, None]:
-    if not isinstance(json, dict):
-        raise JSONDecodeError
-
+def json_traverse(json: Union[List[Dict], Dict[str, Any]]) -> Generator[Tuple[str, Any], None, None]:
     def _list_traverse(key: str, array: List) -> Generator[Tuple[str, Any], None, None]:
         for x in array:
             if isinstance(x, dict):
@@ -95,15 +92,20 @@ def json_traverse(json: Dict[str, Any]) -> Generator[Tuple[str, Any], None, None
             else:
                 yield (key, array)
 
-    for key, value in json.items():
-        if isinstance(value, list):
-            yield (key, value)
-            yield from _list_traverse(key, value)
-        if isinstance(value, dict):
-            yield (key, value)
-            yield from json_traverse(value)
-        else:
-            yield (key, value)
+    if isinstance(json, list):
+        yield from _list_traverse("json", json)
+    elif isinstance(json, dict):
+        for key, value in json.items():
+            if isinstance(value, list):
+                yield (key, value)
+                yield from _list_traverse(key, value)
+            if isinstance(value, dict):
+                yield (key, value)
+                yield from json_traverse(value)
+            else:
+                yield (key, value)
+    else:
+        raise JSONDecodeError(msg="Not a dict", doc=str(json), pos=0)
 
 
 IGNORED_PATTERNS = (
