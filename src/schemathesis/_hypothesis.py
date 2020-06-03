@@ -18,7 +18,17 @@ from .models import Case, Endpoint, Requirement
 from .types import Hook
 
 PARAMETERS = frozenset(
-    ("path_parameters", "headers", "cookies", "query", "body", "form_data", "modified_path_parameters", "modified_body")
+    (
+        "path_parameters",
+        "headers",
+        "cookies",
+        "query",
+        "body",
+        "form_data",
+        "modified_path_parameters",
+        "modified_body",
+        "modified_form_data",
+    )
 )
 SCHEMA_DATATYPE = {"string": (str,), "number": (int, float), "object": (dict,), "array": (list,), "boolean": (bool,)}
 SLASH = "/"
@@ -111,14 +121,20 @@ def strategy_with_example(
             parameters["body"] = parameters["modified_body"]
         if "modified_path_parameters" in parameters:
             parameters["path_parameters"] = parameters["modified_path_parameters"]
+        if "modified_form_data" in parameters:
+            parameters["form_data"] = parameters["modified_form_data"]
         if "modified_body" in strategies:
             strategies["body"] = strategies["modified_body"]
         if "modified_path_parameters" in strategies:
             strategies["path_parameters"] = strategies["modified_path_parameters"]
+        if "modified_form_data" in strategies:
+            strategies["form_data"] = strategies["modified_form_data"]
     parameters.pop("modified_body", None)
     parameters.pop("modified_path_parameters", None)
+    parameters.pop("modified_form_data", None)
     strategies.pop("modified_body", None)
     strategies.pop("modified_path_parameters", None)
+    strategies.pop("modified_form_data", None)
     return _get_case_strategy(endpoint, parameters, strategies)
 
 

@@ -114,7 +114,7 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def get_all_requirements(self) -> List[str]:
-        return [req for endpoint in self.get_all_endpoints() for req in endpoint.requirements]
+        return [req for endpoint in self.get_all_endpoints(filtered=False) for req in endpoint.requirements]
 
     def sort_by_requirements(self, endpoint_list: List[Endpoint]) -> List[Endpoint]:
         if not endpoint_list:
@@ -338,6 +338,7 @@ class SwaggerV20(BaseSchema):
 
     def process_form_data(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         endpoint.form_data = self.add_parameter(endpoint.form_data, parameter)
+        endpoint.modified_form_data = deepcopy(endpoint.form_data)
 
     def add_parameter(self, container: Optional[Dict[str, Any]], parameter: Dict[str, Any]) -> Dict[str, Any]:
         """Add parameter object to the container."""
@@ -395,8 +396,13 @@ class SwaggerV20(BaseSchema):
         return to_json_schema(item, self.nullable_name)
 
     def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        response_200 = definition.get("responses", {}).get("200", {})
-        schema = definition.get("schema") or response_200.get("schema")
+        responses = definition.get("responses", {})
+        response_2xx: Dict[str, Dict] = {"schema": {}}
+        for key, val in responses.items():
+            if key.startswith("2"):
+                response_2xx["schema"].update(val.get("schema", {}))
+
+        schema = definition.get("schema") or response_2xx["schema"]
         if not schema:
             return None
         return to_json_schema(schema, self.nullable_name)
@@ -479,8 +485,13 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         return super().parameter_to_json_schema(data["schema"])
 
     def _get_response_schema(self, definition: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        response_200 = definition.get("responses", {}).get("200", {})
-        options = iter((definition.get("content", {}) or response_200.get("content", {})).values())
+        responses = definition.get("responses", {})
+        response_2xx: Dict[str, Dict] = {"content": {}}
+        for key, val in responses.items():
+            if key.startswith("2"):
+                response_2xx["content"].update(val.get("content", {}))
+
+        options = iter((definition.get("content", {}) or response_2xx["content"]).values())
         option = next(options, None)
         if option:
             return to_json_schema(option["schema"], self.nullable_name)

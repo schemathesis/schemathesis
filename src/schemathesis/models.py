@@ -235,8 +235,9 @@ class Endpoint:
     body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
     form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
     is_dependency: bool = attr.ib(default=False, eq=False)  # pragma: no mutate
-    modified_path_parameters: Optional[PathParameters] = attr.ib()  # pragma: no mutate
-    modified_body: Optional[Body] = attr.ib()  # pragma: no mutate
+    modified_path_parameters: Optional[PathParameters] = attr.ib(eq=False)  # pragma: no mutate
+    modified_body: Optional[Body] = attr.ib(eq=False)  # pragma: no mutate
+    modified_form_data: Optional[FormData] = attr.ib(eq=False)  # pragma: no mutate
 
     @modified_path_parameters.default
     def _copy_path_parameters(self) -> Optional[PathParameters]:
@@ -245,6 +246,10 @@ class Endpoint:
     @modified_body.default
     def _copy_body(self) -> Optional[Body]:
         return deepcopy(self.body)
+
+    @modified_form_data.default
+    def _copy_form_data(self) -> Optional[FormData]:
+        return deepcopy(self.form_data)
 
     def as_strategy(self, hooks: Optional[Dict[str, Hook]] = None) -> SearchStrategy:
         from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel
@@ -264,21 +269,23 @@ class Endpoint:
 
     @property
     def requirements(self) -> Set[str]:
-        path_or_body = (self.body if self.body else self.path_parameters) or {}
-        if isinstance(path_or_body, bytes):
-            return set()
-        return set(path_or_body.get("required", []))
+        # pylint: disable=import-outside-toplevel
+        from ._hypothesis import PARAMETERS
+
+        req_set: Set = set()
+        for param in PARAMETERS:
+            attribute = getattr(self, param)
+            if not attribute or isinstance(attribute, bytes):
+                continue
+            req_set.update(attribute.get("required", []))
+        return req_set
 
     @property
     def same_requirements(self) -> List[Any]:
         """List of endpoints having subset of `self.requirements`."""
         same = []
         for endpoint in self.schema.get_all_endpoints(filtered=False):
-            if (
-                endpoint.path != self.path
-                and endpoint.method != self.method
-                and self.requirements.intersection(endpoint.requirements)
-            ):
+            if endpoint != self and self.requirements.intersection(endpoint.requirements):
                 same.append(endpoint)
         return same
 
@@ -289,7 +296,7 @@ class Endpoint:
         if not dependencies:
             return {}
         for endpoint in self.schema.get_all_endpoints(filtered=False):
-            if endpoint.path == self.path and endpoint.method == self.method:
+            if endpoint == self:
                 continue
             for param in endpoint._get_response_params():
                 if param in dependencies:
