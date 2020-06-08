@@ -12,6 +12,7 @@ Welcome to schemathesis's documentation!
    compatibility
    customization
    stateful
+   graphql
    targeted
    faq
    changelog
