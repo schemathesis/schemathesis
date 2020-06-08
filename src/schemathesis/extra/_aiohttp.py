@@ -1,10 +1,9 @@
 import asyncio
-import threading
-from time import sleep
 from typing import Optional
 
 from aiohttp import web  # pylint: disable=import-error
-from aiohttp.test_utils import unused_port  # pylint: disable=import-error
+
+from . import _server
 
 
 def _run_server(app: web.Application, port: int) -> None:
@@ -25,10 +24,4 @@ def _run_server(app: web.Application, port: int) -> None:
 
 def run_server(app: web.Application, port: Optional[int] = None, timeout: float = 0.05) -> int:
     """Start a thread with the given aiohttp application."""
-    if port is None:
-        port = unused_port()
-    server_thread = threading.Thread(target=_run_server, args=(app, port))
-    server_thread.daemon = True
-    server_thread.start()
-    sleep(timeout)
-    return port
+    return _server.run(_run_server, app=app, port=port, timeout=timeout)

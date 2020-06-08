@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "schemathesis"
 version = "1.9.1"
-description = "Hypothesis strategies for Open API / Swagger schemas"
-keywords = ["pytest", "hypothesis", "openapi", "swagger", "testing"]
+description = "Hypothesis strategies for Open API / Swagger and GraphQL schemas"
+keywords = ["pytest", "hypothesis", "openapi", "swagger", "graphql", "testing"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
@@ -28,6 +28,7 @@ python = "^3.6"
 attrs = "^19.1"
 hypothesis = ">=5.15,<6.0"
 hypothesis_jsonschema = ">=0.16.0,<1.0"
+hypothesis_graphql = ">=0.3"
 jsonschema = "^3.0.0"
 pytest = ">4.6.4"
 pyyaml = "^5.1"
@@ -43,6 +44,8 @@ starlette = "^0.13.2"
 coverage = "^4.5"
 pytest = ">4.6.4"
 aiohttp = "^3.6"
+graphene = "^3.0b3"
+graphql-server-core = "https://github.com/graphql-python/graphql-server-core.git@8e2f147a2c23ec7275fe1924dc0c190370ffd256"
 pytest-mock = "^1.11.0"
 pytest-asyncio = "^0.11.0"
 pytest-xdist = "^1.30"
@@ -68,7 +71,7 @@ multi_line_output = 3
 default_section = "THIRDPARTY"
 include_trailing_comma = true
 known_first_party = "schemathesis"
-known_third_party = ["_pytest", "aiohttp", "attr", "click", "fastapi", "flask", "hypothesis", "hypothesis_jsonschema", "jsonschema", "junit_xml", "packaging", "pytest", "pytest_subtests", "requests", "schemathesis", "starlette", "urllib3", "werkzeug", "yaml"]
+known_third_party = ["_pytest", "aiohttp", "attr", "click", "fastapi", "flask", "graphene", "graphql", "graphql_server", "hypothesis", "hypothesis_graphql", "hypothesis_jsonschema", "jsonschema", "junit_xml", "packaging", "pytest", "pytest_subtests", "requests", "schemathesis", "starlette", "urllib3", "werkzeug", "yaml"]
 
 [build-system]
 requires = ["poetry>=0.12"]
