@@ -3,7 +3,7 @@ Schemathesis
 
 |Build| |Coverage| |Version| |Python versions| |Docs| |Chat| |License|
 
-Schemathesis is a tool for testing your web applications built with Open API / Swagger specifications.
+Schemathesis is a tool for testing your web applications built with Open API / Swagger or GraphQL specifications.
 
 It reads the application schema and generates test cases which will ensure that your application is compliant with its schema.
 
@@ -13,6 +13,7 @@ The application under test could be written in any language, the only thing you 
 
 - Swagger 2.0
 - Open API 3.0.x
+- GraphQL June 2018
 
 More API specifications will be added in the future.
 

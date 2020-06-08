@@ -10,6 +10,7 @@ Added
 ~~~~~
 
 - ``loaders.from_asgi`` supports making calls to ASGI-compliant application (For example: FastAPI). `#521`_
+- Support for GraphQL strategies.
 
 Fixed
 ~~~~~

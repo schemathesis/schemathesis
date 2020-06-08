@@ -6,9 +6,10 @@ from click.testing import CliRunner
 from hypothesis import settings
 
 import schemathesis.cli
-from schemathesis.extra._aiohttp import run_server
+from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
+from schemathesis.extra._flask import run_server as run_flask_server
 
-from .apps import Endpoint, _aiohttp, _fastapi, _flask
+from .apps import Endpoint, _aiohttp, _fastapi, _flask, _graphql
 from .utils import make_schema
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
@@ -64,7 +65,7 @@ def app(_app, reset_app):
 @pytest.fixture(scope="session")
 def server(_app):
     """Run the app on an unused port."""
-    port = run_server(_app)
+    port = run_aiohttp_server(_app)
     yield {"port": port}
 
 
@@ -78,6 +79,27 @@ def base_url(server, app):
 def schema_url(base_url):
     """URL of the schema of the running application."""
     return f"{base_url}/swagger.yaml"
+
+
+@pytest.fixture(scope="session")
+def graphql_path():
+    return "/graphql"
+
+
+@pytest.fixture(scope="session")
+def graphql_app(graphql_path):
+    return _graphql.create_app(graphql_path)
+
+
+@pytest.fixture()
+def graphql_server(graphql_app):
+    port = run_flask_server(graphql_app)
+    yield {"port": port}
+
+
+@pytest.fixture()
+def graphql_endpoint(graphql_server, graphql_path):
+    return f"http://127.0.0.1:{graphql_server['port']}{graphql_path}"
 
 
 @pytest.fixture(scope="session")
