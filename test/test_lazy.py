@@ -84,8 +84,6 @@ def test_(request, case):
             r"test_invalid_endpoint.py::test_[GET:/v1/valid] PASSED                    [100%]",
             r"test_invalid_endpoint.py::test_[GET:/v1/invalid] FAILED                  [200%]",
             r"test_invalid_endpoint.py::test_[GET:/v1/users] PASSED                    [300%]",
-            r"E       Failed: Invalid schema for this endpoint",
-            r"FAILED test_invalid_endpoint.py::test_[GET:/v1/invalid] - Failed: Invalid sch...",
             r".*1 passed",
         ]
     )
