@@ -349,6 +349,7 @@ def testdir(testdir):
     def run_and_assert(*args, **kwargs):
         result = testdir.runpytest(*args)
         result.assert_outcomes(**kwargs)
+        return result
 
     testdir.run_and_assert = run_and_assert
 
