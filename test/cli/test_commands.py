@@ -617,12 +617,9 @@ def test_invalid_endpoint(cli, cli_args, workers):
     # And this endpoint should be marked as errored in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[10].startswith("POST /api/invalid E")
+        assert lines[10].startswith("POST /api/invalid F")
     else:
-        assert lines[10] == "E"
-    # And more clear error message is displayed instead of Hypothesis one
-    lines = result.stdout.split("\n")
-    assert "schemathesis.exceptions.InvalidSchema: Invalid schema for this endpoint" in lines
+        assert lines[10] == "F"
 
 
 @pytest.mark.endpoints("invalid")

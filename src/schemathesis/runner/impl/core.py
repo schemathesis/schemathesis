@@ -161,6 +161,7 @@ def run_test(
             status = Status.success
     except (AssertionError, hypothesis.errors.MultipleFailures):
         status = Status.failure
+        result.mark_failed()  # `AssertionError` may come from `hypothesis-jsonschema`
     except hypothesis.errors.Flaky:
         status = Status.error
         result.mark_errored()

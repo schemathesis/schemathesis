@@ -443,6 +443,7 @@ class TestResult:
     interactions: List[Interaction] = attr.ib(factory=list)  # pragma: no mutate
     logs: List[LogRecord] = attr.ib(factory=list)  # pragma: no mutate
     is_errored: bool = attr.ib(default=False)  # pragma: no mutate
+    is_failed: bool = attr.ib(default=False)  # pragma: no mutate
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
     # To show a proper reproduction code if a failure happens
     overridden_headers: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
@@ -450,13 +451,16 @@ class TestResult:
     def mark_errored(self) -> None:
         self.is_errored = True
 
+    def mark_failed(self) -> None:
+        self.is_failed = True
+
     @property
     def has_errors(self) -> bool:
         return bool(self.errors)
 
     @property
     def has_failures(self) -> bool:
-        return any(check.value == Status.failure for check in self.checks)
+        return self.is_failed or any(check.value == Status.failure for check in self.checks)
 
     @property
     def has_logs(self) -> bool:
