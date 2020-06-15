@@ -19,7 +19,9 @@ from schemathesis.schemas import BaseSchema
 
 
 def make_case(schema: BaseSchema, definition: Dict[str, Any]) -> models.Case:
-    endpoint = models.Endpoint("/path", "GET", definition=EndpointDefinition(definition, None), schema=schema)
+    endpoint = models.Endpoint(
+        "/path", "GET", definition=EndpointDefinition(definition, definition, None), schema=schema
+    )
     return models.Case(endpoint)
 
 
