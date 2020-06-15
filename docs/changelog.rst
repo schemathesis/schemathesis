@@ -11,6 +11,11 @@ Fixed
 
 - Tests with invalid schemas are marked as failed when ``hypothesis-jsonschema>=0.16`` is installed. `#614`_
 
+Changed
+~~~~~~~
+
+- Require ``hypothesis-jsonschema>=0.16``. `#614`_
+
 `1.7.0`_ - 2020-05-30
 ---------------------
 
