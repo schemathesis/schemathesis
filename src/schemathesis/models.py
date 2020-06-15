@@ -285,6 +285,10 @@ class Endpoint:
 
         return get_case_strategy(self, hooks)
 
+    def get_strategies_from_examples(self) -> List[SearchStrategy[Case]]:
+        """Get examples from endpoint."""
+        return self.schema.get_strategies_from_examples(self)
+
     def get_stateful_tests(self, response: GenericResponse, stateful: Optional[str]) -> Sequence["StatefulTest"]:
         return self.schema.get_stateful_tests(response, self, stateful)
 

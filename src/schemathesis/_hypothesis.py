@@ -19,6 +19,14 @@ from .models import Case, Endpoint
 from .types import Hook
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
+LOCATION_TO_CONTAINER = {
+    "path": "path_parameters",
+    "query": "query",
+    "header": "headers",
+    "cookie": "cookies",
+    "body": "body",
+    "formData": "form_data",
+}
 SLASH = "/"
 
 
@@ -57,31 +65,9 @@ def make_async_test(test: Callable) -> Callable:
     return async_run
 
 
-def get_example(endpoint: Endpoint) -> Optional[st.SearchStrategy[Case]]:
-    static_parameters = {}
-    for name in PARAMETERS:
-        parameter = getattr(endpoint, name)
-        if parameter is not None and "example" in parameter:
-            static_parameters[name] = parameter["example"]
-    if static_parameters:
-        strategies = {
-            parameter: prepare_strategy(
-                parameter, getattr(endpoint, parameter), endpoint.get_hypothesis_conversions(parameter)
-            )
-            for parameter in PARAMETERS - set(static_parameters)
-            if getattr(endpoint, parameter) is not None
-        }
-        return _get_case_strategy(endpoint, static_parameters, strategies)
-    return None
-
-
 def add_examples(test: Callable, endpoint: Endpoint, hook_dispatcher: Optional[HookDispatcher] = None) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
-    strategy = get_example(endpoint)
-    if strategy is not None:
-        examples = get_single_example(strategy)
-    else:
-        examples = []
+    examples: List[Case] = [get_single_example(strategy) for strategy in endpoint.get_strategies_from_examples()]
     context = HookContext(endpoint)  # context should be passed here instead
     GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, examples)
     endpoint.schema.hooks.dispatch("before_add_examples", context, examples)
@@ -92,7 +78,7 @@ def add_examples(test: Callable, endpoint: Endpoint, hook_dispatcher: Optional[H
     return test
 
 
-def get_single_example(strategy: st.SearchStrategy[Case]) -> List[Case]:
+def get_single_example(strategy: st.SearchStrategy[Case]) -> Case:
     @hypothesis.given(strategy)  # type: ignore
     @hypothesis.settings(  # type: ignore
         database=None,
@@ -107,7 +93,7 @@ def get_single_example(strategy: st.SearchStrategy[Case]) -> List[Case]:
 
     examples: List[Case] = []
     example_generating_inner_function()
-    return examples
+    return examples[0]
 
 
 def is_valid_header(headers: Dict[str, str]) -> bool:

@@ -296,6 +296,8 @@ Explicit examples
 ~~~~~~~~~~~~~~~~~
 
 If the schema contains parameters examples, then they will be additionally included in the generated cases.
+Schemathesis supports the use of both OpenAPI ``example`` and ``examples`` (more information available in the `OpenAPI documentation <https://swagger.io/docs/specification/adding-examples/>`_).
+Note that ``examples`` were added in OpenAPI 3, but Schemathesis supports this feature for OpenAPI 2 using ``x-examples``.
 
 .. code:: yaml
 
