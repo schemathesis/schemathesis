@@ -7,6 +7,7 @@ from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple
 
 import attr
 
+from ..._hypothesis import LOCATION_TO_CONTAINER
 from ...models import Case, Endpoint
 from ...stateful import ParsedData, StatefulTest
 from ...utils import NOT_SET, GenericResponse
@@ -160,14 +161,6 @@ class Link(StatefulTest):
 
     def _unknown_parameter(self, name: str) -> NoReturn:
         raise ValueError(f"Parameter `{name}` is not defined in endpoint {self.endpoint.method} {self.endpoint.path}")
-
-
-LOCATION_TO_CONTAINER = {
-    "path": "path_parameters",
-    "query": "query",
-    "header": "headers",
-    "cookie": "cookies",
-}
 
 
 def get_links(response: GenericResponse, endpoint: Endpoint, field: str) -> Sequence[Link]:

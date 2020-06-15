@@ -2,7 +2,8 @@ import pytest
 from hypothesis import given
 
 import schemathesis
-from schemathesis._hypothesis import get_example
+from schemathesis.models import Endpoint
+from schemathesis.specs.openapi.examples import get_strategies_from_examples
 
 
 @pytest.fixture(scope="module")
@@ -29,7 +30,8 @@ def schema():
 
 @pytest.mark.hypothesis_nested
 def test_examples_validity(schema, base_url):
-    strategy = get_example(schema.endpoints["/api/success"]["get"])
+    endpoint = next(schema.get_all_endpoints())
+    strategy = get_strategies_from_examples(endpoint, "examples")[0]
 
     @given(case=strategy)
     def test(case):

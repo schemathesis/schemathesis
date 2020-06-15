@@ -12,12 +12,13 @@ from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Seq
 
 import attr
 import hypothesis
+from hypothesis.strategies import SearchStrategy
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
 from .exceptions import InvalidSchema
 from .hooks import HookContext, HookDispatcher, HookLocation, HookScope, dispatch, warn_deprecated_hook
-from .models import Endpoint
+from .models import Case, Endpoint
 from .stateful import StatefulTest
 from .types import Filter, GenericTest, Hook, NotSet
 from .utils import NOT_SET, GenericResponse, deprecated
@@ -59,6 +60,10 @@ class BaseSchema(Mapping):
         return len(list(self.get_all_endpoints()))
 
     def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
+        raise NotImplementedError
+
+    def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
+        """Get examples from endpoint."""
         raise NotImplementedError
 
     def get_stateful_tests(
