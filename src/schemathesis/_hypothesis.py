@@ -142,21 +142,14 @@ def get_case_strategy(endpoint: Endpoint, hooks: Optional[HookDispatcher] = None
     """
     strategies = {}
     static_kwargs: Dict[str, Any] = {"endpoint": endpoint}
-    try:
-        for parameter in PARAMETERS:
-            value = getattr(endpoint, parameter)
-            if value is not None:
-                location = {"headers": "header", "cookies": "cookie", "path_parameters": "path"}.get(
-                    parameter, parameter
-                )
-                strategies[parameter] = prepare_strategy(
-                    parameter, value, endpoint.get_hypothesis_conversions(location)
-                )
-            else:
-                static_kwargs[parameter] = None
-        return _get_case_strategy(endpoint, static_kwargs, strategies, hooks)
-    except AssertionError:
-        raise InvalidSchema("Invalid schema for this endpoint")
+    for parameter in PARAMETERS:
+        value = getattr(endpoint, parameter)
+        if value is not None:
+            location = {"headers": "header", "cookies": "cookie", "path_parameters": "path"}.get(parameter, parameter)
+            strategies[parameter] = prepare_strategy(parameter, value, endpoint.get_hypothesis_conversions(location))
+        else:
+            static_kwargs[parameter] = None
+    return _get_case_strategy(endpoint, static_kwargs, strategies, hooks)
 
 
 def prepare_strategy(parameter: str, value: Dict[str, Any], map_func: Optional[Callable]) -> st.SearchStrategy:
