@@ -400,3 +400,25 @@ def test_(request, case):
             r".*1 failed",
         ]
     )
+
+
+def test_get_request_with_body(testdir, schema_with_get_payload):
+    testdir.make_test(
+        """
+@pytest.fixture
+def simple_schema():
+    return schema
+
+lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+
+@lazy_schema.parametrize()
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+""",
+        schema=schema_with_get_payload,
+    )
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=1, failed=1)
+    result.stdout.re_match_lines(
+        [r"E       Failed: Body parameters are defined for GET request.",]
+    )
