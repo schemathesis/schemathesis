@@ -91,8 +91,9 @@ class SchemathesisCase(PyCollector):
     def _make_test(self, endpoint: Endpoint) -> Callable:
         try:
             return create_test(endpoint, self.test_function)
-        except InvalidSchema:
-            return lambda: pytest.fail("Invalid schema for endpoint")
+        except InvalidSchema as exc:
+            message = exc.args[0]
+            return lambda: pytest.fail(message)
 
     def collect(self) -> List[Function]:  # type: ignore
         """Generate different test items for all endpoints available in the given schema."""

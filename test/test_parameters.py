@@ -1,6 +1,5 @@
 import datetime
 from copy import deepcopy
-from urllib.parse import quote, unquote
 
 import pytest
 import yaml
@@ -341,3 +340,16 @@ def test_date_deserializing(testdir):
         assert isinstance(case.query["key"], str)
 
     test()
+
+
+def test_get_request_with_body(testdir, schema_with_get_payload):
+    testdir.make_test(
+        """
+@schema.parametrize()
+def test_(case):
+    pass
+        """,
+        schema=schema_with_get_payload,
+    )
+    result = testdir.run_and_assert(failed=1)
+    result.stdout.re_match_lines([r"E   Failed: Body parameters are defined for GET request."])
