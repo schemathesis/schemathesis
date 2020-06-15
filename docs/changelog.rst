@@ -10,6 +10,7 @@ Fixed
 ~~~~~
 
 - Tests with invalid schemas are marked as failed when ``hypothesis-jsonschema>=0.16`` is installed. `#614`_
+- ``KeyError`` during creating endpoint strategy if it contains a reference. `#612`_
 
 Changed
 ~~~~~~~
@@ -1110,6 +1111,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#614: https://github.com/kiwicom/schemathesis/issues/614
+.. _#612: https://github.com/kiwicom/schemathesis/issues/612
 .. _#600: https://github.com/kiwicom/schemathesis/issues/600
 .. _#599: https://github.com/kiwicom/schemathesis/issues/599
 .. _#596: https://github.com/kiwicom/schemathesis/issues/596

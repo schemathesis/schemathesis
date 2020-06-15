@@ -82,7 +82,7 @@ class BaseOpenAPISchema(BaseSchema):
                     parameters = itertools.chain(resolved_definition.get("parameters", ()), common_parameters)
                     # To prevent recursion errors we need to pass not resolved schema as well
                     # It could be used for response validation
-                    raw_definition = EndpointDefinition(raw_methods[method], scope)
+                    raw_definition = EndpointDefinition(raw_methods[method], resolved_definition, scope)
                     yield self.make_endpoint(full_path, method, parameters, resolved_definition, raw_definition)
         except (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError):
             raise InvalidSchema("Schema parsing failed. Please check your schema.")
@@ -160,7 +160,7 @@ class BaseOpenAPISchema(BaseSchema):
                 if method not in self.operations or "operationId" not in resolved_definition:
                     continue
                 parameters = itertools.chain(resolved_definition.get("parameters", ()), common_parameters)
-                raw_definition = EndpointDefinition(raw_methods[method], scope)
+                raw_definition = EndpointDefinition(raw_methods[method], resolved_definition, scope)
                 yield resolved_definition["operationId"], self.make_endpoint(
                     full_path, method, parameters, resolved_definition, raw_definition
                 )
@@ -179,7 +179,7 @@ class BaseOpenAPISchema(BaseSchema):
         _, methods = self.resolver.resolve(parent_ref)
         common_parameters = get_common_parameters(methods)
         parameters = itertools.chain(resolved_definition.get("parameters", ()), common_parameters)
-        raw_definition = EndpointDefinition(data, scope)
+        raw_definition = EndpointDefinition(data, resolved_definition, scope)
         return self.make_endpoint(full_path, method, parameters, resolved_definition, raw_definition)
 
 

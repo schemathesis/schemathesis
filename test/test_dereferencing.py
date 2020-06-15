@@ -504,6 +504,52 @@ def test_complex_dereference(testdir, complex_schema):
                 "summary": "Test",
                 "tags": ["ancillaries"],
             },
+            {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "additionalProperties": False,
+                                "description": "Test",
+                                "properties": {
+                                    "profile": {
+                                        "additionalProperties": False,
+                                        "description": "Test",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                        "type": "object",
+                                    },
+                                    "username": {"type": "string"},
+                                },
+                                "required": ["username", "profile"],
+                                "type": "object",
+                            }
+                        }
+                    },
+                    "description": "Test.",
+                    "required": True,
+                },
+                "responses": {
+                    "default": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": False,
+                                    "properties": {
+                                        "key": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                                        "referenced": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                                    },
+                                    "required": ["key", "referenced"],
+                                    "type": "object",
+                                }
+                            }
+                        },
+                        "description": "Probably an error",
+                    }
+                },
+                "summary": "Test",
+                "tags": ["ancillaries"],
+            },
             scope=f"{path.as_uri()}/root/paths/teapot.yaml#/TeapotCreatePath",
         ),
         body={
