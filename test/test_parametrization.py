@@ -569,9 +569,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-rf")
     # Then the tests should fail with the relevant error message
     result.assert_outcomes(failed=1, passed=2)
-    result.stdout.re_match_lines(
-        [r".*test_invalid_endpoint.py::test_\[GET:/v1/invalid\] FAILED", ".*Failed: Invalid schema for endpoint"]
-    )
+    result.stdout.re_match_lines([r".*test_invalid_endpoint.py::test_\[GET:/v1/invalid\] FAILED"])
 
 
 def test_no_base_path(testdir):
