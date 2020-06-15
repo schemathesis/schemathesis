@@ -15,6 +15,7 @@ Changed
 ~~~~~~~
 
 - Require ``hypothesis-jsonschema>=0.16``. `#614`_
+- Pass original ``InvalidSchema`` text to ``pytest.fail`` call.
 
 `1.7.0`_ - 2020-05-30
 ---------------------
