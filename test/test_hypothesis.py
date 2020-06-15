@@ -5,7 +5,7 @@ from hypothesis import HealthCheck, given, settings, strategies
 
 import schemathesis
 from schemathesis import Case, register_string_format
-from schemathesis._hypothesis import PARAMETERS, get_case_strategy, get_example, is_valid_query
+from schemathesis._hypothesis import PARAMETERS, get_case_strategy, is_valid_query
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Endpoint, EndpointDefinition
 
@@ -30,7 +30,9 @@ def test_get_examples(name, swagger_20):
             }
         },
     )
-    assert get_example(endpoint).example() == Case(endpoint, **{name: example})
+    strategies = endpoint.get_strategies_from_examples()
+    assert len(strategies) == 1
+    assert strategies[0].example() == Case(endpoint, **{name: example})
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
@@ -48,7 +50,9 @@ def test_no_body_in_get(swagger_20):
             "example": {"name": "John"},
         },
     )
-    assert get_example(endpoint).example().body is None
+    strategies = endpoint.get_strategies_from_examples()
+    assert len(strategies) == 1
+    assert strategies[0].example().body is None
 
 
 def test_invalid_body_in_get(swagger_20):

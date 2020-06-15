@@ -9,6 +9,7 @@ Changelog
 Added
 ~~~~~
 
+- support for multiple examples with OpenAPI ``examples``. `#589`_
 - ``--verbosity`` CLI option to minimize the error output. `#598`_
 
 `1.8.0`_ - 2020-06-15
@@ -1119,6 +1120,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#589: https://github.com/kiwicom/schemathesis/issues/589
 .. _#614: https://github.com/kiwicom/schemathesis/issues/614
 .. _#612: https://github.com/kiwicom/schemathesis/issues/612
 .. _#600: https://github.com/kiwicom/schemathesis/issues/600

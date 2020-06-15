@@ -5,16 +5,18 @@ from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Seq
 from urllib.parse import urljoin, urlsplit
 
 import jsonschema
+from hypothesis.strategies import SearchStrategy
 from requests.structures import CaseInsensitiveDict
 
 from ...exceptions import InvalidSchema
 from ...hooks import HookContext
-from ...models import Endpoint, EndpointDefinition, empty_object
+from ...models import Case, Endpoint, EndpointDefinition, empty_object
 from ...schemas import BaseSchema
 from ...stateful import StatefulTest
 from ...utils import GenericResponse
 from . import links, serialization
 from .converter import to_json_schema_recursive
+from .examples import get_strategies_from_examples
 from .filters import should_skip_by_operation_id, should_skip_by_tag, should_skip_endpoint, should_skip_method
 from .references import ConvertingResolver
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
@@ -140,6 +142,10 @@ class BaseOpenAPISchema(BaseSchema):
         """Content types available for this endpoint."""
         raise NotImplementedError
 
+    def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
+        """Get examples from endpoint."""
+        raise NotImplementedError
+
     def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
         """Extract response schema from `responses`."""
         raise NotImplementedError
@@ -186,6 +192,7 @@ class BaseOpenAPISchema(BaseSchema):
 class SwaggerV20(BaseOpenAPISchema):
     nullable_name = "x-nullable"
     example_field = "x-example"
+    examples_field = "x-examples"
     operations: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
     security = SwaggerSecurityProcessor()
     links_field = "x-links"
@@ -205,6 +212,10 @@ class SwaggerV20(BaseOpenAPISchema):
         if not path.endswith("/"):
             path += "/"
         return path
+
+    def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
+        """Get examples from endpoint."""
+        return get_strategies_from_examples(endpoint, self.examples_field)
 
     def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         if parameter["in"] == "path":
@@ -281,6 +292,7 @@ class SwaggerV20(BaseOpenAPISchema):
 class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     nullable_name = "nullable"
     example_field = "example"
+    examples_field = "examples"
     operations = SwaggerV20.operations + ("trace",)
     security = OpenAPISecurityProcessor()
     links_field = "links"
@@ -366,6 +378,10 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
             # because it is not converted
             return scopes, to_json_schema_recursive(option["schema"], self.nullable_name)
         return scopes, None
+
+    def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
+        """Get examples from endpoint."""
+        return get_strategies_from_examples(endpoint, self.examples_field)
 
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
         try:
