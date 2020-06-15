@@ -259,6 +259,7 @@ class EndpointDefinition:
     """
 
     raw: Dict[str, Any] = attr.ib()  # pragma: no mutate
+    resolved: Dict[str, Any] = attr.ib()  # pragma: no mutate
     scope: str = attr.ib()  # pragma: no mutate
 
 
@@ -288,7 +289,7 @@ class Endpoint:
         return self.schema.get_stateful_tests(response, self, stateful)
 
     def get_hypothesis_conversions(self, location: str) -> Optional[Callable]:
-        definitions = [item for item in self.definition.raw.get("parameters", []) if item["in"] == location]
+        definitions = [item for item in self.definition.resolved.get("parameters", []) if item["in"] == location]
         if definitions:
             return self.schema.get_hypothesis_conversion(definitions)
         return None

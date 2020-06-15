@@ -46,3 +46,28 @@ def test_as_strategy(swagger_20):
     strategy = endpoint.as_strategy()
     assert isinstance(strategy, st.SearchStrategy)
     assert strategy.example() == Case(endpoint)
+
+
+@pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
+def test_reference_in_path():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Blank API", "version": "1.0"},
+        "servers": [{"url": "http://localhost/api"}],
+        "paths": {
+            "/{key}": {
+                "get": {
+                    "parameters": [{"$ref": "#/components/parameters/PathParameter"}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        "components": {
+            "parameters": {
+                "PathParameter": {"in": "path", "name": "key", "required": True, "schema": {"type": "string"},}
+            }
+        },
+    }
+    schema = schemathesis.from_dict(raw_schema)
+    strategy = schema["/api/{key}"]["GET"].as_strategy()
+    assert isinstance(strategy.example().path_parameters["key"], str)
