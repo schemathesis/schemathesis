@@ -168,6 +168,35 @@ def fast_api_schema():
     }
 
 
+@pytest.fixture(scope="session")
+def schema_with_get_payload():
+    return {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"key": {"type": "string"}},
+                                    "required": ["key"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}
+                    },
+                }
+            }
+        },
+    }
+
+
 ROOT_SCHEMA = {
     "openapi": "3.0.2",
     "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},

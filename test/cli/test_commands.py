@@ -1356,3 +1356,13 @@ def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_lim
     lines = result.stdout.splitlines()
     assert result.exit_code == ExitCode.OK, result.stdout
     assert lines[10] == expected
+
+
+def test_get_request_with_body(testdir, cli, base_url, schema_with_get_payload):
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema_with_get_payload))
+    result = cli.run(
+        str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=1", "--show-errors-tracebacks",
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    lines = result.stdout.splitlines()
+    assert "schemathesis.exceptions.InvalidSchema: Body parameters are defined for GET request." in lines
