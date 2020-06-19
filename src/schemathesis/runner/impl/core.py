@@ -11,14 +11,14 @@ from requests.auth import HTTPDigestAuth, _basic_auth_str
 
 from ..._hypothesis import make_test_or_exception
 from ...constants import USER_AGENT
-from ...exceptions import InvalidSchema, get_grouped_exception
+from ...exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from ...hooks import HookContext, get_all_by_name
 from ...models import Case, CheckFunction, Endpoint, Status, TestResult, TestResultSet
 from ...runner import events
 from ...schemas import BaseSchema
 from ...stateful import ParsedData, StatefulTest
 from ...types import RawAuth
-from ...utils import GenericResponse, capture_hypothesis_output
+from ...utils import GenericResponse, capture_hypothesis_output, format_exception
 from ..targeted import Target
 
 DEFAULT_DEADLINE = 500  # pragma: no mutate
@@ -135,7 +135,7 @@ class BaseRunner:
             )
 
 
-def run_test(
+def run_test(  # pylint: disable=too-many-locals
     endpoint: Endpoint,
     test: Union[Callable, InvalidSchema],
     checks: Iterable[CheckFunction],
@@ -159,9 +159,8 @@ def run_test(
             with capture_hypothesis_output() as hypothesis_output:
                 test(checks, targets, result, headers=headers, **kwargs)
             status = Status.success
-    except (AssertionError, hypothesis.errors.MultipleFailures):
+    except (CheckFailed, hypothesis.errors.MultipleFailures):
         status = Status.failure
-        result.mark_failed()  # `AssertionError` may come from `hypothesis-jsonschema`
     except hypothesis.errors.Flaky:
         status = Status.error
         result.mark_errored()
@@ -184,6 +183,10 @@ def run_test(
     except KeyboardInterrupt:
         yield events.Interrupted()
         return
+    except AssertionError as exc:  # comes from `hypothesis-jsonschema`
+        error = reraise(exc)
+        status = Status.error
+        result.add_error(error)
     except Exception as error:
         status = Status.error
         result.add_error(error)
@@ -196,6 +199,18 @@ def run_test(
     yield events.AfterExecution.from_result(
         result=result, status=status, elapsed_time=test_elapsed_time, hypothesis_output=hypothesis_output
     )
+
+
+def reraise(error: AssertionError) -> InvalidSchema:
+    traceback = format_exception(error, True)
+    if "assert type_ in TYPE_STRINGS" in traceback:
+        message = "Invalid type name"
+    else:
+        message = "Unknown schema error"
+    try:
+        raise InvalidSchema(message) from error
+    except InvalidSchema as exc:
+        return exc
 
 
 def run_checks(case: Case, checks: Iterable[CheckFunction], result: TestResult, response: GenericResponse) -> None:

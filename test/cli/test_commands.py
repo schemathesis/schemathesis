@@ -605,7 +605,7 @@ def test_flaky(cli, cli_args, workers):
 
 
 @pytest.mark.endpoints("invalid")
-@pytest.mark.parametrize("workers", (1, 2))
+@pytest.mark.parametrize("workers", (1,))
 def test_invalid_endpoint(cli, cli_args, workers):
     # When the app's schema contains errors
     # For example if its type is "int" but should be "integer"
@@ -618,9 +618,14 @@ def test_invalid_endpoint(cli, cli_args, workers):
     # And this endpoint should be marked as errored in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[10].startswith("POST /api/invalid F")
+        assert lines[10].startswith("POST /api/invalid E")
     else:
-        assert lines[10] == "F"
+        assert lines[10] == "E"
+    assert " POST: /api/invalid " in lines[13]
+    # There shouldn't be a section end immediately after section start - there should be some error text
+    # An internal error happened during a test run
+    # Error: AssertionError
+    assert not lines[14].startswith("=")
 
 
 @pytest.mark.endpoints("invalid")
