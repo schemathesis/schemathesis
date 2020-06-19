@@ -96,9 +96,11 @@ def get_single_example(strategy: st.SearchStrategy[Case]) -> Case:
     return examples[0]
 
 
-def is_valid_header(headers: Dict[str, str]) -> bool:
+def is_valid_header(headers: Dict[str, Any]) -> bool:
     """Verify if the generated headers are valid."""
     for name, value in headers.items():
+        if not isinstance(value, str):
+            return False
         if not utils.is_latin_1_encodable(value):
             return False
         if utils.has_invalid_characters(name, value):
