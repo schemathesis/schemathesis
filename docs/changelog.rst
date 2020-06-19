@@ -12,6 +12,11 @@ Added
 - support for multiple examples with OpenAPI ``examples``. `#589`_
 - ``--verbosity`` CLI option to minimize the error output. `#598`_
 
+Fixed
+~~~~~
+
+- Crash during generation of loosely-defined headers. `#621`_
+
 `1.8.0`_ - 2020-06-15
 ---------------------
 
@@ -1120,7 +1125,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
-.. _#589: https://github.com/kiwicom/schemathesis/issues/589
+.. _#621: https://github.com/kiwicom/schemathesis/issues/621
 .. _#614: https://github.com/kiwicom/schemathesis/issues/614
 .. _#612: https://github.com/kiwicom/schemathesis/issues/612
 .. _#600: https://github.com/kiwicom/schemathesis/issues/600
@@ -1128,6 +1133,7 @@ Fixed
 .. _#598: https://github.com/kiwicom/schemathesis/issues/598
 .. _#596: https://github.com/kiwicom/schemathesis/issues/596
 .. _#594: https://github.com/kiwicom/schemathesis/issues/594
+.. _#589: https://github.com/kiwicom/schemathesis/issues/589
 .. _#586: https://github.com/kiwicom/schemathesis/issues/586
 .. _#582: https://github.com/kiwicom/schemathesis/issues/582
 .. _#579: https://github.com/kiwicom/schemathesis/issues/579
