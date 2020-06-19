@@ -160,7 +160,10 @@ def test_invalid_custom_strategy(values, error):
 
 
 @pytest.mark.hypothesis_nested
-def test_valid_headers(base_url, swagger_20):
+@pytest.mark.parametrize(
+    "definition", ({"name": "api_key", "in": "header", "type": "string"}, {"name": "api_key", "in": "header"})
+)
+def test_valid_headers(base_url, swagger_20, definition):
     endpoint = Endpoint(
         "/api/success",
         "GET",
@@ -168,7 +171,7 @@ def test_valid_headers(base_url, swagger_20):
         schema=swagger_20,
         base_url=base_url,
         headers={
-            "properties": {"api_key": {"name": "api_key", "in": "header", "type": "string"}},
+            "properties": {"api_key": definition},
             "additionalProperties": False,
             "type": "object",
             "required": ["api_key"],
@@ -176,7 +179,7 @@ def test_valid_headers(base_url, swagger_20):
     )
 
     @given(case=get_case_strategy(endpoint))
-    @settings(suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
+    @settings(suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow], deadline=None, max_examples=10)
     def inner(case):
         case.call()
 
