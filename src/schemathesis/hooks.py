@@ -9,6 +9,7 @@ from hypothesis import strategies as st
 
 from .models import Case, Endpoint
 from .types import GenericTest, Hook
+from .utils import GenericResponse
 
 
 def warn_deprecated_hook(hook: Hook) -> None:
@@ -231,10 +232,10 @@ def before_add_examples(context: HookContext, examples: List[Case]) -> None:
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
-def add_case(context: HookContext, case: Case) -> Case:
-    """Creates an additional test per endpoint.
+def add_case(context: HookContext, case: Case, response: GenericResponse) -> Optional[Case]:
+    """Creates an additional test per endpoint. If this hook returns None, no additional test created.
 
-    Called before request is sent with a copy of the original case object.
+    Called with a copy of the original case object and the server's response to the original case.
     """
 
 
