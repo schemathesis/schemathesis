@@ -16,7 +16,7 @@ from schemathesis.checks import content_type_conformance, response_schema_confor
 from schemathesis.constants import USER_AGENT
 from schemathesis.models import Status
 from schemathesis.runner import ThreadPoolRunner, events, get_base_url, get_requests_auth, prepare
-from schemathesis.runner.impl.core import get_wsgi_auth
+from schemathesis.runner.impl.core import get_wsgi_auth, reraise
 
 
 def execute(schema_uri, loader=loaders.from_uri, **options) -> events.Finished:
@@ -613,3 +613,11 @@ def test_workers_num_regression(mocker, schema_url):
     spy = mocker.patch("schemathesis.runner.ThreadPoolRunner", wraps=ThreadPoolRunner)
     execute(schema_url, workers_num=5)
     assert spy.call_args[1]["workers_num"] == 5
+
+
+def test_reraise():
+    try:
+        raise AssertionError("Foo")
+    except AssertionError as exc:
+        error = reraise(exc)
+        assert error.args[0] == "Unknown schema error"
