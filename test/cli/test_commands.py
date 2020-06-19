@@ -815,7 +815,7 @@ def test_add_case(testdir, cli, schema_url):
             import click
 
             @schemathesis.hooks.register
-            def add_case(context, case):
+            def add_case(context, case, response):
                 if not case.headers:
                     case.headers = {}
                 case.headers["copy"] = "this is a copied case"
@@ -839,6 +839,34 @@ def test_add_case(testdir, cli, schema_url):
 
 
 @pytest.mark.usefixtures("reset_hooks")
+def test_add_case_returns_none(testdir, cli, schema_url):
+    """Tests that no additional test case created when the add_case hook returns None."""
+    module = testdir.make_importable_pyfile(
+        hook="""
+            import schemathesis
+            import click
+
+            @schemathesis.hooks.register
+            def add_case(context, case, response):
+                return None
+
+            @schemathesis.register_check
+            def add_case_check(response, case):
+                click.echo("Validating case.")
+            """
+    )
+
+    result = cli.main(
+        "--pre-run", module.purebasename, "run", "-c", "add_case_check", schema_url, "--hypothesis-max-examples=1"
+    )
+
+    assert result.exit_code == ExitCode.OK
+    # with --hypothesis-max-examples=1 and 2 endpoints, only two cases should be created and validated.
+    # If the count is greater than 2, additional test cases should not have been created but were created.
+    assert result.stdout.count("Validating case.") == 2
+
+
+@pytest.mark.usefixtures("reset_hooks")
 def test_multiple_add_case_hooks(testdir, cli, schema_url):
     """add_case hooks that mutate the case in place should not affect other cases."""
 
@@ -848,14 +876,14 @@ def test_multiple_add_case_hooks(testdir, cli, schema_url):
             import click
 
             @schemathesis.hooks.register("add_case")
-            def add_first_header(context, case):
+            def add_first_header(context, case, response):
                 if not case.headers:
                     case.headers = {}
                 case.headers["first"] = "first header"
                 return case
 
             @schemathesis.hooks.register("add_case")
-            def add_second_header(context, case):
+            def add_second_header(context, case, response):
                 if not case.headers:
                     case.headers = {}
                 case.headers["second"] = "second header"
@@ -890,14 +918,14 @@ def test_add_case_output(testdir, cli, schema_url):
             import click
 
             @schemathesis.hooks.register("add_case")
-            def add_first_header(context, case):
+            def add_first_header(context, case, response):
                 if not case.headers:
                     case.headers = {}
                 case.headers["first"] = "first header"
                 return case
 
             @schemathesis.hooks.register("add_case")
-            def add_second_header(context, case):
+            def add_second_header(context, case, response):
                 if not case.headers:
                     case.headers = {}
                 case.headers["second"] = "second header"

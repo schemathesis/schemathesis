@@ -198,9 +198,23 @@ behavior in the API by changing specific details of the duplicate request.
 
 .. code:: python
 
-    def add_case(context: HookContext, case: Case) -> Case:
+    def add_case(context: HookContext, case: Case, response: GenericResponse) -> Optional[Case]:
         case.headers["Content-Type"] = "application/json"
         return case
+
+If you only want to create another case conditionally, you may return None, and no additional test will be created. For example, you may only want to create
+an additional test case if the original case received a successful response from the server.
+
+.. code:: python
+
+    def add_case(context: HookContext, case: Case, response: GenericResponse) -> Optional[Case]:
+        if 200 <= response.status_code < 300:
+            # if the original case was successful, see if an invalid content type header produces a failure
+            case.headers["Content-Type"] = "invalid/content/type"
+            return case
+        else:
+            # original case produced non-2xx response, do not create additional test case
+            return None
 
 Note: A partial deep copy of the ``Case`` object is passed to each ``add_case`` hook. ``Case.endpoint.app`` is a reference to the original ``app``, 
 and ``Case.endpoint.schema`` is a shallow copy, so changes to these fields will be reflected in other tests.

@@ -9,6 +9,7 @@ Changelog
 Added
 ~~~~~
 
+- pass original case's response to ``add_case`` hook.
 - support for multiple examples with OpenAPI ``examples``. `#589`_
 - ``--verbosity`` CLI option to minimize the error output. `#598`_
 
