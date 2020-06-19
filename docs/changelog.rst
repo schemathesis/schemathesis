@@ -12,10 +12,17 @@ Added
 - support for multiple examples with OpenAPI ``examples``. `#589`_
 - ``--verbosity`` CLI option to minimize the error output. `#598`_
 
+Changed
+~~~~~~~
+
+- Tests with invalid schemas marked as errors, instead of failures. `#622`_
+
 Fixed
 ~~~~~
 
 - Crash during generation of loosely-defined headers. `#621`_
+- Show exception information for test runs on invalid schemas with ``--validate-schema=false`` command-line option.
+  Before the output sections for invalid endpoints were empty. `#622`_
 
 `1.8.0`_ - 2020-06-15
 ---------------------
@@ -23,7 +30,7 @@ Fixed
 Fixed
 ~~~~~
 
-- Tests with invalid schemas are marked as failed when ``hypothesis-jsonschema>=0.16`` is installed. `#614`_
+- Tests with invalid schemas are marked as failed instead of passed when ``hypothesis-jsonschema>=0.16`` is installed. `#614`_
 - ``KeyError`` during creating endpoint strategy if it contains a reference. `#612`_
 
 Changed
