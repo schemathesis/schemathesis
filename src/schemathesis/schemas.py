@@ -140,7 +140,7 @@ class BaseSchema(Mapping):
         warn_deprecated_hook(hook)
         if place not in HookLocation.__members__:
             raise KeyError(place)
-        self.hooks.register_hook_with_name(f"before_generate_{place}", hook, skip_validation=True)
+        self.hooks.register_hook_with_name(hook, f"before_generate_{place}", skip_validation=True)
 
     @deprecated("'with_hook` is deprecated, use `hooks.apply' instead")
     def with_hook(self, place: str, hook: Hook) -> Callable[[GenericTest], GenericTest]:
@@ -149,7 +149,7 @@ class BaseSchema(Mapping):
         if place not in HookLocation.__members__:
             raise KeyError(place)
 
-        return self.hooks.apply(f"before_generate_{place}", hook, skip_validation=True)
+        return self.hooks.apply(hook, name=f"before_generate_{place}", skip_validation=True)
 
     def get_local_hook_dispatcher(self) -> Optional[HookDispatcher]:
         """Get a HookDispatcher instance bound to the test if present."""

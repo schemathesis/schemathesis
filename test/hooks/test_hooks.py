@@ -92,14 +92,14 @@ from hypothesis import strategies as st
 def replacement(context, strategy):
     return st.just({"id": "foobar"})
 
-@schema.hooks.apply("before_generate_query", replacement)
+@schema.hooks.apply(replacement, name="before_generate_query")
 @schema.parametrize()
 @settings(max_examples=1)
 def test_a(case):
     assert case.query["id"] == "foobar"
 
 @schema.parametrize()
-@schema.hooks.apply("before_generate_query", replacement)
+@schema.hooks.apply(replacement, name="before_generate_query")
 @settings(max_examples=1)
 def test_b(case):
     assert case.query["id"] == "foobar"
@@ -107,13 +107,13 @@ def test_b(case):
 def another_replacement(context, strategy):
     return st.just({"id": "foobaz"})
 
-def third_replacement(context, strategy):
+def before_generate_headers(context, strategy):
     return st.just({"value": "spam"})
 
 @schema.parametrize()
-@schema.hooks.apply("before_generate_query", another_replacement)  # Higher priority
-@schema.hooks.apply("before_generate_query", replacement)
-@schema.hooks.apply("before_generate_headers", third_replacement)
+@schema.hooks.apply(another_replacement, name="before_generate_query")  # Higher priority
+@schema.hooks.apply(replacement, name="before_generate_query")
+@schema.hooks.apply(before_generate_headers)
 @settings(max_examples=1)
 def test_c(case):
     assert case.query["id"] == "foobaz"
@@ -189,7 +189,7 @@ def test_local_dispatcher(schema, apply_first):
         return strategy
 
     # And order of decorators is any
-    apply = schema.hooks.apply("before_generate_cookies", local_hook)
+    apply = schema.hooks.apply(local_hook, name="before_generate_cookies")
     parametrize = schema.parametrize()
     if apply_first:
         wrap = lambda x: parametrize(apply(x))
@@ -293,7 +293,7 @@ def another_hook(context, examples):
 IDX = 0
 
 @schema.parametrize()
-@schema.hooks.apply("before_add_examples", another_hook)
+@schema.hooks.apply(another_hook, name="before_add_examples")
 @settings(phases=[Phase.explicit])
 def test_b(case):
     global IDX
