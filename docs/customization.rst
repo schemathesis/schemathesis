@@ -28,10 +28,10 @@ To register a new hook function you need to use special decorators - ``register`
     def schema_hook(context, strategy):
         return strategy.filter(lambda x: int(x["id"]) % 2 == 0)
 
-    def function_hook(context, strategy):
+    def before_generate_headers(context, strategy):
         return strategy.filter(lambda x: len(x["id"]) > 5)
 
-    @schema.hooks.apply("before_generate_query", function_hook)
+    @schema.hooks.apply(before_generate_headers)
     @schema.parametrize()
     def test_api(case):
         ...
