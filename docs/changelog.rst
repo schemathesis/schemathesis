@@ -13,6 +13,7 @@ Added
 - Support for multiple examples with OpenAPI ``examples``. `#589`_
 - ``--verbosity`` CLI option to minimize the error output. `#598`_
 - Allow register function-level hooks without passing their name as the first argument to ``apply``. `#618`_
+- Support for hook usage via ``LazySchema`` / ``from_pytest_fixture``. `#617`_
 
 Changed
 ~~~~~~~
@@ -1136,6 +1137,7 @@ Fixed
 
 .. _#621: https://github.com/kiwicom/schemathesis/issues/621
 .. _#618: https://github.com/kiwicom/schemathesis/issues/618
+.. _#617: https://github.com/kiwicom/schemathesis/issues/617
 .. _#614: https://github.com/kiwicom/schemathesis/issues/614
 .. _#612: https://github.com/kiwicom/schemathesis/issues/612
 .. _#600: https://github.com/kiwicom/schemathesis/issues/600
