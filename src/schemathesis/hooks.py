@@ -82,28 +82,35 @@ class HookDispatcher:
 
             def decorator(func: Callable) -> Callable:
                 hook_name = cast(str, hook)
-                return self.register_hook_with_name(hook_name, func)
+                return self.register_hook_with_name(func, hook_name)
 
             return decorator
-        return self.register_hook_with_name(hook.__name__, hook)
+        return self.register_hook_with_name(hook, hook.__name__)
 
-    def apply(self, name: str, hook: Callable, skip_validation: bool = False) -> Callable[[Callable], Callable]:
+    def apply(
+        self, hook: Callable, *, name: Optional[str] = None, skip_validation: bool = False
+    ) -> Callable[[Callable], Callable]:
         """Register hook to run only on one test function.
 
         Example:
-            def hook(strategy, context):
+            def before_generate_query(strategy, context):
                 ...
 
-            @schema.hooks.apply("before_generate_query", hook)
+            @schema.hooks.apply(before_generate_query)
             @schema.parametrize()
             def test_api(case):
                 ...
 
         """
 
+        if name is None:
+            hook_name = hook.__name__
+        else:
+            hook_name = name
+
         def decorator(func: GenericTest) -> GenericTest:
             dispatcher = self.add_dispatcher(func)
-            dispatcher.register_hook_with_name(name, hook, skip_validation)
+            dispatcher.register_hook_with_name(hook, hook_name, skip_validation)
             return func
 
         return decorator
@@ -115,7 +122,7 @@ class HookDispatcher:
             func._schemathesis_hooks = cls(scope=HookScope.TEST)  # type: ignore
         return func._schemathesis_hooks  # type: ignore
 
-    def register_hook_with_name(self, name: str, hook: Callable, skip_validation: bool = False) -> Callable:
+    def register_hook_with_name(self, hook: Callable, name: str, skip_validation: bool = False) -> Callable:
         """A helper for hooks registration.
 
         Besides its use in this class internally it is used to keep backward compatibility with the old hooks system.
@@ -261,6 +268,6 @@ def register(*args: Union[str, Callable]) -> Callable:
         warn_deprecated_hook(hook)
         if place not in HookLocation.__members__:
             raise KeyError(place)
-        return GLOBAL_HOOK_DISPATCHER.register_hook_with_name(f"before_generate_{place}", hook, skip_validation=True)
+        return GLOBAL_HOOK_DISPATCHER.register_hook_with_name(hook, f"before_generate_{place}", skip_validation=True)
     # This approach is quite naive, but it should be enough for the common use case
     raise TypeError("Invalid number of arguments. Please, use `register` as a decorator.")
