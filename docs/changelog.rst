@@ -9,9 +9,10 @@ Changelog
 Added
 ~~~~~
 
-- pass original case's response to ``add_case`` hook.
-- support for multiple examples with OpenAPI ``examples``. `#589`_
+- Pass original case's response to ``add_case`` hook.
+- Support for multiple examples with OpenAPI ``examples``. `#589`_
 - ``--verbosity`` CLI option to minimize the error output. `#598`_
+- Allow register function-level hooks without passing their name as the first argument to ``apply``. `#618`_
 
 Changed
 ~~~~~~~
@@ -1134,6 +1135,7 @@ Fixed
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#621: https://github.com/kiwicom/schemathesis/issues/621
+.. _#618: https://github.com/kiwicom/schemathesis/issues/618
 .. _#614: https://github.com/kiwicom/schemathesis/issues/614
 .. _#612: https://github.com/kiwicom/schemathesis/issues/612
 .. _#600: https://github.com/kiwicom/schemathesis/issues/600
