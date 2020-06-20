@@ -96,18 +96,27 @@ class BaseSchema(Mapping):
 
         def wrapper(func: GenericTest) -> GenericTest:
             HookDispatcher.add_dispatcher(func)
-            func._schemathesis_test = self.clone(func, method, endpoint, tag, operation_id, validate_schema)  # type: ignore
+            func._schemathesis_test = self.clone(  # type: ignore
+                test_function=func,
+                method=method,
+                endpoint=endpoint,
+                tag=tag,
+                operation_id=operation_id,
+                validate_schema=validate_schema,
+            )
             return func
 
         return wrapper
 
     def clone(  # pylint: disable=too-many-arguments
         self,
+        *,
         test_function: Optional[GenericTest] = None,
         method: Optional[Filter] = NOT_SET,
         endpoint: Optional[Filter] = NOT_SET,
         tag: Optional[Filter] = NOT_SET,
         operation_id: Optional[Filter] = NOT_SET,
+        hooks: Union[HookDispatcher, NotSet] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
     ) -> "BaseSchema":
         if method is NOT_SET:
@@ -120,6 +129,8 @@ class BaseSchema(Mapping):
             operation_id = self.operation_id
         if validate_schema is NOT_SET:
             validate_schema = self.validate_schema
+        if hooks is NOT_SET:
+            hooks = self.hooks
 
         return self.__class__(
             self.raw_schema,
@@ -130,7 +141,7 @@ class BaseSchema(Mapping):
             tag=tag,
             operation_id=operation_id,
             app=self.app,
-            hooks=self.hooks,
+            hooks=hooks,  # type: ignore
             test_function=test_function,
             validate_schema=validate_schema,  # type: ignore
         )
@@ -155,7 +166,8 @@ class BaseSchema(Mapping):
         """Get a HookDispatcher instance bound to the test if present."""
         # It might be not present when it is used without pytest via `Endpoint.as_strategy()`
         if self.test_function is not None:
-            return self.test_function._schemathesis_hooks  # type: ignore
+            # Might be missing it in case of `LazySchema` usage
+            return getattr(self.test_function, "_schemathesis_hooks", None)  # type: ignore
         return None
 
     def dispatch_hook(self, name: str, context: HookContext, *args: Any, **kwargs: Any) -> None:
