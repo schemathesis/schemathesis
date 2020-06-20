@@ -1,3 +1,6 @@
+import pytest
+
+
 def test_default(testdir):
     # When LazySchema is used
     testdir.make_test(
@@ -419,6 +422,46 @@ def test_(request, case):
     )
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1, failed=1)
-    result.stdout.re_match_lines(
-        [r"E       Failed: Body parameters are defined for GET request.",]
+    result.stdout.re_match_lines([r"E       Failed: Body parameters are defined for GET request."])
+
+
+@pytest.mark.parametrize(
+    "decorators",
+    (
+        """@lazy_schema.hooks.apply(before_generate_headers)
+@lazy_schema.parametrize()""",
+        """@lazy_schema.parametrize()
+@lazy_schema.hooks.apply(before_generate_headers)""",
+    ),
+)
+def test_hooks_with_lazy_schema(testdir, simple_openapi, decorators):
+    testdir.make_test(
+        f"""
+@pytest.fixture
+def simple_schema():
+    return schema
+
+lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+
+@lazy_schema.hooks.register
+def before_generate_query(context, strategy):
+    return strategy.filter(lambda x: x["id"].isdigit())
+
+def before_generate_headers(context, strategy):
+    def convert(x):
+        x["value"] = "cool"
+        return x
+    return strategy.map(convert)
+
+{decorators}
+@settings(max_examples=5)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.query["id"].isdigit()
+    assert case.headers["value"] == "cool"
+""",
+        schema=simple_openapi,
     )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines(["Hypothesis calls: 5"])

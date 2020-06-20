@@ -7,9 +7,10 @@ from _pytest.fixtures import FixtureRequest
 from pytest_subtests import SubTests
 
 from .exceptions import InvalidSchema
+from .hooks import HookDispatcher, HookScope
 from .models import Endpoint
 from .schemas import BaseSchema
-from .types import Filter, NotSet
+from .types import Filter, GenericTest, NotSet
 from .utils import NOT_SET
 
 
@@ -20,6 +21,7 @@ class LazySchema:
     endpoint: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
     tag: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
     operation_id: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
+    hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
 
     def parametrize(  # pylint: disable=too-many-arguments
@@ -42,7 +44,19 @@ class LazySchema:
         def wrapper(func: Callable) -> Callable:
             def test(request: FixtureRequest, subtests: SubTests) -> None:
                 """The actual test, which is executed by pytest."""
-                schema = get_schema(request, self.fixture_name, method, endpoint, tag, operation_id, validate_schema)
+                if hasattr(test, "_schemathesis_hooks"):
+                    func._schemathesis_hooks = test._schemathesis_hooks  # type: ignore
+                schema = get_schema(
+                    request=request,
+                    name=self.fixture_name,
+                    method=method,
+                    endpoint=endpoint,
+                    tag=tag,
+                    operation_id=operation_id,
+                    hooks=self.hooks,
+                    test_function=func,
+                    validate_schema=validate_schema,
+                )
                 fixtures = get_fixtures(func, request)
                 # Changing the node id is required for better reporting - the method and endpoint will appear there
                 node_id = subtests.item._nodeid
@@ -85,12 +99,15 @@ def run_subtest(endpoint: Endpoint, fixtures: Dict[str, Any], sub_test: Callable
 
 
 def get_schema(
+    *,
     request: FixtureRequest,
     name: str,
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
+    test_function: GenericTest,
+    hooks: HookDispatcher,
     validate_schema: Union[bool, NotSet] = NOT_SET,
 ) -> BaseSchema:
     """Loads a schema from the fixture."""
@@ -99,7 +116,13 @@ def get_schema(
     if not isinstance(schema, BaseSchema):
         raise ValueError(f"The given schema must be an instance of BaseSchema, got: {type(schema)}")
     return schema.clone(
-        method=method, endpoint=endpoint, tag=tag, operation_id=operation_id, validate_schema=validate_schema
+        method=method,
+        endpoint=endpoint,
+        tag=tag,
+        operation_id=operation_id,
+        test_function=test_function,
+        hooks=hooks,
+        validate_schema=validate_schema,
     )
 
 
