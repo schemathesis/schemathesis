@@ -173,14 +173,17 @@ def make_loader(*tags_to_remove: str) -> Type[yaml.SafeLoader]:
     # Fix pyyaml scientific notation parse bug
     # See PR: https://github.com/yaml/pyyaml/pull/174 for upstream fix
     cls.add_implicit_resolver(  # type: ignore
-        'tag:yaml.org,2002:float',
-        re.compile(r'''^(?:[-+]?(?:[0-9][0-9_]*)\.[0-9_]*(?:[eE][-+]?[0-9]+)?
+        "tag:yaml.org,2002:float",
+        re.compile(
+            r"""^(?:[-+]?(?:[0-9][0-9_]*)\.[0-9_]*(?:[eE][-+]?[0-9]+)?
                        |[-+]?(?:[0-9][0-9_]*)(?:[eE][-+]?[0-9]+)
                        |\.[0-9_]+(?:[eE][-+]?[0-9]+)?
                        |[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\.[0-9_]*
                        |[-+]?\.(?:inf|Inf|INF)
-                       |\.(?:nan|NaN|NAN))$''', re.X),
-        list(u'-+0123456789.'),
+                       |\.(?:nan|NaN|NAN))$""",
+            re.X,
+        ),
+        list("-+0123456789."),
     )
 
     return cls
