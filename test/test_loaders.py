@@ -1,4 +1,5 @@
 import json
+
 import pytest
 
 import schemathesis
@@ -79,10 +80,7 @@ def test_number_deserializing(testdir):
                             "name": "key",
                             "in": "query",
                             "required": True,
-                            "schema": {
-                                "type": "number",
-                                "multipleOf": 0.00001,
-                            },
+                            "schema": {"type": "number", "multipleOf": 0.00001,},
                         }
                     ],
                     "responses": {"200": {"description": "OK"}},
@@ -93,4 +91,7 @@ def test_number_deserializing(testdir):
 
     schema_path = testdir.makefile(".yaml", schema=json.dumps(schema))
     # Then yaml loader should parse them without schema validation errors
-    schemathesis.from_path(str(schema_path))
+    parsed = schemathesis.from_path(str(schema_path))
+    # and the value should be a number
+    value = parsed.raw_schema["paths"]["/teapot"]["get"]["parameters"][0]["schema"]["multipleOf"]
+    assert isinstance(value, float)
