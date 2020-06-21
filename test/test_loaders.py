@@ -1,3 +1,4 @@
+import json
 import pytest
 
 import schemathesis
@@ -62,3 +63,35 @@ def test_operation_id(operation_id):
     assert len(list(schema.get_all_endpoints())) == 1
     for endpoint in schema.get_all_endpoints():
         assert endpoint.definition.raw["operationId"] == operation_id
+
+
+@pytest.mark.hypothesis_nested
+def test_number_deserializing(testdir):
+    # When numbers in schema are written in scientific notation but without a dot (achieved by dumping the schema with json.dumps)
+    schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/teapot": {
+                "get": {
+                    "summary": "Test",
+                    "parameters": [
+                        {
+                            "name": "key",
+                            "in": "query",
+                            "required": True,
+                            "schema": {
+                                "type": "number",
+                                "multipleOf": 0.00001,
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+
+    schema_path = testdir.makefile(".yaml", schema=json.dumps(schema))
+    # Then yaml loader should parse them without schema validation errors
+    schemathesis.from_path(str(schema_path))
