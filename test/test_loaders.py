@@ -65,7 +65,6 @@ def test_operation_id(operation_id):
         assert endpoint.definition.raw["operationId"] == operation_id
 
 
-@pytest.mark.hypothesis_nested
 def test_number_deserializing(testdir):
     # When numbers in schema are written in scientific notation but without a dot (achieved by dumping the schema with json.dumps)
     schema = {
