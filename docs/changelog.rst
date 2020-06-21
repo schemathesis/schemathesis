@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Schema validation error on schemas containing numeric values in scientific notation without a dot. `#629`_
+
 `1.9.0`_ - 2020-06-20
 ---------------------
 
@@ -29,7 +34,6 @@ Fixed
 - Crash during generation of loosely-defined headers. `#621`_
 - Show exception information for test runs on invalid schemas with ``--validate-schema=false`` command-line option.
   Before the output sections for invalid endpoints were empty. `#622`_
-- Schema validation error on schemas containing numeric values in scientific notation without a dot. `#629`_
 
 `1.8.0`_ - 2020-06-15
 ---------------------
