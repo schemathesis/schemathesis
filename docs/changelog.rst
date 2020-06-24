@@ -5,6 +5,10 @@ Changelog
 
 `Unreleased`_
 -------------
+Added
+~~~~~
+
+- ``loaders.from_asgi`` supports making calls to ASGI-compliant application (For example: FastAPI). `#521`_
 
 `1.9.1`_ - 2020-06-21
 ---------------------
@@ -1179,6 +1183,7 @@ Fixed
 .. _#521: https://github.com/kiwicom/schemathesis/issues/521
 .. _#519: https://github.com/kiwicom/schemathesis/issues/519
 .. _#513: https://github.com/kiwicom/schemathesis/issues/513
+.. _#512: https://github.com/kiwicom/schemathesis/issues/512
 .. _#504: https://github.com/kiwicom/schemathesis/issues/504
 .. _#503: https://github.com/kiwicom/schemathesis/issues/503
 .. _#499: https://github.com/kiwicom/schemathesis/issues/499
