@@ -14,6 +14,7 @@ import attr
 import requests
 import werkzeug
 from hypothesis.strategies import SearchStrategy
+from starlette.testclient import TestClient as ASGIClient
 
 from .checks import ALL_CHECKS
 from .exceptions import InvalidSchema
@@ -176,6 +177,23 @@ class Case:
         client = werkzeug.Client(application, WSGIResponse)
         with cookie_handler(client, self.cookies):
             return client.open(**data, **kwargs)
+
+    def call_asgi(
+        self,
+        app: Any = None,
+        base_url: Optional[str] = "http://testserver",
+        headers: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
+    ) -> requests.Response:
+        application = app or self.app
+        if application is None:
+            raise RuntimeError(
+                "ASGI application instance is required. "
+                "Please, set `app` argument in the schema constructor or pass it to `call_asgi`"
+            )
+        client = ASGIClient(application)
+
+        return self.call(base_url=base_url, session=client, headers=headers, **kwargs)
 
     def validate_response(
         self,

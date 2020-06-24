@@ -8,7 +8,7 @@ from hypothesis import settings
 import schemathesis.cli
 from schemathesis.extra._aiohttp import run_server
 
-from .apps import Endpoint, _aiohttp, _flask
+from .apps import Endpoint, _aiohttp, _fastapi, _flask
 from .utils import make_schema
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
@@ -359,6 +359,11 @@ def testdir(testdir):
 @pytest.fixture()
 def flask_app(endpoints):
     return _flask.create_app(endpoints)
+
+
+@pytest.fixture()
+def fastapi_app():
+    return _fastapi.create_app()
 
 
 def make_importable(module):
