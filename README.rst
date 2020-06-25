@@ -86,7 +86,7 @@ To speed up the testing process Schemathesis provides ``-w/--workers`` option fo
 
 In the example above all tests will be distributed among 8 worker threads.
 
-If you'd like to test your web app (Flask or AioHTTP for example) then there is ``--app`` option for you:
+If you'd like to test your web app (Flask or AioHTTP or FastAPI for example) then there is ``--app`` option for you:
 
 .. code:: bash
 

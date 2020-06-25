@@ -360,3 +360,39 @@ def get_wsgi_auth(auth: Optional[RawAuth], auth_type: Optional[str]) -> Optional
             raise ValueError("Digest auth is not supported for WSGI apps")
         return _basic_auth_str(*auth)
     return None
+
+
+def asgi_test(
+    case: Case,
+    checks: Iterable[CheckFunction],
+    targets: Iterable[Target],
+    result: TestResult,
+    store_interactions: bool,
+    headers: Optional[Dict[str, Any]],
+    feedback: Feedback,
+) -> None:
+    """A single test body that will be executed against the target."""
+    # pylint: disable=too-many-arguments
+    headers = headers or {}
+
+    response = _asgi_test(case, checks, targets, result, store_interactions, headers, feedback)
+    add_cases(case, response, _asgi_test, checks, targets, result, store_interactions, headers, feedback)
+
+
+def _asgi_test(
+    case: Case,
+    checks: Iterable[CheckFunction],
+    targets: Iterable[Target],
+    result: TestResult,
+    store_interactions: bool,
+    headers: Optional[Dict[str, Any]],
+    feedback: Feedback,
+) -> requests.Response:
+    # pylint: disable=too-many-arguments
+    response = case.call_asgi(headers=headers)
+    run_targets(targets, response.elapsed.total_seconds())
+    if store_interactions:
+        result.store_requests_response(response)
+    run_checks(case, checks, result, response)
+    feedback.add_test_case(case, response)
+    return response

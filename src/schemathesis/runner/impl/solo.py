@@ -6,7 +6,7 @@ import attr
 from ...models import TestResultSet
 from ...utils import get_requests_auth
 from .. import events
-from .core import BaseRunner, get_session, network_test, wsgi_test
+from .core import BaseRunner, asgi_test, get_session, network_test, wsgi_test
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -44,6 +44,22 @@ class SingleThreadWSGIRunner(SingleThreadRunner):
             results=results,
             auth=self.auth,
             auth_type=self.auth_type,
+            headers=self.headers,
+            store_interactions=self.store_interactions,
+        )
+
+
+@attr.s(slots=True)  # pragma: no mutate
+class SingleThreadASGIRunner(SingleThreadRunner):
+    def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
+        yield from self._run_tests(
+            self.schema.get_all_tests,
+            asgi_test,
+            self.hypothesis_settings,
+            self.seed,
+            checks=self.checks,
+            targets=self.targets,
+            results=results,
             headers=self.headers,
             store_interactions=self.store_interactions,
         )
