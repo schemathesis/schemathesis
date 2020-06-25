@@ -2,6 +2,7 @@ from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tup
 from urllib.parse import urlparse
 
 import hypothesis.errors
+from starlette.applications import Starlette
 
 from .. import fixups as _fixups
 from .. import loaders
@@ -14,6 +15,7 @@ from . import events
 from .impl import (
     DEFAULT_STATEFUL_RECURSION_LIMIT,
     BaseRunner,
+    SingleThreadASGIRunner,
     SingleThreadRunner,
     SingleThreadWSGIRunner,
     ThreadPoolRunner,
@@ -211,22 +213,7 @@ def execute_from_schema(
                     stateful_recursion_limit=stateful_recursion_limit,
                 )
         else:
-            if schema.app:
-                runner = SingleThreadWSGIRunner(
-                    schema=schema,
-                    checks=checks,
-                    targets=targets,
-                    hypothesis_settings=hypothesis_options,
-                    auth=auth,
-                    auth_type=auth_type,
-                    headers=headers,
-                    seed=seed,
-                    exit_first=exit_first,
-                    store_interactions=store_interactions,
-                    stateful=stateful,
-                    stateful_recursion_limit=stateful_recursion_limit,
-                )
-            else:
+            if not schema.app:
                 runner = SingleThreadRunner(
                     schema=schema,
                     checks=checks,
@@ -242,6 +229,37 @@ def execute_from_schema(
                     stateful=stateful,
                     stateful_recursion_limit=stateful_recursion_limit,
                 )
+            elif isinstance(schema.app, Starlette):
+                runner = SingleThreadASGIRunner(
+                    schema=schema,
+                    checks=checks,
+                    targets=targets,
+                    hypothesis_settings=hypothesis_options,
+                    auth=auth,
+                    auth_type=auth_type,
+                    headers=headers,
+                    seed=seed,
+                    exit_first=exit_first,
+                    store_interactions=store_interactions,
+                    stateful=stateful,
+                    stateful_recursion_limit=stateful_recursion_limit,
+                )
+            else:
+                runner = SingleThreadWSGIRunner(
+                    schema=schema,
+                    checks=checks,
+                    targets=targets,
+                    hypothesis_settings=hypothesis_options,
+                    auth=auth,
+                    auth_type=auth_type,
+                    headers=headers,
+                    seed=seed,
+                    exit_first=exit_first,
+                    store_interactions=store_interactions,
+                    stateful=stateful,
+                    stateful_recursion_limit=stateful_recursion_limit,
+                )
+
         yield from runner.execute()
     except Exception as exc:
         yield events.InternalError.from_exc(exc)
