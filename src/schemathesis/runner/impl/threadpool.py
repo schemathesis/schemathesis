@@ -13,7 +13,7 @@ from ...types import RawAuth
 from ...utils import capture_hypothesis_output, get_requests_auth
 from .. import events
 from ..targeted import Target
-from .core import BaseRunner, Feedback, get_session, network_test, run_test, wsgi_test
+from .core import BaseRunner, Feedback, asgi_test, get_session, network_test, run_test, wsgi_test
 
 
 def _run_task(
@@ -113,6 +113,36 @@ def wsgi_thread_task(
         results,
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,
+        **kwargs,
+    )
+
+
+def asgi_thread_task(
+    tasks_queue: Queue,
+    events_queue: Queue,
+    checks: Iterable[CheckFunction],
+    targets: Iterable[Target],
+    settings: hypothesis.settings,
+    headers: Optional[Dict[str, Any]],
+    seed: Optional[int],
+    results: TestResultSet,
+    stateful: Optional[str],
+    stateful_recursion_limit: int,
+    kwargs: Any,
+) -> None:
+    # pylint: disable=too-many-arguments
+    _run_task(
+        asgi_test,
+        tasks_queue,
+        events_queue,
+        checks,
+        targets,
+        settings,
+        seed,
+        results,
+        stateful=stateful,
+        stateful_recursion_limit=stateful_recursion_limit,
+        headers=headers,
         **kwargs,
     )
 
@@ -224,6 +254,26 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
                 "headers": self.headers,
                 "store_interactions": self.store_interactions,
             },
+        }
+
+
+class ThreadPoolASGIRunner(ThreadPoolRunner):
+    def _get_task(self) -> Callable:
+        return asgi_thread_task
+
+    def _get_worker_kwargs(self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet) -> Dict[str, Any]:
+        return {
+            "tasks_queue": tasks_queue,
+            "events_queue": events_queue,
+            "checks": self.checks,
+            "targets": self.targets,
+            "settings": self.hypothesis_settings,
+            "headers": self.headers,
+            "seed": self.seed,
+            "results": results,
+            "stateful": self.stateful,
+            "stateful_recursion_limit": self.stateful_recursion_limit,
+            "kwargs": {"store_interactions": self.store_interactions},
         }
 
 

@@ -37,7 +37,7 @@ click = "^7.0"
 importlib_metadata = { version = "^1.1", python = "<3.8" }
 werkzeug = ">0.16.0"
 junit-xml = "^1.9"
-starlette = "^0"
+starlette = "^0.13.2"
 
 [tool.poetry.dev-dependencies]
 coverage = "^4.5"
@@ -48,6 +48,7 @@ pytest-asyncio = "^0.11.0"
 pytest-xdist = "^1.30"
 typing_extensions = "^3.7"
 flask = "^1.1"
+fastapi = "^0.58.0"
 sphinx = "^3.0.3"
 
 [tool.poetry.plugins]

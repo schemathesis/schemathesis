@@ -18,6 +18,7 @@ from .impl import (
     SingleThreadASGIRunner,
     SingleThreadRunner,
     SingleThreadWSGIRunner,
+    ThreadPoolASGIRunner,
     ThreadPoolRunner,
     ThreadPoolWSGIRunner,
 )
@@ -179,23 +180,7 @@ def execute_from_schema(
 
         runner: BaseRunner
         if workers_num > 1:
-            if schema.app:
-                runner = ThreadPoolWSGIRunner(
-                    schema=schema,
-                    checks=checks,
-                    targets=targets,
-                    hypothesis_settings=hypothesis_options,
-                    auth=auth,
-                    auth_type=auth_type,
-                    headers=headers,
-                    seed=seed,
-                    workers_num=workers_num,
-                    exit_first=exit_first,
-                    store_interactions=store_interactions,
-                    stateful=stateful,
-                    stateful_recursion_limit=stateful_recursion_limit,
-                )
-            else:
+            if not schema.app:
                 runner = ThreadPoolRunner(
                     schema=schema,
                     checks=checks,
@@ -212,6 +197,39 @@ def execute_from_schema(
                     stateful=stateful,
                     stateful_recursion_limit=stateful_recursion_limit,
                 )
+            elif isinstance(schema.app, Starlette):
+                runner = ThreadPoolASGIRunner(
+                    schema=schema,
+                    checks=checks,
+                    targets=targets,
+                    hypothesis_settings=hypothesis_options,
+                    auth=auth,
+                    auth_type=auth_type,
+                    headers=headers,
+                    seed=seed,
+                    exit_first=exit_first,
+                    store_interactions=store_interactions,
+                    stateful=stateful,
+                    stateful_recursion_limit=stateful_recursion_limit,
+                )
+
+            else:
+                runner = ThreadPoolWSGIRunner(
+                    schema=schema,
+                    checks=checks,
+                    targets=targets,
+                    hypothesis_settings=hypothesis_options,
+                    auth=auth,
+                    auth_type=auth_type,
+                    headers=headers,
+                    seed=seed,
+                    workers_num=workers_num,
+                    exit_first=exit_first,
+                    store_interactions=store_interactions,
+                    stateful=stateful,
+                    stateful_recursion_limit=stateful_recursion_limit,
+                )
+
         else:
             if not schema.app:
                 runner = SingleThreadRunner(
