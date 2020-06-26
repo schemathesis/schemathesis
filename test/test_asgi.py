@@ -68,7 +68,7 @@ def test_cookies(fastapi_app):
     test()
 
 
-def test_not_wsgi(schema):
+def test_not_app_with_asgi(schema):
     case = Case(schema.endpoints["/users"]["GET"])
     case.endpoint.app = None
     with pytest.raises(
