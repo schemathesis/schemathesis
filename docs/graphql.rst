@@ -18,7 +18,9 @@ pass strategies to Hypothesis's ``given`` decorator.
 
     import schemathesis
 
-    schema = schemathesis.graphql.from_url("https://bahnql.herokuapp.com/graphql")
+    schema = schemathesis.graphql.from_url(
+        "https://bahnql.herokuapp.com/graphql"
+    )
 
     @given(case=schema.query.as_strategy())
     @settings(deadline=None)
