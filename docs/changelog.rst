@@ -5,10 +5,16 @@ Changelog
 
 `Unreleased`_
 -------------
+
 Added
 ~~~~~
 
 - ``loaders.from_asgi`` supports making calls to ASGI-compliant application (For example: FastAPI). `#521`_
+
+Fixed
+~~~~~
+
+- Passing custom headers to schema loader for WSGI / ASGI apps. `#631`_
 
 `1.9.1`_ - 2020-06-21
 ---------------------
@@ -1152,6 +1158,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#631: https://github.com/kiwicom/schemathesis/issues/631
 .. _#629: https://github.com/kiwicom/schemathesis/issues/629
 .. _#621: https://github.com/kiwicom/schemathesis/issues/621
 .. _#618: https://github.com/kiwicom/schemathesis/issues/618
