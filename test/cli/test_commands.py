@@ -344,6 +344,21 @@ def test_load_schema_arguments(cli, mocker, args, expected):
     assert load_schema.call_args[1] == expected
 
 
+def test_load_schema_arguments_headers_to_loader_for_app(testdir, cli, mocker):
+    from_wsgi = mocker.patch("schemathesis.loaders.from_wsgi", autospec=True)
+
+    module = testdir.make_importable_pyfile(
+        location="""
+        from test.apps._flask import create_app
+
+        app = create_app()
+        """
+    )
+    cli.run("/swagger.yaml", "--app", f"{module.purebasename}:app", "-H", "Authorization: Bearer 123")
+
+    assert from_wsgi.call_args[1]["headers"]["Authorization"] == "Bearer 123"
+
+
 def test_all_checks(cli, mocker):
     execute = mocker.patch("schemathesis.runner.execute_from_schema", autospec=True)
     result = cli.run(SCHEMA_URI, "--checks=all")
