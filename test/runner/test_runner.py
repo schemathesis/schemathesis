@@ -407,12 +407,12 @@ def filter_path_parameters():
     # ".." and "." strings are treated specially, but this behavior is outside of the test's scope
     # "" shouldn't be allowed as a valid path parameter
 
-    def schema_filter(strategy):
+    def before_generate_path_parameters(context, strategy):
         return strategy.filter(
             lambda x: x["key"] not in ("..", ".", "", "/") and not (isinstance(x["key"], str) and "/" in x["key"])
         )
 
-    schemathesis.hooks.register("path_parameters", schema_filter)
+    schemathesis.hooks.register(before_generate_path_parameters)
     yield
     schemathesis.hooks.unregister_all()
 

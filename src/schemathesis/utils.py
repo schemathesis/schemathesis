@@ -3,9 +3,7 @@ import pathlib
 import re
 import sys
 import traceback
-import warnings
 from contextlib import contextmanager
-from functools import wraps
 from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Type, Union, overload
 
 import requests
@@ -27,20 +25,6 @@ except ImportError:
 
 
 NOT_SET = NotSet()
-
-
-def deprecated(message: str) -> Callable:
-    """Emit a warning if the given function is used."""
-
-    def wrapper(func: Callable) -> Callable:
-        @wraps(func)  # pragma: no mutate
-        def inner(*args: Any, **kwargs: Any) -> Any:
-            warnings.warn(message, DeprecationWarning)
-            return func(*args, **kwargs)
-
-        return inner
-
-    return wrapper
 
 
 def file_exists(path: str) -> bool:

@@ -1,5 +1,4 @@
 import inspect
-import warnings
 from collections import defaultdict
 from enum import Enum, unique
 from typing import Any, Callable, DefaultDict, Dict, List, Optional, Union, cast
@@ -8,18 +7,8 @@ import attr
 from hypothesis import strategies as st
 
 from .models import Case, Endpoint
-from .types import GenericTest, Hook
+from .types import GenericTest
 from .utils import GenericResponse
-
-
-def warn_deprecated_hook(hook: Hook) -> None:
-    if "context" not in inspect.signature(hook).parameters:
-        warnings.warn(
-            DeprecationWarning(
-                "Hook functions that do not accept `context` argument are deprecated and "
-                "support will be removed in Schemathesis 2.0."
-            )
-        )
 
 
 class HookLocation(Enum):
@@ -249,25 +238,6 @@ def add_case(context: HookContext, case: Case, response: GenericResponse) -> Opt
 GLOBAL_HOOK_DISPATCHER = HookDispatcher(scope=HookScope.GLOBAL)
 dispatch = GLOBAL_HOOK_DISPATCHER.dispatch
 get_all_by_name = GLOBAL_HOOK_DISPATCHER.get_all_by_name
+register = GLOBAL_HOOK_DISPATCHER.register
 unregister = GLOBAL_HOOK_DISPATCHER.unregister
 unregister_all = GLOBAL_HOOK_DISPATCHER.unregister_all
-
-
-def register(*args: Union[str, Callable]) -> Callable:
-    # This code suppose to support backward compatibility with the old hook system.
-    # In Schemathesis 2.0 this function can be replaced with `register = GLOBAL_HOOK_DISPATCHER.register`
-    if len(args) == 1:
-        return GLOBAL_HOOK_DISPATCHER.register(args[0])
-    if len(args) == 2:
-        warnings.warn(
-            "Calling `schemathesis.register` with two arguments is deprecated, use it as a decorator instead.",
-            DeprecationWarning,
-        )
-        place, hook = args
-        hook = cast(Callable, hook)
-        warn_deprecated_hook(hook)
-        if place not in HookLocation.__members__:
-            raise KeyError(place)
-        return GLOBAL_HOOK_DISPATCHER.register_hook_with_name(hook, f"before_generate_{place}", skip_validation=True)
-    # This approach is quite naive, but it should be enough for the common use case
-    raise TypeError("Invalid number of arguments. Please, use `register` as a decorator.")

@@ -18,11 +18,11 @@ from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
 from .exceptions import InvalidSchema
-from .hooks import HookContext, HookDispatcher, HookLocation, HookScope, dispatch, warn_deprecated_hook
+from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import Case, Endpoint
 from .stateful import StatefulTest
-from .types import Filter, GenericTest, Hook, NotSet
-from .utils import NOT_SET, GenericResponse, deprecated
+from .types import Filter, GenericTest, NotSet
+from .utils import NOT_SET, GenericResponse
 
 
 @attr.s()  # pragma: no mutate
@@ -177,22 +177,6 @@ class BaseSchema(Mapping):
             test_function=test_function,
             validate_schema=validate_schema,  # type: ignore
         )
-
-    @deprecated("'register_hook` is deprecated, use `hooks.register' instead")
-    def register_hook(self, place: str, hook: Hook) -> None:
-        warn_deprecated_hook(hook)
-        if place not in HookLocation.__members__:
-            raise KeyError(place)
-        self.hooks.register_hook_with_name(hook, f"before_generate_{place}", skip_validation=True)
-
-    @deprecated("'with_hook` is deprecated, use `hooks.apply' instead")
-    def with_hook(self, place: str, hook: Hook) -> Callable[[GenericTest], GenericTest]:
-        """Register a hook for a specific test."""
-        warn_deprecated_hook(hook)
-        if place not in HookLocation.__members__:
-            raise KeyError(place)
-
-        return self.hooks.apply(hook, name=f"before_generate_{place}", skip_validation=True)
 
     def get_local_hook_dispatcher(self) -> Optional[HookDispatcher]:
         """Get a HookDispatcher instance bound to the test if present."""

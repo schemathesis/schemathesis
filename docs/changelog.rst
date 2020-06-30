@@ -36,6 +36,13 @@ Fixed
     Full URLs before this change   : http://0.0.0.0:8081/api/v2/api/v1/users/  # INVALID!
     Full URLs after  this change   : http://0.0.0.0:8081/api/v2/users/         # VALID!
 
+Removed
+~~~~~~~
+
+- Support for hooks without `context` argument at the first position.
+- Hooks registration by name and function. Use ``register`` decorators instead, for more details see "Customization" section in our documentation.
+- ``BaseSchema.with_hook`` and ``BaseSchema.register_hook``. Use ``BaseSchema.hooks.apply`` and ``BaseSchema.hooks.register`` instead.
+
 `1.10.0`_ - 2020-06-28
 ---------------------
 
