@@ -1,12 +1,9 @@
-import pathlib
-from test.utils import HERE
-
 import pytest
 import yaml
 from _pytest.main import ExitCode
 
 import schemathesis
-from schemathesis.models import Endpoint, EndpointDefinition
+from schemathesis.models import Endpoint
 from schemathesis.specs.openapi import examples
 from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
@@ -86,28 +83,28 @@ def test_get_request_body_examples(endpoint):
     assert len(request_body_examples["examples"]) == 3
 
 
-def test_get_static_params_from_examples(endpoint):
-    static_params_list = examples.get_static_params_from_examples(endpoint, "examples")
+def test_get_static_parameters_from_examples(endpoint):
+    static_parameters_list = examples.get_static_parameters_from_examples(endpoint, "examples")
 
-    assert len(static_params_list) == 3
+    assert len(static_parameters_list) == 3
 
     # ensure that each request body example is included at least once
     assert all(
         [
-            any("string1" == static_params["body"]["foo"] for static_params in static_params_list),
-            any("string2" == static_params["body"]["foo"] for static_params in static_params_list),
-            any("string3" == static_params["body"]["foo"] for static_params in static_params_list),
+            any("string1" == static_parameters["body"]["foo"] for static_parameters in static_parameters_list),
+            any("string2" == static_parameters["body"]["foo"] for static_parameters in static_parameters_list),
+            any("string3" == static_parameters["body"]["foo"] for static_parameters in static_parameters_list),
         ]
     )
     # ensure that each header parameter example is included at least once
     assert all(
         [
-            any("header1" in static_params["headers"]["anyKey"] for static_params in static_params_list),
-            any("header2" in static_params["headers"]["anyKey"] for static_params in static_params_list),
+            any("header1" in static_parameters["headers"]["anyKey"] for static_parameters in static_parameters_list),
+            any("header2" in static_parameters["headers"]["anyKey"] for static_parameters in static_parameters_list),
         ]
     )
     # ensure that each query parameter example is included at least once
-    assert any("query1" in static_params["query"]["id"] for static_params in static_params_list)
+    assert any("query1" in static_parameters["query"]["id"] for static_parameters in static_parameters_list)
 
 
 def test_get_strategies_from_examples(endpoint):
@@ -127,11 +124,15 @@ def test_merge_examples_no_body_examples():
     result = examples.merge_examples(parameter_examples, request_body_examples)
 
     assert len(result) == 3
-    assert all("query" in static_params and "queryParam" in static_params["query"] for static_params in result)
-    assert all("headers" in static_params and "headerParam" in static_params["headers"] for static_params in result)
     assert all(
-        "path_parameters" in static_params and "pathParam" in static_params["path_parameters"]
-        for static_params in result
+        "query" in static_parameters and "queryParam" in static_parameters["query"] for static_parameters in result
+    )
+    assert all(
+        "headers" in static_parameters and "headerParam" in static_parameters["headers"] for static_parameters in result
+    )
+    assert all(
+        "path_parameters" in static_parameters and "pathParam" in static_parameters["path_parameters"]
+        for static_parameters in result
     )
 
 
@@ -144,7 +145,7 @@ def test_merge_examples_with_body_examples():
     result = examples.merge_examples(parameter_examples, request_body_examples)
 
     assert len(result) == 3
-    assert all("body" in static_params and "foo" in static_params["body"] for static_params in result)
+    assert all("body" in static_parameters and "foo" in static_parameters["body"] for static_parameters in result)
 
 
 def test_examples_from_cli(app, testdir, cli, base_url, schema_with_examples):
