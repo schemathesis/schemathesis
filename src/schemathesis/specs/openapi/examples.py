@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from hypothesis.strategies import SearchStrategy
 
@@ -28,7 +28,7 @@ def get_request_body_examples(endpoint_def: Dict[str, Any], examples_field: str)
     return {"type": param_type, "examples": [example["value"] for example in schema.get(examples_field, {}).values()]}
 
 
-def get_static_params_from_example(endpoint: Endpoint) -> Dict[str, Any]:
+def get_static_parameters_from_example(endpoint: Endpoint) -> Dict[str, Any]:
     static_parameters = {}
     for name in PARAMETERS:
         parameter = getattr(endpoint, name)
@@ -37,7 +37,7 @@ def get_static_params_from_example(endpoint: Endpoint) -> Dict[str, Any]:
     return static_parameters
 
 
-def get_static_params_from_examples(endpoint: Endpoint, examples_field: str) -> List[Dict[str, Any]]:
+def get_static_parameters_from_examples(endpoint: Endpoint, examples_field: str) -> List[Dict[str, Any]]:
     endpoint_def = endpoint.definition.resolved
     return merge_examples(
         get_param_examples(endpoint_def, examples_field), get_request_body_examples(endpoint_def, examples_field)
@@ -46,26 +46,25 @@ def get_static_params_from_examples(endpoint: Endpoint, examples_field: str) -> 
 
 def get_strategies_from_examples(endpoint: Endpoint, examples_field: str = "examples") -> List[SearchStrategy[Case]]:
     strategies = [
-        get_strategy(endpoint, static_params)
-        for static_params in get_static_params_from_examples(endpoint, examples_field)
+        get_strategy(endpoint, static_parameters)
+        for static_parameters in get_static_parameters_from_examples(endpoint, examples_field)
     ]
-    strategy = get_strategy(endpoint, get_static_params_from_example(endpoint))
-    if strategy is not None:
+    static_parameters = get_static_parameters_from_example(endpoint)
+    if static_parameters:
+        strategy = get_strategy(endpoint, get_static_parameters_from_example(endpoint))
         strategies.append(strategy)
     return strategies
 
 
-def get_strategy(endpoint: Endpoint, static_parameters: Dict[str, Any]) -> Optional[SearchStrategy[Case]]:
-    if static_parameters:
-        strategies = {
-            parameter: prepare_strategy(
-                parameter, getattr(endpoint, parameter), endpoint.get_hypothesis_conversions(parameter)
-            )
-            for parameter in PARAMETERS - set(static_parameters)
-            if getattr(endpoint, parameter) is not None
-        }
-        return _get_case_strategy(endpoint, static_parameters, strategies)
-    return None
+def get_strategy(endpoint: Endpoint, static_parameters: Dict[str, Any]) -> SearchStrategy[Case]:
+    strategies = {
+        parameter: prepare_strategy(
+            parameter, getattr(endpoint, parameter), endpoint.get_hypothesis_conversions(parameter)
+        )
+        for parameter in PARAMETERS - set(static_parameters)
+        if getattr(endpoint, parameter) is not None
+    }
+    return _get_case_strategy(endpoint, static_parameters, strategies)
 
 
 def merge_examples(
@@ -74,16 +73,16 @@ def merge_examples(
     """Create list of static parameter objects from parameter and request body examples."""
     static_param_list = []
     for idx in range(num_examples(parameter_examples, request_body_examples)):
-        static_params: Dict[str, Any] = {}
+        static_parameters: Dict[str, Any] = {}
         for param in parameter_examples:
-            if param["type"] not in static_params:
-                static_params[param["type"]] = {}
-            static_params[param["type"]][param["name"]] = param["examples"][min(idx, len(param["examples"]) - 1)]
+            if param["type"] not in static_parameters:
+                static_parameters[param["type"]] = {}
+            static_parameters[param["type"]][param["name"]] = param["examples"][min(idx, len(param["examples"]) - 1)]
         if "examples" in request_body_examples:
-            static_params[request_body_examples["type"]] = request_body_examples["examples"][
+            static_parameters[request_body_examples["type"]] = request_body_examples["examples"][
                 min(idx, len(request_body_examples["examples"]) - 1)
             ]
-        static_param_list.append(static_params)
+        static_param_list.append(static_parameters)
     return static_param_list
 
 
