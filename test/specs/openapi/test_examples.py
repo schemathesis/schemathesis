@@ -1,3 +1,5 @@
+from typing import Any, Dict
+
 import pytest
 import yaml
 from _pytest.main import ExitCode
@@ -9,50 +11,110 @@ from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
 
 @pytest.fixture(scope="module")
-def schema_with_examples() -> BaseOpenAPISchema:
-    return schemathesis.from_dict(
-        {
-            "openapi": "3.0.2",
-            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-            "servers": [{"url": "http://127.0.0.1:8081/{basePath}", "variables": {"basePath": {"default": "api"}}}],
-            "paths": {
-                "/success": {
-                    "post": {
-                        "parameters": [
-                            {
-                                "name": "anyKey",
-                                "in": "header",
-                                "required": True,
-                                "schema": {"type": "string"},
-                                "examples": {"header1": {"value": "header1"}, "header2": {"value": "header2"}},
-                            },
-                            {
-                                "name": "id",
-                                "in": "query",
-                                "required": True,
-                                "schema": {"type": "string"},
-                                "examples": {"query1": {"value": "query1"}},
-                            },
-                            {"name": "idWithoutExamples", "in": "query", "schema": {"type": "string"}},
-                        ],
-                        "requestBody": {
-                            "content": {
-                                "application/json": {
-                                    "schema": {"type": "object", "properties": {"foo": {"type": "string"}}},
-                                    "examples": {
-                                        "body1": {"value": {"foo": "string1"}},
-                                        "body2": {"value": {"foo": "string2"}},
-                                        "body3": {"value": {"foo": "string3"}},
-                                    },
-                                }
-                            }
+def dict_with_examples() -> Dict[str, Any]:
+    return {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "servers": [{"url": "http://127.0.0.1:8081/{basePath}", "variables": {"basePath": {"default": "api"}}}],
+        "paths": {
+            "/success": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "anyKey",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string"},
+                            "examples": {"header1": {"value": "header1"}, "header2": {"value": "header2"}},
                         },
-                        "responses": {"200": {"description": "OK"}},
-                    }
+                        {
+                            "name": "id",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string"},
+                            "examples": {"query1": {"value": "query1"}},
+                        },
+                        {"name": "genericObject", "in": "query", "schema": {"type": "string"}},
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"foo": {"type": "string"}}},
+                                "examples": {
+                                    "body1": {"value": {"foo": "string1"}},
+                                    "body2": {"value": {"foo": "string2"}},
+                                    "body3": {"value": {"foo": "string3"}},
+                                },
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
                 }
-            },
-        }
-    )
+            }
+        },
+    }
+
+
+@pytest.fixture(scope="module")
+def dict_with_property_examples() -> Dict[str, Any]:
+    return {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "servers": [{"url": "http://127.0.0.1:8081/{basePath}", "variables": {"basePath": {"default": "api"}}}],
+        "paths": {
+            "/success": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "param1",
+                            "in": "query",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "param1_prop1": {"type": "string", "example": "prop1 example string"},
+                                    "param1_prop2": {"type": "string", "example": "prop2 example string"},
+                                    "noExampleProp": {"type": "string"},
+                                },
+                            },
+                        },
+                        {
+                            "name": "param2",
+                            "in": "query",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "param2_prop1": {"type": "string", "example": "prop1 example string"},
+                                    "param2_prop2": {"type": "string", "example": "prop2 example string"},
+                                    "noExampleProp": {"type": "string"},
+                                },
+                            },
+                        },
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"foo": {"type": "string", "example": "foo example string"}},
+                                },
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+
+
+@pytest.fixture(scope="module")
+def schema_with_examples(dict_with_examples) -> BaseOpenAPISchema:
+    return schemathesis.from_dict(dict_with_examples)
+
+
+@pytest.fixture(scope="module")
+def schema_with_property_examples(dict_with_property_examples) -> BaseOpenAPISchema:
+    return schemathesis.from_dict(dict_with_property_examples)
 
 
 @pytest.fixture()
@@ -61,8 +123,14 @@ def endpoint(schema_with_examples) -> Endpoint:
     return next(schema_with_examples.get_all_endpoints())
 
 
-def test_get_param_examples(endpoint):
-    param_examples = examples.get_param_examples(endpoint.definition.raw, "examples")
+@pytest.fixture()
+def endpoint_with_property_examples(schema_with_property_examples) -> Endpoint:
+    """Returns first (and only) endpoint from schema_with_examples."""
+    return next(schema_with_property_examples.get_all_endpoints())
+
+
+def test_get_parameter_examples(endpoint):
+    param_examples = examples.get_parameter_examples(endpoint.definition.raw, "examples")
 
     # length equals the number of parameters with examples
     assert len(param_examples) == 2
@@ -159,3 +227,104 @@ def test_examples_from_cli(app, testdir, cli, base_url, schema_with_examples):
     # for any parameter, we expect to generate 3 requests.
     not_a_server_line = next(filter(lambda line: "not_a_server_error" in line, result.stdout.split("\n")))
     assert "3 / 3 passed" in not_a_server_line
+
+
+def test_get_object_example_from_properties():
+    mock_object_schema: Dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "prop1": {"type": "string", "example": "prop1 example string"},
+            "prop2": {
+                "type": "object",
+                "properties": {"sub_prop": {"type": "string"}},  # examples at sub_prop level not supported
+                "example": {"sub_prop": "prop2 example string"},
+            },
+        },
+    }
+    example = examples.get_object_example_from_properties(mock_object_schema)
+    assert "prop1" in example
+    assert "prop2" in example
+    assert example["prop1"] == "prop1 example string"
+    assert example["prop2"]["sub_prop"] == "prop2 example string"
+
+
+def test_get_parameter_example_from_properties():
+    mock_endpoint_schema: Dict[str, Any] = {
+        "parameters": [
+            {
+                "name": "param1",
+                "in": "query",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "prop1": {"type": "string", "example": "prop1 example string"},
+                        "prop2": {"type": "string", "example": "prop2 example string"},
+                        "noExampleProp": {"type": "string"},
+                    },
+                },
+            }
+        ]
+    }
+    example = examples.get_parameter_example_from_properties(mock_endpoint_schema)
+    assert "query" in example
+    assert example["query"] == {"param1": {"prop1": "prop1 example string", "prop2": "prop2 example string"}}
+
+
+def test_get_request_body_example_from_properties():
+    mock_endpoint_schema: Dict[str, Any] = {
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {"foo": {"type": "string", "example": "foo example string"}},
+                    },
+                }
+            }
+        }
+    }
+    example = examples.get_request_body_example_from_properties(mock_endpoint_schema)
+    assert "body" in example
+    assert example["body"] == {"foo": "foo example string"}
+
+
+def test_get_static_parameters_from_properties(endpoint_with_property_examples):
+    example = examples.get_static_parameters_from_properties(endpoint_with_property_examples)
+    assert "query" in example
+    assert "param1" in example["query"]
+    assert "param2" in example["query"]
+    assert example["query"]["param1"] == {
+        "param1_prop1": "prop1 example string",
+        "param1_prop2": "prop2 example string",
+    }
+    assert example["query"]["param2"] == {
+        "param2_prop1": "prop1 example string",
+        "param2_prop2": "prop2 example string",
+    }
+    assert "body" in example
+    assert example["body"] == {"foo": "foo example string"}
+
+
+def test_static_parameters_union_1():
+    sp1 = {"headers": {"header1": "example1 string"}, "body": {"foo1": "example1 string"}}
+    sp2 = {"headers": {"header2": "example2 string"}, "body": {"foo2": "example2 string"}}
+
+    full_sp1, full_sp2 = examples.static_parameters_union(sp1, sp2)
+    assert "header1" in full_sp1["headers"] and full_sp1["headers"]["header1"] == "example1 string"
+    assert "header2" in full_sp1["headers"] and full_sp1["headers"]["header2"] == "example2 string"
+    assert "header1" in full_sp2["headers"] and full_sp2["headers"]["header1"] == "example1 string"
+    assert "header2" in full_sp2["headers"] and full_sp2["headers"]["header2"] == "example2 string"
+
+    assert full_sp1["body"] == {"foo1": "example1 string"}
+    assert full_sp2["body"] == {"foo2": "example2 string"}
+
+
+def test_static_parameters_union_0():
+    sp1 = {"headers": {"header1": "example1 string"}, "body": {"foo1": "example1 string"}}
+    sp2 = {}
+
+    full_sp = examples.static_parameters_union(sp1, sp2)
+    full_sp1 = full_sp[0]
+    assert len(full_sp) == 1
+    assert "header1" in full_sp1["headers"] and full_sp1["headers"]["header1"] == "example1 string"
+    assert full_sp1["body"] == {"foo1": "example1 string"}

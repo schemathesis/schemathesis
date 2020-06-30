@@ -620,6 +620,7 @@ components:
           xml:
             name: photoUrl
             wrapped: true
+          example: ["https://photourl.com"]
         status:
           description: pet status in the store
           enum:
