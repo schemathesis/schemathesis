@@ -669,6 +669,7 @@ definitions:
           wrapped: true
         items:
           type: "string"
+        example: ["https://photourl.com"]
       tags:
         type: "array"
         xml:

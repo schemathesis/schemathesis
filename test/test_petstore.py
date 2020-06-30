@@ -32,7 +32,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore(2, 10)
+    testdir.assert_petstore(2, 12)
 
 
 def test_find_by_status(testdir):
