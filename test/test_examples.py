@@ -2,7 +2,6 @@ import pytest
 from hypothesis import given
 
 import schemathesis
-from schemathesis.models import Endpoint
 from schemathesis.specs.openapi.examples import get_strategies_from_examples
 
 
