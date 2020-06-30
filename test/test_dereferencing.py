@@ -39,6 +39,7 @@ def petstore():
                         "items": {"type": "string"},
                         "type": "array",
                         "xml": {"name": "photoUrl", "wrapped": True},
+                        "example": ["https://photourl.com"],
                     },
                     "status": {
                         "description": "pet status in the store",

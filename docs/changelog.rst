@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- support for property-level examples. `#637`_
+
 `2.0.0`_ - 2020-07-01
 ---------------------
 
@@ -1204,6 +1209,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#467: https://github.com/kiwicom/schemathesis/issues/467
 .. _#631: https://github.com/kiwicom/schemathesis/issues/631
 .. _#629: https://github.com/kiwicom/schemathesis/issues/629
 .. _#621: https://github.com/kiwicom/schemathesis/issues/621
