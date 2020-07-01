@@ -6,6 +6,9 @@ Changelog
 `Unreleased`_
 -------------
 
+`2.0.0`_ - 2020-07-01
+---------------------
+
 Changed
 ~~~~~~~
 
@@ -44,7 +47,7 @@ Removed
 - ``BaseSchema.with_hook`` and ``BaseSchema.register_hook``. Use ``BaseSchema.hooks.apply`` and ``BaseSchema.hooks.register`` instead.
 
 `1.10.0`_ - 2020-06-28
----------------------
+----------------------
 
 Added
 ~~~~~
@@ -1114,7 +1117,8 @@ Fixed
 
 - Initial public release
 
-.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v1.10.0...HEAD
+.. _Unreleased: https://github.com/kiwicom/schemathesis/compare/v2.0.0...HEAD
+.. _2.0.0: https://github.com/kiwicom/schemathesis/compare/v1.10.0...v2.0.0
 .. _1.10.0: https://github.com/kiwicom/schemathesis/compare/v1.9.1...v1.10.0
 .. _1.9.1: https://github.com/kiwicom/schemathesis/compare/v1.9.0...v1.9.1
 .. _1.9.0: https://github.com/kiwicom/schemathesis/compare/v1.8.0...v1.9.0
