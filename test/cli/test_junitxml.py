@@ -35,7 +35,7 @@ def test_junitxml_file(cli, schema_url, tmp_path):
     assert testsuite.attrib["errors"] == "1"
     assert testsuite.attrib["failures"] == "1"
     assert testsuite.attrib["tests"] == "3"
-    # Inpected nested `testcase`s
+    # Inspected nested `testcase`s
     testcases = list(testsuite)
     assert len(testcases) == 3
     # Inspected testcase with a failure

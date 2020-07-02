@@ -558,12 +558,12 @@ Then you could use CLI against this server:
 
 .. code:: bash
 
-    schemathesis run http://127.0.0.1:8081/swagger.yaml
+    schemathesis run http://127.0.0.1:8081/schema.yaml
     ================================== Schemathesis test session starts =================================
     platform Linux -- Python 3.7.4, schemathesis-0.12.2, hypothesis-4.39.0, hypothesis_jsonschema-0.9.8
     rootdir: /
     hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase('/.hypothesis/examples')
-    Schema location: http://127.0.0.1:8081/swagger.yaml
+    Schema location: http://127.0.0.1:8081/schema.yaml
     Base URL: http://127.0.0.1:8081
     Specification version: Swagger 2.0
     collected endpoints: 2

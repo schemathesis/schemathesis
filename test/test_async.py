@@ -73,7 +73,7 @@ def app():
         return web.Response()
 
     app = web.Application()
-    app.add_routes([web.get("/swagger.yaml", schema), web.get("/v1/users", users)])
+    app.add_routes([web.get("/schema.yaml", schema), web.get("/v1/users", users)])
     app["saved_requests"] = saved_requests
     return app
 

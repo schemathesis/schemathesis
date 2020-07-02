@@ -10,6 +10,7 @@ from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
 
 from .apps import Endpoint, _aiohttp, _fastapi, _flask, _graphql
+from .apps.utils import OpenAPIVersion
 from .utils import get_schema_path, make_schema
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
@@ -28,7 +29,7 @@ def pytest_configure(config):
 @pytest.fixture(scope="session")
 def _app():
     """A global AioHTTP application with configurable endpoints."""
-    return _aiohttp.create_app(("success", "failure"))
+    return _aiohttp.create_openapi_app(("success", "failure"))
 
 
 @pytest.fixture
@@ -46,19 +47,24 @@ def endpoints(request):
 
 @pytest.fixture
 def reset_app(_app, endpoints):
-    def inner():
-        _aiohttp.reset_app(_app, endpoints)
+    def inner(version):
+        _aiohttp.reset_app(_app, endpoints, version)
 
     return inner
 
 
-@pytest.fixture()
-def app(_app, reset_app):
+@pytest.fixture(params=[OpenAPIVersion("2.0"), OpenAPIVersion("3.0")])
+def openapi_version(request):
+    return request.param
+
+
+@pytest.fixture
+def app(openapi_version, _app, reset_app):
     """Set up the global app for a specific test.
 
     NOTE. It might cause race conditions when `pytest-xdist` is used, but they have very low probability.
     """
-    reset_app()
+    reset_app(openapi_version)
     return _app
 
 
@@ -78,7 +84,7 @@ def base_url(server, app):
 @pytest.fixture()
 def schema_url(server, app):
     """URL of the schema of the running application."""
-    return f"http://127.0.0.1:{server['port']}/swagger.yaml"
+    return f"http://127.0.0.1:{server['port']}/schema.yaml"
 
 
 @pytest.fixture(scope="session")
@@ -316,8 +322,8 @@ def openapi_30():
 
 
 @pytest.fixture()
-def app_schema():
-    return _aiohttp.make_schema(endpoints=("success", "failure"))
+def app_schema(openapi_version):
+    return _aiohttp.make_openapi_schema(endpoints=("success", "failure"), version=openapi_version)
 
 
 @pytest.fixture()
@@ -385,7 +391,7 @@ def testdir(testdir):
 
 @pytest.fixture()
 def flask_app(endpoints):
-    return _flask.create_app(endpoints)
+    return _flask.create_openapi_app(endpoints)
 
 
 @pytest.fixture()
@@ -403,9 +409,9 @@ def make_importable(module):
 def loadable_flask_app(testdir, endpoints):
     module = testdir.make_importable_pyfile(
         location=f"""
-        from test.apps._flask import create_app
+        from test.apps._flask import create_openapi_app
 
-        app = create_app({endpoints})
+        app = create_openapi_app({endpoints})
         """
     )
     return f"{module.purebasename}:app"
@@ -415,9 +421,9 @@ def loadable_flask_app(testdir, endpoints):
 def loadable_aiohttp_app(testdir, endpoints):
     module = testdir.make_importable_pyfile(
         location=f"""
-        from test.apps._aiohttp import create_app
+        from test.apps._aiohttp import create_openapi_app
 
-        app = create_app({endpoints})
+        app = create_openapi_app({endpoints})
         """
     )
     return f"{module.purebasename}:app"

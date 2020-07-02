@@ -75,7 +75,7 @@ def pytest_generate_tests(metafunc):
 
 
 @pytest.fixture
-def args(request, mocker):
+def args(openapi_version, request, mocker):
     if request.param == "real":
         schema_url = request.getfixturevalue("schema_url")
         kwargs = {"schema_uri": schema_url}
@@ -85,7 +85,7 @@ def args(request, mocker):
         app_path = request.getfixturevalue("loadable_flask_app")
         # To have simpler tests it is easier to reuse already imported application for inspection
         mocker.patch("schemathesis.runner.import_app", return_value=app)
-        kwargs = {"schema_uri": "/swagger.yaml", "app": app_path, "loader": loaders.from_wsgi}
+        kwargs = {"schema_uri": "/schema.yaml", "app": app_path, "loader": loaders.from_wsgi}
     return app, kwargs
 
 
@@ -250,7 +250,9 @@ def test_hypothesis_deadline(args):
 
 
 @pytest.mark.endpoints("multipart")
-def test_form_data(args):
+def test_form_data(openapi_version, args):
+    if openapi_version.is_openapi_3:
+        pytest.xfail(reason="Multipart handling is broken for Open API 3.0. Ref: #640")
     app, kwargs = args
 
     def is_ok(response, case):
@@ -528,7 +530,7 @@ def schema_path(json_string, tmp_path):
 
 @pytest.fixture()
 def relative_schema_url():
-    return "/swagger.yaml"
+    return "/schema.yaml"
 
 
 @pytest.mark.parametrize(
@@ -542,7 +544,7 @@ def relative_schema_url():
     ),
 )
 @pytest.mark.endpoints("success")
-def test_non_default_loader(request, loader, fixture):
+def test_non_default_loader(openapi_version, request, loader, fixture):
     schema = request.getfixturevalue(fixture)
     kwargs = {}
     if loader is loaders.from_wsgi:
