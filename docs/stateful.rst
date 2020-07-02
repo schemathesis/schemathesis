@@ -66,7 +66,7 @@ different algorithms for stateful testing might be implemented in the future.
 
 .. code:: bash
 
-    schemathesis run --stateful=links http://0.0.0.0/swagger.yaml
+    schemathesis run --stateful=links http://0.0.0.0/schema.yaml
 
     ...
 

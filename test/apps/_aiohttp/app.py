@@ -1,3 +1,3 @@
-from . import create_app
+from . import create_openapi_app
 
-app = create_app()
+app = create_openapi_app()

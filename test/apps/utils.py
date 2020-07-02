@@ -31,14 +31,67 @@ class Endpoint(Enum):
     update_user = ("PATCH", "/api/users/{user_id}")
 
 
-def make_schema(endpoints: Tuple[str, ...]) -> Dict:
-    """Generate a Swagger 2.0 schema with the given endpoints.
+class OpenAPIVersion(Enum):
+    _2 = "2.0"
+    _3 = "3.0"
+
+    @property
+    def is_openapi_2(self):
+        return self.value == "2.0"
+
+    @property
+    def is_openapi_3(self):
+        return self.value == "3.0"
+
+
+def make_openapi_schema(endpoints: Tuple[str, ...], version: OpenAPIVersion = OpenAPIVersion("2.0")) -> Dict:
+    """Generate a OAS 2/3 schemas with the given endpoints.
 
     Example:
         If `endpoints` is ("success", "failure")
         then the app will contain GET /success and GET /failure
 
     """
+    return {OpenAPIVersion("2.0"): _make_openapi_2_schema, OpenAPIVersion("3.0"): _make_openapi_3_schema,}[version](
+        endpoints
+    )
+
+
+def make_node_definition(reference):
+    return {
+        "description": "Recursive!",
+        "type": "object",
+        "properties": {
+            "children": {"type": "array", "items": reference},
+            "value": {"type": "integer", "maximum": 4, "exclusiveMaximum": True},
+        },
+    }
+
+
+PAYLOAD = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "age": {"type": "integer", "minimum": 0, "exclusiveMinimum": True},
+        "boolean": {"type": "boolean"},
+        "nested": {
+            "type": "array",
+            "items": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": True,
+                "maximum": 10,
+                "exclusiveMaximum": True,
+            },
+        },
+    },
+    "required": ["name"],
+    "example": {"name": "John"},
+    "additionalProperties": False,
+}
+
+
+def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
     template: Dict[str, Any] = {
         "swagger": "2.0",
         "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},
@@ -62,39 +115,11 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
         if endpoint == "recursive":
             schema = {"responses": {"200": {"description": "OK", "schema": reference}}}
             definitions = template.setdefault("definitions", {})
-            definitions["Node"] = {
-                "description": "Recursive!",
-                "type": "object",
-                "properties": {
-                    "children": {"type": "array", "items": reference},
-                    "value": {"type": "integer", "maximum": 4, "exclusiveMaximum": True},
-                },
-            }
+            definitions["Node"] = make_node_definition(reference)
         elif endpoint in ("payload", "get_payload"):
-            payload = {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "age": {"type": "integer", "minimum": 0, "exclusiveMinimum": True},
-                    "boolean": {"type": "boolean"},
-                    "nested": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "exclusiveMinimum": True,
-                            "maximum": 10,
-                            "exclusiveMaximum": True,
-                        },
-                    },
-                },
-                "required": ["name"],
-                "example": {"name": "John"},
-                "additionalProperties": False,
-            }
             schema = {
-                "parameters": [{"name": "body", "in": "body", "required": True, "schema": payload}],
-                "responses": {"200": {"description": "OK", "schema": payload}},
+                "parameters": [{"name": "body", "in": "body", "required": True, "schema": PAYLOAD}],
+                "responses": {"200": {"description": "OK", "schema": PAYLOAD}},
             }
         elif endpoint == "unsatisfiable":
             schema = {
@@ -257,6 +282,238 @@ def make_schema(endpoints: Tuple[str, ...]) -> Dict:
                     "default": {"description": "Default response"},
                 }
             }
+        template["paths"].setdefault(path, {})
+        template["paths"][path][method.lower()] = schema
+    return template
+
+
+def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
+    _base_path = "api"
+    template: Dict[str, Any] = {
+        "openapi": "3.0.2",
+        "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},
+        "paths": {},
+        "servers": [{"url": "https://127.0.0.1:8888/{basePath}", "variables": {"basePath": {"default": _base_path}}}],
+    }
+    base_path = f"/{_base_path}"
+
+    def add_link(name, definition):
+        components = template.setdefault("components", {})
+        links = components.setdefault("links", {})
+        links.setdefault(name, definition)
+
+    for endpoint in endpoints:
+        method, path = Endpoint[endpoint].value
+        path = path.replace(base_path, "")
+        reference = {"$ref": "#/x-definitions/Node"}
+        if endpoint == "recursive":
+            schema = {
+                "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": reference}}}}
+            }
+            definitions = template.setdefault("x-definitions", {})
+            definitions["Node"] = make_node_definition(reference)
+        elif endpoint in ("payload", "get_payload"):
+            schema = {
+                "requestBody": {"content": {"application/json": {"schema": PAYLOAD}}},
+                "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": PAYLOAD}}}},
+            }
+        elif endpoint == "unsatisfiable":
+            schema = {
+                "requestBody": {
+                    "content": {"application/json": {"schema": {"allOf": [{"type": "integer"}, {"type": "string"}]}}},
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif endpoint == "performance":
+            schema = {
+                "requestBody": {"content": {"application/json": {"schema": {"type": "integer"}}}},
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif endpoint in ("flaky", "multiple_failures"):
+            schema = {
+                "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif endpoint == "path_variable":
+            schema = {
+                "parameters": [
+                    {"name": "key", "in": "path", "required": True, "schema": {"type": "string", "minLength": 1}}
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif endpoint == "invalid":
+            schema = {
+                "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "int"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif endpoint == "upload_file":
+            schema = {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"file": {"type": "string", "format": "binary"}},
+                                "required": ["file"],
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif endpoint == "custom_format":
+            schema = {
+                "parameters": [
+                    {"name": "id", "in": "query", "required": True, "schema": {"type": "string", "format": "digits"}}
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif endpoint == "multipart":
+            schema = {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"key": {"type": "string"}, "value": {"type": "integer"}},
+                                "required": ["key", "value"],
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif endpoint == "teapot":
+            schema = {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"success": {"type": "boolean"}},
+                                    "required": ["success"],
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        elif endpoint == "invalid_path_parameter":
+            schema = {
+                "parameters": [{"name": "id", "in": "path", "required": False, "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif endpoint == "headers":
+            schema = {
+                "security": [{"api_key": []}],
+                "responses": {
+                    "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}},
+                    "default": {"description": "Default response"},
+                },
+            }
+        elif endpoint == "create_user":
+            schema = {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"username": {"type": "string", "minLength": 3}},
+                                "required": ["username"],
+                            }
+                        }
+                    },
+                },
+                "responses": {
+                    "201": {
+                        "description": "OK",
+                        "links": {
+                            "GetUserByUserId": {
+                                "operationId": "getUser",
+                                "parameters": {
+                                    "path.user_id": "$response.body#/id",
+                                    "query.user_id": "$response.body#/id",
+                                },
+                            },
+                            "UpdateUserById": {"$ref": "#/components/links/UpdateUserById"},
+                        },
+                    }
+                },
+            }
+            add_link(
+                "UpdateUserById",
+                {
+                    "operationId": "updateUser",
+                    "parameters": {"user_id": "$response.body#/id"},
+                    "requestBody": {"username": "foo"},
+                },
+            )
+        elif endpoint == "get_user":
+            schema = {
+                "operationId": "getUser",
+                "parameters": [
+                    {"in": "path", "name": "user_id", "required": True, "schema": {"type": "integer"}},
+                    {"in": "query", "name": "code", "required": True, "schema": {"type": "integer"}},
+                    {"in": "query", "name": "user_id", "required": True, "schema": {"type": "integer"}},
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "links": {
+                            "UpdateUserById": {
+                                "operationRef": "#/paths/~1users~1{user_id}/patch",
+                                "parameters": {"user_id": "$response.body#/id"},
+                                "requestBody": {"username": "foo"},
+                            }
+                        },
+                    },
+                    "404": {"description": "Not found"},
+                },
+            }
+        elif endpoint == "update_user":
+            schema = {
+                "operationId": "updateUser",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "additionalProperties": False,
+                                "type": "object",
+                                "properties": {"username": {"type": "string"}},
+                                "required": ["username"],
+                            }
+                        }
+                    },
+                },
+                "parameters": [{"in": "path", "name": "user_id", "required": True, "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+            }
+            paths = template["paths"].setdefault(path, {})
+            paths["parameters"] = [{"in": "query", "name": "common", "required": True, "schema": {"type": "integer"}}]
+        else:
+            schema = {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"success": {"type": "boolean"}},
+                                    "required": ["success"],
+                                }
+                            }
+                        },
+                    },
+                    "default": {"description": "Default response", "content": {"application/json": {"schema": {}}}},
+                }
+            }
+        template["paths"].setdefault(path, {})
+        template["paths"][path][method.lower()] = schema
         template["paths"].setdefault(path, {})
         template["paths"][path][method.lower()] = schema
     return template

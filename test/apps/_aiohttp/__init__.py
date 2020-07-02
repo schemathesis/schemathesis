@@ -7,12 +7,14 @@ from aiohttp import web
 from . import handlers
 
 try:
-    from ..utils import Endpoint, make_schema
+    from ..utils import Endpoint, OpenAPIVersion, make_openapi_schema
 except (ImportError, ValueError):
-    from utils import Endpoint, make_schema
+    from utils import Endpoint, OpenAPIVersion, make_openapi_schema
 
 
-def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Application:
+def create_openapi_app(
+    endpoints: Tuple[str, ...] = ("success", "failure"), version: OpenAPIVersion = OpenAPIVersion("2.0")
+) -> web.Application:
     """Factory for aioHTTP app.
 
     Each endpoint except the one for schema saves requests in the list shared in the app instance and could be
@@ -51,19 +53,23 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Appli
 
     app = web.Application()
     app.add_routes(
-        [web.get("/swagger.yaml", schema), web.get("/api/cookies", set_cookies)]
+        [web.get("/schema.yaml", schema), web.get("/api/cookies", set_cookies)]
         + [web.route(item.value[0], item.value[1], wrapper(item.name)) for item in Endpoint]
     )
     app["users"] = {}
     app["incoming_requests"] = incoming_requests
     app["schema_requests"] = schema_requests
-    app["config"] = {"should_fail": True, "schema_data": make_schema(endpoints)}
+    app["config"] = {"should_fail": True, "schema_data": make_openapi_schema(endpoints, version)}
     return app
 
 
-def reset_app(app: web.Application, endpoints: Tuple[str, ...] = ("success", "failure")) -> None:
+def reset_app(
+    app: web.Application,
+    endpoints: Tuple[str, ...] = ("success", "failure"),
+    version: OpenAPIVersion = OpenAPIVersion("2.0"),
+) -> None:
     """Clean up all internal containers of the application and resets its config."""
     app["users"].clear()
     app["incoming_requests"][:] = []
     app["schema_requests"][:] = []
-    app["config"].update({"should_fail": True, "schema_data": make_schema(endpoints)})
+    app["config"].update({"should_fail": True, "schema_data": make_openapi_schema(endpoints, version)})

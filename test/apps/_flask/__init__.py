@@ -6,15 +6,17 @@ from flask import Flask, Response, _request_ctx_stack, jsonify, request
 from werkzeug.exceptions import GatewayTimeout, InternalServerError
 
 try:
-    from ..utils import Endpoint, make_schema
+    from ..utils import Endpoint, OpenAPIVersion, make_openapi_schema
 except (ImportError, ValueError):
-    from utils import Endpoint, make_schema
+    from utils import Endpoint, OpenAPIVersion, make_openapi_schema
 
 
-def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> Flask:
+def create_openapi_app(
+    endpoints: Tuple[str, ...] = ("success", "failure"), version: OpenAPIVersion = OpenAPIVersion("2.0")
+) -> Flask:
     app = Flask("test_app")
     app.config["should_fail"] = True
-    app.config["schema_data"] = make_schema(endpoints)
+    app.config["schema_data"] = make_openapi_schema(endpoints, version)
     app.config["incoming_requests"] = []
     app.config["schema_requests"] = []
     app.config["internal_exception"] = False
@@ -23,12 +25,12 @@ def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> Flask:
     @app.before_request
     def store_request():
         current_request = _request_ctx_stack.top.request
-        if request.path == "/swagger.yaml":
+        if request.path == "/schema.yaml":
             app.config["schema_requests"].append(current_request)
         else:
             app.config["incoming_requests"].append(current_request)
 
-    @app.route("/swagger.yaml")
+    @app.route("/schema.yaml")
     def schema():
         schema_data = app.config["schema_data"]
         content = yaml.dump(schema_data)

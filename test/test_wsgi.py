@@ -8,7 +8,7 @@ from schemathesis import Case
 
 @pytest.fixture()
 def schema(flask_app):
-    return schemathesis.from_wsgi("/swagger.yaml", flask_app)
+    return schemathesis.from_wsgi("/schema.yaml", flask_app)
 
 
 @pytest.mark.hypothesis_nested
@@ -135,7 +135,7 @@ def test_app_with_parametrize(testdir):
     from test.apps._flask.app import app
     from hypothesis import settings
 
-    schema = schemathesis.from_wsgi("/swagger.yaml", app)
+    schema = schemathesis.from_wsgi("/schema.yaml", app)
 
     called = False
 
