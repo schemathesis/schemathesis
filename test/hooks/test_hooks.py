@@ -25,7 +25,7 @@ def global_hook(request):
 
 @pytest.fixture
 def schema(flask_app):
-    return schemathesis.from_wsgi("/swagger.yaml", flask_app)
+    return schemathesis.from_wsgi("/schema.yaml", flask_app)
 
 
 @pytest.fixture()

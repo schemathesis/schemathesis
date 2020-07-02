@@ -75,7 +75,7 @@ def test_main_process_error(cli, schema_url, cassette_path):
 
 
 @pytest.mark.endpoints("__all__")
-async def test_replay(cli, schema_url, app, reset_app, cassette_path):
+async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette_path):
     # Record a cassette
     result = cli.run(
         schema_url,
@@ -86,7 +86,7 @@ async def test_replay(cli, schema_url, app, reset_app, cassette_path):
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # these requests are not needed
-    reset_app()
+    reset_app(openapi_version)
     assert not app["incoming_requests"]
     # When a valid cassette is replayed
     result = cli.replay(str(cassette_path))

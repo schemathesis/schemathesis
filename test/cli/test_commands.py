@@ -349,12 +349,12 @@ def test_load_schema_arguments_headers_to_loader_for_app(testdir, cli, mocker):
 
     module = testdir.make_importable_pyfile(
         location="""
-        from test.apps._flask import create_app
+        from test.apps._flask import create_openapi_app
 
-        app = create_app()
+        app = create_openapi_app()
         """
     )
-    cli.run("/swagger.yaml", "--app", f"{module.purebasename}:app", "-H", "Authorization: Bearer 123")
+    cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "-H", "Authorization: Bearer 123")
 
     assert from_wsgi.call_args[1]["headers"]["Authorization"] == "Bearer 123"
 
@@ -394,13 +394,13 @@ def pytest_generate_tests(metafunc):
 
 
 @pytest.fixture
-def cli_args(request):
+def cli_args(openapi_version, request):
     if request.param == "real":
         schema_url = request.getfixturevalue("schema_url")
         args = (schema_url,)
     else:
         app_path = request.getfixturevalue("loadable_flask_app")
-        args = (f"--app={app_path}", "/swagger.yaml")
+        args = (f"--app={app_path}", "/schema.yaml")
     return args
 
 
@@ -737,15 +737,15 @@ def test_connection_error(cli, schema_url, workers):
 @pytest.mark.parametrize("workers", (1, 2))
 def test_schema_not_available(cli, workers):
     # When the given schema is unreachable
-    result = cli.run("http://127.0.0.1:1/swagger.yaml", f"--workers={workers}")
+    result = cli.run("http://127.0.0.1:1/schema.yaml", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And error message is displayed
     lines = result.stdout.split("\n")
-    assert lines[0] == "Failed to load schema from http://127.0.0.1:1/swagger.yaml"
+    assert lines[0] == "Failed to load schema from http://127.0.0.1:1/schema.yaml"
     assert lines[1].startswith(
         "Error: requests.exceptions.ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=1): "
-        "Max retries exceeded with url: /swagger.yaml"
+        "Max retries exceeded with url: /schema.yaml"
     )
 
 
@@ -1149,12 +1149,12 @@ async def test_multiple_files_schema(app, testdir, cli, base_url):
 def test_wsgi_app(testdir, cli):
     module = testdir.make_importable_pyfile(
         location="""
-        from test.apps._flask import create_app
+        from test.apps._flask import create_openapi_app
 
-        app = create_app()
+        app = create_openapi_app()
         """
     )
-    result = cli.run("/swagger.yaml", "--app", f"{module.purebasename}:app")
+    result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert "1 passed, 1 failed in" in result.stdout
 
@@ -1162,12 +1162,12 @@ def test_wsgi_app(testdir, cli):
 def test_wsgi_app_exception(testdir, cli):
     module = testdir.make_importable_pyfile(
         location="""
-        from test.apps._flask import create_app
+        from test.apps._flask import create_openapi_app
 
         1 / 0
         """
     )
-    result = cli.run("/swagger.yaml", "--app", f"{module.purebasename}:app", "--show-errors-tracebacks")
+    result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--show-errors-tracebacks")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert "Traceback (most recent call last):" in result.stdout
     assert "ZeroDivisionError: division by zero" in result.stdout
@@ -1176,10 +1176,10 @@ def test_wsgi_app_exception(testdir, cli):
 def test_wsgi_app_missing(testdir, cli):
     module = testdir.make_importable_pyfile(
         location="""
-        from test.apps._flask import create_app
+        from test.apps._flask import create_openapi_app
         """
     )
-    result = cli.run("/swagger.yaml", "--app", f"{module.purebasename}:app")
+    result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
     assert "AttributeError: module 'location' has no attribute 'app'" in lines
@@ -1189,13 +1189,13 @@ def test_wsgi_app_missing(testdir, cli):
 def test_wsgi_app_internal_exception(testdir, cli, caplog):
     module = testdir.make_importable_pyfile(
         location="""
-        from test.apps._flask import create_app
+        from test.apps._flask import create_openapi_app
 
-        app = create_app()
+        app = create_openapi_app()
         app.config["internal_exception"] = True
         """
     )
-    result = cli.run("/swagger.yaml", "--app", f"{module.purebasename}:app")
+    result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
     assert "== APPLICATION LOGS ==" in lines[34]
@@ -1204,11 +1204,11 @@ def test_wsgi_app_internal_exception(testdir, cli, caplog):
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
-def test_aiohttp_app(request, testdir, cli, loadable_aiohttp_app, args):
+def test_aiohttp_app(openapi_version, request, testdir, cli, loadable_aiohttp_app, args):
     # When an URL is passed together with app
     if args:
         args += (request.getfixturevalue("base_url"),)
-    result = cli.run("/swagger.yaml", "--app", loadable_aiohttp_app, *args)
+    result = cli.run("/schema.yaml", "--app", loadable_aiohttp_app, *args)
     # Then the schema should be loaded from that URL
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert "1 passed, 1 failed in" in result.stdout

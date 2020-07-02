@@ -59,7 +59,19 @@ def response():
         (
             "/users/",
             [
-                LINK,
+                Link(
+                    name="GetUserByUserId",
+                    endpoint=Endpoint(
+                        path="/users/{user_id}",
+                        method="GET",
+                        definition=ANY,
+                        schema=ANY,
+                        base_url=ANY,
+                        path_parameters=ANY,
+                        query=ANY,
+                    ),
+                    parameters={"path.user_id": "$response.body#/id", "query.user_id": "$response.body#/id"},
+                ),
                 Link(
                     name="UpdateUserById",
                     endpoint=ANY,
