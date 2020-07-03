@@ -1,6 +1,5 @@
 """Provide strategies for given endpoint(s) definition."""
 import asyncio
-import inspect
 import re
 from base64 import b64encode
 from functools import partial
@@ -16,7 +15,6 @@ from . import utils
 from .exceptions import InvalidSchema
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import Case, Endpoint
-from .types import Hook
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
 LOCATION_TO_CONTAINER = {
@@ -201,17 +199,7 @@ def _apply_hooks(strategies: Dict[str, st.SearchStrategy], dispatcher: HookDispa
         for hook in dispatcher.get_all_by_name(f"before_generate_{key}"):
             # Get the strategy on each hook to pass the first hook output as an input to the next one
             strategy = strategies[key]
-            args: Union[Tuple[st.SearchStrategy], Tuple[HookContext, st.SearchStrategy]]
-            if _accepts_context(hook):
-                args = (context, strategy)
-            else:
-                args = (strategy,)
-            strategies[key] = hook(*args)
-
-
-def _accepts_context(hook: Hook) -> bool:
-    # There are no restrictions on the first argument's name and we don't check its name here.
-    return len(inspect.signature(hook).parameters) == 2
+            strategies[key] = hook(context, strategy)
 
 
 def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
