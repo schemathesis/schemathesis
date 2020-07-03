@@ -361,8 +361,14 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         except KeyError:
             # Possible to get if `validate_schema=False` is passed during schema creation
             raise InvalidSchema("Schema parsing failed. Please check your schema.")
-        definitions = responses.get(str(response.status_code), {}).get("content", {})
-        return list(definitions.keys())
+        status_code = str(response.status_code)
+        if status_code in responses:
+            definitions = responses[status_code]
+        elif "default" in responses:
+            definitions = responses["default"]
+        else:
+            return []
+        return list(definitions.get("content", {}).keys())
 
     def get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         return serialization.serialize_openapi3_parameters(definitions)

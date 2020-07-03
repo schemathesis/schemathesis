@@ -123,6 +123,44 @@ def test_content_type_conformance_valid(spec, response, case):
 )
 @pytest.mark.parametrize("content_type, is_error", (("application/json", False), ("application/xml", True)))
 def test_content_type_conformance_integration(raw_schema, content_type, is_error):
+    assert_content_type_conformance(raw_schema, content_type, is_error)
+
+
+@pytest.mark.parametrize("content_type, is_error", (("application/json", False), ("application/xml", True),))
+def test_content_type_conformance_default_response(content_type, is_error):
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {"default": {"description": "OK", "content": {"application/json": {"schema": {}}}}},
+                }
+            }
+        },
+    }
+    assert_content_type_conformance(raw_schema, content_type, is_error)
+
+
+def test_content_type_conformance_another_status_code():
+    # When the schema only defines a response for status code 400
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {"400": {"description": "Error", "content": {"application/json": {"schema": {}}}}},
+                }
+            }
+        },
+    }
+    # And the response has another status code
+    # Then the content type should be ignored, since the schema does not contain relevant definitions
+    assert_content_type_conformance(raw_schema, "application/xml", False)
+
+
+def assert_content_type_conformance(raw_schema, content_type, is_error):
     schema = schemathesis.from_dict(raw_schema)
     endpoint = schema.endpoints["/users"]["get"]
     case = models.Case(endpoint)
