@@ -24,7 +24,7 @@ class Initialized(ExecutionEvent):
     # Total number of endpoints in the schema
     endpoints_count: int = attr.ib()  # pragma: no mutate
     location: Optional[str] = attr.ib()  # pragma: no mutate
-    base_url: Optional[str] = attr.ib()  # pragma: no mutate
+    base_url: str = attr.ib()  # pragma: no mutate
     specification_name: str = attr.ib()  # pragma: no mutate
     # Timestamp of test run start
     start_time: float = attr.ib(factory=time.monotonic)  # pragma: no mutate
