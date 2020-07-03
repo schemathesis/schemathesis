@@ -306,8 +306,7 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     )
     if event.location is not None:
         click.echo(f"Schema location: {event.location}")
-    if event.base_url is not None:
-        click.echo(f"Base URL: {event.base_url}")
+    click.echo(f"Base URL: {event.base_url}")
     click.echo(f"Specification version: {event.specification_name}")
     click.echo(f"Workers: {context.workers_num}")
     click.secho(f"collected endpoints: {event.endpoints_count}", bold=True)
