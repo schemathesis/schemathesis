@@ -76,9 +76,7 @@ class HookDispatcher:
             return decorator
         return self.register_hook_with_name(hook, hook.__name__)
 
-    def apply(
-        self, hook: Callable, *, name: Optional[str] = None, skip_validation: bool = False
-    ) -> Callable[[Callable], Callable]:
+    def apply(self, hook: Callable, *, name: Optional[str] = None) -> Callable[[Callable], Callable]:
         """Register hook to run only on one test function.
 
         Example:
@@ -99,7 +97,7 @@ class HookDispatcher:
 
         def decorator(func: GenericTest) -> GenericTest:
             dispatcher = self.add_dispatcher(func)
-            dispatcher.register_hook_with_name(hook, hook_name, skip_validation)
+            dispatcher.register_hook_with_name(hook, hook_name)
             return func
 
         return decorator
@@ -111,14 +109,12 @@ class HookDispatcher:
             func._schemathesis_hooks = cls(scope=HookScope.TEST)  # type: ignore
         return func._schemathesis_hooks  # type: ignore
 
-    def register_hook_with_name(self, hook: Callable, name: str, skip_validation: bool = False) -> Callable:
+    def register_hook_with_name(self, hook: Callable, name: str) -> Callable:
         """A helper for hooks registration.
 
         Besides its use in this class internally it is used to keep backward compatibility with the old hooks system.
         """
-        # Validation is skipped only for backward compatibility with the old hooks system
-        if not skip_validation:
-            self._validate_hook(name, hook)
+        self._validate_hook(name, hook)
         self._hooks[name].append(hook)
         return hook
 

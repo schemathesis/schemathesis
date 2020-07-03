@@ -16,6 +16,11 @@ Fixed
 
 - Content type conformance check for cases when Open API 3.0 schemas contain "default" response definitions. `#641`_
 
+Removed
+~~~~~~~
+
+- Deprecated ``skip_validation`` argument to ``HookDispatcher.apply``.
+
 `2.0.0`_ - 2020-07-01
 ---------------------
 
