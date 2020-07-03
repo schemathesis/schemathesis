@@ -20,6 +20,7 @@ Removed
 ~~~~~~~
 
 - Deprecated ``skip_validation`` argument to ``HookDispatcher.apply``.
+- Deprecated ``_accepts_context`` internal function.
 
 `2.0.0`_ - 2020-07-01
 ---------------------

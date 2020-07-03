@@ -110,10 +110,7 @@ class HookDispatcher:
         return func._schemathesis_hooks  # type: ignore
 
     def register_hook_with_name(self, hook: Callable, name: str) -> Callable:
-        """A helper for hooks registration.
-
-        Besides its use in this class internally it is used to keep backward compatibility with the old hooks system.
-        """
+        """A helper for hooks registration."""
         self._validate_hook(name, hook)
         self._hooks[name].append(hook)
         return hook
