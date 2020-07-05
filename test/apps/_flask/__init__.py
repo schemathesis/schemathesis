@@ -6,9 +6,9 @@ from flask import Flask, Response, _request_ctx_stack, jsonify, request
 from werkzeug.exceptions import GatewayTimeout, InternalServerError
 
 try:
-    from ..utils import make_schema, Endpoint
+    from ..utils import Endpoint, make_schema
 except (ImportError, ValueError):
-    from utils import make_schema, Endpoint
+    from utils import Endpoint, make_schema
 
 
 def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> Flask:

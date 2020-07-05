@@ -8,7 +8,7 @@ def test_ref_resolving():
         "openapi": "3.0.0",
         "info": {"title": "Blank API", "version": "1.0"},
         "servers": [{"url": "http://localhost/api"}],
-        "paths": {"foo": {"get": {"responses": {"200": {"description": "OK"}},}}},
+        "paths": {"foo": {"get": {"responses": {"200": {"description": "OK"}}}}},
         "components": {"securitySchemes": {"$ref": "#/components/HTTPSchema"}, "HTTPSchema": http_schema},
     }
     resolver = ConvertingResolver("", schema, nullable_name="nullable")

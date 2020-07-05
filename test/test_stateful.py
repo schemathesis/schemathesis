@@ -8,4 +8,5 @@ from schemathesis.utils import NOT_SET
     "parameters, body", (({"a": 1}, None), ({"a": 1}, NOT_SET), ({"a": 1}, {"value": 1}), ({"a": 1}, [1, 2, 3]))
 )
 def test_hashable(parameters, body):
+    # All parsed data should be hashable
     hash(ParsedData(parameters, body))

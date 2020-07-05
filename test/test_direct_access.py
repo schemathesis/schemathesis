@@ -1,5 +1,5 @@
-import hypothesis.strategies as st
 import pytest
+from hypothesis import strategies as st
 from requests.structures import CaseInsensitiveDict
 
 import schemathesis
@@ -64,7 +64,7 @@ def test_reference_in_path():
         },
         "components": {
             "parameters": {
-                "PathParameter": {"in": "path", "name": "key", "required": True, "schema": {"type": "string"},}
+                "PathParameter": {"in": "path", "name": "key", "required": True, "schema": {"type": "string"}}
             }
         },
     }

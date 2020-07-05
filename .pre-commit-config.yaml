@@ -35,7 +35,7 @@ repos:
       - id: relint
 
   - repo: https://github.com/ambv/black
-    rev: stable
+    rev: 19.10b0
     hooks:
       - id: black
         types: [python]
@@ -62,7 +62,7 @@ repos:
     rev: v2.5.3
     hooks:
       - id: pylint
-        additional_dependencies: ["isort[pyproject]"]
+        additional_dependencies: ["isort[pyproject]==4.3.21"]
         exclude: ^(docs/|test/).*$
         # disabled import-error as may be run out of environment with deps
         args: ["--disable=import-error"]

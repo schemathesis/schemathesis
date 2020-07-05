@@ -622,10 +622,3 @@ def test_url_joining(server, get_schema_path, base_url, schema_path):
         f"http://127.0.0.1:{server['port']}/api/v3/pet/findByStatus"
         in after_execution.result.checks[0].example.requests_code
     )
-
-
-# no base_url specified:
-#   - OAS2. take host from the current one + add basePath
-#   - OAS3. take host from the current one + add path from the first server
-# base url is specified:
-#   - OAS2/3. use it whole

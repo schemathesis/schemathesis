@@ -106,10 +106,10 @@ def test_custom_strategies(swagger_20):
 
 def test_register_default_strategies():
     # If schemathesis is imported
-    import schemathesis
-
     # Default strategies should be registered
     from hypothesis_jsonschema._from_schema import STRING_FORMATS
+
+    import schemathesis
 
     assert "binary" in STRING_FORMATS
     assert "byte" in STRING_FORMATS

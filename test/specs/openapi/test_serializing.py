@@ -77,7 +77,7 @@ def make_openapi_schema(*parameters):
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
         "paths": {
             "/teapot": {
-                "get": {"summary": "Test", "parameters": list(parameters), "responses": {"200": {"description": "OK"}},}
+                "get": {"summary": "Test", "parameters": list(parameters), "responses": {"200": {"description": "OK"}}}
             }
         },
     }

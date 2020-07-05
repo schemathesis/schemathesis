@@ -9,7 +9,7 @@ from schemathesis.utils import traverse_schema
     (
         ({"type": "file"}, {"type": "string", "format": "binary"}),
         (
-            {"type": "integer", "maximum": 10, "minimum": 1, "format": "int64",},
+            {"type": "integer", "maximum": 10, "minimum": 1, "format": "int64"},
             {"type": "integer", "maximum": 10, "minimum": 1, "format": "int64"},
         ),
         ({"x-nullable": True, "type": "string"}, {"anyOf": [{"type": "string"}, {"type": "null"}]}),
