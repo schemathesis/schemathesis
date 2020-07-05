@@ -156,7 +156,10 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
             }
         elif endpoint == "upload_file":
             schema = {
-                "parameters": [{"name": "data", "in": "formData", "required": True, "type": "file"}],
+                "parameters": [
+                    {"name": "note", "in": "formData", "required": True, "type": "string"},
+                    {"name": "data", "in": "formData", "required": True, "type": "file"},
+                ],
                 "responses": {"200": {"description": "OK"}},
             }
         elif endpoint == "custom_format":
@@ -354,8 +357,11 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                         "multipart/form-data": {
                             "schema": {
                                 "type": "object",
-                                "properties": {"file": {"type": "string", "format": "binary"}},
-                                "required": ["file"],
+                                "properties": {
+                                    "data": {"type": "string", "format": "binary"},
+                                    "note": {"type": "string"},
+                                },
+                                "required": ["data", "note"],
                             }
                         }
                     },
