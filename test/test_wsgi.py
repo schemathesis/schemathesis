@@ -82,8 +82,10 @@ def test_form_data(schema):
 
 
 def test_not_wsgi(schema):
+    # When a schema is created without a WSGI app (e.g. from an URL)
     case = Case(schema.endpoints["/success"]["GET"])
     case.endpoint.app = None
+    # Then an error should be raised if the user tries to use `call_wsgi`
     with pytest.raises(
         RuntimeError,
         match="WSGI application instance is required. "
@@ -94,6 +96,7 @@ def test_not_wsgi(schema):
 
 @pytest.mark.hypothesis_nested
 def test_binary_body(mocker, flask_app):
+    # When an endpoint accepts a binary input
     schema = schemathesis.from_dict(
         {
             "openapi": "3.0.2",
@@ -120,6 +123,7 @@ def test_binary_body(mocker, flask_app):
         assert response.status_code == 200
         assert response.json == {"size": mocker.ANY}
 
+    # Then it should be send correctly
     test()
 
 

@@ -343,6 +343,8 @@ def test_date_deserializing(testdir):
 
 
 def test_get_request_with_body(testdir, schema_with_get_payload):
+    # When schema defines a payload for GET request
+    # And schema validation is turned on
     testdir.make_test(
         """
 @schema.parametrize()
@@ -351,5 +353,6 @@ def test_(case):
         """,
         schema=schema_with_get_payload,
     )
+    # Then an error should be propagated with a relevant error message
     result = testdir.run_and_assert(failed=1)
     result.stdout.re_match_lines([r"E   Failed: Body parameters are defined for GET request."])

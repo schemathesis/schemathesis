@@ -22,9 +22,9 @@ from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse
 
 if TYPE_CHECKING:
+    from .hooks import HookDispatcher
     from .schemas import BaseSchema
     from .stateful import StatefulTest
-    from .hooks import HookDispatcher
 
 
 @attr.s(slots=True)  # pragma: no mutate
