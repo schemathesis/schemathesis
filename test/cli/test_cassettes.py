@@ -1,4 +1,5 @@
 import base64
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import pytest
 import requests
@@ -98,7 +99,10 @@ async def test_replay(cli, schema_url, app, reset_app, cassette_path):
         # And these requests should be equal
         serialized = interaction["request"]
         assert request.method == serialized["method"]
-        assert str(request.url) == serialized["uri"]
+        parsed = urlparse(str(request.url))
+        encoded_query = urlencode(parse_qsl(parsed.query, keep_blank_values=True))
+        url = urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, encoded_query, parsed.fragment))
+        assert url == serialized["uri"]
         content = await request.read()
         assert content == base64.b64decode(serialized["body"]["base64_string"])
         compare_headers(request, serialized["headers"])
