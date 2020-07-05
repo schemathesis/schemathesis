@@ -93,11 +93,15 @@ def _decode_multipart(content: bytes, content_type: str) -> Dict[str, str]:
     _, options = cgi.parse_header(content_type)
     options["boundary"] = options["boundary"].encode()
     options["CONTENT-LENGTH"] = len(content)
-    return {key: value[0].decode() for key, value in cgi.parse_multipart(io.BytesIO(content), options).items()}
+    return {
+        key: value[0].decode() if isinstance(value[0], bytes) else value[0]
+        for key, value in cgi.parse_multipart(io.BytesIO(content), options).items()
+    }
 
 
 async def multipart(request: web.Request) -> web.Response:
-    if not request.headers["Content-Type"].startswith("multipart/"):
+    content = await request.read()
+    if not request.headers.get("Content-Type", "").startswith("multipart/"):
         raise web.HTTPUnsupportedMediaType
     # We need to have payload stored in the request, thus can't use `request.multipart` that consumes the reader
     content = await request.read()
@@ -106,6 +110,16 @@ async def multipart(request: web.Request) -> web.Response:
 
 
 async def upload_file(request: web.Request) -> web.Response:
+    if not request.headers["Content-Type"].startswith("multipart/form-data"):
+        raise web.HTTPInternalServerError(text="Not a multipart request!")
+    content = await request.read()
+    expected_lines = [
+        b'Content-Disposition: form-data; name="data"; filename="data"\r\n',
+        # "note" field is not file and should be encoded without filename
+        b'Content-Disposition: form-data; name="note"\r\n',
+    ]
+    if any(line not in content for line in expected_lines):
+        raise web.HTTPInternalServerError(text="Request does not contain expected lines!")
     return web.json_response({"size": request.content_length})
 
 

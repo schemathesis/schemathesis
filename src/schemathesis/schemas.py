@@ -21,7 +21,7 @@ from .exceptions import InvalidSchema
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import Case, Endpoint
 from .stateful import StatefulTest
-from .types import Filter, GenericTest, NotSet
+from .types import Filter, FormData, GenericTest, NotSet
 from .utils import NOT_SET, GenericResponse
 
 
@@ -193,3 +193,12 @@ class BaseSchema(Mapping):
         local_dispatcher = self.get_local_hook_dispatcher()
         if local_dispatcher is not None:
             local_dispatcher.dispatch(name, context, *args, **kwargs)
+
+    def prepare_multipart(
+        self, form_data: FormData, endpoint: Endpoint
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        """Split content of `form_data` into files & data.
+
+        Forms may contain file fields, that we should send via `files` argument in `requests`.
+        """
+        raise NotImplementedError

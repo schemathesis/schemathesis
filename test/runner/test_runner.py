@@ -250,9 +250,7 @@ def test_hypothesis_deadline(args):
 
 
 @pytest.mark.endpoints("multipart")
-def test_form_data(openapi_version, args):
-    if openapi_version.is_openapi_3:
-        pytest.xfail(reason="Multipart handling is broken for Open API 3.0. Ref: #640")
+def test_form_data(args):
     app, kwargs = args
 
     def is_ok(response, case):

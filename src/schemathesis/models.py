@@ -118,7 +118,8 @@ class Case:
         # Form data and body are mutually exclusive
         extra: Dict[str, Optional[Body]]
         if self.form_data:
-            extra = {"files": self.form_data}
+            files, data = self.endpoint.prepare_multipart(self.form_data)
+            extra = {"files": files, "data": data}
         elif is_multipart(self.body):
             extra = {"data": self.body}
         else:
@@ -333,6 +334,13 @@ class Endpoint:
         if definitions:
             return self.schema.get_hypothesis_conversion(definitions)
         return None
+
+    def prepare_multipart(
+        self, form_data: Optional[FormData]
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        if not form_data:
+            return None, None
+        return self.schema.prepare_multipart(form_data, self)
 
     def partial_deepcopy(self) -> "Endpoint":
         return self.__class__(

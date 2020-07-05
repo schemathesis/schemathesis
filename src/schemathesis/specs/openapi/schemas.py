@@ -13,6 +13,7 @@ from ...hooks import HookContext
 from ...models import Case, Endpoint, EndpointDefinition, empty_object
 from ...schemas import BaseSchema
 from ...stateful import StatefulTest
+from ...types import FormData
 from ...utils import GenericResponse
 from . import links, serialization
 from .converter import to_json_schema_recursive
@@ -266,6 +267,20 @@ class SwaggerV20(BaseOpenAPISchema):
     def get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         return serialization.serialize_swagger2_parameters(definitions)
 
+    def prepare_multipart(
+        self, form_data: FormData, endpoint: Endpoint
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        files, data = {}, {}
+        for parameter in endpoint.definition.resolved.get("parameters", ()):
+            name = parameter["name"]
+            if name in form_data:
+                if parameter["in"] == "formData" and is_file(parameter):
+                    files[name] = form_data[name]
+                else:
+                    data[name] = form_data[name]
+        # `None` is the default value for `files` and `data` arguments in `requests.request`
+        return files or None, data or None
+
 
 class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     nullable_name = "nullable"
@@ -327,15 +342,18 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
 
     def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         # Take the first media type object
-        options = iter(parameter["content"].values())
-        parameter = next(options)
+        options = iter(parameter["content"].items())
+        content_type, parameter = next(options)
         # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#media-type-object
         # > Furthermore, if referencing a schema which contains an example,
         # > the example value SHALL override the example provided by the schema
         if "example" in parameter:
             schema = get_schema_from_parameter(parameter)
             schema["example"] = parameter["example"]
-        super().process_body(endpoint, parameter)
+        if content_type == "multipart/form-data":
+            endpoint.form_data = parameter["schema"]
+        else:
+            super().process_body(endpoint, parameter)
 
     def parameter_to_json_schema(self, data: Dict[str, Any]) -> Dict[str, Any]:
         schema = get_schema_from_parameter(data)
@@ -372,6 +390,23 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
 
     def get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         return serialization.serialize_openapi3_parameters(definitions)
+
+    def prepare_multipart(
+        self, form_data: FormData, endpoint: Endpoint
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        files, data = {}, {}
+        schema = endpoint.definition.resolved["requestBody"]["content"]["multipart/form-data"]["schema"]
+        for name, property_schema in schema.get("properties", {}).items():
+            if is_file(property_schema):
+                files[name] = form_data[name]
+            else:
+                data[name] = form_data[name]
+        # `None` is the default value for `files` and `data` arguments in `requests.request`
+        return files or None, data or None
+
+
+def is_file(schema: Dict[str, Any]) -> bool:
+    return schema.get("format") in ("binary", "base64")
 
 
 def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
