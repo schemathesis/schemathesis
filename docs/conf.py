@@ -28,7 +28,6 @@ sys.path.insert(0, os.path.abspath("../src/schemathesis"))
 # isort:imports-firstparty
 import schemathesis
 
-
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.

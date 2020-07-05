@@ -125,7 +125,7 @@ def strip_style_win32(styled_output: str) -> str:
     """Strip text style on Windows.
 
     `click.style` produces ANSI sequences, however they were not supported
-    by PowerShell untill recently and colored output is created differently.
+    by PowerShell until recently and colored output is created differently.
     """
     if platform.system() == "Windows":
         return click.unstyle(styled_output)

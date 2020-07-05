@@ -11,7 +11,7 @@ def test_get_endpoint_via_remote_reference(swagger_20, schema_url):
     assert resolved.method == "PATCH"
     # Via common parameters for all methods
     assert resolved.query == {
-        "properties": {"common": {"in": "query", "name": "common", "type": "integer"},},
+        "properties": {"common": {"in": "query", "name": "common", "type": "integer"}},
         "additionalProperties": False,
         "type": "object",
         "required": ["common"],

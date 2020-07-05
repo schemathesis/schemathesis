@@ -16,8 +16,8 @@ def schema():
                 "/success": {
                     "get": {
                         "parameters": [
-                            {"name": "anyKey", "in": "header", "schema": {"type": "string"},},
-                            {"name": "id", "in": "query", "schema": {"type": "string", "example": "1"},},
+                            {"name": "anyKey", "in": "header", "schema": {"type": "string"}},
+                            {"name": "id", "in": "query", "schema": {"type": "string", "example": "1"}},
                         ],
                         "responses": {"200": {"description": "OK"}},
                     }

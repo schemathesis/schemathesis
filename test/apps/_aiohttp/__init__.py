@@ -4,11 +4,12 @@ from typing import Callable, Tuple
 import yaml
 from aiohttp import web
 
+from . import handlers
+
 try:
-    from . import handlers
-    from ..utils import make_schema, Endpoint
+    from ..utils import Endpoint, make_schema
 except (ImportError, ValueError):
-    from utils import make_schema, Endpoint
+    from utils import Endpoint, make_schema
 
 
 def create_app(endpoints: Tuple[str, ...] = ("success", "failure")) -> web.Application:

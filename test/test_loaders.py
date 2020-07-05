@@ -80,7 +80,7 @@ def test_number_deserializing(testdir):
                             "name": "key",
                             "in": "query",
                             "required": True,
-                            "schema": {"type": "number", "multipleOf": 0.00001,},
+                            "schema": {"type": "number", "multipleOf": 0.00001},
                         }
                     ],
                     "responses": {"200": {"description": "OK"}},

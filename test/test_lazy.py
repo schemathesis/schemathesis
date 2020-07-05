@@ -164,7 +164,7 @@ def test_d(request, case):
                 "post": {"responses": {"200": {"description": "OK"}}},
                 "get": {"tags": ["foo"], "responses": {"200": {"description": "OK"}}},
             },
-            "/third": {"put": {"operationId": "updateThird", "responses": {"200": {"description": "OK"}}},},
+            "/third": {"put": {"operationId": "updateThird", "responses": {"200": {"description": "OK"}}}},
         },
         tags=[{"name": "foo"}, {"name": "bar"}],
     )

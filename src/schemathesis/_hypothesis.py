@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import quote_plus
 
 import hypothesis
-import hypothesis.strategies as st
+from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from requests.auth import _basic_auth_str
 
@@ -139,6 +139,7 @@ def get_case_strategy(endpoint: Endpoint, hooks: Optional[HookDispatcher] = None
 
 
 def prepare_strategy(parameter: str, value: Dict[str, Any], map_func: Optional[Callable]) -> st.SearchStrategy:
+    """Create a strategy for a schema and add location-specific filters & maps."""
     strategy = from_schema(value)
     if map_func is not None:
         strategy = strategy.map(map_func)
@@ -171,6 +172,7 @@ def filter_path_parameters(parameters: Dict[str, Any]) -> bool:
 
 
 def quote_all(parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply URL quotation for all values in a dictionary."""
     return {key: quote_plus(value) if isinstance(value, str) else value for key, value in parameters.items()}
 
 
@@ -179,7 +181,7 @@ def _get_case_strategy(
     extra_static_parameters: Dict[str, Any],
     strategies: Dict[str, st.SearchStrategy],
     hook_dispatcher: Optional[HookDispatcher] = None,
-) -> st.SearchStrategy:
+) -> st.SearchStrategy[Case]:
     static_parameters: Dict[str, Any] = {"endpoint": endpoint, **extra_static_parameters}
     if endpoint.schema.validate_schema and endpoint.method == "GET":
         if endpoint.body is not None:
@@ -203,6 +205,7 @@ def _apply_hooks(strategies: Dict[str, st.SearchStrategy], dispatcher: HookDispa
 
 
 def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
+    """Register a new strategy for generating data for specific string "format"."""
     if not isinstance(name, str):
         raise TypeError(f"name must be of type {str}, not {type(name)}")
     if not isinstance(strategy, st.SearchStrategy):
@@ -213,6 +216,7 @@ def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
 
 
 def init_default_strategies() -> None:
+    """Register all default "format" strategies."""
     register_string_format("binary", st.binary())
     register_string_format("byte", st.binary().map(lambda x: b64encode(x).decode()))
 
