@@ -15,6 +15,7 @@ Fixed
 ~~~~~
 
 - Content type conformance check for cases when Open API 3.0 schemas contain "default" response definitions. `#641`_
+- Handling of multipart requests for Open API 3.0 schemas. `#640`_
 - Sending non-file form fields in multipart requests. `#647`_
 
 Removed

@@ -269,17 +269,28 @@ class SwaggerV20(BaseOpenAPISchema):
 
     def prepare_multipart(
         self, form_data: FormData, endpoint: Endpoint
-    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
-        files, data = {}, {}
+    ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
+        files, data = [], {}
+        # If there is no content types specified for the request or "application/x-www-form-urlencoded" is specified
+        # explicitly, then use it., but if "multipart/form-data" is specified, then use it
+        consumes = self.get_request_payload_content_types(endpoint)
+        is_multipart = "multipart/form-data" in consumes
         for parameter in endpoint.definition.resolved.get("parameters", ()):
             name = parameter["name"]
             if name in form_data:
-                if parameter["in"] == "formData" and is_file(parameter):
-                    files[name] = form_data[name]
+                if parameter["in"] == "formData" and (is_file(parameter) or is_multipart):
+                    files.append((name, form_data[name]))
                 else:
                     data[name] = form_data[name]
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, data or None
+
+    def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
+        global_consumes = endpoint.schema.raw_schema.get("consumes", [])
+        consumes = endpoint.definition.resolved.get("consumes", [])
+        if not consumes:
+            consumes = global_consumes
+        return consumes
 
 
 class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
@@ -350,7 +361,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         if "example" in parameter:
             schema = get_schema_from_parameter(parameter)
             schema["example"] = parameter["example"]
-        if content_type == "multipart/form-data":
+        if content_type in ("multipart/form-data", "application/x-www-form-urlencoded"):
             endpoint.form_data = parameter["schema"]
         else:
             super().process_body(endpoint, parameter)
@@ -391,16 +402,31 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     def get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         return serialization.serialize_openapi3_parameters(definitions)
 
+    def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
+        return list(endpoint.definition.resolved["requestBody"]["content"].keys())
+
     def prepare_multipart(
         self, form_data: FormData, endpoint: Endpoint
-    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
-        files, data = {}, {}
-        schema = endpoint.definition.resolved["requestBody"]["content"]["multipart/form-data"]["schema"]
+    ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
+        files, data = [], {}
+        content = endpoint.definition.resolved["requestBody"]["content"]
+        if "multipart/form-data" in content:
+            schema = content["multipart/form-data"]["schema"]
+            is_multipart = True
+        else:
+            schema = next(iter(content.values()))["schema"]
+            is_multipart = False
         for name, property_schema in schema.get("properties", {}).items():
-            if is_file(property_schema):
-                files[name] = form_data[name]
-            else:
-                data[name] = form_data[name]
+            if name in form_data:
+                if is_multipart:
+                    if isinstance(form_data[name], list):
+                        files.extend([(name, item) for item in form_data[name]])
+                    elif is_file(property_schema):
+                        files.append((name, form_data[name]))
+                    else:
+                        files.append((name, (None, form_data[name])))
+                else:
+                    data[name] = form_data[name]
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, data or None
 
