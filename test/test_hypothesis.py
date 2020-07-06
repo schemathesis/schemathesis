@@ -163,13 +163,13 @@ def test_invalid_custom_strategy(values, error):
 @pytest.mark.parametrize(
     "definition", ({"name": "api_key", "in": "header", "type": "string"}, {"name": "api_key", "in": "header"})
 )
-def test_valid_headers(base_url, swagger_20, definition):
+def test_valid_headers(openapi2_base_url, swagger_20, definition):
     endpoint = Endpoint(
         "/api/success",
         "GET",
         definition=EndpointDefinition({}, {}, "foo"),
         schema=swagger_20,
-        base_url=base_url,
+        base_url=openapi2_base_url,
         headers={
             "properties": {"api_key": definition},
             "additionalProperties": False,

@@ -68,6 +68,18 @@ def app(openapi_version, _app, reset_app):
     return _app
 
 
+@pytest.fixture
+def openapi_2_app(_app, reset_app):
+    reset_app(OpenAPIVersion("2.0"))
+    return _app
+
+
+@pytest.fixture
+def openapi_3_app(_app, reset_app):
+    reset_app(OpenAPIVersion("3.0"))
+    return _app
+
+
 @pytest.fixture(scope="session")
 def server(_app):
     """Run the app on an unused port."""
@@ -82,7 +94,23 @@ def base_url(server, app):
 
 
 @pytest.fixture()
+def openapi2_base_url(server, openapi_2_app):
+    return f"http://127.0.0.1:{server['port']}/api"
+
+
+@pytest.fixture()
+def openapi3_base_url(server, openapi_3_app):
+    return f"http://127.0.0.1:{server['port']}/api"
+
+
+@pytest.fixture()
 def schema_url(server, app):
+    """URL of the schema of the running application."""
+    return f"http://127.0.0.1:{server['port']}/schema.yaml"
+
+
+@pytest.fixture()
+def openapi3_schema_url(server, openapi_3_app):
     """URL of the schema of the running application."""
     return f"http://127.0.0.1:{server['port']}/schema.yaml"
 
