@@ -18,6 +18,7 @@ class Endpoint(Enum):
     recursive = ("GET", "/api/recursive")
     multipart = ("POST", "/api/multipart")
     upload_file = ("POST", "/api/upload_file")
+    form = ("POST", "/api/form")
     teapot = ("POST", "/api/teapot")
     text = ("GET", "/api/text")
     malformed_json = ("GET", "/api/malformed_json")
@@ -162,6 +163,15 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
                 ],
                 "responses": {"200": {"description": "OK"}},
             }
+        elif endpoint == "form":
+            schema = {
+                "parameters": [
+                    {"name": "first_name", "in": "formData", "required": True, "type": "string"},
+                    {"name": "last_name", "in": "formData", "required": True, "type": "string"},
+                ],
+                "consumes": ["application/x-www-form-urlencoded"],
+                "responses": {"200": {"description": "OK"}},
+            }
         elif endpoint == "custom_format":
             schema = {
                 "parameters": [{"name": "id", "in": "query", "required": True, "type": "string", "format": "digits"}],
@@ -173,6 +183,7 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
                     {"in": "formData", "name": "key", "required": True, "type": "string"},
                     {"in": "formData", "name": "value", "required": True, "type": "integer"},
                 ],
+                "consumes": ["multipart/form-data"],
                 "responses": {"200": {"description": "OK"}},
             }
         elif endpoint == "teapot":
@@ -362,6 +373,23 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                                     "note": {"type": "string"},
                                 },
                                 "required": ["data", "note"],
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif endpoint == "form":
+            schema = {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "additionalProperties": False,
+                                "type": "object",
+                                "properties": {"first_name": {"type": "string"}, "last_name": {"type": "string"},},
+                                "required": ["first_name", "last_name"],
                             }
                         }
                     },

@@ -121,39 +121,13 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
     return True
 
 
-def _is_valid_list(value: List) -> bool:
-    # Based on `https://github.com/psf/requests/blob/1b417634721ec377abb7f17bc1f215e07202c2f7/requests/models.py#L146`
-    if len(value) == 2:
-        file_name, file_pointer = value
-        return isinstance(file_name, str) and isinstance(file_pointer, (str, bytes))
-    if len(value) == 3:
-        file_name, file_pointer, content_type = value
-        return (
-            isinstance(file_name, str)
-            and isinstance(file_pointer, (str, bytes))
-            and isinstance(content_type, (str, bytes))
-        )
-    if len(value) == 4:
-        file_name, file_pointer, content_type, headers = value
-        return (
-            isinstance(file_name, str)
-            and isinstance(file_pointer, (str, bytes))
-            and isinstance(content_type, (str, bytes))
-            and isinstance(headers, dict)
-        )
-    return False
-
-
 def is_valid_form_data(form_data: Dict[str, Any]) -> bool:
     """Multipart encoder accepts a very limited input set."""
     for value in form_data.values():
-        # `requests` supports the following tuples:
-        #   - filename, payload
-        #   - filename, payload, content type
-        #   - filename, payload, content type, headers
-        if isinstance(value, list) and not _is_valid_list(value):
-            return False
-        if not isinstance(value, (str, bytes, int)):
+        if isinstance(value, list):
+            # A list of files is generated
+            return all(isinstance(item, bytes) for item in value)
+        if not isinstance(value, (str, bytes, int, bool)):
             return False
     return True
 
