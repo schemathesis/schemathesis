@@ -89,17 +89,17 @@ def args(openapi_version, request, mocker):
     return app, kwargs
 
 
-def test_execute_base_url_not_found(base_url, schema_url, app):
+def test_execute_base_url_not_found(openapi3_base_url, schema_url, app):
     # When base URL is pointing to an unknown location
-    execute(schema_url, base_url=f"{base_url}/404/")
+    execute(schema_url, base_url=f"{openapi3_base_url}/404/")
     # Then the runner should use this base
     # And they will not reach the application
     assert_incoming_requests_num(app, 0)
 
 
-def test_execute_base_url_found(base_url, schema_url, app):
+def test_execute_base_url_found(openapi3_base_url, schema_url, app):
     # When base_url is specified
-    execute(schema_url, base_url=base_url)
+    execute(schema_url, base_url=openapi3_base_url)
     # Then it should be used by the runner
     assert_incoming_requests_num(app, 3)
 
@@ -128,7 +128,7 @@ def test_execute(args):
 def test_interactions(request, args, workers):
     app, kwargs = args
     init, *others, finished = prepare(**kwargs, workers_num=workers, store_interactions=True)
-    base_url = "http://localhost/api" if isinstance(app, Flask) else request.getfixturevalue("base_url")
+    base_url = "http://localhost/api" if isinstance(app, Flask) else request.getfixturevalue("openapi3_base_url")
 
     # failure
     interactions = [
@@ -194,8 +194,8 @@ def test_auth(args):
 
 
 @pytest.mark.parametrize("converter", (lambda x: x, lambda x: x + "/"))
-def test_base_url(base_url, schema_url, app, converter):
-    base_url = converter(base_url)
+def test_base_url(openapi3_base_url, schema_url, app, converter):
+    base_url = converter(openapi3_base_url)
     # When `base_url` is specified explicitly with or without trailing slash
     execute(schema_url, base_url=base_url)
 
@@ -505,8 +505,8 @@ def test_exit_first(args):
     assert results[-1].failed_count == 1
 
 
-def test_auth_loader_options(base_url, schema_url, app):
-    execute(schema_url, base_url=base_url, auth=("test", "test"), auth_type="basic")
+def test_auth_loader_options(openapi3_base_url, schema_url, app):
+    execute(schema_url, base_url=openapi3_base_url, auth=("test", "test"), auth_type="basic")
     schema_request = get_schema_requests(app)
     assert schema_request[0].headers["Authorization"] == "Basic dGVzdDp0ZXN0"
 
@@ -576,15 +576,15 @@ def test_validation(loader, schema, message):
         list(prepare(schema, loader=loader))
 
 
-def test_custom_loader(swagger_20, base_url):
-    swagger_20.base_url = base_url
+def test_custom_loader(swagger_20, openapi2_base_url):
+    swagger_20.base_url = openapi2_base_url
     *others, finished = list(prepare({}, loader=lambda *args, **kwargs: swagger_20))
     assert not finished.has_errors
     assert not finished.has_failures
 
 
 @pytest.mark.endpoints("failure")
-def test_reproduce_code_with_overridden_headers(args, base_url):
+def test_reproduce_code_with_overridden_headers(args, openapi3_base_url):
     app, kwargs = args
 
     *_, after, finished = prepare(**kwargs, headers={"X-Token": "test"}, hypothesis_max_examples=1)
@@ -593,7 +593,7 @@ def test_reproduce_code_with_overridden_headers(args, base_url):
     if isinstance(app, Flask):
         expected = f"requests.get('http://localhost/api/failure', headers={headers})"
     else:
-        expected = f"requests.get('{base_url}/failure', headers={headers})"
+        expected = f"requests.get('{openapi3_base_url}/failure', headers={headers})"
     assert after.result.checks[1].example.requests_code == expected
 
 
@@ -614,7 +614,11 @@ def test_reraise():
 
 
 @pytest.mark.parametrize("schema_path", ("petstore_v2.yaml", "petstore_v3.yaml"))
-def test_url_joining(server, get_schema_path, base_url, schema_path):
+def test_url_joining(request, server, get_schema_path, schema_path):
+    if schema_path == "petstore_v2.yaml":
+        base_url = request.getfixturevalue("openapi2_base_url")
+    else:
+        base_url = request.getfixturevalue("openapi3_base_url")
     path = get_schema_path(schema_path)
     *_, after_execution, _ = prepare(
         path, base_url=f"{base_url}/v3", endpoint="/pet/findByStatus", hypothesis_max_examples=1

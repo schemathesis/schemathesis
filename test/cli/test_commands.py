@@ -493,8 +493,8 @@ def test_cli_run_changed_base_url(cli, server, cli_args, workers):
 )
 @pytest.mark.endpoints("failure")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_execute_missing_schema(cli, base_url, url, message, workers):
-    result = cli.run(f"{base_url}{url}", f"--workers={workers}")
+def test_execute_missing_schema(cli, openapi3_base_url, url, message, workers):
+    result = cli.run(f"{openapi3_base_url}{url}", f"--workers={workers}")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert message in result.stdout
 
@@ -1104,7 +1104,7 @@ def test_hypothesis_output_capture(mocker, cli, cli_args, workers):
     assert "Falsifying example" in result.stdout
 
 
-async def test_multiple_files_schema(app, testdir, cli, base_url):
+async def test_multiple_files_schema(openapi_2_app, testdir, cli, openapi2_base_url):
     # When the schema contains references to other files
     uri = pathlib.Path(HERE).as_uri() + "/"
     schema = {
@@ -1132,16 +1132,16 @@ async def test_multiple_files_schema(app, testdir, cli, base_url):
             }
         },
     }
-    app["config"].update({"should_fail": True, "schema_data": schema})
+    openapi_2_app["config"].update({"should_fail": True, "schema_data": schema})
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
     # And file path is given to the CLI
     result = cli.run(
-        str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=5", "--hypothesis-derandomize"
+        str(schema_file), f"--base-url={openapi2_base_url}", "--hypothesis-max-examples=5", "--hypothesis-derandomize"
     )
     # Then Schemathesis should resolve it and run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
     # And all relevant requests should contain proper data for resolved references
-    payload = await app["incoming_requests"][0].json()
+    payload = await openapi_2_app["incoming_requests"][0].json()
     assert isinstance(payload["name"], str)
     assert isinstance(payload["photoUrls"], list)
 
@@ -1305,7 +1305,7 @@ def test_targeted(mocker, cli, cli_args, workers):
     target.assert_called_with(mocker.ANY, label="response_time")
 
 
-def test_chained_internal_exception(testdir, cli, base_url):
+def test_chained_internal_exception(testdir, cli, openapi3_base_url):
     # When schema contains an error that causes an internal error in `jsonschema`
     raw_schema = {
         "openapi": "3.0.2",
@@ -1323,7 +1323,7 @@ def test_chained_internal_exception(testdir, cli, base_url):
     }
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(raw_schema))
     result = cli.run(
-        str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=1", "--show-errors-tracebacks"
+        str(schema_file), f"--base-url={openapi3_base_url}", "--hypothesis-max-examples=1", "--show-errors-tracebacks"
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
