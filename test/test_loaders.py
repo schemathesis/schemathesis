@@ -26,14 +26,14 @@ def test_uri_loader_custom_kwargs(app, schema_url):
     assert request.headers["User-Agent"] == USER_AGENT
 
 
-def test_base_url(base_url, schema_url):
-    schema = schemathesis.from_uri(schema_url)
+def test_base_url(openapi3_schema_url):
+    schema = schemathesis.from_uri(openapi3_schema_url)
     assert schema.base_url is None
 
 
 @pytest.mark.parametrize("url", ("http://example.com/", "http://example.com"))
-def test_base_url_override(schema_url, url):
-    schema = schemathesis.from_uri(schema_url, base_url=url)
+def test_base_url_override(openapi3_schema_url, url):
+    schema = schemathesis.from_uri(openapi3_schema_url, base_url=url)
     endpoint = next(schema.get_all_endpoints())
     assert endpoint.base_url == "http://example.com"
 

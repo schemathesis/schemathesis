@@ -28,7 +28,7 @@ def schema():
 
 
 @pytest.mark.hypothesis_nested
-def test_examples_validity(schema, base_url):
+def test_examples_validity(schema, openapi3_base_url):
     endpoint = next(schema.get_all_endpoints())
     strategy = get_strategies_from_examples(endpoint, "examples")[0]
 
@@ -36,6 +36,6 @@ def test_examples_validity(schema, base_url):
     def test(case):
         # Generated examples should have valid parameters
         # E.g. headers should be latin-1 encodable
-        case.call(base_url=base_url)
+        case.call(base_url=openapi3_base_url)
 
     test()

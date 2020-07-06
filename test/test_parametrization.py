@@ -589,15 +589,15 @@ def test_(request, case):
     result.stdout.re_match_lines([r".*\[GET:/users\]"])
 
 
-def test_base_url_from_uri(testdir, app, base_url, schema_url):
+def test_base_url_from_uri(testdir, openapi_3_app, openapi3_base_url, openapi3_schema_url):
     # When the schema is created out of URI
     testdir.make_test(
         f"""
-schema = schemathesis.from_uri("{schema_url}")
+schema = schemathesis.from_uri("{openapi3_schema_url}")
 
 @schema.parametrize()
 def test_(request, case):
-    assert case._get_base_url(None) == "{base_url}"
+    assert case._get_base_url(None) == "{openapi3_base_url}"
     case.call()
 """
     )
@@ -606,7 +606,7 @@ def test_(request, case):
     # And can be omitted in `call`
     result.assert_outcomes(passed=2)
     result.stdout.re_match_lines([r".*\[GET:/api/failure\]", r".*\[GET:/api/success\]"])
-    assert len(app["incoming_requests"]) == 2
+    assert len(openapi_3_app["incoming_requests"]) == 2
 
 
 def test_exceptions_on_collect(testdir):
