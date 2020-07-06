@@ -100,9 +100,8 @@ def _decode_multipart(content: bytes, content_type: str) -> Dict[str, str]:
 
 
 async def multipart(request: web.Request) -> web.Response:
-    content = await request.read()
     if not request.headers.get("Content-Type", "").startswith("multipart/"):
-        raise web.HTTPUnsupportedMediaType
+        raise web.HTTPInternalServerError(text="Not a multipart request!")
     # We need to have payload stored in the request, thus can't use `request.multipart` that consumes the reader
     content = await request.read()
     data = _decode_multipart(content, request.headers["Content-Type"])
@@ -110,7 +109,7 @@ async def multipart(request: web.Request) -> web.Response:
 
 
 async def upload_file(request: web.Request) -> web.Response:
-    if not request.headers["Content-Type"].startswith("multipart/form-data"):
+    if not request.headers.get("Content-Type", "").startswith("multipart/"):
         raise web.HTTPInternalServerError(text="Not a multipart request!")
     content = await request.read()
     expected_lines = [
@@ -120,6 +119,12 @@ async def upload_file(request: web.Request) -> web.Response:
     ]
     if any(line not in content for line in expected_lines):
         raise web.HTTPInternalServerError(text="Request does not contain expected lines!")
+    return web.json_response({"size": request.content_length})
+
+
+async def form(request: web.Request) -> web.Response:
+    if not request.headers.get("Content-Type", "").startswith("application/x-www-form-urlencoded"):
+        raise web.HTTPInternalServerError(text="Not an urlencoded request!")
     return web.json_response({"size": request.content_length})
 
 

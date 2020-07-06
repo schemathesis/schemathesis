@@ -196,9 +196,12 @@ class BaseSchema(Mapping):
 
     def prepare_multipart(
         self, form_data: FormData, endpoint: Endpoint
-    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
         """Split content of `form_data` into files & data.
 
         Forms may contain file fields, that we should send via `files` argument in `requests`.
         """
+        raise NotImplementedError
+
+    def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
         raise NotImplementedError

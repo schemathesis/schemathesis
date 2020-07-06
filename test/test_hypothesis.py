@@ -1,5 +1,6 @@
 from base64 import b64decode
 
+import hypothesis.errors
 import pytest
 from hypothesis import HealthCheck, given, settings, strategies
 
@@ -184,6 +185,80 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
         case.call()
 
     inner()
+
+
+@pytest.mark.parametrize(
+    "raw_schema",
+    (
+        {
+            "swagger": "2.0",
+            "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
+            "host": "api.example.com",
+            "basePath": "/v1",
+            "schemes": ["https"],
+            "paths": {
+                "/form": {
+                    "post": {
+                        "parameters": [
+                            {"name": "a", "in": "formData", "required": True, "type": "number"},
+                            {"name": "b", "in": "formData", "required": True, "type": "boolean"},
+                            {"name": "c", "in": "formData", "required": True, "type": "array"},
+                        ],
+                        "summary": "Returns a list of users.",
+                        "description": "Optional extended description in Markdown.",
+                        "consumes": ["multipart/form-data"],
+                        "produces": ["application/json"],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        },
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+            "servers": [{"url": "http://127.0.0.1:8081/{basePath}", "variables": {"basePath": {"default": "api"}}}],
+            "paths": {
+                "/form": {
+                    "post": {
+                        "requestBody": {
+                            "content": {
+                                "multipart/form-data": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "a": {"type": "number"},
+                                            "b": {"type": "boolean"},
+                                            "c": {"type": "array"},
+                                        },
+                                        "required": ["a", "b", "c"],
+                                    },
+                                }
+                            }
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        },
+    ),
+)
+def test_valid_form_data(request, raw_schema):
+    if "swagger" in raw_schema:
+        base_url = request.getfixturevalue("openapi2_base_url")
+    else:
+        base_url = request.getfixturevalue("openapi3_base_url")
+    # When the request definition contains a schema, matching values of which can not be encoded to multipart
+    # in a straightforward way
+    schema = schemathesis.from_dict(raw_schema, base_url=base_url)
+
+    @given(case=schema["/form"]["POST"].as_strategy())
+    @settings(deadline=None, max_examples=100)
+    def inner(case):
+        case.call()
+
+    # Then such values should not be generated at all and there should be no error on the `requests` level
+    with pytest.raises(hypothesis.errors.FailedHealthCheck):
+        inner()
 
 
 @pytest.mark.parametrize("value, expected", (({"key": "1"}, True), ({"key": 1}, True), ({"key": "\udcff"}, False)))

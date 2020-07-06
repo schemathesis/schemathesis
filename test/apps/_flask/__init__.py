@@ -104,6 +104,12 @@ def create_openapi_app(
     def upload_file():
         return jsonify({"size": request.content_length})
 
+    @app.route("/api/form", methods=["POST"])
+    def form():
+        if request.headers["Content-Type"] != "application/x-www-form-urlencoded":
+            raise InternalServerError("Not an urlencoded request!")
+        return jsonify({"size": request.content_length})
+
     @app.route("/api/teapot", methods=["POST"])
     def teapot():
         return jsonify({"success": True}), 418

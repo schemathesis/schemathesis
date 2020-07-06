@@ -165,7 +165,8 @@ class Case:
         if self.form_data:
             extra = {"data": self.form_data}
             final_headers = final_headers or {}
-            final_headers.setdefault("Content-Type", "multipart/form-data")
+            if "multipart/form-data" in self.endpoint.get_request_payload_content_types():
+                final_headers.setdefault("Content-Type", "multipart/form-data")
         elif is_multipart(self.body):
             extra = {"data": self.body}
         else:
@@ -335,12 +336,13 @@ class Endpoint:
             return self.schema.get_hypothesis_conversion(definitions)
         return None
 
-    def prepare_multipart(
-        self, form_data: Optional[FormData]
-    ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    def prepare_multipart(self, form_data: Optional[FormData]) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
         if not form_data:
             return None, None
         return self.schema.prepare_multipart(form_data, self)
+
+    def get_request_payload_content_types(self) -> List[str]:
+        return self.schema.get_request_payload_content_types(self)
 
     def partial_deepcopy(self) -> "Endpoint":
         return self.__class__(

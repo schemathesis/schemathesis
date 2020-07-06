@@ -1230,7 +1230,7 @@ def test_wsgi_app_path_schema(testdir, cli, loadable_flask_app):
     assert "1 passed in" in result.stdout
 
 
-def test_multipart_upload(testdir, tmp_path, base_url, cli):
+def test_multipart_upload(testdir, tmp_path, openapi3_base_url, cli):
     cassette_path = tmp_path / "output.yaml"
     # When requestBody has a binary field or an array of binary items
     responses = {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}}
@@ -1280,9 +1280,10 @@ def test_multipart_upload(testdir, tmp_path, base_url, cli):
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
     result = cli.run(
         str(schema_file),
-        f"--base-url={base_url}",
+        f"--base-url={openapi3_base_url}",
         "--hypothesis-max-examples=5",
         "--show-errors-tracebacks",
+        "--hypothesis-derandomize",
         f"--store-network-log={cassette_path}",
     )
     # Then it should be correctly sent to the server
@@ -1291,9 +1292,25 @@ def test_multipart_upload(testdir, tmp_path, base_url, cli):
 
     with cassette_path.open() as fd:
         cassette = yaml.safe_load(fd)
-    data = base64.b64decode(cassette["http_interactions"][-1]["request"]["body"]["base64_string"])
-    assert data.startswith(b"file=")
+
+    def decode(idx):
+        return base64.b64decode(cassette["http_interactions"][idx]["request"]["body"]["base64_string"])
+
+    first_decoded = decode(0)
+    if first_decoded:
+        assert b'Content-Disposition: form-data; name="files"; filename="files"\r\n' in first_decoded
+    last_decoded = decode(-1)
+    if last_decoded:
+        assert b'Content-Disposition: form-data; name="file"; filename="file"\r\n' in last_decoded
     # NOTE, that the actual endpoint is not checked in this test
+
+
+@pytest.mark.endpoints("form")
+def test_urlencoded_form(cli, cli_args):
+    # When the endpoint accepts application/x-www-form-urlencoded
+    result = cli.run(*cli_args)
+    # Then Schemathesis should generate appropriate payload
+    assert result.exit_code == ExitCode.OK, result.stdout
 
 
 @pytest.mark.parametrize("workers", (1, 2))
