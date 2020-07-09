@@ -16,7 +16,6 @@ def get_object_example_from_properties(object_schema: Dict[str, Any]) -> Dict[st
 
 def get_parameter_examples(endpoint_def: Dict[str, Any], examples_field: str) -> List[Dict[str, Any]]:
     """Gets parameter examples from OAS3 `examples` keyword or `x-examples` for Swagger 2."""
-
     return [
         {
             "type": LOCATION_TO_CONTAINER.get(parameter["in"]),
@@ -47,7 +46,6 @@ def get_parameter_example_from_properties(endpoint_def: Dict[str, Any]) -> Dict[
 
 def get_request_body_examples(endpoint_def: Dict[str, Any], examples_field: str) -> Dict[str, Any]:
     """Gets request body examples from OAS3 `examples` keyword or `x-examples` for Swagger 2."""
-
     request_bodies_items = endpoint_def.get("requestBody", {}).get("content", {}).items()
     if not request_bodies_items:
         return {}
