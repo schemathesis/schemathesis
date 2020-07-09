@@ -1,15 +1,13 @@
 """Provide strategies for given endpoint(s) definition."""
 import asyncio
 import re
-from base64 import b64encode
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 from urllib.parse import quote_plus
 
 import hypothesis
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
-from requests.auth import _basic_auth_str
 
 from . import utils
 from .exceptions import InvalidSchema
@@ -138,7 +136,7 @@ def get_case_strategy(endpoint: Endpoint, hooks: Optional[HookDispatcher] = None
     Path & endpoint are static, the others are JSON schemas.
     """
     strategies = {}
-    static_kwargs: Dict[str, Any] = {"endpoint": endpoint}
+    static_kwargs: Dict[str, Any] = {}
     for parameter in PARAMETERS:
         value = getattr(endpoint, parameter)
         if value is not None:
@@ -215,26 +213,3 @@ def _apply_hooks(strategies: Dict[str, st.SearchStrategy], dispatcher: HookDispa
             # Get the strategy on each hook to pass the first hook output as an input to the next one
             strategy = strategies[key]
             strategies[key] = hook(context, strategy)
-
-
-def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
-    """Register a new strategy for generating data for specific string "format"."""
-    if not isinstance(name, str):
-        raise TypeError(f"name must be of type {str}, not {type(name)}")
-    if not isinstance(strategy, st.SearchStrategy):
-        raise TypeError(f"strategy must be of type {st.SearchStrategy}, not {type(strategy)}")
-    from hypothesis_jsonschema._from_schema import STRING_FORMATS  # pylint: disable=import-outside-toplevel
-
-    STRING_FORMATS[name] = strategy
-
-
-def init_default_strategies() -> None:
-    """Register all default "format" strategies."""
-    register_string_format("binary", st.binary())
-    register_string_format("byte", st.binary().map(lambda x: b64encode(x).decode()))
-
-    def make_basic_auth_str(item: Tuple[str, str]) -> str:
-        return _basic_auth_str(*item)
-
-    register_string_format("_basic_auth", st.tuples(st.text(), st.text()).map(make_basic_auth_str))  # type: ignore
-    register_string_format("_bearer_auth", st.text().map("Bearer {}".format))
