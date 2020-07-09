@@ -42,4 +42,3 @@ Current GraphQL support does **NOT** include the following:
 - Custom scalar types support (it will produce an error);
 - Mutations;
 - Filters for fields under test;
-- Hooks;
