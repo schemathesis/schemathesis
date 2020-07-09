@@ -10,6 +10,7 @@ Added
 ~~~~~
 
 - ``schemathesis.graphql.from_dict`` loader that allows you to use GraphQL schemas represented as a dictionary for testing.
+- ``before_load_schema`` hook for GraphQL schemas.
 
 Fixed
 ~~~~~
