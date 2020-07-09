@@ -1,3 +1,5 @@
+from typing import Any, Dict, Optional
+
 import requests
 
 from .schemas import GraphQLSchema
@@ -90,5 +92,9 @@ fragment TypeRef on __Type {
 
 def from_url(url: str) -> GraphQLSchema:
     response = requests.post(url, json={"query": INTROSPECTION_QUERY})
-    raw_schema = response.json()
-    return GraphQLSchema(raw_schema["data"], location=url)
+    decoded = response.json()
+    return from_dict(raw_schema=decoded["data"], location=url)
+
+
+def from_dict(raw_schema: Dict[str, Any], location: Optional[str] = None) -> GraphQLSchema:
+    return GraphQLSchema(raw_schema, location=location)

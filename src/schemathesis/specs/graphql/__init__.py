@@ -1,1 +1,1 @@
-from .loaders import from_url
+from .loaders import from_dict, from_url
