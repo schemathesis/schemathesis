@@ -88,7 +88,7 @@ def assert_generates(raw_schema, expected, parameter):
 
     @given(case=schema["/teapot"]["GET"].as_strategy())
     def test(case):
-        assert getattr(case, parameter) == expected
+        assert getattr(case, "path_parameters" if parameter == "path" else parameter) == expected
 
     test()
 
@@ -293,3 +293,28 @@ def test_content_serialization():
         {"in": "query", "name": "filter", "required": True, "content": {"application/json": {"schema": OBJECT_SCHEMA}}}
     )
     assert_generates(raw_schema, {"filter": JSONString('{"r":100, "g": 200, "b": 150}')}, "query")
+
+
+def make_array_schema(location, style):
+    return {
+        "name": "bbox",
+        "in": location,
+        "required": True,
+        "schema": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number", "enum": [1.1]}},
+        "style": style,
+        "explode": False,
+    }
+
+
+@pytest.mark.parametrize(
+    "parameter, expected",
+    (
+        (make_array_schema("query", "form"), {"bbox": "1.1,1.1,1.1,1.1"},),
+        (make_array_schema("path", "label"), {"bbox": ".1.1%2C1.1%2C1.1%2C1.1"},),
+        (make_array_schema("path", "matrix"), {"bbox": "%3B1.1%2C1.1%2C1.1%2C1.1"},),
+    ),
+)
+def test_non_string_serialization(parameter, expected):
+    # GH: #651
+    raw_schema = make_openapi_schema(parameter)
+    assert_generates(raw_schema, expected, parameter["in"])

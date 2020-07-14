@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Serialization of non-string parameters. `#651`_
+
 `2.1.0`_ - 2020-07-06
 ---------------------
 
@@ -1226,6 +1231,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#651: https://github.com/kiwicom/schemathesis/issues/651
 .. _#647: https://github.com/kiwicom/schemathesis/issues/647
 .. _#641: https://github.com/kiwicom/schemathesis/issues/641
 .. _#640: https://github.com/kiwicom/schemathesis/issues/640
