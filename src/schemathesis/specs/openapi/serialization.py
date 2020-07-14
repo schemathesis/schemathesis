@@ -179,7 +179,7 @@ def to_json(item: Generated, name: str) -> None:
 
 @conversion
 def delimited(item: Generated, name: str, delimiter: str) -> None:
-    item[name] = delimiter.join(item[name])
+    item[name] = delimiter.join(map(str, item[name]))
 
 
 @conversion
@@ -234,7 +234,7 @@ def label_array(item: Generated, name: str, explode: Optional[bool]) -> None:
         delimiter = "."
     else:
         delimiter = ","
-    item[name] = f".{delimiter.join(item[name])}"
+    item[name] = f".{delimiter.join(map(str, item[name]))}"
 
 
 @conversion
@@ -281,7 +281,7 @@ def matrix_array(item: Generated, name: str, explode: Optional[bool]) -> None:
     if explode:
         new = ";".join(f"{name}={value}" for value in item[name])
     else:
-        new = ",".join(item[name])
+        new = ",".join(map(str, item[name]))
     item[name] = f";{new}"
 
 
