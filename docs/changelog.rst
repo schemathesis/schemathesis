@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Possible ``UnicodeEncodeError`` during generation of ``Authorization`` header values for endpoints with ``basic`` security scheme. `#656`_
+
 `2.2.0`_ - 2020-07-14
 ---------------------
 
@@ -1241,6 +1246,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#656: https://github.com/kiwicom/schemathesis/issues/656
 .. _#651: https://github.com/kiwicom/schemathesis/issues/651
 .. _#647: https://github.com/kiwicom/schemathesis/issues/647
 .. _#641: https://github.com/kiwicom/schemathesis/issues/641
