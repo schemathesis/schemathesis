@@ -24,5 +24,7 @@ def init_default_strategies() -> None:
     def make_basic_auth_str(item: Tuple[str, str]) -> str:
         return _basic_auth_str(*item)
 
-    register_string_format("_basic_auth", st.tuples(st.text(), st.text()).map(make_basic_auth_str))  # type: ignore
+    latin1_text = st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255))
+
+    register_string_format("_basic_auth", st.tuples(latin1_text, latin1_text).map(make_basic_auth_str))  # type: ignore
     register_string_format("_bearer_auth", st.text().map("Bearer {}".format))

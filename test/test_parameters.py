@@ -246,7 +246,7 @@ def test_security_definitions_basic_auth(testdir, basic_auth_schema):
 import base64
 
 @schema.parametrize()
-@settings(max_examples=1, deadline=None)
+@settings(max_examples=10, deadline=None)
 def test_(case):
     assert "Authorization" in case.headers
     auth = case.headers["Authorization"]
