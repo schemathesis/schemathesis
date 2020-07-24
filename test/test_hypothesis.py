@@ -1,6 +1,5 @@
 from base64 import b64decode
 
-import hypothesis.errors
 import pytest
 from hypothesis import HealthCheck, given, settings, strategies
 
@@ -217,7 +216,7 @@ def make_swagger(*parameters):
             {"name": "b", "in": "formData", "required": True, "type": "boolean"},
             {"name": "c", "in": "formData", "required": True, "type": "array"},
         ),
-        make_swagger({"name": "c", "in": "formData", "required": True, "type": "array"},),
+        make_swagger({"name": "c", "in": "formData", "required": True, "type": "array"}),
         {
             "openapi": "3.0.2",
             "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -261,9 +260,8 @@ def test_valid_form_data(request, raw_schema):
     def inner(case):
         case.call()
 
-    # Then such values should not be generated at all and there should be no error on the `requests` level
-    with pytest.raises(hypothesis.errors.FailedHealthCheck):
-        inner()
+    # Then these values should be casted to bytes and handled successfully
+    inner()
 
 
 @pytest.mark.parametrize("value, expected", (({"key": "1"}, True), ({"key": 1}, True), ({"key": "\udcff"}, False)))

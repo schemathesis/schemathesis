@@ -119,17 +119,6 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
     return True
 
 
-def is_valid_form_data(form_data: Dict[str, Any]) -> bool:
-    """Multipart encoder accepts a very limited input set."""
-    for value in form_data.values():
-        if isinstance(value, list):
-            # A list of files is generated
-            return bool(value) and all(isinstance(item, bytes) for item in value)
-        if not isinstance(value, (str, bytes, int, bool)):
-            return False
-    return True
-
-
 def get_case_strategy(endpoint: Endpoint, hooks: Optional[HookDispatcher] = None) -> st.SearchStrategy:
     """Create a strategy for a complete test case.
 
@@ -147,6 +136,19 @@ def get_case_strategy(endpoint: Endpoint, hooks: Optional[HookDispatcher] = None
     return _get_case_strategy(endpoint, static_kwargs, strategies, hooks)
 
 
+def to_bytes(value: Union[str, bytes, int, bool, float]) -> bytes:
+    return str(value).encode(errors="ignore")
+
+
+def prepare_form_data(form_data: Dict[str, Any]) -> Dict[str, Any]:
+    for name, value in form_data.items():
+        if isinstance(value, list):
+            form_data[name] = [to_bytes(item) if not isinstance(item, (bytes, str, int)) else item for item in value]
+        elif not isinstance(value, (bytes, str, int)):
+            form_data[name] = to_bytes(value)
+    return form_data
+
+
 def prepare_strategy(parameter: str, value: Dict[str, Any], map_func: Optional[Callable]) -> st.SearchStrategy:
     """Create a strategy for a schema and add location-specific filters & maps."""
     strategy = from_schema(value)
@@ -159,7 +161,7 @@ def prepare_strategy(parameter: str, value: Dict[str, Any], map_func: Optional[C
     elif parameter == "query":
         strategy = strategy.filter(is_valid_query)  # type: ignore
     elif parameter == "form_data":
-        strategy = strategy.filter(is_valid_form_data)  # type: ignore
+        strategy = strategy.map(prepare_form_data)  # type: ignore
     return strategy
 
 
