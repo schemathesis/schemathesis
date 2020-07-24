@@ -279,7 +279,11 @@ class SwaggerV20(BaseOpenAPISchema):
             name = parameter["name"]
             if name in form_data:
                 if parameter["in"] == "formData" and (is_file(parameter) or is_multipart):
-                    files.append((name, form_data[name]))
+                    if isinstance(form_data[name], list):
+                        for item in form_data[name]:
+                            files.append((name, (None, item)))
+                    else:
+                        files.append((name, form_data[name]))
                 else:
                     data[name] = form_data[name]
         # `None` is the default value for `files` and `data` arguments in `requests.request`
