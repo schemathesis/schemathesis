@@ -187,32 +187,37 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
     inner()
 
 
+def make_swagger(*parameters):
+    return {
+        "swagger": "2.0",
+        "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
+        "host": "api.example.com",
+        "basePath": "/v1",
+        "schemes": ["https"],
+        "paths": {
+            "/form": {
+                "post": {
+                    "parameters": list(parameters),
+                    "summary": "Returns a list of users.",
+                    "description": "Optional extended description in Markdown.",
+                    "consumes": ["multipart/form-data"],
+                    "produces": ["application/json"],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+
+
 @pytest.mark.parametrize(
     "raw_schema",
     (
-        {
-            "swagger": "2.0",
-            "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
-            "host": "api.example.com",
-            "basePath": "/v1",
-            "schemes": ["https"],
-            "paths": {
-                "/form": {
-                    "post": {
-                        "parameters": [
-                            {"name": "a", "in": "formData", "required": True, "type": "number"},
-                            {"name": "b", "in": "formData", "required": True, "type": "boolean"},
-                            {"name": "c", "in": "formData", "required": True, "type": "array"},
-                        ],
-                        "summary": "Returns a list of users.",
-                        "description": "Optional extended description in Markdown.",
-                        "consumes": ["multipart/form-data"],
-                        "produces": ["application/json"],
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
-            },
-        },
+        make_swagger(
+            {"name": "a", "in": "formData", "required": True, "type": "number"},
+            {"name": "b", "in": "formData", "required": True, "type": "boolean"},
+            {"name": "c", "in": "formData", "required": True, "type": "array"},
+        ),
+        make_swagger({"name": "c", "in": "formData", "required": True, "type": "array"},),
         {
             "openapi": "3.0.2",
             "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
