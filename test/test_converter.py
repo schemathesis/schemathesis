@@ -17,6 +17,10 @@ from schemathesis.utils import traverse_schema
             {"x-nullable": True, "type": "integer", "enum": [1, 2]},
             {"anyOf": [{"type": "integer", "enum": [1, 2]}, {"type": "null"}]},
         ),
+        (
+            {"in": "body", "name": "foo", "schema": {"type": "string"}, "x-nullable": True},
+            {"in": "body", "name": "foo", "schema": {"anyOf": [{"type": "string"}, {"type": "null"}]}},
+        ),
     ),
 )
 def test_to_jsonschema(schema, expected):
