@@ -124,7 +124,7 @@ def is_valid_form_data(form_data: Dict[str, Any]) -> bool:
     for value in form_data.values():
         if isinstance(value, list):
             # A list of files is generated
-            return all(isinstance(item, bytes) for item in value)
+            return bool(value) and all(isinstance(item, bytes) for item in value)
         if not isinstance(value, (str, bytes, int, bool)):
             return False
     return True
