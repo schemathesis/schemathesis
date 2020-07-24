@@ -13,7 +13,10 @@ def to_json_schema(schema: Dict[str, Any], nullable_name: str) -> Dict[str, Any]
     schema = deepcopy(schema)
     if schema.get(nullable_name) is True:
         del schema[nullable_name]
-        if schema.get("in"):
+        in_ = schema.get("in")
+        if in_ == "body":
+            schema["schema"] = {"anyOf": [schema["schema"], {"type": "null"}]}
+        elif in_:
             initial_type = {"type": schema["type"]}
             if schema.get("enum"):
                 initial_type["enum"] = schema.pop("enum")
