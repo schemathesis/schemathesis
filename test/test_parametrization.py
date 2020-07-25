@@ -1,5 +1,7 @@
 import pytest
 
+import schemathesis
+
 from .utils import integer
 
 
@@ -607,6 +609,19 @@ def test_(request, case):
     result.assert_outcomes(passed=2)
     result.stdout.re_match_lines([r".*\[GET:/api/failure\]", r".*\[GET:/api/success\]"])
     assert len(openapi_3_app["incoming_requests"]) == 2
+
+
+def test_empty_content():
+    # When the "content" value is empty in "requestBody"
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {"/body": {"post": {"requestBody": {"content": {}}, "responses": {"200": {"description": "OK"}}}}},
+    }
+    schema = schemathesis.from_dict(raw_schema)
+    # Then the body processing should be no-op
+    endpoint = schema.endpoints["/body"]["POST"]
+    assert endpoint.body is None
 
 
 def test_exceptions_on_collect(testdir):
