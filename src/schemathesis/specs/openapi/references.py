@@ -74,7 +74,7 @@ class ConvertingResolver(jsonschema.RefResolver):
             return item
         if isinstance(item, dict):
             item = self.prepare(item)
-            if "$ref" in item:
+            if "$ref" in item and isinstance(item["$ref"], str):
                 with self.resolving(item["$ref"]) as resolved:
                     return self.resolve_all(resolved, recursion_level + 1)
             for key, sub_item in item.items():

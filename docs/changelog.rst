@@ -18,6 +18,7 @@ Fixed
 - ``KeyError`` during processing a schema with nullable parameters and ``in: body``. `#660`_
 - ``StopIteration`` during ``requestBody`` processing if it has empty "content" value. `#673`_
 - ``AttributeError`` during generation of "multipart/form-data" parameters that have no "type" defined. `#675`_
+- Support for properties named "$ref" in object schemas. Previously, it was causing ``TypeError``. `#672`_
 
 `2.2.1`_ - 2020-07-22
 ---------------------
@@ -1265,6 +1266,7 @@ Fixed
 
 .. _#675: https://github.com/kiwicom/schemathesis/issues/675
 .. _#673: https://github.com/kiwicom/schemathesis/issues/673
+.. _#672: https://github.com/kiwicom/schemathesis/issues/672
 .. _#665: https://github.com/kiwicom/schemathesis/issues/665
 .. _#661: https://github.com/kiwicom/schemathesis/issues/661
 .. _#660: https://github.com/kiwicom/schemathesis/issues/660
