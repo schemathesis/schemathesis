@@ -1,4 +1,5 @@
 import pytest
+from hypothesis import given, settings
 
 import schemathesis
 
@@ -622,6 +623,35 @@ def test_empty_content():
     # Then the body processing should be no-op
     endpoint = schema.endpoints["/body"]["POST"]
     assert endpoint.body is None
+
+
+@pytest.mark.hypothesis_nested
+def test_loose_multipart_definition():
+    # When the schema of "multipart/form-data" content does not define "object" type
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/body": {
+                "post": {
+                    "requestBody": {
+                        "content": {"multipart/form-data": {"schema": {"properties": {"foo": {"type": "string"}}}}}
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+    schema = schemathesis.from_dict(raw_schema)
+    # Then non-object data should be excluded during generation
+
+    @given(case=schema.endpoints["/body"]["POST"].as_strategy())
+    @settings(max_examples=5)
+    def test(case):
+        assert isinstance(case.form_data, dict)
+
+    # And the resulting values should be valid
+    test()
 
 
 def test_exceptions_on_collect(testdir):

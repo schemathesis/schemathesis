@@ -17,6 +17,7 @@ Fixed
 - ``ValueError`` during sending a request with test payload if the endpoint defines a parameter with ``type: array`` and ``in: formData``. `#661`_
 - ``KeyError`` during processing a schema with nullable parameters and ``in: body``. `#660`_
 - ``StopIteration`` during ``requestBody`` processing if it has empty "content" value. `#673`_
+- ``AttributeError`` during generation of "multipart/form-data" parameters that have no "type" defined. `#675`_
 
 `2.2.1`_ - 2020-07-22
 ---------------------
@@ -1262,6 +1263,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#675: https://github.com/kiwicom/schemathesis/issues/675
 .. _#673: https://github.com/kiwicom/schemathesis/issues/673
 .. _#665: https://github.com/kiwicom/schemathesis/issues/665
 .. _#661: https://github.com/kiwicom/schemathesis/issues/661
