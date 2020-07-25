@@ -654,6 +654,41 @@ def test_loose_multipart_definition():
     test()
 
 
+def test_ref_field():
+    # When the schema contains "$ref" field, that is not a reference (which is supported by the JSON Schema spec)
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/body": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {"$ref": {"type": "string"}},
+                                    "required": ["$ref"],
+                                    "type": "object",
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+    schema = schemathesis.from_dict(raw_schema)
+
+    @given(case=schema.endpoints["/body"]["POST"].as_strategy())
+    @settings(max_examples=5)
+    def test(case):
+        assert isinstance(case.body["$ref"], str)
+
+    # Then "$ref" field should be generated
+    test()
+
+
 def test_exceptions_on_collect(testdir):
     # When collected item raises an exception during `hasattr` in `is_schemathesis_test`
     testdir.make_test(
