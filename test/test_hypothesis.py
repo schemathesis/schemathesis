@@ -256,7 +256,7 @@ def test_valid_form_data(request, raw_schema):
     schema = schemathesis.from_dict(raw_schema, base_url=base_url)
 
     @given(case=schema["/form"]["POST"].as_strategy())
-    @settings(deadline=None, max_examples=100)
+    @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow], max_examples=100)
     def inner(case):
         case.call()
 
