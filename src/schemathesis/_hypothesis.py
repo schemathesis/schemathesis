@@ -140,6 +140,10 @@ def to_bytes(value: Union[str, bytes, int, bool, float]) -> bytes:
     return str(value).encode(errors="ignore")
 
 
+def is_valid_form_data(form_data: Any) -> bool:
+    return isinstance(form_data, dict)
+
+
 def prepare_form_data(form_data: Dict[str, Any]) -> Dict[str, Any]:
     for name, value in form_data.items():
         if isinstance(value, list):
@@ -161,7 +165,7 @@ def prepare_strategy(parameter: str, value: Dict[str, Any], map_func: Optional[C
     elif parameter == "query":
         strategy = strategy.filter(is_valid_query)  # type: ignore
     elif parameter == "form_data":
-        strategy = strategy.map(prepare_form_data)  # type: ignore
+        strategy = strategy.filter(is_valid_form_data).map(prepare_form_data)  # type: ignore
     return strategy
 
 
