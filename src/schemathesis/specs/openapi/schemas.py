@@ -358,7 +358,11 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         # Take the first media type object
         options = iter(parameter["content"].items())
-        content_type, parameter = next(options)
+        try:
+            content_type, parameter = next(options)
+        except StopIteration:
+            # empty "content" value
+            return None
         # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#media-type-object
         # > Furthermore, if referencing a schema which contains an example,
         # > the example value SHALL override the example provided by the schema
