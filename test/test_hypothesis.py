@@ -5,7 +5,7 @@ from hypothesis import HealthCheck, given, settings, strategies
 
 import schemathesis
 from schemathesis import Case, register_string_format
-from schemathesis._hypothesis import PARAMETERS, get_case_strategy, is_valid_query
+from schemathesis._hypothesis import PARAMETERS, filter_path_parameters, get_case_strategy, is_valid_query
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Endpoint, EndpointDefinition
 
@@ -267,6 +267,11 @@ def test_valid_form_data(request, raw_schema):
 @pytest.mark.parametrize("value, expected", (({"key": "1"}, True), ({"key": 1}, True), ({"key": "\udcff"}, False)))
 def test_is_valid_query(value, expected):
     assert is_valid_query(value) == expected
+
+
+@pytest.mark.parametrize("value", ("/", "\udc9b"))
+def test_filter_path_parameters(value):
+    assert not filter_path_parameters({"foo": value})
 
 
 @pytest.mark.hypothesis_nested

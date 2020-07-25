@@ -104,7 +104,7 @@ def is_valid_header(headers: Dict[str, Any]) -> bool:
     return True
 
 
-def is_surrogate(item: Any) -> bool:
+def is_illegal_surrogate(item: Any) -> bool:
     return isinstance(item, str) and bool(re.search(r"[\ud800-\udfff]", item))
 
 
@@ -114,7 +114,7 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
     `requests` and `werkzeug` will fail to send it to the application.
     """
     for name, value in query.items():
-        if is_surrogate(name) or is_surrogate(value):
+        if is_illegal_surrogate(name) or is_illegal_surrogate(value):
             return False
     return True
 
@@ -183,7 +183,7 @@ def filter_path_parameters(parameters: Dict[str, Any]) -> bool:
     path_parameter_blacklist = (".", SLASH, "")
 
     return not any(
-        (value in path_parameter_blacklist or isinstance(value, str) and SLASH in value)
+        (value in path_parameter_blacklist or is_illegal_surrogate(value) or isinstance(value, str) and SLASH in value)
         for value in parameters.values()
     )
 
