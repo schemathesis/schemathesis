@@ -9,11 +9,17 @@ from schemathesis.cli import CSVOption
 try:
     from . import _aiohttp, _flask, _graphql
     from .utils import Endpoint, OpenAPIVersion
-except ImportError:
-    import _aiohttp
-    import _flask
-    import _graphql
-    from utils import Endpoint, OpenAPIVersion
+except ImportError as exc:
+    # try/except for cases when there is a different ImportError in the block before, that
+    # doesn't imply another running environment (test_server.sh vs usual pytest run)
+    # Ref: https://github.com/kiwicom/schemathesis/issues/658
+    try:
+        import _aiohttp
+        import _flask
+        import _graphql
+        from utils import Endpoint, OpenAPIVersion
+    except ImportError:
+        raise exc
 
 
 @click.command()
@@ -30,7 +36,7 @@ def run_app(port: int, endpoints: List[Endpoint], spec: str, framework: str) -> 
             prepared_endpoints = tuple(endpoint.name for endpoint in endpoints)
         else:
             prepared_endpoints = tuple(endpoint.name for endpoint in Endpoint)
-        version = {"openapi2": OpenAPIVersion("2.0"), "openapi3": OpenAPIVersion("3.0"),}[spec]
+        version = {"openapi2": OpenAPIVersion("2.0"), "openapi3": OpenAPIVersion("3.0")}[spec]
         if framework == "aiohttp":
             app = _aiohttp.create_openapi_app(prepared_endpoints, version)
             web.run_app(app, port=port)
