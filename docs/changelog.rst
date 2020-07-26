@@ -20,6 +20,7 @@ Fixed
 - ``AttributeError`` during generation of "multipart/form-data" parameters that have no "type" defined. `#675`_
 - Support for properties named "$ref" in object schemas. Previously, it was causing ``TypeError``. `#672`_
 - Generating illegal unicode surrogates in path. `#668`_
+- Invalid development dependency on ``graphql-server-core`` package. `#658`_
 
 `2.2.1`_ - 2020-07-22
 ---------------------
@@ -1272,6 +1273,7 @@ Fixed
 .. _#665: https://github.com/kiwicom/schemathesis/issues/665
 .. _#661: https://github.com/kiwicom/schemathesis/issues/661
 .. _#660: https://github.com/kiwicom/schemathesis/issues/660
+.. _#658: https://github.com/kiwicom/schemathesis/issues/658
 .. _#656: https://github.com/kiwicom/schemathesis/issues/656
 .. _#651: https://github.com/kiwicom/schemathesis/issues/651
 .. _#647: https://github.com/kiwicom/schemathesis/issues/647

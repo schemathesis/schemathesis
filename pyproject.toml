@@ -45,7 +45,7 @@ coverage = "^4.5"
 pytest = ">4.6.4"
 aiohttp = "^3.6"
 graphene = "^3.0b3"
-graphql-server-core = "https://github.com/graphql-python/graphql-server-core.git@8e2f147a2c23ec7275fe1924dc0c190370ffd256"
+graphql-server-core = { git = "https://github.com/graphql-python/graphql-server-core.git", rev = "e8f3a89a64d75e8668f5f4762b87d34a1840d926" }
 pytest-mock = "^1.11.0"
 pytest-asyncio = "^0.11.0"
 pytest-xdist = "^1.30"
