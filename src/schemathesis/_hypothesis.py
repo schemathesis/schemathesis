@@ -13,6 +13,7 @@ from . import utils
 from .exceptions import InvalidSchema
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import Case, Endpoint
+from .specs.openapi._hypothesis import STRING_FORMATS
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
 LOCATION_TO_CONTAINER = {
@@ -155,7 +156,7 @@ def prepare_form_data(form_data: Dict[str, Any]) -> Dict[str, Any]:
 
 def prepare_strategy(parameter: str, value: Dict[str, Any], map_func: Optional[Callable]) -> st.SearchStrategy:
     """Create a strategy for a schema and add location-specific filters & maps."""
-    strategy = from_schema(value)
+    strategy = from_schema(value, custom_formats=STRING_FORMATS)
     if map_func is not None:
         strategy = strategy.map(map_func)
     if parameter == "path_parameters":
