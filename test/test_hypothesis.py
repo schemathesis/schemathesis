@@ -8,6 +8,7 @@ from schemathesis import Case, register_string_format
 from schemathesis._hypothesis import PARAMETERS, filter_path_parameters, get_case_strategy, is_valid_query
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Endpoint, EndpointDefinition
+from schemathesis.specs.openapi._hypothesis import STRING_FORMATS
 
 
 def make_endpoint(schema, **kwargs) -> Endpoint:
@@ -105,12 +106,6 @@ def test_custom_strategies(swagger_20):
 
 
 def test_register_default_strategies():
-    # If schemathesis is imported
-    # Default strategies should be registered
-    from hypothesis_jsonschema._from_schema import STRING_FORMATS
-
-    import schemathesis
-
     assert "binary" in STRING_FORMATS
     assert "byte" in STRING_FORMATS
 

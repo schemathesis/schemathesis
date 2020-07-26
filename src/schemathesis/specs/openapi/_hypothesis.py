@@ -4,6 +4,8 @@ from typing import Tuple
 from hypothesis import strategies as st
 from requests.auth import _basic_auth_str
 
+STRING_FORMATS = {}
+
 
 def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
     """Register a new strategy for generating data for specific string "format"."""
@@ -11,7 +13,6 @@ def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
         raise TypeError(f"name must be of type {str}, not {type(name)}")
     if not isinstance(strategy, st.SearchStrategy):
         raise TypeError(f"strategy must be of type {st.SearchStrategy}, not {type(strategy)}")
-    from hypothesis_jsonschema._from_schema import STRING_FORMATS  # pylint: disable=import-outside-toplevel
 
     STRING_FORMATS[name] = strategy
 

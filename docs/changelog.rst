@@ -15,6 +15,7 @@ Changed
 ~~~~~~~
 
 - Error message for cases when a path parameter is in template but is not defined in the parameters list or missing ``required: true`` in its definition. `#667`_
+- Bump minimum required ``hypothesis-jsonschema`` version to `0.17.0`. This allows Schemathesis to use ``custom_formats`` argument in ``from_schema`` calls and avoid using its private API. `#684`_
 
 Fixed
 ~~~~~
@@ -1271,6 +1272,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#684: https://github.com/kiwicom/schemathesis/issues/684
 .. _#675: https://github.com/kiwicom/schemathesis/issues/675
 .. _#673: https://github.com/kiwicom/schemathesis/issues/673
 .. _#672: https://github.com/kiwicom/schemathesis/issues/672
