@@ -482,7 +482,10 @@ def test_invalid_path_parameter(args):
     app, kwargs = args
     init, *others, finished = prepare(validate_schema=False, **kwargs)
     assert finished.has_errors
-    assert "schemathesis.exceptions.InvalidSchema: Missing required property" in others[1].result.errors[0].exception
+    assert (
+        "schemathesis.exceptions.InvalidSchema: Missing path parameter 'id'. "
+        "It either not defined or has no `required: true` in its definition" in others[1].result.errors[0].exception
+    )
 
 
 def test_get_requests_auth():

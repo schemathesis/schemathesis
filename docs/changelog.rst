@@ -11,6 +11,11 @@ Added
 
 - Possibility to generate values for ``in: formData`` parameters that are non-bytes or contain non-bytes (e.g. inside an array). `#665`_
 
+Changed
+~~~~~~~
+
+- Error message for cases when a path parameter is in template but is not defined in the parameters list or missing ``required: true`` in its definition. `#667`_
+
 Fixed
 ~~~~~
 
@@ -1270,6 +1275,7 @@ Fixed
 .. _#673: https://github.com/kiwicom/schemathesis/issues/673
 .. _#672: https://github.com/kiwicom/schemathesis/issues/672
 .. _#668: https://github.com/kiwicom/schemathesis/issues/668
+.. _#667: https://github.com/kiwicom/schemathesis/issues/667
 .. _#665: https://github.com/kiwicom/schemathesis/issues/665
 .. _#661: https://github.com/kiwicom/schemathesis/issues/661
 .. _#660: https://github.com/kiwicom/schemathesis/issues/660
