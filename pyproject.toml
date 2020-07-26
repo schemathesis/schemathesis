@@ -41,7 +41,7 @@ junit-xml = "^1.9"
 starlette = "^0.13.2"
 
 [tool.poetry.dev-dependencies]
-coverage = "^4.5"
+coverage = "^5"
 pytest = ">4.6.4"
 aiohttp = "^3.6"
 graphene = "^3.0b3"
