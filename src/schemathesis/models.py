@@ -64,8 +64,10 @@ class Case:
         # pylint: disable=not-a-mapping
         try:
             return self.path.format(**self.path_parameters or {})
-        except KeyError:
-            raise InvalidSchema("Missing required property `required: true`")
+        except KeyError as variable:
+            raise InvalidSchema(
+                f"Missing path parameter {variable}. It either not defined or has no `required: true` in its definition"
+            )
 
     def get_full_base_url(self) -> Optional[str]:
         """Create a full base url, adding "localhost" for WSGI apps."""
