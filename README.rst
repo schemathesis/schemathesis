@@ -43,7 +43,7 @@ Gitter: https://gitter.im/kiwicom/schemathesis
 Documentation
 -------------
 
-For the full documentation, please see https://schemathesis.readthedocs.io/en/latest/ (WIP)
+For the full documentation, please see https://schemathesis.readthedocs.io/en/stable/
 
 Or you can look at the ``docs/`` directory in the repository.
 
