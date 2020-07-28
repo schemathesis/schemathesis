@@ -133,7 +133,7 @@ def merge_examples(
             static_parameters[parameter["type"]][parameter["name"]] = parameter["examples"][
                 min(idx, len(parameter["examples"]) - 1)
             ]
-        if "examples" in request_body_examples:
+        if "examples" in request_body_examples and request_body_examples["examples"]:
             static_parameters[request_body_examples["type"]] = request_body_examples["examples"][
                 min(idx, len(request_body_examples["examples"]) - 1)
             ]
