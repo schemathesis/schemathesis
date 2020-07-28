@@ -216,6 +216,17 @@ def test_merge_examples_with_body_examples():
     assert all("body" in static_parameters and "foo" in static_parameters["body"] for static_parameters in result)
 
 
+def test_merge_examples_with_empty_examples():
+    parameter_examples = []
+    request_body_examples = {
+        "type": "body",
+        "examples": [],
+    }
+    result = examples.merge_examples(parameter_examples, request_body_examples)
+
+    assert len(result) == 0
+
+
 def test_examples_from_cli(app, testdir, cli, base_url, schema_with_examples):
     schema = schema_with_examples.raw_schema
     app["config"].update({"schema_data": schema})

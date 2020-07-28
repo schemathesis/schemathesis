@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- ``IndexError`` when ``examples`` list is empty.
+
 `2.3.0`_ - 2020-07-26
 ---------------------
 
