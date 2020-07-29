@@ -23,9 +23,15 @@ Built with:
 
 - `hypothesis_jsonschema`_
 
+- `hypothesis_graphql`_
+
 - `pytest`_
 
 Inspired by wonderful `swagger-conformance <https://github.com/olipratt/swagger-conformance>`_ project.
+
+**Docs**: https://schemathesis.readthedocs.io/en/stable/
+
+**Gitter**: https://gitter.im/kiwicom/schemathesis
 
 If you are looking for more information, then there is an article about Schemathesis: https://code.kiwi.com/schemathesis-property-based-testing-for-api-schemas-52811fd2b0a4
 
@@ -37,15 +43,6 @@ To install Schemathesis via ``pip`` run the following command:
 .. code:: bash
 
     pip install schemathesis
-
-Gitter: https://gitter.im/kiwicom/schemathesis
-
-Documentation
--------------
-
-For the full documentation, please see https://schemathesis.readthedocs.io/en/stable/
-
-Or you can look at the ``docs/`` directory in the repository.
 
 Usage
 -----
@@ -632,6 +629,7 @@ will be licensed under its MIT license.
 
 .. _hypothesis: https://hypothesis.works/
 .. _hypothesis_jsonschema: https://github.com/Zac-HD/hypothesis-jsonschema
+.. _hypothesis_graphql: https://github.com/Stranger6667/hypothesis-graphql
 .. _pytest: http://pytest.org/en/latest/
 .. _poetry: https://github.com/sdispater/poetry
 .. _installation guide: https://github.com/sdispater/poetry#installation
