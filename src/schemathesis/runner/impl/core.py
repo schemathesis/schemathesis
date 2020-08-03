@@ -219,8 +219,9 @@ def run_checks(case: Case, checks: Iterable[CheckFunction], result: TestResult, 
     for check in checks:
         check_name = check.__name__
         try:
-            check(response, case)
-            result.add_success(check_name, case)
+            skip_check = check(response, case)
+            if not skip_check:
+                result.add_success(check_name, case)
         except AssertionError as exc:
             errors.append(exc)
             result.add_failure(check_name, case, str(exc))

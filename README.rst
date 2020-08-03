@@ -160,6 +160,21 @@ After registration, your checks will be available in Schemathesis CLI and you ca
 
     schemathesis --pre-run module.with.checks run -c new_check https://example.com/api/swagger.json
 
+Additionally, checks may return ``True`` to skip the check under certain conditions. For example, you may only want to run checks when the
+response code is ``200``.
+
+.. code:: python
+
+    import schemathesis
+
+    @schemathesis.register_check
+    def conditional_check(response, case):
+        if response.status_code == 200:
+            # some awesome assertions!
+        else:
+            # check not relevant to this response, skip test
+            return True
+
 In-code
 ~~~~~~~
 
