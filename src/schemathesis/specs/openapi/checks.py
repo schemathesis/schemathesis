@@ -2,7 +2,7 @@
 import string
 from contextlib import ExitStack, contextmanager
 from itertools import product
-from typing import TYPE_CHECKING, Any, Dict, Generator, List, Union
+from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Union
 
 import jsonschema
 import requests
@@ -14,11 +14,11 @@ if TYPE_CHECKING:
     from ...models import Case
 
 
-def status_code_conformance(response: GenericResponse, case: "Case") -> None:
+def status_code_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
     responses = case.endpoint.definition.raw.get("responses", {})
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
     if "default" in responses:
-        return
+        return None
     allowed_response_statuses = list(_expand_responses(responses))
     if response.status_code not in allowed_response_statuses:
         responses_list = ", ".join(map(str, responses))
@@ -28,6 +28,7 @@ def status_code_conformance(response: GenericResponse, case: "Case") -> None:
         )
         exc_class = get_status_code_error(response.status_code)
         raise exc_class(message)
+    return None  # explicitly return None for mypy
 
 
 def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, None, None]:
@@ -37,18 +38,18 @@ def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, N
             yield int("".join(expanded))
 
 
-def content_type_conformance(response: GenericResponse, case: "Case") -> None:
+def content_type_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
     content_types = case.endpoint.schema.get_content_types(case.endpoint, response)
     if not content_types:
-        return
+        return None
     content_type = response.headers["Content-Type"]
     for option in content_types:
         if are_content_types_equal(option, content_type):
-            return
+            return None
         expected_main, expected_sub = parse_content_type(option)
         received_main, received_sub = parse_content_type(content_type)
     exc_class = get_response_type_error(f"{expected_main}_{expected_sub}", f"{received_main}_{received_sub}")
@@ -95,6 +96,7 @@ def response_schema_conformance(response: GenericResponse, case: "Case") -> None
     except jsonschema.ValidationError as exc:
         exc_class = get_schema_validation_error(exc)
         raise exc_class(f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}")
+    return None  # explicitly return None for mypy
 
 
 @contextmanager

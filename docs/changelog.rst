@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Run checks conditionally.
+
 `2.3.1`_ - 2020-07-28
 ---------------------
 

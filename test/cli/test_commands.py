@@ -823,6 +823,29 @@ def test_pre_run_hook_module_not_found(testdir, cli):
 
 
 @pytest.mark.usefixtures("reset_hooks")
+def test_conditional_checks(testdir, cli, schema_url):
+    module = testdir.make_importable_pyfile(
+        hook="""
+            import schemathesis
+            import click
+
+            @schemathesis.register_check
+            def conditional_check(response, case):
+                # skip this check
+                return True
+            """
+    )
+
+    result = cli.main(
+        "--pre-run", module.purebasename, "run", "-c", "conditional_check", schema_url, "--hypothesis-max-examples=1"
+    )
+
+    assert result.exit_code == ExitCode.OK
+    # One additional case created for two endpoints - /api/failure and /api/success.
+    assert "No checks were performed." in result.stdout
+
+
+@pytest.mark.usefixtures("reset_hooks")
 def test_add_case(testdir, cli, schema_url):
     module = testdir.make_importable_pyfile(
         hook="""

@@ -213,7 +213,7 @@ class Case:
     def validate_response(
         self,
         response: Union[requests.Response, WSGIResponse],
-        checks: Tuple[Callable[[Union[requests.Response, WSGIResponse], "Case"], None], ...] = ALL_CHECKS,
+        checks: Tuple[Callable[[Union[requests.Response, WSGIResponse], "Case"], Optional[bool]], ...] = ALL_CHECKS,
     ) -> None:
         errors = []
         for check in checks:
@@ -594,4 +594,4 @@ class TestResultSet:
         self.results.append(item)
 
 
-CheckFunction = Callable[[GenericResponse, Case], None]  # pragma: no mutate
+CheckFunction = Callable[[GenericResponse, Case], Optional[bool]]  # pragma: no mutate
