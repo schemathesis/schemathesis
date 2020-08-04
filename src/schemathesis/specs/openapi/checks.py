@@ -46,7 +46,9 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> Optiona
     content_types = case.endpoint.schema.get_content_types(case.endpoint, response)
     if not content_types:
         return None
-    content_type = response.headers["Content-Type"]
+    content_type = response.headers.get("Content-Type")
+    if not content_type:
+        return None
     for option in content_types:
         if are_content_types_equal(option, content_type):
             return None

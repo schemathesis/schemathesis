@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import pytest
 import requests
@@ -25,11 +25,12 @@ def make_case(schema: BaseSchema, definition: Dict[str, Any]) -> models.Case:
     return models.Case(endpoint)
 
 
-def make_response(content=b"{}", content_type="application/json") -> requests.Response:
+def make_response(content=b"{}", content_type: Optional[str] = "application/json") -> requests.Response:
     response = requests.Response()
     response._content = content
     response.status_code = 200
-    response.headers["Content-Type"] = content_type
+    if content_type:
+        response.headers["Content-Type"] = content_type
     return response
 
 
@@ -51,7 +52,7 @@ def response(request):
 @pytest.fixture()
 def case(request, spec) -> models.Case:
     if "swagger" in spec.raw_schema:
-        data = {"produces": request.param}
+        data = {"produces": getattr(request, "param", ["application/json"])}
     else:
         data = {
             "responses": {
@@ -232,6 +233,13 @@ def test_invalid_schema_on_content_type_check():
     # Then an error should be risen
     with pytest.raises(InvalidSchema):
         content_type_conformance(response, case)
+
+
+def test_missing_content_type_header(case):
+    # When the response has no `Content-Type` header
+    response = make_response(content_type=None)
+    # Then content_type_conformance should be skipped
+    assert content_type_conformance(response, case) is None
 
 
 SUCCESS_SCHEMA = {"type": "object", "properties": {"success": {"type": "boolean"}}, "required": ["success"]}

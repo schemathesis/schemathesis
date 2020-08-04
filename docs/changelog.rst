@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- ``KeyError`` during the ``content_type_conformance`` check if the response has no ``Content-Type`` header. `#692`_
+
 `2.3.2`_ - 2020-08-04
 ---------------------
 
@@ -1294,6 +1299,7 @@ Fixed
 .. _0.3.0: https://github.com/kiwicom/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/kiwicom/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#692: https://github.com/kiwicom/schemathesis/issues/692
 .. _#684: https://github.com/kiwicom/schemathesis/issues/684
 .. _#675: https://github.com/kiwicom/schemathesis/issues/675
 .. _#673: https://github.com/kiwicom/schemathesis/issues/673
