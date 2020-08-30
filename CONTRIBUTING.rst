@@ -63,9 +63,7 @@ If you wait a few days without a reply, please feel free to ping the thread by a
 At present the core developers are:
 
 - Dmitry Dygalo (`@Stranger6667`_)
-- Stanislav Tkachenko (`@svtkachenko`_)
 
 Thanks!
 
 .. _@Stranger6667: https://github.com/Stranger6667
-.. _@svtkachenko: https://github.com/svtkachenko
