@@ -10,7 +10,7 @@ from _pytest.logging import LogCaptureHandler, catching_logs
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
 from ..._hypothesis import make_test_or_exception
-from ...constants import USER_AGENT
+from ...constants import DEFAULT_DEADLINE, USER_AGENT
 from ...exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from ...hooks import HookContext, get_all_by_name
 from ...models import Case, CheckFunction, Endpoint, Status, TestResult, TestResultSet
@@ -21,7 +21,6 @@ from ...types import RawAuth
 from ...utils import GenericResponse, WSGIResponse, capture_hypothesis_output, format_exception
 from ..targeted import Target
 
-DEFAULT_DEADLINE = 500  # pragma: no mutate
 DEFAULT_STATEFUL_RECURSION_LIMIT = 5  # pragma: no mutate
 
 

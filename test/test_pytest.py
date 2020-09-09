@@ -1,3 +1,6 @@
+from schemathesis.constants import DEFAULT_DEADLINE
+
+
 def test_pytest_parametrize_fixture(testdir):
     # When `pytest_generate_tests` is used on a module level for fixture parametrization
     testdir.make_test(
@@ -113,3 +116,30 @@ def test_b(case, a):
     result = testdir.runpytest("-Werror")
     # There should be no errors. There are no warnings from Schemathesis pytest plugin
     result.assert_outcomes(passed=3)
+
+
+def test_default_hypothesis_deadline(testdir):
+    testdir.make_test(
+        f"""
+@schema.parametrize()
+def test_a(case):
+    assert settings().deadline.microseconds == {DEFAULT_DEADLINE} * 1000
+
+@schema.parametrize()
+@settings(max_examples=5)
+def test_b(case):
+    assert settings().deadline.microseconds == {DEFAULT_DEADLINE} * 1000
+
+@schema.parametrize()
+@settings(max_examples=5, deadline=100)
+def test_c(case):
+    assert settings().deadline.microseconds == 100 * 1000
+
+def test_d():
+    assert settings().deadline.microseconds == 200 * 1000
+""",
+    )
+    # When there is a test with Pytest
+    result = testdir.runpytest()
+    # # Then it should use the global Schemathesis deadline for Hypothesis (DEFAULT_DEADLINE value)
+    result.assert_outcomes(passed=4)
