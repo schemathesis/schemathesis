@@ -10,6 +10,7 @@ from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 
 from . import utils
+from .constants import DEFAULT_DEADLINE
 from .exceptions import InvalidSchema
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import Case, Endpoint
@@ -38,9 +39,20 @@ def create_test(
         wrapped_test = hypothesis.seed(seed)(wrapped_test)
     if asyncio.iscoroutinefunction(test):
         wrapped_test.hypothesis.inner_test = make_async_test(test)  # type: ignore
+    setup_default_deadline(wrapped_test)
     if settings is not None:
         wrapped_test = settings(wrapped_test)
     return add_examples(wrapped_test, endpoint, hook_dispatcher=hook_dispatcher)
+
+
+def setup_default_deadline(wrapped_test: Callable) -> None:
+    # Quite hacky, but it is the simplest way to setup the default deadline value without affecting non-Schemathesis
+    # tests globally
+    existing_settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
+    if existing_settings is not None:
+        if existing_settings.deadline == hypothesis.settings.default.deadline:
+            new_settings = hypothesis.settings(existing_settings, deadline=DEFAULT_DEADLINE)
+            wrapped_test._hypothesis_internal_use_settings = new_settings  # type: ignore
 
 
 def make_test_or_exception(
