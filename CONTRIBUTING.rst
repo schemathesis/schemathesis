@@ -14,7 +14,7 @@ Your feedback and your experience are important for the project :)
 Feature requests and feedback
 -----------------------------
 
-If you'd like to suggest a feature, feel free to `submit an issue <https://github.com/kiwicom/schemathesis/issues>`_
+If you'd like to suggest a feature, feel free to `submit an issue <https://github.com/schemathesis/schemathesis/issues>`_
 and:
 
 * Write a simple and descriptive title to identify your suggestion.
@@ -27,7 +27,7 @@ and:
 Report bugs
 -----------
 
-Report bugs for Schemathesis in the `issue tracker <https://github.com/kiwicom/schemathesis/issues>`_.
+Report bugs for Schemathesis in the `issue tracker <https://github.com/schemathesis/schemathesis/issues>`_.
 
 If you are reporting a bug, please:
 
@@ -54,7 +54,7 @@ Submitting Pull Requests
 
    The test environments above are usually enough to cover most cases locally.
 
-#. Write an entry to `changelog.rst <https://github.com/kiwicom/schemathesis/blob/master/docs/changelog.rst>`_
+#. Write an entry to `changelog.rst <https://github.com/schemathesis/schemathesis/blob/master/docs/changelog.rst>`_
 #. Format your commit message according to the Conventional Commits `specification <https://www.conventionalcommits.org/en/>`_
 
 For each pull request, we aim to review it as soon as possible.

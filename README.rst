@@ -38,6 +38,9 @@ If you are looking for more information:
 - `An article <https://code.kiwi.com/schemathesis-property-based-testing-for-api-schemas-52811fd2b0a4>`_ about Schemathesis by **@Stranger6667**
 - `A video <https://youtu.be/1lo7idI7uq8>`_ from FlaskCon 2020 by **@hultner**
 
+**NOTE**: I started this project during my work at `Kiwi.com <https://kiwi.com/>`_. I am grateful to them for all the support they
+provided to this project during its early days and for the opportunity to evolve Schemathesis independently.
+
 Installation
 ------------
 
@@ -52,8 +55,8 @@ Usage
 
 There are two basic ways to use Schemathesis:
 
-- `Command Line Interface <https://github.com/kiwicom/schemathesis#command-line-interface>`_
-- `Writing tests in Python <https://github.com/kiwicom/schemathesis#in-code>`_
+- `Command Line Interface <https://github.com/schemathesis/schemathesis#command-line-interface>`_
+- `Writing tests in Python <https://github.com/schemathesis/schemathesis#in-code>`_
 
 CLI is pretty simple to use and requires no coding, in-code approach gives more flexibility.
 
@@ -66,7 +69,7 @@ The ``schemathesis`` command can be used to perform Schemathesis test cases:
 
     schemathesis run https://example.com/api/swagger.json
 
-.. image:: https://github.com/kiwicom/schemathesis/blob/master/img/schemathesis.gif
+.. image:: https://github.com/schemathesis/schemathesis/blob/master/img/schemathesis.gif
 
 If your application requires authorization then you can use ``--auth`` option for Basic Auth and ``--header`` to specify
 custom headers to be sent with each request.
@@ -138,7 +141,7 @@ register custom string format strategies or modify Schemathesis behavior in runt
 **NOTE**. This option should be passed before the ``run`` part.
 
 The passed value will be processed as an importable Python path, where you can execute your code.
-An example - https://github.com/kiwicom/schemathesis#custom-string-strategies
+An example - https://github.com/schemathesis/schemathesis#custom-string-strategies
 
 Registering custom checks for CLI
 #################################
@@ -221,7 +224,7 @@ It consists of four main parts:
 
 4. Verifying a property you'd like to test; In the example, we verify that any app response will not indicate a server-side error (HTTP codes 5xx).
 
-**NOTE**. Look for ``from_wsgi`` usage `below <https://github.com/kiwicom/schemathesis#wsgi>`_
+**NOTE**. Look for ``from_wsgi`` usage `below <https://github.com/schemathesis/schemathesis#wsgi>`_
 
 Run the tests:
 
@@ -461,10 +464,10 @@ It can run tests against the given schema URI and will do some simple checks for
 
 ``runner.prepare`` creates a generator that yields events of different kinds - ``BeforeExecution``, ``AfterExecution``, etc.
 They provide a lot of useful information about what happens during tests, but handling of these events is your responsibility.
-You can take some inspiration from Schemathesis `CLI implementation <https://github.com/kiwicom/schemathesis/blob/master/src/schemathesis/cli/__init__.py#L230>`_.
-See full description of events in the `source code <https://github.com/kiwicom/schemathesis/blob/master/src/schemathesis/runner/events.py>`_.
+You can take some inspiration from Schemathesis `CLI implementation <https://github.com/schemathesis/schemathesis/blob/master/src/schemathesis/cli/__init__.py#L230>`_.
+See full description of events in the `source code <https://github.com/schemathesis/schemathesis/blob/master/src/schemathesis/runner/events.py>`_.
 
-If you want to use Schemathesis CLI with your custom checks, look at `this section <https://github.com/kiwicom/schemathesis/tree/dd/deprecate-execute#registering-custom-checks-for-cli>`_
+If you want to use Schemathesis CLI with your custom checks, look at `this section <https://github.com/schemathesis/schemathesis/tree/dd/deprecate-execute#registering-custom-checks-for-cli>`_
 
 The built-in checks list includes the following:
 
@@ -627,8 +630,8 @@ The code in this project is licensed under `MIT license`_.
 By contributing to ``schemathesis``, you agree that your contributions
 will be licensed under its MIT license.
 
-.. |Build| image:: https://github.com/kiwicom/schemathesis/workflows/build/badge.svg
-   :target: https://github.com/kiwicom/schemathesis/actions
+.. |Build| image:: https://github.com/schemathesis/schemathesis/workflows/build/badge.svg
+   :target: https://github.com/schemathesis/schemathesis/actions
 .. |Coverage| image:: https://codecov.io/gh/kiwicom/schemathesis/branch/master/graph/badge.svg
    :target: https://codecov.io/gh/kiwicom/schemathesis/branch/master
    :alt: codecov.io status for master branch
@@ -652,5 +655,5 @@ will be licensed under its MIT license.
 .. _poetry: https://github.com/sdispater/poetry
 .. _installation guide: https://github.com/sdispater/poetry#installation
 .. _here: https://hypothesis.readthedocs.io/en/latest/reproducing.html#providing-explicit-examples
-.. _CONTRIBUTING.rst: https://github.com/kiwicom/schemathesis/blob/master/CONTRIBUTING.rst
+.. _CONTRIBUTING.rst: https://github.com/schemathesis/schemathesis/blob/master/CONTRIBUTING.rst
 .. _MIT license: https://opensource.org/licenses/MIT
