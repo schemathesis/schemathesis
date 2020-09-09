@@ -53,8 +53,8 @@ master_doc = "index"
 
 # General information about the project.
 project = "Schemathesis"
-copyright = "{year}, Kiwi.com".format(year=datetime.date.today().year)
-author = "Kiwi.com"
+copyright = "{year}, Dmitry Dygalo".format(year=datetime.date.today().year)
+author = "Dmitry Dygalo"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

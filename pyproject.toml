@@ -18,9 +18,9 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Topic :: Software Development :: Testing",
 ]
-authors = ["Dmitry Dygalo <dmitry.dygalo@kiwi.com>"]
+authors = ["Dmitry Dygalo <dadygalo@gmail.com>"]
 readme = "README.rst"
-repository = "https://github.com/kiwicom/schemathesis"
+repository = "https://github.com/schemathesis/schemathesis"
 license = "MIT"
 
 [tool.poetry.dependencies]

@@ -12,7 +12,7 @@ try:
 except ImportError as exc:
     # try/except for cases when there is a different ImportError in the block before, that
     # doesn't imply another running environment (test_server.sh vs usual pytest run)
-    # Ref: https://github.com/kiwicom/schemathesis/issues/658
+    # Ref: https://github.com/schemathesis/schemathesis/issues/658
     try:
         import _aiohttp
         import _flask
