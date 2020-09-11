@@ -155,7 +155,9 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     type=click.IntRange(1),
 )
 @click.option("--validate-schema", help="Enable or disable validation of input schema.", type=bool, default=True)
-@click.option("--junit-xml", help="Create junit-xml style report file at given path.", type=click.File("w"))
+@click.option(
+    "--junit-xml", help="Create junit-xml style report file at given path.", type=click.File("w", encoding="utf-8")
+)
 @click.option(
     "--show-errors-tracebacks",
     help="Show full tracebacks for internal errors.",
@@ -163,7 +165,9 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     is_eager=True,
     default=False,
 )
-@click.option("--store-network-log", help="Store requests and responses into a file.", type=click.File("w"))
+@click.option(
+    "--store-network-log", help="Store requests and responses into a file.", type=click.File("w", encoding="utf-8")
+)
 @click.option(
     "--fixups",
     help="Install specified compatibility fixups.",

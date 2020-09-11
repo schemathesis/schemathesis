@@ -12,6 +12,11 @@ Changed
 - The default Hypothesis's ``deadline`` setting for tests with ``schema.parametrize`` is set to 500 ms for consistency with
   the CLI behaviour. `#705`_
 
+Fixed
+~~~~~
+
+- Encoding error when writing a cassette on Windows. `#708`_
+
 `2.3.3`_ - 2020-08-04
 ---------------------
 
@@ -1309,6 +1314,7 @@ Fixed
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#708: https://github.com/schemathesis/schemathesis/issues/708
 .. _#705: https://github.com/schemathesis/schemathesis/issues/705
 .. _#692: https://github.com/schemathesis/schemathesis/issues/692
 .. _#684: https://github.com/schemathesis/schemathesis/issues/684

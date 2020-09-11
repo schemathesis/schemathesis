@@ -17,7 +17,7 @@ def cassette_path(tmp_path):
 
 
 def load_cassette(path):
-    with path.open() as fd:
+    with path.open(encoding="utf-8") as fd:
         return yaml.safe_load(fd)
 
 
@@ -36,6 +36,50 @@ def test_store_cassette(cli, schema_url, cassette_path):
     assert float(cassette["http_interactions"][0]["elapsed"]) >= 0
     data = base64.b64decode(cassette["http_interactions"][0]["response"]["body"]["base64_string"])
     assert data == b'{"success": true}'
+
+
+def test_encoding_error(testdir, cli, cassette_path, openapi3_base_url):
+    # See GH-708
+    # When the schema expects an input that is not ascii and represented as UTF-8
+    # And is not representable in CP1251. E.g. "àààà"
+    # And these interactions are recorded to a cassette
+    fixed_header = "àààà"
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/users": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "X-id",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string", "enum": [fixed_header]},
+                        }
+                    ],
+                    "responses": {
+                        "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}
+                    },
+                }
+            }
+        },
+    }
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(raw_schema))
+    result = cli.run(
+        str(schema_file),
+        f"--base-url={openapi3_base_url}",
+        "--hypothesis-max-examples=1",
+        f"--store-network-log={cassette_path}",
+    )
+    # Then the test run should be successful
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # And there should be no signs of encoding errors
+    assert "UnicodeEncodeError" not in result.stdout
+    # And the cassette should be correctly recorded
+    cassette = load_cassette(cassette_path)
+    assert len(cassette["http_interactions"]) == 1
+    assert cassette["http_interactions"][0]["request"]["headers"]["X-id"] == [fixed_header]
 
 
 def test_get_command_representation_unknown():
