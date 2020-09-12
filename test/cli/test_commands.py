@@ -21,7 +21,8 @@ from schemathesis.cli import reset_checks
 from schemathesis.hooks import unregister_all
 from schemathesis.loaders import from_uri
 from schemathesis.models import Endpoint
-from schemathesis.runner import DEFAULT_CHECKS, DEFAULT_TARGETS
+from schemathesis.runner import DEFAULT_CHECKS
+from schemathesis.targets import DEFAULT_TARGETS
 
 PHASES = "explicit, reuse, generate, target, shrink"
 if metadata.version("hypothesis") < "4.5":
@@ -161,7 +162,8 @@ def test_commands_run_help(cli):
         "  -c, --checks [not_a_server_error|status_code_conformance|"
         "content_type_conformance|response_schema_conformance|all]",
         "                                  List of checks to run.",
-        "  -t, --target [response_time]    Targets for input generation.",
+        "  -t, --target [response_time|all]",
+        "                                  Targets for input generation.",
         "  -x, --exitfirst                 Exit instantly on first error or failed test.",
         "  -a, --auth TEXT                 Server user and password. Example:",
         "                                  USER:PASSWORD",

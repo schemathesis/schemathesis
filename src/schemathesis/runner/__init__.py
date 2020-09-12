@@ -9,6 +9,7 @@ from .. import loaders
 from ..checks import DEFAULT_CHECKS
 from ..models import CheckFunction
 from ..schemas import BaseSchema
+from ..targets import DEFAULT_TARGETS, Target
 from ..types import Filter, NotSet, RawAuth
 from ..utils import dict_not_none_values, dict_true_values, file_exists, get_requests_auth, import_app
 from . import events
@@ -22,7 +23,6 @@ from .impl import (
     ThreadPoolRunner,
     ThreadPoolWSGIRunner,
 )
-from .targeted import DEFAULT_TARGETS, Target
 
 
 def prepare(  # pylint: disable=too-many-arguments

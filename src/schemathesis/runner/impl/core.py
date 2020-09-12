@@ -17,9 +17,9 @@ from ...models import Case, CheckFunction, Endpoint, Status, TestResult, TestRes
 from ...runner import events
 from ...schemas import BaseSchema
 from ...stateful import ParsedData, StatefulTest
+from ...targets import Target, TargetContext
 from ...types import RawAuth
 from ...utils import GenericResponse, WSGIResponse, capture_hypothesis_output, format_exception
-from ..targeted import Target
 
 DEFAULT_STATEFUL_RECURSION_LIMIT = 5  # pragma: no mutate
 
@@ -229,10 +229,10 @@ def run_checks(case: Case, checks: Iterable[CheckFunction], result: TestResult, 
         raise get_grouped_exception(*errors)
 
 
-def run_targets(targets: Iterable[Target], elapsed: float) -> None:
+def run_targets(targets: Iterable[Callable], context: TargetContext) -> None:
     for target in targets:
-        if target == Target.response_time:
-            hypothesis.target(elapsed, label="response_time")
+        value = target(context)
+        hypothesis.target(value, label=target.__name__)
 
 
 def add_cases(case: Case, response: GenericResponse, test: Callable, *args: Any) -> None:
@@ -279,7 +279,8 @@ def _network_test(
 ) -> requests.Response:
     # pylint: disable=too-many-arguments
     response = case.call(session=session, headers=headers, timeout=timeout)
-    run_targets(targets, response.elapsed.total_seconds())
+    context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
+    run_targets(targets, context)
     if store_interactions:
         result.store_requests_response(response)
     run_checks(case, checks, result, response)
@@ -334,7 +335,8 @@ def _wsgi_test(
         start = time.monotonic()
         response = case.call_wsgi(headers=headers)
         elapsed = time.monotonic() - start
-    run_targets(targets, elapsed)
+    context = TargetContext(case=case, response=response, response_time=elapsed)
+    run_targets(targets, context)
     if store_interactions:
         result.store_wsgi_response(case, response, headers, elapsed)
     result.logs.extend(recorded.records)
@@ -390,7 +392,8 @@ def _asgi_test(
 ) -> requests.Response:
     # pylint: disable=too-many-arguments
     response = case.call_asgi(headers=headers)
-    run_targets(targets, response.elapsed.total_seconds())
+    context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
+    run_targets(targets, context)
     if store_interactions:
         result.store_requests_response(response)
     run_checks(case, checks, result, response)

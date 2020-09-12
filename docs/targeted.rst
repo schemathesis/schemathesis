@@ -74,3 +74,18 @@ This behavior is reproducible in general, but not guaranteed due to the randomne
 a significant testing time reduction especially on a big number of examples.
 
 Hypothesis `documentation <https://hypothesis.readthedocs.io/en/latest/details.html#targeted-example-generation>`_ provides a detailed explanation of what targeted property-based testing is.
+
+Custom targets
+~~~~~~~~~~~~~~
+
+You can register your own targets with the ``schemathesis.register_target`` decorator. The function should accept ``schemathesis.targets.TargetContext`` and return a float value:
+
+.. code:: python
+
+    import schemathesis
+
+    @schemathesis.register_target
+    def new_target(context) -> float:
+        return float(len(context.response.content))
+
+Such a function will cause Hypothesis to generate input that is more likely to produce larger responses.
