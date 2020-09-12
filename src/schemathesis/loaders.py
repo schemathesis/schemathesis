@@ -64,8 +64,8 @@ def from_uri(
     response = requests.get(uri, **kwargs)
     try:
         response.raise_for_status()
-    except requests.HTTPError:
-        raise HTTPError(response=response, url=uri)
+    except requests.HTTPError as exc:
+        raise HTTPError(response=response, url=uri) from exc
     return from_file(
         response.text,
         location=uri,
