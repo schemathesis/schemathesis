@@ -53,9 +53,9 @@ def make_openapi_schema(endpoints: Tuple[str, ...], version: OpenAPIVersion = Op
         then the app will contain GET /success and GET /failure
 
     """
-    return {OpenAPIVersion("2.0"): _make_openapi_2_schema, OpenAPIVersion("3.0"): _make_openapi_3_schema,}[version](
-        endpoints
-    )
+    return {OpenAPIVersion("2.0"): _make_openapi_2_schema, OpenAPIVersion("3.0"): _make_openapi_3_schema,}[
+        version
+    ](endpoints)
 
 
 def make_node_definition(reference):
@@ -388,7 +388,10 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                             "schema": {
                                 "additionalProperties": False,
                                 "type": "object",
-                                "properties": {"first_name": {"type": "string"}, "last_name": {"type": "string"},},
+                                "properties": {
+                                    "first_name": {"type": "string"},
+                                    "last_name": {"type": "string"},
+                                },
                                 "required": ["first_name", "last_name"],
                             }
                         }
