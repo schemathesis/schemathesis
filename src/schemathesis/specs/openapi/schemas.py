@@ -79,8 +79,8 @@ class BaseOpenAPISchema(BaseSchema):
                     # It could be used for response validation
                     raw_definition = EndpointDefinition(raw_methods[method], resolved_definition, scope)
                     yield self.make_endpoint(path, method, parameters, resolved_definition, raw_definition)
-        except (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError):
-            raise InvalidSchema("Schema parsing failed. Please check your schema.")
+        except (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError) as exc:
+            raise InvalidSchema("Schema parsing failed. Please check your schema.") from exc
 
     def _resolve_methods(self, methods: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         # We need to know a proper scope in what methods are.
@@ -400,9 +400,9 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
         try:
             responses = endpoint.definition.raw["responses"]
-        except KeyError:
+        except KeyError as exc:
             # Possible to get if `validate_schema=False` is passed during schema creation
-            raise InvalidSchema("Schema parsing failed. Please check your schema.")
+            raise InvalidSchema("Schema parsing failed. Please check your schema.") from exc
         status_code = str(response.status_code)
         if status_code in responses:
             definitions = responses[status_code]

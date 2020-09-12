@@ -67,7 +67,7 @@ class Case:
         except KeyError as variable:
             raise InvalidSchema(
                 f"Missing path parameter {variable}. It either not defined or has no `required: true` in its definition"
-            )
+            ) from variable
 
     def get_full_base_url(self) -> Optional[str]:
         """Create a full base url, adding "localhost" for WSGI apps."""

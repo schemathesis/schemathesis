@@ -97,7 +97,7 @@ def response_schema_conformance(response: GenericResponse, case: "Case") -> None
             jsonschema.validate(data, schema, cls=jsonschema.Draft4Validator, resolver=resolver)
     except jsonschema.ValidationError as exc:
         exc_class = get_schema_validation_error(exc)
-        raise exc_class(f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}")
+        raise exc_class(f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}") from exc
     return None  # explicitly return None for mypy
 
 

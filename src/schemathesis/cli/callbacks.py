@@ -25,8 +25,8 @@ def validate_schema(ctx: click.core.Context, param: click.core.Parameter, raw_va
 def _validate_url(value: str) -> None:
     try:
         PreparedRequest().prepare_url(value, {})  # type: ignore
-    except RequestException:
-        raise click.UsageError("Invalid SCHEMA, must be a valid URL or file path.")
+    except RequestException as exc:
+        raise click.UsageError("Invalid SCHEMA, must be a valid URL or file path.") from exc
 
 
 def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
@@ -114,5 +114,5 @@ def convert_verbosity(
 def reraise_format_error(raw_value: str) -> Generator[None, None, None]:
     try:
         yield
-    except ValueError:
-        raise click.BadParameter(f"Should be in KEY:VALUE format. Got: {raw_value}")
+    except ValueError as exc:
+        raise click.BadParameter(f"Should be in KEY:VALUE format. Got: {raw_value}") from exc
