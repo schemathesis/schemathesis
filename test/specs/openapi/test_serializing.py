@@ -309,9 +309,18 @@ def make_array_schema(location, style):
 @pytest.mark.parametrize(
     "parameter, expected",
     (
-        (make_array_schema("query", "form"), {"bbox": "1.1,1.1,1.1,1.1"},),
-        (make_array_schema("path", "label"), {"bbox": ".1.1%2C1.1%2C1.1%2C1.1"},),
-        (make_array_schema("path", "matrix"), {"bbox": "%3B1.1%2C1.1%2C1.1%2C1.1"},),
+        (
+            make_array_schema("query", "form"),
+            {"bbox": "1.1,1.1,1.1,1.1"},
+        ),
+        (
+            make_array_schema("path", "label"),
+            {"bbox": ".1.1%2C1.1%2C1.1%2C1.1"},
+        ),
+        (
+            make_array_schema("path", "matrix"),
+            {"bbox": "%3B1.1%2C1.1%2C1.1%2C1.1"},
+        ),
     ),
 )
 def test_non_string_serialization(parameter, expected):

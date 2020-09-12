@@ -231,7 +231,11 @@ def test_examples_from_cli(app, testdir, cli, base_url, schema_with_examples):
     schema = schema_with_examples.raw_schema
     app["config"].update({"schema_data": schema})
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
-    result = cli.run(str(schema_file), f"--base-url={base_url}", "--hypothesis-phases=explicit",)
+    result = cli.run(
+        str(schema_file),
+        f"--base-url={base_url}",
+        "--hypothesis-phases=explicit",
+    )
 
     assert result.exit_code == ExitCode.OK, result.stdout
     # The request body has the 3 examples defined. Because 3 is the most examples defined

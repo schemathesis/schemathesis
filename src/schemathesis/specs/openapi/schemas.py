@@ -101,7 +101,12 @@ class BaseOpenAPISchema(BaseSchema):
         """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
         base_url = self.get_base_url()
         endpoint = Endpoint(
-            path=path, method=method.upper(), definition=raw_definition, base_url=base_url, app=self.app, schema=self,
+            path=path,
+            method=method.upper(),
+            definition=raw_definition,
+            base_url=base_url,
+            app=self.app,
+            schema=self,
         )
         for parameter in parameters:
             self.process_parameter(endpoint, parameter)

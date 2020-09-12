@@ -159,7 +159,10 @@ def test_response_from_requests(base_url):
 
 @pytest.mark.parametrize(
     "base_url, expected",
-    ((None, "http://127.0.0.1/api/v3/users/test"), ("http://127.0.0.1/api/v3", "http://127.0.0.1/api/v3/users/test"),),
+    (
+        (None, "http://127.0.0.1/api/v3/users/test"),
+        ("http://127.0.0.1/api/v3", "http://127.0.0.1/api/v3/users/test"),
+    ),
 )
 def test_from_case(swagger_20, base_url, expected):
     endpoint = Endpoint("/users/{name}", "GET", {}, swagger_20, base_url="http://127.0.0.1/api/v3")

@@ -14,7 +14,11 @@ else:
 
 
 @pytest.mark.parametrize(
-    "framework, expected", (("flask", "INFO:werkzeug: * Running on"), ("aiohttp", AIOHTTP_OUTPUT),),
+    "framework, expected",
+    (
+        ("flask", "INFO:werkzeug: * Running on"),
+        ("aiohttp", AIOHTTP_OUTPUT),
+    ),
 )
 def test_app(testdir, aiohttp_unused_port, framework, expected):
     # When the testing app is run from CMD

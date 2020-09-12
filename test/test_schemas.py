@@ -123,7 +123,13 @@ SCHEMA = {
 }
 
 
-@pytest.mark.parametrize("operation_id, path, method", (("getFoo", "/foo", "GET"), ("postBar", "/bar", "POST"),))
+@pytest.mark.parametrize(
+    "operation_id, path, method",
+    (
+        ("getFoo", "/foo", "GET"),
+        ("postBar", "/bar", "POST"),
+    ),
+)
 def test_get_endpoint_by_operation_id(operation_id, path, method):
     schema = schemathesis.from_dict(SCHEMA)
     endpoint = schema.get_endpoint_by_operation_id(operation_id)

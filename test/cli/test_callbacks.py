@@ -54,7 +54,14 @@ def test_reraise_format_error():
             raise ValueError
 
 
-@pytest.mark.parametrize("value", ("+", "\\", "[",))
+@pytest.mark.parametrize(
+    "value",
+    (
+        "+",
+        "\\",
+        "[",
+    ),
+)
 def test_validate_regex(value):
     with pytest.raises(click.BadParameter, match="Invalid regex: "):
         callbacks.validate_regex(None, None, (value,))
