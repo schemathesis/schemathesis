@@ -301,11 +301,11 @@ def load_hook(module_name: str) -> None:
     try:
         sys.path.append(os.getcwd())  # fix ModuleNotFoundError module in cwd
         __import__(module_name)
-    except Exception:
+    except Exception as exc:
         click.secho("An exception happened during the hook loading:\n", fg="red")
         message = traceback.format_exc()
         click.secho(message, fg="red")
-        raise click.Abort()
+        raise click.Abort() from exc
 
 
 class OutputStyle(Enum):
