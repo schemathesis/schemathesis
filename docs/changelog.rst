@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Ability to register custom targets for targeted testing. `#686`_
+
 `2.3.4`_ - 2020-09-11
 ---------------------
 
@@ -1321,6 +1326,7 @@ Fixed
 .. _#708: https://github.com/schemathesis/schemathesis/issues/708
 .. _#705: https://github.com/schemathesis/schemathesis/issues/705
 .. _#692: https://github.com/schemathesis/schemathesis/issues/692
+.. _#686: https://github.com/schemathesis/schemathesis/issues/686
 .. _#684: https://github.com/schemathesis/schemathesis/issues/684
 .. _#675: https://github.com/schemathesis/schemathesis/issues/675
 .. _#673: https://github.com/schemathesis/schemathesis/issues/673

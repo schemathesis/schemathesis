@@ -11,10 +11,11 @@ import yaml
 
 from .. import checks as checks_module
 from .. import models, runner
+from .. import targets as targets_module
 from ..fixups import ALL_FIXUPS
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..runner import DEFAULT_STATEFUL_RECURSION_LIMIT, events
-from ..runner.targeted import DEFAULT_TARGETS_NAMES, Target
+from ..targets import Target
 from ..types import Filter
 from ..utils import WSGIResponse
 from . import callbacks, cassettes, output
@@ -30,13 +31,28 @@ except ImportError:
     from yaml import SafeLoader  # type: ignore
 
 
+def _get_callable_names(items: Tuple[Callable, ...]) -> Tuple[str, ...]:
+    return tuple(item.__name__ for item in items)
+
+
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
-DEFAULT_CHECKS_NAMES = tuple(check.__name__ for check in checks_module.DEFAULT_CHECKS)
-ALL_CHECKS_NAMES = tuple(check.__name__ for check in checks_module.ALL_CHECKS)
+DEFAULT_CHECKS_NAMES = _get_callable_names(checks_module.DEFAULT_CHECKS)
+ALL_CHECKS_NAMES = _get_callable_names(checks_module.ALL_CHECKS)
 CHECKS_TYPE = click.Choice((*ALL_CHECKS_NAMES, "all"))
+
+DEFAULT_TARGETS_NAMES = _get_callable_names(targets_module.DEFAULT_TARGETS)
+ALL_TARGETS_NAMES = _get_callable_names(targets_module.ALL_TARGETS)
+TARGETS_TYPE = click.Choice((*ALL_TARGETS_NAMES, "all"))
+
 DEFAULT_WORKERS = 1
 MAX_WORKERS = 64
+
+
+def register_target(function: Target) -> None:
+    """Register a new testing target for schemathesis CLI."""
+    targets_module.ALL_TARGETS += (function,)
+    TARGETS_TYPE.choices += (function.__name__,)  # type: ignore
 
 
 def register_check(function: Callable[[Union[requests.Response, WSGIResponse], models.Case], None]) -> None:
@@ -49,7 +65,14 @@ def reset_checks() -> None:
     """Get checks list to their default state."""
     # Useful in tests
     checks_module.ALL_CHECKS = checks_module.DEFAULT_CHECKS + checks_module.OPTIONAL_CHECKS
-    CHECKS_TYPE.choices = tuple(check.__name__ for check in checks_module.ALL_CHECKS) + ("all",)
+    CHECKS_TYPE.choices = _get_callable_names(checks_module.ALL_CHECKS) + ("all",)
+
+
+def reset_targets() -> None:
+    """Get targets list to their default state."""
+    # Useful in tests
+    targets_module.ALL_TARGETS = targets_module.DEFAULT_TARGETS + targets_module.OPTIONAL_TARGETS
+    TARGETS_TYPE.choices = _get_callable_names(targets_module.ALL_TARGETS) + ("all",)
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -72,7 +95,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     "targets",
     multiple=True,
     help="Targets for input generation.",
-    type=click.Choice([target.name for target in Target]),
+    type=TARGETS_TYPE,
     default=DEFAULT_TARGETS_NAMES,
 )
 @click.option(
@@ -248,7 +271,7 @@ def run(  # pylint: disable=too-many-arguments
     SCHEMA must be a valid URL or file path pointing to an Open API / Swagger specification.
     """
     # pylint: disable=too-many-locals
-    selected_targets = tuple(target for target in Target if target.name in targets)
+    selected_targets = tuple(target for target in targets_module.ALL_TARGETS if target.__name__ in targets)
 
     if "all" in checks:
         selected_checks = checks_module.ALL_CHECKS
