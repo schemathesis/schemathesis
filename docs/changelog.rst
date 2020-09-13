@@ -1338,6 +1338,7 @@ Fixed
 .. _#640: https://github.com/schemathesis/schemathesis/issues/640
 .. _#631: https://github.com/schemathesis/schemathesis/issues/631
 .. _#629: https://github.com/schemathesis/schemathesis/issues/629
+.. _#622: https://github.com/schemathesis/schemathesis/issues/622
 .. _#621: https://github.com/schemathesis/schemathesis/issues/621
 .. _#618: https://github.com/schemathesis/schemathesis/issues/618
 .. _#617: https://github.com/schemathesis/schemathesis/issues/617
