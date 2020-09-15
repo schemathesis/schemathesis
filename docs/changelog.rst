@@ -11,6 +11,12 @@ Added
 
 - Ability to register custom targets for targeted testing. `#686`_
 
+Changed
+~~~~~~~
+
+- The ``AfterExecution`` event now has ``path`` and ``method`` fields, similar to the ``BeforeExecution`` one.
+  The goal is to make these events self-contained, which improves their usability.
+
 `2.3.4`_ - 2020-09-11
 ---------------------
 

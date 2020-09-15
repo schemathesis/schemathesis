@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes,too-many-arguments
 import time
 from typing import Dict, List, Optional, Union
 
@@ -60,6 +60,9 @@ class BeforeExecution(ExecutionEvent):
 class AfterExecution(ExecutionEvent):
     """Happens after each examined endpoint."""
 
+    method: str = attr.ib()  # pragma: no mutate
+    path: str = attr.ib()  # pragma: no mutate
+
     # Endpoint test status - success / failure / error
     status: Status = attr.ib()  # pragma: no mutate
     result: SerializedTestResult = attr.ib()  # pragma: no mutate
@@ -70,9 +73,11 @@ class AfterExecution(ExecutionEvent):
 
     @classmethod
     def from_result(
-        cls, result: TestResult, status: Status, elapsed_time: float, hypothesis_output: List[str]
+        cls, result: TestResult, status: Status, elapsed_time: float, hypothesis_output: List[str], endpoint: Endpoint
     ) -> "AfterExecution":
         return cls(
+            method=endpoint.method,
+            path=endpoint.full_path,
             result=SerializedTestResult.from_test_result(result),
             status=status,
             elapsed_time=elapsed_time,
