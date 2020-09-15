@@ -196,7 +196,11 @@ def run_test(  # pylint: disable=too-many-locals
     )
     results.append(result)
     yield events.AfterExecution.from_result(
-        result=result, status=status, elapsed_time=test_elapsed_time, hypothesis_output=hypothesis_output
+        result=result,
+        status=status,
+        elapsed_time=test_elapsed_time,
+        hypothesis_output=hypothesis_output,
+        endpoint=endpoint,
     )
 
 

@@ -42,7 +42,11 @@ def results_set(endpoint):
 @pytest.fixture()
 def after_execution(results_set, endpoint, swagger_20):
     return runner.events.AfterExecution.from_result(
-        result=results_set.results[0], status=models.Status.success, hypothesis_output=[], elapsed_time=1.0
+        result=results_set.results[0],
+        status=models.Status.success,
+        hypothesis_output=[],
+        elapsed_time=1.0,
+        endpoint=endpoint,
     )
 
 
