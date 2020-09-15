@@ -6,6 +6,9 @@ Changelog
 `Unreleased`_
 -------------
 
+`2.4.0`_ - 2020-09-15
+---------------------
+
 Added
 ~~~~~
 
@@ -1234,7 +1237,8 @@ Fixed
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.3.4...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.4.0...HEAD
+.. _2.4.0: https://github.com/schemathesis/schemathesis/compare/v2.3.4...v2.4.0
 .. _2.3.4: https://github.com/schemathesis/schemathesis/compare/v2.3.3...v2.3.4
 .. _2.3.3: https://github.com/schemathesis/schemathesis/compare/v2.3.2...v2.3.3
 .. _2.3.2: https://github.com/schemathesis/schemathesis/compare/v2.3.1...v2.3.2
