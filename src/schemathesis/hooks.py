@@ -27,10 +27,10 @@ class HookScope(Enum):
     TEST = 3
 
 
-@attr.s(slots=True)
+@attr.s(slots=True)  # pragma: no mutate
 class RegisteredHook:
-    signature: inspect.Signature = attr.ib()
-    scopes: List[HookScope] = attr.ib()
+    signature: inspect.Signature = attr.ib()  # pragma: no mutate
+    scopes: List[HookScope] = attr.ib()  # pragma: no mutate
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -47,7 +47,7 @@ class HookDispatcher:
     Provides a mechanism to extend Schemathesis in registered hook points.
     """
 
-    scope: HookScope = attr.ib()
+    scope: HookScope = attr.ib()  # pragma: no mutate
     _hooks: DefaultDict[str, List[Callable]] = attr.ib(factory=lambda: defaultdict(list))  # pragma: no mutate
     _specs: Dict[str, RegisteredHook] = {}  # pragma: no mutate
 

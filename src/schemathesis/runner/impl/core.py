@@ -30,12 +30,12 @@ def get_hypothesis_settings(hypothesis_options: Dict[str, Any]) -> hypothesis.se
     return hypothesis.settings(**hypothesis_options)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True)  # pragma: no mutate
 class StatefulData:
     """Storage for data that will be used in later tests."""
 
-    stateful_test: StatefulTest = attr.ib()
-    container: List[ParsedData] = attr.ib(factory=list)
+    stateful_test: StatefulTest = attr.ib()  # pragma: no mutate
+    container: List[ParsedData] = attr.ib(factory=list)  # pragma: no mutate
 
     def make_endpoint(self) -> Endpoint:
         return self.stateful_test.make_endpoint(self.container)
@@ -46,16 +46,16 @@ class StatefulData:
         self.container.append(parsed)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True)  # pragma: no mutate
 class Feedback:
     """Handler for feedback from tests.
 
     Provides a way to control runner's behavior from tests.
     """
 
-    stateful: Optional[str] = attr.ib()
-    endpoint: Endpoint = attr.ib()
-    stateful_tests: Dict[str, StatefulData] = attr.ib(factory=dict)
+    stateful: Optional[str] = attr.ib()  # pragma: no mutate
+    endpoint: Endpoint = attr.ib()  # pragma: no mutate
+    stateful_tests: Dict[str, StatefulData] = attr.ib(factory=dict)  # pragma: no mutate
 
     def add_test_case(self, case: Case, response: GenericResponse) -> None:
         """Store test data to reuse it in the future additional tests."""
