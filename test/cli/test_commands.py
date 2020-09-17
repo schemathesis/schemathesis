@@ -1002,18 +1002,24 @@ def reset_hooks():
     reset_checks()
 
 
-@pytest.fixture()
-def new_check(testdir, cli):
+@pytest.fixture(
+    params=[
+        ('AssertionError("Custom check failed!")', "1. Custom check failed!"),
+        ("AssertionError", "1. Check 'new_check' failed"),
+    ]
+)
+def new_check(request, testdir, cli):
+    exception, message = request.param
     module = testdir.make_importable_pyfile(
-        hook="""
+        hook=f"""
             import schemathesis
 
             @schemathesis.register_check
             def new_check(response, result):
-                raise AssertionError("Custom check failed!")
+                raise {exception}
             """
     )
-    yield module
+    yield module, message
     reset_checks()
     # To verify that "new_check" is unregistered
     result = cli.run("--help")
@@ -1026,6 +1032,7 @@ def new_check(testdir, cli):
 
 @pytest.mark.endpoints("success")
 def test_register_check(new_check, cli, schema_url):
+    new_check, message = new_check
     # When `--pre-run` hook is passed to the CLI call
     # And it contains registering a new check, which always fails for the testing purposes
     result = cli.main("--pre-run", new_check.purebasename, "run", "-c", "new_check", schema_url)
@@ -1034,7 +1041,7 @@ def test_register_check(new_check, cli, schema_url):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And a message from the new check should be displayed
     lines = result.stdout.strip().split("\n")
-    assert lines[14] == "1. Custom check failed!"
+    assert lines[14] == message
 
 
 def assert_threaded_executor_interruption(lines, expected, optional_interrupt=False):
