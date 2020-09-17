@@ -49,16 +49,20 @@ DEFAULT_WORKERS = 1
 MAX_WORKERS = 64
 
 
-def register_target(function: Target) -> None:
+def register_target(function: Target) -> Target:
     """Register a new testing target for schemathesis CLI."""
     targets_module.ALL_TARGETS += (function,)
     TARGETS_TYPE.choices += (function.__name__,)  # type: ignore
+    return function
 
 
-def register_check(function: Callable[[Union[requests.Response, WSGIResponse], models.Case], None]) -> None:
+def register_check(
+    function: Callable[[Union[requests.Response, WSGIResponse], models.Case], None]
+) -> Callable[[Union[requests.Response, WSGIResponse], models.Case], None]:
     """Register a new check for schemathesis CLI."""
     checks_module.ALL_CHECKS += (function,)
     CHECKS_TYPE.choices += (function.__name__,)  # type: ignore
+    return function
 
 
 def reset_checks() -> None:
