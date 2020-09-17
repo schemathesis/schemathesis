@@ -1,6 +1,7 @@
 import pytest
 from _pytest.main import ExitCode
 
+import schemathesis
 from schemathesis.cli import reset_targets
 
 
@@ -35,3 +36,21 @@ def test_custom_target(testdir, cli, new_target, openapi3_schema_url):
     assert result.exit_code == ExitCode.OK, result.stdout
     # And the specified target is called
     assert "NEW TARGET IS CALLED" in result.stdout
+
+
+@pytest.fixture
+def target_function():
+    @schemathesis.register_target
+    def new_target(context):
+        return 0.5
+
+    yield target_function
+
+    reset_targets()
+
+
+def test_register_returns_a_value(target_function):
+    # When a function is registered via the `register_target` decorator
+    # Then this function should be available for further usage
+    # See #721
+    assert target_function is not None
