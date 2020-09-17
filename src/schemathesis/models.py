@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 class Case:
     """A single test case parameters."""
 
-    endpoint: "Endpoint" = attr.ib()  # pragma: no mutate
+    endpoint: "Endpoint" = attr.ib(repr=False)  # pragma: no mutate
     path_parameters: Optional[PathParameters] = attr.ib(default=None)  # pragma: no mutate
     headers: Optional[Headers] = attr.ib(default=None)  # pragma: no mutate
     cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
