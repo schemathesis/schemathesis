@@ -12,6 +12,11 @@ Changed
 - Hide ``Case.endpoint`` from representation. Its representation decreases the usability of pytest's output. `#719`_
 - Return registered functions from ``register_target`` and ``register_check`` decorators. `#721`_
 
+Fixed
+~~~~~
+
+- Possible ``IndexError`` when a user-defined check raises an exception without a message. `#718`_
+
 `2.4.0`_ - 2020-09-15
 ---------------------
 
@@ -1341,6 +1346,7 @@ Fixed
 
 .. _#721: https://github.com/schemathesis/schemathesis/issues/721
 .. _#719: https://github.com/schemathesis/schemathesis/issues/719
+.. _#718: https://github.com/schemathesis/schemathesis/issues/718
 .. _#708: https://github.com/schemathesis/schemathesis/issues/708
 .. _#705: https://github.com/schemathesis/schemathesis/issues/705
 .. _#692: https://github.com/schemathesis/schemathesis/issues/692

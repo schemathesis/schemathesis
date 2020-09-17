@@ -226,8 +226,12 @@ def run_checks(case: Case, checks: Iterable[CheckFunction], result: TestResult, 
             if not skip_check:
                 result.add_success(check_name, case)
         except AssertionError as exc:
+            message = str(exc)
+            if not message:
+                message = f"Check '{check_name}' failed"
+                exc.args = (message,)
             errors.append(exc)
-            result.add_failure(check_name, case, str(exc))
+            result.add_failure(check_name, case, message)
 
     if errors:
         raise get_grouped_exception(*errors)
