@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+~~~~~~~
+
+- Hide ``Case.endpoint`` from representation. Its representation decreases the usability of pytest's output. `#719`_
+
 `2.4.0`_ - 2020-09-15
 ---------------------
 
@@ -1333,6 +1338,7 @@ Fixed
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#719: https://github.com/schemathesis/schemathesis/issues/719
 .. _#708: https://github.com/schemathesis/schemathesis/issues/708
 .. _#705: https://github.com/schemathesis/schemathesis/issues/705
 .. _#692: https://github.com/schemathesis/schemathesis/issues/692
