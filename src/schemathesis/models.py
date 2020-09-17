@@ -212,8 +212,8 @@ class Case:
 
     def validate_response(
         self,
-        response: Union[requests.Response, WSGIResponse],
-        checks: Tuple[Callable[[Union[requests.Response, WSGIResponse], "Case"], Optional[bool]], ...] = ALL_CHECKS,
+        response: GenericResponse,
+        checks: Tuple["CheckFunction", ...] = ALL_CHECKS,
     ) -> None:
         errors = []
         for check in checks:
