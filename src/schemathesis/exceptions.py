@@ -2,10 +2,9 @@ from hashlib import sha1
 from typing import Dict, Type, Union
 
 import attr
-import requests
 from jsonschema import ValidationError
 
-from .utils import WSGIResponse
+from .utils import GenericResponse
 
 
 class CheckFailed(AssertionError):
@@ -61,5 +60,5 @@ class InvalidSchema(Exception):
 
 @attr.s  # pragma: no mutate
 class HTTPError(Exception):
-    response: Union[requests.Response, WSGIResponse] = attr.ib()  # pragma: no mutate
+    response: GenericResponse = attr.ib()  # pragma: no mutate
     url: str = attr.ib()  # pragma: no mutate

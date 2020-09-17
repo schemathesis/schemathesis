@@ -14,6 +14,7 @@ from .. import models, runner
 from .. import targets as targets_module
 from ..fixups import ALL_FIXUPS
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
+from ..models import CheckFunction
 from ..runner import DEFAULT_STATEFUL_RECURSION_LIMIT, events
 from ..targets import Target
 from ..types import Filter
@@ -56,9 +57,7 @@ def register_target(function: Target) -> Target:
     return function
 
 
-def register_check(
-    function: Callable[[Union[requests.Response, WSGIResponse], models.Case], None]
-) -> Callable[[Union[requests.Response, WSGIResponse], models.Case], None]:
+def register_check(function: CheckFunction) -> CheckFunction:
     """Register a new check for schemathesis CLI."""
     checks_module.ALL_CHECKS += (function,)
     CHECKS_TYPE.choices += (function.__name__,)  # type: ignore
