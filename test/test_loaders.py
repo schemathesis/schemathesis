@@ -67,7 +67,8 @@ def test_operation_id(operation_id):
 
 
 def test_number_deserializing(testdir):
-    # When numbers in schema are written in scientific notation but without a dot (achieved by dumping the schema with json.dumps)
+    # When numbers in schema are written in scientific notation but without a dot
+    # (achieved by dumping the schema with json.dumps)
     schema = {
         "openapi": "3.0.2",
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
