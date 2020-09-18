@@ -12,6 +12,7 @@ from ... import utils
 from ...exceptions import InvalidSchema
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import Case, Endpoint
+from ...stateful import Feedback
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
 SLASH = "/"
@@ -69,13 +70,15 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
     return True
 
 
-def get_case_strategy(endpoint: Endpoint, hooks: Optional[HookDispatcher] = None) -> st.SearchStrategy:
+def get_case_strategy(
+    endpoint: Endpoint, hooks: Optional[HookDispatcher] = None, feedback: Optional[Feedback] = None
+) -> st.SearchStrategy:
     """Create a strategy for a complete test case.
 
     Path & endpoint are static, the others are JSON schemas.
     """
     strategies = {}
-    static_kwargs: Dict[str, Any] = {}
+    static_kwargs: Dict[str, Any] = {"feedback": feedback}
     for parameter in PARAMETERS:
         value = getattr(endpoint, parameter)
         if value is not None:

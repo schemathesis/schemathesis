@@ -12,7 +12,7 @@ from ...exceptions import InvalidSchema
 from ...hooks import HookContext, HookDispatcher
 from ...models import Case, Endpoint, EndpointDefinition, empty_object
 from ...schemas import BaseSchema
-from ...stateful import StatefulTest
+from ...stateful import Feedback, Stateful, StatefulTest
 from ...types import FormData
 from ...utils import GenericResponse
 from . import links, serialization
@@ -36,9 +36,9 @@ class BaseOpenAPISchema(BaseSchema):
         raise NotImplementedError
 
     def get_stateful_tests(
-        self, response: GenericResponse, endpoint: Endpoint, stateful: Optional[str]
+        self, response: GenericResponse, endpoint: Endpoint, stateful: Optional[Stateful]
     ) -> Sequence[StatefulTest]:
-        if stateful == "links":
+        if stateful == Stateful.links:
             return links.get_links(response, endpoint, field=self.links_field)
         return []
 
@@ -178,8 +178,10 @@ class BaseOpenAPISchema(BaseSchema):
         raw_definition = EndpointDefinition(data, resolved_definition, scope)
         return self.make_endpoint(path, method, parameters, resolved_definition, raw_definition)
 
-    def get_case_strategy(self, endpoint: Endpoint, hooks: Optional[HookDispatcher] = None) -> SearchStrategy:
-        return get_case_strategy(endpoint, hooks)
+    def get_case_strategy(
+        self, endpoint: Endpoint, hooks: Optional[HookDispatcher] = None, feedback: Optional[Feedback] = None
+    ) -> SearchStrategy:
+        return get_case_strategy(endpoint, hooks, feedback)
 
 
 class SwaggerV20(BaseOpenAPISchema):
