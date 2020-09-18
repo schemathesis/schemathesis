@@ -9,11 +9,12 @@ import hypothesis
 
 from ..._hypothesis import make_test_or_exception
 from ...models import CheckFunction, TestResultSet
+from ...stateful import Feedback, Stateful
 from ...targets import Target
 from ...types import RawAuth
 from ...utils import capture_hypothesis_output, get_requests_auth
 from .. import events
-from .core import BaseRunner, Feedback, asgi_test, get_session, network_test, run_test, wsgi_test
+from .core import BaseRunner, asgi_test, get_session, network_test, run_test, wsgi_test
 
 
 def _run_task(
@@ -25,7 +26,7 @@ def _run_task(
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
-    stateful: Optional[str],
+    stateful: Optional[Stateful],
     stateful_recursion_limit: int,
     **kwargs: Any,
 ) -> None:
@@ -61,7 +62,7 @@ def thread_task(
     headers: Optional[Dict[str, Any]],
     seed: Optional[int],
     results: TestResultSet,
-    stateful: Optional[str],
+    stateful: Optional[Stateful],
     stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
@@ -97,7 +98,7 @@ def wsgi_thread_task(
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
-    stateful: Optional[str],
+    stateful: Optional[Stateful],
     stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
@@ -126,7 +127,7 @@ def asgi_thread_task(
     headers: Optional[Dict[str, Any]],
     seed: Optional[int],
     results: TestResultSet,
-    stateful: Optional[str],
+    stateful: Optional[Stateful],
     stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:

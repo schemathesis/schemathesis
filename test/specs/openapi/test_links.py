@@ -7,7 +7,7 @@ import requests
 import schemathesis
 from schemathesis.models import Case, Endpoint
 from schemathesis.specs.openapi.links import Link
-from schemathesis.stateful import ParsedData
+from schemathesis.stateful import ParsedData, Stateful
 
 ENDPOINT = Endpoint(
     path="/users/{user_id}",
@@ -87,7 +87,7 @@ def response():
 def test_get_links(openapi3_base_url, schema_url, url, expected):
     schema = schemathesis.from_uri(schema_url)
     response = requests.post(f"{openapi3_base_url}{url}", json={"username": "TEST"})
-    assert schema.endpoints["/users/"]["POST"].get_stateful_tests(response, "links") == expected
+    assert schema.endpoints["/users/"]["POST"].get_stateful_tests(response, Stateful.links) == expected
 
 
 def test_parse(case, response):

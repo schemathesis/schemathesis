@@ -3,8 +3,8 @@
 Stateful testing
 ================
 
-By default, Schemathesis generates random data for all endpoints in your schema. With Schemathesis's `stateful testing`
-Schemathesis CLI will try to reuse data from requests that were sent and responses received for generating requests to
+By default, Schemathesis generates random data for all endpoints in your schema. With Schemathesis's ``stateful testing``
+Schemathesis will try to reuse data from requests that were sent and responses received for generating requests to
 other endpoints.
 
 Open API Links
@@ -61,8 +61,10 @@ Based on this definition, Schemathesis will:
 In this case, it is much more likely that instead of a 404 response for a randomly-generated ``user_id`` we'll receive
 something else - for example, HTTP codes 200 or 500.
 
-By default, stateful testing is disabled. You can add it via ``--stateful=links`` CLI option. Please, note that more
+By default, stateful testing is disabled. You can add it via the ``--stateful=links`` CLI option or with the ``stateful=Stateful.links`` argument to ``parametrize``. Please, note that more
 different algorithms for stateful testing might be implemented in the future.
+
+CLI:
 
 .. code:: bash
 
@@ -80,9 +82,32 @@ different algorithms for stateful testing might be implemented in the future.
 
     ...
 
+Python tests:
+
+.. code:: python
+
+    from schemathesis import Stateful
+
+    @schema.parametrize(stateful=Stateful.links)
+    def test_api(case):
+        response = case.call()
+        ...
+
 Each additional test will be indented and prefixed with ``->`` in the CLI output.
-You can specify recursive links if you want. The default recursion depth limit is ``5``, it can be changed with
-``--stateful-recursion-limit=<N>`` CLI option.
+You can specify recursive links if you want. The default recursion depth limit is ``5``, it can be changed with the
+``--stateful-recursion-limit=<N>`` CLI option or with the ``stateful_recursion_limit=<N>`` argument to ``parametrize``.
+
+**NOTE**. If you use stateful testing in Python tests, make sure you use the ``case.call`` method that automatically stores the response for further usage.
+Alternatively, you could use ``case.store_response`` and store the received response by hand:
+
+.. code:: python
+
+    @schema.parametrize(stateful=Stateful.links)
+    def test_api(case):
+        response = case.call()  # stores the response automatically
+        # OR, store it manually
+        response = requests.request(**case.as_requests_kwargs())
+        case.store_response(response)
 
 Even though this feature appears only in Open API 3.0 specification, under Open API 2.0, you can use it
 via the ``x-links`` extension, the syntax is the same, but you need to use the ``x-links`` keyword instead of ``links``.

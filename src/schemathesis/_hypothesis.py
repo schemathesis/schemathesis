@@ -9,6 +9,7 @@ from .constants import DEFAULT_DEADLINE
 from .exceptions import InvalidSchema
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import Case, Endpoint
+from .stateful import Feedback, Stateful
 
 
 def create_test(
@@ -16,7 +17,12 @@ def create_test(
 ) -> Callable:
     """Create a Hypothesis test."""
     hook_dispatcher = getattr(test, "_schemathesis_hooks", None)
-    strategy = endpoint.as_strategy(hooks=hook_dispatcher)
+    feedback: Optional[Feedback]
+    if endpoint.schema.stateful == Stateful.links:
+        feedback = Feedback(endpoint.schema.stateful, endpoint)
+    else:
+        feedback = None
+    strategy = endpoint.as_strategy(hooks=hook_dispatcher, feedback=feedback)
     wrapped_test = hypothesis.given(case=strategy)(test)
     if seed is not None:
         wrapped_test = hypothesis.seed(seed)(wrapped_test)
@@ -25,6 +31,7 @@ def create_test(
     setup_default_deadline(wrapped_test)
     if settings is not None:
         wrapped_test = settings(wrapped_test)
+    wrapped_test._schemathesis_feedback = feedback  # type: ignore
     return add_examples(wrapped_test, endpoint, hook_dispatcher=hook_dispatcher)
 
 

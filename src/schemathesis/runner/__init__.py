@@ -7,14 +7,15 @@ from starlette.applications import Starlette
 from .. import fixups as _fixups
 from .. import loaders
 from ..checks import DEFAULT_CHECKS
+from ..constants import DEFAULT_STATEFUL_RECURSION_LIMIT
 from ..models import CheckFunction
 from ..schemas import BaseSchema
+from ..stateful import Stateful
 from ..targets import DEFAULT_TARGETS, Target
 from ..types import Filter, NotSet, RawAuth
 from ..utils import dict_not_none_values, dict_true_values, file_exists, get_requests_auth, import_app
 from . import events
 from .impl import (
-    DEFAULT_STATEFUL_RECURSION_LIMIT,
     BaseRunner,
     SingleThreadASGIRunner,
     SingleThreadRunner,
@@ -36,7 +37,7 @@ def prepare(  # pylint: disable=too-many-arguments
     exit_first: bool = False,
     store_interactions: bool = False,
     fixups: Iterable[str] = (),
-    stateful: Optional[str] = None,
+    stateful: Optional[Stateful] = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     # Schema loading
     loader: Callable = loaders.from_uri,
@@ -146,7 +147,7 @@ def execute_from_schema(
     exit_first: bool = False,
     store_interactions: bool = False,
     fixups: Iterable[str] = (),
-    stateful: Optional[str] = None,
+    stateful: Optional[Stateful] = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Execute tests for the given schema.

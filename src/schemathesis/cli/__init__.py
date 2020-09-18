@@ -11,10 +11,12 @@ import yaml
 from .. import checks as checks_module
 from .. import runner
 from .. import targets as targets_module
+from ..constants import DEFAULT_STATEFUL_RECURSION_LIMIT
 from ..fixups import ALL_FIXUPS
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..models import CheckFunction
-from ..runner import DEFAULT_STATEFUL_RECURSION_LIMIT, events
+from ..runner import events
+from ..stateful import Stateful
 from ..targets import Target
 from ..types import Filter
 from . import callbacks, cassettes, output
@@ -198,7 +200,12 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     multiple=True,
     type=click.Choice(list(ALL_FIXUPS) + ["all"]),
 )
-@click.option("--stateful", help="Utilize stateful testing capabilities.", type=click.Choice(["links"]))
+@click.option(
+    "--stateful",
+    help="Utilize stateful testing capabilities.",
+    type=click.Choice([item.name for item in Stateful]),
+    callback=callbacks.convert_stateful,
+)
 @click.option(
     "--stateful-recursion-limit",
     help="Limit recursion depth for stateful testing.",
@@ -255,7 +262,7 @@ def run(  # pylint: disable=too-many-arguments
     show_errors_tracebacks: bool = False,
     store_network_log: Optional[click.utils.LazyFile] = None,
     fixups: Tuple[str] = (),  # type: ignore
-    stateful: Optional[str] = None,
+    stateful: Optional[Stateful] = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
     hypothesis_derandomize: Optional[bool] = None,

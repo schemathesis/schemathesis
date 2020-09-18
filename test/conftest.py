@@ -350,8 +350,8 @@ def openapi_30():
 
 
 @pytest.fixture()
-def app_schema(openapi_version):
-    return _aiohttp.make_openapi_schema(endpoints=("success", "failure"), version=openapi_version)
+def app_schema(openapi_version, endpoints):
+    return _aiohttp.make_openapi_schema(endpoints=endpoints, version=openapi_version)
 
 
 @pytest.fixture()
@@ -372,6 +372,7 @@ def testdir(testdir):
             """
         import pytest
         import schemathesis
+        from schemathesis import Stateful
         from test.utils import *
         from hypothesis import given, settings, HealthCheck, Phase
         raw_schema = {schema}

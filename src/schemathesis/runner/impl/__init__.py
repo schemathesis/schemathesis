@@ -1,3 +1,3 @@
-from .core import DEFAULT_STATEFUL_RECURSION_LIMIT, BaseRunner
+from .core import BaseRunner
 from .solo import SingleThreadASGIRunner, SingleThreadRunner, SingleThreadWSGIRunner
 from .threadpool import ThreadPoolASGIRunner, ThreadPoolRunner, ThreadPoolWSGIRunner

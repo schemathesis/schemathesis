@@ -24,7 +24,13 @@ from .utils import GenericResponse, WSGIResponse
 if TYPE_CHECKING:
     from .hooks import HookDispatcher
     from .schemas import BaseSchema
-    from .stateful import StatefulTest
+    from .stateful import Feedback, Stateful, StatefulTest
+
+
+MISSING_STATEFUL_ARGUMENT_MESSAGE = (
+    "To use `store_response` you need to enable stateful testing by adding "
+    "`stateful=Stateful.links` to your `parametrize` call."
+)
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -38,6 +44,8 @@ class Case:
     query: Optional[Query] = attr.ib(default=None)  # pragma: no mutate
     body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
     form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
+
+    feedback: "Feedback" = attr.ib(repr=False, default=None)
 
     @property
     def path(self) -> str:
@@ -177,7 +185,14 @@ class Case:
         response = session.request(**data)  # type: ignore
         if close_session:
             session.close()
+        if self.feedback:
+            self.store_response(response)
         return response
+
+    def store_response(self, response: GenericResponse) -> None:
+        if self.feedback is None:
+            raise RuntimeError(MISSING_STATEFUL_ARGUMENT_MESSAGE)
+        self.feedback.add_test_case(self, response)
 
     def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
@@ -212,7 +227,10 @@ class Case:
         data = self.as_werkzeug_kwargs(headers)
         client = werkzeug.Client(application, WSGIResponse)
         with cookie_handler(client, self.cookies):
-            return client.open(**data, **kwargs)
+            response = client.open(**data, **kwargs)
+        if self.feedback:
+            self.store_response(response)
+        return response
 
     def call_asgi(
         self,
@@ -341,14 +359,16 @@ class Endpoint:
     def full_path(self) -> str:
         return self.schema.get_full_path(self.path)
 
-    def as_strategy(self, hooks: Optional["HookDispatcher"] = None) -> SearchStrategy:
-        return self.schema.get_case_strategy(self, hooks)
+    def as_strategy(
+        self, hooks: Optional["HookDispatcher"] = None, feedback: Optional["Feedback"] = None
+    ) -> SearchStrategy:
+        return self.schema.get_case_strategy(self, hooks, feedback)
 
     def get_strategies_from_examples(self) -> List[SearchStrategy[Case]]:
         """Get examples from endpoint."""
         return self.schema.get_strategies_from_examples(self)
 
-    def get_stateful_tests(self, response: GenericResponse, stateful: Optional[str]) -> Sequence["StatefulTest"]:
+    def get_stateful_tests(self, response: GenericResponse, stateful: Optional["Stateful"]) -> Sequence["StatefulTest"]:
         return self.schema.get_stateful_tests(response, self, stateful)
 
     def get_hypothesis_conversions(self, location: str) -> Optional[Callable]:

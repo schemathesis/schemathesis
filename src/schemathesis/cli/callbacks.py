@@ -8,6 +8,7 @@ import hypothesis
 from requests import PreparedRequest, RequestException
 
 from .. import utils
+from ..stateful import Stateful
 
 
 def validate_schema(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
@@ -108,6 +109,12 @@ def convert_verbosity(
     if value is None:
         return value
     return hypothesis.Verbosity[value]
+
+
+def convert_stateful(ctx: click.core.Context, param: click.core.Parameter, value: Optional[str]) -> Optional[Stateful]:
+    if value is None:
+        return value
+    return Stateful[value]
 
 
 @contextmanager
