@@ -1,7 +1,7 @@
 import logging
 import time
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Union
 
 import attr
 import hypothesis
@@ -9,67 +9,22 @@ import requests
 from _pytest.logging import LogCaptureHandler, catching_logs
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
-from ..._hypothesis import make_test_or_exception
-from ...constants import DEFAULT_DEADLINE, USER_AGENT
+from ...constants import DEFAULT_DEADLINE, DEFAULT_STATEFUL_RECURSION_LIMIT, USER_AGENT
 from ...exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from ...hooks import HookContext, get_all_by_name
 from ...models import Case, CheckFunction, Endpoint, Status, TestResult, TestResultSet
 from ...runner import events
 from ...schemas import BaseSchema
-from ...stateful import ParsedData, StatefulTest
+from ...stateful import Feedback, Stateful
 from ...targets import Target, TargetContext
 from ...types import RawAuth
 from ...utils import GenericResponse, WSGIResponse, capture_hypothesis_output, format_exception
-
-DEFAULT_STATEFUL_RECURSION_LIMIT = 5  # pragma: no mutate
 
 
 def get_hypothesis_settings(hypothesis_options: Dict[str, Any]) -> hypothesis.settings:
     # Default settings, used as a parent settings object below
     hypothesis_options.setdefault("deadline", DEFAULT_DEADLINE)
     return hypothesis.settings(**hypothesis_options)
-
-
-@attr.s(slots=True)  # pragma: no mutate
-class StatefulData:
-    """Storage for data that will be used in later tests."""
-
-    stateful_test: StatefulTest = attr.ib()  # pragma: no mutate
-    container: List[ParsedData] = attr.ib(factory=list)  # pragma: no mutate
-
-    def make_endpoint(self) -> Endpoint:
-        return self.stateful_test.make_endpoint(self.container)
-
-    def store(self, case: Case, response: GenericResponse) -> None:
-        """Parse and store data for a stateful test."""
-        parsed = self.stateful_test.parse(case, response)
-        self.container.append(parsed)
-
-
-@attr.s(slots=True)  # pragma: no mutate
-class Feedback:
-    """Handler for feedback from tests.
-
-    Provides a way to control runner's behavior from tests.
-    """
-
-    stateful: Optional[str] = attr.ib()  # pragma: no mutate
-    endpoint: Endpoint = attr.ib()  # pragma: no mutate
-    stateful_tests: Dict[str, StatefulData] = attr.ib(factory=dict)  # pragma: no mutate
-
-    def add_test_case(self, case: Case, response: GenericResponse) -> None:
-        """Store test data to reuse it in the future additional tests."""
-        for stateful_test in case.endpoint.get_stateful_tests(response, self.stateful):
-            data = self.stateful_tests.setdefault(stateful_test.name, StatefulData(stateful_test))
-            data.store(case, response)
-
-    def get_stateful_tests(
-        self, test: Callable, settings: hypothesis.settings, seed: Optional[int]
-    ) -> Generator[Tuple[Endpoint, Union[Callable, InvalidSchema]], None, None]:
-        """Generate additional tests that use data from the previous ones."""
-        for data in self.stateful_tests.values():
-            endpoint = data.make_endpoint()
-            yield endpoint, make_test_or_exception(endpoint, test, settings, seed)
 
 
 # pylint: disable=too-many-instance-attributes
@@ -86,7 +41,7 @@ class BaseRunner:
     store_interactions: bool = attr.ib(default=False)  # pragma: no mutate
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
     exit_first: bool = attr.ib(default=False)  # pragma: no mutate
-    stateful: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    stateful: Optional[Stateful] = attr.ib(default=None)  # pragma: no mutate
     stateful_recursion_limit: int = attr.ib(default=DEFAULT_STATEFUL_RECURSION_LIMIT)  # pragma: no mutate
 
     def execute(self) -> Generator[events.ExecutionEvent, None, None]:

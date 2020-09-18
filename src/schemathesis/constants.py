@@ -9,3 +9,4 @@ except metadata.PackageNotFoundError:
 
 USER_AGENT = f"schemathesis/{__version__}"
 DEFAULT_DEADLINE = 500  # pragma: no mutate
+DEFAULT_STATEFUL_RECURSION_LIMIT = 5  # pragma: no mutate

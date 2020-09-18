@@ -6,11 +6,18 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Stateful testing via Open API links for the ``pytest`` runner. `#616`_
+
 Changed
 ~~~~~~~
 
 - Check name is no longer displayed in the CLI output, since its verbose message is already displayed. This change
   also simplifies the internal structure of the runner events.
+- The ``stateful`` argument type in the ``runner.prepare`` is ``Optional[Stateful]`` instead of ``Optional[str]``. Use
+  ``schemathesis.Stateful`` enum.
 
 `2.4.1`_ - 2020-09-17
 ---------------------
@@ -1368,6 +1375,7 @@ Fixed
 .. _#621: https://github.com/schemathesis/schemathesis/issues/621
 .. _#618: https://github.com/schemathesis/schemathesis/issues/618
 .. _#617: https://github.com/schemathesis/schemathesis/issues/617
+.. _#616: https://github.com/schemathesis/schemathesis/issues/616
 .. _#614: https://github.com/schemathesis/schemathesis/issues/614
 .. _#612: https://github.com/schemathesis/schemathesis/issues/612
 .. _#600: https://github.com/schemathesis/schemathesis/issues/600

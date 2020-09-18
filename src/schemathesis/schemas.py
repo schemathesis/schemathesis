@@ -17,10 +17,11 @@ from hypothesis.strategies import SearchStrategy
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
+from .constants import DEFAULT_STATEFUL_RECURSION_LIMIT
 from .exceptions import InvalidSchema
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import Case, Endpoint
-from .stateful import StatefulTest
+from .stateful import Feedback, Stateful, StatefulTest
 from .types import Filter, FormData, GenericTest, NotSet
 from .utils import NOT_SET, GenericResponse
 
@@ -38,6 +39,8 @@ class BaseSchema(Mapping):
     hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
     test_function: Optional[GenericTest] = attr.ib(default=None)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
+    stateful: Optional[Stateful] = attr.ib(default=None)  # pragma: no mutate
+    stateful_recursion_limit: int = attr.ib(default=DEFAULT_STATEFUL_RECURSION_LIMIT)  # pragma: no mutate
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.endpoints)
@@ -99,7 +102,7 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def get_stateful_tests(
-        self, response: GenericResponse, endpoint: Endpoint, stateful: Optional[str]
+        self, response: GenericResponse, endpoint: Endpoint, stateful: Optional[Stateful]
     ) -> Sequence[StatefulTest]:
         """Get a list of additional tests, that should be executed after this response from the endpoint."""
         raise NotImplementedError
@@ -123,6 +126,8 @@ class BaseSchema(Mapping):
         tag: Optional[Filter] = NOT_SET,
         operation_id: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
+        stateful: Optional[Union[Stateful, NotSet]] = NOT_SET,
+        stateful_recursion_limit: Union[int, NotSet] = NOT_SET,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
 
@@ -135,6 +140,8 @@ class BaseSchema(Mapping):
                 tag=tag,
                 operation_id=operation_id,
                 validate_schema=validate_schema,
+                stateful=stateful,
+                stateful_recursion_limit=stateful_recursion_limit,
             )
             return func
 
@@ -150,6 +157,8 @@ class BaseSchema(Mapping):
         operation_id: Optional[Filter] = NOT_SET,
         hooks: Union[HookDispatcher, NotSet] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
+        stateful: Optional[Union[Stateful, NotSet]] = NOT_SET,
+        stateful_recursion_limit: Union[int, NotSet] = NOT_SET,
     ) -> "BaseSchema":
         if method is NOT_SET:
             method = self.method
@@ -163,6 +172,10 @@ class BaseSchema(Mapping):
             validate_schema = self.validate_schema
         if hooks is NOT_SET:
             hooks = self.hooks
+        if stateful is NOT_SET:
+            stateful = self.stateful
+        if stateful_recursion_limit is NOT_SET:
+            stateful_recursion_limit = self.stateful_recursion_limit
 
         return self.__class__(
             self.raw_schema,
@@ -176,6 +189,8 @@ class BaseSchema(Mapping):
             hooks=hooks,  # type: ignore
             test_function=test_function,
             validate_schema=validate_schema,  # type: ignore
+            stateful=stateful,  # type: ignore
+            stateful_recursion_limit=stateful_recursion_limit,  # type: ignore
         )
 
     def get_local_hook_dispatcher(self) -> Optional[HookDispatcher]:
@@ -206,5 +221,7 @@ class BaseSchema(Mapping):
     def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
         raise NotImplementedError
 
-    def get_case_strategy(self, endpoint: Endpoint, hooks: Optional[HookDispatcher] = None) -> SearchStrategy:
+    def get_case_strategy(
+        self, endpoint: Endpoint, hooks: Optional[HookDispatcher] = None, feedback: Optional[Feedback] = None
+    ) -> SearchStrategy:
         raise NotImplementedError

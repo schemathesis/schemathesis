@@ -1,10 +1,17 @@
+import enum
 import json
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 import attr
+import hypothesis
 
+from .exceptions import InvalidSchema
 from .models import Case, Endpoint
 from .utils import NOT_SET, GenericResponse
+
+
+class Stateful(enum.Enum):
+    links = 1
 
 
 @attr.s(slots=True, hash=False)  # pragma: no mutate
@@ -41,3 +48,47 @@ class StatefulTest:
 
     def make_endpoint(self, data: List[ParsedData]) -> Endpoint:
         raise NotImplementedError
+
+
+@attr.s(slots=True)  # pragma: no mutate
+class StatefulData:
+    """Storage for data that will be used in later tests."""
+
+    stateful_test: StatefulTest = attr.ib()  # pragma: no mutate
+    container: List[ParsedData] = attr.ib(factory=list)  # pragma: no mutate
+
+    def make_endpoint(self) -> Endpoint:
+        return self.stateful_test.make_endpoint(self.container)
+
+    def store(self, case: Case, response: GenericResponse) -> None:
+        """Parse and store data for a stateful test."""
+        parsed = self.stateful_test.parse(case, response)
+        self.container.append(parsed)
+
+
+@attr.s(slots=True)  # pragma: no mutate
+class Feedback:
+    """Handler for feedback from tests.
+
+    Provides a way to control runner's behavior from tests.
+    """
+
+    stateful: Optional[Stateful] = attr.ib()  # pragma: no mutate
+    endpoint: Endpoint = attr.ib()  # pragma: no mutate
+    stateful_tests: Dict[str, StatefulData] = attr.ib(factory=dict)  # pragma: no mutate
+
+    def add_test_case(self, case: Case, response: GenericResponse) -> None:
+        """Store test data to reuse it in the future additional tests."""
+        for stateful_test in case.endpoint.get_stateful_tests(response, self.stateful):
+            data = self.stateful_tests.setdefault(stateful_test.name, StatefulData(stateful_test))
+            data.store(case, response)
+
+    def get_stateful_tests(
+        self, test: Callable, settings: Optional[hypothesis.settings], seed: Optional[int]
+    ) -> Generator[Tuple[Endpoint, Union[Callable, InvalidSchema]], None, None]:
+        """Generate additional tests that use data from the previous ones."""
+        from ._hypothesis import make_test_or_exception  # pylint: disable=import-outside-toplevel
+
+        for data in self.stateful_tests.values():
+            endpoint = data.make_endpoint()
+            yield endpoint, make_test_or_exception(endpoint, test, settings, seed)
