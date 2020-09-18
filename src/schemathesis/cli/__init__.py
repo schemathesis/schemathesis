@@ -6,11 +6,10 @@ from typing import Callable, Dict, Generator, Iterable, List, Optional, Tuple, U
 
 import click
 import hypothesis
-import requests
 import yaml
 
 from .. import checks as checks_module
-from .. import models, runner
+from .. import runner
 from .. import targets as targets_module
 from ..fixups import ALL_FIXUPS
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
@@ -18,7 +17,6 @@ from ..models import CheckFunction
 from ..runner import DEFAULT_STATEFUL_RECURSION_LIMIT, events
 from ..targets import Target
 from ..types import Filter
-from ..utils import WSGIResponse
 from . import callbacks, cassettes, output
 from .context import ExecutionContext
 from .handlers import EventHandler
