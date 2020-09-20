@@ -6,13 +6,13 @@ Customization
 Often you need to modify certain aspects of Schemathesis behavior, adjust data generation, modify requests before
 sending, and so on. Schemathesis offers a hook mechanism which is similar to the pytest's one.
 
-Basing on the scope of the changes there are three scopes of hooks:
+Depending on the scope of the changes, there are three scopes of hooks:
 
 - Global. These hooks applied to all schemas in the test run;
 - Schema. Applied only for specific schema instance;
-- Test. Applied only for a specific test function;
+- Test. Applied only for a particular test function;
 
-To register a new hook function you need to use special decorators - ``register`` for global and schema-local hooks and ``apply`` for test-specific ones:
+To register a new hook function, you need to use special decorators - ``register`` for global and schema-local hooks and ``apply`` for test-specific ones:
 
 .. code:: python
 
@@ -36,8 +36,8 @@ To register a new hook function you need to use special decorators - ``register`
     def test_api(case):
         ...
 
-By default ``register`` functions will check the registered hook name to determine when to run it
-(see all hook specifications in the section below), but to avoid name collisions you can provide a hook name as an argument to ``register``.
+By default, ``register`` functions will check the registered hook name to determine when to run it
+(see all hook specifications in the section below), but to avoid name collisions, you can provide a hook name as an argument to ``register``.
 
 Also, these decorators will check the signature of your hook function to match the specification.
 Each hook should accept ``context`` as the first argument, that provides additional context for hook execution.
@@ -52,7 +52,7 @@ These hooks can be applied both in CLI and in-code use cases.
 ``before_generate_*``
 ~~~~~~~~~~~~~~~~~~~~~
 
-This is a group of six hooks that share the same purpose - adjust data generation for specific request's part.
+This group of six hooks shares the same purpose - adjust data generation for specific request's part.
 
 - ``before_generate_path_parameters``
 - ``before_generate_headers``
@@ -72,7 +72,7 @@ They have the same signature that looks like this:
         pass
 
 ``strategy`` is a Hypothesis strategy that will generate a certain request part. For example, your endpoint under test
-expects ``id`` query parameter that is a number and you'd like to have only values that have at least three occurrences of "1".
+expects ``id`` query parameter that is a number, and you'd like to have only values that have at least three occurrences of "1".
 Then your hook might look like this:
 
 .. code:: python
@@ -83,7 +83,7 @@ Then your hook might look like this:
 ``before_process_path``
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-This hook is called before each API path is processed (if it is selected by filters). You can use it to modify the schema
+This hook is called before each API path is processed (if filters select it). You can use it to modify the schema
 before processing - set some parameters as constants, update schema syntax, etc.
 
 Let's say you have the following schema:
@@ -101,7 +101,7 @@ Let's say you have the following schema:
               format: int64
               type: integer
 
-Then, with this hook you can query the database for some existing order and set its ID as a constant in the endpoint definition:
+Then, with this hook, you can query the database for some existing order and set its ID as a constant in the endpoint definition:
 
 .. code:: python
 
@@ -133,7 +133,7 @@ This hook allows you to modify schema before loading.
 ``before_add_examples``
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-With this hook you can add additional test cases that will be executed in Hypothesis ``explicit`` phase:
+With this hook, you can add additional test cases that will be executed in Hypothesis ``explicit`` phase:
 
 .. code:: python
 
@@ -148,7 +148,7 @@ With this hook you can add additional test cases that will be executed in Hypoth
 CLI hooks
 ---------
 
-To load CLI hooks you need to put them into a separate module and pass an importable path to it in ``--pre-run`` CLI option.
+To load CLI hooks, you need to put them into a separate module and pass an importable path to it in ``--pre-run`` CLI option.
 For example, you have your hooks definition in ``myproject/hooks.py``, and ``myproject`` is importable:
 
 .. code:: bash
@@ -182,7 +182,7 @@ This hook allows you to extend or redefine a list of CLI handlers that will be u
     ) -> None:
         handlers[:] = [SimpleHandler()]
 
-With this simple handler only ``Done!`` will be displayed at the end of the test run. For example, you can use this hook to:
+With this simple handler, only ``Done!`` will be displayed at the end of the test run. For example, you can use this hook to:
 
 - Send events over the network
 - Store logs in a custom format
@@ -192,9 +192,9 @@ With this simple handler only ``Done!`` will be displayed at the end of the test
 ``add_case``
 ~~~~~~~~~~~~
 
-For each ``add_case`` hook and for each endpoint, we create an additional, duplicate test case. We pass the Case object from the duplicate test to the ``add_case`` hook.
-The user may change the Case object (and therefore the request data) before the request is sent to the server. The ``add_case`` allows the user to target specific
-behavior in the API by changing specific details of the duplicate request.
+For each ``add_case`` hook and each endpoint, we create an additional, duplicate test case. We pass the Case object from the duplicate test to the ``add_case`` hook.
+The user may change the Case object (and therefore the request's data) before the request is sent to the server. The ``add_case`` allows the user to target specific
+behavior in the API by changing the duplicate request's specific details.
 
 .. code:: python
 

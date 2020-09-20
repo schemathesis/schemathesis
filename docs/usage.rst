@@ -53,7 +53,7 @@ Schemathesis provides the following extra fields:
 - ``http_interactions.seed``. Hypothesis seed used in that particular case could be used as an argument to ``--hypothesis-seed`` CLI option to reproduce this request.
 - ``http_interactions.elapsed``. Time in seconds that a request took.
 
-To work with the cassette you could use `yq <https://github.com/mikefarah/yq>`_ or any similar tool.
+To work with the cassette, you could use `yq <https://github.com/mikefarah/yq>`_ or any similar tool.
 Show response body content of first failed interaction:
 
 .. code:: bash
@@ -83,7 +83,7 @@ replay by these parameters:
 - ``uri``. A regular expression for request URI;
 - ``method``. A regular expression for request method;
 
-During replaying Schemathesis will output interactions being replayed together with the response codes from the initial and
+During replaying, Schemathesis will output interactions being replayed together with the response codes from the initial and
 current execution:
 
 .. code:: bash
@@ -111,7 +111,7 @@ It is possible to export test results to format, acceptable by such tools as Jen
 
     $ schemathesis run --junit-xml=/path/junit.xml http://127.0.0.1/schema.yaml
 
-This command will create an XML at given path as in example below.
+This command will create an XML at a given path, as in the example below.
 
 .. code:: xml
 
@@ -155,17 +155,17 @@ This command will create an XML at given path as in example below.
 Base URL configuration
 ----------------------
 
-If your Open API schema defines ``servers`` (or ``basePath`` in Open API 2.0), then these values will be used to
-construct full endpoint URL during testing. In case of Open API 3.0 the first value from ``servers`` will be used.
+If your Open API schema defines ``servers`` (or ``basePath`` in Open API 2.0), these values will be used to
+construct a full endpoint URL during testing. In the case of Open API 3.0, the first value from ``servers`` will be used.
 
-However, you may want to run tests against a different base URL. To do this you need to pass ``--base-url`` option in CLI
+However, you may want to run tests against a different base URL. To do this, you need to pass ``--base-url`` option in CLI
 or provide ``base_url`` argument to a loader / runner if you use Schemathesis in your code:
 
 .. code:: bash
 
     schemathesis run --base-url=http://127.0.0.1:8080/api/v2 http://production.com/api/openapi.json
 
-And if your schema defines ``servers`` like this
+And if your schema defines ``servers`` like this:
 
 .. code:: yaml
 

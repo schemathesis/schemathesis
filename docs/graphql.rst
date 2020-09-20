@@ -11,7 +11,7 @@ The current support is limited to creating Hypothesis strategies for tests and c
 Usage
 ~~~~~
 
-At the moment there is no direct integration with pytest and in order to generate GraphQL queries you need to manually
+At the moment, there is no direct integration with pytest, and to generate GraphQL queries, you need to manually
 pass strategies to Hypothesis's ``given`` decorator.
 
 .. code:: python
