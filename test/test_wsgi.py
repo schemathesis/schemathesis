@@ -123,7 +123,7 @@ def test_binary_body(mocker, flask_app):
         assert response.status_code == 200
         assert response.json == {"size": mocker.ANY}
 
-    # Then it should be send correctly
+    # Then it should be sent correctly
     test()
 
 

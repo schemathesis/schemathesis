@@ -10,13 +10,13 @@ FastAPI
 -------
 
 `FastAPI <https://github.com/tiangolo/fastapi>`_ uses `pydantic <https://github.com/samuelcolvin/pydantic>`_ for JSON Schema
-generation and it produces Draft 7 compatible schemas. But Open API 2 / 3.0.x use earlier versions of JSON Schema (Draft 4 and Wright Draft 00 respectively) which leads
+generation, and it produces Draft 7 compatible schemas. But Open API 2 / 3.0.x use earlier versions of JSON Schema (Draft 4 and Wright Draft 00 respectively), which leads
 to incompatibilities when Schemathesis parses input schema.
 
 This is a `known issue <https://github.com/tiangolo/fastapi/issues/240>`_ on the FastAPI side
-and Schemathesis provides a way to handle such schemas. The idea is based on converting Draft 7 keywords syntax to Draft 4.
+, and Schemathesis provides a way to handle such schemas. The idea is based on converting Draft 7 keywords syntax to Draft 4.
 
-To use it you need to add this code before you load your schema with Schemathesis:
+To use it, you need to add this code before you load your schema with Schemathesis:
 
 .. code:: python
 

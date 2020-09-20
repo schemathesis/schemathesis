@@ -28,7 +28,7 @@ There are two main ways to run it — as a part of Python's test suite, and as a
 
 If you wrote a Python application and you want to utilize the features of an existing test suite, then the in-code option will best suit your needs.
 
-If you wrote your application in a language other than Python, then you should use the built-in CLI. Please keep in mind that you will need to have a running application where you can run Schemathesis against.
+If you wrote your application in a language other than Python, you should use the built-in CLI. Please keep in mind that you will need to have a running application where you can run Schemathesis against.
 
 
 Should I always have my application running before starting the test suite?
@@ -39,14 +39,14 @@ Yes, except for Python apps that are either built with AioHTTP or implement WSGI
 Can I exclude particular data from being generated?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Yes. Schemathesis' hooks mechanism allows you to adapt its behavior and generate data that fits better with your use case.
+Yes. Schemathesis's hooks mechanism allows you to adapt its behavior and generate data that better fits your use case.
 
 Also, if your application fails on some input early in the code, then it's often a good idea to exclude this input from the next test run so you can explore deeper parts of your codebase.
 
 How can I use database objects IDs in tests?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``case`` object, that is injected in each test can be modified, assuming your URL template is ``/api/users/{user_id}`` then in tests it can be done like this:
+The ``case`` object that is injected in each test can be modified, assuming your URL template is ``/api/users/{user_id}`` then in tests, it can be done like this:
 
 .. code:: python
 
@@ -57,7 +57,7 @@ The ``case`` object, that is injected in each test can be modified, assuming you
 Why does Schemathesis fail to parse my API schema generate by FastAPI?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Because FastAPI uses JSON Draft 7 under the hood (via ``pydantic``) which is not compatible with JSON drafts defined by
+Because FastAPI uses JSON Draft 7 under the hood (via ``pydantic``), which is not compatible with JSON drafts defined by
 the Open API 2 / 3.0.x versions. It is a `known issue <https://github.com/tiangolo/fastapi/issues/240>`_ on the FastAPI side.
 Schemathesis is more strict in schema handling by default, but we provide optional fixups for this case:
 
@@ -81,4 +81,4 @@ How to disallow random field names in my schema?
 You need to add ``additionalProperties: false`` to the relevant object definition. But there is a caveat with emulating
 inheritance with Open API via ``allOf``.
 
-In this case, it is better to use YAML anchors to share schema parts, otherwise it will prevent valid data to pass the validation.
+In this case, it is better to use YAML anchors to share schema parts; otherwise it will prevent valid data from passing the validation.

@@ -9,7 +9,7 @@ an API to guide data generation towards certain pre-defined goals:
 - ``response_time``. Hypothesis will try to generate input that will more likely to have higher response time;
 
 To illustrate this feature, consider the following AioHTTP endpoint, that contains a hidden performance problem -
-the more zeroes are in the input number the slower it works and if there are more than 10 zeroes it will cause an internal
+the more zeroes are in the input number, the slower it works, and if there are more than 10 zeroes, it will cause an internal
 server error:
 
 .. code:: python
@@ -71,7 +71,7 @@ And with targeted testing (``.hypothesis`` directory was removed between these t
     ============================================ 1 failed in 305.50s ===========================================
 
 This behavior is reproducible in general, but not guaranteed due to the randomness of data generation. However, it shows
-a significant testing time reduction especially on a big number of examples.
+a significant testing time reduction, especially on a large number of examples.
 
 Hypothesis `documentation <https://hypothesis.readthedocs.io/en/latest/details.html#targeted-example-generation>`_ provides a detailed explanation of what targeted property-based testing is.
 
