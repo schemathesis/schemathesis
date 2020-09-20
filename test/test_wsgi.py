@@ -56,7 +56,7 @@ def test_cookies(flask_app):
     strategy = schema.endpoints["/cookies"]["GET"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
         response = case.call_wsgi()
         assert response.status_code == 200
@@ -71,7 +71,7 @@ def test_form_data(schema):
     strategy = schema.endpoints["/multipart"]["POST"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
         response = case.call_wsgi()
         assert response.status_code == 200
@@ -117,7 +117,7 @@ def test_binary_body(mocker, flask_app):
     strategy = schema.endpoints["/api/upload_file"]["POST"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
         response = case.call_wsgi()
         assert response.status_code == 200
