@@ -9,6 +9,12 @@ It reads the application schema and generates test cases which will ensure that 
 
 The application under test could be written in any language, the only thing you need is a valid API schema in a supported format.
 
+**Please, help us to improve!**
+
+We'd kindly ask you to share your experience with Schemathesis. It will help me to make improvements to it and prioritize new features! 🙂 It will take 5 minutes. The results are anonymous.
+
+Survey: https://forms.gle/dv4s5SXAYWzvuwFWA
+
 **Supported specification versions**:
 
 - Swagger 2.0
