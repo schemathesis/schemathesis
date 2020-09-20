@@ -59,7 +59,7 @@ def test_cookies(fastapi_app):
     strategy = schema.endpoints["/cookies"]["GET"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
         response = case.call_asgi()
         assert response.status_code == 200
