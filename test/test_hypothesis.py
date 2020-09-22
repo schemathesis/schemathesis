@@ -5,10 +5,15 @@ from hypothesis import HealthCheck, given, settings, strategies
 
 import schemathesis
 from schemathesis import Case, register_string_format
-from schemathesis._hypothesis import PARAMETERS, filter_path_parameters, get_case_strategy, is_valid_query
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Endpoint, EndpointDefinition
-from schemathesis.specs.openapi._hypothesis import STRING_FORMATS
+from schemathesis.specs.openapi._hypothesis import (
+    PARAMETERS,
+    STRING_FORMATS,
+    filter_path_parameters,
+    get_case_strategy,
+    is_valid_query,
+)
 
 
 def make_endpoint(schema, **kwargs) -> Endpoint:

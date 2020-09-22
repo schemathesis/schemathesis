@@ -9,13 +9,14 @@ from hypothesis.strategies import SearchStrategy
 from requests.structures import CaseInsensitiveDict
 
 from ...exceptions import InvalidSchema
-from ...hooks import HookContext
+from ...hooks import HookContext, HookDispatcher
 from ...models import Case, Endpoint, EndpointDefinition, empty_object
 from ...schemas import BaseSchema
 from ...stateful import StatefulTest
 from ...types import FormData
 from ...utils import GenericResponse
 from . import links, serialization
+from ._hypothesis import get_case_strategy
 from .converter import to_json_schema_recursive
 from .examples import get_strategies_from_examples
 from .filters import should_skip_by_operation_id, should_skip_by_tag, should_skip_endpoint, should_skip_method
@@ -176,6 +177,9 @@ class BaseOpenAPISchema(BaseSchema):
         parameters = itertools.chain(resolved_definition.get("parameters", ()), common_parameters)
         raw_definition = EndpointDefinition(data, resolved_definition, scope)
         return self.make_endpoint(path, method, parameters, resolved_definition, raw_definition)
+
+    def get_case_strategy(self, endpoint: Endpoint, hooks: Optional[HookDispatcher] = None) -> SearchStrategy:
+        return get_case_strategy(endpoint, hooks)
 
 
 class SwaggerV20(BaseOpenAPISchema):

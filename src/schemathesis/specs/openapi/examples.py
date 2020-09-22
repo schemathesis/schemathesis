@@ -2,8 +2,9 @@ from typing import Any, Dict, List
 
 from hypothesis.strategies import SearchStrategy
 
-from ..._hypothesis import LOCATION_TO_CONTAINER, PARAMETERS, _get_case_strategy, prepare_strategy
 from ...models import Case, Endpoint
+from ._hypothesis import PARAMETERS, _get_case_strategy, prepare_strategy
+from .constants import LOCATION_TO_CONTAINER
 
 
 def get_object_example_from_properties(object_schema: Dict[str, Any]) -> Dict[str, Any]:
