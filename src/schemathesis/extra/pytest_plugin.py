@@ -58,7 +58,7 @@ class SchemathesisCase(PyCollector):
             fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)
             fixtureinfo.prune_dependency_tree()
             for callspec in metafunc._calls:
-                subname = "{}[{}]".format(name, callspec.id)
+                subname = f"{name}[{callspec.id}]"
                 yield create(
                     SchemathesisFunction,
                     name=subname,
