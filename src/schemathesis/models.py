@@ -18,6 +18,7 @@ from starlette.testclient import TestClient as ASGIClient
 
 from .checks import ALL_CHECKS
 from .exceptions import InvalidSchema
+from .protocols import CaseProtocol, EndpointProtocol
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse
 
@@ -37,7 +38,7 @@ MISSING_STATEFUL_ARGUMENT_MESSAGE = (
 class Case:
     """A single test case parameters."""
 
-    endpoint: "Endpoint" = attr.ib(repr=False)  # pragma: no mutate
+    endpoint: EndpointProtocol = attr.ib(repr=False)  # pragma: no mutate
     path_parameters: Optional[PathParameters] = attr.ib(default=None)  # pragma: no mutate
     headers: Optional[Headers] = attr.ib(default=None)  # pragma: no mutate
     cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
@@ -364,7 +365,7 @@ class Endpoint:
     ) -> SearchStrategy:
         return self.schema.get_case_strategy(self, hooks, feedback)
 
-    def get_strategies_from_examples(self) -> List[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self) -> List[SearchStrategy[CaseProtocol]]:
         """Get examples from the endpoint."""
         return self.schema.get_strategies_from_examples(self)
 
@@ -416,7 +417,7 @@ class Check:
 
     name: str = attr.ib()  # pragma: no mutate
     value: Status = attr.ib()  # pragma: no mutate
-    example: Optional[Case] = attr.ib(default=None)  # pragma: no mutate
+    example: Optional[CaseProtocol] = attr.ib(default=None)  # pragma: no mutate
     message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
 
@@ -430,7 +431,7 @@ class Request:
     headers: Headers = attr.ib()  # pragma: no mutate
 
     @classmethod
-    def from_case(cls, case: Case, session: requests.Session) -> "Request":
+    def from_case(cls, case: CaseProtocol, session: requests.Session) -> "Request":
         """Create a new `Request` instance from `Case`."""
         base_url = case.get_full_base_url()
         kwargs = case.as_requests_kwargs(base_url)
@@ -519,7 +520,9 @@ class Interaction:
         return cls(request=Request.from_prepared_request(response.request), response=Response.from_requests(response))
 
     @classmethod
-    def from_wsgi(cls, case: Case, response: WSGIResponse, headers: Dict[str, Any], elapsed: float) -> "Interaction":
+    def from_wsgi(
+        cls, case: CaseProtocol, response: WSGIResponse, headers: Dict[str, Any], elapsed: float
+    ) -> "Interaction":
         session = requests.Session()
         session.headers.update(headers)
         return cls(request=Request.from_case(case, session), response=Response.from_wsgi(response, elapsed))
@@ -529,9 +532,9 @@ class Interaction:
 class TestResult:
     """Result of a single test."""
 
-    endpoint: Endpoint = attr.ib()  # pragma: no mutate
+    endpoint: EndpointProtocol = attr.ib()  # pragma: no mutate
     checks: List[Check] = attr.ib(factory=list)  # pragma: no mutate
-    errors: List[Tuple[Exception, Optional[Case]]] = attr.ib(factory=list)  # pragma: no mutate
+    errors: List[Tuple[Exception, Optional[CaseProtocol]]] = attr.ib(factory=list)  # pragma: no mutate
     interactions: List[Interaction] = attr.ib(factory=list)  # pragma: no mutate
     logs: List[LogRecord] = attr.ib(factory=list)  # pragma: no mutate
     is_errored: bool = attr.ib(default=False)  # pragma: no mutate
@@ -554,19 +557,21 @@ class TestResult:
     def has_logs(self) -> bool:
         return bool(self.logs)
 
-    def add_success(self, name: str, example: Case) -> None:
+    def add_success(self, name: str, example: CaseProtocol) -> None:
         self.checks.append(Check(name, Status.success, example))
 
-    def add_failure(self, name: str, example: Case, message: str) -> None:
+    def add_failure(self, name: str, example: CaseProtocol, message: str) -> None:
         self.checks.append(Check(name, Status.failure, example, message))
 
-    def add_error(self, exception: Exception, example: Optional[Case] = None) -> None:
+    def add_error(self, exception: Exception, example: Optional[CaseProtocol] = None) -> None:
         self.errors.append((exception, example))
 
     def store_requests_response(self, response: requests.Response) -> None:
         self.interactions.append(Interaction.from_requests(response))
 
-    def store_wsgi_response(self, case: Case, response: WSGIResponse, headers: Dict[str, Any], elapsed: float) -> None:
+    def store_wsgi_response(
+        self, case: CaseProtocol, response: WSGIResponse, headers: Dict[str, Any], elapsed: float
+    ) -> None:
         self.interactions.append(Interaction.from_wsgi(case, response, headers, elapsed))
 
 
@@ -633,4 +638,4 @@ class TestResultSet:
         self.results.append(item)
 
 
-CheckFunction = Callable[[GenericResponse, Case], Optional[bool]]  # pragma: no mutate
+CheckFunction = Callable[[GenericResponse, CaseProtocol], Optional[bool]]  # pragma: no mutate

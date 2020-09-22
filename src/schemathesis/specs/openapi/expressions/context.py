@@ -1,6 +1,6 @@
 import attr
 
-from ....models import Case
+from ....protocols import CaseProtocol
 from ....utils import GenericResponse
 
 
@@ -9,4 +9,4 @@ class ExpressionContext:
     """Context in what an expression are evaluated."""
 
     response: GenericResponse = attr.ib()  # pragma: no mutate
-    case: Case = attr.ib()  # pragma: no mutate
+    case: CaseProtocol = attr.ib()  # pragma: no mutate

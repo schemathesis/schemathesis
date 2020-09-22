@@ -6,7 +6,8 @@ import attr
 from requests import exceptions
 
 from ..exceptions import HTTPError
-from ..models import Endpoint, Status, TestResult, TestResultSet
+from ..models import Status, TestResult, TestResultSet
+from ..protocols import EndpointProtocol
 from ..schemas import BaseSchema
 from ..utils import format_exception
 from .serialization import SerializedTestResult
@@ -52,7 +53,7 @@ class BeforeExecution(ExecutionEvent):
     recursion_level: int = attr.ib()  # pragma: no mutate
 
     @classmethod
-    def from_endpoint(cls, endpoint: Endpoint, recursion_level: int) -> "BeforeExecution":
+    def from_endpoint(cls, endpoint: EndpointProtocol, recursion_level: int) -> "BeforeExecution":
         return cls(method=endpoint.method, path=endpoint.full_path, recursion_level=recursion_level)
 
 
@@ -73,7 +74,12 @@ class AfterExecution(ExecutionEvent):
 
     @classmethod
     def from_result(
-        cls, result: TestResult, status: Status, elapsed_time: float, hypothesis_output: List[str], endpoint: Endpoint
+        cls,
+        result: TestResult,
+        status: Status,
+        elapsed_time: float,
+        hypothesis_output: List[str],
+        endpoint: EndpointProtocol,
     ) -> "AfterExecution":
         return cls(
             method=endpoint.method,

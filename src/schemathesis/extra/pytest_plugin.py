@@ -14,7 +14,7 @@ from packaging import version
 
 from .._hypothesis import create_test
 from ..exceptions import InvalidSchema
-from ..models import Endpoint
+from ..protocols import EndpointProtocol
 from ..stateful import Feedback
 from ..utils import is_schemathesis_test
 
@@ -33,10 +33,10 @@ class SchemathesisCase(PyCollector):
         self.schemathesis_case = test_function._schemathesis_test  # type: ignore
         super().__init__(*args, **kwargs)
 
-    def _get_test_name(self, endpoint: Endpoint) -> str:
+    def _get_test_name(self, endpoint: EndpointProtocol) -> str:
         return f"{self.name}[{endpoint.method}:{endpoint.full_path}]"
 
-    def _gen_items(self, endpoint: Endpoint) -> Generator[Function, None, None]:
+    def _gen_items(self, endpoint: EndpointProtocol) -> Generator[Function, None, None]:
         """Generate all items for the given endpoint.
 
         Could produce more than one test item if
@@ -100,7 +100,7 @@ class SchemathesisCase(PyCollector):
         self.ihook.pytest_generate_tests.call_extra(methods, {"metafunc": metafunc})
         return metafunc
 
-    def _make_test(self, endpoint: Endpoint) -> Callable:
+    def _make_test(self, endpoint: EndpointProtocol) -> Callable:
         try:
             return create_test(endpoint, self.test_function)
         except InvalidSchema as exc:
@@ -156,7 +156,7 @@ class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
         previous_test_name = self.test_name or f"{feedback.endpoint.method}:{feedback.endpoint.full_path}"
 
         def make_test(
-            endpoint: Endpoint, test: Union[Callable, InvalidSchema], previous_tests: str
+            endpoint: EndpointProtocol, test: Union[Callable, InvalidSchema], previous_tests: str
         ) -> SchemathesisFunction:
             test_name = f"{previous_tests} -> {endpoint.method}:{endpoint.full_path}"
             return create(

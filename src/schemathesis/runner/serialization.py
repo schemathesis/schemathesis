@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Optional
 
 import attr
 
-from ..models import Case, Check, Interaction, Status, TestResult
+from ..models import Check, Interaction, Status, TestResult
+from ..protocols import CaseProtocol
 from ..utils import format_exception
 
 
@@ -18,7 +19,7 @@ class SerializedCase:
     requests_code: str = attr.ib()
 
     @classmethod
-    def from_case(cls, case: Case, headers: Optional[Dict[str, Any]]) -> "SerializedCase":
+    def from_case(cls, case: CaseProtocol, headers: Optional[Dict[str, Any]]) -> "SerializedCase":
         return cls(
             text_lines=case.as_text_lines(),
             requests_code=case.get_code_to_reproduce(headers),
@@ -50,7 +51,7 @@ class SerializedError:
 
     @classmethod
     def from_error(
-        cls, exception: Exception, case: Optional[Case], headers: Optional[Dict[str, Any]]
+        cls, exception: Exception, case: Optional[CaseProtocol], headers: Optional[Dict[str, Any]]
     ) -> "SerializedError":
         return cls(
             exception=format_exception(exception),

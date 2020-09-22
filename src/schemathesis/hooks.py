@@ -6,7 +6,7 @@ from typing import Any, Callable, DefaultDict, Dict, List, Optional, Union, cast
 import attr
 from hypothesis import strategies as st
 
-from .models import Case, Endpoint
+from .protocols import CaseProtocol, EndpointProtocol
 from .types import GenericTest
 from .utils import GenericResponse
 
@@ -37,7 +37,7 @@ class RegisteredHook:
 class HookContext:
     """A context that is passed to some hook functions."""
 
-    endpoint: Optional[Endpoint] = attr.ib(default=None)  # pragma: no mutate
+    endpoint: Optional[EndpointProtocol] = attr.ib(default=None)  # pragma: no mutate
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -213,7 +213,7 @@ def before_load_schema(context: HookContext, raw_schema: Dict[str, Any]) -> None
 
 
 @all_scopes
-def before_add_examples(context: HookContext, examples: List[Case]) -> None:
+def before_add_examples(context: HookContext, examples: List[CaseProtocol]) -> None:
     """Called before explicit examples are added to a test via `@example` decorator.
 
     `examples` is a list that could be extended with examples provided by the user.
@@ -221,7 +221,7 @@ def before_add_examples(context: HookContext, examples: List[Case]) -> None:
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
-def add_case(context: HookContext, case: Case, response: GenericResponse) -> Optional[Case]:
+def add_case(context: HookContext, case: CaseProtocol, response: GenericResponse) -> Optional[CaseProtocol]:
     """Creates an additional test per endpoint. If this hook returns None, no additional test created.
 
     Called with a copy of the original case object and the server's response to the original case.

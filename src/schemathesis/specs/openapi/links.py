@@ -7,7 +7,7 @@ from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple
 
 import attr
 
-from ...models import Case, Endpoint
+from ...protocols import CaseProtocol, EndpointProtocol
 from ...stateful import ParsedData, StatefulTest
 from ...utils import NOT_SET, GenericResponse
 from . import expressions
@@ -16,12 +16,14 @@ from .constants import LOCATION_TO_CONTAINER
 
 @attr.s(slots=True)  # pragma: no mutate
 class Link(StatefulTest):
-    endpoint: Endpoint = attr.ib()  # pragma: no mutate
+    endpoint: EndpointProtocol = attr.ib()  # pragma: no mutate
     parameters: Dict[str, Any] = attr.ib()  # pragma: no mutate
     request_body: Any = attr.ib(default=NOT_SET)  # pragma: no mutate
 
     @classmethod
-    def from_definition(cls, name: str, definition: Dict[str, Dict[str, Any]], source_endpoint: Endpoint) -> "Link":
+    def from_definition(
+        cls, name: str, definition: Dict[str, Dict[str, Any]], source_endpoint: EndpointProtocol
+    ) -> "Link":
         # Links can be behind a reference
         _, definition = source_endpoint.schema.resolver.resolve_in_scope(  # type: ignore
             definition, source_endpoint.definition.scope
@@ -40,7 +42,7 @@ class Link(StatefulTest):
             request_body=definition.get("requestBody", NOT_SET),  # `None` might be a valid value - `null`
         )
 
-    def parse(self, case: Case, response: GenericResponse) -> ParsedData:
+    def parse(self, case: CaseProtocol, response: GenericResponse) -> ParsedData:
         """Parse data into a structure expected by links definition."""
         context = expressions.ExpressionContext(case=case, response=response)
         parameters = {
@@ -54,7 +56,7 @@ class Link(StatefulTest):
             body=expressions.evaluate(self.request_body, context),
         )
 
-    def make_endpoint(self, data: List[ParsedData]) -> Endpoint:
+    def make_endpoint(self, data: List[ParsedData]) -> EndpointProtocol:
         """Create a modified version of the original endpoint with additional data merged in."""
         # For each response from the previous endpoint run we create a new JSON schema and collect all results
         # Instead of unconditionally creating `oneOf` list we gather it separately to optimize
@@ -163,7 +165,7 @@ class Link(StatefulTest):
         raise ValueError(f"Parameter `{name}` is not defined in endpoint {self.endpoint.method} {self.endpoint.path}")
 
 
-def get_links(response: GenericResponse, endpoint: Endpoint, field: str) -> Sequence[Link]:
+def get_links(response: GenericResponse, endpoint: EndpointProtocol, field: str) -> Sequence[Link]:
     """Get `x-links` / `links` definitions from the schema."""
     responses = endpoint.definition.raw["responses"]
     if str(response.status_code) in responses:

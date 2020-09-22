@@ -20,7 +20,7 @@ from ._hypothesis import make_test_or_exception
 from .constants import DEFAULT_STATEFUL_RECURSION_LIMIT
 from .exceptions import InvalidSchema
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
-from .models import Case, Endpoint
+from .protocols import CaseProtocol, EndpointProtocol
 from .stateful import Feedback, Stateful, StatefulTest
 from .types import Filter, FormData, GenericTest, NotSet
 from .utils import NOT_SET, GenericResponse
@@ -94,15 +94,15 @@ class BaseSchema(Mapping):
     def endpoints_count(self) -> int:
         return len(list(self.get_all_endpoints()))
 
-    def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
+    def get_all_endpoints(self) -> Generator[EndpointProtocol, None, None]:
         raise NotImplementedError
 
-    def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, endpoint: EndpointProtocol) -> List[SearchStrategy[CaseProtocol]]:
         """Get examples from the endpoint."""
         raise NotImplementedError
 
     def get_stateful_tests(
-        self, response: GenericResponse, endpoint: Endpoint, stateful: Optional[Stateful]
+        self, response: GenericResponse, endpoint: EndpointProtocol, stateful: Optional[Stateful]
     ) -> Sequence[StatefulTest]:
         """Get a list of additional tests, that should be executed after this response from the endpoint."""
         raise NotImplementedError
@@ -112,7 +112,7 @@ class BaseSchema(Mapping):
 
     def get_all_tests(
         self, func: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
-    ) -> Generator[Tuple[Endpoint, Union[Callable, InvalidSchema]], None, None]:
+    ) -> Generator[Tuple[EndpointProtocol, Union[Callable, InvalidSchema]], None, None]:
         """Generate all endpoints and Hypothesis tests for them."""
         test: Union[Callable, InvalidSchema]
         for endpoint in self.get_all_endpoints():
@@ -210,7 +210,7 @@ class BaseSchema(Mapping):
             local_dispatcher.dispatch(name, context, *args, **kwargs)
 
     def prepare_multipart(
-        self, form_data: FormData, endpoint: Endpoint
+        self, form_data: FormData, endpoint: EndpointProtocol
     ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
         """Split content of `form_data` into files & data.
 
@@ -218,10 +218,10 @@ class BaseSchema(Mapping):
         """
         raise NotImplementedError
 
-    def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
+    def get_request_payload_content_types(self, endpoint: EndpointProtocol) -> List[str]:
         raise NotImplementedError
 
     def get_case_strategy(
-        self, endpoint: Endpoint, hooks: Optional[HookDispatcher] = None, feedback: Optional[Feedback] = None
+        self, endpoint: EndpointProtocol, hooks: Optional[HookDispatcher] = None, feedback: Optional[Feedback] = None
     ) -> SearchStrategy:
         raise NotImplementedError

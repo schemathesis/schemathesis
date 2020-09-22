@@ -2,19 +2,17 @@
 import string
 from contextlib import ExitStack, contextmanager
 from itertools import product
-from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Union
+from typing import Any, Dict, Generator, List, Optional, Union
 
 import jsonschema
 import requests
 
 from ...exceptions import get_response_type_error, get_schema_validation_error, get_status_code_error
+from ...protocols import CaseProtocol
 from ...utils import GenericResponse, are_content_types_equal, parse_content_type
 
-if TYPE_CHECKING:
-    from ...models import Case
 
-
-def status_code_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
+def status_code_conformance(response: GenericResponse, case: CaseProtocol) -> Optional[bool]:
     responses = case.endpoint.definition.raw.get("responses", {})
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
     if "default" in responses:
@@ -38,7 +36,7 @@ def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, N
             yield int("".join(expanded))
 
 
-def content_type_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
+def content_type_conformance(response: GenericResponse, case: CaseProtocol) -> Optional[bool]:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
@@ -62,7 +60,7 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> Optiona
     )
 
 
-def response_schema_conformance(response: GenericResponse, case: "Case") -> None:
+def response_schema_conformance(response: GenericResponse, case: CaseProtocol) -> None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.endpoint.schema, BaseOpenAPISchema):

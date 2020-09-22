@@ -8,12 +8,15 @@ from hypothesis import strategies as st
 from .constants import DEFAULT_DEADLINE
 from .exceptions import InvalidSchema
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
-from .models import Case, Endpoint
+from .protocols import CaseProtocol, EndpointProtocol
 from .stateful import Feedback, Stateful
 
 
 def create_test(
-    endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
+    endpoint: EndpointProtocol,
+    test: Callable,
+    settings: Optional[hypothesis.settings] = None,
+    seed: Optional[int] = None,
 ) -> Callable:
     """Create a Hypothesis test."""
     hook_dispatcher = getattr(test, "_schemathesis_hooks", None)
@@ -46,7 +49,10 @@ def setup_default_deadline(wrapped_test: Callable) -> None:
 
 
 def make_test_or_exception(
-    endpoint: Endpoint, func: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
+    endpoint: EndpointProtocol,
+    func: Callable,
+    settings: Optional[hypothesis.settings] = None,
+    seed: Optional[int] = None,
 ) -> Union[Callable, InvalidSchema]:
     try:
         return create_test(endpoint, func, settings, seed=seed)
@@ -64,9 +70,13 @@ def make_async_test(test: Callable) -> Callable:
     return async_run
 
 
-def add_examples(test: Callable, endpoint: Endpoint, hook_dispatcher: Optional[HookDispatcher] = None) -> Callable:
+def add_examples(
+    test: Callable, endpoint: EndpointProtocol, hook_dispatcher: Optional[HookDispatcher] = None
+) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
-    examples: List[Case] = [get_single_example(strategy) for strategy in endpoint.get_strategies_from_examples()]
+    examples: List[CaseProtocol] = [
+        get_single_example(strategy) for strategy in endpoint.get_strategies_from_examples()
+    ]
     context = HookContext(endpoint)  # context should be passed here instead
     GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, examples)
     endpoint.schema.hooks.dispatch("before_add_examples", context, examples)
@@ -77,7 +87,7 @@ def add_examples(test: Callable, endpoint: Endpoint, hook_dispatcher: Optional[H
     return test
 
 
-def get_single_example(strategy: st.SearchStrategy[Case]) -> Case:
+def get_single_example(strategy: st.SearchStrategy[CaseProtocol]) -> CaseProtocol:
     @hypothesis.given(strategy)  # type: ignore
     @hypothesis.settings(  # type: ignore
         database=None,
@@ -87,9 +97,9 @@ def get_single_example(strategy: st.SearchStrategy[Case]) -> Case:
         phases=(hypothesis.Phase.generate,),
         suppress_health_check=hypothesis.HealthCheck.all(),
     )
-    def example_generating_inner_function(ex: Case) -> None:
+    def example_generating_inner_function(ex: CaseProtocol) -> None:
         examples.append(ex)
 
-    examples: List[Case] = []
+    examples: List[CaseProtocol] = []
     example_generating_inner_function()
     return examples[0]

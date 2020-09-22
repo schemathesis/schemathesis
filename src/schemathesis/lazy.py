@@ -8,7 +8,7 @@ from pytest_subtests import SubTests
 
 from .exceptions import InvalidSchema
 from .hooks import HookDispatcher, HookScope
-from .models import Endpoint
+from .protocols import EndpointProtocol
 from .schemas import BaseSchema
 from .types import Filter, GenericTest, NotSet
 from .utils import NOT_SET
@@ -89,12 +89,12 @@ def get_test(test: Union[Callable, InvalidSchema]) -> Callable:
     return test
 
 
-def _get_node_name(node_id: str, endpoint: Endpoint) -> str:
+def _get_node_name(node_id: str, endpoint: EndpointProtocol) -> str:
     """Make a test node name. For example: test_api[GET:/users]."""
     return f"{node_id}[{endpoint.method}:{endpoint.full_path}]"
 
 
-def run_subtest(endpoint: Endpoint, fixtures: Dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:
+def run_subtest(endpoint: EndpointProtocol, fixtures: Dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:
     """Run the given subtest with pytest fixtures."""
     with subtests.test(method=endpoint.method, path=endpoint.path):
         sub_test(**fixtures)

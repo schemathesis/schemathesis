@@ -2,7 +2,7 @@ from typing import Any, Dict, List
 
 from hypothesis.strategies import SearchStrategy
 
-from ...models import Case, Endpoint
+from ...protocols import CaseProtocol, EndpointProtocol
 from ._hypothesis import PARAMETERS, _get_case_strategy, prepare_strategy
 from .constants import LOCATION_TO_CONTAINER
 
@@ -72,7 +72,7 @@ def get_request_body_example_from_properties(endpoint_def: Dict[str, Any]) -> Di
     return static_parameters
 
 
-def get_static_parameters_from_example(endpoint: Endpoint) -> Dict[str, Any]:
+def get_static_parameters_from_example(endpoint: EndpointProtocol) -> Dict[str, Any]:
     static_parameters = {}
     for name in PARAMETERS:
         parameter = getattr(endpoint, name)
@@ -81,7 +81,7 @@ def get_static_parameters_from_example(endpoint: Endpoint) -> Dict[str, Any]:
     return static_parameters
 
 
-def get_static_parameters_from_examples(endpoint: Endpoint, examples_field: str) -> List[Dict[str, Any]]:
+def get_static_parameters_from_examples(endpoint: EndpointProtocol, examples_field: str) -> List[Dict[str, Any]]:
     """Get static parameters from OpenAPI examples keyword."""
     endpoint_def = endpoint.definition.resolved
     return merge_examples(
@@ -89,7 +89,7 @@ def get_static_parameters_from_examples(endpoint: Endpoint, examples_field: str)
     )
 
 
-def get_static_parameters_from_properties(endpoint: Endpoint) -> Dict[str, Any]:
+def get_static_parameters_from_properties(endpoint: EndpointProtocol) -> Dict[str, Any]:
     endpoint_def = endpoint.definition.resolved
     return {
         **get_parameter_example_from_properties(endpoint_def),
@@ -97,7 +97,9 @@ def get_static_parameters_from_properties(endpoint: Endpoint) -> Dict[str, Any]:
     }
 
 
-def get_strategies_from_examples(endpoint: Endpoint, examples_field: str = "examples") -> List[SearchStrategy[Case]]:
+def get_strategies_from_examples(
+    endpoint: EndpointProtocol, examples_field: str = "examples"
+) -> List[SearchStrategy[CaseProtocol]]:
     strategies = [
         get_strategy(endpoint, static_parameters)
         for static_parameters in get_static_parameters_from_examples(endpoint, examples_field)
@@ -110,7 +112,7 @@ def get_strategies_from_examples(endpoint: Endpoint, examples_field: str = "exam
     return strategies
 
 
-def get_strategy(endpoint: Endpoint, static_parameters: Dict[str, Any]) -> SearchStrategy[Case]:
+def get_strategy(endpoint: EndpointProtocol, static_parameters: Dict[str, Any]) -> SearchStrategy[CaseProtocol]:
     strategies = {
         parameter: prepare_strategy(
             parameter, getattr(endpoint, parameter), endpoint.get_hypothesis_conversions(parameter)

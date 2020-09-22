@@ -2,13 +2,13 @@ from typing import Callable, Tuple
 
 import attr
 
-from .models import Case
+from .protocols import CaseProtocol
 from .utils import GenericResponse
 
 
 @attr.s(slots=True)  # pragma: no mutate
 class TargetContext:
-    case: Case = attr.ib()  # pragma: no mutate
+    case: CaseProtocol = attr.ib()  # pragma: no mutate
     response: GenericResponse = attr.ib()  # pragma: no mutate
     response_time: float = attr.ib()  # pragma: no mutate
 

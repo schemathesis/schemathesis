@@ -10,7 +10,8 @@ from requests.structures import CaseInsensitiveDict
 
 from ...exceptions import InvalidSchema
 from ...hooks import HookContext, HookDispatcher
-from ...models import Case, Endpoint, EndpointDefinition, empty_object
+from ...models import Endpoint, EndpointDefinition, empty_object
+from ...protocols import CaseProtocol, EndpointProtocol
 from ...schemas import BaseSchema
 from ...stateful import Feedback, Stateful, StatefulTest
 from ...types import FormData
@@ -29,14 +30,14 @@ class BaseOpenAPISchema(BaseSchema):
     links_field: str
     operations: Tuple[str, ...]
     security: BaseSecurityProcessor
-    _endpoints_by_operation_id: Dict[str, Endpoint]
+    _endpoints_by_operation_id: Dict[str, EndpointProtocol]
 
     @property  # pragma: no mutate
     def spec_version(self) -> str:
         raise NotImplementedError
 
     def get_stateful_tests(
-        self, response: GenericResponse, endpoint: Endpoint, stateful: Optional[Stateful]
+        self, response: GenericResponse, endpoint: EndpointProtocol, stateful: Optional[Stateful]
     ) -> Sequence[StatefulTest]:
         if stateful == Stateful.links:
             return links.get_links(response, endpoint, field=self.links_field)
@@ -54,7 +55,7 @@ class BaseOpenAPISchema(BaseSchema):
             self._endpoints = endpoints_to_dict(endpoints)
         return self._endpoints
 
-    def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
+    def get_all_endpoints(self) -> Generator[EndpointProtocol, None, None]:
         try:
             paths = self.raw_schema["paths"]  # pylint: disable=unsubscriptable-object
             context = HookContext()
@@ -98,7 +99,7 @@ class BaseOpenAPISchema(BaseSchema):
         parameters: Iterator[Dict[str, Any]],
         resolved_definition: Dict[str, Any],
         raw_definition: EndpointDefinition,
-    ) -> Endpoint:
+    ) -> EndpointProtocol:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         base_url = self.get_base_url()
         endpoint = Endpoint(
@@ -114,13 +115,13 @@ class BaseOpenAPISchema(BaseSchema):
         self.security.process_definitions(self.raw_schema, endpoint, self.resolver)
         return endpoint
 
-    def process_parameter(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+    def process_parameter(self, endpoint: EndpointProtocol, parameter: Dict[str, Any]) -> None:
         """Convert each Parameter object to a JSON schema."""
         parameter = deepcopy(parameter)
         parameter = self.resolver.resolve_all(parameter)
         self.process_by_type(endpoint, parameter)
 
-    def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+    def process_by_type(self, endpoint: EndpointProtocol, parameter: Dict[str, Any]) -> None:
         raise NotImplementedError
 
     @property
@@ -130,11 +131,11 @@ class BaseOpenAPISchema(BaseSchema):
             self._resolver = ConvertingResolver(self.location or "", self.raw_schema, nullable_name=self.nullable_name)
         return self._resolver
 
-    def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
+    def get_content_types(self, endpoint: EndpointProtocol, response: GenericResponse) -> List[str]:
         """Content types available for this endpoint."""
         raise NotImplementedError
 
-    def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, endpoint: EndpointProtocol) -> List[SearchStrategy[CaseProtocol]]:
         """Get examples from the endpoint."""
         raise NotImplementedError
 
@@ -142,13 +143,13 @@ class BaseOpenAPISchema(BaseSchema):
         """Extract response schema from `responses`."""
         raise NotImplementedError
 
-    def get_endpoint_by_operation_id(self, operation_id: str) -> Endpoint:
+    def get_endpoint_by_operation_id(self, operation_id: str) -> EndpointProtocol:
         """Get an `Endpoint` instance by its `operationId`."""
         if not hasattr(self, "_endpoints_by_operation_id"):
             self._endpoints_by_operation_id = dict(self._group_endpoints_by_operation_id())
         return self._endpoints_by_operation_id[operation_id]
 
-    def _group_endpoints_by_operation_id(self) -> Generator[Tuple[str, Endpoint], None, None]:
+    def _group_endpoints_by_operation_id(self) -> Generator[Tuple[str, EndpointProtocol], None, None]:
         for path, methods in self.raw_schema["paths"].items():
             scope, raw_methods = self._resolve_methods(methods)
             methods = self.resolver.resolve_all(methods)
@@ -162,7 +163,7 @@ class BaseOpenAPISchema(BaseSchema):
                     path, method, parameters, resolved_definition, raw_definition
                 )
 
-    def get_endpoint_by_reference(self, reference: str) -> Endpoint:
+    def get_endpoint_by_reference(self, reference: str) -> EndpointProtocol:
         """Get local or external `Endpoint` instance by reference.
 
         Reference example: #/paths/~1users~1{user_id}/patch
@@ -179,7 +180,7 @@ class BaseOpenAPISchema(BaseSchema):
         return self.make_endpoint(path, method, parameters, resolved_definition, raw_definition)
 
     def get_case_strategy(
-        self, endpoint: Endpoint, hooks: Optional[HookDispatcher] = None, feedback: Optional[Feedback] = None
+        self, endpoint: EndpointProtocol, hooks: Optional[HookDispatcher] = None, feedback: Optional[Feedback] = None
     ) -> SearchStrategy:
         return get_case_strategy(endpoint, hooks, feedback)
 
@@ -203,11 +204,11 @@ class SwaggerV20(BaseOpenAPISchema):
     def _get_base_path(self) -> str:
         return self.raw_schema.get("basePath", "/")
 
-    def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, endpoint: EndpointProtocol) -> List[SearchStrategy[CaseProtocol]]:
         """Get examples from the endpoint."""
         return get_strategies_from_examples(endpoint, self.examples_field)
 
-    def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+    def process_by_type(self, endpoint: EndpointProtocol, parameter: Dict[str, Any]) -> None:
         if parameter["in"] == "path":
             self.process_path(endpoint, parameter)
         elif parameter["in"] == "query":
@@ -220,20 +221,20 @@ class SwaggerV20(BaseOpenAPISchema):
         elif parameter["in"] == "formData":
             self.process_form_data(endpoint, parameter)
 
-    def process_path(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+    def process_path(self, endpoint: EndpointProtocol, parameter: Dict[str, Any]) -> None:
         endpoint.path_parameters = self.add_parameter(endpoint.path_parameters, parameter)
 
-    def process_header(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+    def process_header(self, endpoint: EndpointProtocol, parameter: Dict[str, Any]) -> None:
         endpoint.headers = self.add_parameter(endpoint.headers, parameter)
 
-    def process_query(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+    def process_query(self, endpoint: EndpointProtocol, parameter: Dict[str, Any]) -> None:
         endpoint.query = self.add_parameter(endpoint.query, parameter)
 
-    def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+    def process_body(self, endpoint: EndpointProtocol, parameter: Dict[str, Any]) -> None:
         # "schema" is a required field
         endpoint.body = parameter["schema"]
 
-    def process_form_data(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+    def process_form_data(self, endpoint: EndpointProtocol, parameter: Dict[str, Any]) -> None:
         endpoint.form_data = self.add_parameter(endpoint.form_data, parameter)
 
     def add_parameter(self, container: Optional[Dict[str, Any]], parameter: Dict[str, Any]) -> Dict[str, Any]:
@@ -269,7 +270,7 @@ class SwaggerV20(BaseOpenAPISchema):
         # because it is not converted
         return scopes, to_json_schema_recursive(schema, self.nullable_name)
 
-    def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
+    def get_content_types(self, endpoint: EndpointProtocol, response: GenericResponse) -> List[str]:
         produces = endpoint.definition.raw.get("produces", None)
         if produces:
             return produces
@@ -279,7 +280,7 @@ class SwaggerV20(BaseOpenAPISchema):
         return serialization.serialize_swagger2_parameters(definitions)
 
     def prepare_multipart(
-        self, form_data: FormData, endpoint: Endpoint
+        self, form_data: FormData, endpoint: EndpointProtocol
     ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
         files, data = [], {}
         # If there is no content types specified for the request or "application/x-www-form-urlencoded" is specified
@@ -300,7 +301,7 @@ class SwaggerV20(BaseOpenAPISchema):
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, data or None
 
-    def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
+    def get_request_payload_content_types(self, endpoint: EndpointProtocol) -> List[str]:
         global_consumes = endpoint.schema.raw_schema.get("consumes", [])
         consumes = endpoint.definition.resolved.get("consumes", [])
         if not consumes:
@@ -340,14 +341,14 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         parameters: Iterator[Dict[str, Any]],
         resolved_definition: Dict[str, Any],
         raw_definition: EndpointDefinition,
-    ) -> Endpoint:
+    ) -> EndpointProtocol:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         endpoint = super().make_endpoint(path, method, parameters, resolved_definition, raw_definition)
         if "requestBody" in resolved_definition:
             self.process_body(endpoint, resolved_definition["requestBody"])
         return endpoint
 
-    def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+    def process_by_type(self, endpoint: EndpointProtocol, parameter: Dict[str, Any]) -> None:
         if parameter["in"] == "cookie":
             self.process_cookie(endpoint, parameter)
         else:
@@ -363,10 +364,10 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         # > the example value SHALL override the example provided by the schema
         return super().add_examples(container, parameter)
 
-    def process_cookie(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+    def process_cookie(self, endpoint: EndpointProtocol, parameter: Dict[str, Any]) -> None:
         endpoint.cookies = self.add_parameter(endpoint.cookies, parameter)
 
-    def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
+    def process_body(self, endpoint: EndpointProtocol, parameter: Dict[str, Any]) -> None:
         # Take the first media type object
         options = iter(parameter["content"].items())
         try:
@@ -399,11 +400,11 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
             return scopes, to_json_schema_recursive(option["schema"], self.nullable_name)
         return scopes, None
 
-    def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, endpoint: EndpointProtocol) -> List[SearchStrategy[CaseProtocol]]:
         """Get examples from the endpoint."""
         return get_strategies_from_examples(endpoint, self.examples_field)
 
-    def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
+    def get_content_types(self, endpoint: EndpointProtocol, response: GenericResponse) -> List[str]:
         try:
             responses = endpoint.definition.raw["responses"]
         except KeyError as exc:
@@ -421,11 +422,11 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     def get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         return serialization.serialize_openapi3_parameters(definitions)
 
-    def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
+    def get_request_payload_content_types(self, endpoint: EndpointProtocol) -> List[str]:
         return list(endpoint.definition.resolved["requestBody"]["content"].keys())
 
     def prepare_multipart(
-        self, form_data: FormData, endpoint: Endpoint
+        self, form_data: FormData, endpoint: EndpointProtocol
     ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
         files, data = [], {}
         content = endpoint.definition.resolved["requestBody"]["content"]
@@ -465,7 +466,7 @@ def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
     return []
 
 
-def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, CaseInsensitiveDict]:
+def endpoints_to_dict(endpoints: Generator[EndpointProtocol, None, None]) -> Dict[str, CaseInsensitiveDict]:
     output: Dict[str, CaseInsensitiveDict] = {}
     for endpoint in endpoints:
         output.setdefault(endpoint.path, CaseInsensitiveDict())
