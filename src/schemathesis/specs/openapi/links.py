@@ -7,11 +7,11 @@ from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple
 
 import attr
 
-from ..._hypothesis import LOCATION_TO_CONTAINER
 from ...models import Case, Endpoint
 from ...stateful import ParsedData, StatefulTest
 from ...utils import NOT_SET, GenericResponse
 from . import expressions
+from .constants import LOCATION_TO_CONTAINER
 
 
 @attr.s(slots=True)  # pragma: no mutate

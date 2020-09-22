@@ -321,9 +321,7 @@ class Endpoint:
         return self.schema.get_full_path(self.path)
 
     def as_strategy(self, hooks: Optional["HookDispatcher"] = None) -> SearchStrategy:
-        from ._hypothesis import get_case_strategy  # pylint: disable=import-outside-toplevel
-
-        return get_case_strategy(self, hooks)
+        return self.schema.get_case_strategy(self, hooks)
 
     def get_strategies_from_examples(self) -> List[SearchStrategy[Case]]:
         """Get examples from endpoint."""
