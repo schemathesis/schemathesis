@@ -5,9 +5,9 @@ Schemathesis
 
 Schemathesis is a tool for testing your web applications built with Open API / Swagger or GraphQL specifications.
 
-It reads the application schema and generates test cases which will ensure that your application is compliant with its schema.
+It reads the application schema and generates test cases, which will ensure that your application is compliant with its schema.
 
-The application under test could be written in any language, the only thing you need is a valid API schema in a supported format.
+The application under test could be written in any language; the only thing you need is a valid API schema in a supported format.
 
 **Please, help us to improve!**
 
@@ -33,7 +33,7 @@ Built with:
 
 - `pytest`_
 
-Inspired by wonderful `swagger-conformance <https://github.com/olipratt/swagger-conformance>`_ project.
+It was inspired by the beautiful `swagger-conformance <https://github.com/olipratt/swagger-conformance>`_ project.
 
 **Docs**: https://schemathesis.readthedocs.io/en/stable/
 
@@ -64,7 +64,7 @@ There are two basic ways to use Schemathesis:
 - `Command Line Interface <https://github.com/schemathesis/schemathesis#command-line-interface>`_
 - `Writing tests in Python <https://github.com/schemathesis/schemathesis#in-code>`_
 
-CLI is pretty simple to use and requires no coding, in-code approach gives more flexibility.
+CLI is pretty simple to use and requires no coding; the in-code approach gives more flexibility.
 
 Command Line Interface
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -77,10 +77,10 @@ The ``schemathesis`` command can be used to perform Schemathesis test cases:
 
 .. image:: https://github.com/schemathesis/schemathesis/blob/master/img/schemathesis.gif
 
-If your application requires authorization then you can use ``--auth`` option for Basic Auth and ``--header`` to specify
+If your application requires authorization, then you can use the ``--auth`` option for Basic Auth and ``--header`` to specify
 custom headers to be sent with each request.
 
-To filter your tests by endpoint name, HTTP method, Open API tags or operationId you could use ``-E``, ``-M``, ``-T``, ``-O`` options respectively.
+To filter your tests by endpoint name, HTTP method, Open API tags, or operationId, you could use ``-E``, ``-M``, ``-T``, ``-O`` options, respectively.
 
 CLI supports passing options to ``hypothesis.settings``. All of them are prefixed with ``--hypothesis-``:
 
@@ -88,15 +88,15 @@ CLI supports passing options to ``hypothesis.settings``. All of them are prefixe
 
     schemathesis run --hypothesis-max-examples=1000 https://example.com/api/swagger.json
 
-To speed up the testing process Schemathesis provides ``-w/--workers`` option for concurrent test execution:
+To speed up the testing process, Schemathesis provides ``-w/--workers`` option for concurrent test execution:
 
 .. code:: bash
 
     schemathesis run -w 8 https://example.com/api/swagger.json
 
-In the example above all tests will be distributed among 8 worker threads.
+In the example above, all tests will be distributed among 8 worker threads.
 
-If you'd like to test your web app (Flask or AioHTTP or FastAPI for example) then there is ``--app`` option for you:
+If you'd like to test your web app (Flask or AioHTTP or FastAPI, for example), then there is ``--app`` option for you:
 
 .. code:: bash
 
@@ -107,9 +107,9 @@ to your app. **Note**, app factories are not supported. The schema location coul
 
 - A full URL;
 - An existing filesystem path;
-- In-app endpoint with schema.
+- In-app endpoint with the schema.
 
-This method is significantly faster for WSGI apps, since it doesn't involve network.
+This method is significantly faster for WSGI apps since it doesn't involve a network.
 
 For the full list of options, run:
 
@@ -128,7 +128,7 @@ Schemathesis CLI also available as a docker image
 
     docker run kiwicom/schemathesis:stable run http://example.com/schema.json
 
-To run it against localhost server add ``--network=host`` parameter:
+To run it against the localhost server, add ``--network=host`` parameter:
 
 .. code:: bash
 
@@ -137,7 +137,7 @@ To run it against localhost server add ``--network=host`` parameter:
 Pre-run CLI hook
 ################
 
-Sometimes you need to execute custom code before the CLI run, for example setup an environment,
+Sometimes you need to execute custom code before the CLI run, for example, set up an environment,
 register custom string format strategies or modify Schemathesis behavior in runtime you can use ``--pre-run`` hook:
 
 .. code:: bash
@@ -152,7 +152,7 @@ An example - https://github.com/schemathesis/schemathesis#custom-string-strategi
 Registering custom checks for CLI
 #################################
 
-To add a new check for the Schemathesis CLI there is a special function
+There is a special function to add a new check for the Schemathesis CLI:
 
 .. code:: python
 
@@ -166,7 +166,7 @@ To add a new check for the Schemathesis CLI there is a special function
 The registered check should accept a ``response`` with ``requests.Response`` / ``schemathesis.utils.WSGIResponse`` type and
 ``case`` with ``schemathesis.models.Case`` type.
 
-After registration, your checks will be available in Schemathesis CLI and you can use them via ``-c`` command line option.
+After registration, your checks will be available in Schemathesis CLI, and you can use them via the ``-c`` command-line option.
 
 .. code:: bash
 
@@ -190,7 +190,7 @@ response code is ``200``.
 In-code
 ~~~~~~~
 
-To examine your application with Schemathesis you need to:
+To examine your application with Schemathesis, you need to:
 
 - Setup & run your application, so it is accessible via the network;
 - Write a couple of tests in Python;
@@ -199,7 +199,7 @@ To examine your application with Schemathesis you need to:
 Suppose you have your application running on ``http://0.0.0.0:8080`` and its
 schema is available at ``http://0.0.0.0:8080/swagger.json``.
 
-A basic test, that will verify that any data, that fit into the schema will not cause any internal server error could
+A basic test that will verify that any data that fit into the schema will not cause any internal server error could
 look like this:
 
 .. code:: python
@@ -224,7 +224,7 @@ It consists of four main parts:
 
 1. Schema preparation; ``schemathesis`` package provides multiple ways to initialize the schema - ``from_path``, ``from_dict``, ``from_uri``, ``from_file`` and ``from_wsgi``.
 
-2. Test parametrization; ``@schema.parametrize()`` generates separate tests for all endpoint/method combination available in the schema.
+2. Test parametrization; ``@schema.parametrize()`` generates separate tests for all endpoint/method combinations available in the schema.
 
 3. A network call to the running application; ``case.call`` does it.
 
@@ -241,9 +241,9 @@ Run the tests:
 **Other properties that could be tested**:
 
 - Any call will be processed in <50 ms - you can verify the app performance;
-- Any unauthorized access will end with 401 HTTP response code;
+- Any unauthorized access will end with a 401 HTTP response code;
 
-Each test function should have the ``case`` fixture, that represents a single test case.
+Each test function should have the ``case`` fixture, which represents a single test case.
 
 Important ``Case`` attributes:
 
@@ -268,10 +268,10 @@ You can use them manually in network calls or can convert to a dictionary accept
 
 
 For each test, Schemathesis will generate a bunch of random inputs acceptable by the schema.
-This data could be used to verify that your application works in the way as described in the schema or that schema describes expected behavior.
+This data could be used to verify that your application works in the way described in the schema or that schema describes expected behavior.
 
 By default, there will be 100 test cases per endpoint/method combination.
-To limit the number of examples you could use ``hypothesis.settings`` decorator on your test functions:
+To limit the number of examples, you could use ``hypothesis.settings`` decorator on your test functions:
 
 .. code:: python
 
@@ -282,7 +282,7 @@ To limit the number of examples you could use ``hypothesis.settings`` decorator 
     def test_something(client, case):
         ...
 
-To narrow down the scope of the schemathesis tests it is possible to filter by method or endpoint:
+To narrow down the scope of the schemathesis tests, it is possible to filter by method or endpoint:
 
 .. code:: python
 
@@ -290,7 +290,7 @@ To narrow down the scope of the schemathesis tests it is possible to filter by m
     def test_no_server_errors(case):
         ...
 
-The acceptable values are regexps or list of regexps (matched with ``re.search``).
+The acceptable values are regexps or a list of regexps (matched with ``re.search``).
 
 WSGI applications support
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -320,7 +320,7 @@ the test execution will go much faster.
 Explicit examples
 ~~~~~~~~~~~~~~~~~
 
-If the schema contains parameters examples, then they will be additionally included in the generated cases.
+If the schema contains parameter examples, then they will be additionally included in the generated cases.
 Schemathesis supports the use of both OpenAPI ``example`` and ``examples`` (more information available in the `OpenAPI documentation <https://swagger.io/docs/specification/adding-examples/>`_).
 Note that ``examples`` were added in OpenAPI 3, but Schemathesis supports this feature for OpenAPI 2 using ``x-examples``.
 
@@ -399,7 +399,7 @@ See below:
 Direct strategies access
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-For convenience you can explore the schemas and strategies manually:
+For convenience, you can explore the schemas and strategies manually:
 
 .. code:: python
 
@@ -422,7 +422,7 @@ For convenience you can explore the schemas and strategies manually:
         form_data={}
     )
 
-Schema instances implement ``Mapping`` protocol.
+Schema instances implement the ``Mapping`` protocol.
 
 **NOTE**. Paths are relative to the schema's base path (``host`` + ``basePath`` in Open API 2.0 and ``server.url`` in Open API 3.0):
 
@@ -435,8 +435,8 @@ Schema instances implement ``Mapping`` protocol.
 Lazy loading
 ~~~~~~~~~~~~
 
-If you have a schema that is not available when the tests are collected, for example it is build with tools
-like ``apispec`` and requires an application instance available, then you can parametrize the tests from a pytest fixture.
+If you have a schema that is not available when the tests are collected, for example, it is built with tools
+like ``apispec`` and requires an application instance available, you can parametrize the tests from a pytest fixture.
 
 .. code:: python
 
@@ -449,7 +449,7 @@ like ``apispec`` and requires an application instance available, then you can pa
     def test_api(case):
         ...
 
-In this case the test body will be used as a sub-test via ``pytest-subtests`` library.
+In this case, the test body will be used as a sub-test via the ``pytest-subtests`` library.
 
 **NOTE**: the used fixture should return a valid schema that could be created via ``schemathesis.from_dict`` or other
 ``schemathesis.from_`` variations.
@@ -457,7 +457,7 @@ In this case the test body will be used as a sub-test via ``pytest-subtests`` li
 Extending schemathesis
 ~~~~~~~~~~~~~~~~~~~~~~
 
-If you're looking for a way to extend ``schemathesis`` or reuse it in your own application, then ``runner`` module might be helpful for you.
+If you're looking for a way to extend ``schemathesis`` or reuse it in your own application, then the ``runner`` module might help you.
 It can run tests against the given schema URI and will do some simple checks for you.
 
 .. code:: python
@@ -469,7 +469,7 @@ It can run tests against the given schema URI and will do some simple checks for
         # do something with event
 
 ``runner.prepare`` creates a generator that yields events of different kinds - ``BeforeExecution``, ``AfterExecution``, etc.
-They provide a lot of useful information about what happens during tests, but handling of these events is your responsibility.
+They provide a lot of useful information about what happens during tests, but your responsibility is handling these events.
 You can take some inspiration from Schemathesis `CLI implementation <https://github.com/schemathesis/schemathesis/blob/master/src/schemathesis/cli/__init__.py#L230>`_.
 See full description of events in the `source code <https://github.com/schemathesis/schemathesis/blob/master/src/schemathesis/runner/events.py>`_.
 
@@ -477,12 +477,12 @@ If you want to use Schemathesis CLI with your custom checks, look at `this secti
 
 The built-in checks list includes the following:
 
-- Not a server error. Asserts that response's status code is less than 500;
-- Status code conformance. Asserts that response's status code is listed in the schema;
-- Content type conformance. Asserts that response's content type is listed in the schema;
-- Response schema conformance. Asserts that response's content conforms to the declared schema;
+- Not a server error. Asserts that the response's status code is less than 500;
+- Status code conformance. Asserts that the response's status code is listed in the schema;
+- Content-type conformance. Asserts that the response's content type is listed in the schema;
+- Response schema conformance. Asserts that the response's content conforms to the declared schema;
 
-You can provide your custom checks to the execute function, the check is a callable that accepts one argument of ``requests.Response`` type.
+You can provide your custom checks to the execute function; the check is a callable that accepts one argument of ``requests.Response`` type.
 
 .. code:: python
 
@@ -500,9 +500,9 @@ Custom string strategies
 ########################
 
 Some string fields could use custom format and validators,
-e.g. ``card_number`` and Luhn algorithm validator.
+e.g., ``card_number`` and Luhn algorithm validator.
 
-For such cases it is possible to register custom strategies:
+For such cases, it is possible to register custom strategies:
 
 1. Create ``hypothesis.strategies.SearchStrategy`` object
 2. Optionally provide predicate function to filter values
@@ -538,8 +538,8 @@ you only need to specify strategies for ``hypothesis.given``:
 Schema validation
 #################
 
-To avoid obscure and hard to debug errors during test runs Schemathesis validates input schemas for conformance with the relevant spec.
-If you'd like to disable this behavior use ``--validate-schema=false`` in CLI and ``validate_schema=False`` argument in loaders.
+To avoid obscure and hard to debug errors during test runs, Schemathesis validates input schemas for conformance with the relevant spec.
+If you'd like to disable this behavior, use ``--validate-schema=false`` in CLI and ``validate_schema=False`` argument in loaders.
 
 Local development
 -----------------
@@ -571,8 +571,8 @@ To start the server:
 
     ./test_server.sh 8081
 
-It is possible to configure available endpoints via ``--endpoints`` option.
-The value is expected to be a comma separated string with endpoint names (``success``, ``failure``, ``slow``, etc):
+It is possible to configure available endpoints via the ``--endpoints`` option.
+The value is expected to be a comma-separated string with endpoint names (``success``, ``failure``, ``slow``, etc.):
 
 .. code:: bash
 
@@ -620,14 +620,14 @@ or ``pytest`` in your current environment:
 Contributing
 ------------
 
-Any contribution in development, testing or any other area is highly appreciated and useful to the project.
+Any contribution to development, testing, or any other area is highly appreciated and useful to the project.
 
 Please, see the `CONTRIBUTING.rst`_ file for more details.
 
 Python support
 --------------
 
-Schemathesis supports Python 3.6, 3.7 and 3.8.
+Schemathesis supports Python 3.6, 3.7, and 3.8.
 
 License
 -------
