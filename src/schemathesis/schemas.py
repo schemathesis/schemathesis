@@ -205,3 +205,6 @@ class BaseSchema(Mapping):
 
     def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
         raise NotImplementedError
+
+    def get_case_strategy(self, endpoint: Endpoint, hooks: Optional[HookDispatcher] = None) -> SearchStrategy:
+        raise NotImplementedError
