@@ -77,6 +77,27 @@ class Case:
             return urlunsplit(("http", "localhost", path or "", "", ""))
         return self.base_url
 
+    def as_text_lines(self) -> List[str]:
+        """Textual representation.
+
+        Each component is a separate line.
+        """
+        output = {
+            "Path parameters": self.path_parameters,
+            "Headers": self.headers,
+            "Cookies": self.cookies,
+            "Query": self.query,
+            "Body": self.body,
+            "Form data": self.form_data,
+        }
+        max_length = max(map(len, output))
+        template = f"{{:<{max_length}}} : {{}}"
+        return [
+            template.format(key, value)
+            for key, value in output.items()
+            if (key == "Body" and value is not None) or value not in (None, {})
+        ]
+
     def get_code_to_reproduce(self, headers: Optional[Dict[str, Any]] = None) -> str:
         """Construct a Python code to reproduce this case with `requests`."""
         base_url = self.get_full_base_url()
