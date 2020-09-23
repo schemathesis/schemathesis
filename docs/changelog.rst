@@ -6,6 +6,12 @@ Changelog
 `Unreleased`_
 -------------
 
+Changed
+~~~~~~~
+
+- Check name is no longer displayed in the CLI output, since its verbose message is already displayed. This change
+  also simplifies the internal structure of the runner events.
+
 `2.4.1`_ - 2020-09-17
 ---------------------
 

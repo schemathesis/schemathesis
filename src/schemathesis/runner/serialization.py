@@ -9,29 +9,18 @@ from typing import Any, Dict, List, Optional
 import attr
 
 from ..models import Case, Check, Interaction, Status, TestResult
-from ..types import Body, Cookies, FormData, Headers, PathParameters, Query
 from ..utils import format_exception
 
 
 @attr.s(slots=True)  # pragma: no mutate
 class SerializedCase:
-    requests_code: str = attr.ib()  # pragma: no mutate
-    path_parameters: Optional[PathParameters] = attr.ib(default=None)  # pragma: no mutate
-    headers: Optional[Headers] = attr.ib(default=None)  # pragma: no mutate
-    cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
-    query: Optional[Query] = attr.ib(default=None)  # pragma: no mutate
-    body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
-    form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
+    text_lines: List[str] = attr.ib()  # pragma: no mutate
+    requests_code: str = attr.ib()
 
     @classmethod
     def from_case(cls, case: Case, headers: Optional[Dict[str, Any]]) -> "SerializedCase":
         return cls(
-            path_parameters=case.path_parameters,
-            headers=case.headers,
-            cookies=case.cookies,
-            query=case.query,
-            body=case.body,
-            form_data=case.form_data,
+            text_lines=case.as_text_lines(),
             requests_code=case.get_code_to_reproduce(headers),
         )
 

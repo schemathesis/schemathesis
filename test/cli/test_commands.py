@@ -1218,7 +1218,7 @@ def test_wsgi_app_missing(testdir, cli):
     assert "Can not import application from the given module" in lines
 
 
-def test_wsgi_app_internal_exception(testdir, cli, caplog):
+def test_wsgi_app_internal_exception(testdir, cli):
     module = testdir.make_importable_pyfile(
         location="""
         from test.apps._flask import create_openapi_app
@@ -1230,13 +1230,13 @@ def test_wsgi_app_internal_exception(testdir, cli, caplog):
     result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
-    assert "== APPLICATION LOGS ==" in lines[34]
-    assert "ERROR in app: Exception on /api/success [GET]" in lines[36]
-    assert lines[52] == "ZeroDivisionError: division by zero"
+    assert "== APPLICATION LOGS ==" in lines[30]
+    assert "ERROR in app: Exception on /api/success [GET]" in lines[32]
+    assert lines[48] == "ZeroDivisionError: division by zero"
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
-def test_aiohttp_app(openapi_version, request, testdir, cli, loadable_aiohttp_app, args):
+def test_aiohttp_app(openapi_version, request, cli, loadable_aiohttp_app, args):
     # When an URL is passed together with app
     if args:
         args += (request.getfixturevalue("base_url"),)
@@ -1246,7 +1246,7 @@ def test_aiohttp_app(openapi_version, request, testdir, cli, loadable_aiohttp_ap
     assert "1 passed, 1 failed in" in result.stdout
 
 
-def test_wsgi_app_remote_schema(testdir, cli, schema_url, loadable_flask_app):
+def test_wsgi_app_remote_schema(cli, schema_url, loadable_flask_app):
     # When an URL is passed together with app
     result = cli.run(schema_url, "--app", loadable_flask_app)
     # Then the schema should be loaded from that URL
@@ -1254,7 +1254,7 @@ def test_wsgi_app_remote_schema(testdir, cli, schema_url, loadable_flask_app):
     assert "1 passed, 1 failed in" in result.stdout
 
 
-def test_wsgi_app_path_schema(testdir, cli, loadable_flask_app):
+def test_wsgi_app_path_schema(cli, loadable_flask_app):
     # When an existing path to schema is passed together with app
     result = cli.run(SIMPLE_PATH, "--app", loadable_flask_app)
     # Then the schema should be loaded from that path
