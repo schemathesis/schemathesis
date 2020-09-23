@@ -181,8 +181,6 @@ def test_display_single_failure(capsys, swagger_20, execution_context, endpoint,
     lines = out.split("\n")
     # Then the endpoint name is displayed as a subsection
     assert " GET: /v1/success " in lines[0]
-    # And check name is displayed in red
-    assert lines[1] == strip_style_win32(click.style("Check           : not_a_server_error", fg="red"))
     # And body should be displayed if it is not None
     if body is None:
         assert "Body" not in out
@@ -274,8 +272,6 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set):
     # And endpoint with a failure is displayed as a subsection
     assert " GET: /v1/api/failure " in out
     assert "Message" in out
-    # And check name is displayed
-    assert "Check           : test" in out
     assert "Run this Python code to reproduce this failure: " in out
     assert "requests.get('http://127.0.0.1:8080/api/failure')" in out
 
@@ -322,11 +318,6 @@ def test_display_internal_error(capsys, execution_context, show_errors_traceback
         out = capsys.readouterr().out.strip()
         assert ("Traceback (most recent call last):" in out) is show_errors_tracebacks
         assert "ZeroDivisionError: division by zero" in out
-
-
-@pytest.mark.parametrize("attribute, expected", (("cookies", "Cookies"), ("path_parameters", "Path parameters")))
-def test_make_verbose_name(attribute, expected):
-    assert default.make_verbose_name(attribute) == expected
 
 
 def test_display_summary(capsys, results_set, swagger_20):

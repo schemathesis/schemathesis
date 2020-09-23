@@ -156,7 +156,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
         else:
             message = None
         example = cast(SerializedCase, check.example)  # filtered in `_get_unique_failures`
-        display_example(context, example, check.name, message, result.seed)
+        display_example(context, example, message, result.seed)
         # Display every time except the last check
         if idx != len(checks):
             click.echo("\n")
@@ -173,7 +173,6 @@ def reduce_schema_error(message: str) -> str:
 def display_example(
     context: ExecutionContext,
     case: SerializedCase,
-    check_name: Optional[str] = None,
     message: Optional[str] = None,
     seed: Optional[int] = None,
 ) -> None:
@@ -182,25 +181,13 @@ def display_example(
             message = reduce_schema_error(message)
         click.secho(message, fg="red")
         click.echo()
-    output = {
-        make_verbose_name(attribute): getattr(case, attribute)
-        for attribute in ("path_parameters", "headers", "cookies", "query", "body", "form_data")
-    }
-    max_length = max(map(len, output))
-    template = f"{{:<{max_length}}} : {{}}"
-    if check_name is not None:
-        click.secho(template.format("Check", check_name), fg="red")
-    for key, value in output.items():
-        if (key == "Body" and value is not None) or value not in (None, {}):
-            click.secho(template.format(key, value), fg="red")
-    click.echo()
+    for line in case.text_lines:
+        click.secho(line, fg="red")
+    if case.text_lines:
+        click.echo()
     click.secho(f"Run this Python code to reproduce this failure: \n\n    {case.requests_code}", fg="red")
     if seed is not None:
         click.secho(f"\nOr add this option to your command line parameters: --hypothesis-seed={seed}", fg="red")
-
-
-def make_verbose_name(attribute: str) -> str:
-    return attribute.capitalize().replace("_", " ")
 
 
 def display_application_logs(context: ExecutionContext, event: events.Finished) -> None:
