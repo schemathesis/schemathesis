@@ -301,7 +301,7 @@ Added
 Fixed
 ~~~~~
 
-- Passing ``workers_num`` to ``ThreadPoolRunner``leads to always using 2 workers in this worker kind. `#579`_
+- Passing ``workers_num`` to ``ThreadPoolRunner`` leads to always using 2 workers in this worker kind. `#579`_
 
 `1.5.1`_ - 2020-05-08
 ---------------------
@@ -413,7 +413,7 @@ Changed
 
 - Added indentation & section name to the ``SUMMARY`` CLI block.
 - Use C-extension for YAML loading when it is possible. It can cause more than 10x speedup on schema parsing.
-Do not show Click's "Aborted!" message when an error occurs during CLI schema loading.
+  Do not show Click's "Aborted!" message when an error occurs during CLI schema loading.
 - Add a help message to the CLI output when an internal exception happens. `#529`_
 
 `1.2.0`_ - 2020-04-15
