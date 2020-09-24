@@ -459,7 +459,7 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "properties": {"username": {"type": "string", "minLength": 3}},
+                                "properties": {"username": {"type": "string", "minLength": 3, "example": "John"}},
                                 "required": ["username"],
                             }
                         }

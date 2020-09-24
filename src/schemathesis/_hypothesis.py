@@ -32,7 +32,7 @@ def create_test(
     if settings is not None:
         wrapped_test = settings(wrapped_test)
     wrapped_test._schemathesis_feedback = feedback  # type: ignore
-    return add_examples(wrapped_test, endpoint, hook_dispatcher=hook_dispatcher)
+    return add_examples(wrapped_test, endpoint, hook_dispatcher=hook_dispatcher, feedback=feedback)
 
 
 def setup_default_deadline(wrapped_test: Callable) -> None:
@@ -64,7 +64,12 @@ def make_async_test(test: Callable) -> Callable:
     return async_run
 
 
-def add_examples(test: Callable, endpoint: Endpoint, hook_dispatcher: Optional[HookDispatcher] = None) -> Callable:
+def add_examples(
+    test: Callable,
+    endpoint: Endpoint,
+    hook_dispatcher: Optional[HookDispatcher] = None,
+    feedback: Optional["Feedback"] = None,
+) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
     examples: List[Case] = [get_single_example(strategy) for strategy in endpoint.get_strategies_from_examples()]
     context = HookContext(endpoint)  # context should be passed here instead
@@ -73,6 +78,7 @@ def add_examples(test: Callable, endpoint: Endpoint, hook_dispatcher: Optional[H
     if hook_dispatcher:
         hook_dispatcher.dispatch("before_add_examples", context, examples)
     for example in examples:
+        example.feedback = feedback
         test = hypothesis.example(case=example)(test)
     return test
 

@@ -45,7 +45,7 @@ class Case:
     body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
     form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
 
-    feedback: "Feedback" = attr.ib(repr=False, default=None)
+    feedback: Optional["Feedback"] = attr.ib(repr=False, default=None)
 
     @property
     def path(self) -> str:

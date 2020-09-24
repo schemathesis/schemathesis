@@ -152,3 +152,22 @@ def test_(request, case):
     )
     # Then there should be an exception, that is verified via the pytest.raises ctx manager
     testdir.run_and_assert(passed=1)
+
+
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_stateful_examples_only(testdir, app_schema, openapi3_base_url):
+    # When "stateful" is used in the "parametrize" decorator
+    # And only explicit examples are selected
+    testdir.make_test(
+        f"""
+@schema.parametrize(stateful=Stateful.links, method="POST")
+@settings(phases=[Phase.explicit])
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.feedback is not None
+    response = case.call(base_url="{openapi3_base_url}")
+        """,
+        schema=app_schema,
+    )
+    # Then those examples should be used in the linked endpoints
+    testdir.run_and_assert("-vs", passed=3)
