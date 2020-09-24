@@ -210,9 +210,11 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
 
 def pytest_runtest_protocol(item: Function, nextitem: Optional[Function]) -> bool:
     item.ihook.pytest_runtest_logstart(nodeid=item.nodeid, location=item.location)
-    runtestprotocol(item, nextitem=nextitem)
+    reports = runtestprotocol(item, nextitem=nextitem)
     item.ihook.pytest_runtest_logfinish(nodeid=item.nodeid, location=item.location)
     if isinstance(item, SchemathesisFunction):
-        item.warn_if_stateful_responses_not_stored()
+        for report in reports:
+            if report.when == "call" and report.outcome == "passed":
+                item.warn_if_stateful_responses_not_stored()
         item.add_stateful_tests()
     return True
