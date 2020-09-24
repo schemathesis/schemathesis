@@ -152,3 +152,21 @@ def test_(request, case):
     )
     # Then there should be an exception, that is verified via the pytest.raises ctx manager
     testdir.run_and_assert(passed=1)
+
+
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_no_warning_on_failure(testdir, app_schema):
+    # When a stateful test fails
+    testdir.make_test(
+        f"""
+@schema.parametrize(stateful=Stateful.links, method="POST")
+@settings(max_examples=2)
+def test_(case):
+    1 / 0
+        """,
+        schema=app_schema,
+    )
+    # Then there should be no warning about not using the "stateful" argument
+    result = testdir.run_and_assert(failed=1)
+    warning_text = f"  test_no_warning_on_failure.py:10: PytestWarning: {NOT_USED_STATEFUL_TESTING_MESSAGE}"
+    assert warning_text not in result.stdout.lines
