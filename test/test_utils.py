@@ -10,7 +10,7 @@ def test_is_schemathesis_test(swagger_20):
     def test():
         pass
 
-    # Then is should be recognized as a schemathesis test
+    # Then it should be recognized as a schemathesis test
     assert is_schemathesis_test(test)
 
 

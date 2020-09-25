@@ -99,7 +99,7 @@ class BaseOpenAPISchema(BaseSchema):
         resolved_definition: Dict[str, Any],
         raw_definition: EndpointDefinition,
     ) -> Endpoint:
-        """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
+        """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         base_url = self.get_base_url()
         endpoint = Endpoint(
             path=path,
@@ -135,7 +135,7 @@ class BaseOpenAPISchema(BaseSchema):
         raise NotImplementedError
 
     def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
-        """Get examples from endpoint."""
+        """Get examples from the endpoint."""
         raise NotImplementedError
 
     def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
@@ -204,7 +204,7 @@ class SwaggerV20(BaseOpenAPISchema):
         return self.raw_schema.get("basePath", "/")
 
     def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
-        """Get examples from endpoint."""
+        """Get examples from the endpoint."""
         return get_strategies_from_examples(endpoint, self.examples_field)
 
     def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
@@ -341,7 +341,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         resolved_definition: Dict[str, Any],
         raw_definition: EndpointDefinition,
     ) -> Endpoint:
-        """Create JSON schemas for query, body, etc from Swagger parameters definitions."""
+        """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         endpoint = super().make_endpoint(path, method, parameters, resolved_definition, raw_definition)
         if "requestBody" in resolved_definition:
             self.process_body(endpoint, resolved_definition["requestBody"])
@@ -400,7 +400,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         return scopes, None
 
     def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
-        """Get examples from endpoint."""
+        """Get examples from the endpoint."""
         return get_strategies_from_examples(endpoint, self.examples_field)
 
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
@@ -474,7 +474,7 @@ def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, C
 
 
 def get_schema_from_parameter(data: Dict[str, Any]) -> Dict[str, Any]:
-    # In Open API 3.0 there could be "schema" or "content" field. They are mutually exclusive
+    # In Open API 3.0 there could be "schema" or "content" field. They are mutually exclusive.
     if "schema" in data:
         return data["schema"]
     options = iter(data["content"].values())

@@ -204,7 +204,7 @@ def delimited_object(item: Generated, name: str) -> None:
 
 @conversion
 def extracted_object(item: Generated, name: str) -> None:
-    """Merge a child node to to the parent one."""
+    """Merge a child node to the parent one."""
     generated = item.pop(name)
     item.update(generated)
 

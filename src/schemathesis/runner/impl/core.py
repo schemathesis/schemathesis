@@ -218,7 +218,7 @@ def network_test(
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
 ) -> None:
-    """A single test body that will be executed against the target."""
+    """A single test body will be executed against the target."""
     # pylint: disable=too-many-arguments
     headers = headers or {}
     headers.setdefault("User-Agent", USER_AGENT)
@@ -336,7 +336,7 @@ def asgi_test(
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
 ) -> None:
-    """A single test body that will be executed against the target."""
+    """A single test body will be executed against the target."""
     # pylint: disable=too-many-arguments
     headers = headers or {}
 

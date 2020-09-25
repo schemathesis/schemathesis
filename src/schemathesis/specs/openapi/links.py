@@ -86,7 +86,7 @@ class Link(StatefulTest):
             for location, container_name in LOCATION_TO_CONTAINER.items():
                 variant = _templates[location]
                 # There could be no schema defined for e.g. `query`, then the container in the `Endpoint` instance
-                # is `None`. The resulting
+                # is `None`.
                 if variant is not None:
                     variants[container_name].append(variant)
 

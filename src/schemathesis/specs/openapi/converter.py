@@ -7,7 +7,7 @@ from ...utils import traverse_schema
 def to_json_schema(schema: Dict[str, Any], nullable_name: str) -> Dict[str, Any]:
     """Convert Open API parameters to JSON Schema.
 
-    NOTE. This function is applied to all keywords (including nested) during schema resolving, thus it is not recursive.
+    NOTE. This function is applied to all keywords (including nested) during a schema resolving, thus it is not recursive.
     See a recursive version below.
     """
     schema = deepcopy(schema)

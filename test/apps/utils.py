@@ -46,7 +46,7 @@ class OpenAPIVersion(Enum):
 
 
 def make_openapi_schema(endpoints: Tuple[str, ...], version: OpenAPIVersion = OpenAPIVersion("2.0")) -> Dict:
-    """Generate a OAS 2/3 schemas with the given endpoints.
+    """Generate an OAS 2/3 schemas with the given endpoints.
 
     Example:
         If `endpoints` is ("success", "failure")

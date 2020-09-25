@@ -23,5 +23,5 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Publish latest image
+      - name: Publish the latest image
         run: docker push kiwicom/schemathesis:latest

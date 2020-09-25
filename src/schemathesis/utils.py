@@ -75,7 +75,7 @@ def force_tuple(item: Filter) -> Union[List, Set, Tuple]:
 
 
 def dict_true_values(**kwargs: Any) -> Dict[str, Any]:
-    """Create dict with given kwargs while skipping items where bool(value) evaluates to False."""
+    """Create a dict with given kwargs while skipping items where bool(value) evaluates to False."""
     return {key: value for key, value in kwargs.items() if bool(value)}
 
 
