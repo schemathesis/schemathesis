@@ -155,7 +155,6 @@ Temporary Items
 *.un~
 Session.vim
 .netrwhist
-*~
 
 #####=== VS Code ===#####
 .vscode/*
