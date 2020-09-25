@@ -16,7 +16,6 @@ import werkzeug
 from hypothesis.strategies import SearchStrategy
 from starlette.testclient import TestClient as ASGIClient
 
-from .checks import ALL_CHECKS
 from .exceptions import InvalidSchema
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse
@@ -252,8 +251,11 @@ class Case:
     def validate_response(
         self,
         response: GenericResponse,
-        checks: Tuple["CheckFunction", ...] = ALL_CHECKS,
+        checks: Tuple["CheckFunction", ...] = (),
     ) -> None:
+        from .checks import ALL_CHECKS  # pylint: disable=import-outside-toplevel
+
+        checks = checks or ALL_CHECKS
         errors = []
         for check in checks:
             try:
