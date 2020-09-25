@@ -11,6 +11,11 @@ Added
 
 - Stateful testing via Open API links for the ``pytest`` runner. `#616`_
 
+Fixed
+~~~~~
+
+- Progress percentage in the terminal output for "lazy" schemas. `#636`_
+
 Changed
 ~~~~~~~
 
@@ -1369,6 +1374,7 @@ Fixed
 .. _#647: https://github.com/schemathesis/schemathesis/issues/647
 .. _#641: https://github.com/schemathesis/schemathesis/issues/641
 .. _#640: https://github.com/schemathesis/schemathesis/issues/640
+.. _#636: https://github.com/schemathesis/schemathesis/issues/636
 .. _#631: https://github.com/schemathesis/schemathesis/issues/631
 .. _#629: https://github.com/schemathesis/schemathesis/issues/629
 .. _#622: https://github.com/schemathesis/schemathesis/issues/622
