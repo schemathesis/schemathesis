@@ -6,7 +6,6 @@ from urllib.parse import urlsplit
 
 import jsonschema
 from hypothesis.strategies import SearchStrategy
-from requests.structures import CaseInsensitiveDict
 
 from ...exceptions import InvalidSchema
 from ...hooks import HookContext, HookDispatcher
@@ -45,14 +44,6 @@ class BaseOpenAPISchema(BaseSchema):
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
         return f"{self.__class__.__name__} for {info['title']} ({info['version']})"
-
-    @property
-    def endpoints(self) -> Dict[str, CaseInsensitiveDict]:
-        if not hasattr(self, "_endpoints"):
-            # pylint: disable=attribute-defined-outside-init
-            endpoints = self.get_all_endpoints()
-            self._endpoints = endpoints_to_dict(endpoints)
-        return self._endpoints
 
     def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
         try:
@@ -463,14 +454,6 @@ def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
     if common_parameters is not None:
         return deepcopy(common_parameters)
     return []
-
-
-def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, CaseInsensitiveDict]:
-    output: Dict[str, CaseInsensitiveDict] = {}
-    for endpoint in endpoints:
-        output.setdefault(endpoint.path, CaseInsensitiveDict())
-        output[endpoint.path][endpoint.method] = endpoint
-    return output
 
 
 def get_schema_from_parameter(data: Dict[str, Any]) -> Dict[str, Any]:
