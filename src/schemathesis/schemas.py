@@ -111,7 +111,7 @@ class BaseSchema(Mapping):
         """Get a list of additional tests, that should be executed after this response from the endpoint."""
         raise NotImplementedError
 
-    def get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
+    def get_hypothesis_conversion(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
         raise NotImplementedError
 
     def get_all_tests(
