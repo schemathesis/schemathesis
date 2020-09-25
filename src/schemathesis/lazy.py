@@ -61,7 +61,9 @@ class LazySchema:
                 # Changing the node id is required for better reporting - the method and endpoint will appear there
                 node_id = subtests.item._nodeid
                 settings = getattr(test, "_hypothesis_internal_use_settings", None)
-                for _endpoint, sub_test in schema.get_all_tests(func, settings):
+                tests = list(schema.get_all_tests(func, settings))
+                request.session.testscollected += len(tests)
+                for _endpoint, sub_test in tests:
                     actual_test = get_test(sub_test)
                     subtests.item._nodeid = _get_node_name(node_id, _endpoint)
                     run_subtest(_endpoint, fixtures, actual_test, subtests)
