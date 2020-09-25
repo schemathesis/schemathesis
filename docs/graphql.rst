@@ -3,16 +3,11 @@
 GraphQL
 =======
 
-Schemathesis provides basic capabilities for testing GraphQL-based applications.
-The current support is limited to creating Hypothesis strategies for tests and crafting appropriate network requests.
-
-**NOTE**: This area is in active development - more features will be added soon.
+Schemathesis provides capabilities for testing GraphQL-based applications.
+The current support is limited to Python tests - CLI support is in the works.
 
 Usage
 ~~~~~
-
-At the moment, there is no direct integration with pytest, and to generate GraphQL queries, you need to manually
-pass strategies to Hypothesis's ``given`` decorator.
 
 .. code:: python
 
@@ -22,22 +17,19 @@ pass strategies to Hypothesis's ``given`` decorator.
         "https://bahnql.herokuapp.com/graphql"
     )
 
-    @given(case=schema.query.as_strategy())
+    @schema.parametrize()
     @settings(deadline=None)
     def test(case):
         response = case.call()
-        assert response.status_code < 500, response.content
+        case.validate_response(response)
 
-This test will load GraphQL schema from ``https://bahnql.herokuapp.com/graphql`` and will generate queries for it.
-In the test body, ``case`` instance provides only one method - ``call`` that will run a proper network request to the
-application under test.
+This test will load GraphQL schema from ``https://bahnql.herokuapp.com/graphql``, generate queries for it, send them to the server, and verify responses.
 
 Limitations
 ~~~~~~~~~~~
 
 Current GraphQL support does **NOT** include the following:
 
-- Direct pytest integration;
 - CLI integration;
 - Custom scalar types support (it will produce an error);
 - Mutations;
