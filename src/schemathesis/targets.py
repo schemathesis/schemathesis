@@ -1,14 +1,16 @@
-from typing import Callable, Tuple
+from typing import TYPE_CHECKING, Callable, Tuple
 
 import attr
 
-from .models import Case
 from .utils import GenericResponse
+
+if TYPE_CHECKING:
+    from .models import Case
 
 
 @attr.s(slots=True)  # pragma: no mutate
 class TargetContext:
-    case: Case = attr.ib()  # pragma: no mutate
+    case: "Case" = attr.ib()  # pragma: no mutate
     response: GenericResponse = attr.ib()  # pragma: no mutate
     response_time: float = attr.ib()  # pragma: no mutate
 

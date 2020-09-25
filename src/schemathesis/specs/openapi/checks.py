@@ -9,6 +9,7 @@ import requests
 
 from ...exceptions import get_response_type_error, get_schema_validation_error, get_status_code_error
 from ...utils import GenericResponse, are_content_types_equal, parse_content_type
+from .schemas import BaseOpenAPISchema
 
 if TYPE_CHECKING:
     from ...models import Case
@@ -39,8 +40,6 @@ def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, N
 
 
 def content_type_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
-    from .schemas import BaseOpenAPISchema
-
     if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
     content_types = case.endpoint.schema.get_content_types(case.endpoint, response)
@@ -63,8 +62,6 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> Optiona
 
 
 def response_schema_conformance(response: GenericResponse, case: "Case") -> None:
-    from .schemas import BaseOpenAPISchema
-
     if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
     try:
