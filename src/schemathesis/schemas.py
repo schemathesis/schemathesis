@@ -88,7 +88,11 @@ class BaseSchema(Mapping):
 
     @property
     def endpoints(self) -> Dict[str, CaseInsensitiveDict]:
-        raise NotImplementedError
+        if not hasattr(self, "_endpoints"):
+            # pylint: disable=attribute-defined-outside-init
+            endpoints = self.get_all_endpoints()
+            self._endpoints = endpoints_to_dict(endpoints)
+        return self._endpoints
 
     @property
     def endpoints_count(self) -> int:
@@ -225,3 +229,11 @@ class BaseSchema(Mapping):
         self, endpoint: Endpoint, hooks: Optional[HookDispatcher] = None, feedback: Optional[Feedback] = None
     ) -> SearchStrategy:
         raise NotImplementedError
+
+
+def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, CaseInsensitiveDict]:
+    output: Dict[str, CaseInsensitiveDict] = {}
+    for endpoint in endpoints:
+        output.setdefault(endpoint.path, CaseInsensitiveDict())
+        output[endpoint.path][endpoint.method] = endpoint
+    return output
