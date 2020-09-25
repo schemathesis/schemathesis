@@ -102,20 +102,7 @@ class Link(StatefulTest):
             make_variants(item, templates)
             add_variants(templates)
         components = self._convert_to_schema(variants)
-        return self.endpoint.__class__(
-            path=self.endpoint.path,
-            method=self.endpoint.method,
-            definition=self.endpoint.definition,
-            schema=self.endpoint.schema,
-            app=self.endpoint.app,
-            base_url=self.endpoint.base_url,
-            path_parameters=components["path_parameters"],
-            query=components["query"],
-            headers=components["headers"],
-            cookies=components["cookies"],
-            body=components["body"],
-            form_data=self.endpoint.form_data,
-        )
+        return self.endpoint.clone(**components)
 
     def _get_container_by_parameter_name(
         self, full_name: str, templates: Dict[str, Optional[Dict[str, Any]]]

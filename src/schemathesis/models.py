@@ -401,6 +401,23 @@ class Endpoint:
             form_data=deepcopy(self.form_data),
         )
 
+    def clone(self, **components: Any) -> "Endpoint":
+        """Create a new instance of this endpoint with updated components."""
+        return self.__class__(
+            path=self.path,
+            method=self.method,
+            definition=self.definition,
+            schema=self.schema,
+            app=self.app,
+            base_url=self.base_url,
+            path_parameters=components["path_parameters"],
+            query=components["query"],
+            headers=components["headers"],
+            cookies=components["cookies"],
+            body=components["body"],
+            form_data=self.form_data,
+        )
+
 
 class Status(IntEnum):
     """Status of an action or multiple actions."""
