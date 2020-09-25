@@ -16,7 +16,6 @@ on:
       - 'tox.ini'
       - 'mypy.ini'
       - '!docs/**'
-      - '!adr/**'
   push:
     branches:
       - master
