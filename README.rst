@@ -9,43 +9,31 @@ It reads the application schema and generates test cases, which will ensure that
 
 The application under test could be written in any language; the only thing you need is a valid API schema in a supported format.
 
-**Please, help us to improve!**
-
-We'd kindly ask you to share your experience with Schemathesis. It will help me to make improvements to it and prioritize new features! 🙂 It will take 5 minutes. The results are anonymous.
-
-Survey: https://forms.gle/dv4s5SXAYWzvuwFWA
-
 **Supported specification versions**:
 
 - Swagger 2.0
 - Open API 3.0.x
 - GraphQL June 2018
 
-More API specifications will be added in the future.
-
-Built with:
-
-- `hypothesis`_
-
-- `hypothesis_jsonschema`_
-
-- `hypothesis_graphql`_
-
-- `pytest`_
-
-It was inspired by the beautiful `swagger-conformance <https://github.com/olipratt/swagger-conformance>`_ project.
-
 **Docs**: https://schemathesis.readthedocs.io/en/stable/
 
 **Gitter**: https://gitter.im/kiwicom/schemathesis
 
-If you are looking for more information:
+More information:
 
-- `An article <https://code.kiwi.com/schemathesis-property-based-testing-for-api-schemas-52811fd2b0a4>`_ about Schemathesis by **@Stranger6667**
+- `An article <https://dygalo.dev/blog/schemathesis-property-based-testing-for-api-schemas/>`_ about Schemathesis by **@Stranger6667**
 - `A video <https://youtu.be/1lo7idI7uq8>`_ from FlaskCon 2020 by **@hultner**
 
-**NOTE**: I started this project during my work at `Kiwi.com <https://kiwi.com/>`_. I am grateful to them for all the support they
+Also, I occasionally write posts about Schemathesis in `my blog <https://dygalo.dev/>`_ and offer consulting services for businesses.
+
+I started this project during my work at `Kiwi.com <https://kiwi.com/>`_. I am grateful to them for all the support they
 provided to this project during its early days and for the opportunity to evolve Schemathesis independently.
+
+**Please, help us to improve!**
+
+We'd kindly ask you to share your experience with Schemathesis. It will help me to make improvements to it and prioritize new features! 🙂 It will take 5 minutes. The results are anonymous.
+
+Survey: https://forms.gle/dv4s5SXAYWzvuwFWA
 
 Installation
 ------------
@@ -654,9 +642,6 @@ will be licensed under its MIT license.
    :target: https://schemathesis.readthedocs.io/en/stable/?badge=stable
    :alt: Documentation Status
 
-.. _hypothesis: https://hypothesis.works/
-.. _hypothesis_jsonschema: https://github.com/Zac-HD/hypothesis-jsonschema
-.. _hypothesis_graphql: https://github.com/Stranger6667/hypothesis-graphql
 .. _pytest: http://pytest.org/en/latest/
 .. _poetry: https://github.com/sdispater/poetry
 .. _installation guide: https://github.com/sdispater/poetry#installation
