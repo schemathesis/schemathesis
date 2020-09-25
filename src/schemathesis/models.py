@@ -348,12 +348,12 @@ class Endpoint:
     schema: "BaseSchema" = attr.ib()  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
-    path_parameters: Optional[PathParameters] = attr.ib(default=None)  # pragma: no mutate
-    headers: Optional[Headers] = attr.ib(default=None)  # pragma: no mutate
-    cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
-    query: Optional[Query] = attr.ib(default=None)  # pragma: no mutate
-    body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
-    form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
+    path_parameters: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
+    headers: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
+    cookies: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
+    query: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
+    body: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
+    form_data: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
 
     @property
     def full_path(self) -> str:
