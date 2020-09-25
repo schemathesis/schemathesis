@@ -372,10 +372,7 @@ class Endpoint:
         return self.schema.get_stateful_tests(response, self, stateful)
 
     def get_hypothesis_conversions(self, location: str) -> Optional[Callable]:
-        definitions = [item for item in self.definition.resolved.get("parameters", []) if item["in"] == location]
-        if definitions:
-            return self.schema.get_hypothesis_conversion(definitions)
-        return None
+        return self.schema.get_hypothesis_conversion(self, location)
 
     def prepare_multipart(self, form_data: Optional[FormData]) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
         if not form_data:
