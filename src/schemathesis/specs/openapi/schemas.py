@@ -174,6 +174,15 @@ class BaseOpenAPISchema(BaseSchema):
     ) -> SearchStrategy:
         return get_case_strategy(endpoint, hooks, feedback)
 
+    def get_hypothesis_conversion(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
+        definitions = [item for item in endpoint.definition.resolved.get("parameters", []) if item["in"] == location]
+        if definitions:
+            return self._get_hypothesis_conversion(definitions)
+        return None
+
+    def _get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
+        raise NotImplementedError
+
 
 class SwaggerV20(BaseOpenAPISchema):
     nullable_name = "x-nullable"
@@ -266,7 +275,7 @@ class SwaggerV20(BaseOpenAPISchema):
             return produces
         return self.raw_schema.get("produces", [])
 
-    def get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
+    def _get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         return serialization.serialize_swagger2_parameters(definitions)
 
     def prepare_multipart(
@@ -409,7 +418,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
             return []
         return list(definitions.get("content", {}).keys())
 
-    def get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
+    def _get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         return serialization.serialize_openapi3_parameters(definitions)
 
     def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
