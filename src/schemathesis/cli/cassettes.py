@@ -90,7 +90,7 @@ def worker(file_handle: click.utils.LazyFile, queue: Queue) -> None:
 
     This implementation doesn't use `pyyaml` package and composes YAML manually as string due to the following reasons:
       - It is much faster. The string-based approach gives only ~2.5% time overhead when `yaml.CDumper` has ~11.2%;
-      - Implementation complexity. We have a quite simple format where all values are strings and it is much simpler to
+      - Implementation complexity. We have a quite simple format where all values are strings, and it is much simpler to
         implement it with string composition rather than with adjusting `yaml.Serializer` to emit explicit types.
         Another point is that with `pyyaml` we need to emit events and handle some low-level details like providing
         tags, anchors to have incremental writing, with strings it is much simpler.

@@ -82,7 +82,7 @@ def test_form_data(schema):
 
 
 def test_not_wsgi(schema):
-    # When a schema is created without a WSGI app (e.g. from an URL)
+    # When a schema is created without a WSGI app (e.g. from a URL)
     case = Case(schema.endpoints["/success"]["GET"])
     case.endpoint.app = None
     # Then an error should be raised if the user tries to use `call_wsgi`

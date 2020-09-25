@@ -87,7 +87,7 @@ class AfterExecution(ExecutionEvent):
 
 @attr.s(slots=True)  # pragma: no mutate
 class Interrupted(ExecutionEvent):
-    """If execution was interrupted by Ctrl-C or a received SIGTERM."""
+    """If execution was interrupted by Ctrl-C, or a received SIGTERM."""
 
 
 @attr.s(slots=True)  # pragma: no mutate

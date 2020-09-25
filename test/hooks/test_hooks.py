@@ -257,7 +257,7 @@ def test_register_wrong_scope(schema):
 
     with pytest.raises(
         ValueError,
-        match=r"Can not register hook 'before_load_schema' on SCHEMA scope dispatcher. "
+        match=r"Cannot register hook 'before_load_schema' on SCHEMA scope dispatcher. "
         r"Use a dispatcher with GLOBAL scope\(s\) instead",
     ):
 

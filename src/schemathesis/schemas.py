@@ -98,7 +98,7 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
-        """Get examples from endpoint."""
+        """Get examples from the endpoint."""
         raise NotImplementedError
 
     def get_stateful_tests(

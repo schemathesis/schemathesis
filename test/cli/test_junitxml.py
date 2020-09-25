@@ -28,7 +28,7 @@ def test_junitxml_file(cli, schema_url, tmp_path):
     assert root.attrib["errors"] == "1"
     assert root.attrib["failures"] == "1"
     assert root.attrib["tests"] == "3"
-    # Inspect nested element `testsuite`
+    # Inspect the nested element `testsuite`
     testsuite = root[0]
     assert testsuite.tag == "testsuite"
     assert testsuite.attrib["name"] == "schemathesis"

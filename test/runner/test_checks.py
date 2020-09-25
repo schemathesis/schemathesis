@@ -224,7 +224,7 @@ def test_content_type_conformance_invalid(spec, response, case):
 
 
 def test_invalid_schema_on_content_type_check():
-    # When schema validation is disabled and it doesn't contain "responses" key
+    # When schema validation is disabled, and it doesn't contain "responses" key
     schema = schemathesis.from_dict(
         {
             "openapi": "3.0.2",

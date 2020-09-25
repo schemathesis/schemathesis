@@ -15,7 +15,7 @@ CACHE: Dict[Union[str, int], Type[CheckFailed]] = {}
 
 
 def get_exception(name: str) -> Type[CheckFailed]:
-    """Create a new exception class with provided name or fetch one from cache."""
+    """Create a new exception class with provided name or fetch one from the cache."""
     if name in CACHE:
         exception_class = CACHE[name]
     else:

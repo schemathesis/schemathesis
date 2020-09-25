@@ -90,7 +90,7 @@ def from_file(
     *,
     app: Any = None,
     validate_schema: bool = True,
-    **kwargs: Any,  # needed in runner to have compatible API across all loaders
+    **kwargs: Any,  # needed in the runner to have compatible API across all loaders
 ) -> BaseOpenAPISchema:
     """Load a file content and parse to schema instance.
 

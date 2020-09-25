@@ -149,7 +149,7 @@ def asgi_thread_task(
 
 
 def stop_worker(thread_id: int) -> None:
-    """Raise an error in a thread so it is possible to asynchronously stop thread execution."""
+    """Raise an error in a thread, so it is possible to asynchronously stop thread execution."""
     ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(thread_id), ctypes.py_object(SystemExit))
 
 
@@ -178,7 +178,7 @@ class ThreadPoolRunner(BaseRunner):
             while not is_finished:
                 # Sleep is needed for performance reasons
                 # each call to `is_alive` of an alive worker waits for a lock
-                # iterations without waiting are too frequent and a lot of time will be spent on waiting for this locks
+                # iterations without waiting are too frequent, and a lot of time will be spent on waiting for this locks
                 time.sleep(0.001)
                 is_finished = all(not worker.is_alive() for worker in workers)
                 while not events_queue.empty():

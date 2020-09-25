@@ -452,7 +452,7 @@ def test_b(request, case):
     ),
 )
 def test_custom_properties(testdir, schema_name, endpoint):
-    # When custom properties are present in endpoint definitions (e.g. vendor extensions or some other allowed fields)
+    # When custom properties are present in endpoint definitions (e.g. vendor extensions, or some other allowed fields)
     testdir.make_test(
         """
 @schema.parametrize()

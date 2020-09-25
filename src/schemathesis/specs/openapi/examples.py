@@ -40,7 +40,7 @@ def get_parameter_example_from_properties(endpoint_def: Dict[str, Any]) -> Dict[
                     static_parameters[parameter_type] = {}
                 static_parameters[parameter_type][parameter["name"]] = example
             else:
-                # swagger 2 body and formData parameters should not include parameter name
+                # swagger 2 body and formData parameters should not include parameter names
                 static_parameters[parameter_type] = example
     return static_parameters
 
@@ -124,7 +124,7 @@ def get_strategy(endpoint: Endpoint, static_parameters: Dict[str, Any]) -> Searc
 def merge_examples(
     parameter_examples: List[Dict[str, Any]], request_body_examples: Dict[str, Any]
 ) -> List[Dict[str, Any]]:
-    """Create list of static parameter objects from parameter and request body examples."""
+    """Create list of static parameter objects from the parameter and request body examples."""
     static_parameter_list = []
     for idx in range(num_examples(parameter_examples, request_body_examples)):
         static_parameters: Dict[str, Any] = {}

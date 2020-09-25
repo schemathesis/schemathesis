@@ -42,7 +42,7 @@ def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value
     try:
         utils.import_app(raw_value)
         # String is returned instead of an app because it might be passed to a subprocess
-        # Since most of app instances are not-transferable to another process, they are passed as strings and
+        # Since most app instances are not-transferable to another process, they are passed as strings and
         # imported in a subprocess
         return raw_value
     except Exception as exc:

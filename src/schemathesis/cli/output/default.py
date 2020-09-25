@@ -52,7 +52,7 @@ def display_percentage(context: ExecutionContext, event: events.AfterExecution) 
     endpoints_count = cast(int, context.endpoints_count)  # is already initialized via `Initialized` event
     current_percentage = get_percentage(context.endpoints_processed, endpoints_count)
     styled = click.style(current_percentage, fg="cyan")
-    # Total length of the message so it will fill to the right border of the terminal minus padding
+    # Total length of the message, so it will fill to the right border of the terminal minus padding
     length = get_terminal_width() - context.current_line_length + len(styled) - len(current_percentage) - padding
     template = f"{{:>{length}}}"
     click.echo(template.format(styled))
@@ -267,7 +267,7 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
         if event.exception_type == "jsonschema.exceptions.ValidationError":
             message += (
                 "\n\nYou can disable input schema validation with --validate-schema=false "
-                "command-line option\nIn this case, Schemathesis can not guarantee proper"
+                "command-line option\nIn this case, Schemathesis cannot guarantee proper"
                 " behavior during the test run"
             )
         click.secho(message, fg="red")

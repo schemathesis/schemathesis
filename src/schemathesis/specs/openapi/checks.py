@@ -105,7 +105,7 @@ def response_schema_conformance(response: GenericResponse, case: "Case") -> None
 def in_scopes(resolver: jsonschema.RefResolver, scopes: List[str]) -> Generator[None, None, None]:
     """Push all available scopes into the resolver.
 
-    There could be an additional scope change during schema resolving in `get_response_schema`, so in total there
+    There could be an additional scope change during a schema resolving in `get_response_schema`, so in total there
     could be a stack of two scopes maximum. This context manager handles both cases (1 or 2 scope changes) in the same
     way.
     """

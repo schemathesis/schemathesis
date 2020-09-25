@@ -16,7 +16,7 @@ class Stateful(enum.Enum):
 
 @attr.s(slots=True, hash=False)  # pragma: no mutate
 class ParsedData:
-    """A structure that holds information parsed from a test outcomes.
+    """A structure that holds information parsed from a test outcome.
 
     It is used later to create a new version of an endpoint that will reuse this data.
     """

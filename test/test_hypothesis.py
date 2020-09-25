@@ -251,8 +251,8 @@ def test_valid_form_data(request, raw_schema):
         base_url = request.getfixturevalue("openapi2_base_url")
     else:
         base_url = request.getfixturevalue("openapi3_base_url")
-    # When the request definition contains a schema, matching values of which can not be encoded to multipart
-    # in a straightforward way
+    # When the request definition contains a schema, matching values of which cannot be encoded to multipart
+    # straightforwardly
     schema = schemathesis.from_dict(raw_schema, base_url=base_url)
 
     @given(case=schema["/form"]["POST"].as_strategy())

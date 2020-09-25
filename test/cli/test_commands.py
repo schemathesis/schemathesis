@@ -504,7 +504,7 @@ def test_execute_missing_schema(cli, openapi3_base_url, url, message, workers):
 @pytest.mark.endpoints("success", "slow")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_hypothesis_failed_event(cli, cli_args, workers):
-    # When the Hypothesis deadline option is set manually and it is smaller than the response time
+    # When the Hypothesis deadline option is set manually, and it is smaller than the response time
     result = cli.run(*cli_args, "--hypothesis-deadline=20", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
@@ -653,7 +653,7 @@ def test_invalid_endpoint_suggestion(cli, cli_args):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And there should be a suggestion to disable schema validation
     expected = """You can disable input schema validation with --validate-schema=false command-line option
-In this case, Schemathesis can not guarantee proper behavior during the test run
+In this case, Schemathesis cannot guarantee proper behavior during the test run
 """
     assert expected in result.stdout
 
@@ -1089,7 +1089,7 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
         mocker.patch("schemathesis.Case.call", wraps=mocked)
     result = cli.run(*cli_args, f"--workers={workers}")
     assert result.exit_code == ExitCode.OK, result.stdout
-    # Then execution stops and a message about interruption is displayed
+    # Then execution stops, and a message about interruption is displayed
     lines = result.stdout.strip().split("\n")
     # And summary is still displayed in the end of the output
     if workers == 1:
@@ -1103,7 +1103,7 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
 
 
 def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
-    # When a Schemathesis run in interrupted by keyboard or via SIGINT
+    # When a Schemathesis run in interrupted by the keyboard or via SIGINT
     original = time.sleep
     counter = 0
 
@@ -1118,9 +1118,9 @@ def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
     result = cli.run(*cli_args, "--workers=2")
     # the exit status depends on what thread finished first
     assert result.exit_code in (ExitCode.OK, ExitCode.TESTS_FAILED), result.stdout
-    # Then execution stops and a message about interruption is displayed
+    # Then execution stops, and a message about interruption is displayed
     lines = result.stdout.strip().split("\n")
-    # There are many scenarios possible, depends how many tests will be executed before interruption
+    # There are many scenarios possible, depends on how many tests will be executed before interruption
     # and in what order. it could be no tests at all, some of them or all of them.
     assert_threaded_executor_interruption(lines, ("F", ".", "F.", ".F", ""), True)
 
@@ -1237,7 +1237,7 @@ def test_wsgi_app_internal_exception(testdir, cli):
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
 def test_aiohttp_app(openapi_version, request, cli, loadable_aiohttp_app, args):
-    # When an URL is passed together with app
+    # When a URL is passed together with app
     if args:
         args += (request.getfixturevalue("base_url"),)
     result = cli.run("/schema.yaml", "--app", loadable_aiohttp_app, *args)
@@ -1247,7 +1247,7 @@ def test_aiohttp_app(openapi_version, request, cli, loadable_aiohttp_app, args):
 
 
 def test_wsgi_app_remote_schema(cli, schema_url, loadable_flask_app):
-    # When an URL is passed together with app
+    # When a URL is passed together with app
     result = cli.run(schema_url, "--app", loadable_flask_app)
     # Then the schema should be loaded from that URL
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout

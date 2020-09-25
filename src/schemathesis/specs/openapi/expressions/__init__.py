@@ -16,5 +16,5 @@ def evaluate(expr: Any, context: ExpressionContext) -> str:
     parts = [node.evaluate(context) for node in parser.parse(expr)]
     if len(parts) == 1:
         return parts[0]  # keep the return type the same as the internal value type
-    # otherwise concatenate into a string
+    # otherwise, concatenate into a string
     return "".join(map(str, parts))
