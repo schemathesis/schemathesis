@@ -9,6 +9,11 @@ def graphql_schema(graphql_endpoint):
     return schemathesis.graphql.from_url(graphql_endpoint)
 
 
+@pytest.fixture
+def graphql_strategy(graphql_schema):
+    return graphql_schema["/graphql"]["POST"].as_strategy()
+
+
 def test_raw_schema(graphql_schema):
     assert graphql_schema.raw_schema["__schema"]["types"][1] == {
         "kind": "OBJECT",
@@ -44,13 +49,29 @@ def test_raw_schema(graphql_schema):
 
 
 @pytest.mark.hypothesis_nested
-def test_query_strategy(graphql_schema):
-    strategy = graphql_schema.query.as_strategy()
-
-    @given(case=strategy)
+def test_query_strategy(graphql_strategy):
+    @given(case=graphql_strategy)
     @settings(max_examples=10)
     def test(case):
         response = case.call()
         assert response.status_code < 500
 
     test()
+
+
+@pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
+def test_get_code_to_reproduce(graphql_endpoint, graphql_strategy):
+    case = graphql_strategy.example()
+    assert case.get_code_to_reproduce() == f"requests.post('{graphql_endpoint}', json={{'query': {repr(case.body)}}})"
+
+
+@pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
+def test_as_werkzeug_kwargs(graphql_strategy):
+    case = graphql_strategy.example()
+    assert case.as_werkzeug_kwargs() == {
+        "method": "POST",
+        "path": "/graphql",
+        "query_string": None,
+        "json": {"query": case.body},
+        "headers": {},
+    }

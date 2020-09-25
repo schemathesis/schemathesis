@@ -10,6 +10,7 @@ Added
 ~~~~~
 
 - Stateful testing via Open API links for the ``pytest`` runner. `#616`_
+- Support for GraphQL tests for the ``pytest`` runner. `#649`_
 
 Fixed
 ~~~~~
@@ -1371,6 +1372,7 @@ Fixed
 .. _#658: https://github.com/schemathesis/schemathesis/issues/658
 .. _#656: https://github.com/schemathesis/schemathesis/issues/656
 .. _#651: https://github.com/schemathesis/schemathesis/issues/651
+.. _#649: https://github.com/schemathesis/schemathesis/issues/649
 .. _#647: https://github.com/schemathesis/schemathesis/issues/647
 .. _#641: https://github.com/schemathesis/schemathesis/issues/641
 .. _#640: https://github.com/schemathesis/schemathesis/issues/640
