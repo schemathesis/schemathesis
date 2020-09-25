@@ -365,7 +365,7 @@ class Endpoint:
         return self.schema.get_case_strategy(self, hooks, feedback)
 
     def get_strategies_from_examples(self) -> List[SearchStrategy[Case]]:
-        """Get examples from endpoint."""
+        """Get examples from the endpoint."""
         return self.schema.get_strategies_from_examples(self)
 
     def get_stateful_tests(self, response: GenericResponse, stateful: Optional["Stateful"]) -> Sequence["StatefulTest"]:
@@ -616,7 +616,7 @@ class TestResultSet:
 
     @property
     def total(self) -> Dict[str, Dict[Union[str, Status], int]]:
-        """Aggregated statistic about test results."""
+        """An aggregated statistic about test results."""
         output: Dict[str, Dict[Union[str, Status], int]] = {}
         for item in self.results:
             for check in item.checks:

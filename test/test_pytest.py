@@ -114,7 +114,7 @@ def test_b(case, a):
     )
     # When a test is run with treating warnings as errors
     result = testdir.runpytest("-Werror")
-    # There should be no errors. There are no warnings from Schemathesis pytest plugin
+    # There should be no errors. There are no warnings from Schemathesis pytest plugin.
     result.assert_outcomes(passed=3)
 
 

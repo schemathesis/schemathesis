@@ -133,11 +133,11 @@ class HookDispatcher:
         spec = self._specs.get(name)
         if spec is None:
             raise TypeError(f"There is no hook with name '{name}'")
-        # Some hooks are not present on all levels. We need to avoid registering hooks on wrong levels
+        # Some hooks are not present on all levels. We need to avoid registering hooks on wrong levels.
         if self.scope not in spec.scopes:
             scopes = ", ".join(scope.name for scope in spec.scopes)
             raise ValueError(
-                f"Can not register hook '{name}' on {self.scope.name} scope dispatcher. "
+                f"Cannot register hook '{name}' on {self.scope.name} scope dispatcher. "
                 f"Use a dispatcher with {scopes} scope(s) instead"
             )
         signature = inspect.signature(hook)
@@ -147,7 +147,7 @@ class HookDispatcher:
             )
 
     def get_all_by_name(self, name: str) -> List[Callable]:
-        """Get a list of hooks registered for name."""
+        """Get a list of hooks registered for a name."""
         return self._hooks.get(name, [])
 
     def dispatch(self, name: str, context: HookContext, *args: Any, **kwargs: Any) -> None:

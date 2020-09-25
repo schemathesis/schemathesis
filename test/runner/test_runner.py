@@ -448,7 +448,7 @@ def test_flaky_exceptions(args, mocker):
         error_idx += 1
         raise exception_class
 
-    # When there are many different exceptions during the test
+    # When there are many exceptions during the test
     # And Hypothesis consider this test as a flaky one
     mocker.patch("schemathesis.Case.call", side_effect=flaky)
     mocker.patch("schemathesis.Case.call_wsgi", side_effect=flaky)
