@@ -12,6 +12,7 @@ Changelog
 - New hook to pre-commit, rstcheck, as well as updates to documentation based on rstcheck `#734`_
 - New check for maximum response time and corresponding CLI option ``--max-response-time`` `#716`_
 - New field with information about executed checks in cassettes. `#702`_
+- New ``port`` parameter added to ``from_uri()`` method. `#706`_
 
 **Fixed**
 
@@ -1389,6 +1390,7 @@ Deprecated
 .. _#718: https://github.com/schemathesis/schemathesis/issues/718
 .. _#716: https://github.com/schemathesis/schemathesis/issues/716
 .. _#708: https://github.com/schemathesis/schemathesis/issues/708
+.. _#706: https://github.com/schemathesis/schemathesis/issues/706
 .. _#705: https://github.com/schemathesis/schemathesis/issues/705
 .. _#702: https://github.com/schemathesis/schemathesis/issues/702
 .. _#695: https://github.com/schemathesis/schemathesis/issues/695
