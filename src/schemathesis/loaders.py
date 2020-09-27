@@ -10,6 +10,7 @@ from jsonschema import ValidationError
 from starlette.applications import Starlette
 from starlette.testclient import TestClient as ASGIClient
 from werkzeug.test import Client
+from yarl import URL
 
 from .constants import USER_AGENT
 from .exceptions import HTTPError
@@ -54,6 +55,7 @@ def from_uri(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
+    port: Optional[int] = None,
     *,
     app: Any = None,
     validate_schema: bool = True,
@@ -63,6 +65,8 @@ def from_uri(
     headers = kwargs.setdefault("headers", {})
     if "user-agent" not in {header.lower() for header in headers}:
         kwargs["headers"]["User-Agent"] = USER_AGENT
+    if not base_url and port:
+        base_url = str(URL(uri).with_port(port))
     response = requests.get(uri, **kwargs)
     try:
         response.raise_for_status()
