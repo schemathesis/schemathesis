@@ -529,67 +529,6 @@ Schema validation
 To avoid obscure and hard to debug errors during test runs, Schemathesis validates input schemas for conformance with the relevant spec.
 If you'd like to disable this behavior, use ``--validate-schema=false`` in CLI and ``validate_schema=False`` argument in loaders.
 
-Local development
------------------
-
-First, you need to prepare a virtual environment with `poetry`_.
-Install ``poetry`` (check out the `installation guide`_) and run this command inside the project root:
-
-.. code:: bash
-
-    poetry install
-
-For simpler local development Schemathesis includes a ``aiohttp``-based server with the following endpoints in Swagger 2.0 schema:
-
-- ``/api/success`` - always returns ``{"success": true}``
-- ``/api/failure`` - always returns 500
-- ``/api/slow`` - always returns ``{"slow": true}`` after 250 ms delay
-- ``/api/unsatisfiable`` - parameters for this endpoint are impossible to generate
-- ``/api/invalid`` - invalid parameter definition. Uses ``int`` instead of ``integer``
-- ``/api/flaky`` - returns 1/1 ratio of 200/500 responses
-- ``/api/multipart`` - accepts multipart data
-- ``/api/teapot`` - returns 418 status code, that is not listed in the schema
-- ``/api/text`` - returns ``plain/text`` responses, which are not declared in the schema
-- ``/api/malformed_json`` - returns malformed JSON with ``application/json`` content type header
-
-
-To start the server:
-
-.. code:: bash
-
-    ./test_server.sh 8081
-
-It is possible to configure available endpoints via the ``--endpoints`` option.
-The value is expected to be a comma-separated string with endpoint names (``success``, ``failure``, ``slow``, etc.):
-
-.. code:: bash
-
-    ./test_server.sh 8081 --endpoints=success,slow
-
-Then you could use CLI against this server:
-
-.. code:: bash
-
-    schemathesis run http://127.0.0.1:8081/schema.yaml
-    ================================== Schemathesis test session starts =================================
-    platform Linux -- Python 3.7.4, schemathesis-0.12.2, hypothesis-4.39.0, hypothesis_jsonschema-0.9.8
-    rootdir: /
-    hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase('/.hypothesis/examples')
-    Schema location: http://127.0.0.1:8081/schema.yaml
-    Base URL: http://127.0.0.1:8081
-    Specification version: Swagger 2.0
-    collected endpoints: 2
-
-    GET /api/slow .                                                                               [ 50%]
-    GET /api/success .                                                                            [100%]
-
-    ============================================== SUMMARY ==============================================
-
-    not_a_server_error            2 / 2 passed          PASSED
-
-    ========================================= 2 passed in 0.29s =========================================
-
-
 Running tests
 ~~~~~~~~~~~~~
 

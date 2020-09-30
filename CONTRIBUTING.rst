@@ -41,6 +41,115 @@ It would be awesome if you can submit a failing test that demonstrates the probl
 
 .. _fixbugs:
 
+Using a local test server
+-------------------------
+
+Schemathesis provides a local test server to simplify the development of new features or fixing bugs.
+It allows you to configure the generated API schema to reflect various common scenarios of server-side behavior.
+
+To start using it, you need to prepare a virtual environment with `poetry`_.
+Install ``poetry`` (check out the `installation guide`_) and run this command inside the project root:
+
+.. code:: bash
+
+    poetry install
+
+To start the server, run the following command in your terminal:
+
+.. code:: bash
+
+    ./test_server.sh 8081
+
+It will start the test server on the 8081 port with a simple Open API 2.0 schema.
+The local server supports three specs via the ``--spec`` command-line option - ``openapi2``, ``openapi3``, and ``graphql``.
+
+GraphQL
+~~~~~~~
+
+This spec serves a simple schema:
+
+.. code:: graphql
+
+    type Query {
+      patron: Patron
+    }
+
+    type Patron {
+      id: ID
+      name: String
+      age: Int
+    }
+
+OpenAPI
+~~~~~~~
+
+Both ``openapi2`` and ``openapi3`` expose semantically the same schema with version-specific keywords.
+By default, the server will generate an API schema with the following endpoints:
+
+- ``GET /api/success`` - returns ``{"success": true}``
+- ``GET /api/failure`` - returns 500 with the ``plain/text`` content type
+- ``POST /api/payload`` - returns the request's payload
+- ``GET /api/get_payload`` - returns the request's payload, but accepts only GET requests
+- ``GET /api/multiple_failures`` - returns different response statuses, depending on the provided integer ``id`` parameter. For negative values returns 200 with ``{"result": "OK"}`` payload, 500 if ``id`` is 0, and 504 for positive ``id`` values.
+- ``GET /api/slow`` - always returns ``{"slow": true}`` after 100 ms delay
+- ``GET /api/path_variable/{key}`` - receives the ``key`` path parameter and unconditionally returns ``{"success": true}``
+- ``POST /api/unsatisfiable`` - parameters for this endpoint are impossible to generate
+- ``POST /api/performance`` - depending on the number of "0" in the input value, responds slower and if the input value has more than ten "0", returns 500
+- ``POST /api/invalid`` - invalid parameter definition. Uses ``int`` instead of ``integer``
+- ``GET /api/flaky`` - returns 1:1 ratio of 200/500 responses
+- ``GET /api/recursive`` - accepts a recursive structure and responds with a recursive one
+- ``POST /api/multipart`` - accepts two body parameters as multipart payload
+- ``POST /api/upload_file`` - accepts a file and a body parameter
+- ``POST /api/form`` - accepts ``application/x-www-form-urlencoded`` payload
+- ``POST /api/teapot`` - returns 418 status code that is not listed in the schema
+- ``GET /api/text`` - returns ``plain/text`` responses, which are not declared in the schema
+- ``GET /api/malformed_json`` - returns malformed JSON with ``application/json`` content type header
+- ``GET /api/invalid_response`` - response doesn't conform to the declared schema
+- ``GET /api/custom_format`` - accepts a string in the custom "digits" format. This endpoint is used to verify custom string formats
+- ``GET /api/invalid_path_parameter/{id}`` - the parameter declaration is invalid (``required`` keyword is set to ``false``)
+- ``GET /api/headers`` - returns the passed headers
+- ``POST /api/users/`` (``create_user``) - creates a user and stores it in memory. Provides Open API links to the endpoints below
+- ``GET /api/users/{user_id}`` (``get_user``) - returns a user stored in memory
+- ``PATCH /api/users/{user_id}`` (``update_user``) - updates a user stored in memory
+
+You can find the complete schema at ``http://127.0.0.1:8081/schema.yaml`` (replace 8081 with the port you chose in the start server command).
+
+To select only a subset of the endpoints above, you could use the ``--endpoints`` command-line option and provide a
+list of names separated by a comma. Values in this list are either mentioned in parentheses or are the path part after ``/api/``.
+For example, to select the ``GET /api/success``, ``GET /api/path_variable/{key}``, and  ``POST /api/users/`` endpoints, you can run the following command:
+
+.. code:: bash
+
+    ./test_server.sh 8081 --endpoints=success,path_variable,create_user
+
+Then you could use CLI against this server:
+
+.. code::
+
+    schemathesis run http://127.0.0.1:8081/schema.yaml
+    =========================================== Schemathesis test session starts ==========================================
+    platform Linux -- Python 3.8.5, schemathesis-2.5.0, hypothesis-5.23.0, hypothesis_jsonschema-0.17.3, jsonschema-3.2.0
+    rootdir: /
+    hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase('/.hypothesis/examples')
+    Schema location: http://127.0.0.1:8081/schema.yaml
+    Base URL: http://127.0.0.1:8081/api
+    Specification version: Swagger 2.0
+    Workers: 1
+    collected endpoints: 3
+
+    GET /api/path_variable/{key} .                                              [ 33%]
+    GET /api/success .                                                          [ 66%]
+    POST /api/users/ .                                                          [100%]
+
+    ======================================================= SUMMARY =======================================================
+
+    Performed checks:
+        not_a_server_error                    201 / 201 passed          PASSED
+
+    ================================================== 3 passed in 1.77s ==================================================
+
+.. _testserver:
+
 Submitting Pull Requests
 -----------------------
 
@@ -67,3 +176,5 @@ At present the core developers are:
 Thanks!
 
 .. _@Stranger6667: https://github.com/Stranger6667
+.. _poetry: https://github.com/sdispater/poetry
+.. _installation guide: https://github.com/sdispater/poetry#installation
