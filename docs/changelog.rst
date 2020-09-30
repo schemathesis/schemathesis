@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+`2.5.1`_ - 2020-09-30
+---------------------
+
+This release contains only documentation updates which are necessary to upload to PyPI.
+
 `2.5.0`_ - 2020-09-27
 ---------------------
 
@@ -1259,7 +1264,8 @@ Fixed
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.5.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.5.1...HEAD
+.. _2.5.1: https://github.com/schemathesis/schemathesis/compare/v2.5.0...v2.5.1
 .. _2.5.0: https://github.com/schemathesis/schemathesis/compare/v2.4.1...v2.5.0
 .. _2.4.1: https://github.com/schemathesis/schemathesis/compare/v2.4.0...v2.4.1
 .. _2.4.0: https://github.com/schemathesis/schemathesis/compare/v2.3.4...v2.4.0
