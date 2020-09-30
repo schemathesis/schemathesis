@@ -22,6 +22,7 @@ authors = ["Dmitry Dygalo <dadygalo@gmail.com>"]
 readme = "README.rst"
 repository = "https://github.com/schemathesis/schemathesis"
 license = "MIT"
+include = ["src/schemathesis/py.typed"]
 
 [tool.poetry.dependencies]
 python = "^3.6"
