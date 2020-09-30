@@ -19,8 +19,11 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 authors = ["Dmitry Dygalo <dadygalo@gmail.com>"]
+maintainers = ["Dmitry Dygalo <dadygalo@gmail.com>"]
+documentation = "https://schemathesis.readthedocs.io/en/stable/"
 readme = "README.rst"
 repository = "https://github.com/schemathesis/schemathesis"
+homepage = "https://github.com/schemathesis/schemathesis"
 license = "MIT"
 
 [tool.poetry.dependencies]
