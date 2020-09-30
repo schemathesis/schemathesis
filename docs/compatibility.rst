@@ -13,8 +13,8 @@ FastAPI
 generation, and it produces Draft 7 compatible schemas. But Open API 2 / 3.0.x use earlier versions of JSON Schema (Draft 4 and Wright Draft 00 respectively), which leads
 to incompatibilities when Schemathesis parses input schema.
 
-This is a `known issue <https://github.com/tiangolo/fastapi/issues/240>`_ on the FastAPI side
-, and Schemathesis provides a way to handle such schemas. The idea is based on converting Draft 7 keywords syntax to Draft 4.
+It is a `known issue <https://github.com/tiangolo/fastapi/issues/240>`_ on the FastAPI side,
+and Schemathesis provides a way to handle such schemas. The idea is to convert Draft 7 keywords syntax to Draft 4.
 
 To use it, you need to add this code before you load your schema with Schemathesis:
 
@@ -24,7 +24,7 @@ To use it, you need to add this code before you load your schema with Schemathes
 
     # will install all available compatibility fixups.
     schemathesis.fixups.install()
-    # You can also provide a list of fixup names as the first argument
+    # You can provide a list of fixup names as the first argument
     # schemathesis.fixups.install(["fastapi"])
 
-If you use CLI, then you can utilize ``--fixups=all`` option.
+If you use the Command Line Interface, then you can utilize the ``--fixups=all`` option.
