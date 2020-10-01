@@ -271,7 +271,7 @@ class Case:
         session: Optional[requests.Session] = None,
         headers: Optional[Dict[str, Any]] = None,
         checks: Tuple["CheckFunction", ...] = (),
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
         response = self.call(base_url, session, headers, **kwargs)
         self.validate_response(response, checks)
