@@ -19,6 +19,7 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 authors = ["Dmitry Dygalo <dadygalo@gmail.com>"]
+maintainers = ["Dmitry Dygalo <dadygalo@gmail.com>"]
 readme = "README.rst"
 repository = "https://github.com/schemathesis/schemathesis"
 license = "MIT"
