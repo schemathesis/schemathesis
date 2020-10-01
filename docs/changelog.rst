@@ -11,6 +11,7 @@ Added
 
 - Support PEP561 `#748`_
 - Shortcut for calling & validation. `#738`_
+- Support PEP561 `#748`_
 
 `2.5.1`_ - 2020-09-30
 ---------------------
@@ -1371,6 +1372,7 @@ Fixed
 
 .. _#748: https://github.com/schemathesis/schemathesis/issues/748
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
+.. _#748: https://github.com/schemathesis/schemathesis/issues/748
 .. _#721: https://github.com/schemathesis/schemathesis/issues/721
 .. _#719: https://github.com/schemathesis/schemathesis/issues/719
 .. _#718: https://github.com/schemathesis/schemathesis/issues/718
