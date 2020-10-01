@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "schemathesis"
-version = "2.5.1"
+version = "2.5.0"
 description = "Property-based testing framework for Open API and GraphQL based apps"
 keywords = ["pytest", "hypothesis", "openapi", "swagger", "graphql", "testing"]
 classifiers = [
@@ -19,12 +19,10 @@ classifiers = [
     "Topic :: Software Development :: Testing",
 ]
 authors = ["Dmitry Dygalo <dadygalo@gmail.com>"]
-maintainers = ["Dmitry Dygalo <dadygalo@gmail.com>"]
-documentation = "https://schemathesis.readthedocs.io/en/stable/"
 readme = "README.rst"
 repository = "https://github.com/schemathesis/schemathesis"
-homepage = "https://github.com/schemathesis/schemathesis"
 license = "MIT"
+include = ["src/schemathesis/py.typed"]
 
 [tool.poetry.dependencies]
 python = "^3.6"
