@@ -25,6 +25,7 @@ readme = "README.rst"
 repository = "https://github.com/schemathesis/schemathesis"
 homepage = "https://github.com/schemathesis/schemathesis"
 license = "MIT"
+include = ["src/schemathesis/py.typed"]
 
 [tool.poetry.dependencies]
 python = "^3.6"
