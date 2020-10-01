@@ -63,7 +63,21 @@ For example, the following command will select all endpoints which paths start w
 
     $ schemathesis run -E ^/api/users http://api.com/swagger.json
 
-How responses are checked?
+Tests configuration
+-------------------
+
+Schemathesis is built on top of the `Hypothesis <http://hypothesis.works/>`_ library and allows you to configure testing process in the same way.
+
+We support all configuration options accepted by the ``hypothesis.settings`` decorator.
+All of them are prefixed with ``--hypothesis-`` and underscores are replaced with dashes, for example:
+
+- ``--hypothesis-max-examples=1000``. Generate up to 1000 test cases per endpoint;
+- ``--hypothesis-phases=explicit``. Run only examples, specified explicitly in the API schema;
+- ``--hypothesis-suppress-health-check=too_slow``. Disables the ``too_slow`` health check and makes Schemathesis continue testing even if it is considered too slow.
+
+See the whole list of available options via the ``schemathesis run --help`` command and in the `Hypothesis documentation <https://hypothesis.readthedocs.io/en/latest/settings.html#available-settings>`_.
+
+How are responses checked?
 --------------------------
 
 For each API response received during the test, Schemathesis runs several checks to verify response conformance. By default,
@@ -104,20 +118,6 @@ To make Schemathesis perform all built-in checks use ``--check all`` CLI option:
         response_schema_conformance     201 / 201 passed       PASSED
 
     ======================= 3 passed in 1.69s =======================
-
-Tests configuration
--------------------
-
-Schemathesis is built on top of the `Hypothesis <http://hypothesis.works/>`_ library and allows you to configure testing process in the same way.
-
-We support all configuration options accepted by the ``hypothesis.settings`` decorator.
-All of them are prefixed with ``--hypothesis-`` and underscores are replaced with dashes, for example:
-
-- ``--hypothesis-max-examples=1000``. Generate up to 1000 test cases per endpoint;
-- ``--hypothesis-phases=explicit``. Run only examples, specified explicitly in the API schema;
-- ``--hypothesis-suppress-health-check=too_slow``. Disables the ``too_slow`` health check and makes Schemathesis continue testing even if it is considered too slow.
-
-See the whole list of available options via the ``schemathesis run --help`` command and in the `Hypothesis documentation <https://hypothesis.readthedocs.io/en/latest/settings.html#available-settings>`_.
 
 API authorization
 -----------------

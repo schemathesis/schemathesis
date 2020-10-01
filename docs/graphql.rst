@@ -18,8 +18,7 @@ Usage
     @schema.parametrize()
     @settings(deadline=None)
     def test(case):
-        response = case.call()
-        case.validate_response(response)
+        case.call_and_validate()
 
 This test will load GraphQL schema from ``https://bahnql.herokuapp.com/graphql``, generate queries for it, send them to the server, and verify responses.
 
