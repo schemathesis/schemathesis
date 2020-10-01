@@ -265,6 +265,17 @@ class Case:
         if errors:
             raise AssertionError(*errors)
 
+    def call_and_validate(
+        self,
+        base_url: Optional[str] = None,
+        session: Optional[requests.Session] = None,
+        headers: Optional[Dict[str, Any]] = None,
+        checks: Tuple["CheckFunction", ...] = (),
+        **kwargs: Any,
+    ) -> None:
+        response = self.call(base_url, session, headers, **kwargs)
+        self.validate_response(response, checks)
+
     def get_full_url(self) -> str:
         """Make a full URL to the current endpoint, including query parameters."""
         base_url = self.base_url or "http://localhost"
