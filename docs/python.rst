@@ -17,8 +17,7 @@ The following test will load the API schema from ``http://0.0.0.0:8080/swagger.j
 
     @schema.parametrize()
     def test_api(case):
-        response = case.call()
-        case.validate_response(response)
+        case.call_and_validate()
 
 Each test set includes up to 100 test cases by default, depending on the endpoint definition.
 
@@ -64,8 +63,7 @@ For example, the following test selects all endpoints which paths start with ``/
 
     @schema.parametrize(endpoint="^/api/users")
     def test_api(case):
-        response = case.call()
-        case.validate_response(response)
+        case.call_and_validate()
 
 Tests configuration
 -------------------
@@ -117,8 +115,8 @@ When the received response is validated, Schemathesis runs the following checks:
 
 Validation happens in the ``case.validate_response`` function, but you can add your code to verify the response conformance as you do in regular Python tests.
 
-ASGI/WSGI applications support
-------------------------------
+ASGI / WSGI support
+-------------------
 
 Schemathesis supports making calls to ASGI and WSGI-compliant applications instead of real network calls;
 in this case, the test execution will go much faster.
@@ -161,8 +159,7 @@ You only need to specify strategies for ``hypothesis.given``:
 
         @given(case=new_pet_strategy)
         def test_pets(self, case):
-            response = case.call()
-            case.validate_response(response)
+            case.call_and_validate()
 
 Anatomy of a test
 -----------------
@@ -178,14 +175,13 @@ seamlessly combines your API schema with ``pytest``-style parametrization and pr
 
     @schema.parametrize()
     def test_api(case):
-        response = case.call()
-        case.validate_response(response)
+        case.call_and_validate()
 
 Such test consists of four main parts:
 
 1. Schema preparation; In this case, the schema is loaded via the ``from_uri`` function.
 2. Test parametrization; ``@schema.parametrize()`` generates separate tests for all endpoint/method combinations available in the schema.
-3. A network call to the running application; ``case.call`` does it.
+3. A network call to the running application; ``case.call_and_validate()`` does it.
 4. Verifying a property you'd like to test; In this example, we run all built-in checks.
 
 Each test function where you use ``schema.parametrize`` should have the ``case`` fixture, representing a single test case.
