@@ -12,6 +12,7 @@ def test_(request, case):
     response = case.call()
     assert response.status_code == 200
     case.validate_response(response)
+    case.call_and_validate()
 """,
     )
     result = testdir.runpytest("-v", "-s")
