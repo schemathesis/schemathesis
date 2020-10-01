@@ -88,14 +88,14 @@ Python tests:
 
     @schema.parametrize(stateful=Stateful.links)
     def test_api(case):
-        response = case.call()
+        case.call_and_validate()
         ...
 
 Each additional test will be indented and prefixed with ``->`` in the CLI output.
 You can specify recursive links if you want. The default recursion depth limit is **5** and can be changed with the
 ``--stateful-recursion-limit=<N>`` CLI option or with the ``stateful_recursion_limit=<N>`` argument to ``parametrize``.
 
-**NOTE**. If you use stateful testing in Python tests, make sure you use the ``case.call`` method that automatically stores the response for further usage.
+**NOTE**. If you use stateful testing in Python tests, make sure you use the ``case.call_and_validate`` or ``case.call`` methods that automatically store the response for further usage.
 Alternatively, you could use ``case.store_response`` and store the received response by hand:
 
 .. code:: python

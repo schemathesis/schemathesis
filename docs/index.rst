@@ -5,9 +5,9 @@ Schemathesis is a modern API testing tool for web applications built with Open A
 
 It reads the application schema and generates test cases, which will ensure that your application is compliant with its schema.
 
-Simple to use and yet powerful to uncover hard-to-find errors thanks to the property-based testing approach backed by state-of-the-art `Hypothesis <http://hypothesis.works/>`_ library.
-
 The application under test could be written in any language; the only thing you need is a valid API schema in a supported format.
+
+Simple to use and yet powerful to uncover hard-to-find errors thanks to the property-based testing approach backed by state-of-the-art `Hypothesis <http://hypothesis.works/>`_ library.
 
 You can use Schemathesis in the command line:
 
@@ -25,8 +25,7 @@ Or in your Python tests:
 
     @schema.parametrize()
     def test_api(case):
-        response = case.call()
-        case.validate_response(response)
+        case.call_and_validate()
 
 Features
 --------
