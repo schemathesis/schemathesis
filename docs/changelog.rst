@@ -1372,7 +1372,6 @@ Fixed
 
 .. _#748: https://github.com/schemathesis/schemathesis/issues/748
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
-.. _#748: https://github.com/schemathesis/schemathesis/issues/748
 .. _#721: https://github.com/schemathesis/schemathesis/issues/721
 .. _#719: https://github.com/schemathesis/schemathesis/issues/719
 .. _#718: https://github.com/schemathesis/schemathesis/issues/718
