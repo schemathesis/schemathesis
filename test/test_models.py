@@ -2,6 +2,7 @@ from test.utils import SIMPLE_PATH
 
 import pytest
 import requests
+from hypothesis import given, settings
 
 import schemathesis
 from schemathesis.models import Case, Endpoint, Request, Response
@@ -56,6 +57,18 @@ def test_call(override, base_url, swagger_20):
     with pytest.warns(None) as records:
         del response
     assert not records
+
+
+@pytest.mark.endpoints("success")
+def test_call_and_validate(openapi3_schema_url):
+    api_schema = schemathesis.from_uri(openapi3_schema_url)
+
+    @given(case=api_schema["/success"]["GET"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        case.call_and_validate()
+
+    test()
 
 
 def test_case_partial_deepcopy(swagger_20):
