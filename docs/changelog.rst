@@ -6,6 +6,12 @@ Changelog
 `Unreleased`_
 -------------
 
+=======
+Added
+~~~~~
+
+- Shortcut for calling & validation. `#738`_
+
 `2.5.1`_ - 2020-09-30
 ---------------------
 
