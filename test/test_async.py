@@ -59,6 +59,7 @@ def test_aiohttp_client(testdir):
         """
 from aiohttp import web
 import yaml
+from schemathesis.constants import USER_AGENT
 
 @pytest.fixture()
 def app():
@@ -82,7 +83,8 @@ def app():
 async def test_(request, aiohttp_client, app, case):
     request.config.HYPOTHESIS_CASES += 1
     client = await aiohttp_client(app)
-    response = await client.request(case.method, f"/v1{case.formatted_path}", headers=case.headers, json=case.body)
+    headers = case.headers or {"User-Agent": USER_AGENT}
+    response = await client.request(case.method, f"/v1{case.formatted_path}", headers=headers, json=case.body)
     assert response.status < 500
     assert len(app["saved_requests"]) == 1
     assert app["saved_requests"][0].method == "GET"

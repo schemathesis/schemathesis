@@ -5,6 +5,7 @@ import requests
 
 import schemathesis
 from schemathesis.models import Case, Endpoint, Request, Response
+from schemathesis.constants import USER_AGENT
 
 
 def test_path(swagger_20):
@@ -18,7 +19,7 @@ def test_path(swagger_20):
 def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
     base_url = converter(base_url)
     endpoint = Endpoint("/success", "GET", {}, swagger_20)
-    kwargs = {"endpoint": endpoint, "cookies": {"TOKEN": "secret"}}
+    kwargs = {"endpoint": endpoint, "cookies": {"TOKEN": "secret"}, "headers": {"User-Agent": USER_AGENT}}
     if override:
         case = Case(**kwargs)
         data = case.as_requests_kwargs(base_url)
@@ -27,7 +28,7 @@ def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
         endpoint.base_url = base_url
         data = case.as_requests_kwargs()
     assert data == {
-        "headers": None,
+        "headers": {"User-Agent": USER_AGENT},
         "json": None,
         "method": "GET",
         "params": None,
@@ -149,7 +150,8 @@ def test_(case):
 
 @pytest.mark.endpoints()
 def test_response_from_requests(base_url):
-    response = requests.get(f"{base_url}/cookies")
+    headers = {"User-Agent": USER_AGENT}
+    response = requests.get(f"{base_url}/cookies", headers=headers)
     serialized = Response.from_requests(response)
     assert serialized.status_code == 200
     assert serialized.http_version == "1.1"

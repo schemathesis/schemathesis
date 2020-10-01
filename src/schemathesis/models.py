@@ -19,6 +19,7 @@ from starlette.testclient import TestClient as ASGIClient
 from .exceptions import InvalidSchema
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse
+from .constants import USER_AGENT
 
 if TYPE_CHECKING:
     from .hooks import HookDispatcher
@@ -178,8 +179,12 @@ class Case:
             close_session = False
 
         data = self.as_requests_kwargs(base_url)
+        if "headers" not in data or data["headers"] is None:
+            data.update({"headers": {}})
         if headers is not None:
-            data["headers"] = {**(data["headers"] or {}), **headers}
+            data["headers"].update(headers)
+        if "User-Agent" not in data["headers"]:
+            data["headers"].update({"User-Agent": USER_AGENT})
         data.update(kwargs)
         response = session.request(**data)  # type: ignore
         if close_session:
@@ -216,7 +221,12 @@ class Case:
             **extra,
         }
 
-    def call_wsgi(self, app: Any = None, headers: Optional[Dict[str, str]] = None, **kwargs: Any) -> WSGIResponse:
+    def call_wsgi(
+        self,
+        app: Any = None,
+        headers: Optional[Dict[str, str]] = None,
+        **kwargs: Any
+    ) -> WSGIResponse:
         application = app or self.app
         if application is None:
             raise RuntimeError(
@@ -224,6 +234,12 @@ class Case:
                 "Please, set `app` argument in the schema constructor or pass it to `call_wsgi`"
             )
         data = self.as_werkzeug_kwargs(headers)
+        if "headers" not in data or data["headers"] is None:
+            data.update({"headers": {}})
+        if headers is not None:
+            data["headers"].update(headers)
+        if "User-Agent" not in data["headers"]:
+            data["headers"].update({"User-Agent": USER_AGENT})
         client = werkzeug.Client(application, WSGIResponse)
         with cookie_handler(client, self.cookies):
             response = client.open(**data, **kwargs)

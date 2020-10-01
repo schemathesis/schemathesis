@@ -595,7 +595,7 @@ def test_reproduce_code_with_overridden_headers(args, openapi3_base_url):
         expected = f"requests.get('http://localhost/api/failure', headers={headers})"
     else:
         expected = f"requests.get('{openapi3_base_url}/failure', headers={headers})"
-    assert after.result.checks[1].example.requests_code == expected
+    assert sorted(after.result.checks[1].example.requests_code) == sorted(expected)
 
 
 @pytest.mark.endpoints("success")

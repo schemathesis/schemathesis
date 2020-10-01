@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Fixed
+~~~~~
+
+- Set default User-Agent header in `Case.call`. `#717`_
+
 `2.5.0`_ - 2020-09-27
 ---------------------
 
