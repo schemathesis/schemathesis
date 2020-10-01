@@ -8,6 +8,7 @@ from _pytest.main import ExitCode
 from urllib3._collections import HTTPHeaderDict
 
 from schemathesis.cli.cassettes import filter_cassette, get_command_representation, get_prepared_request
+from schemathesis.constants import USER_AGENT
 from schemathesis.models import Request
 
 
@@ -153,7 +154,8 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
 
 
 def test_multiple_cookies(base_url):
-    response = requests.get(f"{base_url}/success", cookies={"foo": "bar", "baz": "spam"})
+    headers = {"User-Agent": USER_AGENT}
+    response = requests.get(f"{base_url}/success", cookies={"foo": "bar", "baz": "spam"}, headers=headers)
     request = Request.from_prepared_request(response.request)
     serialized = {
         "uri": request.uri,
@@ -161,6 +163,7 @@ def test_multiple_cookies(base_url):
         "headers": request.headers,
         "body": {"encoding": "utf-8", "base64_string": request.body},
     }
+    assert USER_AGENT in serialized["headers"]["User-Agent"]
     prepared = get_prepared_request(serialized)
     compare_headers(prepared, serialized["headers"])
 

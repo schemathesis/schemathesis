@@ -12,6 +12,11 @@ Added
 - Support PEP561 `#748`_
 - Shortcut for calling & validation. `#738`_
 
+Fixed
+~~~~~
+
+- Set default User-Agent header in ``Case.call``. `#717`_
+
 `2.5.1`_ - 2020-09-30
 ---------------------
 
@@ -1369,6 +1374,7 @@ Fixed
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#717: https://github.com/schemathesis/schemathesis/issues/717
 .. _#748: https://github.com/schemathesis/schemathesis/issues/748
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
 .. _#721: https://github.com/schemathesis/schemathesis/issues/721
