@@ -31,6 +31,6 @@ Limitations
 Current GraphQL support does **NOT** include the following:
 
 - CLI integration;
-- Custom scalar types support (it will produce an error);
+- Custom scalar types as required arguments (it will produce an error);
 - Mutations;
-- Filters for fields under test;
+- Filters;

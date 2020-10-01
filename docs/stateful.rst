@@ -3,8 +3,8 @@
 Stateful testing
 ================
 
-By default, Schemathesis generates random data for all endpoints in your schema. With Schemathesis's ``stateful testing``
-Schemathesis will try to reuse data from requests that were sent and responses received for generating requests to
+By default, Schemathesis generates random data for all endpoints in your schema. With stateful testing,
+Schemathesis will try to reuse data from requests sent and responses received for generating requests to
 other endpoints.
 
 Open API Links
@@ -58,11 +58,11 @@ Based on this definition, Schemathesis will:
 - Each response with 201 code will be parsed and used for additional tests of ``GET /users/{user_id}`` endpoint;
 - All data that is not filled from responses will be generated as usual;
 
-In this case, it is much more likely that instead of a 404 response for a randomly-generated ``user_id`` we'll receive
+In this case, it is much more likely that instead of a 404 response for a randomly-generated ``user_id``, we'll receive
 something else - for example, HTTP codes 200 or 500.
 
-By default, stateful testing is disabled. You can add it via the ``--stateful=links`` CLI option or with the ``stateful=Stateful.links`` argument to ``parametrize``. Please, note that more
-different algorithms for stateful testing might be implemented in the future.
+By default, stateful testing is disabled. You can add it via the ``--stateful=links`` CLI option or with the ``stateful=Stateful.links`` argument to ``parametrize``.
+Please, note that we plan to implement more different algorithms for stateful testing in the future.
 
 CLI:
 
@@ -94,7 +94,7 @@ Python tests:
         ...
 
 Each additional test will be indented and prefixed with ``->`` in the CLI output.
-You can specify recursive links if you want. The default recursion depth limit is ``5``, it can be changed with the
+You can specify recursive links if you want. The default recursion depth limit is **5** and can be changed with the
 ``--stateful-recursion-limit=<N>`` CLI option or with the ``stateful_recursion_limit=<N>`` argument to ``parametrize``.
 
 **NOTE**. If you use stateful testing in Python tests, make sure you use the ``case.call`` method that automatically stores the response for further usage.
@@ -116,12 +116,12 @@ The `runtime expressions <https://swagger.io/docs/specification/links/#runtime-e
 following restriction:
 
 - Symbol ``}`` can not be used as a part of a JSON pointer even though it is a valid symbol.
-  This is done due to ambiguity in the runtime expressions syntax, where ``}`` cannot be distinguished from the
-  closing bracket of an embedded runtime expression.
+  It is done due to ambiguity in the runtime expressions syntax, where ``}`` cannot be distinguished from an
+  embedded runtime expression's closing bracket.
 
 **IMPORTANT**. The Open API standard defines ``requestBody`` keyword value in this way:
 
     A literal value or {expression} to use as a request body when calling the target operation.
 
-This means you cannot use multiple runtime expressions for different parameters, and you always have to provide either a literal
+It means you cannot use multiple runtime expressions for different parameters, and you always have to provide either a literal
 or an expression.
