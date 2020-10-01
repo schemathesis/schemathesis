@@ -1,16 +1,17 @@
-.. customization:
-
-Customization
-=============
+Extending Schemathesis
+======================
 
 Often you need to modify certain aspects of Schemathesis behavior, adjust data generation, modify requests before
-sending, and so on. Schemathesis offers a hook mechanism which is similar to the pytest's one.
+sending, and so on. Schemathesis offers multiple extension mechanisms.
 
-Depending on the scope of the changes, there are three scopes of hooks:
+Hooks
+-----
+
+The hook mechanism is similar to the pytest's one. Depending on the scope of the changes, there are three scopes of hooks:
 
 - Global. These hooks applied to all schemas in the test run;
-- Schema. Applied only for specific schema instance;
-- Test. Applied only for a particular test function;
+- Schema. Used only for specific schema instance;
+- Test. Used only for a particular test function;
 
 To register a new hook function, you need to use special decorators - ``register`` for global and schema-local hooks and ``apply`` for test-specific ones:
 
@@ -37,15 +38,12 @@ To register a new hook function, you need to use special decorators - ``register
         ...
 
 By default, ``register`` functions will check the registered hook name to determine when to run it
-(see all hook specifications in the section below), but to avoid name collisions, you can provide a hook name as an argument to ``register``.
+(see all hook specifications in the section below). Still, to avoid name collisions, you can provide a hook name as an argument to ``register``.
 
 Also, these decorators will check the signature of your hook function to match the specification.
 Each hook should accept ``context`` as the first argument, that provides additional context for hook execution.
 
 Hooks registered on the same scope will be applied in the order of registration. When there are multiple hooks in the same hook location, then the global ones will be applied first.
-
-Common hooks
-------------
 
 These hooks can be applied both in CLI and in-code use cases.
 
@@ -71,7 +69,7 @@ They have the same signature that looks like this:
     ) -> hypothesis.strategies.SearchStrategy:
         pass
 
-``strategy`` is a Hypothesis strategy that will generate a certain request part. For example, your endpoint under test
+The ``strategy`` argument is a Hypothesis strategy that will generate a certain request part. For example, your endpoint under test
 expects ``id`` query parameter that is a number, and you'd like to have only values that have at least three occurrences of "1".
 Then your hook might look like this:
 
@@ -129,7 +127,6 @@ Called just before schema instance is created. Takes a raw schema representation
 
 This hook allows you to modify schema before loading.
 
-
 ``before_add_examples``
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -145,16 +142,12 @@ With this hook, you can add additional test cases that will be executed in Hypot
             Case(endpoint=context.endpoint, query={"foo": "bar"})
         )
 
-CLI hooks
----------
-
-To load CLI hooks, you need to put them into a separate module and pass an importable path to it in ``--pre-run`` CLI option.
+To load CLI hooks, you need to put them into a separate module and pass an importable path in the ``--pre-run`` CLI option.
 For example, you have your hooks definition in ``myproject/hooks.py``, and ``myproject`` is importable:
 
 .. code:: bash
 
     schemathesis --pre-run myproject.hooks run http://127.0.0.1/openapi.yaml
-
 
 ``after_init_cli_run_handlers``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -218,3 +211,54 @@ an additional test case if the original case received a successful response from
 
 Note: A partial deep copy of the ``Case`` object is passed to each ``add_case`` hook. ``Case.endpoint.app`` is a reference to the original ``app``, 
 and ``Case.endpoint.schema`` is a shallow copy, so changes to these fields will be reflected in other tests.
+
+Custom string strategies
+------------------------
+
+Open API allows you to set a custom string format for a property via the ``format`` keyword.
+For example, you may use the ``card_number`` format and validate input with the Luhn algorithm.
+
+You can teach Schemathesis to generate values that fit this format by registering a custom Hypothesis strategy:
+
+1. Create a Hypothesis strategy that generates valid string values
+2. Register it via ``schemathesis.register_string_format``
+
+.. code-block:: python
+
+    strategy = strategies.from_regex(
+        r"\A4[0-9]{15}\Z"
+    ).filter(luhn_validator)
+    schemathesis.register_string_format("visa_cards", strategy)
+
+Schemathesis test runner
+------------------------
+
+If you're looking for a way to extend Schemathesis or reuse it in your own application, then the ``runner`` module might help you.
+It can run tests against the given schema URI and will do some simple checks for you.
+
+.. code:: python
+
+    from schemathesis import runner
+
+    events = runner.prepare("http://127.0.0.1:8080/swagger.json")
+    for event in events:
+        # do something with event
+
+``runner.prepare`` creates a generator that yields events of different kinds - ``BeforeExecution``, ``AfterExecution``, etc.
+They provide a lot of useful information about what happens during tests, but your responsibility is handling these events.
+You can take some inspiration from Schemathesis `CLI implementation <https://github.com/schemathesis/schemathesis/blob/master/src/schemathesis/cli/__init__.py#L230>`_.
+See the full description of events in the `source code <https://github.com/schemathesis/schemathesis/blob/master/src/schemathesis/runner/events.py>`_.
+
+You can provide your custom checks to the execute function; the check is a callable that accepts one argument of ``requests.Response`` type.
+
+.. code:: python
+
+    from datetime import timedelta
+    from schemathesis import runner, models
+
+    def not_too_long(response, case: models.Case):
+        assert response.elapsed < timedelta(milliseconds=300)
+
+    events = runner.prepare("http://127.0.0.1:8080/swagger.json", checks=[not_too_long])
+    for event in events:
+        # do something with event
