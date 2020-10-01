@@ -6,6 +6,11 @@ Changelog
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+- Shortcut for calling & validation. `#738`_
+
 `2.5.1`_ - 2020-09-30
 ---------------------
 
@@ -1363,6 +1368,7 @@ Fixed
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#738: https://github.com/schemathesis/schemathesis/issues/738
 .. _#721: https://github.com/schemathesis/schemathesis/issues/721
 .. _#719: https://github.com/schemathesis/schemathesis/issues/719
 .. _#718: https://github.com/schemathesis/schemathesis/issues/718
