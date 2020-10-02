@@ -18,7 +18,7 @@ and:
 * Write a simple and descriptive title to identify your suggestion.
 * Provide as many details as possible, explain your context, and how the feature should work.
 * Explain why this improvement would be useful.
-* Keep the scope narrow. It will make it easier to implement.
+* Keep the scope narrow. This will make it easier to implement.
 
 Report bugs
 -----------
@@ -161,8 +161,24 @@ Then you could use CLI against this server:
 
     ================================================== 3 passed in 1.77s ==================================================
 
-Maintainers
------------
+Submitting Pull Requests
+------------------------
+
+#. Fork the repository.
+#. Enable and install `pre-commit <https://pre-commit.com>`_ to ensure style-guides and code checks are followed.
+#. Target the ``master`` branch.
+#. Follow **PEP-8** for naming and `black <https://github.com/psf/black>`_ for formatting.
+#. Tests are run using ``tox``::
+
+    tox -e pylint,mypy,py37
+
+   The test environments above are usually enough to cover most cases locally.
+
+#. Write an entry to `changelog.rst <https://github.com/schemathesis/schemathesis/blob/master/docs/changelog.rst>`_
+#. Format your commit message according to the Conventional Commits `specification <https://www.conventionalcommits.org/en/>`_
+
+For each pull request, we aim to review it as soon as possible.
+If you wait a few days without a reply, please feel free to ping the thread by adding a new comment.
 
 At present, the core developers are:
 
