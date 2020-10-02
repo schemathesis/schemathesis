@@ -151,16 +151,29 @@ def test_schema_given(testdir):
         """
 from hypothesis.strategies._internal.core import DataObject
 
+ENDPOINTS = []
+
 @schema.parametrize()
 @schema.given(data=st.data())
 def test(data, case):
     assert isinstance(data, DataObject)
+    ENDPOINTS.append(f"{case.method} {case.path}")
+
+
+def test_endpoints():
+    assert ENDPOINTS == ['GET /users', 'POST /users']
     """,
+        paths={
+            "/users": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"200": {"description": "OK"}}},
+            }
+        },
     )
     # Then its arguments should be proxied to the `hypothesis.given`
     # And be available in the test
     result = testdir.runpytest()
-    result.assert_outcomes(passed=1)
+    result.assert_outcomes(passed=3)
 
 
 def test_invalid_test(testdir):
