@@ -179,9 +179,10 @@ class Case:
             close_session = False
         data = self.as_requests_kwargs(base_url)
         data["headers"] = data["headers"] or {}
+        data["headers"] = data["headers"].copy()
         if headers is not None:
             data["headers"].update(headers)
-        if "User-Agent" not in data["headers"]:
+        if "user-agent" not in set(k.lower() for k in data["headers"]):
             data["headers"]["User-Agent"] = USER_AGENT
         data.update(kwargs)
         response = session.request(**data)  # type: ignore
@@ -227,10 +228,7 @@ class Case:
                 "Please, set `app` argument in the schema constructor or pass it to `call_wsgi`"
             )
         data = self.as_werkzeug_kwargs(headers)
-        data["headers"] = data["headers"] or {}
-        if headers is not None:
-            data["headers"].update(headers)
-        if "User-Agent" not in data["headers"]:
+        if "user-agent" not in set(k.lower() for k in data["headers"]):
             data["headers"]["User-Agent"] = USER_AGENT
         client = werkzeug.Client(application, WSGIResponse)
         with cookie_handler(client, self.cookies):
