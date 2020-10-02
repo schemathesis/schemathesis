@@ -1,13 +1,11 @@
-.. _compatibility:
-
 Compatibility
 =============
 
 By default, Schemathesis is strict on Open API spec interpretation, but other 3rd-party tools often are more flexible
 and not always comply with the spec.
 
-FastAPI
--------
+Using FastAPI
+-------------
 
 `FastAPI <https://github.com/tiangolo/fastapi>`_ uses `pydantic <https://github.com/samuelcolvin/pydantic>`_ for JSON Schema
 generation, and it produces Draft 7 compatible schemas. But Open API 2 / 3.0.x use earlier versions of JSON Schema (Draft 4 and Wright Draft 00 respectively), which leads
