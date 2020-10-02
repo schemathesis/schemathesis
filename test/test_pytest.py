@@ -143,3 +143,21 @@ def test_d():
     result = testdir.runpytest()
     # # Then it should use the global Schemathesis deadline for Hypothesis (DEFAULT_DEADLINE value)
     result.assert_outcomes(passed=4)
+
+
+def test_schema_given(testdir):
+    # When the test uses `schema.given`
+    testdir.make_test(
+        f"""
+from hypothesis.strategies._internal.core import DataObject
+
+@schema.parametrize()
+@schema.given(data=st.data())
+def test(data, case):
+    assert isinstance(data, DataObject)
+    """,
+    )
+    # Then its arguments should be proxied to the `hypothesis.given`
+    # And be available in the test
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
