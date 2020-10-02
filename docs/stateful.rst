@@ -1,5 +1,3 @@
-.. _stateful:
-
 Stateful testing
 ================
 
