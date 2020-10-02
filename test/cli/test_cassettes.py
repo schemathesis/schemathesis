@@ -37,6 +37,11 @@ def test_store_cassette(cli, schema_url, cassette_path):
     assert float(cassette["http_interactions"][0]["elapsed"]) >= 0
     data = base64.b64decode(cassette["http_interactions"][0]["response"]["body"]["base64_string"])
     assert data == b'{"success": true}'
+    assert all("checks" in interaction for interaction in cassette["http_interactions"])
+    assert len(cassette["http_interactions"][0]["checks"]) == 1
+    assert cassette["http_interactions"][0]["checks"][0]["name"] == "not_a_server_error"
+    assert cassette["http_interactions"][0]["checks"][0]["status"] == "SUCCESS"
+    assert cassette["http_interactions"][0]["checks"][0]["message"] is None
 
 
 def test_encoding_error(testdir, cli, cassette_path, openapi3_base_url):

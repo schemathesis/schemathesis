@@ -14,6 +14,7 @@ from requests.structures import CaseInsensitiveDict
 from .. import constants
 from ..models import Interaction
 from ..runner import events
+from ..runner.serialization import SerializedCheck
 from .context import ExecutionContext
 from .handlers import EventHandler
 
@@ -45,7 +46,14 @@ class CassetteWriter(EventHandler):
             # Seed is always present at this point, the original Optional[int] type is there because `TestResult`
             # instance is created before `seed` is generated on the hypothesis side
             seed = cast(int, event.result.seed)
-            self.queue.put(Process(status=event.status.name.upper(), seed=seed, interactions=event.result.interactions))
+            self.queue.put(
+                Process(
+                    status=event.status.name.upper(),
+                    seed=seed,
+                    interactions=event.result.interactions,
+                    checks=event.result.checks,
+                )
+            )
         if isinstance(event, events.Finished):
             self.shutdown()
 
@@ -69,6 +77,7 @@ class Process:
     status: str = attr.ib()  # pragma: no mutate
     seed: int = attr.ib()  # pragma: no mutate
     interactions: List[Interaction] = attr.ib()  # pragma: no mutate
+    checks: List[SerializedCheck] = attr.ib()  # pragma: no mutate
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -104,6 +113,15 @@ def worker(file_handle: click.utils.LazyFile, queue: Queue) -> None:
     def format_headers(headers: Dict[str, List[str]]) -> str:
         return "\n".join(f"      {name}:\n{format_header_values(values)}" for name, values in headers.items())
 
+    def format_check_message(message: Optional[str]) -> str:
+        return "~" if message is None else f"'{message}'"
+
+    def format_checks(checks: List[SerializedCheck]) -> str:
+        return "\n".join(
+            f"    - name: '{check.name}'\n      status: '{check.value.name.upper()}'\n      message: {format_check_message(check.message)}"
+            for check in checks
+        )
+
     while True:
         item = queue.get()
         if isinstance(item, Initialize):
@@ -120,6 +138,8 @@ http_interactions:"""
   seed: '{item.seed}'
   elapsed: '{interaction.response.elapsed}'
   recorded_at: '{interaction.recorded_at}'
+  checks:
+{format_checks(item.checks)}
   request:
     uri: '{interaction.request.uri}'
     method: '{interaction.request.method}'

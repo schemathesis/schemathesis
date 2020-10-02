@@ -233,6 +233,10 @@ It might look like this:
       seed: '1'
       elapsed: '0.00123'
       recorded_at: '2020-04-22T17:52:51.275318'
+      checks:
+        - name: 'not_a_server_error'
+          status: 'FAILURE'
+          message: 'Received a response with 5xx status code: 500'
       request:
         uri: 'http://127.0.0.1/api/failure'
         method: 'GET'
@@ -259,6 +263,7 @@ Schemathesis provides the following extra fields:
 - ``http_interactions.status``. Type of test outcome is one of ``SUCCESS``, ``FAILURE``, ``ERROR``.
 - ``http_interactions.seed``. The Hypothesis seed used in that particular case could be used as an argument to ``--hypothesis-seed`` CLI option to reproduce this request.
 - ``http_interactions.elapsed``. Time in seconds that a request took.
+- ``http_interactions.checks``. A list of executed checks and and their status.
 
 To work with the cassette, you could use `yq <https://github.com/mikefarah/yq>`_ or any similar tool.
 Show response body content of first failed interaction:
