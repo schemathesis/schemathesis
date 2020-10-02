@@ -1,4 +1,3 @@
-# pylint: disable=import-outside-toplevel
 import string
 from contextlib import ExitStack, contextmanager
 from itertools import product
@@ -16,6 +15,8 @@ if TYPE_CHECKING:
 
 
 def status_code_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
+    if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
+        raise TypeError("This check can be used only with Open API schemas")
     responses = case.endpoint.definition.raw.get("responses", {})
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
     if "default" in responses:
