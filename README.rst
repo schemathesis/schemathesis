@@ -94,7 +94,7 @@ Links
 Additional content:
 
 - `An article <https://dygalo.dev/blog/schemathesis-property-based-testing-for-api-schemas/>`_ about Schemathesis by **@Stranger6667**
-- `A video <https://youtu.be/1lo7idI7uq8>`_ from FlaskCon 2020 by **@hultner**
+- `A video <https://www.youtube.com/watch?v=9FHRwrv-xuQ>`_ from EuroPython 2020 by **@hultner**
 
 License
 -------
