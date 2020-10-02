@@ -59,7 +59,7 @@ class GraphQLSchema(BaseSchema):
         return self._get_base_path()
 
     def _get_base_path(self) -> str:
-        return cast(str, urlsplit(self.location).path)
+        return cast(str, urlsplit(self.location or "").path)
 
     def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
         yield Endpoint(

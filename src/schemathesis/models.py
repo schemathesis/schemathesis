@@ -79,7 +79,7 @@ class Case:
 
     def get_full_base_url(self) -> Optional[str]:
         """Create a full base url, adding "localhost" for WSGI apps."""
-        parts = urlsplit(self.base_url)
+        parts = urlsplit(self.base_url or "")
         if not parts.hostname:
             path = cast(str, parts.path or "")
             return urlunsplit(("http", "localhost", path or "", "", ""))
@@ -178,8 +178,7 @@ class Case:
         else:
             close_session = False
         data = self.as_requests_kwargs(base_url)
-        if data["headers"] is None:
-            data["headers"] = {}
+        data["headers"] = data["headers"] or {}
         if headers is not None:
             data["headers"].update(headers)
         if "User-Agent" not in data["headers"]:
@@ -228,8 +227,7 @@ class Case:
                 "Please, set `app` argument in the schema constructor or pass it to `call_wsgi`"
             )
         data = self.as_werkzeug_kwargs(headers)
-        if data["headers"] is None:
-            data["headers"] = {}
+        data["headers"] = data["headers"] or {}
         if headers is not None:
             data["headers"].update(headers)
         if "User-Agent" not in data["headers"]:
