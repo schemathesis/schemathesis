@@ -10,6 +10,7 @@ import schemathesis.cli.context
 from schemathesis import models, runner, utils
 from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
+from schemathesis.constants import USER_AGENT
 from schemathesis.runner.events import Finished, InternalError
 from schemathesis.runner.serialization import SerializedTestResult
 
@@ -273,7 +274,7 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set):
     assert " GET: /v1/api/failure " in out
     assert "Message" in out
     assert "Run this Python code to reproduce this failure: " in out
-    assert "requests.get('http://127.0.0.1:8080/api/failure')" in out
+    assert f"requests.get('http://127.0.0.1:8080/api/failure', headers={{'User-Agent': '{USER_AGENT}'}})" in out
 
 
 @pytest.mark.parametrize("verbosity", (0, 1))

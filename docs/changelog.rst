@@ -16,6 +16,11 @@ Changelog
 
 - Default ``User-Agent`` header in ``Case.call``. `#717`_
 
+**Changed**
+
+- ``Case.as_requests_kwargs`` and ``Case.as_werkzeug_kwargs`` now return the ``User-Agent`` header.
+  This change also affects code snippets for failure reproduction - all snippets will include the ``User-Agent`` header.
+
 `2.5.1`_ - 2020-09-30
 ---------------------
 

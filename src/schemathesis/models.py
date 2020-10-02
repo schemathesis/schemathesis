@@ -141,8 +141,19 @@ class Case:
                 )
         return base_url
 
-    def as_requests_kwargs(self, base_url: Optional[str] = None) -> Dict[str, Any]:
+    def _get_headers(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        final_headers = self.headers.copy() if self.headers is not None else {}
+        if headers:
+            final_headers.update(headers)
+        if "User-Agent" not in final_headers:
+            final_headers["User-Agent"] = USER_AGENT
+        return final_headers
+
+    def as_requests_kwargs(
+        self, base_url: Optional[str] = None, headers: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by requests."""
+        final_headers = self._get_headers(headers)
         base_url = self._get_base_url(base_url)
         formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
         url = urljoin(base_url + "/", formatted_path)
@@ -159,7 +170,7 @@ class Case:
             "method": self.method,
             "url": url,
             "cookies": self.cookies,
-            "headers": self.headers,
+            "headers": final_headers,
             "params": self.query,
             **extra,
         }
@@ -177,13 +188,7 @@ class Case:
             close_session = True
         else:
             close_session = False
-        data = self.as_requests_kwargs(base_url)
-        data["headers"] = data["headers"] or {}
-        data["headers"] = data["headers"].copy()
-        if headers is not None:
-            data["headers"].update(headers)
-        if "User-Agent" not in data["headers"]:
-            data["headers"]["User-Agent"] = USER_AGENT
+        data = self.as_requests_kwargs(base_url, headers)
         data.update(kwargs)
         response = session.request(**data)  # type: ignore
         if close_session:
@@ -199,9 +204,7 @@ class Case:
 
     def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
-        final_headers = self.headers.copy() if self.headers is not None else {}
-        if headers:
-            final_headers.update(headers)
+        final_headers = self._get_headers(headers)
         extra: Dict[str, Optional[Body]]
         if self.form_data:
             extra = {"data": self.form_data}
@@ -228,8 +231,6 @@ class Case:
                 "Please, set `app` argument in the schema constructor or pass it to `call_wsgi`"
             )
         data = self.as_werkzeug_kwargs(headers)
-        if "User-Agent" not in data["headers"]:
-            data["headers"]["User-Agent"] = USER_AGENT
         client = werkzeug.Client(application, WSGIResponse)
         with cookie_handler(client, self.cookies):
             response = client.open(**data, **kwargs)
