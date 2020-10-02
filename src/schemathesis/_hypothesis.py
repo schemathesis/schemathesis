@@ -33,7 +33,7 @@ def create_test(
     else:
         feedback = None
     strategy = endpoint.as_strategy(hooks=hook_dispatcher, feedback=feedback)
-    _given_kwargs = _given_kwargs or {}
+    _given_kwargs = (_given_kwargs or {}).copy()
     _given_kwargs.setdefault("case", strategy)
     wrapped_test = hypothesis.given(*_given_args, **_given_kwargs)(test)
     if seed is not None:
