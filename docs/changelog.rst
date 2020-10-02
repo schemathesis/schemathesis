@@ -16,6 +16,7 @@ Changelog
 
 - Fixes ``User-Agent`` header overriding the passed one. `#757`_
 - Default ``User-Agent`` header in ``Case.call``. `#717`_
+- Fixes ``User-Agent`` header overriding the passed one. `#757`_
 
 **Changed**
 
