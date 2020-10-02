@@ -374,7 +374,7 @@ def testdir(testdir):
         import schemathesis
         from schemathesis import Stateful
         from test.utils import *
-        from hypothesis import given, settings, HealthCheck, Phase
+        from hypothesis import given, settings, HealthCheck, Phase, strategies as st
         raw_schema = {schema}
         schema = schemathesis.from_dict(raw_schema, method={method}, endpoint={endpoint}, tag={tag}, validate_schema={validate_schema})
         """.format(

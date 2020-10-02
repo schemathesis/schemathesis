@@ -14,6 +14,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 import attr
 import hypothesis
 from hypothesis.strategies import SearchStrategy
+from hypothesis.utils.conventions import InferType
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
@@ -147,6 +148,16 @@ class BaseSchema(Mapping):
                 stateful=stateful,
                 stateful_recursion_limit=stateful_recursion_limit,
             )
+            return func
+
+        return wrapper
+
+    def given(self, *args: Union[SearchStrategy, InferType], **kwargs: Union[SearchStrategy, InferType]) -> Callable:
+        """Proxy Hypothesis strategies to ``hypothesis.given``."""
+
+        def wrapper(func: GenericTest) -> GenericTest:
+            func._schemathesis_given_args = args  # type: ignore
+            func._schemathesis_given_kwargs = kwargs  # type: ignore
             return func
 
         return wrapper
