@@ -2,6 +2,7 @@ import pytest
 from hypothesis import given, settings
 
 import schemathesis
+from schemathesis.constants import USER_AGENT
 
 
 @pytest.fixture()
@@ -62,7 +63,11 @@ def test_query_strategy(graphql_strategy):
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_get_code_to_reproduce(graphql_endpoint, graphql_strategy):
     case = graphql_strategy.example()
-    assert case.get_code_to_reproduce() == f"requests.post('{graphql_endpoint}', json={{'query': {repr(case.body)}}})"
+    assert (
+        case.get_code_to_reproduce() == f"requests.post('{graphql_endpoint}', "
+        f"json={{'query': {repr(case.body)}}}, "
+        f"headers={{'User-Agent': '{USER_AGENT}'}})"
+    )
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
@@ -73,5 +78,5 @@ def test_as_werkzeug_kwargs(graphql_strategy):
         "path": "/graphql",
         "query_string": None,
         "json": {"query": case.body},
-        "headers": {},
+        "headers": {"User-Agent": USER_AGENT},
     }
