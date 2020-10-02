@@ -5,6 +5,7 @@ import requests
 from hypothesis import given, settings
 
 import schemathesis
+from schemathesis.constants import USER_AGENT
 from schemathesis.models import Case, Endpoint, Request, Response
 
 
@@ -17,9 +18,10 @@ def test_path(swagger_20):
 @pytest.mark.parametrize("override", (False, True))
 @pytest.mark.parametrize("converter", (lambda x: x, lambda x: x + "/"))
 def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
+    headers = {"User-Agent": USER_AGENT}
     base_url = converter(base_url)
     endpoint = Endpoint("/success", "GET", {}, swagger_20)
-    kwargs = {"endpoint": endpoint, "cookies": {"TOKEN": "secret"}}
+    kwargs = {"endpoint": endpoint, "cookies": {"TOKEN": "secret"}, "headers": headers}
     if override:
         case = Case(**kwargs)
         data = case.as_requests_kwargs(base_url)
@@ -28,7 +30,7 @@ def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
         endpoint.base_url = base_url
         data = case.as_requests_kwargs()
     assert data == {
-        "headers": None,
+        "headers": headers,
         "json": None,
         "method": "GET",
         "params": None,

@@ -16,6 +16,7 @@ import werkzeug
 from hypothesis.strategies import SearchStrategy
 from starlette.testclient import TestClient as ASGIClient
 
+from .constants import USER_AGENT
 from .exceptions import InvalidSchema
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse
@@ -78,7 +79,7 @@ class Case:
 
     def get_full_base_url(self) -> Optional[str]:
         """Create a full base url, adding "localhost" for WSGI apps."""
-        parts = urlsplit(self.base_url)
+        parts = urlsplit(self.base_url or "")
         if not parts.hostname:
             path = cast(str, parts.path or "")
             return urlunsplit(("http", "localhost", path or "", "", ""))
@@ -176,10 +177,12 @@ class Case:
             close_session = True
         else:
             close_session = False
-
         data = self.as_requests_kwargs(base_url)
+        data["headers"] = data["headers"] or {}
         if headers is not None:
-            data["headers"] = {**(data["headers"] or {}), **headers}
+            data["headers"].update(headers)
+        if "User-Agent" not in data["headers"]:
+            data["headers"]["User-Agent"] = USER_AGENT
         data.update(kwargs)
         response = session.request(**data)  # type: ignore
         if close_session:
@@ -224,6 +227,11 @@ class Case:
                 "Please, set `app` argument in the schema constructor or pass it to `call_wsgi`"
             )
         data = self.as_werkzeug_kwargs(headers)
+        data["headers"] = data["headers"] or {}
+        if headers is not None:
+            data["headers"].update(headers)
+        if "User-Agent" not in data["headers"]:
+            data["headers"]["User-Agent"] = USER_AGENT
         client = werkzeug.Client(application, WSGIResponse)
         with cookie_handler(client, self.cookies):
             response = client.open(**data, **kwargs)
