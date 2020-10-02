@@ -18,14 +18,15 @@ from ...utils import GenericResponse
 
 @attr.s()  # pragma: no mutate
 class GraphQLCase(Case):
-    def as_requests_kwargs(self, base_url: Optional[str] = None) -> Dict[str, Any]:
+    def as_requests_kwargs(
+        self, base_url: Optional[str] = None, headers: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        final_headers = self._get_headers(headers)
         base_url = self._get_base_url(base_url)
-        return {"method": self.method, "url": base_url, "json": {"query": self.body}, "headers": self.headers}
+        return {"method": self.method, "url": base_url, "json": {"query": self.body}, "headers": final_headers}
 
     def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-        final_headers = self.headers.copy() if self.headers is not None else {}
-        if headers:
-            final_headers.update(headers)
+        final_headers = self._get_headers(headers)
         return {
             "method": self.method,
             "path": self.endpoint.schema.get_full_path(self.formatted_path),
