@@ -6,6 +6,7 @@ Changelog
 
 **Added**
 
+- Support for passing Hypothesis strategies to tests created with ``schema.parametrize`` by using ``schema.given`` decorator. `#768`_
 - Support PEP561 `#748`_
 - Shortcut for calling & validation. `#738`_
 - New hook to pre-commit, rstcheck, as well as updates to documentation based on rstcheck `#734`_
@@ -1363,6 +1364,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#768: https://github.com/schemathesis/schemathesis/issues/768
 .. _#748: https://github.com/schemathesis/schemathesis/issues/748
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
 .. _#734: https://github.com/schemathesis/schemathesis/issues/734
