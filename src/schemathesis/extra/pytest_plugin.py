@@ -31,6 +31,8 @@ class SchemathesisCase(PyCollector):
     def __init__(self, test_function: Callable, *args: Any, **kwargs: Any) -> None:
         self.test_function = test_function
         self.schemathesis_case = test_function._schemathesis_test  # type: ignore
+        self.given_args = getattr(test_function, "_schemathesis_given_args", ())
+        self.given_kwargs = getattr(test_function, "_schemathesis_given_kwargs", {})
         super().__init__(*args, **kwargs)
 
     def _get_test_name(self, endpoint: Endpoint) -> str:
@@ -102,7 +104,9 @@ class SchemathesisCase(PyCollector):
 
     def _make_test(self, endpoint: Endpoint) -> Callable:
         try:
-            return create_test(endpoint, self.test_function)
+            return create_test(
+                endpoint=endpoint, test=self.test_function, _given_args=self.given_args, _given_kwargs=self.given_kwargs
+            )
         except InvalidSchema as exc:
             message = exc.args[0]
             return lambda: pytest.fail(message)

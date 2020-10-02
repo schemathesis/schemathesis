@@ -1,9 +1,11 @@
 """Provide strategies for given endpoint(s) definition."""
 import asyncio
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import hypothesis
 from hypothesis import strategies as st
+from hypothesis.strategies import SearchStrategy
+from hypothesis.utils.conventions import InferType
 
 from .constants import DEFAULT_DEADLINE
 from .exceptions import InvalidSchema
@@ -11,9 +13,17 @@ from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import Case, Endpoint
 from .stateful import Feedback, Stateful
 
+GivenInput = Union[SearchStrategy, InferType]
+
 
 def create_test(
-    endpoint: Endpoint, test: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
+    *,
+    endpoint: Endpoint,
+    test: Callable,
+    settings: Optional[hypothesis.settings] = None,
+    seed: Optional[int] = None,
+    _given_args: Tuple[GivenInput, ...] = (),
+    _given_kwargs: Optional[Dict[str, GivenInput]] = None,
 ) -> Callable:
     """Create a Hypothesis test."""
     hook_dispatcher = getattr(test, "_schemathesis_hooks", None)
@@ -23,7 +33,9 @@ def create_test(
     else:
         feedback = None
     strategy = endpoint.as_strategy(hooks=hook_dispatcher, feedback=feedback)
-    wrapped_test = hypothesis.given(case=strategy)(test)
+    _given_kwargs = _given_kwargs or {}
+    _given_kwargs.setdefault("case", strategy)
+    wrapped_test = hypothesis.given(*_given_args, **_given_kwargs)(test)
     if seed is not None:
         wrapped_test = hypothesis.seed(seed)(wrapped_test)
     if asyncio.iscoroutinefunction(test):
@@ -48,7 +60,7 @@ def make_test_or_exception(
     endpoint: Endpoint, func: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
 ) -> Union[Callable, InvalidSchema]:
     try:
-        return create_test(endpoint, func, settings, seed=seed)
+        return create_test(endpoint=endpoint, test=func, settings=settings, seed=seed)
     except InvalidSchema as exc:
         return exc
 
