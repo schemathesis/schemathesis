@@ -135,6 +135,10 @@ def test_commands_version(cli):
             "Error: Invalid value for '--header' / '-H': Header value should be latin-1 encodable",
         ),
         (("run", "//test"), "Error: Invalid SCHEMA, must be a valid URL or file path."),
+        (
+            ("run", "http://127.0.0.1", "--max-response-time=0"),
+            "Error: Invalid value for '--max-response-time': 0 is smaller than the minimum valid value 1.",
+        ),
     ),
 )
 def test_commands_run_errors(cli, args, error):
@@ -162,6 +166,11 @@ def test_commands_run_help(cli):
         "  -c, --checks [not_a_server_error|status_code_conformance|"
         "content_type_conformance|response_schema_conformance|all]",
         "                                  List of checks to run.",
+        "  --max-response-time INTEGER RANGE",
+        "                                  A custom check that will fail if the response",
+        "                                  time is greater than the specified one in",
+        "                                  milliseconds.",
+        "",
         "  -t, --target [response_time|all]",
         "                                  Targets for input generation.",
         "  -x, --exitfirst                 Exit instantly on first error or failed test.",
@@ -264,6 +273,7 @@ SCHEMA_URI = "https://example.com/swagger.json"
             },
         ),
         (["--hypothesis-deadline=None"], {"hypothesis_options": {"deadline": None}}),
+        (["--max-response-time=10"], {"max_response_time": 10}),
     ),
 )
 def test_execute_arguments(cli, mocker, simple_schema, args, expected):
@@ -299,6 +309,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "request_timeout": None,
         "store_interactions": False,
         "seed": None,
+        "max_response_time": None,
         **expected,
     }
 
@@ -1464,3 +1475,21 @@ def test_get_request_with_body(testdir, cli, base_url, schema_with_get_payload):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
     assert "schemathesis.exceptions.InvalidSchema: Body parameters are defined for GET request." in lines
+
+
+@pytest.mark.endpoints("slow")
+@pytest.mark.parametrize("workers", (1, 2))
+def test_max_response_time(cli, server, schema_url, workers):
+    # When maximum response time check is specified in the CLI and the request takes more time
+    result = cli.run(schema_url, "--max-response-time=50", f"--workers={workers}")
+    # Then the whole Schemathesis run should fail
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # And the given endpoint should be displayed as a failure
+    lines = result.stdout.split("\n")
+    if workers == 1:
+        assert lines[10].startswith("GET /api/slow F")
+    else:
+        assert lines[10].startswith("F")
+    # And the proper error message should be displayed
+    assert "max_response_time                     0 / 2 passed          FAILED" in result.stdout
+    assert "Check 'max_response_time' failed" in result.stdout
