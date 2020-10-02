@@ -5,6 +5,7 @@ import requests
 from hypothesis import given, settings
 
 import schemathesis
+from schemathesis.constants import USER_AGENT
 from schemathesis.models import Case, Endpoint, Request, Response
 
 
@@ -28,13 +29,41 @@ def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
         endpoint.base_url = base_url
         data = case.as_requests_kwargs()
     assert data == {
-        "headers": None,
+        "headers": {"User-Agent": USER_AGENT},
         "json": None,
         "method": "GET",
         "params": None,
         "cookies": {"TOKEN": "secret"},
         "url": f"http://127.0.0.1:{server['port']}/api/success",
     }
+    response = requests.request(**data)
+    assert response.status_code == 200
+    assert response.json() == {"success": True}
+
+
+@pytest.mark.parametrize(
+    "headers, expected",
+    (
+        (None, {"User-Agent": USER_AGENT, "X-Key": "foo"}),
+        ({"User-Agent": "foo/1.0"}, {"User-Agent": "foo/1.0", "X-Key": "foo"}),
+        ({"X-Value": "bar"}, {"X-Value": "bar", "User-Agent": USER_AGENT, "X-Key": "foo"}),
+    ),
+)
+def test_as_requests_kwargs_override_user_agent(server, openapi2_base_url, swagger_20, headers, expected):
+    endpoint = Endpoint("/success", "GET", {}, swagger_20, base_url=openapi2_base_url)
+    original_headers = headers.copy() if headers is not None else headers
+    kwargs = {"endpoint": endpoint, "headers": headers}
+    case = Case(**kwargs)
+    data = case.as_requests_kwargs(headers={"X-Key": "foo"})
+    assert data == {
+        "headers": expected,
+        "json": None,
+        "method": "GET",
+        "params": None,
+        "cookies": None,
+        "url": f"http://127.0.0.1:{server['port']}/api/success",
+    }
+    assert case.headers == original_headers
     response = requests.request(**data)
     assert response.status_code == 200
     assert response.json() == {"success": True}
@@ -109,14 +138,37 @@ ENDPOINT = Endpoint("/api/success", "GET", {}, base_url="http://example.com", sc
     "case, expected",
     (
         # Body can be of any primitive type supported by Open API
-        (Case(ENDPOINT, body={"test": 1}), "requests.get('http://example.com/api/success', json={'test': 1})"),
-        (Case(ENDPOINT, body=["foo"]), "requests.get('http://example.com/api/success', json=['foo'])"),
-        (Case(ENDPOINT, body="foo"), "requests.get('http://example.com/api/success', json='foo')"),
-        (Case(ENDPOINT, body=1), "requests.get('http://example.com/api/success', json=1)"),
-        (Case(ENDPOINT, body=1.1), "requests.get('http://example.com/api/success', json=1.1)"),
-        (Case(ENDPOINT, body=True), "requests.get('http://example.com/api/success', json=True)"),
-        (Case(ENDPOINT), "requests.get('http://example.com/api/success')"),
-        (Case(ENDPOINT, query={"a": 1}), "requests.get('http://example.com/api/success', params={'a': 1})"),
+        (
+            Case(ENDPOINT, body={"test": 1}),
+            f"requests.get('http://example.com/api/success', "
+            f"headers={{'User-Agent': '{USER_AGENT}'}}, json={{'test': 1}})",
+        ),
+        (
+            Case(ENDPOINT, body=["foo"]),
+            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, json=['foo'])",
+        ),
+        (
+            Case(ENDPOINT, body="foo"),
+            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, json='foo')",
+        ),
+        (
+            Case(ENDPOINT, body=1),
+            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, json=1)",
+        ),
+        (
+            Case(ENDPOINT, body=1.1),
+            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, json=1.1)",
+        ),
+        (
+            Case(ENDPOINT, body=True),
+            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, json=True)",
+        ),
+        (Case(ENDPOINT), f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}})"),
+        (
+            Case(ENDPOINT, query={"a": 1}),
+            f"requests.get('http://example.com/api/success', "
+            f"headers={{'User-Agent': '{USER_AGENT}'}}, params={{'a': 1}})",
+        ),
     ),
 )
 def test_get_code_to_reproduce(case, expected):
