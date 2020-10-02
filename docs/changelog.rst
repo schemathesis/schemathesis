@@ -1373,6 +1373,7 @@ Deprecated
 .. _#768: https://github.com/schemathesis/schemathesis/issues/768
 .. _#717: https://github.com/schemathesis/schemathesis/issues/717
 .. _#768: https://github.com/schemathesis/schemathesis/issues/768
+.. _#717: https://github.com/schemathesis/schemathesis/issues/717
 .. _#748: https://github.com/schemathesis/schemathesis/issues/748
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
 .. _#734: https://github.com/schemathesis/schemathesis/issues/734
