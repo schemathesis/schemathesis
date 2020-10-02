@@ -31,6 +31,7 @@ def prepare(  # pylint: disable=too-many-arguments
     *,
     # Runtime behavior
     checks: Iterable[CheckFunction] = DEFAULT_CHECKS,
+    max_response_time: Optional[int] = None,
     targets: Iterable[Target] = DEFAULT_TARGETS,
     workers_num: int = 1,
     seed: Optional[int] = None,
@@ -89,6 +90,7 @@ def prepare(  # pylint: disable=too-many-arguments
         app=app,
         validate_schema=validate_schema,
         checks=checks,
+        max_response_time=max_response_time,
         targets=targets,
         hypothesis_options=hypothesis_options,
         seed=seed,
@@ -136,6 +138,7 @@ def execute_from_schema(
     app: Optional[str] = None,
     validate_schema: bool = True,
     checks: Iterable[CheckFunction],
+    max_response_time: Optional[int] = None,
     targets: Iterable[Target],
     workers_num: int = 1,
     hypothesis_options: Dict[str, Any],
@@ -185,6 +188,7 @@ def execute_from_schema(
                 runner = ThreadPoolRunner(
                     schema=schema,
                     checks=checks,
+                    max_response_time=max_response_time,
                     targets=targets,
                     hypothesis_settings=hypothesis_options,
                     auth=auth,
@@ -202,6 +206,7 @@ def execute_from_schema(
                 runner = ThreadPoolASGIRunner(
                     schema=schema,
                     checks=checks,
+                    max_response_time=max_response_time,
                     targets=targets,
                     hypothesis_settings=hypothesis_options,
                     auth=auth,
@@ -218,6 +223,7 @@ def execute_from_schema(
                 runner = ThreadPoolWSGIRunner(
                     schema=schema,
                     checks=checks,
+                    max_response_time=max_response_time,
                     targets=targets,
                     hypothesis_settings=hypothesis_options,
                     auth=auth,
@@ -236,6 +242,7 @@ def execute_from_schema(
                 runner = SingleThreadRunner(
                     schema=schema,
                     checks=checks,
+                    max_response_time=max_response_time,
                     targets=targets,
                     hypothesis_settings=hypothesis_options,
                     auth=auth,
@@ -252,6 +259,7 @@ def execute_from_schema(
                 runner = SingleThreadASGIRunner(
                     schema=schema,
                     checks=checks,
+                    max_response_time=max_response_time,
                     targets=targets,
                     hypothesis_settings=hypothesis_options,
                     auth=auth,
@@ -267,6 +275,7 @@ def execute_from_schema(
                 runner = SingleThreadWSGIRunner(
                     schema=schema,
                     checks=checks,
+                    max_response_time=max_response_time,
                     targets=targets,
                     hypothesis_settings=hypothesis_options,
                     auth=auth,

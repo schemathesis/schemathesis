@@ -32,6 +32,7 @@ def get_hypothesis_settings(hypothesis_options: Dict[str, Any]) -> hypothesis.se
 class BaseRunner:
     schema: BaseSchema = attr.ib()  # pragma: no mutate
     checks: Iterable[CheckFunction] = attr.ib()  # pragma: no mutate
+    max_response_time: Optional[int] = attr.ib()  # pragma: no mutate
     targets: Iterable[Target] = attr.ib()  # pragma: no mutate
     hypothesis_settings: hypothesis.settings = attr.ib(converter=get_hypothesis_settings)  # pragma: no mutate
     auth: Optional[RawAuth] = attr.ib(default=None)  # pragma: no mutate
@@ -171,7 +172,14 @@ def reraise(error: AssertionError) -> InvalidSchema:
         return exc
 
 
-def run_checks(case: Case, checks: Iterable[CheckFunction], result: TestResult, response: GenericResponse) -> None:
+def run_checks(  # pylint: disable=too-many-arguments
+    case: Case,
+    checks: Iterable[CheckFunction],
+    result: TestResult,
+    response: GenericResponse,
+    elapsed_time: float,
+    max_response_time: Optional[int] = None,
+) -> None:
     errors = []
 
     for check in checks:
@@ -187,6 +195,14 @@ def run_checks(case: Case, checks: Iterable[CheckFunction], result: TestResult, 
                 exc.args = (message,)
             errors.append(exc)
             result.add_failure(check_name, case, message)
+
+    if max_response_time:
+        if elapsed_time > max_response_time:
+            message = "Check 'max_response_time' failed"
+            errors.append(AssertionError(message))
+            result.add_failure("max_response_time", case, message)
+        else:
+            result.add_success("max_response_time", case)
 
     if errors:
         raise get_grouped_exception(*errors)
@@ -217,15 +233,38 @@ def network_test(
     store_interactions: bool,
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
+    max_response_time: Optional[int],
 ) -> None:
     """A single test body will be executed against the target."""
     # pylint: disable=too-many-arguments
     headers = headers or {}
     headers.setdefault("User-Agent", USER_AGENT)
     timeout = prepare_timeout(request_timeout)
-    response = _network_test(case, checks, targets, result, session, timeout, store_interactions, headers, feedback)
+    response = _network_test(
+        case,
+        checks,
+        targets,
+        result,
+        session,
+        timeout,
+        store_interactions,
+        headers,
+        feedback,
+        max_response_time,
+    )
     add_cases(
-        case, response, _network_test, checks, targets, result, session, timeout, store_interactions, headers, feedback
+        case,
+        response,
+        _network_test,
+        checks,
+        targets,
+        result,
+        session,
+        timeout,
+        store_interactions,
+        headers,
+        feedback,
+        max_response_time,
     )
 
 
@@ -239,6 +278,7 @@ def _network_test(
     store_interactions: bool,
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
+    max_response_time: Optional[int],
 ) -> requests.Response:
     # pylint: disable=too-many-arguments
     response = case.call(session=session, headers=headers, timeout=timeout)
@@ -246,7 +286,7 @@ def _network_test(
     run_targets(targets, context)
     if store_interactions:
         result.store_requests_response(response)
-    run_checks(case, checks, result, response)
+    run_checks(case, checks, result, response, context.response_time * 1000, max_response_time)
     feedback.add_test_case(case, response)
     return response
 
@@ -277,11 +317,14 @@ def wsgi_test(
     headers: Optional[Dict[str, Any]],
     store_interactions: bool,
     feedback: Feedback,
+    max_response_time: Optional[int],
 ) -> None:
     # pylint: disable=too-many-arguments
     headers = _prepare_wsgi_headers(headers, auth, auth_type)
-    response = _wsgi_test(case, checks, targets, result, headers, store_interactions, feedback)
-    add_cases(case, response, _wsgi_test, checks, targets, result, headers, store_interactions, feedback)
+    response = _wsgi_test(case, checks, targets, result, headers, store_interactions, feedback, max_response_time)
+    add_cases(
+        case, response, _wsgi_test, checks, targets, result, headers, store_interactions, feedback, max_response_time
+    )
 
 
 def _wsgi_test(
@@ -292,6 +335,7 @@ def _wsgi_test(
     headers: Dict[str, Any],
     store_interactions: bool,
     feedback: Feedback,
+    max_response_time: Optional[int],
 ) -> WSGIResponse:
     # pylint: disable=too-many-arguments
     with catching_logs(LogCaptureHandler(), level=logging.DEBUG) as recorded:
@@ -303,7 +347,7 @@ def _wsgi_test(
     if store_interactions:
         result.store_wsgi_response(case, response, headers, elapsed)
     result.logs.extend(recorded.records)
-    run_checks(case, checks, result, response)
+    run_checks(case, checks, result, response, context.response_time * 1000, max_response_time)
     feedback.add_test_case(case, response)
     return response
 
@@ -335,13 +379,16 @@ def asgi_test(
     store_interactions: bool,
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
+    max_response_time: Optional[int],
 ) -> None:
     """A single test body will be executed against the target."""
     # pylint: disable=too-many-arguments
     headers = headers or {}
 
-    response = _asgi_test(case, checks, targets, result, store_interactions, headers, feedback)
-    add_cases(case, response, _asgi_test, checks, targets, result, store_interactions, headers, feedback)
+    response = _asgi_test(case, checks, targets, result, store_interactions, headers, feedback, max_response_time)
+    add_cases(
+        case, response, _asgi_test, checks, targets, result, store_interactions, headers, feedback, max_response_time
+    )
 
 
 def _asgi_test(
@@ -352,6 +399,7 @@ def _asgi_test(
     store_interactions: bool,
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
+    max_response_time: Optional[int],
 ) -> requests.Response:
     # pylint: disable=too-many-arguments
     response = case.call_asgi(headers=headers)
@@ -359,6 +407,6 @@ def _asgi_test(
     run_targets(targets, context)
     if store_interactions:
         result.store_requests_response(response)
-    run_checks(case, checks, result, response)
+    run_checks(case, checks, result, response, context.response_time * 1000, max_response_time)
     feedback.add_test_case(case, response)
     return response
