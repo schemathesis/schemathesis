@@ -51,7 +51,7 @@ def setup_default_deadline(wrapped_test: Callable) -> None:
     # Quite hacky, but it is the simplest way to set up the default deadline value without affecting non-Schemathesis
     # tests globally
     existing_settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
-    if existing_settings.deadline == hypothesis.settings.default.deadline:
+    if existing_settings is not None and existing_settings.deadline == hypothesis.settings.default.deadline:
         new_settings = hypothesis.settings(existing_settings, deadline=DEFAULT_DEADLINE)
         wrapped_test._hypothesis_internal_use_settings = new_settings  # type: ignore
 
