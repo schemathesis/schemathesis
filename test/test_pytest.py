@@ -148,7 +148,7 @@ def test_d():
 def test_schema_given(testdir):
     # When the test uses `schema.given`
     testdir.make_test(
-        f"""
+        """
 from hypothesis.strategies._internal.core import DataObject
 
 @schema.parametrize()
@@ -161,3 +161,18 @@ def test(data, case):
     # And be available in the test
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+
+
+def test_invalid_test(testdir):
+    # When the test doesn't use the strategy provided in `schema.given`
+    testdir.make_test(
+        """
+@schema.parametrize()
+@schema.given(data=st.data())
+def test(case):
+    pass
+    """,
+    )
+    # Then the test should fail instead of error
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
