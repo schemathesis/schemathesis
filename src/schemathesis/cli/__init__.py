@@ -93,6 +93,11 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     "--checks", "-c", multiple=True, help="List of checks to run.", type=CHECKS_TYPE, default=DEFAULT_CHECKS_NAMES
 )
 @click.option(
+    "--max-response-time",
+    help="A custom check that will fail if the response time is greater than the specified one in milliseconds.",
+    type=click.IntRange(min=1),
+)
+@click.option(
     "--target",
     "-t",
     "targets",
@@ -247,6 +252,7 @@ def run(  # pylint: disable=too-many-arguments
     auth_type: str,
     headers: Dict[str, str],
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
+    max_response_time: Optional[int] = None,
     targets: Iterable[str] = DEFAULT_TARGETS_NAMES,
     exit_first: bool = False,
     endpoints: Optional[Filter] = None,
@@ -302,6 +308,7 @@ def run(  # pylint: disable=too-many-arguments
         exit_first=exit_first,
         store_interactions=store_network_log is not None,
         checks=selected_checks,
+        max_response_time=max_response_time,
         targets=selected_targets,
         workers_num=workers_num,
         validate_schema=validate_schema,

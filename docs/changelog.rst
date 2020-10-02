@@ -10,6 +10,7 @@ Changelog
 - Support PEP561 `#748`_
 - Shortcut for calling & validation. `#738`_
 - New hook to pre-commit, rstcheck, as well as updates to documentation based on rstcheck `#734`_
+- New check for maximum response time and corresponding CLI option ``--max-response-time`` `#716`_
 
 **Fixed**
 
@@ -1376,6 +1377,7 @@ Deprecated
 .. _#721: https://github.com/schemathesis/schemathesis/issues/721
 .. _#719: https://github.com/schemathesis/schemathesis/issues/719
 .. _#718: https://github.com/schemathesis/schemathesis/issues/718
+.. _#716: https://github.com/schemathesis/schemathesis/issues/716
 .. _#708: https://github.com/schemathesis/schemathesis/issues/708
 .. _#705: https://github.com/schemathesis/schemathesis/issues/705
 .. _#692: https://github.com/schemathesis/schemathesis/issues/692

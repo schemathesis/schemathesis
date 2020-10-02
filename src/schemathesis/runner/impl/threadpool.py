@@ -230,7 +230,11 @@ class ThreadPoolRunner(BaseRunner):
             "results": results,
             "stateful": self.stateful,
             "stateful_recursion_limit": self.stateful_recursion_limit,
-            "kwargs": {"request_timeout": self.request_timeout, "store_interactions": self.store_interactions},
+            "kwargs": {
+                "request_timeout": self.request_timeout,
+                "store_interactions": self.store_interactions,
+                "max_response_time": self.max_response_time,
+            },
         }
 
 
@@ -254,6 +258,7 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
                 "auth_type": self.auth_type,
                 "headers": self.headers,
                 "store_interactions": self.store_interactions,
+                "max_response_time": self.max_response_time,
             },
         }
 
@@ -274,7 +279,10 @@ class ThreadPoolASGIRunner(ThreadPoolRunner):
             "results": results,
             "stateful": self.stateful,
             "stateful_recursion_limit": self.stateful_recursion_limit,
-            "kwargs": {"store_interactions": self.store_interactions},
+            "kwargs": {
+                "store_interactions": self.store_interactions,
+                "max_response_time": self.max_response_time,
+            },
         }
 
 
