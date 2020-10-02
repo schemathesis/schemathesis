@@ -1,7 +1,7 @@
 import asyncio
 from typing import Optional
 
-from aiohttp import web  # pylint: disable=import-error
+from aiohttp import web
 
 from . import _server
 
