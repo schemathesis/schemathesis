@@ -1,5 +1,5 @@
 default_language_version:
-  python: python3.7
+  python: python3
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -66,3 +66,11 @@ repos:
         exclude: ^(docs/|test/).*$
         # disabled import-error as may be run out of environment with deps
         args: ["--disable=import-error"]
+
+  - repo: https://github.com/myint/rstcheck
+    rev: master
+    hooks:
+      - id: rstcheck
+        additional_dependencies:
+          - sphinx==3.1.2
+        args: [--ignore-directives=code]
