@@ -1,12 +1,11 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, NewType, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Set, Tuple, Union
 
 from hypothesis.strategies import SearchStrategy
 
 if TYPE_CHECKING:
     from .hooks import HookContext
 
-Schema = NewType("Schema", Dict[str, Any])  # pragma: no mutate
 PathLike = Union[Path, str]  # pragma: no mutate
 
 Query = Dict[str, Any]  # pragma: no mutate
