@@ -198,7 +198,7 @@ def run_checks(  # pylint: disable=too-many-arguments
 
     if max_response_time:
         if elapsed_time > max_response_time:
-            message = f"Response time exceeded the limit of {max_response_time} ms"
+            message = "Check 'max_response_time' failed"
             errors.append(AssertionError(message))
             result.add_failure("max_response_time", case, message)
         else:
