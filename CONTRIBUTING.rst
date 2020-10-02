@@ -9,8 +9,6 @@ Your feedback and your experience are important for the project :)
    :depth: 2
    :backlinks: none
 
-.. _feedback:
-
 Feature requests and feedback
 -----------------------------
 
@@ -21,8 +19,6 @@ and:
 * Provide as many details as possible, explain your context and how the feature should work.
 * Explain why this improvement would be useful.
 * Keep the scope narrow. This will make it easier to implement.
-
-.. _reportbugs:
 
 Report bugs
 -----------
@@ -38,8 +34,6 @@ If you are reporting a bug, please:
 * Include Python / Schemathesis versions.
 
 It would be awesome if you can submit a failing test that demonstrates the problem.
-
-.. _fixbugs:
 
 Using a local test server
 -------------------------
@@ -148,10 +142,8 @@ Then you could use CLI against this server:
 
     ================================================== 3 passed in 1.77s ==================================================
 
-.. _testserver:
-
 Submitting Pull Requests
------------------------
+------------------------
 
 #. Fork the repository.
 #. Enable and install `pre-commit <https://pre-commit.com>`_ to ensure style-guides and code checks are followed.

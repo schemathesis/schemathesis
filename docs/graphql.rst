@@ -1,5 +1,3 @@
-.. _graphql:
-
 GraphQL
 =======
 

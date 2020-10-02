@@ -1,5 +1,3 @@
-.. _targeted:
-
 Targeted property-based testing
 ===============================
 
