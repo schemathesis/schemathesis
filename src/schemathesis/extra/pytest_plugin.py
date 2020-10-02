@@ -9,7 +9,7 @@ from _pytest.nodes import Node
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from _pytest.runner import runtestprotocol
 from _pytest.warning_types import PytestWarning
-from hypothesis.errors import InvalidArgument  # pylint: disable=ungrouped-imports
+from hypothesis.errors import InvalidArgument
 from packaging import version
 
 from .._hypothesis import create_test
