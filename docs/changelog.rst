@@ -1,16 +1,14 @@
-.. _changelog:
-
 Changelog
 =========
 
-`Unreleased`_
--------------
+`Unreleased`_ - TBD
+-------------------
 
-Added
-~~~~~
+**Added**
 
 - Support PEP561 `#748`_
 - Shortcut for calling & validation. `#738`_
+- New hook to pre-commit, rstcheck, as well as updates to documentation based on rstcheck `#734`_
 
 Fixed
 ~~~~~
@@ -25,19 +23,16 @@ This release contains only documentation updates which are necessary to upload t
 `2.5.0`_ - 2020-09-27
 ---------------------
 
-Added
-~~~~~
+**Added**
 
 - Stateful testing via Open API links for the ``pytest`` runner. `#616`_
 - Support for GraphQL tests for the ``pytest`` runner. `#649`_
 
-Fixed
-~~~~~
+**Fixed**
 
 - Progress percentage in the terminal output for "lazy" schemas. `#636`_
 
-Changed
-~~~~~~~
+**Changed**
 
 - Check name is no longer displayed in the CLI output, since its verbose message is already displayed. This change
   also simplifies the internal structure of the runner events.
@@ -47,27 +42,26 @@ Changed
 `2.4.1`_ - 2020-09-17
 ---------------------
 
-Changed
-~~~~~~~
+**Changed**
 
 - Hide ``Case.endpoint`` from representation. Its representation decreases the usability of the pytest's output. `#719`_
 - Return registered functions from ``register_target`` and ``register_check`` decorators. `#721`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Possible ``IndexError`` when a user-defined check raises an exception without a message. `#718`_
 
 `2.4.0`_ - 2020-09-15
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Ability to register custom targets for targeted testing. `#686`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - The ``AfterExecution`` event now has ``path`` and ``method`` fields, similar to the ``BeforeExecution`` one.
   The goal is to make these events self-contained, which improves their usability.
@@ -75,56 +69,56 @@ Changed
 `2.3.4`_ - 2020-09-11
 ---------------------
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - The default Hypothesis's ``deadline`` setting for tests with ``schema.parametrize`` is set to 500 ms for consistency with the CLI behavior. `#705`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Encoding error when writing a cassette on Windows. `#708`_
 
 `2.3.3`_ - 2020-08-04
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - ``KeyError`` during the ``content_type_conformance`` check if the response has no ``Content-Type`` header. `#692`_
 
 `2.3.2`_ - 2020-08-04
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Run checks conditionally.
 
 `2.3.1`_ - 2020-07-28
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - ``IndexError`` when ``examples`` list is empty.
 
 `2.3.0`_ - 2020-07-26
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Possibility to generate values for ``in: formData`` parameters that are non-bytes or contain non-bytes (e.g., inside an array). `#665`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Error message for cases when a path parameter is in the template but is not defined in the parameters list or missing ``required: true`` in its definition. `#667`_
 - Bump minimum required ``hypothesis-jsonschema`` version to `0.17.0`. This allows Schemathesis to use the ``custom_formats`` argument in ``from_schema`` calls and avoid using its private API. `#684`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - ``ValueError`` during sending a request with test payload if the endpoint defines a parameter with ``type: array`` and ``in: formData``. `#661`_
 - ``KeyError``while processing a schema with nullable parameters and ``in: body``. `#660`_
@@ -137,42 +131,42 @@ Fixed
 `2.2.1`_ - 2020-07-22
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Possible ``UnicodeEncodeError`` during generation of ``Authorization`` header values for endpoints with ``basic`` security scheme. `#656`_
 
 `2.2.0`_ - 2020-07-14
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - ``schemathesis.graphql.from_dict`` loader allows you to use GraphQL schemas represented as a dictionary for testing.
 - ``before_load_schema`` hook for GraphQL schemas.
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Serialization of non-string parameters. `#651`_
 
 `2.1.0`_ - 2020-07-06
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Support for property-level examples. `#467`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Content-type conformance check for cases when Open API 3.0 schemas contain "default" response definitions. `#641`_
 - Handling of multipart requests for Open API 3.0 schemas. `#640`_
 - Sending non-file form fields in multipart requests. `#647`_
 
-Removed
-~~~~~~~
+**Removed**
+
 
 - Deprecated ``skip_validation`` argument to ``HookDispatcher.apply``.
 - Deprecated ``_accepts_context`` internal function.
@@ -180,8 +174,8 @@ Removed
 `2.0.0`_ - 2020-07-01
 ---------------------
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - **BREAKING**. Base URL handling. ``base_url`` now is treated as one with a base path included.
   You should pass a full base URL now instead:
@@ -195,8 +189,8 @@ Open API 2.0 / 3.0 respectively. Previously if you pass a base URL like the one 
 was concatenated with the base path defined in the schema, which leads to a lack of ability
 to redefine the base path. `#511`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Show the correct URL in CLI progress when the base URL is overridden, including the path part. `#511`_
 - Construct valid URL when overriding base URL with base path. `#511`_
@@ -210,8 +204,8 @@ Fixed
     Full URLs before this change   : http://0.0.0.0:8081/api/v2/api/v1/users/  # INVALID!
     Full URLs after this change    : http://0.0.0.0:8081/api/v2/users/         # VALID!
 
-Removed
-~~~~~~~
+**Removed**
+
 
 - Support for hooks without `context` argument in the first position.
 - Hooks registration by name and function. Use ``register`` decorators instead. For more details, see the "Customization" section in our documentation.
@@ -220,30 +214,30 @@ Removed
 `1.10.0`_ - 2020-06-28
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - ``loaders.from_asgi`` supports making calls to ASGI-compliant application (For example: FastAPI). `#521`_
 - Support for GraphQL strategies.
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Passing custom headers to schema loader for WSGI / ASGI apps. `#631`_
 
 `1.9.1`_ - 2020-06-21
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Schema validation error on schemas containing numeric values in scientific notation without a dot. `#629`_
 
 `1.9.0`_ - 2020-06-20
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Pass the original case's response to the ``add_case`` hook.
 - Support for multiple examples with OpenAPI ``examples``. `#589`_
@@ -251,13 +245,13 @@ Added
 - Allow registering function-level hooks without passing their name as the first argument to ``apply``. `#618`_
 - Support for hook usage via ``LazySchema`` / ``from_pytest_fixture``. `#617`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Tests with invalid schemas marked as errors, instead of failures. `#622`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Crash during the generation of loosely-defined headers. `#621`_
 - Show exception information for test runs on invalid schemas with ``--validate-schema=false`` command-line option.
@@ -266,14 +260,14 @@ Fixed
 `1.8.0`_ - 2020-06-15
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Tests with invalid schemas are marked as failed instead of passed when ``hypothesis-jsonschema>=0.16`` is installed. `#614`_
 - ``KeyError`` during creating an endpoint strategy if it contains a reference. `#612`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Require ``hypothesis-jsonschema>=0.16``. `#614`_
 - Pass original ``InvalidSchema`` text to ``pytest.fail`` call.
@@ -281,8 +275,8 @@ Changed
 `1.7.0`_ - 2020-05-30
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Support for YAML files in references via HTTPS & HTTP schemas. `#600`_
 - Stateful testing support via ``Open API links`` syntax. `#548`_
@@ -290,8 +284,8 @@ Added
 - Support for parameter serialization formats in Open API 2 / 3. For example ``pipeDelimited`` or ``deepObject``. `#599`_
 - Support serializing parameters with ``application/json`` content-type. `#594`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - The minimum required versions for ``Hypothesis`` and ``hypothesis-jsonschema`` are ``5.15.0`` and ``0.11.1`` respectively.
   The main reason is `this fix <https://github.com/HypothesisWorks/hypothesis/commit/4c7f3fbc55b294f13a503b2d2af0d3221fd37938>`_ that is
@@ -300,54 +294,54 @@ Changed
 `1.6.3`_ - 2020-05-26
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Support for a colon symbol (``:``) inside of a header value passed via CLI. `#596`_
 
 `1.6.2`_ - 2020-05-15
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Partially generated explicit examples are always valid and can be used in requests. `#582`_
 
 `1.6.1`_ - 2020-05-13
 ---------------------
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Look at the current working directory when loading hooks for CLI. `#586`_
 
 `1.6.0`_ - 2020-05-10
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - New ``before_add_examples`` hook. `#571`_
 - New ``after_init_cli_run_handlers`` hook. `#575`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Passing ``workers_num`` to ``ThreadPoolRunner`` leads to always using 2 workers in this worker kind. `#579`_
 
 `1.5.1`_ - 2020-05-08
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Display proper headers in reproduction code when headers are overridden. `#566`_
 
 `1.5.0`_ - 2020-05-06
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Display a suggestion to disable schema validation on schema loading errors in CLI. `#531`_
 - Filtration of endpoints by ``operationId`` via ``operation_id`` parameter to ``schema.parametrize`` or ``-O`` command-line option. `#546`_
@@ -355,8 +349,8 @@ Added
   to the generated data. It supports generating API keys in headers or query parameters and generating data for HTTP
   authentication schemes. `#540`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Overriding header values in CLI and runner when headers provided explicitly clash with ones defined in the schema. `#559`_
 - Nested references resolving in ``response_schema_conformance`` check. `#562`_
@@ -365,8 +359,8 @@ Fixed
 `1.4.0`_ - 2020-05-03
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - ``context`` argument for hook functions to provide an additional context for hooks. A deprecation warning is emitted
   for hook functions that do not accept this argument.
@@ -375,14 +369,14 @@ Added
 - Third-party compatibility fixups mechanism. Currently, there is one fixup for `FastAPI <https://github.com/tiangolo/fastapi>`_. `#503`_
 
 Deprecated
-~~~~~~~~~~
+
 
 - Hook functions that do not accept ``context`` as their first argument. They will become not be supported in Schemathesis 2.0.
 - Registering hooks by name and function. Use ``register`` decorators instead. For more details, see the "Customization" section in our documentation.
 - ``BaseSchema.with_hook`` and ``BaseSchema.register_hook``. Use ``BaseSchema.hooks.apply`` and ``BaseSchema.hooks.register`` instead.
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Add missing ``validate_schema`` argument to ``loaders.from_pytest_fixture``.
 - Reference resolving during response schema conformance check. `#539`_
@@ -390,24 +384,24 @@ Fixed
 `1.3.4`_ - 2020-04-30
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Validation of nullable properties in ``response_schema_conformance`` check introduced in ``1.3.0``. `#542`_
 
 `1.3.3`_ - 2020-04-29
 ---------------------
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Update ``pytest-subtests`` pin to ``>=0.2.1,<1.0``. `#537`_
 
 `1.3.2`_ - 2020-04-27
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Show exceptions if they happened during loading a WSGI application. Option ``--show-errors-tracebacks`` will display a
   full traceback.
@@ -415,16 +409,16 @@ Added
 `1.3.1`_ - 2020-04-27
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Packaging issue
 
 `1.3.0`_ - 2020-04-27
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Storing network logs with ``--store-network-log=<filename.yaml>``.
   The stored cassettes are based on the `VCR format <https://relishapp.com/vcr/vcr/v/5-1-0/docs/cassettes/cassette-format>`_
@@ -433,15 +427,15 @@ Added
 - Targeted property-based testing in CLI and runner. It only supports the ``response_time`` target at the moment. `#104`_
 - Export CLI test results to JUnit.xml with ``--junit-xml=<filename.xml>``. `#427`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Code samples for schemas where ``body`` is defined as ``{"type": "string"}``. `#521`_
 - Showing error causes on internal ``jsonschema`` errors during input schema validation. `#513`_
 - Recursion error in ``response_schema_conformance`` check. Because of this change, ``Endpoint.definition`` contains a definition where references are not resolved. In this way, it makes it possible to avoid recursion errors in ``jsonschema`` validation. `#468`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Added indentation & section name to the ``SUMMARY`` CLI block.
 - Use C-extension for YAML loading when it is possible. It can cause more than 10x speedup on schema parsing.
@@ -451,8 +445,8 @@ Changed
 `1.2.0`_ - 2020-04-15
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Per-test hooks for modification of data generation strategies. `#492`_
 - Support for ``x-example`` vendor extension in Open API 2.0. `#504`_
@@ -461,8 +455,8 @@ Added
 `1.1.2`_ - 2020-04-14
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Support for custom loaders in ``runner``. Now all built-in loaders are supported as an argument to ``runner.prepare``. `#496`_
 - ``from_wsgi`` loader accepts custom keyword arguments that will be passed to ``client.get`` when accessing the schema. `#497`_
@@ -470,8 +464,8 @@ Fixed
 `1.1.1`_ - 2020-04-12
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Mistakenly applied Open API -> JSON Schema Draft 7 conversion. It should be Draft 4. `#489`_
 - Using wrong validator in ``response_schema_conformance`` check. It should be Draft 4 validator. `#468`_
@@ -479,13 +473,13 @@ Fixed
 `1.1.0`_ - 2020-04-08
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Response schema check for recursive schemas. `#468`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - App loading in ``runner``. Now it accepts application as an importable string, rather than an instance. It is done to make it possible to execute a runner in a subprocess. Otherwise, apps can't be easily serialized and transferred into another process.
 - Runner events structure. All data in events is static from now. There are no references to ``BaseSchema``, ``Endpoint`` or similar objects that may calculate data dynamically. This is done to make events serializable and not tied to Python object, which decouples any ``runner`` consumer from implementation details. It will help make ``runner`` usable in more cases (e.g., web application) since events can be serialized to JSON and used in any environment.
@@ -494,8 +488,8 @@ Changed
 `1.0.5`_ - 2020-04-03
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Open API 3. Handling of endpoints that contain ``multipart/form-data`` media types.
   Previously only file upload endpoints were working correctly. `#473`_
@@ -503,16 +497,16 @@ Fixed
 `1.0.4`_ - 2020-04-03
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - ``OpenApi30.get_content_types`` behavior, introduced in `8aeee1a <https://github.com/schemathesis/schemathesis/commit/8aeee1ab2c6c97d94272dde4790f5efac3951aed>`_. `#469`_
 
 `1.0.3`_ - 2020-04-03
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Precedence of ``produces`` keywords for Swagger 2.0 schemas. Now, operation-level ``produces`` overrides schema-level ``produces`` as specified in the specification. `#463`_
 - Content-type conformance check for Open API 3.0 schemas. `#461`_
@@ -521,8 +515,8 @@ Fixed
 `1.0.2`_ - 2020-04-02
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Handling of fields in ``paths`` that are not operations, but allowed by the Open API spec. `#457`_
 - Pytest 5.4 warning about deprecated ``Node`` initialization usage. `#451`_
@@ -530,8 +524,8 @@ Fixed
 `1.0.1`_ - 2020-04-01
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Processing of explicit examples in Open API 3.0 when there are multiple parameters in the same location (e.g. ``path``)
   contain ``example`` value. They are properly combined now. `#450`_
@@ -539,21 +533,21 @@ Fixed
 `1.0.0`_ - 2020-03-31
 ---------------------
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Move processing of ``runner`` parameters to ``runner.prepare``. This change will provide better code reuse since all users of ``runner`` (e.g., if you extended it in your project`) need some kind of input parameters handling, which was implemented only in Schemathesis CLI. It is not backward-compatible. If you didn't use ``runner`` directly, then this change should not have a visible effect on your use-case.
 
 `0.28.0`_ - 2020-03-31
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Handling of schemas that use ``x-*`` custom properties. `#448`_
 
-Removed
-~~~~~~~
+**Removed**
+
 
 - Deprecated ``runner.execute``. Use ``runner.prepare`` instead.
 
@@ -561,28 +555,28 @@ Removed
 ----------------------
 
 Deprecated
-~~~~~~~~~~
+
 
 - ``runner.execute`` should not be used, since ``runner.prepare`` provides a more flexible interface to test execution.
 
-Removed
-~~~~~~~
+**Removed**
+
 
 - Deprecated ``Parametrizer`` class. Use ``schemathesis.from_path`` as a replacement for ``Parametrizer.from_path``.
 
 `0.26.1`_ - 2020-03-24
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Limit recursion depth while resolving JSON schema to handle recursion without breaking. `#435`_
 
 `0.26.0`_ - 2020-03-19
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Filter problematic path template variables containing ``"/"``, or ``"%2F"`` url encoded. `#440`_
 - Filter invalid empty ``""`` path template variables. `#439`_
@@ -591,16 +585,16 @@ Fixed
 `0.25.1`_ - 2020-03-09
 ----------------------
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Allow ``werkzeug`` >= 1.0.0. `#433`_
 
 `0.25.0`_ - 2020-02-27
 ----------------------
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Handling of explicit examples from schemas. Now, if there are examples for multiple locations
   (e.g., for body and query) then they will be combined into a single example. `#424`_
@@ -608,24 +602,24 @@ Changed
 `0.24.5`_ - 2020-02-26
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Error during ``pytest`` collection on objects with custom ``__getattr__`` method and therefore pass ``is_schemathesis`` check. `#429`_
 
 `0.24.4`_ - 2020-02-22
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Resolving references when the schema is loaded from a file on Windows. `#418`_
 
 `0.24.3`_ - 2020-02-10
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Not copied ``validate_schema`` parameter in ``BaseSchema.parametrize``. Regression after implementing `#383`_
 - Missing ``app``, ``location`` and ``hooks`` parameters in schema when used with ``BaseSchema.parametrize``. `#416`_
@@ -633,8 +627,8 @@ Fixed
 `0.24.2`_ - 2020-02-09
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Crash on invalid regular expressions in ``method``, ``endpoint`` and ``tag`` CLI options. `#403`_
 - Crash on a non-latin-1 encodable value in the ``auth`` CLI option. `#404`_
@@ -647,103 +641,103 @@ Fixed
 `0.24.1`_ - 2020-02-08
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - CLI crash on Windows and Python < 3.8 when the schema path contains characters unrepresentable at the OS level. `#400`_
 
 `0.24.0`_ - 2020-02-07
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Support for testing of examples in Parameter & Media Type objects in Open API 3.0. `#394`_
 - ``--show-error-tracebacks`` CLI option to display errors' tracebacks in the output. `#391`_
 - Support for schema behind auth. `#115`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Schemas with GET endpoints accepting body are allowed now if schema validation is disabled (via ``--validate-schema=false`` for example).
   The use-case is for tools like ElasticSearch that use GET requests with non-empty bodies. `#383`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - CLI crash when an explicit example is specified in the endpoint definition. `#386`_
 
 `0.23.7`_ - 2020-01-30
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - ``-x``/``--exitfirst`` CLI option to exit after the first failed test. `#378`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Handling examples of parameters in Open API 3.0. `#381`_
 
 `0.23.6`_ - 2020-01-28
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - ``all`` variant for ``--checks`` CLI option to use all available checks. `#374`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Use built-in ``importlib.metadata`` on Python 3.8. `#376`_
 
 `0.23.5`_ - 2020-01-24
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Generation of invalid values in ``Case.cookies``. `#371`_
 
 `0.23.4`_ - 2020-01-22
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Converting ``exclusiveMinimum`` & ``exclusiveMaximum`` fields to JSON Schema. `#367`_
 
 `0.23.3`_ - 2020-01-21
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Filter out surrogate pairs from the query string.
 
 `0.23.2`_ - 2020-01-16
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Prevent ``KeyError`` when the response does not have the "Content-Type" header. `#365`_
 
 `0.23.1`_ - 2020-01-15
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Dockerfile entrypoint was not working as per docs. `#361`_
 
 `0.23.0`_ - 2020-01-15
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Hooks for strategy modification. `#313`_
 - Input schema validation. Use ``--validate-schema=false`` to disable it in CLI and ``validate_schema=False`` argument in loaders. `#110`_
@@ -751,15 +745,15 @@ Added
 `0.22.0`_ - 2020-01-11
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Show multiple found failures in the CLI output. `#266`_ & `#207`_
 - Raise a proper exception when the given schema is invalid. `#308`_
 - Support for ``None`` as a value for ``--hypothesis-deadline``. `#349`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Handling binary request payloads in ``Case.call``. `#350`_
 - Type of the second argument to all built-in checks set to proper ``Case`` instead of ``TestResult``.
@@ -768,62 +762,62 @@ Fixed
 `0.21.0`_ - 2019-12-20
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Support for AioHTTP applications in CLI. `#329`_
 
 `0.20.5`_ - 2019-12-18
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Compatibility with the latest release of ``hypothesis-jsonschema`` and setting its minimal required version to ``0.9.13``. `#338`_
 
 `0.20.4`_ - 2019-12-17
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Handling ``nullable`` attribute in Open API schemas. `#335`_
 
 `0.20.3`_ - 2019-12-17
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Usage of the response status code conformance check with old ``requests`` version. `#330`_
 
 `0.20.2`_ - 2019-12-14
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Response schema conformance check for Open API 3.0. `#332`_
 
 `0.20.1`_ - 2019-12-13
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Support for response code ranges. `#330`_
 
 `0.20.0`_ - 2019-12-12
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - WSGI apps support. `#31`_
 - ``Case.validate_response`` for running built-in checks against app's response. `#319`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Checks receive ``Case`` instance as a second argument instead of ``TestResult``.
   This was done for making checks usable in Python tests via ``Case.validate_response``.
@@ -832,16 +826,16 @@ Changed
 `0.19.1`_ - 2019-12-11
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Compatibility with Hypothesis >= 4.53.2. `#322`_
 
 `0.19.0`_ - 2019-12-02
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Concurrent test execution in CLI / runner. `#91`_
 - update importlib_metadata pin to ``^1.1``. `#315`_
@@ -849,21 +843,21 @@ Added
 `0.18.1`_ - 2019-11-28
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Validation of the ``base-url`` CLI parameter. `#311`_
 
 `0.18.0`_ - 2019-11-27
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Resolving references in ``PathItem`` objects. `#301`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Resolving of relative paths in schemas. `#303`_
 - Loading string dates as ``datetime.date`` objects in YAML loader. `#305`_
@@ -871,34 +865,34 @@ Fixed
 `0.17.0`_ - 2019-11-21
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Resolving references that point to different files. `#294`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Keyboard interrupt is now handled during the CLI run, and the summary is displayed in the output. `#295`_
 
 `0.16.0`_ - 2019-11-19
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Display RNG seed in the CLI output to allow test reproducing. `#267`_
 - Allow specifying seed in CLI.
 - Ability to pass custom kwargs to the ``requests.get`` call in ``loaders.from_uri``.
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Refactor case generation strategies: strategy is not used to generate empty value. `#253`_
 - Improved error message for invalid path parameter declaration. `#255`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Pytest fixture parametrization via ``pytest_generate_tests``. `#280`_
 - Support for tests defined as methods. `#282`_
@@ -907,8 +901,8 @@ Fixed
 `0.15.0`_ - 2019-11-15
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Support for OpenAPI 3.0 server variables (base_path). `#40`_
 - Support for ``format: byte``. `#254`_
@@ -917,32 +911,32 @@ Added
 - Pre-run hooks for CLI. `#147`_
 - A way to register custom checks for CLI via ``schemathesis.register_check``. `#270`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Not encoded path parameters. `#272`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Verbose messages are displayed in the CLI on failed checks. `#261`_
 
 `0.14.0`_ - 2019-11-09
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - CLI: Support file paths in the ``schema`` argument. `#119`_
 - Checks to verify response status & content type in CLI / Runner. `#101`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Custom base URL handling in CLI / Runner. `#248`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Raise an error if the schema has a body for GET requests. `#218`_
 - Method names are case insensitive during direct schema access. `#246`_
@@ -950,29 +944,29 @@ Changed
 `0.13.2`_ - 2019-11-05
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - ``IndexError`` when Hypothesis found inconsistent test results during the test execution in the runner. `#236`_
 
 `0.13.1`_ - 2019-11-05
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Support for binary format `#197`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Error that happens when there are no success checks in the statistic in CLI. `#237`_
 
 `0.13.0`_ - 2019-11-03
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - An option to configure request timeout for CLI / Runner. `#204`_
 - A help snippet to reproduce errors caught by Schemathesis. `#206`_
@@ -980,16 +974,16 @@ Added
 - Summary line in the CLI output with the number of passed / failed / errored endpoint tests. `#209`_
 - Extra information to the CLI output: schema address, spec version, and base URL. `#188`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Compatibility with Hypothesis 4.42.4+ . `#212`_
 - Display flaky errors only in the "ERRORS" section and improve CLI output. `#215`_
 - Handling ``formData`` parameters in ``Case.call``. `#196`_
 - Handling cookies in ``Case.call``. `#211`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - More readable falsifying examples output. `#127`_
 - Show exceptions in a separate section of the CLI output. `#203`_
@@ -1000,8 +994,8 @@ Changed
 `0.12.2`_ - 2019-10-30
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Wrong handling of the ``base_url`` parameter in runner and ``Case.call`` if it has a trailing slash. `#194`_ and `#199`_
 - Do not send any payload with GET requests. `#200`_
@@ -1009,49 +1003,49 @@ Fixed
 `0.12.1`_ - 2019-10-28
 ----------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Handling for errors other than ``AssertionError`` and ``HypothesisException`` in the runner. `#189`_
 - CLI failing on the case when there are tests, but no checks were performed. `#191`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Display the "SUMMARY" section in the CLI output for empty test suites.
 
 `0.12.0`_ - 2019-10-28
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Display progress during the CLI run. `#125`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Test server-generated wrong schema when the ``endpoints`` option is passed via CLI. `#173`_
 - Error message if the schema is not found in CLI. `#172`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Continue running tests on hypothesis error. `#137`_
 
 `0.11.0`_ - 2019-10-22
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - LazySchema accepts filters. `#149`_
 - Ability to register strategies for custom string formats. `#94`_
 - Generator-based events in the ``runner`` module to improve control over the execution flow.
 - Filtration by tags. `#134`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Base URL in schema instances could be reused when it is defined during creation.
   Now on, the ``base_url`` argument in ``Case.call`` is optional in such cases. `#153`_
@@ -1059,46 +1053,46 @@ Changed
 - Hypothesis output is captured separately, without capturing the whole stdout during CLI run.
 - Disallow empty username in CLI ``--auth`` option.
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - User-agent during schema loading. `#144`_
 - Generation of invalid values in ``Case.headers``. `#167`_
 
-Removed
-~~~~~~~
+**Removed**
+
 
 - Undocumented support for ``file://`` URI schema
 
 `0.10.0`_ - 2019-10-14
 ----------------------
 
-Added
-~~~~~
+**Added**
+
 
 - HTTP Digest Auth support. `#106`_
 - Support for Hypothesis settings in CLI & Runner. `#107`_
 - ``Case.call`` and ``Case.as_requests_kwargs`` convenience methods. `#109`_
 - Local development server. `#126`_
 
-Removed
-~~~~~~~
+**Removed**
+
 
 - Autogenerated ``runner.StatsCollector.__repr__`` to make Hypothesis output more readable.
 
 `0.9.0`_ - 2019-10-09
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Test executor collects results of execution. `#29`_
 - CLI option ``--base-url`` for specifying base URL of API. `#118`_
 - Support for coroutine-based tests. `#121`_
 - User Agent to network requests in CLI & runner. `#130`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - CLI command ``schemathesis run`` prints result in a more readable way with a summary of passing checks.
 - Empty header names are forbidden for CLI.
@@ -1107,144 +1101,144 @@ Changed
 `0.8.1`_ - 2019-10-04
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Wrap each test in ``suppress`` so the runner doesn't stop after the first test failure.
 
 `0.8.0`_ - 2019-10-04
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - CLI tool invoked by the ``schemathesis`` command. `#30`_
 - New arguments ``api_options``, ``loader_options`` and ``loader`` for test executor. `#90`_
 - A mapping interface for schemas & convenience methods for direct strategy access. `#98`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Runner stopping on the first falsifying example. `#99`_
 
 `0.7.3`_ - 2019-09-30
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Filtration in lazy loaders.
 
 `0.7.2`_ - 2019-09-30
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Support for type "file" for Swagger 2.0. `#78`_
 - Support for filtering in loaders. `#75`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Conflict for lazy schema filtering. `#64`_
 
 `0.7.1`_ - 2019-09-27
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Support for ``x-nullable`` extension. `#45`_
 
 `0.7.0`_ - 2019-09-26
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Support for the ``cookie`` parameter in OpenAPI 3.0 schemas. `#21`_
 - Support for the ``formData`` parameter in Swagger 2.0 schemas. `#6`_
 - Test executor. `#28`_
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Using ``hypothesis.settings`` decorator with test functions created from ``from_pytest_fixture`` loader. `#69`_
 
 `0.6.0`_ - 2019-09-24
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Parametrizing tests from a pytest fixture via ``pytest-subtests``. `#58`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Rename module ``readers`` to ``loaders``.
 - Rename ``parametrize`` parameters. ``filter_endpoint`` to ``endpoint`` and ``filter_method`` to ``method``.
 
-Removed
-~~~~~~~
+**Removed**
+
 
 - Substring match for method/endpoint filters. To avoid clashing with escaped chars in endpoints keys in schemas.
 
 `0.5.0`_ - 2019-09-16
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Generating explicit examples from the schema. `#17`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Schemas are loaded eagerly from now on. Using ``schemathesis.from_uri`` implies network calls.
 
 Deprecated
-~~~~~~~~~~
+
 
 - Using ``Parametrizer.from_{path,uri}`` is deprecated, use ``schemathesis.from_{path,uri}`` instead.
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Body resolving during test collection. `#55`_
 
 `0.4.1`_ - 2019-09-11
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Possibly unhandled exception during ``hasattr`` check in ``is_schemathesis_test``.
 
 `0.4.0`_ - 2019-09-10
 ---------------------
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - Resolving all inner references in objects. `#34`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - ``jsonschema.RefResolver`` is now used for reference resolving. `#35`_
 
 `0.3.0`_ - 2019-09-06
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - ``Parametrizer.from_uri`` method to construct parametrizer instances from URIs. `#24`_
 
-Removed
-~~~~~~~
+**Removed**
+
 
 - Possibility to use ``Parametrizer.parametrize`` and custom ``Parametrizer`` kwargs for passing config options
   to ``hypothesis.settings``. Use ``hypothesis.settings`` decorators on tests instead.
@@ -1252,21 +1246,21 @@ Removed
 `0.2.0`_ - 2019-09-05
 ---------------------
 
-Added
-~~~~~
+**Added**
+
 
 - Open API 3.0 support. `#10`_
 - "header" parameters. `#7`_
 
-Changed
-~~~~~~~
+**Changed**
+
 
 - Handle errors during collection / executions as failures.
 - Use ``re.search`` for pattern matching in ``filter_method``/``filter_endpoint`` instead of ``fnmatch``. `#18`_
 - ``Case.body`` contains properties from the target schema, without the extra level of nesting.
 
-Fixed
-~~~~~
+**Fixed**
+
 
 - ``KeyError`` on collection when "basePath" is absent. `#16`_
 
@@ -1377,6 +1371,7 @@ Fixed
 .. _#717: https://github.com/schemathesis/schemathesis/issues/717
 .. _#748: https://github.com/schemathesis/schemathesis/issues/748
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
+.. _#734: https://github.com/schemathesis/schemathesis/issues/734
 .. _#721: https://github.com/schemathesis/schemathesis/issues/721
 .. _#719: https://github.com/schemathesis/schemathesis/issues/719
 .. _#718: https://github.com/schemathesis/schemathesis/issues/718
@@ -1435,7 +1430,6 @@ Fixed
 .. _#521: https://github.com/schemathesis/schemathesis/issues/521
 .. _#519: https://github.com/schemathesis/schemathesis/issues/519
 .. _#513: https://github.com/schemathesis/schemathesis/issues/513
-.. _#512: https://github.com/schemathesis/schemathesis/issues/512
 .. _#511: https://github.com/schemathesis/schemathesis/issues/511
 .. _#504: https://github.com/schemathesis/schemathesis/issues/504
 .. _#503: https://github.com/schemathesis/schemathesis/issues/503
@@ -1496,7 +1490,6 @@ Fixed
 .. _#322: https://github.com/schemathesis/schemathesis/issues/322
 .. _#319: https://github.com/schemathesis/schemathesis/issues/319
 .. _#315: https://github.com/schemathesis/schemathesis/issues/315
-.. _#314: https://github.com/schemathesis/schemathesis/issues/314
 .. _#313: https://github.com/schemathesis/schemathesis/issues/313
 .. _#311: https://github.com/schemathesis/schemathesis/issues/311
 .. _#308: https://github.com/schemathesis/schemathesis/issues/308
