@@ -16,6 +16,7 @@ import werkzeug
 from hypothesis.strategies import SearchStrategy
 from starlette.testclient import TestClient as ASGIClient
 
+from .constants import USER_AGENT
 from .exceptions import InvalidSchema
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse
@@ -176,10 +177,13 @@ class Case:
             close_session = True
         else:
             close_session = False
-
         data = self.as_requests_kwargs(base_url)
+        data["headers"] = data["headers"] or {}
+        data["headers"] = data["headers"].copy()
         if headers is not None:
-            data["headers"] = {**(data["headers"] or {}), **headers}
+            data["headers"].update(headers)
+        if "user-agent" not in set(k.lower() for k in data["headers"]):
+            data["headers"]["User-Agent"] = USER_AGENT
         data.update(kwargs)
         response = session.request(**data)  # type: ignore
         if close_session:
@@ -224,6 +228,8 @@ class Case:
                 "Please, set `app` argument in the schema constructor or pass it to `call_wsgi`"
             )
         data = self.as_werkzeug_kwargs(headers)
+        if "user-agent" not in set(k.lower() for k in data["headers"]):
+            data["headers"]["User-Agent"] = USER_AGENT
         client = werkzeug.Client(application, WSGIResponse)
         with cookie_handler(client, self.cookies):
             response = client.open(**data, **kwargs)

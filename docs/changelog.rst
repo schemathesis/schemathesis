@@ -12,6 +12,10 @@ Changelog
 - New hook to pre-commit, rstcheck, as well as updates to documentation based on rstcheck `#734`_
 - New check for maximum response time and corresponding CLI option ``--max-response-time`` `#716`_
 
+**Fixed**
+
+- Default User-Agent header in ``Case.call`` `#717`_
+
 `2.5.1`_ - 2020-09-30
 ---------------------
 
@@ -1365,6 +1369,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#717: https://github.com/schemathesis/schemathesis/issues/717
 .. _#768: https://github.com/schemathesis/schemathesis/issues/768
 .. _#748: https://github.com/schemathesis/schemathesis/issues/748
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
