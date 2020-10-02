@@ -1492,4 +1492,4 @@ def test_max_response_time(cli, server, schema_url, workers):
         assert lines[10].startswith("F")
     # And the proper error message should be displayed
     assert "max_response_time                     0 / 2 passed          FAILED" in result.stdout
-    assert "Check 'max_response_time' failed" in result.stdout
+    assert "Response time exceeded the limit of 50 ms" in result.stdout

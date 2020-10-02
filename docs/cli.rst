@@ -119,6 +119,42 @@ To make Schemathesis perform all built-in checks use ``--check all`` CLI option:
 
     ======================= 3 passed in 1.69s =======================
 
+Additionally, you can define the response time limit with ``--max-response-time``.
+If any response will take longer than the provided value (in milliseconds) than it will indicate a failure:
+
+.. code:: text
+
+    $ schemathesis run --max-response-time=50 ...
+    ================ Schemathesis test session starts ===============
+    platform Linux -- Python 3.8.5, schemathesis-2.5.0, ...
+    rootdir: /
+    hypothesis profile 'default' -> ...
+    Schema location: http://api.com/swagger.json
+    Base URL: http://api.com/
+    Specification version: Swagger 2.0
+    Workers: 1
+    collected endpoints: 1
+
+    GET /api/slow F                                            [100%]
+
+    ============================ FAILURES ===========================
+    _________________________ GET: /api/slow ________________________
+    1. Response time exceeded the limit of 50 ms
+
+    Run this Python code to reproduce this failure:
+
+        requests.get('http://127.0.0.1:8081/api/slow')
+
+    Or add this option to your command line parameters:
+        --hypothesis-seed=103697217851787640556597810346466192664
+    ============================ SUMMARY ============================
+
+    Performed checks:
+        not_a_server_error                  2 / 2 passed       PASSED
+        max_response_time                   0 / 2 passed       FAILED
+
+    ======================= 1 failed in 0.29s =======================
+
 API authorization
 -----------------
 
