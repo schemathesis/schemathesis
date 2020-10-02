@@ -116,14 +116,10 @@ class Case:
             kwargs["headers"] = final_headers
         method = kwargs["method"].lower()
 
-        def are_defaults(key: str, value: Optional[Dict]) -> bool:
-            default_value: Optional[Dict] = {"json": None}.get(key, None)
-            return value == default_value
-
         printed_kwargs = ", ".join(
             f"{key}={repr(value)}"
             for key, value in kwargs.items()
-            if key not in ("method", "url") and not are_defaults(key, value)
+            if key not in ("method", "url") and value is not None
         )
         args_repr = f"'{kwargs['url']}'"
         if printed_kwargs:
