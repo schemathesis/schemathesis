@@ -141,7 +141,7 @@ class Case:
         final_headers = self.headers.copy() if self.headers is not None else {}
         if headers:
             final_headers.update(headers)
-        if "User-Agent" not in final_headers:
+        if "user-agent" not in {header.lower() for header in final_headers}:
             final_headers["User-Agent"] = USER_AGENT
         return final_headers
 

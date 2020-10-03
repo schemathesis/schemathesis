@@ -60,7 +60,9 @@ def from_uri(
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load a remote resource and parse to schema instance."""
-    kwargs.setdefault("headers", {}).setdefault("User-Agent", USER_AGENT)
+    headers = kwargs.setdefault("headers", {})
+    if "user-agent" not in {header.lower() for header in headers}:
+        kwargs["headers"]["User-Agent"] = USER_AGENT
     response = requests.get(uri, **kwargs)
     try:
         response.raise_for_status()
@@ -192,7 +194,9 @@ def from_wsgi(
     validate_schema: bool = True,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
-    kwargs.setdefault("headers", {}).setdefault("User-Agent", USER_AGENT)
+    headers = kwargs.setdefault("headers", {})
+    if "user-agent" not in {header.lower() for header in headers}:
+        kwargs["headers"]["User-Agent"] = USER_AGENT
     client = Client(app, WSGIResponse)
     response = client.get(schema_path, **kwargs)
     # Raising exception to provide unified behavior
@@ -259,7 +263,9 @@ def from_asgi(
     validate_schema: bool = True,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
-    kwargs.setdefault("headers", {}).setdefault("User-Agent", USER_AGENT)
+    headers = kwargs.setdefault("headers", {})
+    if "user-agent" not in {header.lower() for header in headers}:
+        kwargs["headers"]["User-Agent"] = USER_AGENT
     client = ASGIClient(app)
     response = client.get(schema_path, **kwargs)
     # Raising exception to provide unified behavior
