@@ -12,7 +12,7 @@ from requests.auth import HTTPDigestAuth, _basic_auth_str
 from ...constants import DEFAULT_DEADLINE, DEFAULT_STATEFUL_RECURSION_LIMIT, USER_AGENT
 from ...exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from ...hooks import HookContext, get_all_by_name
-from ...models import Case, CheckFunction, Endpoint, Status, TestResult, TestResultSet
+from ...models import Case, Check, CheckFunction, Endpoint, Status, TestResult, TestResultSet
 from ...runner import events
 from ...schemas import BaseSchema
 from ...stateful import Feedback, Stateful
@@ -175,6 +175,7 @@ def reraise(error: AssertionError) -> InvalidSchema:
 def run_checks(  # pylint: disable=too-many-arguments
     case: Case,
     checks: Iterable[CheckFunction],
+    check_results: List[Check],
     result: TestResult,
     response: GenericResponse,
     elapsed_time: float,
@@ -188,6 +189,7 @@ def run_checks(  # pylint: disable=too-many-arguments
             skip_check = check(response, case)
             if not skip_check:
                 result.add_success(check_name, case)
+                check_results.append(Check(check_name, Status.success, case))
         except AssertionError as exc:
             message = str(exc)
             if not message:
@@ -195,6 +197,7 @@ def run_checks(  # pylint: disable=too-many-arguments
                 exc.args = (message,)
             errors.append(exc)
             result.add_failure(check_name, case, message)
+            check_results.append(Check(check_name, Status.failure, case, message))
 
     if max_response_time:
         if elapsed_time > max_response_time:
@@ -286,14 +289,15 @@ def _network_test(
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
     status = Status.success
+    check_results: List[Check] = []
     try:
-        run_checks(case, checks, result, response, context.response_time * 1000, max_response_time)
+        run_checks(case, checks, check_results, result, response, context.response_time * 1000, max_response_time)
     except CheckFailed:
         status = Status.failure
         raise
     finally:
         if store_interactions:
-            result.store_requests_response(response, status)
+            result.store_requests_response(response, status, check_results)
     feedback.add_test_case(case, response)
     return response
 
@@ -353,14 +357,15 @@ def _wsgi_test(
     run_targets(targets, context)
     result.logs.extend(recorded.records)
     status = Status.success
+    check_results: List[Check] = []
     try:
-        run_checks(case, checks, result, response, context.response_time * 1000, max_response_time)
+        run_checks(case, checks, check_results, result, response, context.response_time * 1000, max_response_time)
     except CheckFailed:
         status = Status.failure
         raise
     finally:
         if store_interactions:
-            result.store_wsgi_response(case, response, headers, elapsed, status)
+            result.store_wsgi_response(case, response, headers, elapsed, status, check_results)
     feedback.add_test_case(case, response)
     return response
 
@@ -420,13 +425,14 @@ def _asgi_test(
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
     status = Status.success
+    check_results: List[Check] = []
     try:
-        run_checks(case, checks, result, response, context.response_time * 1000, max_response_time)
+        run_checks(case, checks, check_results, result, response, context.response_time * 1000, max_response_time)
     except CheckFailed:
         status = Status.failure
         raise
     finally:
         if store_interactions:
-            result.store_requests_response(response, status)
+            result.store_requests_response(response, status, check_results)
     feedback.add_test_case(case, response)
     return response

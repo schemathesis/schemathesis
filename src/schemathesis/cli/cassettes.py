@@ -12,9 +12,8 @@ from requests.cookies import RequestsCookieJar
 from requests.structures import CaseInsensitiveDict
 
 from .. import constants
-from ..models import Interaction
 from ..runner import events
-from ..runner.serialization import SerializedCheck
+from ..runner.serialization import SerializedCheck, SerializedInteraction
 from .context import ExecutionContext
 from .handlers import EventHandler
 
@@ -50,7 +49,6 @@ class CassetteWriter(EventHandler):
                 Process(
                     seed=seed,
                     interactions=event.result.interactions,
-                    checks=event.result.checks,
                 )
             )
         if isinstance(event, events.Finished):
@@ -74,8 +72,7 @@ class Process:
     """A new chunk of data should be processed."""
 
     seed: int = attr.ib()  # pragma: no mutate
-    interactions: List[Interaction] = attr.ib()  # pragma: no mutate
-    checks: List[SerializedCheck] = attr.ib()  # pragma: no mutate
+    interactions: List[SerializedInteraction] = attr.ib()  # pragma: no mutate
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -112,7 +109,7 @@ def worker(file_handle: click.utils.LazyFile, queue: Queue) -> None:
         return "\n".join(f"      {name}:\n{format_header_values(values)}" for name, values in headers.items())
 
     def format_check_message(message: Optional[str]) -> str:
-        return "~" if message is None else f"'{message}'"
+        return "~" if message is None else f"{repr(message)}"
 
     def format_checks(checks: List[SerializedCheck]) -> str:
         return "\n".join(
@@ -138,7 +135,7 @@ http_interactions:"""
   elapsed: '{interaction.response.elapsed}'
   recorded_at: '{interaction.recorded_at}'
   checks:
-{format_checks(item.checks)}
+{format_checks(interaction.checks)}
   request:
     uri: '{interaction.request.uri}'
     method: '{interaction.request.method}'

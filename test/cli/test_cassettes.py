@@ -42,9 +42,12 @@ def test_store_cassette(cli, schema_url, cassette_path):
     assert load_response_body(cassette, 0) == b'{"success": true}'
     assert all("checks" in interaction for interaction in cassette["http_interactions"])
     assert len(cassette["http_interactions"][0]["checks"]) == 1
-    assert cassette["http_interactions"][0]["checks"][0]["name"] == "not_a_server_error"
-    assert cassette["http_interactions"][0]["checks"][0]["status"] == "SUCCESS"
-    assert cassette["http_interactions"][0]["checks"][0]["message"] is None
+    assert cassette["http_interactions"][0]["checks"][0] == {
+        "name": "not_a_server_error",
+        "status": "SUCCESS",
+        "message": None,
+    }
+    assert len(cassette["http_interactions"][1]["checks"]) == 1
 
 
 @pytest.mark.endpoints("flaky")
@@ -159,6 +162,7 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
         "--hypothesis-max-examples=1",
         "--hypothesis-seed=1",
         "--validate-schema=false",
+        "--checks=all",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # these requests are not needed
