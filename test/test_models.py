@@ -47,6 +47,7 @@ def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
         (None, {"User-Agent": USER_AGENT, "X-Key": "foo"}),
         ({"User-Agent": "foo/1.0"}, {"User-Agent": "foo/1.0", "X-Key": "foo"}),
         ({"X-Value": "bar"}, {"X-Value": "bar", "User-Agent": USER_AGENT, "X-Key": "foo"}),
+        ({"UsEr-agEnT": "foo/1.0"}, {"UsEr-agEnT": "foo/1.0", "X-Key": "foo"}),
     ),
 )
 def test_as_requests_kwargs_override_user_agent(server, openapi2_base_url, swagger_20, headers, expected):
