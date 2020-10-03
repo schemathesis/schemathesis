@@ -7,10 +7,10 @@ Changelog
 **Added**
 
 - Support for passing Hypothesis strategies to tests created with ``schema.parametrize`` by using ``schema.given`` decorator. `#768`_
-- Support PEP561 `#748`_
+- Support for PEP561. `#748`_
 - Shortcut for calling & validation. `#738`_
-- New hook to pre-commit, rstcheck, as well as updates to documentation based on rstcheck `#734`_
-- New check for maximum response time and corresponding CLI option ``--max-response-time`` `#716`_
+- New hook to pre-commit, ``rstcheck``, as well as updates to documentation based on rstcheck. `#734`_
+- New check for maximum response time and corresponding CLI option ``--max-response-time``. `#716`_
 - New field with information about executed checks in cassettes. `#702`_
 - New ``port`` parameter added to ``from_uri()`` method. `#706`_
 
