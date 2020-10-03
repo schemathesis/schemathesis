@@ -1376,8 +1376,8 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
-.. _#757: https://github.com/schemathesis/schemathesis/issues/757
 .. _#768: https://github.com/schemathesis/schemathesis/issues/768
+.. _#757: https://github.com/schemathesis/schemathesis/issues/757
 .. _#748: https://github.com/schemathesis/schemathesis/issues/748
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
 .. _#734: https://github.com/schemathesis/schemathesis/issues/734
