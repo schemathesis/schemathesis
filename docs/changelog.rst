@@ -13,6 +13,7 @@ Changelog
 - New check for maximum response time and corresponding CLI option ``--max-response-time``. `#716`_
 - New field with information about executed checks in cassettes. `#702`_
 - New ``port`` parameter added to ``from_uri()`` method. `#706`_
+- Python 3.9 support. `#731`_
 
 **Fixed**
 
@@ -1388,6 +1389,7 @@ Deprecated
 .. _#748: https://github.com/schemathesis/schemathesis/issues/748
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
 .. _#734: https://github.com/schemathesis/schemathesis/issues/734
+.. _#731: https://github.com/schemathesis/schemathesis/issues/731
 .. _#721: https://github.com/schemathesis/schemathesis/issues/721
 .. _#719: https://github.com/schemathesis/schemathesis/issues/719
 .. _#717: https://github.com/schemathesis/schemathesis/issues/717
