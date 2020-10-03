@@ -542,17 +542,26 @@ class Interaction:
 
     request: Request = attr.ib()  # pragma: no mutate
     response: Response = attr.ib()  # pragma: no mutate
+    status: Status = attr.ib()  # pragma: no mutate
     recorded_at: str = attr.ib(factory=lambda: datetime.datetime.now().isoformat())  # pragma: no mutate
 
     @classmethod
-    def from_requests(cls, response: requests.Response) -> "Interaction":
-        return cls(request=Request.from_prepared_request(response.request), response=Response.from_requests(response))
+    def from_requests(cls, response: requests.Response, status: Status) -> "Interaction":
+        return cls(
+            request=Request.from_prepared_request(response.request),
+            response=Response.from_requests(response),
+            status=status,
+        )
 
     @classmethod
-    def from_wsgi(cls, case: Case, response: WSGIResponse, headers: Dict[str, Any], elapsed: float) -> "Interaction":
+    def from_wsgi(  # pylint: disable=too-many-arguments
+        cls, case: Case, response: WSGIResponse, headers: Dict[str, Any], elapsed: float, status: Status
+    ) -> "Interaction":
         session = requests.Session()
         session.headers.update(headers)
-        return cls(request=Request.from_case(case, session), response=Response.from_wsgi(response, elapsed))
+        return cls(
+            request=Request.from_case(case, session), response=Response.from_wsgi(response, elapsed), status=status
+        )
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
@@ -593,11 +602,13 @@ class TestResult:
     def add_error(self, exception: Exception, example: Optional[Case] = None) -> None:
         self.errors.append((exception, example))
 
-    def store_requests_response(self, response: requests.Response) -> None:
-        self.interactions.append(Interaction.from_requests(response))
+    def store_requests_response(self, response: requests.Response, status: Status) -> None:
+        self.interactions.append(Interaction.from_requests(response, status))
 
-    def store_wsgi_response(self, case: Case, response: WSGIResponse, headers: Dict[str, Any], elapsed: float) -> None:
-        self.interactions.append(Interaction.from_wsgi(case, response, headers, elapsed))
+    def store_wsgi_response(  # pylint: disable=too-many-arguments
+        self, case: Case, response: WSGIResponse, headers: Dict[str, Any], elapsed: float, status: Status
+    ) -> None:
+        self.interactions.append(Interaction.from_wsgi(case, response, headers, elapsed, status))
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
