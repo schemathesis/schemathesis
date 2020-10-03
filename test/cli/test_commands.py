@@ -836,7 +836,7 @@ def test_pre_run_hook_module_not_found(testdir, cli):
 
 
 @pytest.mark.usefixtures("reset_hooks")
-def test_conditional_checks(testdir, cli, schema_url):
+def test_conditional_checks(testdir, cli, hypothesis_max_examples, schema_url):
     module = testdir.make_importable_pyfile(
         hook="""
             import schemathesis
@@ -850,7 +850,13 @@ def test_conditional_checks(testdir, cli, schema_url):
     )
 
     result = cli.main(
-        "--pre-run", module.purebasename, "run", "-c", "conditional_check", schema_url, "--hypothesis-max-examples=1"
+        "--pre-run",
+        module.purebasename,
+        "run",
+        "-c",
+        "conditional_check",
+        schema_url,
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
     )
 
     assert result.exit_code == ExitCode.OK
@@ -859,7 +865,7 @@ def test_conditional_checks(testdir, cli, schema_url):
 
 
 @pytest.mark.usefixtures("reset_hooks")
-def test_add_case(testdir, cli, schema_url):
+def test_add_case(testdir, cli, hypothesis_max_examples, schema_url):
     module = testdir.make_importable_pyfile(
         hook="""
             import schemathesis
@@ -881,7 +887,13 @@ def test_add_case(testdir, cli, schema_url):
     )
 
     result = cli.main(
-        "--pre-run", module.purebasename, "run", "-c", "add_case_check", schema_url, "--hypothesis-max-examples=1"
+        "--pre-run",
+        module.purebasename,
+        "run",
+        "-c",
+        "add_case_check",
+        schema_url,
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
     )
 
     assert result.exit_code == ExitCode.OK
@@ -890,7 +902,7 @@ def test_add_case(testdir, cli, schema_url):
 
 
 @pytest.mark.usefixtures("reset_hooks")
-def test_add_case_returns_none(testdir, cli, schema_url):
+def test_add_case_returns_none(testdir, cli, hypothesis_max_examples, schema_url):
     """Tests that no additional test case created when the add_case hook returns None."""
     module = testdir.make_importable_pyfile(
         hook="""
@@ -908,7 +920,13 @@ def test_add_case_returns_none(testdir, cli, schema_url):
     )
 
     result = cli.main(
-        "--pre-run", module.purebasename, "run", "-c", "add_case_check", schema_url, "--hypothesis-max-examples=1"
+        "--pre-run",
+        module.purebasename,
+        "run",
+        "-c",
+        "add_case_check",
+        schema_url,
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
     )
 
     assert result.exit_code == ExitCode.OK
@@ -918,7 +936,7 @@ def test_add_case_returns_none(testdir, cli, schema_url):
 
 
 @pytest.mark.usefixtures("reset_hooks")
-def test_multiple_add_case_hooks(testdir, cli, schema_url):
+def test_multiple_add_case_hooks(testdir, cli, hypothesis_max_examples, schema_url):
     """add_case hooks that mutate the case in place should not affect other cases."""
 
     module = testdir.make_importable_pyfile(
@@ -952,7 +970,13 @@ def test_multiple_add_case_hooks(testdir, cli, schema_url):
     )
 
     result = cli.main(
-        "--pre-run", module.purebasename, "run", "-c", "add_case_check", schema_url, "--hypothesis-max-examples=1"
+        "--pre-run",
+        module.purebasename,
+        "run",
+        "-c",
+        "add_case_check",
+        schema_url,
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
     )
 
     assert result.exit_code == ExitCode.OK
@@ -962,7 +986,7 @@ def test_multiple_add_case_hooks(testdir, cli, schema_url):
 
 
 @pytest.mark.usefixtures("reset_hooks")
-def test_add_case_output(testdir, cli, schema_url):
+def test_add_case_output(testdir, cli, hypothesis_max_examples, schema_url):
     module = testdir.make_importable_pyfile(
         hook="""
             import schemathesis
@@ -995,7 +1019,13 @@ def test_add_case_output(testdir, cli, schema_url):
     )
 
     result = cli.main(
-        "--pre-run", module.purebasename, "run", "-c", "add_case_check", schema_url, "--hypothesis-max-examples=1"
+        "--pre-run",
+        module.purebasename,
+        "run",
+        "-c",
+        "add_case_check",
+        schema_url,
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
     )
 
     assert result.exit_code == ExitCode.TESTS_FAILED
@@ -1147,7 +1177,7 @@ def test_hypothesis_output_capture(mocker, cli, cli_args, workers):
     assert "Falsifying example" in result.stdout
 
 
-async def test_multiple_files_schema(openapi_2_app, testdir, cli, openapi2_base_url):
+async def test_multiple_files_schema(openapi_2_app, testdir, cli, hypothesis_max_examples, openapi2_base_url):
     # When the schema contains references to other files
     uri = pathlib.Path(HERE).as_uri() + "/"
     schema = {
@@ -1179,7 +1209,10 @@ async def test_multiple_files_schema(openapi_2_app, testdir, cli, openapi2_base_
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
     # And file path is given to the CLI
     result = cli.run(
-        str(schema_file), f"--base-url={openapi2_base_url}", "--hypothesis-max-examples=5", "--hypothesis-derandomize"
+        str(schema_file),
+        f"--base-url={openapi2_base_url}",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
+        "--hypothesis-derandomize",
     )
     # Then Schemathesis should resolve it and run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -1273,7 +1306,7 @@ def test_wsgi_app_path_schema(cli, loadable_flask_app):
     assert "1 passed in" in result.stdout
 
 
-def test_multipart_upload(testdir, tmp_path, openapi3_base_url, cli):
+def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_base_url, cli):
     cassette_path = tmp_path / "output.yaml"
     # When requestBody has a binary field or an array of binary items
     responses = {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}}
@@ -1324,7 +1357,7 @@ def test_multipart_upload(testdir, tmp_path, openapi3_base_url, cli):
     result = cli.run(
         str(schema_file),
         f"--base-url={openapi3_base_url}",
-        "--hypothesis-max-examples=5",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
         "--show-errors-tracebacks",
         "--hypothesis-derandomize",
         f"--store-network-log={cassette_path}",
@@ -1365,7 +1398,7 @@ def test_targeted(mocker, cli, cli_args, workers):
     target.assert_called_with(mocker.ANY, label="response_time")
 
 
-def test_chained_internal_exception(testdir, cli, openapi3_base_url):
+def test_chained_internal_exception(testdir, cli, hypothesis_max_examples, openapi3_base_url):
     # When schema contains an error that causes an internal error in `jsonschema`
     raw_schema = {
         "openapi": "3.0.2",
@@ -1383,7 +1416,10 @@ def test_chained_internal_exception(testdir, cli, openapi3_base_url):
     }
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(raw_schema))
     result = cli.run(
-        str(schema_file), f"--base-url={openapi3_base_url}", "--hypothesis-max-examples=1", "--show-errors-tracebacks"
+        str(schema_file),
+        f"--base-url={openapi3_base_url}",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        "--show-errors-tracebacks",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
@@ -1397,10 +1433,15 @@ def fast_api_fixup():
 
 
 @pytest.mark.parametrize("fixup", ("all", "fast_api"))
-def test_fast_api_fixup(testdir, cli, base_url, fast_api_schema, fast_api_fixup, fixup):
+def test_fast_api_fixup(testdir, cli, base_url, fast_api_schema, hypothesis_max_examples, fast_api_fixup, fixup):
     # When schema contains Draft 7 definitions as ones from FastAPI may contain
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(fast_api_schema))
-    result = cli.run(str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=1", f"--fixups={fixup}")
+    result = cli.run(
+        str(schema_file),
+        f"--base-url={base_url}",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        f"--fixups={fixup}",
+    )
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
@@ -1415,12 +1456,12 @@ def test_colon_in_headers(cli, schema_url, app):
 
 @pytest.mark.parametrize("recursion_limit", (1, 5))
 @pytest.mark.endpoints("create_user", "get_user", "update_user")
-def test_openapi_links(cli, cli_args, schema_url, recursion_limit):
+def test_openapi_links(cli, cli_args, schema_url, hypothesis_max_examples, recursion_limit):
     # When the schema contains Open API links or Swagger 2 extension for links
     # And these links are nested - endpoints in these links contain links to another endpoints
     result = cli.run(
         *cli_args,
-        "--hypothesis-max-examples=2",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 2}",
         "--hypothesis-seed=1",
         "--hypothesis-derandomize",
         "--show-errors-tracebacks",
@@ -1449,12 +1490,12 @@ def test_openapi_links(cli, cli_args, schema_url, recursion_limit):
 
 @pytest.mark.parametrize("recursion_limit, expected", ((1, "....."), (5, "......")))
 @pytest.mark.endpoints("create_user", "get_user", "update_user")
-def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_limit, expected):
+def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_limit, hypothesis_max_examples, expected):
     # When the schema contains Open API links or Swagger 2 extension for links
     # And these links are nested - endpoints in these links contain links to another endpoints
     result = cli.run(
         *cli_args,
-        "--hypothesis-max-examples=2",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         "--hypothesis-seed=1",
         "--hypothesis-derandomize",
         "--show-errors-tracebacks",
@@ -1464,13 +1505,16 @@ def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_lim
     )
     lines = result.stdout.splitlines()
     assert result.exit_code == ExitCode.OK, result.stdout
-    assert lines[10] == expected
+    assert lines[10] == expected + "." if hypothesis_max_examples else expected
 
 
-def test_get_request_with_body(testdir, cli, base_url, schema_with_get_payload):
+def test_get_request_with_body(testdir, cli, base_url, hypothesis_max_examples, schema_with_get_payload):
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema_with_get_payload))
     result = cli.run(
-        str(schema_file), f"--base-url={base_url}", "--hypothesis-max-examples=1", "--show-errors-tracebacks"
+        str(schema_file),
+        f"--base-url={base_url}",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        "--show-errors-tracebacks",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
