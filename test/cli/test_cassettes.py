@@ -22,6 +22,10 @@ def load_cassette(path):
         return yaml.safe_load(fd)
 
 
+def load_response_body(cassette, idx):
+    return base64.b64decode(cassette["http_interactions"][idx]["response"]["body"]["base64_string"])
+
+
 @pytest.mark.endpoints("success", "upload_file")
 def test_store_cassette(cli, schema_url, cassette_path):
     result = cli.run(
@@ -35,13 +39,35 @@ def test_store_cassette(cli, schema_url, cassette_path):
     assert cassette["http_interactions"][0]["status"] == "SUCCESS"
     assert cassette["http_interactions"][0]["seed"] == "1"
     assert float(cassette["http_interactions"][0]["elapsed"]) >= 0
-    data = base64.b64decode(cassette["http_interactions"][0]["response"]["body"]["base64_string"])
-    assert data == b'{"success": true}'
+    assert load_response_body(cassette, 0) == b'{"success": true}'
     assert all("checks" in interaction for interaction in cassette["http_interactions"])
     assert len(cassette["http_interactions"][0]["checks"]) == 1
     assert cassette["http_interactions"][0]["checks"][0]["name"] == "not_a_server_error"
     assert cassette["http_interactions"][0]["checks"][0]["status"] == "SUCCESS"
     assert cassette["http_interactions"][0]["checks"][0]["message"] is None
+
+
+@pytest.mark.endpoints("flaky")
+def test_interaction_status(cli, openapi3_schema_url, cassette_path):
+    # See GH-695
+    # When an endpoint has responses with SUCCESS and FAILURE statuses
+    result = cli.run(
+        openapi3_schema_url,
+        f"--store-network-log={cassette_path}",
+        "--hypothesis-max-examples=5",
+        "--hypothesis-seed=1",
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    cassette = load_cassette(cassette_path)
+    assert len(cassette["http_interactions"]) == 3
+    # Then their statuses should be reflected in the "status" field
+    # And it should not be overridden by the overall test status
+    assert cassette["http_interactions"][0]["status"] == "FAILURE"
+    assert load_response_body(cassette, 0) == b"500: Internal Server Error"
+    assert cassette["http_interactions"][1]["status"] == "SUCCESS"
+    assert load_response_body(cassette, 1) == b'{"result": "flaky!"}'
+    assert cassette["http_interactions"][2]["status"] == "SUCCESS"
+    assert load_response_body(cassette, 2) == b'{"result": "flaky!"}'
 
 
 def test_encoding_error(testdir, cli, cassette_path, openapi3_base_url):
