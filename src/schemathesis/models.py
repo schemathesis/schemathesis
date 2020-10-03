@@ -542,25 +542,36 @@ class Interaction:
 
     request: Request = attr.ib()  # pragma: no mutate
     response: Response = attr.ib()  # pragma: no mutate
+    checks: List[Check] = attr.ib()  # pragma: no mutate
     status: Status = attr.ib()  # pragma: no mutate
     recorded_at: str = attr.ib(factory=lambda: datetime.datetime.now().isoformat())  # pragma: no mutate
 
     @classmethod
-    def from_requests(cls, response: requests.Response, status: Status) -> "Interaction":
+    def from_requests(cls, response: requests.Response, status: Status, checks: List[Check]) -> "Interaction":
         return cls(
             request=Request.from_prepared_request(response.request),
             response=Response.from_requests(response),
             status=status,
+            checks=checks,
         )
 
     @classmethod
     def from_wsgi(  # pylint: disable=too-many-arguments
-        cls, case: Case, response: WSGIResponse, headers: Dict[str, Any], elapsed: float, status: Status
+        cls,
+        case: Case,
+        response: WSGIResponse,
+        headers: Dict[str, Any],
+        elapsed: float,
+        status: Status,
+        checks: List[Check],
     ) -> "Interaction":
         session = requests.Session()
         session.headers.update(headers)
         return cls(
-            request=Request.from_case(case, session), response=Response.from_wsgi(response, elapsed), status=status
+            request=Request.from_case(case, session),
+            response=Response.from_wsgi(response, elapsed),
+            status=status,
+            checks=checks,
         )
 
 
@@ -602,13 +613,19 @@ class TestResult:
     def add_error(self, exception: Exception, example: Optional[Case] = None) -> None:
         self.errors.append((exception, example))
 
-    def store_requests_response(self, response: requests.Response, status: Status) -> None:
-        self.interactions.append(Interaction.from_requests(response, status))
+    def store_requests_response(self, response: requests.Response, status: Status, checks: List[Check]) -> None:
+        self.interactions.append(Interaction.from_requests(response, status, checks))
 
     def store_wsgi_response(  # pylint: disable=too-many-arguments
-        self, case: Case, response: WSGIResponse, headers: Dict[str, Any], elapsed: float, status: Status
+        self,
+        case: Case,
+        response: WSGIResponse,
+        headers: Dict[str, Any],
+        elapsed: float,
+        status: Status,
+        checks: List[Check],
     ) -> None:
-        self.interactions.append(Interaction.from_wsgi(case, response, headers, elapsed, status))
+        self.interactions.append(Interaction.from_wsgi(case, response, headers, elapsed, status, checks))
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate

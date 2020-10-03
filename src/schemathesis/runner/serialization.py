@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 import attr
 
-from ..models import Case, Check, Interaction, Status, TestResult
+from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
 from ..utils import format_exception
 
 
@@ -60,6 +60,25 @@ class SerializedError:
 
 
 @attr.s(slots=True)  # pragma: no mutate
+class SerializedInteraction:
+    request: Request = attr.ib()  # pragma: no mutate
+    response: Response = attr.ib()  # pragma: no mutate
+    checks: List[SerializedCheck] = attr.ib()  # pragma: no mutate
+    status: Status = attr.ib()  # pragma: no mutate
+    recorded_at: str = attr.ib()  # pragma: no mutate
+
+    @classmethod
+    def from_interaction(cls, interaction: Interaction, headers: Optional[Dict[str, Any]]) -> "SerializedInteraction":
+        return cls(
+            request=interaction.request,
+            response=interaction.response,
+            checks=[SerializedCheck.from_check(check, headers) for check in interaction.checks],
+            status=interaction.status,
+            recorded_at=interaction.recorded_at,
+        )
+
+
+@attr.s(slots=True)  # pragma: no mutate
 class SerializedTestResult:
     method: str = attr.ib()  # pragma: no mutate
     path: str = attr.ib()  # pragma: no mutate
@@ -71,7 +90,7 @@ class SerializedTestResult:
     checks: List[SerializedCheck] = attr.ib()  # pragma: no mutate
     logs: List[str] = attr.ib()  # pragma: no mutate
     errors: List[SerializedError] = attr.ib()  # pragma: no mutate
-    interactions: List[Interaction] = attr.ib()  # pragma: no mutate
+    interactions: List[SerializedInteraction] = attr.ib()  # pragma: no mutate
 
     @classmethod
     def from_test_result(cls, result: TestResult) -> "SerializedTestResult":
@@ -87,5 +106,8 @@ class SerializedTestResult:
             checks=[SerializedCheck.from_check(check, headers=result.overridden_headers) for check in result.checks],
             logs=[formatter.format(record) for record in result.logs],
             errors=[SerializedError.from_error(*error, headers=result.overridden_headers) for error in result.errors],
-            interactions=result.interactions,
+            interactions=[
+                SerializedInteraction.from_interaction(interaction, headers=result.overridden_headers)
+                for interaction in result.interactions
+            ],
         )
