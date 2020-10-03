@@ -27,13 +27,17 @@ def load_response_body(cassette, idx):
 
 
 @pytest.mark.endpoints("success", "upload_file")
-def test_store_cassette(cli, schema_url, cassette_path):
+def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples):
+    hypothesis_max_examples = hypothesis_max_examples or 2
     result = cli.run(
-        schema_url, f"--store-network-log={cassette_path}", "--hypothesis-max-examples=2", "--hypothesis-seed=1"
+        schema_url,
+        f"--store-network-log={cassette_path}",
+        f"--hypothesis-max-examples={hypothesis_max_examples}",
+        "--hypothesis-seed=1",
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
-    assert len(cassette["http_interactions"]) == 3
+    assert len(cassette["http_interactions"]) == 1 + hypothesis_max_examples
     assert cassette["http_interactions"][0]["id"] == "1"
     assert cassette["http_interactions"][1]["id"] == "2"
     assert cassette["http_interactions"][0]["status"] == "SUCCESS"
@@ -51,13 +55,13 @@ def test_store_cassette(cli, schema_url, cassette_path):
 
 
 @pytest.mark.endpoints("flaky")
-def test_interaction_status(cli, openapi3_schema_url, cassette_path):
+def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, cassette_path):
     # See GH-695
     # When an endpoint has responses with SUCCESS and FAILURE statuses
     result = cli.run(
         openapi3_schema_url,
         f"--store-network-log={cassette_path}",
-        "--hypothesis-max-examples=5",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
         "--hypothesis-seed=1",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
@@ -73,7 +77,7 @@ def test_interaction_status(cli, openapi3_schema_url, cassette_path):
     assert load_response_body(cassette, 2) == b'{"result": "flaky!"}'
 
 
-def test_encoding_error(testdir, cli, cassette_path, openapi3_base_url):
+def test_encoding_error(testdir, cli, cassette_path, hypothesis_max_examples, openapi3_base_url):
     # See GH-708
     # When the schema expects an input that is not ascii and represented as UTF-8
     # And is not representable in CP1251. E.g. "àààà"
@@ -104,7 +108,7 @@ def test_encoding_error(testdir, cli, cassette_path, openapi3_base_url):
     result = cli.run(
         str(schema_file),
         f"--base-url={openapi3_base_url}",
-        "--hypothesis-max-examples=1",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         f"--store-network-log={cassette_path}",
     )
     # Then the test run should be successful
@@ -127,24 +131,34 @@ def test_get_command_representation(mocker):
 
 
 @pytest.mark.endpoints("success")
-def test_run_subprocess(testdir, cassette_path, schema_url):
+def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_url):
     result = testdir.run(
-        "schemathesis", "run", f"--store-network-log={cassette_path}", "--hypothesis-max-examples=2", schema_url
+        "schemathesis",
+        "run",
+        f"--store-network-log={cassette_path}",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 2}",
+        schema_url,
     )
     assert result.ret == ExitCode.OK
     assert result.outlines[17] == f"Network log: {cassette_path}"
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) == 1
-    command = f"schemathesis run --store-network-log={cassette_path} --hypothesis-max-examples=2 {schema_url}"
+    command = (
+        f"schemathesis run --store-network-log={cassette_path} "
+        f"--hypothesis-max-examples={hypothesis_max_examples or 2} {schema_url}"
+    )
     assert cassette["command"] == command
 
 
 @pytest.mark.endpoints("invalid")
-def test_main_process_error(cli, schema_url, cassette_path):
+def test_main_process_error(cli, schema_url, hypothesis_max_examples, cassette_path):
     # When there is an error in the main process before the background writer is finished
     # Here it is happening because the schema is not valid
     result = cli.run(
-        schema_url, f"--store-network-log={cassette_path}", "--hypothesis-max-examples=1", "--hypothesis-seed=1"
+        schema_url,
+        f"--store-network-log={cassette_path}",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        "--hypothesis-seed=1",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then there should be no hanging threads
@@ -154,12 +168,12 @@ def test_main_process_error(cli, schema_url, cassette_path):
 
 
 @pytest.mark.endpoints("__all__")
-async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette_path):
+async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette_path, hypothesis_max_examples):
     # Record a cassette
     result = cli.run(
         schema_url,
         f"--store-network-log={cassette_path}",
-        "--hypothesis-max-examples=1",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         "--hypothesis-seed=1",
         "--validate-schema=false",
         "--checks=all",
@@ -190,13 +204,13 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
 
 
 @pytest.mark.endpoints("headers")
-async def test_headers_serialization(cli, openapi2_schema_url, cassette_path):
+async def test_headers_serialization(cli, openapi2_schema_url, hypothesis_max_examples, cassette_path):
     # See GH-783
     # When headers contain control characters that are not directly representable in YAML
     result = cli.run(
         openapi2_schema_url,
         f"--store-network-log={cassette_path}",
-        "--hypothesis-max-examples=100",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 100}",
         "--hypothesis-seed=1",
         "--validate-schema=false",
     )

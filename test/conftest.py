@@ -21,6 +21,26 @@ pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
 settings.register_profile("CI", max_examples=10000)
 
 
+@pytest.fixture(scope="session")
+def hypothesis_max_examples():
+    """Take `max_examples` value if it is not default.
+
+    If it is default, then return None, so individual tests can use appropriate values.
+    """
+    value = settings().max_examples
+    return None if value == 100 else value  # Hypothesis uses 100 examples by default
+
+
+def pytest_collection_modifyitems(session, config, items):
+    """Add the `hypothesis_nested` marker to tests, that depend on the `hypothesis_max_examples` fixture.
+
+    During scheduled test runs on CI, we select such tests and run them with a higher number of examples.
+    """
+    for item in items:
+        if isinstance(item, pytest.Function) and "hypothesis_max_examples" in item.fixturenames:
+            item.add_marker("hypothesis_nested")
+
+
 def pytest_configure(config):
     config.addinivalue_line("markers", "endpoints(*names): add only specified endpoints to the test application.")
     config.addinivalue_line("markers", "hypothesis_nested: mark tests with nested Hypothesis tests.")
