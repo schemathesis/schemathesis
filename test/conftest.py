@@ -110,6 +110,12 @@ def schema_url(server, app):
 
 
 @pytest.fixture()
+def openapi2_schema_url(server, openapi_2_app):
+    """URL of the schema of the running application."""
+    return f"http://127.0.0.1:{server['port']}/schema.yaml"
+
+
+@pytest.fixture()
 def openapi3_schema_url(server, openapi_3_app):
     """URL of the schema of the running application."""
     return f"http://127.0.0.1:{server['port']}/schema.yaml"
