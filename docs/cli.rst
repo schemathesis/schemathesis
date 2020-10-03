@@ -260,7 +260,7 @@ Schemathesis provides the following extra fields:
 
 - ``command``. Full CLI command used to run Schemathesis.
 - ``http_interactions.id``. A numeric interaction ID within the current cassette.
-- ``http_interactions.status``. Type of test outcome is one of ``SUCCESS``, ``FAILURE``, ``ERROR``.
+- ``http_interactions.status``. Type of test outcome is one of ``SUCCESS``, ``FAILURE``. The status value is calculated from individual checks statuses - if any check failed, then the final status is ``FAILURE``.
 - ``http_interactions.seed``. The Hypothesis seed used in that particular case could be used as an argument to ``--hypothesis-seed`` CLI option to reproduce this request.
 - ``http_interactions.elapsed``. Time in seconds that a request took.
 - ``http_interactions.checks``. A list of executed checks and and their status.
@@ -288,7 +288,7 @@ Saved cassettes can be replayed with ``schemathesis replay`` command. Additional
 replay by these parameters:
 
 - ``id``. Specific, unique ID;
-- ``status``. Replay only interactions with this status (``SUCCESS``, ``FAILURE`` or ``ERROR``);
+- ``status``. Replay only interactions with this status (``SUCCESS`` or ``FAILURE``);
 - ``uri``. A regular expression for request URI;
 - ``method``. A regular expression for request method;
 

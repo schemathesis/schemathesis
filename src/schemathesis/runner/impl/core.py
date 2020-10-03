@@ -284,9 +284,15 @@ def _network_test(
     response = case.call(session=session, headers=headers, timeout=timeout)
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
-    if store_interactions:
-        result.store_requests_response(response)
-    run_checks(case, checks, result, response, context.response_time * 1000, max_response_time)
+    status = Status.success
+    try:
+        run_checks(case, checks, result, response, context.response_time * 1000, max_response_time)
+    except CheckFailed:
+        status = Status.failure
+        raise
+    finally:
+        if store_interactions:
+            result.store_requests_response(response, status)
     feedback.add_test_case(case, response)
     return response
 
@@ -344,10 +350,16 @@ def _wsgi_test(
         elapsed = time.monotonic() - start
     context = TargetContext(case=case, response=response, response_time=elapsed)
     run_targets(targets, context)
-    if store_interactions:
-        result.store_wsgi_response(case, response, headers, elapsed)
     result.logs.extend(recorded.records)
-    run_checks(case, checks, result, response, context.response_time * 1000, max_response_time)
+    status = Status.success
+    try:
+        run_checks(case, checks, result, response, context.response_time * 1000, max_response_time)
+    except CheckFailed:
+        status = Status.failure
+        raise
+    finally:
+        if store_interactions:
+            result.store_wsgi_response(case, response, headers, elapsed, status)
     feedback.add_test_case(case, response)
     return response
 
@@ -405,8 +417,14 @@ def _asgi_test(
     response = case.call_asgi(headers=headers)
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
-    if store_interactions:
-        result.store_requests_response(response)
-    run_checks(case, checks, result, response, context.response_time * 1000, max_response_time)
+    status = Status.success
+    try:
+        run_checks(case, checks, result, response, context.response_time * 1000, max_response_time)
+    except CheckFailed:
+        status = Status.failure
+        raise
+    finally:
+        if store_interactions:
+            result.store_requests_response(response, status)
     feedback.add_test_case(case, response)
     return response

@@ -16,6 +16,8 @@ Changelog
 **Fixed**
 
 - Default ``User-Agent`` header in ``Case.call``. `#717`_
+- Status of individual interactions in VCR cassettes. Before this change, all statuses were taken from the overall test outcome,
+  rather than from the check results for a particular response. `#695`_
 
 **Changed**
 
@@ -1387,6 +1389,7 @@ Deprecated
 .. _#708: https://github.com/schemathesis/schemathesis/issues/708
 .. _#705: https://github.com/schemathesis/schemathesis/issues/705
 .. _#702: https://github.com/schemathesis/schemathesis/issues/702
+.. _#695: https://github.com/schemathesis/schemathesis/issues/695
 .. _#692: https://github.com/schemathesis/schemathesis/issues/692
 .. _#686: https://github.com/schemathesis/schemathesis/issues/686
 .. _#684: https://github.com/schemathesis/schemathesis/issues/684

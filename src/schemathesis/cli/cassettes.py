@@ -48,7 +48,6 @@ class CassetteWriter(EventHandler):
             seed = cast(int, event.result.seed)
             self.queue.put(
                 Process(
-                    status=event.status.name.upper(),
                     seed=seed,
                     interactions=event.result.interactions,
                     checks=event.result.checks,
@@ -74,7 +73,6 @@ class Initialize:
 class Process:
     """A new chunk of data should be processed."""
 
-    status: str = attr.ib()  # pragma: no mutate
     seed: int = attr.ib()  # pragma: no mutate
     interactions: List[Interaction] = attr.ib()  # pragma: no mutate
     checks: List[SerializedCheck] = attr.ib()  # pragma: no mutate
@@ -132,9 +130,10 @@ http_interactions:"""
             )
         elif isinstance(item, Process):
             for interaction in item.interactions:
+                status = interaction.status.name.upper()
                 stream.write(
                     f"""\n- id: '{current_id}'
-  status: '{item.status}'
+  status: '{status}'
   seed: '{item.seed}'
   elapsed: '{interaction.response.elapsed}'
   recorded_at: '{interaction.recorded_at}'
