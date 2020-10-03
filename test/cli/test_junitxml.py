@@ -5,10 +5,15 @@ from _pytest.main import ExitCode
 
 
 @pytest.mark.endpoints("success")
-def test_junitxml_option(cli, schema_url, tmp_path):
+def test_junitxml_option(cli, schema_url, hypothesis_max_examples, tmp_path):
     # When option with a path to junit.xml is provided
     xml_path = tmp_path / "junit.xml"
-    result = cli.run(schema_url, f"--junit-xml={xml_path}", "--hypothesis-max-examples=2", "--hypothesis-seed=1")
+    result = cli.run(
+        schema_url,
+        f"--junit-xml={xml_path}",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 2}",
+        "--hypothesis-seed=1",
+    )
     # Command executed successfully
     assert result.exit_code == ExitCode.OK, result.stdout
     # File is created
@@ -18,9 +23,15 @@ def test_junitxml_option(cli, schema_url, tmp_path):
 
 
 @pytest.mark.endpoints("success", "failure", "malformed_json")
-def test_junitxml_file(cli, schema_url, tmp_path):
+def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path):
     xml_path = tmp_path / "junit.xml"
-    cli.run(schema_url, f"--junit-xml={xml_path}", "--hypothesis-max-examples=1", "--hypothesis-seed=1", "--checks=all")
+    cli.run(
+        schema_url,
+        f"--junit-xml={xml_path}",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        "--hypothesis-seed=1",
+        "--checks=all",
+    )
     tree = ElementTree.parse(xml_path)
     # Inspect root element `testsuites`
     root = tree.getroot()

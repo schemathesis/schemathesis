@@ -47,7 +47,7 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 0$"])
 
 
-def test_invalid_endpoint(testdir):
+def test_invalid_endpoint(testdir, hypothesis_max_examples):
     # When the given schema is invalid
     # And schema validation is disabled
     testdir.make_test(
@@ -90,7 +90,8 @@ def test_(request, case):
         ]
     )
     # 100 for /valid, 1 for /users
-    result.stdout.re_match_lines([r"Hypothesis calls: 101$"])
+    hypothesis_calls = (hypothesis_max_examples or 100) + 1
+    result.stdout.re_match_lines([rf"Hypothesis calls: {hypothesis_calls}$"])
 
 
 def test_with_fixtures(testdir):
