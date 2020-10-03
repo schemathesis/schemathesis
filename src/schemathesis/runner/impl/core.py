@@ -238,7 +238,7 @@ def network_test(
     """A single test body will be executed against the target."""
     # pylint: disable=too-many-arguments
     headers = headers or {}
-    if "user-agent" not in set(k.lower() for k in headers):
+    if "user-agent" not in {header.lower() for header in headers}:
         headers["User-Agent"] = USER_AGENT
     timeout = prepare_timeout(request_timeout)
     response = _network_test(
@@ -357,7 +357,7 @@ def _prepare_wsgi_headers(
     headers: Optional[Dict[str, Any]], auth: Optional[RawAuth], auth_type: Optional[str]
 ) -> Dict[str, Any]:
     headers = headers or {}
-    if "user-agent" not in set(k.lower() for k in headers):
+    if "user-agent" not in {header.lower() for header in headers}:
         headers["User-Agent"] = USER_AGENT
     wsgi_auth = get_wsgi_auth(auth, auth_type)
     if wsgi_auth:
