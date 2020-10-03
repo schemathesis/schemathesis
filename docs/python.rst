@@ -82,8 +82,127 @@ For example, in the following test, Schemathesis will test each endpoint with up
 
 See the whole list of available options in the `Hypothesis documentation <https://hypothesis.readthedocs.io/en/latest/settings.html#available-settings>`_.
 
+Loading schemas
+---------------
+
+To start testing, you need to load your API schema first.
+It could be a file on your local machine or a web resource or a simple Python dictionary - Schemathesis supports loading API schemas from different location types.
+
+Remote URL
+~~~~~~~~~~
+
+The most common way to load the API schema is from the running application via a network request.
+If your application is running at ``http://app.com`` and the schema is available at the ``/api/openapi.json`` path, then
+you can load it by using the ``schemathesis.from_uri`` loader:
+
+.. code:: python
+
+    schema = schemathesis.from_uri("http://app.com/api/openapi.json")
+
+If you want to load the schema from one URL, but run tests against an URL which differs in port value,
+then you can use the ``port`` argument:
+
+.. code:: python
+
+    schema = schemathesis.from_uri(
+        "http://app.com/api/openapi.json",
+        port=8081
+    )
+
+This code will run tests against ``http://app.com:8081/api/openapi.json``.
+
+Local path
+~~~~~~~~~~
+
+Sometimes you store the schema in a separate file, then it might be easier to load it from there, instead of a running application:
+
+.. code:: python
+
+    schema = schemathesis.from_path("/tmp/openapi.json")
+
+Schemathesis will load the API schema from the ``/tmp/openapi.json`` file and will use ``host`` or ``servers`` keyword values to send requests to.
+If you don't need this behavior, you can specify the ``base_url`` argument to send testing requests elsewhere.
+
+For example, if you have the following Open API 2 schema:
+
+.. code:: yaml
+
+    swagger: "2.0"
+    host: "petstore.swagger.io"
+    basePath: "/v2"
+
+But want to send requests to a local test server which is running at ``http://127.0.0.1:8000``, then your schema loading code may look like this:
+
+.. code:: python
+
+    schema = schemathesis.from_path(
+        "/tmp/openapi.json",
+        base_url="http://127.0.0.1:8000/v2"
+    )
+
+Note that you need to provide the full base URL, which includes the ``basePath`` part.
+It works similarly for Open API 3, where the ``servers`` keyword contains a list of URLs:
+
+.. code:: yaml
+
+    openapi: 3.0.0
+    servers:
+      - url: https://petstore.swagger.io/v2
+      - url: http://petstore.swagger.io/v2
+
+With Open API 3, Schemathesis uses the first value from this list to send requests to.
+To use another server, you need to provide it explicitly, the same way as in the example above.
+
+Raw string
+~~~~~~~~~~
+
+This loader serves as a basic block for the previous two. It loads a schema from a string or generic IO handle (like one returned by the ``open`` call):
+
+.. code:: python
+
+    # The first argument is a valid Open API schema as a JSON string
+    schema = schemathesis.from_file('{"paths": {}, ...}')
+
+Python dictionary
+~~~~~~~~~~~~~~~~~
+
+If you maintain your API schema in Python code or your web framework (for example, Fast API) generates it this way, then you can load it directly to Schemathesis:
+
+.. code:: python
+
+    raw_schema = {
+        "swagger": "2.0",
+        "paths": {
+            # Open API endpoints here
+        },
+    }
+    schema = schemathesis.from_dict(raw_schema)
+
+Web applications
+~~~~~~~~~~~~~~~~
+
+Schemathesis natively supports testing of ASGI and WSGI compatible apps (e.g., Flask or FastAPI),
+which is significantly faster since it doesn't involve the network.
+
+.. code:: python
+
+    from project import app
+
+    # WSGI
+    schema = schemathesis.from_wsgi("/api/openapi.json", app)
+    # Or ASGI
+    schema = schemathesis.from_asgi("/api/openapi.json", app)
+
+Both loaders expect the relative schema path and an application instance.
+
+Also, we support ``aiohttp`` by implicitly starting an application in a separate thread:
+
+.. code:: python
+
+    schema = schemathesis.from_aiohttp("/api/openapi.json", app)
+
 Lazy loading
-------------
+~~~~~~~~~~~~
 
 Suppose you have a schema that is not available when the tests are collected if, for example, it is built with tools like ``apispec``.
 This approach requires an initialized application instance to generate the API schema. You can parametrize the tests from a pytest fixture.
@@ -92,11 +211,29 @@ This approach requires an initialized application instance to generate the API s
 
     import schemathesis
 
-    schema = schemathesis.from_pytest_fixture("fixture_name")
+    @pytest.fixture
+    def web_app(db):
+        # some dynamically built application
+        # that depends on other fixtures
+        app = FastAPI()
+
+        @app.on_event("startup")
+        async def startup():
+            await db.connect()
+
+        @app.on_event("shutdown")
+        async def shutdown():
+            await db.disconnect()
+
+        return schemathesis.from_dict(app.openapi())
+
+    schema = schemathesis.from_pytest_fixture("web_app")
 
     @schema.parametrize()
     def test_api(case):
         ...
+
+This approach is useful, when in your tests you need to initialize some pytest fixtures before loading the API schema.
 
 In this case, the test body will be used as a sub-test via the ``pytest-subtests`` library.
 
