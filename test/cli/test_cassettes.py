@@ -1,5 +1,5 @@
 import base64
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from urllib.parse import parse_qsl, quote_plus, unquote_plus, urlencode, urlparse, urlunparse
 
 import pytest
 import requests
@@ -181,8 +181,9 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
         assert request.method == serialized["method"]
         parsed = urlparse(str(request.url))
         encoded_query = urlencode(parse_qsl(parsed.query, keep_blank_values=True))
-        url = urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, encoded_query, parsed.fragment))
-        assert url == serialized["uri"]
+        encoded_path = quote_plus(unquote_plus(parsed.path), "/")
+        url = urlunparse((parsed.scheme, parsed.netloc, encoded_path, parsed.params, encoded_query, parsed.fragment))
+        assert url == serialized["uri"], request.url
         content = await request.read()
         assert content == base64.b64decode(serialized["body"]["base64_string"])
         compare_headers(request, serialized["headers"])
