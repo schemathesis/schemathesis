@@ -188,6 +188,26 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
         compare_headers(request, serialized["headers"])
 
 
+@pytest.mark.endpoints("headers")
+async def test_headers_serialization(cli, openapi2_schema_url, cassette_path):
+    # See GH-783
+    # When headers contain control characters that are not directly representable in YAML
+    result = cli.run(
+        openapi2_schema_url,
+        f"--store-network-log={cassette_path}",
+        "--hypothesis-max-examples=100",
+        "--hypothesis-seed=1",
+        "--validate-schema=false",
+    )
+    # Then tests should pass
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # And cassette can be replayed
+    result = cli.replay(str(cassette_path))
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # And should be loadable
+    load_cassette(cassette_path)
+
+
 def test_multiple_cookies(base_url):
     headers = {"User-Agent": USER_AGENT}
     response = requests.get(f"{base_url}/success", cookies={"foo": "bar", "baz": "spam"}, headers=headers)

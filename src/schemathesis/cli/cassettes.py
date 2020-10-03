@@ -1,4 +1,5 @@
 import base64
+import json
 import re
 import sys
 import threading
@@ -103,7 +104,7 @@ def worker(file_handle: click.utils.LazyFile, queue: Queue) -> None:
     stream = file_handle.open()
 
     def format_header_values(values: List[str]) -> str:
-        return "\n".join(f"      - '{v}'" for v in values)
+        return "\n".join(f"      - {json.dumps(v)}" for v in values)
 
     def format_headers(headers: Dict[str, List[str]]) -> str:
         return "\n".join(f"      {name}:\n{format_header_values(values)}" for name, values in headers.items())
