@@ -15,10 +15,11 @@ Changelog
 
 **Fixed**
 
-- Fix ``User-Agent`` header overriding the passed one. `#757`_
+- ``User-Agent`` header overriding the passed one. `#757`_
 - Default ``User-Agent`` header in ``Case.call``. `#717`_
 - Status of individual interactions in VCR cassettes. Before this change, all statuses were taken from the overall test outcome,
   rather than from the check results for a particular response. `#695`_
+- Escaping header values in VCR cassettes. `#783`_
 
 **Changed**
 
@@ -1378,6 +1379,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#783: https://github.com/schemathesis/schemathesis/issues/783
 .. _#768: https://github.com/schemathesis/schemathesis/issues/768
 .. _#757: https://github.com/schemathesis/schemathesis/issues/757
 .. _#748: https://github.com/schemathesis/schemathesis/issues/748
