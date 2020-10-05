@@ -54,6 +54,11 @@ def get_schema_validation_error(exception: ValidationError) -> Type[CheckFailed]
     return _get_hashed_exception("SchemaValidationError", str(exception))
 
 
+def get_headers_error(message: str) -> Type[CheckFailed]:
+    """Return new exception for missing headers."""
+    return _get_hashed_exception("MissingHeadersError", message)
+
+
 class InvalidSchema(Exception):
     """Schema associated with an endpoint contains an error."""
 

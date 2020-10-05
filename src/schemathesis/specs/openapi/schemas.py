@@ -183,6 +183,25 @@ class BaseOpenAPISchema(BaseSchema):
     def _get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         raise NotImplementedError
 
+    def _get_response_definitions(self, endpoint: Endpoint, response: GenericResponse) -> Optional[Dict[str, Any]]:
+        try:
+            responses = endpoint.definition.resolved["responses"]
+        except KeyError as exc:
+            # Possible to get if `validate_schema=False` is passed during schema creation
+            raise InvalidSchema("Schema parsing failed. Please check your schema.") from exc
+        status_code = str(response.status_code)
+        if status_code in responses:
+            return responses[status_code]
+        if "default" in responses:
+            return responses["default"]
+        return None
+
+    def get_headers(self, endpoint: Endpoint, response: GenericResponse) -> Optional[Dict[str, Dict[str, Any]]]:
+        definitions = self._get_response_definitions(endpoint, response)
+        if not definitions:
+            return None
+        return definitions.get("headers")
+
 
 class SwaggerV20(BaseOpenAPISchema):
     nullable_name = "x-nullable"
@@ -404,17 +423,8 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         return get_strategies_from_examples(endpoint, self.examples_field)
 
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
-        try:
-            responses = endpoint.definition.raw["responses"]
-        except KeyError as exc:
-            # Possible to get if `validate_schema=False` is passed during schema creation
-            raise InvalidSchema("Schema parsing failed. Please check your schema.") from exc
-        status_code = str(response.status_code)
-        if status_code in responses:
-            definitions = responses[status_code]
-        elif "default" in responses:
-            definitions = responses["default"]
-        else:
+        definitions = self._get_response_definitions(endpoint, response)
+        if not definitions:
             return []
         return list(definitions.get("content", {}).keys())
 

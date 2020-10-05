@@ -1,7 +1,12 @@
 from typing import TYPE_CHECKING, Optional, Tuple
 
 from .exceptions import get_status_code_error
-from .specs.openapi.checks import content_type_conformance, response_schema_conformance, status_code_conformance
+from .specs.openapi.checks import (
+    content_type_conformance,
+    response_headers_conformance,
+    response_schema_conformance,
+    status_code_conformance,
+)
 from .utils import GenericResponse
 
 if TYPE_CHECKING:
@@ -17,5 +22,10 @@ def not_a_server_error(response: GenericResponse, case: "Case") -> Optional[bool
 
 
 DEFAULT_CHECKS = (not_a_server_error,)
-OPTIONAL_CHECKS = (status_code_conformance, content_type_conformance, response_schema_conformance)
+OPTIONAL_CHECKS = (
+    status_code_conformance,
+    content_type_conformance,
+    response_headers_conformance,
+    response_schema_conformance,
+)
 ALL_CHECKS: Tuple["CheckFunction", ...] = DEFAULT_CHECKS + OPTIONAL_CHECKS
