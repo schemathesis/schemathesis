@@ -148,7 +148,7 @@ http_interactions:"""
   response:
     status:
       code: '{interaction.response.status_code}'
-      message: '{interaction.response.message}'
+      message: {json.dumps(interaction.response.message)}
     headers:
 {format_headers(interaction.response.headers)}
     body:
