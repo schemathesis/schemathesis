@@ -1,3 +1,4 @@
+import json
 from time import sleep
 from typing import Tuple
 
@@ -56,7 +57,8 @@ def create_openapi_app(
 
     @app.route("/api/headers", methods=["GET"])
     def headers():
-        return jsonify(dict(request.headers))
+        values = dict(request.headers)
+        return Response(json.dumps(values), content_type="application/json", headers=values)
 
     @app.route("/api/failure", methods=["GET"])
     def failure():

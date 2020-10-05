@@ -248,7 +248,8 @@ When the received response is validated, Schemathesis runs the following checks:
 - ``not_a_server_error``. The response has 5xx HTTP status;
 - ``status_code_conformance``. The response status is not defined in the API schema;
 - ``content_type_conformance``. The response content type is not defined in the API schema;
-- ``response_schema_conformance``. The response content does not conform to the schema defined for this specific response.
+- ``response_schema_conformance``. The response content does not conform to the schema defined for this specific response;
+- ``response_headers_conformance``. The response headers does not contain all defined headers.
 
 Validation happens in the ``case.validate_response`` function, but you can add your code to verify the response conformance as you do in regular Python tests.
 

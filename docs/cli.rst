@@ -88,7 +88,8 @@ There are four built-in checks you can use via the `--check / -c` CLI option:
 - ``not_a_server_error``. The response has 5xx HTTP status;
 - ``status_code_conformance``. The response status is not defined in the API schema;
 - ``content_type_conformance``. The response content type is not defined in the API schema;
-- ``response_schema_conformance``. The response content does not conform to the schema defined for this specific response.
+- ``response_schema_conformance``. The response content does not conform to the schema defined for this specific response;
+- ``response_headers_conformance``. The response headers does not contain all defined headers.
 
 To make Schemathesis perform all built-in checks use ``--check all`` CLI option:
 
