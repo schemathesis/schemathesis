@@ -164,7 +164,7 @@ def test_commands_run_help(cli):
         "",
         "Options:",
         "  -c, --checks [not_a_server_error|status_code_conformance|"
-        "content_type_conformance|response_schema_conformance|all]",
+        "content_type_conformance|response_headers_conformance|response_schema_conformance|all]",
         "                                  List of checks to run.",
         "  --max-response-time INTEGER RANGE",
         "                                  A custom check that will fail if the response",
@@ -689,6 +689,22 @@ def test_status_code_conformance(cli, cli_args, workers):
     assert lines[16].strip() == "Declared status codes: 200"
 
 
+@pytest.mark.endpoints("headers")
+def test_headers_conformance_invalid(cli, cli_args):
+    result = cli.run(*cli_args, "-c", "response_headers_conformance")
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    lines = result.stdout.split("\n")
+    assert "1. Received a response with missing headers: X-Custom-Header" in lines
+
+
+@pytest.mark.endpoints("headers")
+def test_headers_conformance_valid(cli, cli_args):
+    result = cli.run(*cli_args, "-c", "response_headers_conformance", "-H", "X-Custom-Header: bla")
+    assert result.exit_code == ExitCode.OK, result.stdout
+    lines = result.stdout.split("\n")
+    assert "1. Received a response with missing headers: X-Custom-Header" not in lines
+
+
 @pytest.mark.endpoints("multiple_failures")
 def test_multiple_failures_single_check(cli, schema_url):
     result = cli.run(schema_url, "--hypothesis-seed=1", "--hypothesis-derandomize")
@@ -1067,7 +1083,7 @@ def new_check(request, testdir, cli):
     lines = result.stdout.splitlines()
     assert (
         "  -c, --checks [not_a_server_error|status_code_conformance|content_type_conformance|"
-        "response_schema_conformance|all]" in lines
+        "response_headers_conformance|response_schema_conformance|all]" in lines
     )
 
 

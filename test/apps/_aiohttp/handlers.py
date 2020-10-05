@@ -39,7 +39,8 @@ async def text(request: web.Request) -> web.Response:
 
 
 async def headers(request: web.Request) -> web.Response:
-    return web.json_response(dict(request.headers))
+    values = dict(request.headers)
+    return web.json_response(values, headers=values)
 
 
 async def malformed_json(request: web.Request) -> web.Response:

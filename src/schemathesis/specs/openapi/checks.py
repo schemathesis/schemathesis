@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Union
 import jsonschema
 import requests
 
-from ...exceptions import get_response_type_error, get_schema_validation_error, get_status_code_error
+from ...exceptions import get_headers_error, get_response_type_error, get_schema_validation_error, get_status_code_error
 from ...utils import GenericResponse, are_content_types_equal, parse_content_type
 from .schemas import BaseOpenAPISchema
 
@@ -60,6 +60,21 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> Optiona
         f"but it is not declared in the schema.\n\n"
         f"Defined content types: {', '.join(content_types)}"
     )
+
+
+def response_headers_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
+    if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
+        raise TypeError("This check can be used only with Open API schemas")
+    defined_headers = case.endpoint.schema.get_headers(case.endpoint, response)
+    if not defined_headers:
+        return None
+
+    missing_headers = [header for header in defined_headers if header not in response.headers]
+    if not missing_headers:
+        return None
+    message = ",".join(missing_headers)
+    exc_class = get_headers_error(message)
+    raise exc_class(f"Received a response with missing headers: {message}")
 
 
 def response_schema_conformance(response: GenericResponse, case: "Case") -> None:

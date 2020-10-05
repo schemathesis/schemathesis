@@ -11,6 +11,7 @@ Changelog
 - Shortcut for calling & validation. `#738`_
 - New hook to pre-commit, ``rstcheck``, as well as updates to documentation based on rstcheck. `#734`_
 - New check for maximum response time and corresponding CLI option ``--max-response-time``. `#716`_
+- New ``response_headers_conformance`` check that verifies the presence of all headers defined for a response. `#742`_
 - New field with information about executed checks in cassettes. `#702`_
 - New ``port`` parameter added to ``from_uri()`` method. `#706`_
 - Python 3.9 support. `#731`_
@@ -1387,6 +1388,7 @@ Deprecated
 .. _#768: https://github.com/schemathesis/schemathesis/issues/768
 .. _#757: https://github.com/schemathesis/schemathesis/issues/757
 .. _#748: https://github.com/schemathesis/schemathesis/issues/748
+.. _#742: https://github.com/schemathesis/schemathesis/issues/742
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
 .. _#734: https://github.com/schemathesis/schemathesis/issues/734
 .. _#731: https://github.com/schemathesis/schemathesis/issues/731
