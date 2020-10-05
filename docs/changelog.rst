@@ -21,6 +21,7 @@ Changelog
 - Status of individual interactions in VCR cassettes. Before this change, all statuses were taken from the overall test outcome,
   rather than from the check results for a particular response. `#695`_
 - Escaping header values in VCR cassettes. `#783`_
+- Escaping HTTP response message in VCR cassettes. `#788`_
 
 **Changed**
 
@@ -1380,6 +1381,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#788: https://github.com/schemathesis/schemathesis/issues/788
 .. _#783: https://github.com/schemathesis/schemathesis/issues/783
 .. _#768: https://github.com/schemathesis/schemathesis/issues/768
 .. _#757: https://github.com/schemathesis/schemathesis/issues/757
