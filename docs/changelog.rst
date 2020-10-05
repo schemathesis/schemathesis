@@ -14,6 +14,7 @@ Changelog
 - New ``response_headers_conformance`` check that verifies the presence of all headers defined for a response. `#742`_
 - New field with information about executed checks in cassettes. `#702`_
 - New ``port`` parameter added to ``from_uri()`` method. `#706`_
+- A code snippet to reproduce a failed check when running Python tests. `#793`_
 - Python 3.9 support. `#731`_
 
 **Fixed**
@@ -1383,6 +1384,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#793: https://github.com/schemathesis/schemathesis/issues/793
 .. _#788: https://github.com/schemathesis/schemathesis/issues/788
 .. _#783: https://github.com/schemathesis/schemathesis/issues/783
 .. _#768: https://github.com/schemathesis/schemathesis/issues/768

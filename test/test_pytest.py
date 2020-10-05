@@ -189,3 +189,30 @@ def test(case):
     # Then the test should fail instead of error
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
+
+
+def test_failure_reproduction_message(testdir, openapi3_base_url):
+    # When a test fails
+    testdir.make_test(
+        f"""
+schema.base_url = "{openapi3_base_url}"
+
+@schema.parametrize(endpoint="failure")
+def test(case):
+    response = case.call()
+    case.validate_response(response)
+    """,
+        paths={"/failure": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    )
+    # Then there should be a helpful message in the output
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    result.stdout.re_match_lines(
+        [
+            r".+1. Received a response with 5xx status code: 500",
+            r".+2. Received a response with a status code, which is not defined in the schema: 500",
+            r".+Declared status codes: 200",
+            r".+Run this Python code to reproduce this response:",
+            rf".+requests.get\('{openapi3_base_url}/failure', headers={{'User-Agent': 'schemathesis/2.5.1'}}\)",
+        ]
+    )
