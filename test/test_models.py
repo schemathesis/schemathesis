@@ -189,7 +189,19 @@ def test_(case):
     try:
         case.validate_response(response)
     except AssertionError as exc:
-        assert exc.args[0] == "Received a response with a status code, which is not defined in the schema: 418\n\nDeclared status codes: 200"
+        assert exc.args[0].split("\n") == [
+          '',
+          '',
+          '1. Received a response with a status code, which is not defined in the schema: 418',
+          '',
+          'Declared status codes: 200',
+          '',
+          '----------',
+          '',
+          'Run this Python code to reproduce this response: ',
+          '',
+          "    requests.get('http://localhost/v1/users', headers={'User-Agent': 'schemathesis/2.5.1'})"
+    ]
 """
     )
     result = testdir.runpytest()

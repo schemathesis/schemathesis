@@ -17,7 +17,7 @@ from hypothesis.strategies import SearchStrategy
 from starlette.testclient import TestClient as ASGIClient
 
 from .constants import USER_AGENT
-from .exceptions import InvalidSchema
+from .exceptions import CheckFailed, InvalidSchema
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse
 
@@ -263,10 +263,14 @@ class Case:
         for check in checks:
             try:
                 check(response, self)
-            except AssertionError as exc:
+            except CheckFailed as exc:
                 errors.append(exc.args[0])
         if errors:
-            raise AssertionError(*errors)
+            formatted_errors = "\n\n".join(f"{idx}. {error}" for idx, error in enumerate(errors, 1))
+            raise CheckFailed(
+                f"\n\n{formatted_errors}\n\n----------\n\n"
+                f"Run this Python code to reproduce this response: \n\n    {self.get_code_to_reproduce()}"
+            )
 
     def call_and_validate(
         self,
