@@ -1,4 +1,4 @@
-from schemathesis.constants import DEFAULT_DEADLINE
+from schemathesis.constants import DEFAULT_DEADLINE, USER_AGENT
 
 
 def test_pytest_parametrize_fixture(testdir):
@@ -213,6 +213,6 @@ def test(case):
             r".+2. Received a response with a status code, which is not defined in the schema: 500",
             r".+Declared status codes: 200",
             r".+Run this Python code to reproduce this response:",
-            rf".+requests.get\('{openapi3_base_url}/failure', headers={{'User-Agent': 'schemathesis/2.5.1'}}\)",
+            rf".+requests.get\('{openapi3_base_url}/failure', headers={{'User-Agent': '{USER_AGENT}'}}\)",
         ]
     )
