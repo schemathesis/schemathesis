@@ -13,6 +13,7 @@ from schemathesis.specs.openapi._hypothesis import (
     filter_path_parameters,
     get_case_strategy,
     is_valid_query,
+    prepare_headers_schema,
 )
 
 
@@ -284,3 +285,18 @@ def test_is_valid_query_strategy():
         assert value == {"key": "1"}
 
     test()
+
+
+def test_prepare_headers_schema():
+    schema = {
+        "properties": {"api_key": {"name": "api_key", "in": "header"}},
+        "additionalProperties": False,
+        "type": "object",
+        "required": ["api_key"],
+    }
+    assert prepare_headers_schema(schema) == {
+        "properties": {"api_key": {"name": "api_key", "in": "header", "type": "string"}},
+        "additionalProperties": False,
+        "type": "object",
+        "required": ["api_key"],
+    }
