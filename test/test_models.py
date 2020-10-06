@@ -178,7 +178,7 @@ def test_get_code_to_reproduce(case, expected):
 
 def test_validate_response(testdir):
     testdir.make_test(
-        r"""
+        fr"""
 from requests import Response
 
 @schema.parametrize()
@@ -200,7 +200,7 @@ def test_(case):
           '',
           'Run this Python code to reproduce this response: ',
           '',
-          "    requests.get('http://localhost/v1/users', headers={'User-Agent': 'schemathesis/2.5.1'})"
+          "    requests.get('http://localhost/v1/users', headers={{'User-Agent': '{USER_AGENT}'}})"
     ]
 """
     )
