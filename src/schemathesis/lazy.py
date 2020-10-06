@@ -1,3 +1,4 @@
+# pylint: disable=too-many-instance-attributes
 from inspect import signature
 from typing import Any, Callable, Dict, Optional, Union
 
@@ -23,6 +24,7 @@ class LazySchema:
     operation_id: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
     hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
+    skip_deprecated_endpoints: bool = attr.ib(default=False)  # pragma: no mutate
 
     def parametrize(  # pylint: disable=too-many-arguments
         self,
@@ -31,6 +33,7 @@ class LazySchema:
         tag: Optional[Filter] = NOT_SET,
         operation_id: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
+        skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
     ) -> Callable:
         if method is NOT_SET:
             method = self.method
@@ -56,6 +59,7 @@ class LazySchema:
                     hooks=self.hooks,
                     test_function=func,
                     validate_schema=validate_schema,
+                    skip_deprecated_endpoints=skip_deprecated_endpoints,
                 )
                 fixtures = get_fixtures(func, request)
                 # Changing the node id is required for better reporting - the method and endpoint will appear there
@@ -111,6 +115,7 @@ def get_schema(
     test_function: GenericTest,
     hooks: HookDispatcher,
     validate_schema: Union[bool, NotSet] = NOT_SET,
+    skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
 ) -> BaseSchema:
     """Loads a schema from the fixture."""
     # pylint: disable=too-many-arguments
@@ -125,6 +130,7 @@ def get_schema(
         test_function=test_function,
         hooks=hooks,
         validate_schema=validate_schema,
+        skip_deprecated_endpoints=skip_deprecated_endpoints,
     )
 
 
