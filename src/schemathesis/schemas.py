@@ -40,6 +40,7 @@ class BaseSchema(Mapping):
     hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
     test_function: Optional[GenericTest] = attr.ib(default=None)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
+    skip_deprecated_endpoints: bool = attr.ib(default=False)  # pragma: no mutate
     stateful: Optional[Stateful] = attr.ib(default=None)  # pragma: no mutate
     stateful_recursion_limit: int = attr.ib(default=DEFAULT_STATEFUL_RECURSION_LIMIT)  # pragma: no mutate
 
@@ -131,6 +132,7 @@ class BaseSchema(Mapping):
         tag: Optional[Filter] = NOT_SET,
         operation_id: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
+        skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
         stateful: Optional[Union[Stateful, NotSet]] = NOT_SET,
         stateful_recursion_limit: Union[int, NotSet] = NOT_SET,
     ) -> Callable:
@@ -145,6 +147,7 @@ class BaseSchema(Mapping):
                 tag=tag,
                 operation_id=operation_id,
                 validate_schema=validate_schema,
+                skip_deprecated_endpoints=skip_deprecated_endpoints,
                 stateful=stateful,
                 stateful_recursion_limit=stateful_recursion_limit,
             )
@@ -172,6 +175,7 @@ class BaseSchema(Mapping):
         operation_id: Optional[Filter] = NOT_SET,
         hooks: Union[HookDispatcher, NotSet] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
+        skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
         stateful: Optional[Union[Stateful, NotSet]] = NOT_SET,
         stateful_recursion_limit: Union[int, NotSet] = NOT_SET,
     ) -> "BaseSchema":
@@ -185,6 +189,8 @@ class BaseSchema(Mapping):
             operation_id = self.operation_id
         if validate_schema is NOT_SET:
             validate_schema = self.validate_schema
+        if skip_deprecated_endpoints is NOT_SET:
+            skip_deprecated_endpoints = self.skip_deprecated_endpoints
         if hooks is NOT_SET:
             hooks = self.hooks
         if stateful is NOT_SET:
@@ -204,6 +210,7 @@ class BaseSchema(Mapping):
             hooks=hooks,  # type: ignore
             test_function=test_function,
             validate_schema=validate_schema,  # type: ignore
+            skip_deprecated_endpoints=skip_deprecated_endpoints,  # type: ignore
             stateful=stateful,  # type: ignore
             stateful_recursion_limit=stateful_recursion_limit,  # type: ignore
         )

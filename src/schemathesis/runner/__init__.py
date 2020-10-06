@@ -53,6 +53,7 @@ def prepare(  # pylint: disable=too-many-arguments
     operation_id: Optional[Filter] = None,
     app: Optional[str] = None,
     validate_schema: bool = True,
+    skip_deprecated_endpoints: bool = False,
     # Hypothesis-specific configuration
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
     hypothesis_derandomize: Optional[bool] = None,
@@ -89,6 +90,7 @@ def prepare(  # pylint: disable=too-many-arguments
         operation_id=operation_id,
         app=app,
         validate_schema=validate_schema,
+        skip_deprecated_endpoints=skip_deprecated_endpoints,
         checks=checks,
         max_response_time=max_response_time,
         targets=targets,
@@ -137,6 +139,7 @@ def execute_from_schema(
     operation_id: Optional[Filter] = None,
     app: Optional[str] = None,
     validate_schema: bool = True,
+    skip_deprecated_endpoints: bool = False,
     checks: Iterable[CheckFunction],
     max_response_time: Optional[int] = None,
     targets: Iterable[Target],
@@ -173,6 +176,7 @@ def execute_from_schema(
             loader=loader,
             app=app,
             validate_schema=validate_schema,
+            skip_deprecated_endpoints=skip_deprecated_endpoints,
             auth=auth,
             auth_type=auth_type,
             headers=headers,
@@ -300,6 +304,7 @@ def load_schema(
     loader: Callable = loaders.from_uri,
     app: Any = None,
     validate_schema: bool = True,
+    skip_deprecated_endpoints: bool = False,
     # Network request parameters
     auth: Optional[Tuple[str, str]] = None,
     auth_type: Optional[str] = None,
@@ -329,7 +334,12 @@ def load_schema(
     if loader is loaders.from_uri and loader_options.get("auth"):
         loader_options["auth"] = get_requests_auth(loader_options["auth"], loader_options.pop("auth_type", None))
 
-    return loader(schema_uri, validate_schema=validate_schema, **loader_options)
+    return loader(
+        schema_uri,
+        validate_schema=validate_schema,
+        skip_deprecated_endpoints=skip_deprecated_endpoints,
+        **loader_options,
+    )
 
 
 def prepare_hypothesis_options(  # pylint: disable=too-many-arguments

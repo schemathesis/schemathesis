@@ -32,6 +32,7 @@ def from_path(
     *,
     app: Any = None,
     validate_schema: bool = True,
+    skip_deprecated_endpoints: bool = False,
 ) -> BaseOpenAPISchema:
     """Load a file from OS path and parse to schema instance."""
     with open(path) as fd:
@@ -45,6 +46,7 @@ def from_path(
             operation_id=operation_id,
             app=app,
             validate_schema=validate_schema,
+            skip_deprecated_endpoints=skip_deprecated_endpoints,
         )
 
 
@@ -59,6 +61,7 @@ def from_uri(
     *,
     app: Any = None,
     validate_schema: bool = True,
+    skip_deprecated_endpoints: bool = False,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load a remote resource and parse to schema instance."""
@@ -82,6 +85,7 @@ def from_uri(
         operation_id=operation_id,
         app=app,
         validate_schema=validate_schema,
+        skip_deprecated_endpoints=skip_deprecated_endpoints,
     )
 
 
@@ -96,6 +100,7 @@ def from_file(
     *,
     app: Any = None,
     validate_schema: bool = True,
+    skip_deprecated_endpoints: bool = False,
     **kwargs: Any,  # needed in the runner to have compatible API across all loaders
 ) -> BaseOpenAPISchema:
     """Load a file content and parse to schema instance.
@@ -113,6 +118,7 @@ def from_file(
         operation_id=operation_id,
         app=app,
         validate_schema=validate_schema,
+        skip_deprecated_endpoints=skip_deprecated_endpoints,
     )
 
 
@@ -127,6 +133,7 @@ def from_dict(
     *,
     app: Any = None,
     validate_schema: bool = True,
+    skip_deprecated_endpoints: bool = False,
 ) -> BaseOpenAPISchema:
     """Get a proper abstraction for the given raw schema."""
     dispatch("before_load_schema", HookContext(), raw_schema)
@@ -142,6 +149,7 @@ def from_dict(
             operation_id=operation_id,
             app=app,
             validate_schema=validate_schema,
+            skip_deprecated_endpoints=skip_deprecated_endpoints,
         )
 
     if "openapi" in raw_schema:
@@ -156,6 +164,7 @@ def from_dict(
             operation_id=operation_id,
             app=app,
             validate_schema=validate_schema,
+            skip_deprecated_endpoints=skip_deprecated_endpoints,
         )
     raise ValueError("Unsupported schema type")
 
@@ -175,6 +184,7 @@ def from_pytest_fixture(
     tag: Optional[Filter] = NOT_SET,
     operation_id: Optional[Filter] = NOT_SET,
     validate_schema: bool = True,
+    skip_deprecated_endpoints: bool = False,
 ) -> LazySchema:
     """Needed for a consistent library API."""
     return LazySchema(
@@ -184,6 +194,7 @@ def from_pytest_fixture(
         tag=tag,
         operation_id=operation_id,
         validate_schema=validate_schema,
+        skip_deprecated_endpoints=skip_deprecated_endpoints,
     )
 
 
@@ -196,6 +207,7 @@ def from_wsgi(
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
     validate_schema: bool = True,
+    skip_deprecated_endpoints: bool = False,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     headers = kwargs.setdefault("headers", {})
@@ -217,6 +229,7 @@ def from_wsgi(
         operation_id=operation_id,
         app=app,
         validate_schema=validate_schema,
+        skip_deprecated_endpoints=skip_deprecated_endpoints,
     )
 
 
@@ -238,6 +251,7 @@ def from_aiohttp(
     operation_id: Optional[Filter] = None,
     *,
     validate_schema: bool = True,
+    skip_deprecated_endpoints: bool = False,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     from .extra._aiohttp import run_server  # pylint: disable=import-outside-toplevel
@@ -253,6 +267,7 @@ def from_aiohttp(
         tag=tag,
         operation_id=operation_id,
         validate_schema=validate_schema,
+        skip_deprecated_endpoints=skip_deprecated_endpoints,
         **kwargs,
     )
 
@@ -265,6 +280,7 @@ def from_asgi(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     validate_schema: bool = True,
+    skip_deprecated_endpoints: bool = False,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     headers = kwargs.setdefault("headers", {})
@@ -285,4 +301,5 @@ def from_asgi(
         tag=tag,
         app=app,
         validate_schema=validate_schema,
+        skip_deprecated_endpoints=skip_deprecated_endpoints,
     )

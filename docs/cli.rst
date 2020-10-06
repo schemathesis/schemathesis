@@ -63,6 +63,13 @@ For example, the following command will select all endpoints which paths start w
 
     $ schemathesis run -E ^/api/users http://api.com/swagger.json
 
+If your API contains deprecated endpoints (that have ``deprecated: true`` in their definition),
+then you can skip them by passing ``--skip-deprecated-endpoints``:
+
+.. code:: bash
+
+    $ schemathesis run --skip-deprecated-endpoints ...
+
 Tests configuration
 -------------------
 

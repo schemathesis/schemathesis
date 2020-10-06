@@ -204,6 +204,7 @@ def test_commands_run_help(cli):
         "                                  during the test run.",
         "",
         "  --validate-schema BOOLEAN       Enable or disable validation of input schema.",
+        "  --skip-deprecated-endpoints     Skip testing of deprecated endpoints.",
         "  --junit-xml FILENAME            Create junit-xml style report file at given",
         "                                  path.",
         "",
@@ -296,6 +297,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "operation_id": (),
         "schema_uri": SCHEMA_URI,
         "validate_schema": True,
+        "skip_deprecated_endpoints": False,
         "loader": from_uri,
         "hypothesis_options": {},
         "workers_num": 1,
@@ -350,6 +352,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
         "tag": (),
         "operation_id": (),
         "validate_schema": True,
+        "skip_deprecated_endpoints": False,
         **expected,
     }
 
@@ -1440,6 +1443,44 @@ def test_chained_internal_exception(testdir, cli, hypothesis_max_examples, opena
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
     assert "The above exception was the direct cause of the following exception:" in lines
+
+
+@pytest.mark.parametrize(
+    "options, expected",
+    (
+        (
+            ("--skip-deprecated-endpoints",),
+            "collected endpoints: 1",
+        ),
+        (
+            (),
+            "collected endpoints: 2",
+        ),
+    ),
+)
+def test_skip_deprecated_endpoints(testdir, cli, openapi3_base_url, options, expected):
+    # When there are some deprecated endpoints
+    definition = {
+        "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}}
+    }
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/users": {
+                "get": definition,
+                "post": {
+                    "deprecated": True,
+                    **definition,
+                },
+            }
+        },
+    }
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(raw_schema))
+    result = cli.run(str(schema_file), f"--base-url={openapi3_base_url}", f"--hypothesis-max-examples=1", *options)
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # Then only not deprecated endpoints should be selected
+    assert expected in result.stdout.splitlines()
 
 
 @pytest.fixture()

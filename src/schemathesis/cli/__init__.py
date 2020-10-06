@@ -187,6 +187,13 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 )
 @click.option("--validate-schema", help="Enable or disable validation of input schema.", type=bool, default=True)
 @click.option(
+    "--skip-deprecated-endpoints",
+    help="Skip testing of deprecated endpoints.",
+    is_flag=True,
+    is_eager=True,
+    default=False,
+)
+@click.option(
     "--junit-xml", help="Create junit-xml style report file at given path.", type=click.File("w", encoding="utf-8")
 )
 @click.option(
@@ -264,6 +271,7 @@ def run(  # pylint: disable=too-many-arguments
     app: Optional[str] = None,
     request_timeout: Optional[int] = None,
     validate_schema: bool = True,
+    skip_deprecated_endpoints: bool = False,
     junit_xml: Optional[click.utils.LazyFile] = None,
     show_errors_tracebacks: bool = False,
     store_network_log: Optional[click.utils.LazyFile] = None,
@@ -312,6 +320,7 @@ def run(  # pylint: disable=too-many-arguments
         targets=selected_targets,
         workers_num=workers_num,
         validate_schema=validate_schema,
+        skip_deprecated_endpoints=skip_deprecated_endpoints,
         fixups=fixups,
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,
