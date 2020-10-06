@@ -46,8 +46,6 @@ def init_default_strategies() -> None:
 def is_valid_header(headers: Dict[str, Any]) -> bool:
     """Verify if the generated headers are valid."""
     for name, value in headers.items():
-        if not isinstance(value, str):
-            return False
         if not utils.is_latin_1_encodable(value):
             return False
         if utils.has_invalid_characters(name, value):
@@ -93,10 +91,6 @@ def to_bytes(value: Union[str, bytes, int, bool, float]) -> bytes:
     return str(value).encode(errors="ignore")
 
 
-def is_valid_form_data(form_data: Any) -> bool:
-    return isinstance(form_data, dict)
-
-
 def prepare_form_data(form_data: Dict[str, Any]) -> Dict[str, Any]:
     for name, value in form_data.items():
         if isinstance(value, list):
@@ -106,8 +100,28 @@ def prepare_form_data(form_data: Dict[str, Any]) -> Dict[str, Any]:
     return form_data
 
 
+def prepare_headers_schema(value: Dict[str, Any]) -> Dict[str, Any]:
+    """Improve schemas for headers.
+
+    Headers are strings, but it is not always explicitly defined in the schema. By preparing them properly we
+    can achieve significant performance improvements for such cases.
+    For reference (my machine) - running a single test with 100 examples with the resulting strategy:
+      - without: 4.37 s
+      - with: 294 ms
+
+    It also reduces the number of cases when the "filter_too_much" health check fails during testing.
+    """
+    for schema in value.get("properties", {}).values():
+        schema.setdefault("type", "string")
+    return value
+
+
 def prepare_strategy(parameter: str, value: Dict[str, Any], map_func: Optional[Callable]) -> st.SearchStrategy:
     """Create a strategy for a schema and add location-specific filters & maps."""
+    if parameter in ("headers", "cookies"):
+        value = prepare_headers_schema(value)
+    if parameter == "form_data":
+        value.setdefault("type", "object")
     strategy = from_schema(value, custom_formats=STRING_FORMATS)
     if map_func is not None:
         strategy = strategy.map(map_func)
@@ -118,7 +132,7 @@ def prepare_strategy(parameter: str, value: Dict[str, Any], map_func: Optional[C
     elif parameter == "query":
         strategy = strategy.filter(is_valid_query)  # type: ignore
     elif parameter == "form_data":
-        strategy = strategy.filter(is_valid_form_data).map(prepare_form_data)  # type: ignore
+        strategy = strategy.map(prepare_form_data)  # type: ignore
     return strategy
 
 
