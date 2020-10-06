@@ -35,6 +35,10 @@ def should_skip_by_operation_id(operation_id: Optional[str], pattern: Optional[F
     return not _match_any_pattern(operation_id, pattern)
 
 
+def should_skip_deprecated(is_deprecated: bool, skip_deprecated_endpoints: bool) -> bool:
+    return skip_deprecated_endpoints and is_deprecated
+
+
 def _match_any_pattern(target: str, pattern: Filter) -> bool:
     patterns = force_tuple(pattern)
     return any(re.search(item, target) for item in patterns)

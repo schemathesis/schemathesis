@@ -18,7 +18,13 @@ from . import links, serialization
 from ._hypothesis import get_case_strategy
 from .converter import to_json_schema_recursive
 from .examples import get_strategies_from_examples
-from .filters import should_skip_by_operation_id, should_skip_by_tag, should_skip_endpoint, should_skip_method
+from .filters import (
+    should_skip_by_operation_id,
+    should_skip_by_tag,
+    should_skip_deprecated,
+    should_skip_endpoint,
+    should_skip_method,
+)
 from .references import ConvertingResolver
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 
@@ -62,6 +68,9 @@ class BaseOpenAPISchema(BaseSchema):
                     if (
                         method not in self.operations
                         or should_skip_method(method, self.method)
+                        or should_skip_deprecated(
+                            resolved_definition.get("deprecated", False), self.skip_deprecated_endpoints
+                        )
                         or should_skip_by_tag(resolved_definition.get("tags"), self.tag)
                         or should_skip_by_operation_id(resolved_definition.get("operationId"), self.operation_id)
                     ):

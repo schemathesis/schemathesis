@@ -444,6 +444,51 @@ def test_b(request, case):
     result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST:/v1/pets\]", r"Hypothesis calls: 2"])
 
 
+def test_skip_deprecated_endpoints(testdir):
+    # When the schema is loaded with `skip_deprecated_endpoints=True`
+    testdir.make_test(
+        """
+schema = schemathesis.from_dict(raw_schema, skip_deprecated_endpoints=True)
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_a(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+
+@schema.parametrize(skip_deprecated_endpoints=False)
+@settings(max_examples=1)
+def test_b(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    """,
+        paths={
+            "/users": {
+                "post": {
+                    "deprecated": True,
+                    "responses": {"200": {"description": "OK"}},
+                },
+                "patch": {
+                    "deprecated": False,
+                    "responses": {"200": {"description": "OK"}},
+                },
+            }
+        },
+    )
+    result = testdir.runpytest("-v", "-s")
+    # Then only not deprecated endpoints should be tested
+    result.assert_outcomes(passed=5)
+    result.stdout.re_match_lines(
+        [
+            r".*test_a\[PATCH:/v1/users\]",
+            r".*test_a\[GET:/v1/users\]",
+            # Here POST is not skipped due to using skip_deprecated_endpoints=False in the `parametrize` call
+            r".*test_b\[POST:/v1/users\]",
+            r".*test_b\[PATCH:/v1/users\]",
+            r".*test_b\[GET:/v1/users\]",
+            r"Hypothesis calls: 5",
+        ]
+    )
+
+
 @pytest.mark.parametrize(
     "schema_name, endpoint",
     (

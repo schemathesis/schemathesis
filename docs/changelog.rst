@@ -16,6 +16,7 @@ Changelog
 - New ``port`` parameter added to ``from_uri()`` method. `#706`_
 - A code snippet to reproduce a failed check when running Python tests. `#793`_
 - Python 3.9 support. `#731`_
+- Ability to skip deprecated endpoints with ``--skip-deprecated-endpoints`` CLI option and ``skip_deprecated_endpoints=True`` argument to schema loaders. `#715`_
 
 **Fixed**
 
@@ -1404,6 +1405,7 @@ Deprecated
 .. _#717: https://github.com/schemathesis/schemathesis/issues/717
 .. _#718: https://github.com/schemathesis/schemathesis/issues/718
 .. _#716: https://github.com/schemathesis/schemathesis/issues/716
+.. _#715: https://github.com/schemathesis/schemathesis/issues/715
 .. _#708: https://github.com/schemathesis/schemathesis/issues/708
 .. _#706: https://github.com/schemathesis/schemathesis/issues/706
 .. _#705: https://github.com/schemathesis/schemathesis/issues/705
