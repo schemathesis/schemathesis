@@ -31,6 +31,10 @@ Changelog
 - ``Case.as_requests_kwargs`` and ``Case.as_werkzeug_kwargs`` now return the ``User-Agent`` header.
   This change also affects code snippets for failure reproduction - all snippets will include the ``User-Agent`` header.
 
+**Performance**
+
+- Speed up generation of ``headers``, ``cookies``, and ``formData`` parameters when their schemas do not define the ``type`` keyword. `#795`_
+
 `2.5.1`_ - 2020-09-30
 ---------------------
 
@@ -1384,6 +1388,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#795: https://github.com/schemathesis/schemathesis/issues/795
 .. _#793: https://github.com/schemathesis/schemathesis/issues/793
 .. _#788: https://github.com/schemathesis/schemathesis/issues/788
 .. _#783: https://github.com/schemathesis/schemathesis/issues/783
