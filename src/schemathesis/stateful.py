@@ -74,8 +74,8 @@ class Feedback:
     """
 
     stateful: Optional[Stateful] = attr.ib()  # pragma: no mutate
-    endpoint: Endpoint = attr.ib()  # pragma: no mutate
-    stateful_tests: Dict[str, StatefulData] = attr.ib(factory=dict)  # pragma: no mutate
+    endpoint: Endpoint = attr.ib(repr=False)  # pragma: no mutate
+    stateful_tests: Dict[str, StatefulData] = attr.ib(factory=dict, repr=False)  # pragma: no mutate
 
     def add_test_case(self, case: Case, response: GenericResponse) -> None:
         """Store test data to reuse it in the future additional tests."""

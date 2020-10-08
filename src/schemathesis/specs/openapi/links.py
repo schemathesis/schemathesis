@@ -14,7 +14,7 @@ from . import expressions
 from .constants import LOCATION_TO_CONTAINER
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@attr.s(slots=True, repr=False)  # pragma: no mutate
 class Link(StatefulTest):
     endpoint: Endpoint = attr.ib()  # pragma: no mutate
     parameters: Dict[str, Any] = attr.ib()  # pragma: no mutate
