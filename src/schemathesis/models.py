@@ -364,7 +364,7 @@ class Endpoint:
     # https://swagger.io/docs/specification/2-0/api-host-and-base-path/
     path: str = attr.ib()  # pragma: no mutate
     method: str = attr.ib()  # pragma: no mutate
-    definition: EndpointDefinition = attr.ib()  # pragma: no mutate
+    definition: EndpointDefinition = attr.ib(repr=False)  # pragma: no mutate
     schema: "BaseSchema" = attr.ib()  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
