@@ -62,6 +62,7 @@ def make_node_definition(reference):
     return {
         "description": "Recursive!",
         "type": "object",
+        "additionalProperties": False,
         "properties": {
             "children": {"type": "array", "items": reference},
             "value": {"type": "integer", "maximum": 4, "exclusiveMaximum": True},
@@ -216,6 +217,7 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
                             "type": "object",
                             "properties": {"username": {"type": "string", "minLength": 3}},
                             "required": ["username"],
+                            "additionalProperties": False,
                         },
                     }
                 ],
@@ -469,6 +471,7 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                                 "type": "object",
                                 "properties": {"username": {"type": "string", "minLength": 3}},
                                 "required": ["username"],
+                                "additionalProperties": False,
                             }
                         }
                     },
