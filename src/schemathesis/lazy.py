@@ -95,12 +95,12 @@ def get_test(test: Union[Callable, InvalidSchema]) -> Callable:
 
 def _get_node_name(node_id: str, endpoint: Endpoint) -> str:
     """Make a test node name. For example: test_api[GET:/users]."""
-    return f"{node_id}[{endpoint.method}:{endpoint.full_path}]"
+    return f"{node_id}[{endpoint.method.upper()}:{endpoint.full_path}]"
 
 
 def run_subtest(endpoint: Endpoint, fixtures: Dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:
     """Run the given subtest with pytest fixtures."""
-    with subtests.test(method=endpoint.method, path=endpoint.path):
+    with subtests.test(method=endpoint.method.upper(), path=endpoint.path):
         sub_test(**fixtures)
 
 

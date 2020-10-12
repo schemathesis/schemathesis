@@ -96,7 +96,7 @@ class SerializedTestResult:
     def from_test_result(cls, result: TestResult) -> "SerializedTestResult":
         formatter = logging.Formatter("[%(asctime)s] %(levelname)s in %(module)s: %(message)s")
         return SerializedTestResult(
-            method=result.endpoint.method,
+            method=result.endpoint.method.upper(),
             path=result.endpoint.full_path,
             has_failures=result.has_failures,
             has_errors=result.has_errors,

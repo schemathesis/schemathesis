@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 from time import sleep
 from typing import Tuple
 
@@ -22,6 +23,7 @@ def create_openapi_app(
     app.config["schema_requests"] = []
     app.config["internal_exception"] = False
     app.config["users"] = {}
+    app.config["requests_history"] = defaultdict(list)
 
     @app.before_request
     def store_request():
@@ -141,12 +143,14 @@ def create_openapi_app(
         data = request.json
         user_id = len(app.config["users"]) + 1
         app.config["users"][user_id] = {**data, "id": user_id}
+        app.config["requests_history"][user_id].append("POST")
         return jsonify({"id": user_id}), 201
 
     @app.route("/api/users/<int:user_id>", methods=["GET"])
     def get_user(user_id):
         try:
             user = app.config["users"][user_id]
+            app.config["requests_history"][user_id].append("GET")
             return jsonify(user)
         except KeyError:
             return jsonify({"message": "Not found"}), 404
@@ -155,6 +159,10 @@ def create_openapi_app(
     def update_user(user_id):
         try:
             user = app.config["users"][user_id]
+            history = app.config["requests_history"][user_id]
+            history.append("PATCH")
+            if history == ["POST", "GET", "PATCH", "GET", "PATCH"]:
+                raise InternalServerError("We got a problem!")
             user["username"] = request.json["username"]
             return jsonify(user)
         except KeyError:

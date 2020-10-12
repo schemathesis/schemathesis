@@ -246,10 +246,11 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
                 },
             )
         elif endpoint == "get_user":
+            parent = template["paths"].setdefault(path, {})
+            parent["parameters"] = [{"in": "path", "name": "user_id", "required": True, "type": "integer"}]
             schema = {
                 "operationId": "getUser",
                 "parameters": [
-                    {"in": "path", "name": "user_id", "required": True, "type": "integer"},
                     {"in": "query", "name": "code", "required": True, "type": "integer"},
                     {"in": "query", "name": "user_id", "required": True, "type": "integer"},
                 ],
@@ -268,10 +269,14 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
                 },
             }
         elif endpoint == "update_user":
+            parent = template["paths"].setdefault(path, {})
+            parent["parameters"] = [
+                {"in": "path", "name": "user_id", "required": True, "type": "integer"},
+                {"in": "query", "name": "common", "required": True, "type": "integer"},
+            ]
             schema = {
                 "operationId": "updateUser",
                 "parameters": [
-                    {"in": "path", "name": "user_id", "required": True, "type": "integer"},
                     {
                         "in": "body",
                         "name": "username",
@@ -286,8 +291,6 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
                 ],
                 "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
             }
-            paths = template["paths"].setdefault(path, {})
-            paths["parameters"] = [{"in": "query", "name": "common", "required": True, "type": "integer"}]
         else:
             schema = {
                 "responses": {
@@ -501,10 +504,11 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                 },
             )
         elif endpoint == "get_user":
+            parent = template["paths"].setdefault(path, {})
+            parent["parameters"] = [{"in": "path", "name": "user_id", "required": True, "schema": {"type": "integer"}}]
             schema = {
                 "operationId": "getUser",
                 "parameters": [
-                    {"in": "path", "name": "user_id", "required": True, "schema": {"type": "integer"}},
                     {"in": "query", "name": "code", "required": True, "schema": {"type": "integer"}},
                     {"in": "query", "name": "user_id", "required": True, "schema": {"type": "integer"}},
                 ],
@@ -523,6 +527,11 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                 },
             }
         elif endpoint == "update_user":
+            parent = template["paths"].setdefault(path, {})
+            parent["parameters"] = [
+                {"in": "path", "name": "user_id", "required": True, "schema": {"type": "integer"}},
+                {"in": "query", "name": "common", "required": True, "schema": {"type": "integer"}},
+            ]
             schema = {
                 "operationId": "updateUser",
                 "requestBody": {
@@ -537,11 +546,8 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                         }
                     },
                 },
-                "parameters": [{"in": "path", "name": "user_id", "required": True, "schema": {"type": "integer"}}],
                 "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
             }
-            paths = template["paths"].setdefault(path, {})
-            paths["parameters"] = [{"in": "query", "name": "common", "required": True, "schema": {"type": "integer"}}]
         else:
             schema = {
                 "responses": {
