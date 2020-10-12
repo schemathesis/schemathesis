@@ -51,9 +51,9 @@ User's Guide
    introduction
    cli
    python
+   stateful
    compatibility
    examples
-   stateful
    graphql
    targeted
    extending

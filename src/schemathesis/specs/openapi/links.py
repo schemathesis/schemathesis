@@ -3,12 +3,13 @@
 Based on https://swagger.io/docs/specification/links/
 """
 from copy import deepcopy
-from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple
+from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tuple, Union
 
 import attr
 
 from ...models import Case, Endpoint
-from ...stateful import ParsedData, StatefulTest
+from ...stateful import Direction, ParsedData, StatefulTest
+from ...types import NotSet
 from ...utils import NOT_SET, GenericResponse
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
@@ -147,7 +148,9 @@ class Link(StatefulTest):
         return {name: convert(name, component) for name, component in variants.items()}
 
     def _unknown_parameter(self, name: str) -> NoReturn:
-        raise ValueError(f"Parameter `{name}` is not defined in endpoint {self.endpoint.method} {self.endpoint.path}")
+        raise ValueError(
+            f"Parameter `{name}` is not defined in endpoint {self.endpoint.method.upper()} {self.endpoint.path}"
+        )
 
 
 def get_links(response: GenericResponse, endpoint: Endpoint, field: str) -> Sequence[Link]:
@@ -159,3 +162,145 @@ def get_links(response: GenericResponse, endpoint: Endpoint, field: str) -> Sequ
         response_definition = responses.get("default", {})
     links = response_definition.get(field, {})
     return [Link.from_definition(name, definition, endpoint) for name, definition in links.items()]
+
+
+@attr.s(slots=True, repr=False)  # pragma: no mutate
+class OpenAPILink(Direction):
+    """Alternative approach to link processing.
+
+    NOTE. This class will replace `Link` in the future.
+    """
+
+    name: str = attr.ib()  # pragma: no mutate
+    status_code: str = attr.ib()  # pragma: no mutate
+    definition: Dict[str, Any] = attr.ib()  # pragma: no mutate
+    endpoint: Endpoint = attr.ib()  # pragma: no mutate
+    parameters: List[Tuple[Optional[str], str, str]] = attr.ib(init=False)  # pragma: no mutate
+    body: Union[Dict[str, Any], NotSet] = attr.ib(init=False)  # pragma: no mutate
+
+    def __attrs_post_init__(self) -> None:
+        self.parameters = [
+            normalize_parameter(parameter, expression)
+            for parameter, expression in self.definition.get("parameters", {}).items()
+        ]
+        self.body = self.definition.get("requestBody", NOT_SET)
+
+    def set_data(self, case: Case, **kwargs: Any) -> None:
+        """Assign all linked definitions to the new case instance."""
+        context = kwargs["context"]
+        self.set_parameters(case, context)
+        self.set_body(case, context)
+        case.set_source(context.response, context.case)
+
+    def set_parameters(self, case: Case, context: expressions.ExpressionContext) -> None:
+        for location, name, expression in self.parameters:
+            container = get_container(case, location, name)
+            # Might happen if there is directly specified container,
+            # but the schema has no parameters of such type at all.
+            # Therefore the container is empty, otherwise it will be at least an empty object
+            if container is None:
+                raise ValueError(
+                    f"Parameter `{name}` is not defined in endpoint `{case.endpoint.verbose_name}`. "
+                    "Did you misspell the parameter name?"
+                )
+            container[name] = expressions.evaluate(expression, context)
+
+    def set_body(self, case: Case, context: expressions.ExpressionContext) -> None:
+        if self.body is not NOT_SET:
+            case.body = expressions.evaluate(self.body, context)
+
+    def get_target_endpoint(self) -> Endpoint:
+        if "operationId" in self.definition:
+            return self.endpoint.schema.get_endpoint_by_operation_id(self.definition["operationId"])  # type: ignore
+        return self.endpoint.schema.get_endpoint_by_reference(self.definition["operationRef"])  # type: ignore
+
+
+def get_container(case: Case, location: Optional[str], name: str) -> Dict[str, Any]:
+    """Get a container that suppose to store the given parameter."""
+    if location:
+        container_name = LOCATION_TO_CONTAINER[location]
+    else:
+        for param in case.endpoint.definition.parameters:
+            if param["name"] == name:
+                container_name = LOCATION_TO_CONTAINER[param["in"]]
+                break
+        else:
+            raise ValueError(f"Parameter `{name}` is not defined in endpoint `{case.endpoint.verbose_name}`")
+    return getattr(case, container_name)
+
+
+def normalize_parameter(parameter: str, expression: str) -> Tuple[Optional[str], str, str]:
+    """Normalize runtime expressions.
+
+    Runtime expressions may have parameter names prefixed with their location - `path.id`.
+    At the same time, parameters could be defined without a prefix - `id`.
+    We need to normalize all parameters to the same form to simplify working with them.
+    """
+    try:
+        # The parameter name is prefixed with its location. Example: `path.id`
+        location, name = tuple(parameter.split("."))
+        return location, name, expression
+    except ValueError:
+        return None, parameter, expression
+
+
+def get_all_links(endpoint: Endpoint) -> Generator[Tuple[str, OpenAPILink], None, None]:
+    for status_code, definition in endpoint.definition.resolved["responses"].items():
+        for name, link_definition in definition.get(endpoint.schema.links_field, {}).items():  # type: ignore
+            yield status_code, OpenAPILink(name, status_code, link_definition, endpoint)
+
+
+def add_link(  # pylint: disable=too-many-arguments
+    schema: Dict[str, Any],
+    links_field: str,
+    source: Endpoint,
+    target: Union[str, Endpoint],
+    status_code: Union[str, int],
+    parameters: Optional[Dict[str, str]] = None,
+    request_body: Any = None,
+) -> None:
+    """Add a link between two endpoints to the provided schema."""
+    # We modify the definition in-place
+    for endpoint, methods in schema["paths"].items():
+        if endpoint == source.path:
+            for method, definition in methods.items():
+                if method.upper() == source.method.upper():
+                    _add_link(definition["responses"], links_field, parameters, request_body, status_code, target)
+                    break
+            else:
+                raise ValueError(
+                    "Can't locate the endpoint definition in the schema. Did you modify the schema manually?"
+                )
+
+
+def _add_link(  # pylint: disable=too-many-arguments
+    responses: Dict[str, Dict[str, Any]],
+    links_field: str,
+    parameters: Optional[Dict[str, str]],
+    request_body: Any,
+    status_code: Union[str, int],
+    target: Union[str, Endpoint],
+) -> None:
+    response = responses.setdefault(str(status_code), {})
+    links_definition = response.setdefault(links_field, {})
+    new_link: Dict[str, Union[str, Dict[str, str]]] = {}
+    if parameters is not None:
+        new_link["parameters"] = parameters
+    if request_body is not None:
+        new_link["requestBody"] = request_body
+    if isinstance(target, str):
+        name = target
+        new_link["operationRef"] = target
+    else:
+        name = target.verbose_name
+        # operationId is a dict lookup which is more efficient than using `operationRef`, since it
+        # doesn't involve reference resolving when we will look up for this target during testing.
+        if "operationId" in target.definition.resolved:
+            new_link["operationId"] = target.definition.resolved["operationId"]
+        else:
+            new_link["operationRef"] = target.operation_reference
+    # The name is arbitrary, so we don't really case what it is,
+    # but it should not override existing links
+    while name in links_definition:
+        name += "_new"
+    links_definition[name] = new_link

@@ -36,7 +36,7 @@ class SchemathesisCase(PyCollector):
         super().__init__(*args, **kwargs)
 
     def _get_test_name(self, endpoint: Endpoint) -> str:
-        return f"{self.name}[{endpoint.method}:{endpoint.full_path}]"
+        return f"{self.name}[{endpoint.method.upper()}:{endpoint.full_path}]"
 
     def _gen_items(self, endpoint: Endpoint) -> Generator[Function, None, None]:
         """Generate all items for the given endpoint.
@@ -157,12 +157,12 @@ class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
         recursion_level = self.recursion_level
         if feedback is None or recursion_level >= feedback.endpoint.schema.stateful_recursion_limit:
             return []
-        previous_test_name = self.test_name or f"{feedback.endpoint.method}:{feedback.endpoint.full_path}"
+        previous_test_name = self.test_name or f"{feedback.endpoint.method.upper()}:{feedback.endpoint.full_path}"
 
         def make_test(
             endpoint: Endpoint, test: Union[Callable, InvalidSchema], previous_tests: str
         ) -> SchemathesisFunction:
-            test_name = f"{previous_tests} -> {endpoint.method}:{endpoint.full_path}"
+            test_name = f"{previous_tests} -> {endpoint.method.upper()}:{endpoint.full_path}"
             return create(
                 self.__class__,
                 name=f"{self.originalname}[{test_name}]",

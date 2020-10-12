@@ -1,4 +1,4 @@
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes,too-many-public-methods
 """Schema objects provide a convenient interface to raw schemas.
 
 Their responsibilities:
@@ -7,8 +7,9 @@ Their responsibilities:
 
 They give only static definitions of endpoints.
 """
+import warnings
 from collections.abc import Mapping
-from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple, Type, Union
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import attr
@@ -22,7 +23,7 @@ from .constants import DEFAULT_STATEFUL_RECURSION_LIMIT
 from .exceptions import InvalidSchema
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import Case, Endpoint
-from .stateful import Feedback, Stateful, StatefulTest
+from .stateful import APIStateMachine, Feedback, Stateful, StatefulTest
 from .types import Filter, FormData, GenericTest, NotSet
 from .utils import NOT_SET, GenericResponse
 
@@ -179,6 +180,12 @@ class BaseSchema(Mapping):
         stateful: Optional[Union[Stateful, NotSet]] = NOT_SET,
         stateful_recursion_limit: Union[int, NotSet] = NOT_SET,
     ) -> "BaseSchema":
+        if stateful is not NOT_SET or stateful_recursion_limit is not NOT_SET:
+            warnings.warn(
+                "`stateful` and `stateful_recursion_limit` arguments are deprecated. Use `as_state_machine` instead.",
+                DeprecationWarning,
+            )
+
         if method is NOT_SET:
             method = self.method
         if endpoint is NOT_SET:
@@ -246,6 +253,12 @@ class BaseSchema(Mapping):
     def get_case_strategy(
         self, endpoint: Endpoint, hooks: Optional[HookDispatcher] = None, feedback: Optional[Feedback] = None
     ) -> SearchStrategy:
+        raise NotImplementedError
+
+    def as_state_machine(self) -> Type[APIStateMachine]:
+        raise NotImplementedError
+
+    def get_links(self, endpoint: Endpoint) -> Dict[str, Dict[str, Any]]:
         raise NotImplementedError
 
 

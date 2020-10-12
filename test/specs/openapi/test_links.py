@@ -5,13 +5,13 @@ import pytest
 import requests
 
 import schemathesis
-from schemathesis.models import Case, Endpoint
-from schemathesis.specs.openapi.links import Link
+from schemathesis.models import Case, Endpoint, EndpointDefinition
+from schemathesis.specs.openapi.links import Link, get_container
 from schemathesis.stateful import ParsedData, Stateful
 
 ENDPOINT = Endpoint(
     path="/users/{user_id}",
-    method="GET",
+    method="get",
     definition=ANY,
     schema=ANY,
     base_url=ANY,
@@ -63,7 +63,7 @@ def response():
                     name="GetUserByUserId",
                     endpoint=Endpoint(
                         path="/users/{user_id}",
-                        method="GET",
+                        method="get",
                         definition=ANY,
                         schema=ANY,
                         base_url=ANY,
@@ -199,3 +199,24 @@ def test_make_endpoint_single():
 def test_make_endpoint_invalid_location(parameter):
     with pytest.raises(ValueError, match=f"Parameter `{parameter}` is not defined in endpoint GET /users/{{user_id}}"):
         LINK.make_endpoint([ParsedData({parameter: 4})])
+
+
+def test_get_container_invalid_location():
+    endpoint = Endpoint(
+        path="/users/{user_id}",
+        method="get",
+        schema=None,
+        definition=EndpointDefinition(
+            raw={},
+            resolved={},
+            scope="",
+            parameters=[
+                {"in": "query", "name": "code", "type": "integer"},
+                {"in": "query", "name": "user_id", "type": "integer"},
+                {"in": "query", "name": "common", "type": "integer"},
+            ],
+        ),
+    )
+    case = endpoint.make_case()
+    with pytest.raises(ValueError, match="Parameter `unknown` is not defined in endpoint `GET /users/{user_id}`"):
+        get_container(case, None, "unknown")

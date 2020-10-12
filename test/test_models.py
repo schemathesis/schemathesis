@@ -11,7 +11,7 @@ from schemathesis.models import Case, Endpoint, Request, Response
 
 def test_path(swagger_20):
     endpoint = Endpoint("/users/{name}", "GET", {}, swagger_20)
-    case = Case(endpoint, path_parameters={"name": "test"})
+    case = endpoint.make_case(path_parameters={"name": "test"})
     assert case.formatted_path == "/users/test"
 
 
@@ -20,12 +20,10 @@ def test_path(swagger_20):
 def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
     base_url = converter(base_url)
     endpoint = Endpoint("/success", "GET", {}, swagger_20)
-    kwargs = {"endpoint": endpoint, "cookies": {"TOKEN": "secret"}}
+    case = endpoint.make_case(cookies={"TOKEN": "secret"})
     if override:
-        case = Case(**kwargs)
         data = case.as_requests_kwargs(base_url)
     else:
-        case = Case(**kwargs)
         endpoint.base_url = base_url
         data = case.as_requests_kwargs()
     assert data == {
@@ -53,8 +51,7 @@ def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
 def test_as_requests_kwargs_override_user_agent(server, openapi2_base_url, swagger_20, headers, expected):
     endpoint = Endpoint("/success", "GET", {}, swagger_20, base_url=openapi2_base_url)
     original_headers = headers.copy() if headers is not None else headers
-    kwargs = {"endpoint": endpoint, "headers": headers}
-    case = Case(**kwargs)
+    case = endpoint.make_case(headers=headers)
     data = case.as_requests_kwargs(headers={"X-Key": "foo"})
     assert data == {
         "headers": expected,
@@ -74,12 +71,10 @@ def test_as_requests_kwargs_override_user_agent(server, openapi2_base_url, swagg
 @pytest.mark.filterwarnings("always")
 def test_call(override, base_url, swagger_20):
     endpoint = Endpoint("/success", "GET", {}, swagger_20)
-    kwargs = {"endpoint": endpoint}
+    case = endpoint.make_case()
     if override:
-        case = Case(**kwargs)
         response = case.call(base_url)
     else:
-        case = Case(**kwargs)
         endpoint.base_url = base_url
         response = case.call()
     assert response.status_code == 200

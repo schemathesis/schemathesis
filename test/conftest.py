@@ -89,6 +89,16 @@ def app(openapi_version, _app, reset_app):
 
 
 @pytest.fixture
+def open_api_2():
+    return OpenAPIVersion("2.0")
+
+
+@pytest.fixture
+def open_api_3():
+    return OpenAPIVersion("3.0")
+
+
+@pytest.fixture
 def openapi_2_app(_app, reset_app):
     reset_app(OpenAPIVersion("2.0"))
     return _app
@@ -444,14 +454,24 @@ def testdir(testdir):
     return testdir
 
 
-@pytest.fixture()
-def flask_app(endpoints):
-    return _flask.create_openapi_app(endpoints)
+@pytest.fixture
+def wsgi_app_factory():
+    return _flask.create_openapi_app
 
 
 @pytest.fixture()
-def fastapi_app():
-    return _fastapi.create_app()
+def flask_app(wsgi_app_factory, endpoints):
+    return wsgi_app_factory(endpoints)
+
+
+@pytest.fixture
+def asgi_app_factory():
+    return _fastapi.create_app
+
+
+@pytest.fixture()
+def fastapi_app(asgi_app_factory):
+    return asgi_app_factory()
 
 
 def make_importable(module):

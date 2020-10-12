@@ -1,6 +1,4 @@
-import string
 from contextlib import ExitStack, contextmanager
-from itertools import product
 from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Union
 
 import jsonschema
@@ -9,6 +7,7 @@ import requests
 from ...exceptions import get_headers_error, get_response_type_error, get_schema_validation_error, get_status_code_error
 from ...utils import GenericResponse, are_content_types_equal, parse_content_type
 from .schemas import BaseOpenAPISchema
+from .utils import expand_status_code
 
 if TYPE_CHECKING:
     from ...models import Case
@@ -35,9 +34,7 @@ def status_code_conformance(response: GenericResponse, case: "Case") -> Optional
 
 def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, None, None]:
     for code in responses:
-        chars = [list(string.digits) if digit == "X" else [digit] for digit in str(code).upper()]
-        for expanded in product(*chars):
-            yield int("".join(expanded))
+        yield from expand_status_code(code)
 
 
 def content_type_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:

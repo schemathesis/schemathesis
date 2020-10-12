@@ -1,7 +1,8 @@
 # pylint: disable=too-many-ancestors
 import itertools
+from collections import defaultdict
 from copy import deepcopy
-from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple, Type, Union
 from urllib.parse import urlsplit
 
 import jsonschema
@@ -11,7 +12,7 @@ from ...exceptions import InvalidSchema
 from ...hooks import HookContext, HookDispatcher
 from ...models import Case, Endpoint, EndpointDefinition, empty_object
 from ...schemas import BaseSchema
-from ...stateful import Feedback, Stateful, StatefulTest
+from ...stateful import APIStateMachine, Feedback, Stateful, StatefulTest
 from ...types import FormData
 from ...utils import GenericResponse
 from . import links, serialization
@@ -27,6 +28,7 @@ from .filters import (
 )
 from .references import ConvertingResolver
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
+from .stateful import create_state_machine
 
 
 class BaseOpenAPISchema(BaseSchema):
@@ -75,10 +77,10 @@ class BaseOpenAPISchema(BaseSchema):
                         or should_skip_by_operation_id(resolved_definition.get("operationId"), self.operation_id)
                     ):
                         continue
-                    parameters = itertools.chain(resolved_definition.get("parameters", ()), common_parameters)
+                    parameters = list(itertools.chain(resolved_definition.get("parameters", ()), common_parameters))
                     # To prevent recursion errors we need to pass not resolved schema as well
                     # It could be used for response validation
-                    raw_definition = EndpointDefinition(raw_methods[method], resolved_definition, scope)
+                    raw_definition = EndpointDefinition(raw_methods[method], resolved_definition, scope, parameters)
                     yield self.make_endpoint(path, method, parameters, resolved_definition, raw_definition)
         except (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError) as exc:
             raise InvalidSchema("Schema parsing failed. Please check your schema.") from exc
@@ -95,7 +97,7 @@ class BaseOpenAPISchema(BaseSchema):
         self,
         path: str,
         method: str,
-        parameters: Iterator[Dict[str, Any]],
+        parameters: List[Dict[str, Any]],
         resolved_definition: Dict[str, Any],
         raw_definition: EndpointDefinition,
     ) -> Endpoint:
@@ -103,7 +105,7 @@ class BaseOpenAPISchema(BaseSchema):
         base_url = self.get_base_url()
         endpoint = Endpoint(
             path=path,
-            method=method.upper(),
+            method=method,
             definition=raw_definition,
             base_url=base_url,
             app=self.app,
@@ -156,8 +158,8 @@ class BaseOpenAPISchema(BaseSchema):
             for method, resolved_definition in methods.items():
                 if method not in self.operations or "operationId" not in resolved_definition:
                     continue
-                parameters = itertools.chain(resolved_definition.get("parameters", ()), common_parameters)
-                raw_definition = EndpointDefinition(raw_methods[method], resolved_definition, scope)
+                parameters = list(itertools.chain(resolved_definition.get("parameters", ()), common_parameters))
+                raw_definition = EndpointDefinition(raw_methods[method], resolved_definition, scope, parameters)
                 yield resolved_definition["operationId"], self.make_endpoint(
                     path, method, parameters, resolved_definition, raw_definition
                 )
@@ -174,8 +176,8 @@ class BaseOpenAPISchema(BaseSchema):
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
         _, methods = self.resolver.resolve(parent_ref)
         common_parameters = get_common_parameters(methods)
-        parameters = itertools.chain(resolved_definition.get("parameters", ()), common_parameters)
-        raw_definition = EndpointDefinition(data, resolved_definition, scope)
+        parameters = list(itertools.chain(resolved_definition.get("parameters", ()), common_parameters))
+        raw_definition = EndpointDefinition(data, resolved_definition, scope, parameters)
         return self.make_endpoint(path, method, parameters, resolved_definition, raw_definition)
 
     def get_case_strategy(
@@ -210,6 +212,53 @@ class BaseOpenAPISchema(BaseSchema):
         if not definitions:
             return None
         return definitions.get("headers")
+
+    def as_state_machine(self) -> Type[APIStateMachine]:
+        return create_state_machine(self)
+
+    def add_link(  # pylint: disable=too-many-arguments
+        self,
+        source: Endpoint,
+        target: Union[str, Endpoint],
+        status_code: Union[str, int],
+        parameters: Optional[Dict[str, str]] = None,
+        request_body: Any = None,
+    ) -> None:
+        """Add a new Open API link to the schema definition.
+
+        :param Endpoint source: This operation is the source of data
+        :param target: This operation will receive the data from this link.
+            Can be an ``Endpoint`` instance or a reference like this - ``#/paths/~1users~1{userId}/get``
+        :param str status_code: The link is triggered when the source endpoint responds with this status code.
+        :param parameters: A dictionary that describes how parameters should be extracted from the matched response.
+            The key represents the parameter name in the target endpoint, and the value is a runtime expression string.
+        :param request_body: A literal value or runtime expression to use as a request body when
+            calling the target operation.
+
+        .. code-block:: python
+
+            schema = schemathesis.from_uri("http://0.0.0.0/schema.yaml")
+
+            schema.add_link(
+                source=schema["/users/"]["POST"],
+                target=schema["/users/{userId}"]["GET"],
+                status_code="201",
+                parameters={
+                    "userId": "$response.body#/id"
+                }
+            )
+        """
+        if parameters is None and request_body is None:
+            raise ValueError("You need to provide `parameters` or `request_body`.")
+        links.add_link(self.raw_schema, self.links_field, source, target, status_code, parameters, request_body)
+        if hasattr(self, "_endpoints"):
+            delattr(self, "_endpoints")
+
+    def get_links(self, endpoint: Endpoint) -> Dict[str, Dict[str, Any]]:
+        result: Dict[str, Dict[str, Any]] = defaultdict(dict)
+        for status_code, link in links.get_all_links(endpoint):
+            result[status_code][link.name] = link
+        return result
 
 
 class SwaggerV20(BaseOpenAPISchema):
@@ -365,7 +414,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         self,
         path: str,
         method: str,
-        parameters: Iterator[Dict[str, Any]],
+        parameters: List[Dict[str, Any]],
         resolved_definition: Dict[str, Any],
         raw_definition: EndpointDefinition,
     ) -> Endpoint:

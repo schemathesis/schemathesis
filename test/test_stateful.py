@@ -1,7 +1,9 @@
 import pytest
 
+import schemathesis
 from schemathesis.extra.pytest_plugin import NOT_USED_STATEFUL_TESTING_MESSAGE
 from schemathesis.models import MISSING_STATEFUL_ARGUMENT_MESSAGE
+from schemathesis.specs.openapi import expressions
 from schemathesis.stateful import ParsedData
 from schemathesis.utils import NOT_SET
 
@@ -170,3 +172,143 @@ def test_(case):
     result = testdir.run_and_assert(failed=1)
     warning_text = f"  test_no_warning_on_failure.py:10: PytestWarning: {NOT_USED_STATEFUL_TESTING_MESSAGE}"
     assert warning_text not in result.stdout.lines
+
+
+def add_link(schema, target, **kwargs):
+    schema.add_link(source=schema["/users/"]["POST"], target=target, status_code="201", **kwargs)
+    return schema["/users/"]["POST"].definition.resolved["responses"]["201"]["links"]
+
+
+EXPECTED_LINK_PARAMETERS = {"parameters": {"userId": "$response.body#/id"}}
+
+
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_add_link_default(schema_url):
+    schema = schemathesis.from_uri(schema_url)
+    # When we add a link to the target endpoint
+    # And it is an `Endpoint` instance
+    # And it has the `operationId` key
+    links = add_link(schema, schema["/users/{user_id}"]["GET"], parameters={"userId": "$response.body#/id"})
+    # Then it should be added without errors
+    assert links[schema["/users/{user_id}"]["GET"].verbose_name] == {
+        "operationId": "getUser",
+        **EXPECTED_LINK_PARAMETERS,
+    }
+
+
+@pytest.mark.parametrize("status_code", ("201", 201))
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_add_link_no_endpoints_cache(schema_url, status_code):
+    schema = schemathesis.from_uri(schema_url)
+    # When we add a link to the target endpoint
+    source = schema["/users/"]["POST"]
+    target = schema["/users/{user_id}"]["GET"]
+    # And the endpoints are not cached
+    delattr(schema, "_endpoints")
+    schema.add_link(
+        source=source,
+        target=target,
+        status_code=status_code,
+        parameters={"userId": "$response.body#/id"},
+    )
+    # Then it should be added without errors
+    # And the cache cleanup should be no-op
+    links = schema["/users/"]["POST"].definition.resolved["responses"]["201"]["links"]
+    assert links[schema["/users/{user_id}"]["GET"].verbose_name] == {
+        "operationId": "getUser",
+        **EXPECTED_LINK_PARAMETERS,
+    }
+
+
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_add_link_no_operation_id(schema_url):
+    schema = schemathesis.from_uri(schema_url)
+    target = schema["/users/{user_id}"]["GET"]
+    del target.definition.resolved["operationId"]
+    links = add_link(schema, schema["/users/{user_id}"]["GET"], parameters={"userId": "$response.body#/id"})
+    assert links[schema["/users/{user_id}"]["GET"].verbose_name] == {
+        "operationRef": "#/paths/~1users~1{user_id}/get",
+        **EXPECTED_LINK_PARAMETERS,
+    }
+
+
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_add_link_by_reference(schema_url):
+    schema = schemathesis.from_uri(schema_url)
+    links = add_link(schema, "#/paths/~1users~1{user_id}/get", parameters={"userId": "$response.body#/id"})
+    assert links["#/paths/~1users~1{user_id}/get"] == {
+        "operationRef": "#/paths/~1users~1{user_id}/get",
+        **EXPECTED_LINK_PARAMETERS,
+    }
+
+
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_add_link_by_reference_twice(schema_url):
+    schema = schemathesis.from_uri(schema_url)
+    add_link(schema, "#/paths/~1users~1{user_id}/get", parameters={"userId": "$response.body#/id"})
+    links = add_link(schema, "#/paths/~1users~1{user_id}/get", request_body="#/foo")
+    assert links["#/paths/~1users~1{user_id}/get"] == {
+        "operationRef": "#/paths/~1users~1{user_id}/get",
+        **EXPECTED_LINK_PARAMETERS,
+    }
+    assert links["#/paths/~1users~1{user_id}/get_new"] == {
+        "operationRef": "#/paths/~1users~1{user_id}/get",
+        "requestBody": "#/foo",
+    }
+
+
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_add_link_nothing_is_provided(schema_url):
+    schema = schemathesis.from_uri(schema_url)
+    # When the user doesn't provide parameters or request_body
+    with pytest.raises(ValueError, match="You need to provide `parameters` or `request_body`."):
+        # Then there should be an error
+        schema.add_link(
+            source=schema["/users/"]["POST"],
+            target="#/paths/~1users~1{user_id}/get",
+            status_code="201",
+        )
+
+
+@pytest.mark.parametrize(
+    "change",
+    (
+        lambda s, e: setattr(e, "method", "GET"),
+        lambda s, e: s.raw_schema["paths"].__setitem__("/users/", {}),
+    ),
+)
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_add_link_unknown_endpoint(schema_url, change):
+    schema = schemathesis.from_uri(schema_url)
+    # When the source endpoint is modified and can't be found
+    source = schema["/users/"]["POST"]
+    change(schema, source)
+    with pytest.raises(
+        ValueError, match="Can't locate the endpoint definition in the schema. Did you modify the schema manually?"
+    ):
+        # Then there should be an error about it.
+        schema.add_link(source=source, target="#/paths/~1users~1{user_id}/get", status_code="201", request_body="#/foo")
+
+
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_links_access(schema_url):
+    schema = schemathesis.from_uri(schema_url)
+    links = schema["/users/"]["POST"].links["201"]
+    assert len(links) == 2
+    assert links["GetUserByUserId"].name == "GetUserByUserId"
+
+
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_misspelled_parameter(schema_url):
+    schema = schemathesis.from_uri(schema_url)
+    # When the user supplies a parameter definition, that points to location which has no parameters defined in the
+    # schema
+    add_link(schema, "#/paths/~1users~1{user_id}/get", parameters={"header.userId": "$response.body#/id"})
+    case = schema["/users/{user_id}"]["GET"].make_case()
+    link = schema["/users/"]["POST"].links["201"]["#/paths/~1users~1{user_id}/get"]
+    with pytest.raises(
+        ValueError,
+        match="Parameter `userId` is not defined in endpoint `GET /users/{user_id}`. "
+        "Did you misspell the parameter name?",
+    ):
+        link.set_data(case, context=expressions.ExpressionContext(case=case, response=None))

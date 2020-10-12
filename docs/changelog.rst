@@ -4,12 +4,22 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- New approach to stateful testing, based on the Hypothesis's ``RuleBasedStateMachine``. `#737`_
+
+**Deprecated**
+
+- Using ``stateful=Stateful.links`` in schema loaders and ``parametrize``. Use ``schema.as_state_machine().TestCase`` instead.
+  The old approach to stateful testing will be removed in ``3.0``.
+  See the ``Stateful testing`` section of our documentation for more information.
+
 `2.6.1`_ - 2020-10-19
 ---------------------
 
 **Added**
 
-- New method ``as_curl_command`` added to the Case class `#689`_
+- New method ``as_curl_command`` added to the ``Case`` class. `#689`_
 
 `2.6.0`_ - 2020-10-06
 ---------------------
@@ -1410,6 +1420,7 @@ Deprecated
 .. _#748: https://github.com/schemathesis/schemathesis/issues/748
 .. _#742: https://github.com/schemathesis/schemathesis/issues/742
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
+.. _#737: https://github.com/schemathesis/schemathesis/issues/737
 .. _#734: https://github.com/schemathesis/schemathesis/issues/734
 .. _#731: https://github.com/schemathesis/schemathesis/issues/731
 .. _#721: https://github.com/schemathesis/schemathesis/issues/721

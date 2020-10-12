@@ -134,4 +134,4 @@ def test_get_endpoint_by_operation_id(operation_id, path, method):
     schema = schemathesis.from_dict(SCHEMA)
     endpoint = schema.get_endpoint_by_operation_id(operation_id)
     assert endpoint.path == path
-    assert endpoint.method == method
+    assert endpoint.method.upper() == method
