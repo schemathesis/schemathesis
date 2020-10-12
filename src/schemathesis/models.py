@@ -35,7 +35,15 @@ MISSING_STATEFUL_ARGUMENT_MESSAGE = (
 
 
 @attr.s(slots=True)  # pragma: no mutate
-class Case:
+class CaseSource:
+    """Data sources, used to generate a test case."""
+
+    case: "Case" = attr.ib()  # pragma: no mutate
+    response: GenericResponse = attr.ib()  # pragma: no mutate
+
+
+@attr.s(slots=True)  # pragma: no mutate
+class Case:  # pylint: disable=too-many-public-methods
     """A single test case parameters."""
 
     endpoint: "Endpoint" = attr.ib(repr=False)  # pragma: no mutate
@@ -46,7 +54,8 @@ class Case:
     body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
     form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
 
-    feedback: "Feedback" = attr.ib(repr=False, default=None)
+    feedback: "Feedback" = attr.ib(repr=False, default=None)  # pragma: no mutate
+    source: Optional[CaseSource] = attr.ib(repr=False, default=None)  # pragma: no mutate
 
     @property
     def path(self) -> str:
@@ -58,7 +67,7 @@ class Case:
 
     @property
     def method(self) -> str:
-        return self.endpoint.method
+        return self.endpoint.method.upper()
 
     @property
     def base_url(self) -> Optional[str]:
@@ -67,6 +76,9 @@ class Case:
     @property
     def app(self) -> Any:
         return self.endpoint.app
+
+    def set_source(self, response: GenericResponse, case: "Case") -> None:
+        self.source = CaseSource(case=case, response=response)
 
     @property
     def formatted_path(self) -> str:
@@ -365,6 +377,7 @@ class EndpointDefinition:
     raw: Dict[str, Any] = attr.ib()  # pragma: no mutate
     resolved: Dict[str, Any] = attr.ib()  # pragma: no mutate
     scope: str = attr.ib()  # pragma: no mutate
+    parameters: List[Dict[str, Any]] = attr.ib()  # pragma: no mutate
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -388,8 +401,16 @@ class Endpoint:
     form_data: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
 
     @property
+    def verbose_name(self) -> str:
+        return f"{self.method.upper()} {self.path}"
+
+    @property
     def full_path(self) -> str:
         return self.schema.get_full_path(self.path)
+
+    @property
+    def links(self) -> Dict[str, Dict[str, Any]]:
+        return self.schema.get_links(self)
 
     def as_strategy(
         self, hooks: Optional["HookDispatcher"] = None, feedback: Optional["Feedback"] = None
@@ -446,6 +467,31 @@ class Endpoint:
             body=components["body"],
             form_data=self.form_data,
         )
+
+    def make_case(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        path_parameters: Optional[PathParameters] = None,
+        headers: Optional[Headers] = None,
+        cookies: Optional[Cookies] = None,
+        query: Optional[Query] = None,
+        body: Optional[Body] = None,
+        form_data: Optional[FormData] = None,
+    ) -> Case:
+        return Case(
+            endpoint=self,
+            path_parameters=path_parameters,
+            headers=headers,
+            cookies=cookies,
+            query=query,
+            body=body,
+            form_data=form_data,
+        )
+
+    @property
+    def operation_reference(self) -> str:
+        path = self.path.replace("~", "~0").replace("/", "~1")
+        return f"#/paths/{path}/{self.method}"
 
 
 class Status(IntEnum):

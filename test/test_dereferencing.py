@@ -492,7 +492,7 @@ def test_complex_dereference(testdir, complex_schema):
     assert schema.endpoints["/teapot"]["POST"] == Endpoint(
         base_url="file:///",
         path="/teapot",
-        method="POST",
+        method="post",
         definition=EndpointDefinition(
             {
                 "requestBody": {
@@ -553,6 +553,7 @@ def test_complex_dereference(testdir, complex_schema):
                 "tags": ["ancillaries"],
             },
             scope=f"{path.as_uri()}/root/paths/teapot.yaml#/TeapotCreatePath",
+            parameters=[],
         ),
         body={
             "additionalProperties": False,

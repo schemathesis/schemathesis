@@ -167,7 +167,7 @@ def _get_case_strategy(
     hook_dispatcher: Optional[HookDispatcher] = None,
 ) -> st.SearchStrategy[Case]:
     static_parameters: Dict[str, Any] = {"endpoint": endpoint, **extra_static_parameters}
-    if endpoint.schema.validate_schema and endpoint.method == "GET":
+    if endpoint.schema.validate_schema and endpoint.method.upper() == "GET":
         if endpoint.body is not None:
             raise InvalidSchema("Body parameters are defined for GET request.")
         static_parameters["body"] = None

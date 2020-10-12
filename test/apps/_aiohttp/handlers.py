@@ -133,6 +133,7 @@ async def create_user(request: web.Request) -> web.Response:
     data = await request.json()
     user_id = len(request.app["users"]) + 1
     request.app["users"][user_id] = {**data, "id": user_id}
+    request.app["requests_history"][user_id].append("POST")
     return web.json_response({"id": user_id}, status=201)
 
 
@@ -140,6 +141,7 @@ async def get_user(request: web.Request) -> web.Response:
     user_id = int(request.match_info["user_id"])
     try:
         user = request.app["users"][user_id]
+        request.app["requests_history"][user_id].append("GET")
         return web.json_response(user)
     except KeyError:
         return web.json_response({"message": "Not found"}, status=404)
@@ -149,6 +151,10 @@ async def update_user(request: web.Request) -> web.Response:
     user_id = int(request.match_info["user_id"])
     try:
         user = request.app["users"][user_id]
+        history = request.app["requests_history"][user_id]
+        history.append("PATCH")
+        if history == ["POST", "GET", "PATCH", "GET", "PATCH"]:
+            raise web.HTTPInternalServerError(text="We got a problem!")
         data = await request.json()
         user["username"] = data["username"]
         return web.json_response(user)

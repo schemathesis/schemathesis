@@ -18,7 +18,7 @@ from schemathesis.specs.openapi._hypothesis import (
 
 
 def make_endpoint(schema, **kwargs) -> Endpoint:
-    return Endpoint("/users", "POST", definition=EndpointDefinition({}, {}, "foo"), schema=schema, **kwargs)
+    return Endpoint("/users", "POST", definition=EndpointDefinition({}, {}, "foo", []), schema=schema, **kwargs)
 
 
 @pytest.mark.parametrize("name", sorted(PARAMETERS))
@@ -47,7 +47,7 @@ def test_no_body_in_get(swagger_20):
     endpoint = Endpoint(
         path="/api/success",
         method="GET",
-        definition=EndpointDefinition({}, {}, "foo"),
+        definition=EndpointDefinition({}, {}, "foo", []),
         schema=swagger_20,
         query={
             "required": ["name"],
@@ -66,7 +66,7 @@ def test_invalid_body_in_get(swagger_20):
     endpoint = Endpoint(
         path="/foo",
         method="GET",
-        definition=EndpointDefinition({}, {}, "foo"),
+        definition=EndpointDefinition({}, {}, "foo", []),
         schema=swagger_20,
         body={"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
     )
@@ -80,7 +80,7 @@ def test_invalid_body_in_get_disable_validation(simple_schema):
     endpoint = Endpoint(
         path="/foo",
         method="GET",
-        definition=EndpointDefinition({}, {}, "foo"),
+        definition=EndpointDefinition({}, {}, "foo", []),
         schema=schema,
         body={"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
     )
@@ -168,7 +168,7 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
     endpoint = Endpoint(
         "/api/success",
         "GET",
-        definition=EndpointDefinition({}, {}, "foo"),
+        definition=EndpointDefinition({}, {}, "foo", []),
         schema=swagger_20,
         base_url=openapi2_base_url,
         headers={
