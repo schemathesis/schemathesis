@@ -1,5 +1,6 @@
 import pytest
 from hypothesis import given, settings
+from packaging import version
 
 import schemathesis
 
@@ -530,7 +531,11 @@ def test_(request, case):
     )
     result = testdir.runpytest()
     # Then collection phase should fail with error
-    result.assert_outcomes(errors=1)
+    if version.parse(pytest.__version__) >= version.parse("6.0.0"):
+        kwargs = {"errors": 1}
+    else:
+        kwargs = {"error": 1}
+    result.assert_outcomes(**kwargs)
     result.stdout.re_match_lines([r".*Error during collection$"])
 
 

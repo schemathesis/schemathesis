@@ -44,7 +44,7 @@ importlib_metadata = { version = "^1.1", python = "<3.8" }
 werkzeug = ">0.16.0"
 junit-xml = "^1.9"
 starlette = "^0.13.2"
-yarl = "^1.6.0"
+yarl = "^1.5"
 curlify = "^2.2.1"
 
 [tool.poetry.dev-dependencies]
