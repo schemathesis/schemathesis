@@ -530,7 +530,7 @@ def test_(request, case):
     )
     result = testdir.runpytest()
     # Then collection phase should fail with error
-    result.assert_outcomes(error=1)
+    result.assert_outcomes(errors=1)
     result.stdout.re_match_lines([r".*Error during collection$"])
 
 
