@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- New method ``as_curl_command`` added to the Case class `#689`_
+
 `2.6.0`_ - 2020-10-06
 ---------------------
 
@@ -1416,6 +1420,7 @@ Deprecated
 .. _#702: https://github.com/schemathesis/schemathesis/issues/702
 .. _#695: https://github.com/schemathesis/schemathesis/issues/695
 .. _#692: https://github.com/schemathesis/schemathesis/issues/692
+.. _#689: https://github.com/schemathesis/schemathesis/issues/689
 .. _#686: https://github.com/schemathesis/schemathesis/issues/686
 .. _#684: https://github.com/schemathesis/schemathesis/issues/684
 .. _#675: https://github.com/schemathesis/schemathesis/issues/675
