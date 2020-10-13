@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, Iterator, List
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import attr
+import curlify
 import requests
 import werkzeug
 from hypothesis.strategies import SearchStrategy
@@ -125,6 +126,17 @@ class Case:
         if printed_kwargs:
             args_repr += f", {printed_kwargs}"
         return f"requests.{method}({args_repr})"
+
+    def as_curl_command(self, headers: Optional[Dict[str, Any]] = None) -> str:
+        """Construct a curl command for a given case."""
+        base_url = self.get_full_base_url()
+        kwargs = self.as_requests_kwargs(base_url)
+        if headers:
+            final_headers = kwargs["headers"] or {}
+            final_headers.update(headers)
+            kwargs["headers"] = final_headers
+        request = requests.Request(**kwargs)
+        return curlify.to_curl(request.prepare())
 
     def _get_base_url(self, base_url: Optional[str] = None) -> str:
         if base_url is None:
