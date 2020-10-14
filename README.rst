@@ -50,13 +50,15 @@ Or in your Python tests:
 
     import schemathesis
 
-    schema = schemathesis.from_uri("http://example.com/swagger.json")
+    schema = schemathesis.from_uri("http://0.0.0.0:8081/schema.yaml")
 
     @schema.parametrize()
     def test_api(case):
         case.call_and_validate()
 
 CLI is simple to use and requires no coding; the in-code approach gives more flexibility.
+
+Both examples above will run hundreds of requests against the API under test and report all found failures and inconsistencies along with instructions to reproduce them.
 
 Contributing
 ------------
