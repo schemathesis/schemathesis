@@ -469,12 +469,12 @@ Schemathesis CLI is also available as a docker image:
 
 .. code-block:: bash
 
-    docker run kiwicom/schemathesis:stable \
+    docker run schemathesis/schemathesis:stable \
         run http://api.com/schema.json
 
 To run it against the localhost server, add ``--network=host`` parameter:
 
 .. code-block:: bash
 
-    docker run --network="host" kiwicom/schemathesis:stable \
+    docker run --network="host" schemathesis/schemathesis:stable \
         run http://127.0.0.1/schema.json
