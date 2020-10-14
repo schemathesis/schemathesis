@@ -6,22 +6,27 @@ on:
       - master
 
 jobs:
-  release_image:
-    name: Build and publish to Docker Hub
+  container:
+    name: Container image
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v2
+
+      - name: GitHub Package Registry
+        uses: aevea/action-kaniko@master
         with:
-          fetch-depth: 1
+          registry: docker.pkg.github.com
+          password: ${{ secrets.GITHUB_TOKEN }}
+          image: server
+          cache: true
+          cache_registry: cache
 
-      - name: Build the image
-        run: docker build -f "Dockerfile" -t "kiwicom/schemathesis:latest" .
-
-      - name: Login to registry
-        run: docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
-
-      - name: Publish the latest image
-        run: docker push kiwicom/schemathesis:latest
+      - name: Dockerhub
+        uses: aevea/action-kaniko@master
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          image: schemathesis/schemathesis
+          cache: true
+          cache_registry: schemathesis/cache
