@@ -27,10 +27,12 @@ Or in your Python tests:
     def test_api(case):
         case.call_and_validate()
 
+Both examples above will run hundreds of requests against the API under test and report all found failures and inconsistencies along with instructions to reproduce them.
+
 Features
 --------
 
- - Content-Type, schema, and status code conformance checks for Open API;
+ - Content-Type, schema, headers, and status code conformance checks for Open API;
  - Testing of explicit examples from the input schema;
  - Stateful testing via Open API links;
  - Concurrent test execution;
