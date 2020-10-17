@@ -7,7 +7,7 @@
   filePattern: ".*.py$"
 
 - name: Leftover print
-  pattern: "print\\("
+  pattern: "\\Wprint\\("
   filePattern: ^(?!.*conftest).*\.py$
 
 - name: Use relative imports
