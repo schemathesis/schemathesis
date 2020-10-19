@@ -5,6 +5,7 @@ import pytest
 from hypothesis import example, given
 from hypothesis import strategies as st
 
+from schemathesis import utils
 from schemathesis.cli import callbacks
 
 from ..utils import SIMPLE_PATH
@@ -38,7 +39,16 @@ def test_validate_app(value):
         callbacks.validate_app(SimpleNamespace(params={"show_errors_tracebacks": False}), None, value)
 
 
-@given(value=st.lists(st.text(), min_size=1).map(tuple))
+def is_invalid_header(header):
+    try:
+        # We need to avoid generating known valid headers
+        key, value = header.split(":")
+        return not (key.strip() and utils.is_latin_1_encodable(key))
+    except ValueError:
+        return True
+
+
+@given(value=st.lists(st.text().filter(is_invalid_header), min_size=1).map(tuple))
 @example((":",))
 @example(("0:Ā",))
 @example(("Ā:0",))
