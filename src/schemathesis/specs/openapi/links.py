@@ -3,6 +3,7 @@
 Based on https://swagger.io/docs/specification/links/
 """
 from copy import deepcopy
+from difflib import get_close_matches
 from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tuple, Union
 
 import attr
@@ -199,10 +200,12 @@ class OpenAPILink(Direction):
             # but the schema has no parameters of such type at all.
             # Therefore the container is empty, otherwise it will be at least an empty object
             if container is None:
-                raise ValueError(
-                    f"Parameter `{name}` is not defined in endpoint `{case.endpoint.verbose_name}`. "
-                    "Did you misspell the parameter name?"
-                )
+                message = f"No such parameter in `{case.endpoint.verbose_name}`: `{name}`."
+                possibilities = [param["name"] for param in case.endpoint.definition.parameters]
+                matches = get_close_matches(name, possibilities)
+                if matches:
+                    message += f" Did you mean `{matches[0]}`?"
+                raise ValueError(message)
             container[name] = expressions.evaluate(expression, context)
 
     def set_body(self, case: Case, context: expressions.ExpressionContext) -> None:
@@ -215,7 +218,7 @@ class OpenAPILink(Direction):
         return self.endpoint.schema.get_endpoint_by_reference(self.definition["operationRef"])  # type: ignore
 
 
-def get_container(case: Case, location: Optional[str], name: str) -> Dict[str, Any]:
+def get_container(case: Case, location: Optional[str], name: str) -> Optional[Dict[str, Any]]:
     """Get a container that suppose to store the given parameter."""
     if location:
         container_name = LOCATION_TO_CONTAINER[location]
@@ -251,29 +254,6 @@ def get_all_links(endpoint: Endpoint) -> Generator[Tuple[str, OpenAPILink], None
 
 
 def add_link(  # pylint: disable=too-many-arguments
-    schema: Dict[str, Any],
-    links_field: str,
-    source: Endpoint,
-    target: Union[str, Endpoint],
-    status_code: Union[str, int],
-    parameters: Optional[Dict[str, str]] = None,
-    request_body: Any = None,
-) -> None:
-    """Add a link between two endpoints to the provided schema."""
-    # We modify the definition in-place
-    for endpoint, methods in schema["paths"].items():
-        if endpoint == source.path:
-            for method, definition in methods.items():
-                if method.upper() == source.method.upper():
-                    _add_link(definition["responses"], links_field, parameters, request_body, status_code, target)
-                    break
-            else:
-                raise ValueError(
-                    "Can't locate the endpoint definition in the schema. Did you modify the schema manually?"
-                )
-
-
-def _add_link(  # pylint: disable=too-many-arguments
     responses: Dict[str, Dict[str, Any]],
     links_field: str,
     parameters: Optional[Dict[str, str]],

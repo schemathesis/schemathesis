@@ -31,10 +31,12 @@ def _get_hashed_exception(prefix: str, message: str) -> Type[CheckFailed]:
     return get_exception(name)
 
 
-def get_grouped_exception(*exceptions: AssertionError) -> Type[CheckFailed]:
+def get_grouped_exception(prefix: str, *exceptions: AssertionError) -> Type[CheckFailed]:
+    # The prefix is needed to distinguish multiple endpoints with the same error messages
+    # that are coming from different endpoints
     messages = [exception.args[0] for exception in exceptions]
     message = "".join(messages)
-    return _get_hashed_exception("GroupedException", message)
+    return _get_hashed_exception("GroupedException", f"{prefix}{message}")
 
 
 def get_status_code_error(status_code: int) -> Type[CheckFailed]:
