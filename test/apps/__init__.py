@@ -22,9 +22,14 @@ except ImportError as exc:
         raise exc
 
 
+INVALID_ENDPOINTS = ("invalid", "invalid_response", "invalid_path_parameter")
+AvailableEndpoints = CSVOption(Endpoint)
+AvailableEndpoints.choices += ("__all__",)
+
+
 @click.command()
 @click.argument("port", type=int)
-@click.option("--endpoints", type=CSVOption(Endpoint))
+@click.option("--endpoints", type=AvailableEndpoints)
 @click.option("--spec", type=click.Choice(["openapi2", "openapi3", "graphql"]), default="openapi2")
 @click.option("--framework", type=click.Choice(["aiohttp", "flask"]), default="aiohttp")
 def run_app(port: int, endpoints: List[Endpoint], spec: str, framework: str) -> None:
@@ -33,9 +38,12 @@ def run_app(port: int, endpoints: List[Endpoint], spec: str, framework: str) -> 
         app.run(port=port)
     else:
         if endpoints is not None:
-            prepared_endpoints = tuple(endpoint.name for endpoint in endpoints)
+            if "__all__" in endpoints:
+                prepared_endpoints = tuple(endpoint.name for endpoint in Endpoint)
+            else:
+                prepared_endpoints = tuple(endpoint.name for endpoint in endpoints)
         else:
-            prepared_endpoints = tuple(endpoint.name for endpoint in Endpoint)
+            prepared_endpoints = tuple(endpoint.name for endpoint in Endpoint if endpoint.name not in INVALID_ENDPOINTS)
         version = {"openapi2": OpenAPIVersion("2.0"), "openapi3": OpenAPIVersion("3.0")}[spec]
         if framework == "aiohttp":
             app = _aiohttp.create_openapi_app(prepared_endpoints, version)
