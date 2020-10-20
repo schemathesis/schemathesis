@@ -2,6 +2,7 @@
 import itertools
 from collections import defaultdict
 from copy import deepcopy
+from difflib import get_close_matches
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple, Type, Union
 from urllib.parse import urlsplit
 
@@ -250,9 +251,27 @@ class BaseOpenAPISchema(BaseSchema):
         """
         if parameters is None and request_body is None:
             raise ValueError("You need to provide `parameters` or `request_body`.")
-        links.add_link(self.raw_schema, self.links_field, source, target, status_code, parameters, request_body)
         if hasattr(self, "_endpoints"):
             delattr(self, "_endpoints")
+        for endpoint, methods in self.raw_schema["paths"].items():
+            if endpoint == source.path:
+                _, raw_methods = self._resolve_methods(methods)
+                for method, definition in raw_methods.items():
+                    if method.upper() == source.method.upper():
+                        links.add_link(
+                            definition["responses"], self.links_field, parameters, request_body, status_code, target
+                        )
+                        # If methods are behind a reference, then on the next resolving they will miss the new link
+                        # Therefore we need to modify it this way
+                        self.raw_schema["paths"][endpoint][method] = definition
+                        return
+        message = f"No such endpoint: `{source.verbose_name}`."
+        possibilities = [e.verbose_name for e in self.get_all_endpoints()]
+        matches = get_close_matches(source.verbose_name, possibilities)
+        if matches:
+            message += f" Did you mean `{matches[0]}`?"
+        message += " Check if the requested endpoint passes the filters in the schema."
+        raise ValueError(message)
 
     def get_links(self, endpoint: Endpoint) -> Dict[str, Dict[str, Any]]:
         result: Dict[str, Dict[str, Any]] = defaultdict(dict)

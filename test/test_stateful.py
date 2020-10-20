@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 import schemathesis
@@ -271,20 +273,24 @@ def test_add_link_nothing_is_provided(schema_url):
 
 
 @pytest.mark.parametrize(
-    "change",
+    "change, message",
     (
-        lambda s, e: setattr(e, "method", "GET"),
-        lambda s, e: s.raw_schema["paths"].__setitem__("/users/", {}),
+        (lambda s, e: setattr(e, "method", "GET"), "No such endpoint: `GET /users/`. Did you mean `POST /users/`?"),
+        (lambda s, e: setattr(e, "path", "/userz/"), "No such endpoint: `POST /userz/`. Did you mean `POST /users/`?"),
+        (
+            lambda s, e: s.raw_schema["paths"].__setitem__("/users/", {}),
+            "No such endpoint: `POST /users/`.",
+        ),
     ),
 )
 @pytest.mark.endpoints("create_user", "get_user", "update_user")
-def test_add_link_unknown_endpoint(schema_url, change):
+def test_add_link_unknown_endpoint(schema_url, change, message):
     schema = schemathesis.from_uri(schema_url)
     # When the source endpoint is modified and can't be found
     source = schema["/users/"]["POST"]
     change(schema, source)
     with pytest.raises(
-        ValueError, match="Can't locate the endpoint definition in the schema. Did you modify the schema manually?"
+        ValueError, match=re.escape(f"{message} Check if the requested endpoint passes the filters in the schema.")
     ):
         # Then there should be an error about it.
         schema.add_link(source=source, target="#/paths/~1users~1{user_id}/get", status_code="201", request_body="#/foo")
@@ -307,8 +313,6 @@ def test_misspelled_parameter(schema_url):
     case = schema["/users/{user_id}"]["GET"].make_case()
     link = schema["/users/"]["POST"].links["201"]["#/paths/~1users~1{user_id}/get"]
     with pytest.raises(
-        ValueError,
-        match="Parameter `userId` is not defined in endpoint `GET /users/{user_id}`. "
-        "Did you misspell the parameter name?",
+        ValueError, match="No such parameter in `GET /users/{user_id}`: `userId`. Did you mean `user_id`?"
     ):
         link.set_data(case, context=expressions.ExpressionContext(case=case, response=None))

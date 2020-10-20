@@ -84,7 +84,7 @@ APIWorkflow = schema.as_state_machine()
         schema=app_schema,
     )
     result = testdir.runpytest()
-    assert "E   schemathesis.exceptions.CheckFailed: " in result.outlines
+    assert "E   1. Received a response with 5xx status code: 500" in result.outlines
 
 
 @pytest.mark.parametrize("factory_name", ("wsgi_app_factory", "asgi_app_factory"))

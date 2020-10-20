@@ -16,6 +16,9 @@ Stateful testing checks how multiple API endpoints work in combination.
 
 It solves the problem when your application produces a high number of "404 Not Found" responses during testing due to randomness in the input data.
 
+**NOTE**. The number of received "404 Not Found" responses depends on the number of connections between different operations defined in the schema.
+The more connections you have, the deeper tests can reach.
+
 How to specify connections?
 ---------------------------
 
@@ -363,8 +366,7 @@ Login to an app and use its API token with each call:
     class APIWorkflow(schema.as_state_machine()):
         headers: dict
 
-        def __init__(self):
-            super().__init__()
+        def setup(self):
             # Make a login request
             response = requests.post(
                 "http://0.0.0.0/api/login",
@@ -379,9 +381,9 @@ Login to an app and use its API token with each call:
                 "Authorization": f"Bearer {token}"
             }
 
-        def call(self, case):
+        def get_call_kwargs(self, case):
             # Use stored headers
-            return case.call(headers=self.headers)
+            return {"headers": self.headers}
 
 Conditional validation
 ~~~~~~~~~~~~~~~~~~~~~~

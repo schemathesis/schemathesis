@@ -18,7 +18,7 @@ from hypothesis.strategies import SearchStrategy
 from starlette.testclient import TestClient as ASGIClient
 
 from .constants import USER_AGENT
-from .exceptions import CheckFailed, InvalidSchema
+from .exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse
 
@@ -288,10 +288,11 @@ class Case:  # pylint: disable=too-many-public-methods
             try:
                 check(response, self)
             except CheckFailed as exc:
-                errors.append(exc.args[0])
+                errors.append(exc)
         if errors:
-            formatted_errors = "\n\n".join(f"{idx}. {error}" for idx, error in enumerate(errors, 1))
-            raise CheckFailed(
+            exception_cls = get_grouped_exception(self.endpoint.verbose_name, *errors)
+            formatted_errors = "\n\n".join(f"{idx}. {error.args[0]}" for idx, error in enumerate(errors, 1))
+            raise exception_cls(
                 f"\n\n{formatted_errors}\n\n----------\n\n"
                 f"Run this Python code to reproduce this response: \n\n    {self.get_code_to_reproduce()}"
             )
