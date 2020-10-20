@@ -70,7 +70,7 @@ TestStateful.settings = settings(
     # ["POST", "GET", "PATCH", "GET", "PATCH"]
     result.assert_outcomes(failed=1)
     # And there should be Python code to reproduce the error in the PATCH call
-    result.stdout.re_match_lines([rf"E +requests\.patch\('{openapi3_base_url}/users/\d+'.+"])
+    result.stdout.re_match_lines([rf"E +requests\.patch\('{openapi3_base_url}/users/\d+.+"])
     # And the reproducing example should work
     first = result.outlines.index("Falsifying example:") + 1
     last = result.outlines.index("state.teardown()") + 1

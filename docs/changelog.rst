@@ -12,6 +12,10 @@ Changelog
 
 - The ``response_schema_conformance`` and ``content_type_conformance`` checks fail unconditionally if the input response has no ``Content-Type`` header. `#816`_
 
+**Fixed**
+
+- Failure reproduction code missing values that were explicitly passed to ``call_*`` methods during testing. `#814`_
+
 **Deprecated**
 
 - Using ``stateful=Stateful.links`` in schema loaders and ``parametrize``. Use ``schema.as_state_machine().TestCase`` instead.
@@ -1416,6 +1420,7 @@ Deprecated
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#816: https://github.com/schemathesis/schemathesis/issues/816
+.. _#814: https://github.com/schemathesis/schemathesis/issues/814
 .. _#795: https://github.com/schemathesis/schemathesis/issues/795
 .. _#793: https://github.com/schemathesis/schemathesis/issues/793
 .. _#788: https://github.com/schemathesis/schemathesis/issues/788

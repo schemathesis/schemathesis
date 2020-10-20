@@ -170,7 +170,8 @@ StringDatesYAMLLoader = make_loader("tag:yaml.org,2002:timestamp")
 
 
 class WSGIResponse(BaseResponse, JSONMixin):  # pylint: disable=too-many-ancestors
-    pass
+    # We store "requests" request to build a reproduction code
+    request: requests.PreparedRequest
 
 
 def get_requests_auth(auth: Optional[RawAuth], auth_type: Optional[str]) -> Optional[Union[HTTPDigestAuth, RawAuth]]:
