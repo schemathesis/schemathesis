@@ -208,7 +208,7 @@ def run_checks(  # pylint: disable=too-many-arguments
             result.add_success("max_response_time", case)
 
     if errors:
-        raise get_grouped_exception(*errors)
+        raise get_grouped_exception(case.endpoint.verbose_name, *errors)
 
 
 def run_targets(targets: Iterable[Callable], context: TargetContext) -> None:

@@ -174,11 +174,11 @@ class APIStateMachine(RuleBasedStateMachine):
     def transform(self, result: StepResult, direction: Direction, case: Case) -> Case:
         raise NotImplementedError
 
-    def step(self, previous: Optional[Tuple[StepResult, Direction]], case: Case) -> StepResult:
+    def step(self, case: Case, previous: Optional[Tuple[StepResult, Direction]] = None) -> StepResult:
         """A single state machine step.
 
-        :param previous: Optional result from the previous step and the direction in which this step should be done.
         :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param previous: Optional result from the previous step and the direction in which this step should be done.
 
         Schemathesis prepares data, makes a call and validates the received response.
         It is the most high-level point to extend the testing process. You probably don't need it in most cases.
@@ -187,7 +187,8 @@ class APIStateMachine(RuleBasedStateMachine):
             result, direction = previous
             case = self.transform(result, direction, case)
         self.before_call(case)
-        response = self.call(case)
+        kwargs = self.get_call_kwargs(case)
+        response = self.call(case, **kwargs)
         self.after_call(response, case)
         self.validate_response(response, case)
         return self.store_result(response, case)
@@ -241,35 +242,41 @@ class APIStateMachine(RuleBasedStateMachine):
             # PATCH /users/{user_id} -> 500
         """
 
-    def call(self, case: Case) -> GenericResponse:
+    def call(self, case: Case, **kwargs: Any) -> GenericResponse:
         """Make a request to an endpoint.
 
         :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param kwargs: Keyword arguments that will be passed to the appropriate ``case.call_*`` method.
         :return: Response from the application under test.
 
-        Here you can pass additional arguments to :func:`Case.call <schemathesis.models.Case.call>`, which mostly
-        are proxied to :func:`requests.request`:
+        Note that WSGI/ASGI applications are detected automatically in this method. Depending on the result of this
+        detection the state machine will call ``call``, ``call_wsgi`` or ``call_asgi`` methods.
+        """
+        method = self._get_call_method(case)
+        return method(**kwargs)
+
+    def get_call_kwargs(self, case: Case) -> Dict[str, Any]:
+        """Create custom keyword arguments that will be passed to the ``call`` method.
+
+        :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
 
         .. code-block:: python
 
             class APIWorkflow(schema.as_state_machine()):
 
-                def call(self, case):
-                    return case.call(verify=False)
+                def get_call_kwargs(self, case):
+                    return {"verify": True}
 
         The above example disables the server's TLS certificate verification.
-
-        Note that WSGI/ASGI applications are detected automatically in this method.
         """
-        method: Callable
+        return {}
+
+    def _get_call_method(self, case: Case) -> Callable:
         if case.app is not None:
             if isinstance(case.app, Starlette):
-                method = case.call_asgi
-            else:
-                method = case.call_wsgi
-        else:
-            method = case.call
-        return method()
+                return case.call_asgi
+            return case.call_wsgi
+        return case.call
 
     def validate_response(self, response: GenericResponse, case: Case) -> None:
         """Validate an API response.
