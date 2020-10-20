@@ -108,7 +108,6 @@ By default, the server will generate an API schema with the following endpoints:
 - ``GET /api/path_variable/{key}`` - receives the ``key`` path parameter and unconditionally returns ``{"success": true}``
 - ``POST /api/unsatisfiable`` - parameters for this endpoint are impossible to generate
 - ``POST /api/performance`` - depending on the number of "0" in the input value, responds slower and if the input value has more than ten "0", returns 500
-- ``POST /api/invalid`` - invalid parameter definition. Uses ``int`` instead of ``integer``
 - ``GET /api/flaky`` - returns 1:1 ratio of 200/500 responses
 - ``GET /api/recursive`` - accepts a recursive structure and responds with a recursive one
 - ``POST /api/multipart`` - accepts two body parameters as multipart payload
@@ -117,15 +116,19 @@ By default, the server will generate an API schema with the following endpoints:
 - ``POST /api/teapot`` - returns 418 status code that is not listed in the schema
 - ``GET /api/text`` - returns ``plain/text`` responses, which are not declared in the schema
 - ``GET /api/malformed_json`` - returns malformed JSON with ``application/json`` content type header
-- ``GET /api/invalid_response`` - response doesn't conform to the declared schema
 - ``GET /api/custom_format`` - accepts a string in the custom "digits" format. This endpoint is used to verify custom string formats
-- ``GET /api/invalid_path_parameter/{id}`` - the parameter declaration is invalid (``required`` keyword is set to ``false``)
 - ``GET /api/headers`` - returns the passed headers
 - ``POST /api/users/`` (``create_user``) - creates a user and stores it in memory. Provides Open API links to the endpoints below
 - ``GET /api/users/{user_id}`` (``get_user``) - returns a user stored in memory
 - ``PATCH /api/users/{user_id}`` (``update_user``) - updates a user stored in memory
 
 You can find the complete schema at ``http://127.0.0.1:8081/schema.yaml`` (replace 8081 with the port you chose in the start server command).
+
+There are also few endpoints with deliberately malformed schemas, that are not included by default:
+
+- ``POST /api/invalid`` - invalid parameter definition. Uses ``int`` instead of ``integer``
+- ``GET /api/invalid_response`` - response doesn't conform to the declared schema
+- ``GET /api/invalid_path_parameter/{id}`` - the parameter declaration is invalid (``required`` keyword is set to ``false``)
 
 To select only a subset of the endpoints above, you could use the ``--endpoints`` command-line option and provide a
 list of names separated by a comma. Values in this list are either mentioned in parentheses or are the path part after ``/api/``.
@@ -134,6 +137,8 @@ For example, to select the ``GET /api/success``, ``GET /api/path_variable/{key}`
 .. code:: bash
 
     ./test_server.sh 8081 --endpoints=success,path_variable,create_user
+
+To select all available endpoints, use ``--endpoints=__all__``.
 
 Then you could use CLI against this server:
 
