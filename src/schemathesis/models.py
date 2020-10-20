@@ -119,10 +119,20 @@ class Case:  # pylint: disable=too-many-public-methods
             if (key == "Body" and value is not None) or value not in (None, {})
         ]
 
-    def get_code_to_reproduce(self, headers: Optional[Dict[str, Any]] = None) -> str:
+    def get_code_to_reproduce(
+        self, headers: Optional[Dict[str, Any]] = None, request: Optional[requests.PreparedRequest] = None
+    ) -> str:
         """Construct a Python code to reproduce this case with `requests`."""
-        base_url = self.get_full_base_url()
-        kwargs = self.as_requests_kwargs(base_url)
+        if request is not None:
+            kwargs: Dict[str, Any] = {
+                "method": request.method,
+                "url": request.url,
+                "headers": request.headers,
+                "body": request.body,
+            }
+        else:
+            base_url = self.get_full_base_url()
+            kwargs = self.as_requests_kwargs(base_url)
         if headers:
             final_headers = kwargs["headers"] or {}
             final_headers.update(headers)
@@ -254,6 +264,8 @@ class Case:  # pylint: disable=too-many-public-methods
         client = werkzeug.Client(application, WSGIResponse)
         with cookie_handler(client, self.cookies):
             response = client.open(**data, **kwargs)
+        requests_kwargs = self.as_requests_kwargs(base_url=self.get_full_base_url(), headers=headers)
+        response.request = requests.Request(**requests_kwargs).prepare()
         if self.feedback:
             self.store_response(response)
         return response
@@ -292,9 +304,10 @@ class Case:  # pylint: disable=too-many-public-methods
         if errors:
             exception_cls = get_grouped_exception(self.endpoint.verbose_name, *errors)
             formatted_errors = "\n\n".join(f"{idx}. {error.args[0]}" for idx, error in enumerate(errors, 1))
+            code = self.get_code_to_reproduce(request=response.request)
             raise exception_cls(
                 f"\n\n{formatted_errors}\n\n----------\n\n"
-                f"Run this Python code to reproduce this response: \n\n    {self.get_code_to_reproduce()}"
+                f"Run this Python code to reproduce this response: \n\n    {code}"
             )
 
     def call_and_validate(
