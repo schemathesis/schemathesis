@@ -9,7 +9,7 @@ from requests.structures import CaseInsensitiveDict
 from starlette.applications import Starlette
 
 from .exceptions import InvalidSchema
-from .models import Case, Endpoint
+from .models import Case, CheckFunction, Endpoint
 from .utils import NOT_SET, GenericResponse
 
 if TYPE_CHECKING:
@@ -278,7 +278,9 @@ class APIStateMachine(RuleBasedStateMachine):
             return case.call_wsgi
         return case.call
 
-    def validate_response(self, response: GenericResponse, case: Case) -> None:
+    def validate_response(
+        self, response: GenericResponse, case: Case, additional_checks: Tuple[CheckFunction, ...] = ()
+    ) -> None:
         """Validate an API response.
 
         :param response: Response from the application under test.
@@ -310,7 +312,7 @@ class APIStateMachine(RuleBasedStateMachine):
         In this case, all checks will be executed, and you'll receive a grouped exception that contains results from
         all provided checks rather than only the first encountered exception.
         """
-        case.validate_response(response)
+        case.validate_response(response, additional_checks=additional_checks)
 
     def store_result(self, response: GenericResponse, case: Case) -> StepResult:
         return StepResult(response, case)
