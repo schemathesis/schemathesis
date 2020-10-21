@@ -51,6 +51,11 @@ def get_response_type_error(expected: str, received: str) -> Type[CheckFailed]:
     return get_exception(name)
 
 
+def get_missing_content_type_error() -> Type[CheckFailed]:
+    """Return new exception for a missing Content-Type header."""
+    return get_exception("MissingContentTypeError")
+
+
 def get_schema_validation_error(exception: ValidationError) -> Type[CheckFailed]:
     """Return new exception for schema validation error."""
     return _get_hashed_exception("SchemaValidationError", str(exception))
