@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - New approach to stateful testing, based on the Hypothesis's ``RuleBasedStateMachine``. `#737`_
+- ``Case.validate_response`` accepts the new ``additional_checks`` argument. It provides a way to execute additional checks in addition to existing ones.
 
 **Changed**
 

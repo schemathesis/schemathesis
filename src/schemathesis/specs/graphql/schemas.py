@@ -39,8 +39,10 @@ class GraphQLCase(Case):
         self,
         response: GenericResponse,
         checks: Tuple[CheckFunction, ...] = (),
+        additional_checks: Tuple[CheckFunction, ...] = (),
     ) -> None:
         checks = checks or (not_a_server_error,)
+        checks += additional_checks
         return super().validate_response(response, checks)
 
 

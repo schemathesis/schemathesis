@@ -291,10 +291,12 @@ class Case:  # pylint: disable=too-many-public-methods
         self,
         response: GenericResponse,
         checks: Tuple["CheckFunction", ...] = (),
+        additional_checks: Tuple["CheckFunction", ...] = (),
     ) -> None:
         from .checks import ALL_CHECKS  # pylint: disable=import-outside-toplevel
 
         checks = checks or ALL_CHECKS
+        checks += additional_checks
         errors = []
         for check in checks:
             try:
