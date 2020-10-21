@@ -4,7 +4,13 @@ from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Union
 import jsonschema
 import requests
 
-from ...exceptions import get_headers_error, get_response_type_error, get_schema_validation_error, get_status_code_error
+from ...exceptions import (
+    get_headers_error,
+    get_missing_content_type_error,
+    get_response_type_error,
+    get_schema_validation_error,
+    get_status_code_error,
+)
 from ...utils import GenericResponse, are_content_types_equal, parse_content_type
 from .schemas import BaseOpenAPISchema
 from .utils import expand_status_code
@@ -45,7 +51,7 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> Optiona
         return None
     content_type = response.headers.get("Content-Type")
     if not content_type:
-        return None
+        raise get_missing_content_type_error()("Response is missing the `Content-Type` header")
     for option in content_types:
         if are_content_types_equal(option, content_type):
             return None
@@ -77,11 +83,9 @@ def response_headers_conformance(response: GenericResponse, case: "Case") -> Opt
 def response_schema_conformance(response: GenericResponse, case: "Case") -> None:
     if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
-    try:
-        content_type = response.headers["Content-Type"]
-    except KeyError:
-        # Not all responses have a content-type
-        return
+    content_type = response.headers.get("Content-Type")
+    if content_type is None:
+        raise get_missing_content_type_error()("Response is missing the `Content-Type` header")
     if not content_type.startswith("application/json"):
         return
     # the keys should be strings

@@ -13,7 +13,7 @@ from schemathesis.checks import (
     response_schema_conformance,
     status_code_conformance,
 )
-from schemathesis.exceptions import InvalidSchema
+from schemathesis.exceptions import CheckFailed, InvalidSchema
 from schemathesis.models import EndpointDefinition
 from schemathesis.schemas import BaseSchema
 
@@ -244,8 +244,9 @@ def test_invalid_schema_on_content_type_check():
 def test_missing_content_type_header(case):
     # When the response has no `Content-Type` header
     response = make_response(content_type=None)
-    # Then content_type_conformance should be skipped
-    assert content_type_conformance(response, case) is None
+    # Then an error should be risen
+    with pytest.raises(CheckFailed, match="Response is missing the `Content-Type` header"):
+        content_type_conformance(response, case)
 
 
 SUCCESS_SCHEMA = {"type": "object", "properties": {"success": {"type": "boolean"}}, "required": ["success"]}
@@ -270,12 +271,10 @@ def test_response_schema_conformance_swagger(swagger_20, content, definition):
 def test_response_schema_conformance_swagger_no_content_header(swagger_20):
     """Regression: response_schema_conformance does not raise KeyError when response does not have a "Content-Type"."""
     response = requests.Response()
-    response.status_code = 418
     case = make_case(swagger_20, {})
 
-    result = response_schema_conformance(response, case)
-
-    assert result is None
+    with pytest.raises(CheckFailed, match="Response is missing the `Content-Type` header"):
+        response_schema_conformance(response, case)
 
 
 @pytest.mark.parametrize(
