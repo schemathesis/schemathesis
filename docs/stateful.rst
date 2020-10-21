@@ -405,9 +405,11 @@ Run different checks, depending on the result of the previous call:
     class APIWorkflow(schema.as_state_machine()):
 
         def validate_response(self, response, case):
-            case.validate_response(
+            # Run all default checks together with the new one
+            super().validate_response(
                 response,
-                (check_condition, )
+                case,
+                additional_checks=(check_condition, )
             )
 
 Reproducing failures
@@ -503,13 +505,20 @@ After:
 
 .. code-block:: python
 
+    def check_header(response, case):
+        # A custom conditional check
+        if case.path == "/items":
+            assert "X-Item-Id" in response.headers
+
     class APIWorkflow(schema.as_state_machine()):
 
         def validate_response(self, response, case):
-            super().validate_response(response, case)
-            # A custom conditional check
-            if case.path == "/items":
-                assert "X-Item-Id" in response.headers
+            super().validate_response(
+                response,
+                case,
+                # Run it together with default checks
+                additional_checks=(check_header, )
+            )
 
     TestCase = APIWorkflow.TestCase
 
