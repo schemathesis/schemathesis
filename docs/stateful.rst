@@ -162,11 +162,11 @@ gets a freshly created state machine instance that runs a sequence of steps.
 
     These methods might be called multiple times per test scenario.
 
-    .. automethod:: step
+    .. automethod:: before_call
 
     |
 
-    .. automethod:: before_call
+    .. automethod:: get_call_kwargs
 
     |
 
@@ -298,7 +298,11 @@ The best way to do so is by using the Hypothesis's ``initialize`` decorator:
 
 This rule will use the ``POST /users/`` endpoint strategy and generate random data as input and store the result in
 a special bundle, where it will be used for dependent API calls. The state machine will run this rule at the beginning of any test scenario.
-Note that if you have multiple rules, they will run in arbitrary order.
+
+.. important::
+
+    If you have multiple rules, they will run in arbitrary order, which may not be desired.
+    If you need to run initialization code always at the beginning of each test scenario, use the :meth:`setup` hook instead.
 
 If you need more control and you'd like to provide the whole payload to your endpoint, then you can do it either by modifying
 the generated case manually or by creating a new one via the :func:`Endpoint.make_case` function:
@@ -384,6 +388,14 @@ Login to an app and use its API token with each call:
         def get_call_kwargs(self, case):
             # Use stored headers
             return {"headers": self.headers}
+
+Note that this example uses the ``setup`` hook. A similar hook could be implemented with the ``initialize`` decorator, but
+there is a caveat with that.
+
+You can have multiple initialization rules by using the ``initialize`` decorator, and they will be called in an arbitrary order.
+In this example, such behavior may not be desired since the login request should run first, and then all following requests will use the received token.
+If we'd use ``initialize`` to login with some additional ``initialize`` rules that depend on the API token, it won't work because of random execution order.
+The ``setup`` method fits better here since it **always** is executed when the state machine starts.
 
 Conditional validation
 ~~~~~~~~~~~~~~~~~~~~~~
