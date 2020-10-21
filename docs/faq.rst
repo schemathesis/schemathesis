@@ -19,6 +19,22 @@ It depends. The test data that Schemathesis generates is random. Input validatio
 
 Since Schemathesis generates data that fits the application's API schema, it can reach the app's business logic, but it depends on the architecture of each particular application.
 
+How is Schemathesis different from Dredd?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Schemathesis focuses on finding inputs that result in application crash, but it shares the goal of keeping the API documentation up to date with Dredd.
+Both tools can generate requests to the API under test, but they approach it differently.
+
+Schemathesis uses Property-Based Testing to infer all input values and uses examples defined in the API schema as separate test cases.
+Dredd uses examples described in the API schema as the primary source of inputs (and `requires <https://dredd.org/en/latest/how-it-works.html#uri-parameters>`_ them to work) and
+generates data only in `some situations <https://dredd.org/en/latest/how-it-works.html#id8>`_.
+
+By using `Hypothesis <https://hypothesis.readthedocs.io/en/latest/>`_ as the underlying testing framework, Schemathesis benefits from all its features like test case reduction and stateful testing.
+Dredd works more in a way that requires you to write some sort of example-based tests when Schemathesis requires only a valid API schema and will generate tests for you.
+
+There are a lot of features that Dredd has are Schemathesis has not (e.g., API Blueprint support, that powerful hook system, and many more) and probably vice versa.
+Definitely, Schemathesis can learn a lot from Dredd and if you miss any feature that exists in Dredd but doesn't exist in Schemathesis, let us know.
+
 How should I run Schemathesis?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
