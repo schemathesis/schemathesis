@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`2.7.0`_ - 2020-10-21
+---------------------
+
 **Added**
 
 - New approach to stateful testing, based on the Hypothesis's ``RuleBasedStateMachine``. `#737`_
@@ -1319,7 +1322,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.6.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.7.0...HEAD
+.. _2.7.0: https://github.com/schemathesis/schemathesis/compare/v2.6.1...v2.7.0
 .. _2.6.1: https://github.com/schemathesis/schemathesis/compare/v2.6.0...v2.6.1
 .. _2.6.0: https://github.com/schemathesis/schemathesis/compare/v2.5.1...v2.6.0
 .. _2.5.1: https://github.com/schemathesis/schemathesis/compare/v2.5.0...v2.5.1
