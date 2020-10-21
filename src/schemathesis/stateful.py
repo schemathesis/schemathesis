@@ -198,16 +198,26 @@ class APIStateMachine(RuleBasedStateMachine):
 
         :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
 
-        Use it if you want to inject static data to **all requests**, for example, an
-        API token that should always be present in headers:
+        Use it if you want to inject static data, for example,
+        a query parameter that should always be used in API calls:
 
         .. code-block:: python
 
             class APIWorkflow(schema.as_state_machine()):
 
                 def before_call(self, case):
-                    case.headers = case.headers or {}
-                    case.headers["Authorization"] = "Bearer <TOKEN>"
+                    case.query = case.query or {}
+                    case.query["test"] = "true"
+
+        You can also modify data only for some operations:
+
+        .. code-block:: python
+
+            class APIWorkflow(schema.as_state_machine()):
+
+                def before_call(self, case):
+                    if case.method == "PUT" and case.path == "/items":
+                        case.body["is_fake"] = True
         """
 
     def after_call(self, response: GenericResponse, case: Case) -> None:
@@ -251,12 +261,17 @@ class APIStateMachine(RuleBasedStateMachine):
 
         Note that WSGI/ASGI applications are detected automatically in this method. Depending on the result of this
         detection the state machine will call ``call``, ``call_wsgi`` or ``call_asgi`` methods.
+
+        Usually, you don't need to override this method unless you are building a different state machine on top of this
+        one and want to customize the transport layer itself.
         """
         method = self._get_call_method(case)
         return method(**kwargs)
 
     def get_call_kwargs(self, case: Case) -> Dict[str, Any]:
-        """Create custom keyword arguments that will be passed to the ``call`` method.
+        """Create custom keyword arguments that will be passed to the :meth:`Case.call` method.
+
+        Mostly they are proxied to the :func:`requests.request` call.
 
         :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
 
