@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`2.7.1`_ - 2020-10-22
+---------------------
+
 **Fixed**
 
 - Adding new Open API links via the ``add_link`` method, when the related PathItem contains a reference. `#824`_
@@ -1326,7 +1329,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.7.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.7.1...HEAD
+.. _2.7.1: https://github.com/schemathesis/schemathesis/compare/v2.7.0...v2.7.1
 .. _2.7.0: https://github.com/schemathesis/schemathesis/compare/v2.6.1...v2.7.0
 .. _2.6.1: https://github.com/schemathesis/schemathesis/compare/v2.6.0...v2.6.1
 .. _2.6.0: https://github.com/schemathesis/schemathesis/compare/v2.5.1...v2.6.0
