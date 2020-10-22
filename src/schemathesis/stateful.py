@@ -300,6 +300,7 @@ class APIStateMachine(RuleBasedStateMachine):
 
         :param response: Response from the application under test.
         :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param additional_checks: A list of checks that will be run together with the default ones.
         :raises CheckFailed: If any of the supplied checks failed.
 
         If you need to change the default checks or provide custom validation rules, you can do it here.
