@@ -255,16 +255,24 @@ class BaseOpenAPISchema(BaseSchema):
             delattr(self, "_endpoints")
         for endpoint, methods in self.raw_schema["paths"].items():
             if endpoint == source.path:
-                _, raw_methods = self._resolve_methods(methods)
-                for method, definition in raw_methods.items():
+                # Methods should be completely resolved now, otherwise they might miss a resolving scope when
+                # they will be fully resolved later
+                methods = self.resolver.resolve_all(methods)
+                found = False
+                for method, definition in methods.items():
                     if method.upper() == source.method.upper():
+                        found = True
                         links.add_link(
                             definition["responses"], self.links_field, parameters, request_body, status_code, target
                         )
-                        # If methods are behind a reference, then on the next resolving they will miss the new link
-                        # Therefore we need to modify it this way
-                        self.raw_schema["paths"][endpoint][method] = definition
-                        return
+                    # If methods are behind a reference, then on the next resolving they will miss the new link
+                    # Therefore we need to modify it this way
+                    self.raw_schema["paths"][endpoint][method] = definition
+                # The reference should be removed completely, otherwise new keys in this dictionary will be ignored
+                # due to the `$ref` keyword behavior
+                self.raw_schema["paths"][endpoint].pop("$ref", None)
+                if found:
+                    return
         message = f"No such endpoint: `{source.verbose_name}`."
         possibilities = [e.verbose_name for e in self.get_all_endpoints()]
         matches = get_close_matches(source.verbose_name, possibilities)
