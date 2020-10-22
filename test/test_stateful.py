@@ -260,6 +260,27 @@ def test_add_link_by_reference_twice(schema_url):
 
 
 @pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_add_link_behind_a_reference(schema_url):
+    # See GH-824
+    schema = schemathesis.from_uri(schema_url)
+    # When all methods for an endpoint are behind a reference
+    schema.raw_schema["components"]["methods"] = {
+        "users": schema.raw_schema["paths"]["/users/"],
+        "user-details": schema.raw_schema["paths"]["/users/{user_id}"],
+    }
+    schema.raw_schema["paths"]["/users/"] = {"$ref": "#/components/methods/users"}
+    schema.raw_schema["paths"]["/users/{user_id}"] = {"$ref": "#/components/methods/user-details"}
+    assert not hasattr(schema, "_endpoints")
+    # And a link is added
+    add_link(schema, schema["/users/{user_id}"]["GET"], parameters={"userId": "$response.body#/id"})
+    # Then the source endpoint should have the new link
+    endpoint = schema["/users/"]["POST"]
+    links = endpoint.definition.resolved["responses"]["201"]["links"]
+    assert len(links) == 3
+    assert links["GET /users/{user_id}"] == {"parameters": {"userId": "$response.body#/id"}, "operationId": "getUser"}
+
+
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
 def test_add_link_nothing_is_provided(schema_url):
     schema = schemathesis.from_uri(schema_url)
     # When the user doesn't provide parameters or request_body
