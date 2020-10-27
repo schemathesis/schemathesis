@@ -1,5 +1,5 @@
-import jsonschema
 from hypothesis import given
+from jsonschema import Draft4Validator
 
 from schemathesis.specs.openapi.negative import negative_schema
 
@@ -8,14 +8,20 @@ EXAMPLE = {
     "properties": {
         "foo": {"type": "string"},
         "bar": {"type": "integer"},
-        "baz": {"type": "array"},
+        "baf": {"type": ["integer"]},
+        "baz": {"type": ["array", "object"]},
     },
-    "required": ["foo", "bar", "baz"],
+    "required": [
+        "foo",
+        "bar",
+        "baf",
+        "baz",
+    ],
 }
 
 
 def test_negative():
-    validator = jsonschema.validators.validator_for(EXAMPLE)(EXAMPLE)
+    validator = Draft4Validator(EXAMPLE)
 
     @given(negative_schema(EXAMPLE))
     def test(instance):

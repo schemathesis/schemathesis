@@ -28,7 +28,7 @@ def negative_schema(schema: Dict[str, Any]) -> st.SearchStrategy:
 
         # Other properties & mutations are chosen with feature flags
         enabled_properties = draw(FeatureStrategy())
-        enabled_mutations = draw(FeatureStrategy())
+        enabled_mutations = draw(st.shared(FeatureStrategy(), "enabled_mutations"))
 
         for name, property_schema in properties:
             if name != mutated_property_name and enabled_properties.is_enabled(name):
@@ -43,7 +43,7 @@ def negative_schema(schema: Dict[str, Any]) -> st.SearchStrategy:
 
 def mutate_required(draw: Draw, new_schema: Schema, property_schema: Schema, name: str) -> None:
     required = new_schema.get("required")
-    if required:
+    if required and name in required:
         required.remove(name)
     # An optional property still can be generated
     # To avoid it we need to remove it completely
@@ -52,14 +52,11 @@ def mutate_required(draw: Draw, new_schema: Schema, property_schema: Schema, nam
 
 
 def mutate_type(draw: Draw, new_schema: Schema, property_schema: Schema, name: str) -> None:
-    to_exclude = {property_schema["type"]}
-    if property_schema["type"] == "integer":
-        # Any valid integer is also a valid number
-        # If we won't change it then it is possible that the result will still match the original schema
-        # For example 0.0 is still a valid integer in JSON Schema Draft 7 (TODO. check)
-        to_exclude.add("number")
-    available_types = {"null", "string", "integer", "number", "array", "object"} - to_exclude
-    property_schema["type"] = draw(st.sampled_from(sorted(available_types)))
+    property_type = property_schema["type"]
+    to_exclude = set(property_type) if isinstance(property_type, list) else {property_type}
+    available_types = {"string", "integer", "number", "object", "array", "boolean", "null"} - to_exclude
+    if available_types:
+        property_schema["type"] = draw(st.sampled_from(sorted(available_types)))
 
 
 MUTATIONS = [mutate_required, mutate_type]
