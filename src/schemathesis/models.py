@@ -509,6 +509,16 @@ class Endpoint:
         path = self.path.replace("~", "~0").replace("/", "~1")
         return f"#/paths/{path}/{self.method}"
 
+    def validate_response(self, response: GenericResponse) -> None:
+        return self.schema.validate_response(self, response)
+
+    def is_response_valid(self, response: GenericResponse) -> bool:
+        try:
+            self.validate_response(response)
+            return True
+        except CheckFailed:
+            return False
+
 
 class Status(IntEnum):
     """Status of an action or multiple actions."""
