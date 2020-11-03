@@ -1,15 +1,17 @@
 # pylint: disable=too-many-ancestors
 import itertools
 from collections import defaultdict
+from contextlib import ExitStack, contextmanager
 from copy import deepcopy
 from difflib import get_close_matches
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple, Type, Union
 from urllib.parse import urlsplit
 
 import jsonschema
+import requests
 from hypothesis.strategies import SearchStrategy
 
-from ...exceptions import InvalidSchema
+from ...exceptions import InvalidSchema, get_schema_validation_error
 from ...hooks import HookContext, HookDispatcher
 from ...models import Case, Endpoint, EndpointDefinition, empty_object
 from ...schemas import BaseSchema
@@ -291,6 +293,47 @@ class BaseOpenAPISchema(BaseSchema):
         for status_code, link in links.get_all_links(endpoint):
             result[status_code][link.name] = link
         return result
+
+    def validate_response(self, endpoint: Endpoint, response: GenericResponse) -> None:
+        responses = {str(key): value for key, value in endpoint.definition.raw.get("responses", {}).items()}
+        status_code = str(response.status_code)
+        if status_code in responses:
+            definition = responses[status_code]
+        elif "default" in responses:
+            definition = responses["default"]
+        else:
+            # No response defined for the received response status code
+            return
+        scopes, schema = self.get_response_schema(definition, endpoint.definition.scope)
+        if not schema:
+            return
+        if isinstance(response, requests.Response):
+            data = response.json()
+        else:
+            data = response.json
+        with in_scopes(self.resolver, scopes):
+            try:
+                jsonschema.validate(data, schema, cls=jsonschema.Draft4Validator, resolver=self.resolver)
+            except jsonschema.ValidationError as exc:
+                exc_class = get_schema_validation_error(exc)
+                raise exc_class(
+                    f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}"
+                ) from exc
+        return None  # explicitly return None for mypy
+
+
+@contextmanager
+def in_scopes(resolver: jsonschema.RefResolver, scopes: List[str]) -> Generator[None, None, None]:
+    """Push all available scopes into the resolver.
+
+    There could be an additional scope change during a schema resolving in `get_response_schema`, so in total there
+    could be a stack of two scopes maximum. This context manager handles both cases (1 or 2 scope changes) in the same
+    way.
+    """
+    with ExitStack() as stack:
+        for scope in scopes:
+            stack.enter_context(resolver.in_scope(scope))
+        yield
 
 
 class SwaggerV20(BaseOpenAPISchema):

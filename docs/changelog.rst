@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Shortcut for response validation when Schemathesis's data generation is not used. `#485`_
+
 **Changed**
 
 - Improve the error message when the application can not be loaded from the value passed to the ``--app`` command-line option. `#836`_
@@ -1534,6 +1538,7 @@ Deprecated
 .. _#496: https://github.com/schemathesis/schemathesis/issues/496
 .. _#492: https://github.com/schemathesis/schemathesis/issues/492
 .. _#489: https://github.com/schemathesis/schemathesis/issues/489
+.. _#485: https://github.com/schemathesis/schemathesis/issues/485
 .. _#473: https://github.com/schemathesis/schemathesis/issues/473
 .. _#469: https://github.com/schemathesis/schemathesis/issues/469
 .. _#468: https://github.com/schemathesis/schemathesis/issues/468

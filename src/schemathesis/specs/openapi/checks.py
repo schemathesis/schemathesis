@@ -1,14 +1,9 @@
-from contextlib import ExitStack, contextmanager
-from typing import TYPE_CHECKING, Any, Dict, Generator, List, Optional, Union
-
-import jsonschema
-import requests
+from typing import TYPE_CHECKING, Any, Dict, Generator, Optional, Union
 
 from ...exceptions import (
     get_headers_error,
     get_missing_content_type_error,
     get_response_type_error,
-    get_schema_validation_error,
     get_status_code_error,
 )
 from ...utils import GenericResponse, are_content_types_equal, parse_content_type
@@ -88,42 +83,4 @@ def response_schema_conformance(response: GenericResponse, case: "Case") -> None
         raise get_missing_content_type_error()("Response is missing the `Content-Type` header")
     if not content_type.startswith("application/json"):
         return
-    # the keys should be strings
-    responses = {str(key): value for key, value in case.endpoint.definition.raw.get("responses", {}).items()}
-    status_code = str(response.status_code)
-    if status_code in responses:
-        definition = responses[status_code]
-    elif "default" in responses:
-        definition = responses["default"]
-    else:
-        # No response defined for the received response status code
-        return
-    scopes, schema = case.endpoint.schema.get_response_schema(definition, case.endpoint.definition.scope)
-    if not schema:
-        return
-    if isinstance(response, requests.Response):
-        data = response.json()
-    else:
-        data = response.json
-    try:
-        resolver = case.endpoint.schema.resolver
-        with in_scopes(resolver, scopes):
-            jsonschema.validate(data, schema, cls=jsonschema.Draft4Validator, resolver=resolver)
-    except jsonschema.ValidationError as exc:
-        exc_class = get_schema_validation_error(exc)
-        raise exc_class(f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}") from exc
-    return None  # explicitly return None for mypy
-
-
-@contextmanager
-def in_scopes(resolver: jsonschema.RefResolver, scopes: List[str]) -> Generator[None, None, None]:
-    """Push all available scopes into the resolver.
-
-    There could be an additional scope change during a schema resolving in `get_response_schema`, so in total there
-    could be a stack of two scopes maximum. This context manager handles both cases (1 or 2 scope changes) in the same
-    way.
-    """
-    with ExitStack() as stack:
-        for scope in scopes:
-            stack.enter_context(resolver.in_scope(scope))
-        yield
+    return case.endpoint.validate_response(response)

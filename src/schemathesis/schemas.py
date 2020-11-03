@@ -261,6 +261,9 @@ class BaseSchema(Mapping):
     def get_links(self, endpoint: Endpoint) -> Dict[str, Dict[str, Any]]:
         raise NotImplementedError
 
+    def validate_response(self, endpoint: Endpoint, response: GenericResponse) -> None:
+        raise NotImplementedError
+
 
 def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, CaseInsensitiveDict]:
     output: Dict[str, CaseInsensitiveDict] = {}
