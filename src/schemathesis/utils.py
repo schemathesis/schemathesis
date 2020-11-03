@@ -185,7 +185,7 @@ GenericResponse = Union[requests.Response, WSGIResponse]  # pragma: no mutate
 
 def import_app(path: str) -> Any:
     """Import an application from a string."""
-    path, name = (re.split(r":(?![\\/])", path, 1) + [None])[:2]  # type: ignore
+    path, name = (re.split(r":(?![\\/])", path, 1) + [""])[:2]
     __import__(path)
     # accessing the module from sys.modules returns a proper module, while `__import__`
     # may return a parent module (system dependent)
