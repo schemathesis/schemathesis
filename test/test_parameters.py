@@ -10,34 +10,42 @@ import schemathesis
 from .utils import as_param
 
 
-def test_headers(testdir):
+@pytest.mark.parametrize("schema_name", ("simple_swagger.yaml", "simple_openapi.yaml"))
+@pytest.mark.parametrize("type_", ("string", "integer", "array", "boolean", "number"))
+def test_headers(testdir, schema_name, type_):
     # When parameter is specified for "header"
+    if schema_name == "simple_swagger.yaml":
+        kwargs = {"type": type_}
+    else:
+        kwargs = {"schema": {"type": type_}}
     testdir.make_test(
         """
 @schema.parametrize()
-@settings(suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
+@settings(suppress_health_check=[HealthCheck.filter_too_much], deadline=None, max_examples=3)
 def test_(case):
-    assert_str(case.headers["api_key"])
+    assert_str(case.headers["X-Header"])
     assert_requests_call(case)
         """,
-        **as_param({"name": "api_key", "in": "header", "required": True, "type": "string"}),
+        schema_name=schema_name,
+        **as_param({"name": "X-Header", "in": "header", "required": True, **kwargs}),
     )
     # Then the generated test case should contain it in its `headers` attribute
     testdir.run_and_assert(passed=1)
 
 
-def test_cookies(testdir):
+@pytest.mark.parametrize("type_", ("string", "integer", "array", "object", "boolean", "number"))
+def test_cookies(testdir, type_):
     # When parameter is specified for "cookie"
     testdir.make_test(
         """
 @schema.parametrize()
-@settings(suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
+@settings(suppress_health_check=[HealthCheck.filter_too_much], deadline=None, max_examples=3)
 def test_(case):
     assert_str(case.cookies["token"])
     assert_requests_call(case)
         """,
         schema_name="simple_openapi.yaml",
-        **as_param({"name": "token", "in": "cookie", "required": True, "schema": {"type": "string"}}),
+        **as_param({"name": "token", "in": "cookie", "required": True, "schema": {"type": type_}}),
     )
     # Then the generated test case should contain it in its `cookies` attribute
     testdir.run_and_assert(passed=1)
