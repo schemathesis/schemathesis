@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Improve the error message when the application can not be loaded from the value passed to the ``--app`` command-line option. `#836`_
+
 `2.7.1`_ - 2020-10-22
 ---------------------
 
@@ -1432,6 +1436,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#836: https://github.com/schemathesis/schemathesis/issues/836
 .. _#824: https://github.com/schemathesis/schemathesis/issues/824
 .. _#816: https://github.com/schemathesis/schemathesis/issues/816
 .. _#814: https://github.com/schemathesis/schemathesis/issues/814

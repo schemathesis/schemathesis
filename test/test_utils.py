@@ -1,6 +1,14 @@
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
-from schemathesis.utils import are_content_types_equal, dict_true_values, is_schemathesis_test, parse_content_type
+from schemathesis.utils import (
+    are_content_types_equal,
+    dict_true_values,
+    import_app,
+    is_schemathesis_test,
+    parse_content_type,
+)
 
 
 def test_is_schemathesis_test(swagger_20):
@@ -45,3 +53,23 @@ def test_parse_content_type(value, expected):
 )
 def test_are_content_types_equal(first, second, expected):
     assert are_content_types_equal(first, second) is expected
+
+
+@pytest.mark.parametrize(
+    "path, exception, match",
+    (
+        ("", ValueError, "Empty module name"),
+        ("foo", ImportError, "No module named 'foo'"),
+        ("schemathesis:foo", AttributeError, "module 'schemathesis' has no attribute 'foo'"),
+    ),
+)
+def test_import_app(path, exception, match):
+    with pytest.raises(exception, match=match):
+        import_app(path)
+
+
+@given(st.text())
+def test_import_app_no_unexpected_exceptions(path):
+    # `import_app` should not raise nothing else but `ImportError` or `AttributeError` or `ValueError`
+    with pytest.raises((ImportError, AttributeError, ValueError)):
+        import_app(path)

@@ -36,6 +36,14 @@ def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_
     return raw_value
 
 
+APPLICATION_FORMAT_MESSAGE = (
+    "Can not import application from the given module!\n"
+    "The `--app` option value should be in format:\n\n    path:variable\n\n"
+    "where `path` is an importable path to a Python module,\n"
+    "and `variable` is a variable name inside that module."
+)
+
+
 def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]) -> Optional[str]:
     if raw_value is None:
         return raw_value
@@ -47,11 +55,11 @@ def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value
         return raw_value
     except Exception as exc:
         show_errors_tracebacks = ctx.params["show_errors_tracebacks"]
-        message = utils.format_exception(exc, show_errors_tracebacks)
-        click.secho(f"{message}\nCan not import application from the given module", fg="red")
+        message = utils.format_exception(exc, show_errors_tracebacks).strip()
+        click.secho(f"{APPLICATION_FORMAT_MESSAGE}\n\nException:\n\n{message}", fg="red")
         if not show_errors_tracebacks:
             click.secho(
-                "Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks",
+                "\nAdd this option to your command line parameters to see full tracebacks: --show-errors-tracebacks",
                 fg="red",
             )
         raise click.exceptions.Exit(1)

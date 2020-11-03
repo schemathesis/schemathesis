@@ -1278,7 +1278,7 @@ def test_wsgi_app_missing(testdir, cli):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
     assert "AttributeError: module 'location' has no attribute 'app'" in lines
-    assert "Can not import application from the given module" in lines
+    assert "Can not import application from the given module!" in lines
 
 
 def test_wsgi_app_internal_exception(testdir, cli):
