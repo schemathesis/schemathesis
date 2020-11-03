@@ -107,6 +107,8 @@ def _serialize_query_openapi3(
 def _serialize_header_openapi3(
     name: str, type_: str, explode: Optional[bool]
 ) -> Generator[Optional[Callable], None, None]:
+    # Headers should be coerced to a string so we can check it for validity later
+    yield to_string(name)
     # Header parameters always use the "simple" style, that is, comma-separated values
     if type_ == "array":
         yield delimited(name, delimiter=",")
@@ -120,6 +122,8 @@ def _serialize_header_openapi3(
 def _serialize_cookie_openapi3(
     name: str, type_: str, explode: Optional[bool]
 ) -> Generator[Optional[Callable], None, None]:
+    # Cookies should be coerced to a string so we can check it for validity later
+    yield to_string(name)
     # Cookie parameters always use the "form" style
     if explode and type_ in ("array", "object"):
         # `explode=true` doesn't make sense
@@ -140,15 +144,19 @@ def _serialize_swagger2(definitions: DefinitionList) -> Generator[Optional[Calla
         name = definition["name"]
         collection_format = definition.get("collectionFormat", "csv")
         type_ = definition.get("type")
-        if definition["in"] != "body" and type_ in ("array", "object"):
-            if collection_format == "csv":
-                yield delimited(name, delimiter=",")
-            if collection_format == "ssv":
-                yield delimited(name, delimiter=" ")
-            if collection_format == "tsv":
-                yield delimited(name, delimiter="\t")
-            if collection_format == "pipes":
-                yield delimited(name, delimiter="|")
+        if definition["in"] == "header":
+            # Headers should be coerced to a string so we can check it for validity later
+            yield to_string(name)
+        if definition["in"] != "body":
+            if type_ in ("array", "object"):
+                if collection_format == "csv":
+                    yield delimited(name, delimiter=",")
+                if collection_format == "ssv":
+                    yield delimited(name, delimiter=" ")
+                if collection_format == "tsv":
+                    yield delimited(name, delimiter="\t")
+                if collection_format == "pipes":
+                    yield delimited(name, delimiter="|")
 
 
 serialize_openapi3_parameters = make_serializer(_serialize_openapi3)
@@ -309,3 +317,9 @@ def matrix_object(item: Generated, name: str, explode: Optional[bool]) -> None:
 def nothing(item: Generated, name: str) -> None:
     """Remove a key from an item."""
     item.pop(name, None)
+
+
+@conversion
+def to_string(item: Generated, name: str) -> None:
+    """Convert the value to a string."""
+    item[name] = str(item[name])
