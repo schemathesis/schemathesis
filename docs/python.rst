@@ -263,6 +263,21 @@ When the received response is validated, Schemathesis runs the following checks:
 
 Validation happens in the ``case.validate_response`` function, but you can add your code to verify the response conformance as you do in regular Python tests.
 
+If you don't use Schemathesis for data generation, you can still utilize response validation:
+
+.. code-block:: python
+
+    schema = schemathesis.from_uri("http://0.0.0.0/openapi.json")
+
+    def test_api():
+        response = requests.get("http://0.0.0.0/api/users")
+        # Raises a validation error
+        schema["/users"]["GET"].validate_response(response)
+        # Returns a boolean value
+        schema["/users"]["GET"].is_response_valid(response)
+
+The response will be validated the same way as it is validated in the ``response_schema_conformance`` check.
+
 Using additional Hypothesis strategies
 --------------------------------------
 
