@@ -5,14 +5,13 @@ from urllib.parse import urljoin
 import jsonschema
 import requests
 import yaml
-from jsonschema import ValidationError
 from starlette.applications import Starlette
 from starlette.testclient import TestClient as ASGIClient
 from werkzeug.test import Client
 from yarl import URL
 
+from . import exceptions
 from .constants import DEFAULT_DATA_GENERATION_METHODS, USER_AGENT, DataGenerationMethod
-from .exceptions import HTTPError
 from .hooks import HookContext, dispatch
 from .lazy import LazySchema
 from .specs.openapi import definitions
@@ -83,7 +82,7 @@ def from_uri(
     try:
         response.raise_for_status()
     except requests.HTTPError as exc:
-        raise HTTPError(response=response, url=uri) from exc
+        raise exceptions.HTTPError(response=response, url=uri) from exc
     return from_file(
         response.text,
         location=uri,
@@ -205,10 +204,7 @@ def _maybe_validate_schema(
     instance: Dict[str, Any], validator: jsonschema.validators.Draft4Validator, validate_schema: bool
 ) -> None:
     if validate_schema:
-        try:
-            validator.validate(instance)
-        except TypeError as exc:
-            raise ValidationError("Invalid schema") from exc
+        exceptions.validate_schema(instance, validator)
 
 
 def from_pytest_fixture(
@@ -370,7 +366,7 @@ def check_response(response: requests.Response, schema_path: str) -> None:
     # Raising exception to provide unified behavior
     # E.g. it will be handled in CLI - a proper error message will be shown
     if 400 <= response.status_code < 600:
-        raise HTTPError(response=response, url=schema_path)
+        raise exceptions.HTTPError(response=response, url=schema_path)
 
 
 def _setup_headers(kwargs: Dict[str, Any]) -> None:
