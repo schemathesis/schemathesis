@@ -189,13 +189,18 @@ def test_(case):
     testdir.run_and_assert(passed=1)
 
 
-def test_security_definitions_api_key_cookie(testdir, simple_openapi):
-    # When schema contains "apiKeySecurity" security definition
-    # And it is in cookie
+@pytest.fixture
+def cookie_schema(simple_openapi):
     schema = deepcopy(simple_openapi)
     components = schema.setdefault("components", {})
     components["securitySchemes"] = {"api_key": {"type": "apiKey", "name": "api_key", "in": "cookie"}}
     schema["security"] = [{"api_key": []}]
+    return schema
+
+
+def test_security_definitions_api_key_cookie(testdir, cookie_schema):
+    # When schema contains "apiKeySecurity" security definition
+    # And it is in cookie
     testdir.make_test(
         """
 @schema.parametrize()
@@ -204,10 +209,37 @@ def test_(case):
     assert_str(case.cookies["api_key"])
     assert_requests_call(case)
         """,
-        schema=schema,
+        schema=cookie_schema,
     )
     # Then the generated test case should contain API key in a proper place
     testdir.run_and_assert(passed=1)
+
+
+def _assert_parameter(schema, schema_spec, location, expected=None):
+    expected = expected if expected is not None else [{"in": location, "name": "api_key", "type": "string"}]
+    # When security definition is defined as "apiKey"
+    schema = schemathesis.from_dict(schema)
+    if schema_spec == "swagger":
+        endpoint = schema["/users"]["get"]
+    else:
+        endpoint = schema["/query"]["get"]
+    parameters = schema.security.get_security_definitions_as_parameters(
+        schema.raw_schema, endpoint, schema.resolver, location
+    )
+    # Then it should be presented as a "string" parameter
+    assert parameters == expected
+
+
+def test_security_as_parameters_api_key(schema, schema_spec, location):
+    _assert_parameter(schema, schema_spec, location)
+
+
+def test_security_as_parameters_api_key_cookie(cookie_schema):
+    _assert_parameter(cookie_schema, "openapi", "cookie")
+
+
+def test_security_as_parameters_api_key_overridden(overridden_security_schema, schema_spec, location):
+    _assert_parameter(overridden_security_schema, schema_spec, location, [])
 
 
 @pytest.fixture()

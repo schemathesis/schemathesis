@@ -7,6 +7,9 @@ Changelog
 **Changed**
 
 - Improve the error message when the application can not be loaded from the value passed to the ``--app`` command-line option. `#836`_
+- Security definitions are now serialized as other parameters. At the moment, it means that the generated values
+  will be coerced to strings, which is a no-op. However, types of security definitions might be affected by
+  the "Negative testing" feature in the future. Therefore this change is mostly for future-compatibility. `#841`_
 
 **Fixed**
 
@@ -1440,6 +1443,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#841: https://github.com/schemathesis/schemathesis/issues/841
 .. _#839: https://github.com/schemathesis/schemathesis/issues/839
 .. _#836: https://github.com/schemathesis/schemathesis/issues/836
 .. _#824: https://github.com/schemathesis/schemathesis/issues/824

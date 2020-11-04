@@ -188,6 +188,11 @@ class BaseOpenAPISchema(BaseSchema):
 
     def get_hypothesis_conversion(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
         definitions = [item for item in endpoint.definition.resolved.get("parameters", []) if item["in"] == location]
+        security_parameters = self.security.get_security_definitions_as_parameters(
+            self.raw_schema, endpoint, self.resolver, location
+        )
+        if security_parameters:
+            definitions.extend(security_parameters)
         if definitions:
             return self._get_hypothesis_conversion(definitions)
         return None
