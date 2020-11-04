@@ -1,5 +1,5 @@
 """Processing of ``securityDefinitions`` or ``securitySchemes`` keywords."""
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Tuple
 
 import attr
 from jsonschema import RefResolver
@@ -9,18 +9,42 @@ from ...models import Endpoint, empty_object
 
 @attr.s(slots=True)  # pragma: no mutate
 class BaseSecurityProcessor:
+    api_key_locations: Tuple[str, ...] = ("header", "query")
+    http_security_name = "basic"
+
     def process_definitions(self, schema: Dict[str, Any], endpoint: Endpoint, resolver: RefResolver) -> None:
         """Add relevant security parameters to data generation."""
+        for definition in self._get_active_definitions(schema, endpoint, resolver):
+            if definition["type"] == "apiKey":
+                self.process_api_key_security_definition(definition, endpoint)
+            self.process_http_security_definition(definition, endpoint)
+
+    def _get_active_definitions(
+        self, schema: Dict[str, Any], endpoint: Endpoint, resolver: RefResolver
+    ) -> Generator[Dict[str, Any], None, None]:
+        """Get only security definitions active for the given endpoint."""
         definitions = self.get_security_definitions(schema, resolver)
         requirements = get_security_requirements(schema, endpoint)
         for name, definition in definitions.items():
             if name in requirements:
-                if definition["type"] == "apiKey":
-                    self.process_api_key_security_definition(definition, endpoint)
-                self.process_http_security_definition(definition, endpoint)
+                yield definition
 
     def get_security_definitions(self, schema: Dict[str, Any], resolver: RefResolver) -> Dict[str, Any]:
         return schema.get("securityDefinitions", {})
+
+    def get_security_definitions_as_parameters(
+        self, schema: Dict[str, Any], endpoint: Endpoint, resolver: RefResolver, location: str
+    ) -> List[Dict[str, Any]]:
+        """Security definitions converted to OAS parameters.
+
+        We need it to get proper serialization that will be applied on generated values. For this case it is only
+        coercing to a string.
+        """
+        return [
+            self._to_parameter(definition)
+            for definition in self._get_active_definitions(schema, endpoint, resolver)
+            if self._is_match(definition, location)
+        ]
 
     def process_api_key_security_definition(self, definition: Dict[str, Any], endpoint: Endpoint) -> None:
         if definition["in"] == "query":
@@ -32,12 +56,36 @@ class BaseSecurityProcessor:
         if definition["type"] == "basic":
             endpoint.headers = add_http_auth_definition(endpoint.headers)
 
+    def _is_match(self, definition: Dict[str, Any], location: str) -> bool:
+        return (definition["type"] == "apiKey" and location in self.api_key_locations) or (
+            definition["type"] == self.http_security_name and location == "header"
+        )
+
+    def _to_parameter(self, definition: Dict[str, Any]) -> Dict[str, Any]:
+        func = {
+            "apiKey": _make_api_key_parameter,
+            self.http_security_name: _make_http_auth_parameter,
+        }[definition["type"]]
+        return func(definition)
+
+
+def _make_api_key_parameter(definition: Dict[str, Any]) -> Dict[str, Any]:
+    return {"type": "string", "name": definition["name"], "in": definition["in"]}
+
+
+def _make_http_auth_parameter(definition: Dict[str, Any]) -> Dict[str, Any]:
+    scheme = definition.get("scheme", "basic").lower()
+    return {"type": "string", "name": "Authorization", "in": "header", "format": f"_{scheme}_auth"}
+
 
 SwaggerSecurityProcessor = BaseSecurityProcessor
 
 
 @attr.s(slots=True)  # pragma: no mutate
 class OpenAPISecurityProcessor(BaseSecurityProcessor):
+    api_key_locations = ("header", "cookie", "query")
+    http_security_name = "http"
+
     def get_security_definitions(self, schema: Dict[str, Any], resolver: RefResolver) -> Dict[str, Any]:
         """In Open API 3 security definitions are located in ``components`` and may have references inside."""
         components = schema.get("components", {})
