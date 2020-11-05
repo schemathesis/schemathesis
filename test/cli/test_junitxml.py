@@ -22,7 +22,7 @@ def test_junitxml_option(cli, schema_url, hypothesis_max_examples, tmp_path):
     ElementTree.parse(xml_path)
 
 
-@pytest.mark.endpoints("success", "failure", "malformed_json")
+@pytest.mark.endpoints("success", "failure", "unsatisfiable")
 def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path):
     xml_path = tmp_path / "junit.xml"
     cli.run(
@@ -58,10 +58,10 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path):
         testcases[0][0].attrib["message"] == "1. Received a response with 'text/plain; charset=utf-8' Content-Type, "
         "but it is not declared in the schema.  Defined content types: application/json"
     )
-    # Inspect testcase with an error
-    assert testcases[1].attrib["name"] == "GET /api/malformed_json"
-    assert testcases[1][0].tag == "error"
-    assert testcases[1][0].attrib["type"] == "error"
-    assert "Expecting property name enclosed in double quotes" in testcases[1][0].attrib["message"]
     # Inspect passed testcase
-    assert testcases[2].attrib["name"] == "GET /api/success"
+    assert testcases[1].attrib["name"] == "GET /api/success"
+    # Inspect testcase with an error
+    assert testcases[2].attrib["name"] == "POST /api/unsatisfiable"
+    assert testcases[2][0].tag == "error"
+    assert testcases[2][0].attrib["type"] == "error"
+    assert "Unable to satisfy schema parameters for this endpoint" in testcases[2][0].attrib["message"]

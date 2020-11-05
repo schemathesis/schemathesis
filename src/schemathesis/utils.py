@@ -4,7 +4,8 @@ import re
 import sys
 import traceback
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Type, Union, overload
+from json import JSONDecodeError
+from typing import Any, Callable, Dict, Generator, List, NoReturn, Optional, Set, Tuple, Type, Union, overload
 
 import requests
 import yaml
@@ -172,6 +173,10 @@ StringDatesYAMLLoader = make_loader("tag:yaml.org,2002:timestamp")
 class WSGIResponse(BaseResponse, JSONMixin):  # pylint: disable=too-many-ancestors
     # We store "requests" request to build a reproduction code
     request: requests.PreparedRequest
+
+    def on_json_loading_failed(self, e: JSONDecodeError) -> NoReturn:
+        # We don't need a werkzeug-specific exception when JSON parsing error happens
+        raise e
 
 
 def get_requests_auth(auth: Optional[RawAuth], auth_type: Optional[str]) -> Optional[Union[HTTPDigestAuth, RawAuth]]:

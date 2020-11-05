@@ -1,4 +1,5 @@
 from hashlib import sha1
+from json import JSONDecodeError
 from typing import Dict, Type, Union
 
 import attr
@@ -59,6 +60,11 @@ def get_missing_content_type_error() -> Type[CheckFailed]:
 def get_schema_validation_error(exception: ValidationError) -> Type[CheckFailed]:
     """Return new exception for schema validation error."""
     return _get_hashed_exception("SchemaValidationError", str(exception))
+
+
+def get_response_parsing_error(exception: JSONDecodeError) -> Type[CheckFailed]:
+    """Return new exception for response parsing error."""
+    return _get_hashed_exception("ResponseParsingError", str(exception))
 
 
 def get_headers_error(message: str) -> Type[CheckFailed]:
