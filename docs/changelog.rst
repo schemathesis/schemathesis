@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- An option to set data generation methods. At the moment, it includes only "positive", which means that Schemathesis will
+  generate data that matches the schema.
+
 `2.7.5`_ - 2020-11-09
 ---------------------
 

@@ -9,7 +9,7 @@ They give only static definitions of endpoints.
 """
 import warnings
 from collections.abc import Mapping
-from typing import Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Callable, Dict, Generator, Iterable, Iterator, List, Optional, Sequence, Tuple, Type, Union
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import attr
@@ -19,7 +19,7 @@ from hypothesis.utils.conventions import InferType
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import make_test_or_exception
-from .constants import DEFAULT_STATEFUL_RECURSION_LIMIT
+from .constants import DEFAULT_DATA_GENERATION_METHODS, DEFAULT_STATEFUL_RECURSION_LIMIT, DataGenerationMethod
 from .exceptions import InvalidSchema
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import Case, Endpoint
@@ -44,6 +44,9 @@ class BaseSchema(Mapping):
     skip_deprecated_endpoints: bool = attr.ib(default=False)  # pragma: no mutate
     stateful: Optional[Stateful] = attr.ib(default=None)  # pragma: no mutate
     stateful_recursion_limit: int = attr.ib(default=DEFAULT_STATEFUL_RECURSION_LIMIT)  # pragma: no mutate
+    data_generation_methods: Iterable[DataGenerationMethod] = attr.ib(
+        default=DEFAULT_DATA_GENERATION_METHODS
+    )  # pragma: no mutate
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.endpoints)
@@ -118,13 +121,17 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def get_all_tests(
-        self, func: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
-    ) -> Generator[Tuple[Endpoint, Union[Callable, InvalidSchema]], None, None]:
+        self,
+        func: Callable,
+        settings: Optional[hypothesis.settings] = None,
+        seed: Optional[int] = None,
+    ) -> Generator[Tuple[Endpoint, DataGenerationMethod, Union[Callable, InvalidSchema]], None, None]:
         """Generate all endpoints and Hypothesis tests for them."""
         test: Union[Callable, InvalidSchema]
         for endpoint in self.get_all_endpoints():
-            test = make_test_or_exception(endpoint, func, settings, seed)
-            yield endpoint, test
+            for data_generation_method in self.data_generation_methods:
+                test = make_test_or_exception(endpoint, func, settings, seed, data_generation_method)
+                yield endpoint, data_generation_method, test
 
     def parametrize(  # pylint: disable=too-many-arguments
         self,
@@ -136,6 +143,7 @@ class BaseSchema(Mapping):
         skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
         stateful: Optional[Union[Stateful, NotSet]] = NOT_SET,
         stateful_recursion_limit: Union[int, NotSet] = NOT_SET,
+        data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
 
@@ -151,6 +159,7 @@ class BaseSchema(Mapping):
                 skip_deprecated_endpoints=skip_deprecated_endpoints,
                 stateful=stateful,
                 stateful_recursion_limit=stateful_recursion_limit,
+                data_generation_methods=data_generation_methods,
             )
             return func
 
@@ -179,6 +188,7 @@ class BaseSchema(Mapping):
         skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
         stateful: Optional[Union[Stateful, NotSet]] = NOT_SET,
         stateful_recursion_limit: Union[int, NotSet] = NOT_SET,
+        data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
     ) -> "BaseSchema":
         if stateful is not NOT_SET or stateful_recursion_limit is not NOT_SET:
             warnings.warn(
@@ -204,6 +214,8 @@ class BaseSchema(Mapping):
             stateful = self.stateful
         if stateful_recursion_limit is NOT_SET:
             stateful_recursion_limit = self.stateful_recursion_limit
+        if data_generation_methods is NOT_SET:
+            data_generation_methods = self.data_generation_methods
 
         return self.__class__(
             self.raw_schema,
@@ -220,6 +232,7 @@ class BaseSchema(Mapping):
             skip_deprecated_endpoints=skip_deprecated_endpoints,  # type: ignore
             stateful=stateful,  # type: ignore
             stateful_recursion_limit=stateful_recursion_limit,  # type: ignore
+            data_generation_methods=data_generation_methods,  # type: ignore
         )
 
     def get_local_hook_dispatcher(self) -> Optional[HookDispatcher]:
@@ -251,7 +264,11 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def get_case_strategy(
-        self, endpoint: Endpoint, hooks: Optional[HookDispatcher] = None, feedback: Optional[Feedback] = None
+        self,
+        endpoint: Endpoint,
+        hooks: Optional[HookDispatcher] = None,
+        feedback: Optional[Feedback] = None,
+        data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
         raise NotImplementedError
 

@@ -1,6 +1,6 @@
 # pylint: disable=too-many-arguments
 import pathlib
-from typing import IO, Any, Callable, Dict, Optional, Union
+from typing import IO, Any, Callable, Dict, Iterable, Optional, Union
 from urllib.parse import urljoin
 
 import jsonschema
@@ -12,7 +12,7 @@ from starlette.testclient import TestClient as ASGIClient
 from werkzeug.test import Client
 from yarl import URL
 
-from .constants import USER_AGENT
+from .constants import DEFAULT_DATA_GENERATION_METHODS, USER_AGENT, DataGenerationMethod
 from .exceptions import HTTPError
 from .hooks import HookContext, dispatch
 from .lazy import LazySchema
@@ -33,6 +33,7 @@ def from_path(
     app: Any = None,
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
 ) -> BaseOpenAPISchema:
     """Load a file from OS path and parse to schema instance."""
     with open(path) as fd:
@@ -47,6 +48,7 @@ def from_path(
             app=app,
             validate_schema=validate_schema,
             skip_deprecated_endpoints=skip_deprecated_endpoints,
+            data_generation_methods=data_generation_methods,
         )
 
 
@@ -62,6 +64,7 @@ def from_uri(
     app: Any = None,
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load a remote resource and parse to schema instance."""
@@ -86,6 +89,7 @@ def from_uri(
         app=app,
         validate_schema=validate_schema,
         skip_deprecated_endpoints=skip_deprecated_endpoints,
+        data_generation_methods=data_generation_methods,
     )
 
 
@@ -101,6 +105,7 @@ def from_file(
     app: Any = None,
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     **kwargs: Any,  # needed in the runner to have compatible API across all loaders
 ) -> BaseOpenAPISchema:
     """Load a file content and parse to schema instance.
@@ -119,6 +124,7 @@ def from_file(
         app=app,
         validate_schema=validate_schema,
         skip_deprecated_endpoints=skip_deprecated_endpoints,
+        data_generation_methods=data_generation_methods,
     )
 
 
@@ -134,6 +140,7 @@ def from_dict(
     app: Any = None,
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
 ) -> BaseOpenAPISchema:
     """Get a proper abstraction for the given raw schema."""
     dispatch("before_load_schema", HookContext(), raw_schema)
@@ -150,6 +157,7 @@ def from_dict(
             app=app,
             validate_schema=validate_schema,
             skip_deprecated_endpoints=skip_deprecated_endpoints,
+            data_generation_methods=data_generation_methods,
         )
 
     if "openapi" in raw_schema:
@@ -165,6 +173,7 @@ def from_dict(
             app=app,
             validate_schema=validate_schema,
             skip_deprecated_endpoints=skip_deprecated_endpoints,
+            data_generation_methods=data_generation_methods,
         )
     raise ValueError("Unsupported schema type")
 
@@ -185,6 +194,7 @@ def from_pytest_fixture(
     operation_id: Optional[Filter] = NOT_SET,
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
 ) -> LazySchema:
     """Needed for a consistent library API."""
     return LazySchema(
@@ -195,6 +205,7 @@ def from_pytest_fixture(
         operation_id=operation_id,
         validate_schema=validate_schema,
         skip_deprecated_endpoints=skip_deprecated_endpoints,
+        data_generation_methods=data_generation_methods,
     )
 
 
@@ -208,6 +219,7 @@ def from_wsgi(
     operation_id: Optional[Filter] = None,
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     headers = kwargs.setdefault("headers", {})
@@ -230,6 +242,7 @@ def from_wsgi(
         app=app,
         validate_schema=validate_schema,
         skip_deprecated_endpoints=skip_deprecated_endpoints,
+        data_generation_methods=data_generation_methods,
     )
 
 
@@ -252,6 +265,7 @@ def from_aiohttp(
     *,
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     from .extra._aiohttp import run_server  # pylint: disable=import-outside-toplevel
@@ -268,6 +282,7 @@ def from_aiohttp(
         operation_id=operation_id,
         validate_schema=validate_schema,
         skip_deprecated_endpoints=skip_deprecated_endpoints,
+        data_generation_methods=data_generation_methods,
         **kwargs,
     )
 
@@ -281,6 +296,7 @@ def from_asgi(
     tag: Optional[Filter] = None,
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     headers = kwargs.setdefault("headers", {})
@@ -302,4 +318,5 @@ def from_asgi(
         app=app,
         validate_schema=validate_schema,
         skip_deprecated_endpoints=skip_deprecated_endpoints,
+        data_generation_methods=data_generation_methods,
     )

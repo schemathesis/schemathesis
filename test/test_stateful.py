@@ -48,11 +48,13 @@ def test_(request, case):
     result = testdir.run_and_assert("-v", passed=4)
     result.stdout.re_match_lines(
         [
-            r"test_stateful_enabled.py::test_\[POST:/api/users/\] PASSED",
-            r"test_stateful_enabled.py::test_\[POST:/api/users/ -> GET:/api/users/{user_id}\] PASSED * \[ 66%\]",
-            r"test_stateful_enabled.py::test_"
-            r"\[POST:/api/users/ -> GET:/api/users/{user_id} -> PATCH:/api/users/{user_id}\] PASSED * \[ 75%\]",
-            r"test_stateful_enabled.py::test_\[POST:/api/users/ -> PATCH:/api/users/{user_id}\] PASSED * \[100%\]",
+            r"test_stateful_enabled.py::test_\[POST:/api/users/\]\[P\] PASSED",
+            r"test_stateful_enabled.py::test_\[POST:/api/users/ -> GET:/api/users/{user_id}\]"
+            r"\[P\] PASSED * \[ 66%\]",
+            r"test_stateful_enabled.py::test_\[POST:/api/users/ -> GET:/api/users/{user_id} -> "
+            r"PATCH:/api/users/{user_id}\]\[P\] PASSED * \[ 75%\]",
+            r"test_stateful_enabled.py::test_\[POST:/api/users/ -> PATCH:/api/users/{user_id}\]"
+            r"\[P\] PASSED * \[100%\]",
             r"Hypothesis calls: 8",
         ]
     )
@@ -81,9 +83,11 @@ def test_(request, case):
     result = testdir.run_and_assert("-v", passed=3)
     result.stdout.re_match_lines(
         [
-            r"test_stateful_enabled_limit.py::test_\[POST:/api/users/\] PASSED",
-            r"test_stateful_enabled_limit.py::test_\[POST:/api/users/ -> GET:/api/users/{user_id}\] PASSED * \[ 66%\]",
-            r"test_stateful_enabled_limit.py::test_\[POST:/api/users/ -> PATCH:/api/users/{user_id}\] PASSED * \[100%\]",
+            r"test_stateful_enabled_limit.py::test_\[POST:/api/users/\]\[P\] PASSED",
+            r"test_stateful_enabled_limit.py::test_\[POST:/api/users/ -> GET:/api/users/{user_id}\]"
+            r"\[P\] PASSED * \[ 66%\]",
+            r"test_stateful_enabled_limit.py::test_\[POST:/api/users/ -> PATCH:/api/users/{user_id}\]"
+            r"\[P\] PASSED * \[100%\]",
             r"Hypothesis calls: 6",
         ]
     )
@@ -107,7 +111,7 @@ def test_(request, case):
     result = testdir.run_and_assert("-v", passed=1)
     result.stdout.re_match_lines(
         [
-            r"test_stateful_disabled.py::test_\[POST:/api/users/\] PASSED",
+            r"test_stateful_disabled.py::test_\[POST:/api/users/\]\[P\] PASSED",
             r"Hypothesis calls: 2",
         ]
     )
@@ -130,7 +134,7 @@ def test_(request, case):
     result = testdir.run_and_assert("-v", passed=1)
     result.stdout.re_match_lines(
         [
-            r"test_stateful_not_used.py::test_\[POST:/api/users/\] PASSED",
+            r"test_stateful_not_used.py::test_\[POST:/api/users/\]\[P\] PASSED",
             r"Hypothesis calls: 2",
         ]
     )
