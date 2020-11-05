@@ -12,6 +12,7 @@ import jsonschema
 import requests
 from hypothesis.strategies import SearchStrategy
 
+from ...constants import DataGenerationMethod
 from ...exceptions import InvalidSchema, get_response_parsing_error, get_schema_validation_error
 from ...hooks import HookContext, HookDispatcher
 from ...models import Case, Endpoint, EndpointDefinition, empty_object
@@ -185,9 +186,13 @@ class BaseOpenAPISchema(BaseSchema):
         return self.make_endpoint(path, method, parameters, resolved_definition, raw_definition)
 
     def get_case_strategy(
-        self, endpoint: Endpoint, hooks: Optional[HookDispatcher] = None, feedback: Optional[Feedback] = None
+        self,
+        endpoint: Endpoint,
+        hooks: Optional[HookDispatcher] = None,
+        feedback: Optional[Feedback] = None,
+        data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
-        return get_case_strategy(endpoint, hooks, feedback)
+        return get_case_strategy(endpoint, hooks, feedback, data_generation_method)
 
     def get_hypothesis_conversion(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
         definitions = [item for item in endpoint.definition.resolved.get("parameters", []) if item["in"] == location]

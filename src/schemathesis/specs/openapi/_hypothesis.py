@@ -9,6 +9,7 @@ from hypothesis_jsonschema import from_schema
 from requests.auth import _basic_auth_str
 
 from ... import utils
+from ...constants import DataGenerationMethod
 from ...exceptions import InvalidSchema
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import Case, Endpoint
@@ -69,7 +70,10 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
 
 
 def get_case_strategy(
-    endpoint: Endpoint, hooks: Optional[HookDispatcher] = None, feedback: Optional[Feedback] = None
+    endpoint: Endpoint,
+    hooks: Optional[HookDispatcher] = None,
+    feedback: Optional[Feedback] = None,
+    data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
 ) -> st.SearchStrategy:
     """Create a strategy for a complete test case.
 
@@ -81,7 +85,9 @@ def get_case_strategy(
         value = getattr(endpoint, parameter)
         if value is not None:
             location = {"headers": "header", "cookies": "cookie", "path_parameters": "path"}.get(parameter, parameter)
-            strategies[parameter] = prepare_strategy(parameter, value, endpoint.get_hypothesis_conversions(location))
+            strategies[parameter] = prepare_strategy(
+                parameter, value, endpoint.get_hypothesis_conversions(location), data_generation_method
+            )
         else:
             static_kwargs[parameter] = None
     return _get_case_strategy(endpoint, static_kwargs, strategies, hooks)
@@ -116,13 +122,19 @@ def prepare_headers_schema(value: Dict[str, Any]) -> Dict[str, Any]:
     return value
 
 
-def prepare_strategy(parameter: str, value: Dict[str, Any], map_func: Optional[Callable]) -> st.SearchStrategy:
+def prepare_strategy(
+    parameter: str,
+    value: Dict[str, Any],
+    map_func: Optional[Callable],
+    data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+) -> st.SearchStrategy:
     """Create a strategy for a schema and add location-specific filters & maps."""
     if parameter in ("headers", "cookies"):
         value = prepare_headers_schema(value)
     if parameter == "form_data":
         value.setdefault("type", "object")
-    strategy = from_schema(value, custom_formats=STRING_FORMATS)
+    to_strategy = {DataGenerationMethod.positive: make_positive_strategy}[data_generation_method]
+    strategy = to_strategy(value)
     if map_func is not None:
         strategy = strategy.map(map_func)
     if parameter == "path_parameters":
@@ -134,6 +146,10 @@ def prepare_strategy(parameter: str, value: Dict[str, Any], map_func: Optional[C
     elif parameter == "form_data":
         strategy = strategy.map(prepare_form_data)  # type: ignore
     return strategy
+
+
+def make_positive_strategy(schema: Dict[str, Any]) -> st.SearchStrategy:
+    return from_schema(schema, custom_formats=STRING_FORMATS)
 
 
 def filter_path_parameters(parameters: Dict[str, Any]) -> bool:

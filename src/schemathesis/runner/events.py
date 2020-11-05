@@ -40,8 +40,17 @@ class Initialized(ExecutionEvent):
         )
 
 
+class CurrentPathMixin:
+    method: str
+    path: str
+
+    @property
+    def current_endpoint(self) -> str:
+        return f"{self.method} {self.path}"
+
+
 @attr.s(slots=True)  # pragma: no mutate
-class BeforeExecution(ExecutionEvent):
+class BeforeExecution(CurrentPathMixin, ExecutionEvent):
     """Happens before each examined endpoint.
 
     It happens before a single hypothesis test, that may contain many examples inside.
@@ -63,7 +72,7 @@ class BeforeExecution(ExecutionEvent):
 
 
 @attr.s(slots=True)  # pragma: no mutate
-class AfterExecution(ExecutionEvent):
+class AfterExecution(CurrentPathMixin, ExecutionEvent):
     """Happens after each examined endpoint."""
 
     method: str = attr.ib()  # pragma: no mutate

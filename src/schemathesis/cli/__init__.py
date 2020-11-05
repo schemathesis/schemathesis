@@ -11,7 +11,7 @@ import yaml
 from .. import checks as checks_module
 from .. import runner
 from .. import targets as targets_module
-from ..constants import DEFAULT_STATEFUL_RECURSION_LIMIT
+from ..constants import DEFAULT_DATA_GENERATION_METHODS, DEFAULT_STATEFUL_RECURSION_LIMIT, DataGenerationMethod
 from ..fixups import ALL_FIXUPS
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..models import CheckFunction
@@ -91,6 +91,14 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 @click.argument("schema", type=str, callback=callbacks.validate_schema)
 @click.option(
     "--checks", "-c", multiple=True, help="List of checks to run.", type=CHECKS_TYPE, default=DEFAULT_CHECKS_NAMES
+)
+@click.option(
+    "--data-generation-method",
+    "-D",
+    "data_generation_methods",
+    help="Defines how Schemathesis generates data for tests.",
+    type=CSVOption(DataGenerationMethod),
+    default=DataGenerationMethod.default(),
 )
 @click.option(
     "--max-response-time",
@@ -259,6 +267,7 @@ def run(  # pylint: disable=too-many-arguments
     auth_type: str,
     headers: Dict[str, str],
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
+    data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
     max_response_time: Optional[int] = None,
     targets: Iterable[str] = DEFAULT_TARGETS_NAMES,
     exit_first: bool = False,
@@ -316,6 +325,7 @@ def run(  # pylint: disable=too-many-arguments
         exit_first=exit_first,
         store_interactions=store_network_log is not None,
         checks=selected_checks,
+        data_generation_methods=data_generation_methods,
         max_response_time=max_response_time,
         targets=selected_targets,
         workers_num=workers_num,

@@ -8,6 +8,7 @@ from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
 from hypothesis_graphql import strategies as gql_st
 
+from ... import DataGenerationMethod
 from ...checks import not_a_server_error
 from ...hooks import HookDispatcher
 from ...models import Case, CheckFunction, Endpoint
@@ -70,7 +71,11 @@ class GraphQLSchema(BaseSchema):
         )
 
     def get_case_strategy(
-        self, endpoint: Endpoint, hooks: Optional[HookDispatcher] = None, feedback: Optional[Feedback] = None
+        self,
+        endpoint: Endpoint,
+        hooks: Optional[HookDispatcher] = None,
+        feedback: Optional[Feedback] = None,
+        data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
         constructor = partial(GraphQLCase, endpoint=endpoint)
         schema = graphql.build_client_schema(self.raw_schema)
