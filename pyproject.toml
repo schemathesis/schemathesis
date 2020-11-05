@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "schemathesis"
-version = "2.7.1"
+version = "2.7.2"
 description = "Property-based testing framework for Open API and GraphQL based apps"
 keywords = ["pytest", "hypothesis", "openapi", "swagger", "graphql", "testing"]
 classifiers = [

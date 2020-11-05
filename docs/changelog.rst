@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`2.7.2`_ - 2020-11-05
+---------------------
+
 **Added**
 
 - Shortcut for response validation when Schemathesis's data generation is not used. `#485`_
@@ -1344,7 +1347,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.7.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.7.2...HEAD
+.. _2.7.2: https://github.com/schemathesis/schemathesis/compare/v2.7.1...v2.7.2
 .. _2.7.1: https://github.com/schemathesis/schemathesis/compare/v2.7.0...v2.7.1
 .. _2.7.0: https://github.com/schemathesis/schemathesis/compare/v2.6.1...v2.7.0
 .. _2.6.1: https://github.com/schemathesis/schemathesis/compare/v2.6.0...v2.6.1
