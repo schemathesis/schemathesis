@@ -35,18 +35,26 @@ def _run_task(
     def _run_tests(maker: Callable, recursion_level: int = 0) -> None:
         if recursion_level > stateful_recursion_limit:
             return
-        for _endpoint, test in maker(test_template, settings, seed):
+        for _endpoint, data_generation_method, test in maker(test_template, settings, seed):
             feedback = Feedback(stateful, _endpoint)
             for event in run_test(
-                _endpoint, test, checks, targets, results, recursion_level=recursion_level, feedback=feedback, **kwargs
+                _endpoint,
+                test,
+                checks,
+                data_generation_method,
+                targets,
+                results,
+                recursion_level=recursion_level,
+                feedback=feedback,
+                **kwargs,
             ):
                 events_queue.put(event)
             _run_tests(feedback.get_stateful_tests, recursion_level + 1)
 
     with capture_hypothesis_output():
         while not tasks_queue.empty():
-            endpoint = tasks_queue.get()
-            items = (endpoint, make_test_or_exception(endpoint, test_template, settings, seed))
+            endpoint, data_generation_method = tasks_queue.get()
+            items = (endpoint, data_generation_method, make_test_or_exception(endpoint, test_template, settings, seed))
             # This lambda ignores the input arguments to support the same interface for `feedback.get_stateful_tests`
             _run_tests(lambda *_: (items,))
 
@@ -198,7 +206,13 @@ class ThreadPoolRunner(BaseRunner):
     def _get_tasks_queue(self) -> Queue:
         """All endpoints are distributed among all workers via a queue."""
         tasks_queue: Queue = Queue()
-        tasks_queue.queue.extend(self.schema.get_all_endpoints())
+        tasks_queue.queue.extend(
+            [
+                (endpoint, data_generation_method)
+                for endpoint in self.schema.get_all_endpoints()
+                for data_generation_method in self.schema.data_generation_methods
+            ]
+        )
         return tasks_queue
 
     def _init_workers(self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet) -> List[threading.Thread]:

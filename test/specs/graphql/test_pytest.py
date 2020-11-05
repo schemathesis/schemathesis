@@ -18,5 +18,5 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines(
-        [r"test_basic_pytest_graphql.py::test_\[POST:/graphql\] PASSED", r"Hypothesis calls: 10"]
+        [r"test_basic_pytest_graphql.py::test_\[POST:/graphql\]\[P\] PASSED", r"Hypothesis calls: 10"]
     )

@@ -7,7 +7,7 @@ from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
 from hypothesis.utils.conventions import InferType
 
-from .constants import DEFAULT_DEADLINE
+from .constants import DEFAULT_DEADLINE, DataGenerationMethod
 from .exceptions import InvalidSchema
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import Case, Endpoint
@@ -22,6 +22,7 @@ def create_test(
     test: Callable,
     settings: Optional[hypothesis.settings] = None,
     seed: Optional[int] = None,
+    data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     _given_args: Tuple[GivenInput, ...] = (),
     _given_kwargs: Optional[Dict[str, GivenInput]] = None,
 ) -> Callable:
@@ -32,7 +33,9 @@ def create_test(
         feedback = Feedback(endpoint.schema.stateful, endpoint)
     else:
         feedback = None
-    strategy = endpoint.as_strategy(hooks=hook_dispatcher, feedback=feedback)
+    strategy = endpoint.as_strategy(
+        hooks=hook_dispatcher, feedback=feedback, data_generation_method=data_generation_method
+    )
     _given_kwargs = (_given_kwargs or {}).copy()
     _given_kwargs.setdefault("case", strategy)
     wrapped_test = hypothesis.given(*_given_args, **_given_kwargs)(test)
@@ -57,10 +60,16 @@ def setup_default_deadline(wrapped_test: Callable) -> None:
 
 
 def make_test_or_exception(
-    endpoint: Endpoint, func: Callable, settings: Optional[hypothesis.settings] = None, seed: Optional[int] = None
+    endpoint: Endpoint,
+    func: Callable,
+    settings: Optional[hypothesis.settings] = None,
+    seed: Optional[int] = None,
+    data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
 ) -> Union[Callable, InvalidSchema]:
     try:
-        return create_test(endpoint=endpoint, test=func, settings=settings, seed=seed)
+        return create_test(
+            endpoint=endpoint, test=func, settings=settings, seed=seed, data_generation_method=data_generation_method
+        )
     except InvalidSchema as exc:
         return exc
 

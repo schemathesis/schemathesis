@@ -9,7 +9,7 @@ import requests
 from _pytest.logging import LogCaptureHandler, catching_logs
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
-from ...constants import DEFAULT_DEADLINE, DEFAULT_STATEFUL_RECURSION_LIMIT, USER_AGENT
+from ...constants import DEFAULT_DEADLINE, DEFAULT_STATEFUL_RECURSION_LIMIT, USER_AGENT, DataGenerationMethod
 from ...exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from ...hooks import HookContext, get_all_by_name
 from ...models import Case, Check, CheckFunction, Endpoint, Status, TestResult, TestResultSet
@@ -78,9 +78,16 @@ class BaseRunner:
         """Run tests and recursively run additional tests."""
         if recursion_level > self.stateful_recursion_limit:
             return
-        for endpoint, test in maker(template, settings, seed):
+        for endpoint, data_generation_method, test in maker(template, settings, seed):
             feedback = Feedback(self.stateful, endpoint)
-            for event in run_test(endpoint, test, feedback=feedback, recursion_level=recursion_level, **kwargs):
+            for event in run_test(
+                endpoint,
+                test,
+                feedback=feedback,
+                recursion_level=recursion_level,
+                data_generation_method=data_generation_method,
+                **kwargs,
+            ):
                 yield event
                 if isinstance(event, events.Interrupted):
                     return
@@ -94,6 +101,7 @@ def run_test(  # pylint: disable=too-many-locals
     endpoint: Endpoint,
     test: Union[Callable, InvalidSchema],
     checks: Iterable[CheckFunction],
+    data_generation_method: DataGenerationMethod,
     targets: Iterable[Target],
     results: TestResultSet,
     headers: Optional[Dict[str, Any]],
@@ -102,7 +110,7 @@ def run_test(  # pylint: disable=too-many-locals
 ) -> Generator[events.ExecutionEvent, None, None]:
     """A single test run with all error handling needed."""
     # pylint: disable=too-many-arguments
-    result = TestResult(endpoint=endpoint, overridden_headers=headers)
+    result = TestResult(endpoint=endpoint, overridden_headers=headers, data_generation_method=data_generation_method)
     yield events.BeforeExecution.from_endpoint(endpoint=endpoint, recursion_level=recursion_level)
     hypothesis_output: List[str] = []
     test_start_time = time.monotonic()

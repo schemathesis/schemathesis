@@ -99,4 +99,4 @@ def from_url(url: str) -> GraphQLSchema:
 
 def from_dict(raw_schema: Dict[str, Any], location: Optional[str] = None) -> GraphQLSchema:
     dispatch("before_load_schema", HookContext(), raw_schema)
-    return GraphQLSchema(raw_schema, location=location)
+    return GraphQLSchema(raw_schema, location=location)  # type: ignore

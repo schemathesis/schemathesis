@@ -87,6 +87,7 @@ class SerializedTestResult:
     has_logs: bool = attr.ib()  # pragma: no mutate
     is_errored: bool = attr.ib()  # pragma: no mutate
     seed: Optional[int] = attr.ib()  # pragma: no mutate
+    data_generation_method: str = attr.ib()  # pragma: no mutate
     checks: List[SerializedCheck] = attr.ib()  # pragma: no mutate
     logs: List[str] = attr.ib()  # pragma: no mutate
     errors: List[SerializedError] = attr.ib()  # pragma: no mutate
@@ -103,6 +104,7 @@ class SerializedTestResult:
             has_logs=result.has_logs,
             is_errored=result.is_errored,
             seed=result.seed,
+            data_generation_method=result.data_generation_method.as_short_name(),
             checks=[SerializedCheck.from_check(check, headers=result.overridden_headers) for check in result.checks],
             logs=[formatter.format(record) for record in result.logs],
             errors=[SerializedError.from_error(*error, headers=result.overridden_headers) for error in result.errors],

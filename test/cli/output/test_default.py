@@ -10,7 +10,7 @@ import schemathesis.cli.context
 from schemathesis import models, runner, utils
 from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
-from schemathesis.constants import USER_AGENT
+from schemathesis.constants import USER_AGENT, DataGenerationMethod
 from schemathesis.runner.events import Finished, InternalError
 from schemathesis.runner.serialization import SerializedTestResult
 
@@ -36,7 +36,7 @@ def endpoint(swagger_20):
 
 @pytest.fixture()
 def results_set(endpoint):
-    statistic = models.TestResult(endpoint)
+    statistic = models.TestResult(endpoint, data_generation_method=DataGenerationMethod.default())
     return models.TestResultSet([statistic])
 
 
@@ -94,7 +94,9 @@ def test_display_statistic(capsys, swagger_20, execution_context, endpoint):
     success = models.Check("not_a_server_error", models.Status.success)
     failure = models.Check("not_a_server_error", models.Status.failure)
     single_test_statistic = models.TestResult(
-        endpoint, [success, success, success, failure, failure, models.Check("different_check", models.Status.success)]
+        endpoint,
+        DataGenerationMethod.default(),
+        [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
     )
     results = models.TestResultSet([single_test_statistic])
     event = Finished.from_results(results, running_time=1.0)
@@ -174,7 +176,9 @@ def test_display_single_failure(capsys, swagger_20, execution_context, endpoint,
     success = models.Check("not_a_server_error", models.Status.success)
     failure = models.Check("not_a_server_error", models.Status.failure, models.Case(endpoint, body=body))
     test_statistic = models.TestResult(
-        endpoint, [success, success, success, failure, failure, models.Check("different_check", models.Status.success)]
+        endpoint,
+        DataGenerationMethod.default(),
+        [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
     )
     # When this failure is displayed
     default.display_failures_for_single_test(execution_context, SerializedTestResult.from_test_result(test_statistic))
@@ -235,7 +239,7 @@ def test_display_single_error(capsys, swagger_20, endpoint, execution_context, s
     except SyntaxError as exc:
         exception = exc
 
-    result = models.TestResult(endpoint)
+    result = models.TestResult(endpoint, DataGenerationMethod.default())
     result.add_error(exception)
     # When the related test result is displayed
     execution_context.show_errors_tracebacks = show_errors_tracebacks
@@ -260,7 +264,7 @@ def test_display_single_error(capsys, swagger_20, endpoint, execution_context, s
 def test_display_failures(swagger_20, capsys, execution_context, results_set):
     # Given two test results - success and failure
     endpoint = models.Endpoint("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)
-    failure = models.TestResult(endpoint)
+    failure = models.TestResult(endpoint, DataGenerationMethod.default())
     failure.add_failure("test", models.Case(endpoint), "Message")
     execution_context.results.append(SerializedTestResult.from_test_result(failure))
     results_set.append(failure)
@@ -283,7 +287,7 @@ def test_display_errors(swagger_20, capsys, results_set, execution_context, show
     execution_context.verbosity = verbosity
     # Given two test results - success and error
     endpoint = models.Endpoint("/api/error", "GET", {}, swagger_20)
-    error = models.TestResult(endpoint, seed=123)
+    error = models.TestResult(endpoint, DataGenerationMethod.default(), seed=123)
     error.add_error(ConnectionError("Connection refused!"), models.Case(endpoint, query={"a": 1}))
     results_set.append(error)
     execution_context.results.append(SerializedTestResult.from_test_result(error))

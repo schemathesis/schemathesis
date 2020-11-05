@@ -17,7 +17,7 @@ import werkzeug
 from hypothesis.strategies import SearchStrategy
 from starlette.testclient import TestClient as ASGIClient
 
-from .constants import USER_AGENT
+from .constants import USER_AGENT, DataGenerationMethod
 from .exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse
@@ -429,9 +429,12 @@ class Endpoint:
         return self.schema.get_links(self)
 
     def as_strategy(
-        self, hooks: Optional["HookDispatcher"] = None, feedback: Optional["Feedback"] = None
+        self,
+        hooks: Optional["HookDispatcher"] = None,
+        feedback: Optional["Feedback"] = None,
+        data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
-        return self.schema.get_case_strategy(self, hooks, feedback)
+        return self.schema.get_case_strategy(self, hooks, feedback, data_generation_method)
 
     def get_strategies_from_examples(self) -> List[SearchStrategy[Case]]:
         """Get examples from the endpoint."""
@@ -668,6 +671,7 @@ class TestResult:
     """Result of a single test."""
 
     endpoint: Endpoint = attr.ib()  # pragma: no mutate
+    data_generation_method: DataGenerationMethod = attr.ib()  # pragma: no mutate
     checks: List[Check] = attr.ib(factory=list)  # pragma: no mutate
     errors: List[Tuple[Exception, Optional[Case]]] = attr.ib(factory=list)  # pragma: no mutate
     interactions: List[Interaction] = attr.ib(factory=list)  # pragma: no mutate

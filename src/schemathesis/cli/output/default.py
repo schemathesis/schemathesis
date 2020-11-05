@@ -19,16 +19,17 @@ def get_terminal_width() -> int:
     return shutil.get_terminal_size().columns
 
 
-def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> None:
+def display_section_name(title: str, separator: str = "=", extra: str = "", **kwargs: Any) -> None:
     """Print section name with separators in terminal with the given title nicely centered."""
-    message = f" {title} ".center(get_terminal_width(), separator)
+    extra = extra if not extra else f" [{extra}]"
+    message = f" {title}{extra} ".center(get_terminal_width(), separator)
     kwargs.setdefault("bold", True)
     click.secho(message, **kwargs)
 
 
 def display_subsection(result: SerializedTestResult, color: Optional[str] = "red") -> None:
     section_name = f"{result.method}: {result.path}"
-    display_section_name(section_name, "_", fg=color)
+    display_section_name(section_name, "_", result.data_generation_method, fg=color)
 
 
 def get_percentage(position: int, length: int) -> str:

@@ -7,7 +7,7 @@ from starlette.applications import Starlette
 from .. import fixups as _fixups
 from .. import loaders
 from ..checks import DEFAULT_CHECKS
-from ..constants import DEFAULT_STATEFUL_RECURSION_LIMIT
+from ..constants import DEFAULT_DATA_GENERATION_METHODS, DEFAULT_STATEFUL_RECURSION_LIMIT, DataGenerationMethod
 from ..models import CheckFunction
 from ..schemas import BaseSchema
 from ..stateful import Stateful
@@ -31,6 +31,7 @@ def prepare(  # pylint: disable=too-many-arguments
     *,
     # Runtime behavior
     checks: Iterable[CheckFunction] = DEFAULT_CHECKS,
+    data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
     max_response_time: Optional[int] = None,
     targets: Iterable[Target] = DEFAULT_TARGETS,
     workers_num: int = 1,
@@ -92,6 +93,7 @@ def prepare(  # pylint: disable=too-many-arguments
         validate_schema=validate_schema,
         skip_deprecated_endpoints=skip_deprecated_endpoints,
         checks=checks,
+        data_generation_methods=data_generation_methods,
         max_response_time=max_response_time,
         targets=targets,
         hypothesis_options=hypothesis_options,
@@ -141,6 +143,7 @@ def execute_from_schema(
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
     checks: Iterable[CheckFunction],
+    data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
     max_response_time: Optional[int] = None,
     targets: Iterable[Target],
     workers_num: int = 1,
@@ -184,6 +187,7 @@ def execute_from_schema(
             method=method,
             tag=tag,
             operation_id=operation_id,
+            data_generation_methods=data_generation_methods,
         )
 
         runner: BaseRunner
@@ -305,6 +309,7 @@ def load_schema(
     app: Any = None,
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
+    data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
     # Network request parameters
     auth: Optional[Tuple[str, str]] = None,
     auth_type: Optional[str] = None,
@@ -317,7 +322,13 @@ def load_schema(
 ) -> BaseSchema:
     """Load schema via specified loader and parameters."""
     loader_options = dict_true_values(
-        base_url=base_url, endpoint=endpoint, method=method, tag=tag, operation_id=operation_id, app=app
+        base_url=base_url,
+        endpoint=endpoint,
+        method=method,
+        tag=tag,
+        operation_id=operation_id,
+        app=app,
+        data_generation_methods=data_generation_methods,
     )
 
     if not isinstance(schema_uri, dict):

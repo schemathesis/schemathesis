@@ -24,7 +24,9 @@ def test_(request, case):
     result.assert_outcomes(passed=1)
     # Then test name should contain method:endpoint
     # And there should be only 1 hypothesis call
-    result.stdout.re_match_lines([r"test_parametrization.py::test_\[GET:/v1/users\] PASSED", r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines(
+        [r"test_parametrization.py::test_\[GET:/v1/users\]\[P\] PASSED", r"Hypothesis calls: 1"]
+    )
 
 
 def test_pytest_parametrize(testdir):
@@ -52,8 +54,8 @@ def test_(request, param, case):
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
-            r"test_pytest_parametrize.py::test_\[GET:/v1/users\]\[A\] PASSED",
-            r"test_pytest_parametrize.py::test_\[GET:/v1/users\]\[B\] PASSED",
+            r"test_pytest_parametrize.py::test_\[GET:/v1/users\]\[P\]\[A\] PASSED",
+            r"test_pytest_parametrize.py::test_\[GET:/v1/users\]\[P\]\[B\] PASSED",
             r"Hypothesis calls: 4",
         ]
     )
@@ -82,8 +84,8 @@ class TestAPI:
     result.assert_outcomes(passed=2)
     result.stdout.re_match_lines(
         [
-            r"test_method.py::TestAPI::test_\[GET:/v1/users\] PASSED",
-            r"test_method.py::TestAPI::test_\[POST:/v1/users\] PASSED",
+            r"test_method.py::TestAPI::test_\[GET:/v1/users\]\[P\] PASSED",
+            r"test_method.py::TestAPI::test_\[POST:/v1/users\]\[P\] PASSED",
             r"Hypothesis calls: 2",
         ]
     )
@@ -479,12 +481,12 @@ def test_b(request, case):
     result.assert_outcomes(passed=5)
     result.stdout.re_match_lines(
         [
-            r".*test_a\[PATCH:/v1/users\]",
-            r".*test_a\[GET:/v1/users\]",
+            r".*test_a\[PATCH:/v1/users\]\[P\]",
+            r".*test_a\[GET:/v1/users\]\[P\]",
             # Here POST is not skipped due to using skip_deprecated_endpoints=False in the `parametrize` call
-            r".*test_b\[POST:/v1/users\]",
-            r".*test_b\[PATCH:/v1/users\]",
-            r".*test_b\[GET:/v1/users\]",
+            r".*test_b\[POST:/v1/users\]\[P\]",
+            r".*test_b\[PATCH:/v1/users\]\[P\]",
+            r".*test_b\[GET:/v1/users\]\[P\]",
             r"Hypothesis calls: 5",
         ]
     )
@@ -622,7 +624,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-rf")
     # Then the tests should fail with the relevant error message
     result.assert_outcomes(failed=1, passed=2)
-    result.stdout.re_match_lines([r".*test_invalid_endpoint.py::test_\[GET:/v1/invalid\] FAILED"])
+    result.stdout.re_match_lines([r".*test_invalid_endpoint.py::test_\[GET:/v1/invalid\]\[P\] FAILED"])
 
 
 def test_no_base_path(testdir):

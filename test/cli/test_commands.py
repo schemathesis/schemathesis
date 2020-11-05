@@ -14,7 +14,7 @@ import yaml
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
 
-from schemathesis import Case, fixups
+from schemathesis import Case, DataGenerationMethod, fixups
 from schemathesis._compat import metadata
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.cli import reset_checks
@@ -166,6 +166,10 @@ def test_commands_run_help(cli):
         "  -c, --checks [not_a_server_error|status_code_conformance|"
         "content_type_conformance|response_headers_conformance|response_schema_conformance|all]",
         "                                  List of checks to run.",
+        "  -D, --data-generation-method [positive]",
+        "                                  Defines how Schemathesis generates data for",
+        "                                  tests.",
+        "",
         "  --max-response-time INTEGER RANGE",
         "                                  A custom check that will fail if the response",
         "                                  time is greater than the specified one in",
@@ -297,6 +301,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "operation_id": (),
         "schema_uri": SCHEMA_URI,
         "validate_schema": True,
+        "data_generation_methods": [DataGenerationMethod.default()],
         "skip_deprecated_endpoints": False,
         "loader": from_uri,
         "hypothesis_options": {},
@@ -348,6 +353,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
         "endpoint": (),
         "headers": {},
         "loader": from_uri,
+        "data_generation_methods": [DataGenerationMethod.default()],
         "method": (),
         "tag": (),
         "operation_id": (),
@@ -624,7 +630,7 @@ def test_flaky(cli, cli_args, workers):
         assert lines[10] == "E"
     # And it should be displayed only once in "ERRORS" section
     assert "= ERRORS =" in result.stdout
-    assert "_ GET: /api/flaky _" in result.stdout
+    assert "_ GET: /api/flaky [P] _" in result.stdout
     # And it should not go into "FAILURES" section
     assert "= FAILURES =" not in result.stdout
     # And more clear error message is displayed instead of Hypothesis one
@@ -759,8 +765,8 @@ def test_connection_error(cli, schema_url, workers):
     # And errors section title should be displayed
     assert "= ERRORS =" in result.stdout
     # And all endpoints should be mentioned in this section as subsections
-    assert "_ GET: /api/success _" in result.stdout
-    assert "_ GET: /api/failure _" in result.stdout
+    assert "_ GET: /api/success [P] _" in result.stdout
+    assert "_ GET: /api/failure [P] _" in result.stdout
     # And the proper error messages should be displayed for each endpoint
     assert "Max retries exceeded with url: /api/success" in result.stdout
     assert "Max retries exceeded with url: /api/failure" in result.stdout

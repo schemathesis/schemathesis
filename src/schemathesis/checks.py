@@ -21,7 +21,7 @@ def not_a_server_error(response: GenericResponse, case: "Case") -> Optional[bool
     return None
 
 
-DEFAULT_CHECKS = (not_a_server_error,)
+DEFAULT_CHECKS: Tuple["CheckFunction", ...] = (not_a_server_error,)
 OPTIONAL_CHECKS = (
     status_code_conformance,
     content_type_conformance,

@@ -12,6 +12,7 @@ from _pytest.warning_types import PytestWarning
 from hypothesis.errors import InvalidArgument
 from packaging import version
 
+from .. import DataGenerationMethod
 from .._hypothesis import create_test
 from ..exceptions import InvalidSchema
 from ..models import Endpoint
@@ -35,10 +36,12 @@ class SchemathesisCase(PyCollector):
         self.given_kwargs = getattr(test_function, "_schemathesis_given_kwargs", {})
         super().__init__(*args, **kwargs)
 
-    def _get_test_name(self, endpoint: Endpoint) -> str:
-        return f"{self.name}[{endpoint.method.upper()}:{endpoint.full_path}]"
+    def _get_test_name(self, endpoint: Endpoint, data_generation_method: DataGenerationMethod) -> str:
+        return f"{self.name}[{endpoint.method.upper()}:{endpoint.full_path}][{data_generation_method.as_short_name()}]"
 
-    def _gen_items(self, endpoint: Endpoint) -> Generator[Function, None, None]:
+    def _gen_items(
+        self, endpoint: Endpoint, data_generation_method: DataGenerationMethod
+    ) -> Generator[Function, None, None]:
         """Generate all items for the given endpoint.
 
         Could produce more than one test item if
@@ -47,8 +50,8 @@ class SchemathesisCase(PyCollector):
         This implementation is based on the original one in pytest, but with slight adjustments
         to produce tests out of hypothesis ones.
         """
-        name = self._get_test_name(endpoint)
-        funcobj = self._make_test(endpoint)
+        name = self._get_test_name(endpoint, data_generation_method)
+        funcobj = self._make_test(endpoint, data_generation_method)
 
         cls = self._get_class_parent()
         definition = create(FunctionDefinition, name=self.name, parent=self.parent, callobj=funcobj)
@@ -66,6 +69,7 @@ class SchemathesisCase(PyCollector):
                 fixtureinfo=fixtureinfo,
                 test_func=self.test_function,
                 originalname=self.name,
+                data_generation_method=data_generation_method,
             )
         else:
             fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)
@@ -82,6 +86,7 @@ class SchemathesisCase(PyCollector):
                     keywords={callspec.id: True},
                     originalname=name,
                     test_func=self.test_function,
+                    data_generation_method=data_generation_method,
                 )
 
     def _get_class_parent(self) -> Optional[Type]:
@@ -102,10 +107,14 @@ class SchemathesisCase(PyCollector):
         self.ihook.pytest_generate_tests.call_extra(methods, {"metafunc": metafunc})
         return metafunc
 
-    def _make_test(self, endpoint: Endpoint) -> Callable:
+    def _make_test(self, endpoint: Endpoint, data_generation_method: DataGenerationMethod) -> Callable:
         try:
             return create_test(
-                endpoint=endpoint, test=self.test_function, _given_args=self.given_args, _given_kwargs=self.given_kwargs
+                endpoint=endpoint,
+                test=self.test_function,
+                _given_args=self.given_args,
+                _given_kwargs=self.given_kwargs,
+                data_generation_method=data_generation_method,
             )
         except InvalidSchema as exc:
             message = exc.args[0]
@@ -115,7 +124,10 @@ class SchemathesisCase(PyCollector):
         """Generate different test items for all endpoints available in the given schema."""
         try:
             return [
-                item for endpoint in self.schemathesis_case.get_all_endpoints() for item in self._gen_items(endpoint)
+                item
+                for data_generation_method in self.schemathesis_case.data_generation_methods
+                for endpoint in self.schemathesis_case.get_all_endpoints()
+                for item in self._gen_items(endpoint, data_generation_method)
             ]
         except Exception:
             pytest.fail("Error during collection")
@@ -129,12 +141,19 @@ NOT_USED_STATEFUL_TESTING_MESSAGE = (
 
 class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
     def __init__(
-        self, *args: Any, test_func: Callable, test_name: Optional[str] = None, recursion_level: int = 0, **kwargs: Any
+        self,
+        *args: Any,
+        test_func: Callable,
+        test_name: Optional[str] = None,
+        recursion_level: int = 0,
+        data_generation_method: DataGenerationMethod,
+        **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.test_function = test_func
         self.test_name = test_name
         self.recursion_level = recursion_level
+        self.data_generation_method = data_generation_method
 
     def _getobj(self) -> partial:
         """Tests defined as methods require `self` as the first argument.
@@ -160,12 +179,15 @@ class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
         previous_test_name = self.test_name or f"{feedback.endpoint.method.upper()}:{feedback.endpoint.full_path}"
 
         def make_test(
-            endpoint: Endpoint, test: Union[Callable, InvalidSchema], previous_tests: str
+            endpoint: Endpoint,
+            test: Union[Callable, InvalidSchema],
+            data_generation_method: DataGenerationMethod,
+            previous_tests: str,
         ) -> SchemathesisFunction:
             test_name = f"{previous_tests} -> {endpoint.method.upper()}:{endpoint.full_path}"
             return create(
                 self.__class__,
-                name=f"{self.originalname}[{test_name}]",
+                name=f"{self.originalname}[{test_name}][{self.data_generation_method.as_short_name()}]",
                 parent=self.parent,
                 callspec=getattr(self, "callspec", None),
                 callobj=test,
@@ -175,11 +197,12 @@ class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
                 test_func=self.test_function,
                 test_name=test_name,
                 recursion_level=recursion_level + 1,
+                data_generation_method=data_generation_method,
             )
 
         return [
-            make_test(endpoint, test, previous_test_name)
-            for (endpoint, test) in feedback.get_stateful_tests(self.test_function, None, None)
+            make_test(endpoint, test, data_generation_method, previous_test_name)
+            for (endpoint, data_generation_method, test) in feedback.get_stateful_tests(self.test_function, None, None)
         ]
 
     def add_stateful_tests(self) -> None:
