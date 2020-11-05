@@ -2,7 +2,6 @@ from copy import deepcopy
 from typing import Any, Callable, Dict, List, Set, Tuple, TypeVar
 
 import attr
-import jsonschema
 from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
 from hypothesis_jsonschema import from_schema
@@ -68,7 +67,6 @@ def negative_schema(
     """A strategy for instances, that DO NOT match the input schema."""
     mutations = MUTATIONS[parameter]
 
-    validator = jsonschema.Draft4Validator(schema)
     # First we mutate the input schema, so any valid instance for it is invalid to the original schema
 
     @st.composite  # type: ignore
@@ -80,11 +78,7 @@ def negative_schema(
             return mutate_object_schema(draw, new_schema, mutations)
         return {"not": new_schema}
 
-    return (
-        mutated()
-        .flatmap(lambda s: from_schema(s, custom_formats=custom_formats))
-        .filter(lambda i: not validator.is_valid(i))
-    )
+    return mutated().flatmap(lambda s: from_schema({"allOf": [{"not": schema}, s]}, custom_formats=custom_formats))
 
 
 def get_type(schema: Schema) -> List[str]:
