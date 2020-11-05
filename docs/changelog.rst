@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Internal error on malformed JSON when the ``response_conformance`` check is used. `#832`_
+
 `2.7.2`_ - 2020-11-05
 ---------------------
 
@@ -1454,6 +1458,7 @@ Deprecated
 .. _#841: https://github.com/schemathesis/schemathesis/issues/841
 .. _#839: https://github.com/schemathesis/schemathesis/issues/839
 .. _#836: https://github.com/schemathesis/schemathesis/issues/836
+.. _#832: https://github.com/schemathesis/schemathesis/issues/832
 .. _#824: https://github.com/schemathesis/schemathesis/issues/824
 .. _#816: https://github.com/schemathesis/schemathesis/issues/816
 .. _#814: https://github.com/schemathesis/schemathesis/issues/814

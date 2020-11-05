@@ -4,6 +4,7 @@ from collections import defaultdict
 from contextlib import ExitStack, contextmanager
 from copy import deepcopy
 from difflib import get_close_matches
+from json import JSONDecodeError
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple, Type, Union
 from urllib.parse import urlsplit
 
@@ -11,7 +12,7 @@ import jsonschema
 import requests
 from hypothesis.strategies import SearchStrategy
 
-from ...exceptions import InvalidSchema, get_schema_validation_error
+from ...exceptions import InvalidSchema, get_response_parsing_error, get_schema_validation_error
 from ...hooks import HookContext, HookDispatcher
 from ...models import Case, Endpoint, EndpointDefinition, empty_object
 from ...schemas import BaseSchema
@@ -307,10 +308,21 @@ class BaseOpenAPISchema(BaseSchema):
         scopes, schema = self.get_response_schema(definition, endpoint.definition.scope)
         if not schema:
             return
-        if isinstance(response, requests.Response):
-            data = response.json()
-        else:
-            data = response.json
+        try:
+            if isinstance(response, requests.Response):
+                data = response.json()
+            else:
+                data = response.json
+        except JSONDecodeError as exc:
+            exc_class = get_response_parsing_error(exc)
+            if isinstance(response, requests.Response):
+                raw_content = response.content
+            else:
+                raw_content = response.get_data()
+            payload = raw_content.decode(errors="replace")
+            raise exc_class(
+                f"The received response is not valid JSON:\n\n    {payload}\n\nException: \n\n    {exc}"
+            ) from exc
         with in_scopes(self.resolver, scopes):
             try:
                 jsonschema.validate(data, schema, cls=jsonschema.Draft4Validator, resolver=self.resolver)
