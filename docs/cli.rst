@@ -90,7 +90,7 @@ How are responses checked?
 For each API response received during the test, Schemathesis runs several checks to verify response conformance. By default,
 it runs only one check that raises an error if the checked response has a 5xx HTTP status code.
 
-There are four built-in checks you can use via the `--check / -c` CLI option:
+There are four built-in checks you can use via the `--checks / -c` CLI option:
 
 - ``not_a_server_error``. The response has 5xx HTTP status;
 - ``status_code_conformance``. The response status is not defined in the API schema;
@@ -98,11 +98,11 @@ There are four built-in checks you can use via the `--check / -c` CLI option:
 - ``response_schema_conformance``. The response content does not conform to the schema defined for this specific response;
 - ``response_headers_conformance``. The response headers does not contain all defined headers.
 
-To make Schemathesis perform all built-in checks use ``--check all`` CLI option:
+To make Schemathesis perform all built-in checks use ``--checks all`` CLI option:
 
 .. code:: text
 
-    $ schemathesis run --check all http://api.com/swagger.json
+    $ schemathesis run --checks all http://api.com/swagger.json
     ================ Schemathesis test session starts ===============
     platform Linux -- Python 3.8.5, schemathesis-2.5.0, ...
     rootdir: /
