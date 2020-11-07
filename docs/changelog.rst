@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- New ``relative_path`` property for ``BeforeExecution`` and ``AfterExecution`` events. It represents an operation
+  path as it is in the schema definition.
+
 `2.7.3`_ - 2020-11-05
 ---------------------
 
