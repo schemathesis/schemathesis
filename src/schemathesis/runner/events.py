@@ -49,11 +49,17 @@ class BeforeExecution(ExecutionEvent):
 
     method: str = attr.ib()  # pragma: no mutate
     path: str = attr.ib()  # pragma: no mutate
+    relative_path: str = attr.ib()  # pragma: no mutate
     recursion_level: int = attr.ib()  # pragma: no mutate
 
     @classmethod
     def from_endpoint(cls, endpoint: Endpoint, recursion_level: int) -> "BeforeExecution":
-        return cls(method=endpoint.method.upper(), path=endpoint.full_path, recursion_level=recursion_level)
+        return cls(
+            method=endpoint.method.upper(),
+            path=endpoint.full_path,
+            relative_path=endpoint.path,
+            recursion_level=recursion_level,
+        )
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -62,6 +68,7 @@ class AfterExecution(ExecutionEvent):
 
     method: str = attr.ib()  # pragma: no mutate
     path: str = attr.ib()  # pragma: no mutate
+    relative_path: str = attr.ib()  # pragma: no mutate
 
     # Endpoint test status - success / failure / error
     status: Status = attr.ib()  # pragma: no mutate
@@ -78,6 +85,7 @@ class AfterExecution(ExecutionEvent):
         return cls(
             method=endpoint.method.upper(),
             path=endpoint.full_path,
+            relative_path=endpoint.path,
             result=SerializedTestResult.from_test_result(result),
             status=status,
             elapsed_time=elapsed_time,
