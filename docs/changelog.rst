@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`2.7.4`_ - 2020-11-07
+---------------------
+
 **Added**
 
 - New ``relative_path`` property for ``BeforeExecution`` and ``AfterExecution`` events. It represents an operation
@@ -1359,7 +1362,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.7.3...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.7.4...HEAD
+.. _2.7.4: https://github.com/schemathesis/schemathesis/compare/v2.7.3...v2.7.4
 .. _2.7.3: https://github.com/schemathesis/schemathesis/compare/v2.7.2...v2.7.3
 .. _2.7.2: https://github.com/schemathesis/schemathesis/compare/v2.7.1...v2.7.2
 .. _2.7.1: https://github.com/schemathesis/schemathesis/compare/v2.7.0...v2.7.1
