@@ -208,7 +208,7 @@ def test_create_multiple_users(testdir):
 @settings(max_examples=5, deadline=None)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert_list(case.body)
+    assert_json_list(case.body)
     assert_requests_call(case)
 """
     )

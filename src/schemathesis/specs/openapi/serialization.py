@@ -147,7 +147,10 @@ def _serialize_swagger2(definitions: DefinitionList) -> Generator[Optional[Calla
         if definition["in"] == "header":
             # Headers should be coerced to a string so we can check it for validity later
             yield to_string(name)
-        if definition["in"] != "body":
+        if definition["in"] == "body":
+            # Serialize bodies to JSON
+            yield json.dumps
+        else:
             if type_ in ("array", "object"):
                 if collection_format == "csv":
                     yield delimited(name, delimiter=",")

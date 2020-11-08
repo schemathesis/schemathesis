@@ -188,21 +188,22 @@ class Case:  # pylint: disable=too-many-public-methods
         formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
         url = urljoin(base_url + "/", formatted_path)
         # Form data and body are mutually exclusive
-        extra: Dict[str, Optional[Body]]
-        if self.form_data:
+        payload: Dict[str, Optional[Body]]
+        if self.form_data is not None:
             files, data = self.endpoint.prepare_multipart(self.form_data)
-            extra = {"files": files, "data": data}
-        elif is_multipart(self.body):
-            extra = {"data": self.body}
+            payload = {"files": files, "data": data}
+        elif self.body is not None:
+            payload = {"data": self.body}
         else:
-            extra = {"json": self.body}
+            # No body at all
+            payload = {}
         return {
             "method": self.method,
             "url": url,
             "cookies": self.cookies,
             "headers": final_headers,
             "params": self.query,
-            **extra,
+            **payload,
         }
 
     def call(
@@ -235,22 +236,22 @@ class Case:  # pylint: disable=too-many-public-methods
     def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
         final_headers = self._get_headers(headers)
-        extra: Dict[str, Optional[Body]]
-        if self.form_data:
-            extra = {"data": self.form_data}
+        payload: Dict[str, Optional[Body]]
+        if self.form_data is not None:
+            payload = {"data": self.form_data}
             final_headers = final_headers or {}
             if "multipart/form-data" in self.endpoint.get_request_payload_content_types():
                 final_headers.setdefault("Content-Type", "multipart/form-data")
-        elif is_multipart(self.body):
-            extra = {"data": self.body}
+        elif self.body is not None:
+            payload = {"data": self.body}
         else:
-            extra = {"json": self.body}
+            payload = {}
         return {
             "method": self.method,
             "path": self.endpoint.schema.get_full_path(self.formatted_path),
             "headers": final_headers,
             "query_string": self.query,
-            **extra,
+            **payload,
         }
 
     def call_wsgi(self, app: Any = None, headers: Optional[Dict[str, str]] = None, **kwargs: Any) -> WSGIResponse:

@@ -480,6 +480,24 @@ async def test_payload_explicit_example(args):
     assert body == {"name": "John"}
 
 
+@pytest.mark.endpoints("plain_text_body")
+async def test_plain_text_body(args):
+    # When the expected payload is text/plain
+    app, kwargs = args
+
+    # Then the payload is not encoded as JSON
+    def check_content(response, case):
+        if isinstance(app, Flask):
+            data = response.get_data()
+        else:
+            data = response.text.decode()
+        assert case.body.encode() == data
+
+    result = execute(**kwargs, checks=(check_content,))
+    assert not result.has_errors
+    assert not result.has_failures
+
+
 @pytest.mark.endpoints("invalid_path_parameter")
 def test_invalid_path_parameter(args):
     app, kwargs = args
