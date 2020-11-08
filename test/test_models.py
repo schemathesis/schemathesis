@@ -171,6 +171,14 @@ def test_get_code_to_reproduce(case, expected):
     assert case.get_code_to_reproduce() == expected
 
 
+def test_code_to_reproduce():
+    case = Case(Endpoint("/api/success", "GET", {}, base_url="http://127.0.0.1:1", schema=schema), body={"foo": 42})
+    request = requests.Request(**case.as_requests_kwargs()).prepare()
+    code = case.get_code_to_reproduce(request=request)
+    with pytest.raises(requests.exceptions.ConnectionError):
+        eval(code)
+
+
 def test_validate_response(testdir):
     testdir.make_test(
         fr"""

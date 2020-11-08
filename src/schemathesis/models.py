@@ -128,7 +128,7 @@ class Case:  # pylint: disable=too-many-public-methods
                 "method": request.method,
                 "url": request.url,
                 "headers": request.headers,
-                "body": request.body,
+                "data": request.body,
             }
         else:
             base_url = self.get_full_base_url()
