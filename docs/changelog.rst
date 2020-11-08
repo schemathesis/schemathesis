@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Invalid keyword in code samples that Schemathesis suggests to run to reproduce errors. `#851`_
+
 `2.7.4`_ - 2020-11-07
 ---------------------
 
@@ -1468,6 +1472,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#851: https://github.com/schemathesis/schemathesis/issues/851
 .. _#841: https://github.com/schemathesis/schemathesis/issues/841
 .. _#839: https://github.com/schemathesis/schemathesis/issues/839
 .. _#836: https://github.com/schemathesis/schemathesis/issues/836
