@@ -217,7 +217,7 @@ def test_commands_run_help(cli):
         "                                  Verbosity level of Hypothesis messages.",
         "",
         "Generic options:",
-        "  -D, --data-generation-method [positive]",
+        "  -D, --data-generation-method [positive|negative]",
         "                                  Defines how Schemathesis generates data for",
         "                                  tests.  [default: positive]",
         "",
