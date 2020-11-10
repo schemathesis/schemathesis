@@ -21,7 +21,10 @@ disable =
   fixme,
   too-few-public-methods,
   bad-continuation,
-  inconsistent-return-statements
+  inconsistent-return-statements,
+  too-many-arguments,
+  too-many-instance-attributes,
+  too-many-public-methods
 
 
 [REPORTS]

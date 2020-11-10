@@ -98,7 +98,7 @@ class BaseOpenAPISchema(BaseSchema):
             return deepcopy(self.resolver.resolve(methods["$ref"]))
         return self.resolver.resolution_scope, deepcopy(methods)
 
-    def make_endpoint(  # pylint: disable=too-many-arguments
+    def make_endpoint(
         self,
         path: str,
         method: str,
@@ -230,7 +230,7 @@ class BaseOpenAPISchema(BaseSchema):
     def as_state_machine(self) -> Type[APIStateMachine]:
         return create_state_machine(self)
 
-    def add_link(  # pylint: disable=too-many-arguments
+    def add_link(
         self,
         source: Endpoint,
         target: Union[str, Endpoint],
@@ -502,7 +502,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
             return urlsplit(url).path
         return "/"
 
-    def make_endpoint(  # pylint: disable=too-many-arguments
+    def make_endpoint(
         self,
         path: str,
         method: str,

@@ -2,7 +2,6 @@
 
 They all consist of primitive types and don't have references to schemas, app, etc.
 """
-# pylint: disable=too-many-instance-attributes
 import logging
 from typing import Any, Dict, List, Optional
 

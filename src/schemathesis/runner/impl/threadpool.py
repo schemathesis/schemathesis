@@ -30,8 +30,6 @@ def _run_task(
     stateful_recursion_limit: int,
     **kwargs: Any,
 ) -> None:
-    # pylint: disable=too-many-arguments
-
     def _run_tests(maker: Callable, recursion_level: int = 0) -> None:
         if recursion_level > stateful_recursion_limit:
             return
@@ -78,7 +76,6 @@ def thread_task(
 
     Pretty similar to the default one-thread flow, but includes communication with the main thread via the events queue.
     """
-    # pylint: disable=too-many-arguments
     prepared_auth = get_requests_auth(auth, auth_type)
     with get_session(prepared_auth) as session:
         _run_task(
@@ -110,7 +107,6 @@ def wsgi_thread_task(
     stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
-    # pylint: disable=too-many-arguments
     _run_task(
         wsgi_test,
         tasks_queue,
@@ -139,7 +135,6 @@ def asgi_thread_task(
     stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
-    # pylint: disable=too-many-arguments
     _run_task(
         asgi_test,
         tasks_queue,
