@@ -1,4 +1,3 @@
-# pylint: disable=too-many-instance-attributes
 import base64
 import datetime
 import http
@@ -487,7 +486,7 @@ class Endpoint:
             form_data=self.form_data,
         )
 
-    def make_case(  # pylint: disable=too-many-arguments
+    def make_case(
         self,
         *,
         path_parameters: Optional[PathParameters] = None,
@@ -647,7 +646,7 @@ class Interaction:
         )
 
     @classmethod
-    def from_wsgi(  # pylint: disable=too-many-arguments
+    def from_wsgi(
         cls,
         case: Case,
         response: WSGIResponse,
@@ -708,7 +707,7 @@ class TestResult:
     def store_requests_response(self, response: requests.Response, status: Status, checks: List[Check]) -> None:
         self.interactions.append(Interaction.from_requests(response, status, checks))
 
-    def store_wsgi_response(  # pylint: disable=too-many-arguments
+    def store_wsgi_response(
         self,
         case: Case,
         response: WSGIResponse,

@@ -253,7 +253,7 @@ def get_all_links(endpoint: Endpoint) -> Generator[Tuple[str, OpenAPILink], None
             yield status_code, OpenAPILink(name, status_code, link_definition, endpoint)
 
 
-def add_link(  # pylint: disable=too-many-arguments
+def add_link(
     responses: Dict[str, Dict[str, Any]],
     links_field: str,
     parameters: Optional[Dict[str, str]],

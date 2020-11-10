@@ -261,7 +261,7 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     callback=callbacks.convert_verbosity,
 )
 @click.option("--verbosity", "-v", help="Reduce verbosity of error output.", count=True)
-def run(  # pylint: disable=too-many-arguments
+def run(
     schema: str,
     auth: Optional[Tuple[str, str]],
     auth_type: str,
@@ -372,7 +372,7 @@ class OutputStyle(Enum):
     short = output.short.ShortOutputStyleHandler
 
 
-def execute(  # pylint: disable=too-many-arguments
+def execute(
     prepared_runner: Generator[events.ExecutionEvent, None, None],
     workers_num: int,
     show_errors_tracebacks: bool,

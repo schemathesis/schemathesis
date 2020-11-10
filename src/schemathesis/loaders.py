@@ -1,4 +1,3 @@
-# pylint: disable=too-many-arguments
 import pathlib
 from typing import IO, Any, Callable, Dict, Iterable, Optional, Union
 from urllib.parse import urljoin

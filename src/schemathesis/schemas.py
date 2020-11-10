@@ -1,4 +1,3 @@
-# pylint: disable=too-many-instance-attributes,too-many-public-methods
 """Schema objects provide a convenient interface to raw schemas.
 
 Their responsibilities:
@@ -133,7 +132,7 @@ class BaseSchema(Mapping):
                 test = make_test_or_exception(endpoint, func, settings, seed, data_generation_method)
                 yield endpoint, data_generation_method, test
 
-    def parametrize(  # pylint: disable=too-many-arguments
+    def parametrize(
         self,
         method: Optional[Filter] = NOT_SET,
         endpoint: Optional[Filter] = NOT_SET,
@@ -175,7 +174,7 @@ class BaseSchema(Mapping):
 
         return wrapper
 
-    def clone(  # pylint: disable=too-many-arguments
+    def clone(
         self,
         *,
         test_function: Optional[GenericTest] = None,
