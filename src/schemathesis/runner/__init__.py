@@ -26,7 +26,7 @@ from .impl import (
 )
 
 
-def prepare(  # pylint: disable=too-many-arguments
+def prepare(
     schema_uri: Union[str, Dict[str, Any]],
     *,
     # Runtime behavior
@@ -353,7 +353,7 @@ def load_schema(
     )
 
 
-def prepare_hypothesis_options(  # pylint: disable=too-many-arguments
+def prepare_hypothesis_options(
     deadline: Optional[Union[int, NotSet]] = None,
     derandomize: Optional[bool] = None,
     max_examples: Optional[int] = None,

@@ -1,4 +1,3 @@
-# pylint: disable=too-many-instance-attributes
 from inspect import signature
 from typing import Any, Callable, Dict, Iterable, Optional, Union
 
@@ -28,7 +27,7 @@ class LazySchema:
     skip_deprecated_endpoints: bool = attr.ib(default=False)  # pragma: no mutate
     data_generation_methods: Iterable[DataGenerationMethod] = attr.ib(default=DEFAULT_DATA_GENERATION_METHODS)
 
-    def parametrize(  # pylint: disable=too-many-arguments
+    def parametrize(
         self,
         method: Optional[Filter] = NOT_SET,
         endpoint: Optional[Filter] = NOT_SET,
@@ -125,7 +124,6 @@ def get_schema(
     data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
 ) -> BaseSchema:
     """Loads a schema from the fixture."""
-    # pylint: disable=too-many-arguments
     schema = request.getfixturevalue(name)
     if not isinstance(schema, BaseSchema):
         raise ValueError(f"The given schema must be an instance of BaseSchema, got: {type(schema)}")
