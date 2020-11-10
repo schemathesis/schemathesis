@@ -337,7 +337,9 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
             definitions["Node"] = make_node_definition(reference)
         elif endpoint in ("payload", "get_payload"):
             schema = {
-                "requestBody": {"content": {"application/json": {"schema": PAYLOAD}}},
+                "requestBody": {
+                    "content": {"application/json": {"schema": PAYLOAD}, "text/plain": {"schema": {"type": "string"}}}
+                },
                 "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": PAYLOAD}}}},
             }
         elif endpoint == "unsatisfiable":

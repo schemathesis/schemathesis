@@ -191,10 +191,11 @@ class BaseOpenAPISchema(BaseSchema):
         hooks: Optional[HookDispatcher] = None,
         feedback: Optional[Feedback] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        media_type: Optional[str] = None,
     ) -> SearchStrategy:
-        return get_case_strategy(endpoint, hooks, feedback, data_generation_method)
+        return get_case_strategy(endpoint, hooks, feedback, data_generation_method, media_type)
 
-    def get_hypothesis_conversion(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
+    def get_data_serializers(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
         definitions = [item for item in endpoint.definition.resolved.get("parameters", []) if item["in"] == location]
         security_parameters = self.security.get_security_definitions_as_parameters(
             self.raw_schema, endpoint, self.resolver, location
@@ -202,10 +203,10 @@ class BaseOpenAPISchema(BaseSchema):
         if security_parameters:
             definitions.extend(security_parameters)
         if definitions:
-            return self._get_hypothesis_conversion(definitions)
+            return self._get_data_serializers(definitions)
         return None
 
-    def _get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
+    def _get_data_serializers(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         raise NotImplementedError
 
     def _get_response_definitions(self, endpoint: Endpoint, response: GenericResponse) -> Optional[Dict[str, Any]]:
@@ -400,7 +401,8 @@ class SwaggerV20(BaseOpenAPISchema):
 
     def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         # "schema" is a required field
-        endpoint.body = parameter["schema"]
+        media_types = self.get_request_payload_content_types(endpoint) or ["application/json"]
+        endpoint.body = {media_type: {"schema": parameter["schema"]} for media_type in media_types}
 
     def process_form_data(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
         endpoint.form_data = self.add_parameter(endpoint.form_data, parameter)
@@ -444,7 +446,7 @@ class SwaggerV20(BaseOpenAPISchema):
             return produces
         return self.raw_schema.get("produces", [])
 
-    def _get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
+    def _get_data_serializers(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         return serialization.serialize_swagger2_parameters(definitions)
 
     def prepare_multipart(
@@ -536,23 +538,24 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         endpoint.cookies = self.add_parameter(endpoint.cookies, parameter)
 
     def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        # Take the first media type object
-        options = iter(parameter["content"].items())
-        try:
-            content_type, parameter = next(options)
-        except StopIteration:
-            # empty "content" value
-            return None
-        # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#media-type-object
-        # > Furthermore, if referencing a schema which contains an example,
-        # > the example value SHALL override the example provided by the schema
-        if "example" in parameter:
-            schema = get_schema_from_parameter(parameter)
-            schema["example"] = parameter["example"]
-        if content_type in ("multipart/form-data", "application/x-www-form-urlencoded"):
-            endpoint.form_data = parameter["schema"]
-        else:
-            super().process_body(endpoint, parameter)
+        # All media types
+        endpoint.body = parameter["content"]
+        # options = iter(parameter["content"].items())
+        # try:
+        #     content_type, parameter = next(options)
+        # except StopIteration:
+        #     # empty "content" value
+        #     return None
+        # # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#media-type-object
+        # # > Furthermore, if referencing a schema which contains an example,
+        # # > the example value SHALL override the example provided by the schema
+        # if "example" in parameter:
+        #     schema = get_schema_from_parameter(parameter)
+        #     schema["example"] = parameter["example"]
+        # if content_type in ("multipart/form-data", "application/x-www-form-urlencoded"):
+        #     endpoint.form_data = parameter["schema"]
+        # else:
+        #     super().process_body(endpoint, parameter)
 
     def parameter_to_json_schema(self, data: Dict[str, Any]) -> Dict[str, Any]:
         schema = get_schema_from_parameter(data)
@@ -578,7 +581,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
             return []
         return list(definitions.get("content", {}).keys())
 
-    def _get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
+    def _get_data_serializers(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         return serialization.serialize_openapi3_parameters(definitions)
 
     def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:

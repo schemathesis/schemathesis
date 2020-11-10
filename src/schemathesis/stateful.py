@@ -92,15 +92,15 @@ class Feedback:
 
     def get_stateful_tests(
         self, test: Callable, settings: Optional[hypothesis.settings], seed: Optional[int]
-    ) -> Generator[Tuple[Endpoint, DataGenerationMethod, Union[Callable, InvalidSchema]], None, None]:
+    ) -> Generator[Tuple[Endpoint, Optional[str], DataGenerationMethod, Union[Callable, InvalidSchema]], None, None]:
         """Generate additional tests that use data from the previous ones."""
         from ._hypothesis import make_test_or_exception  # pylint: disable=import-outside-toplevel
 
         for data in self.stateful_tests.values():
             endpoint = data.make_endpoint()
             for data_generation_method in endpoint.schema.data_generation_methods:
-                yield endpoint, data_generation_method, make_test_or_exception(
-                    endpoint, test, settings, seed, data_generation_method
+                yield endpoint, None, data_generation_method, make_test_or_exception(
+                    endpoint, test, None, settings, seed, data_generation_method
                 )
 
 

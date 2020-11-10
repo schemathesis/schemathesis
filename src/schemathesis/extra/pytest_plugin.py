@@ -200,9 +200,12 @@ class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
                 data_generation_method=data_generation_method,
             )
 
+        # TODO. use media-type
         return [
             make_test(endpoint, test, data_generation_method, previous_test_name)
-            for (endpoint, data_generation_method, test) in feedback.get_stateful_tests(self.test_function, None, None)
+            for (endpoint, media_type, data_generation_method, test) in feedback.get_stateful_tests(
+                self.test_function, None, None
+            )
         ]
 
     def add_stateful_tests(self) -> None:

@@ -432,8 +432,9 @@ class Endpoint:
         hooks: Optional["HookDispatcher"] = None,
         feedback: Optional["Feedback"] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        media_type: Optional[str] = None,
     ) -> SearchStrategy:
-        return self.schema.get_case_strategy(self, hooks, feedback, data_generation_method)
+        return self.schema.get_case_strategy(self, hooks, feedback, data_generation_method, media_type)
 
     def get_strategies_from_examples(self) -> List[SearchStrategy[Case]]:
         """Get examples from the endpoint."""
@@ -442,8 +443,8 @@ class Endpoint:
     def get_stateful_tests(self, response: GenericResponse, stateful: Optional["Stateful"]) -> Sequence["StatefulTest"]:
         return self.schema.get_stateful_tests(response, self, stateful)
 
-    def get_hypothesis_conversions(self, location: str) -> Optional[Callable]:
-        return self.schema.get_hypothesis_conversion(self, location)
+    def get_data_serializerss(self, location: str) -> Optional[Callable]:
+        return self.schema.get_data_serializers(self, location)
 
     def prepare_multipart(self, form_data: Optional[FormData]) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
         if not form_data:

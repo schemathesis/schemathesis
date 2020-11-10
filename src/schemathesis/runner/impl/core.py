@@ -77,7 +77,8 @@ class BaseRunner:
         """Run tests and recursively run additional tests."""
         if recursion_level > self.stateful_recursion_limit:
             return
-        for endpoint, data_generation_method, test in maker(template, settings, seed):
+        # TODO. use media-type
+        for endpoint, _, data_generation_method, test in maker(template, settings, seed):
             feedback = Feedback(self.stateful, endpoint)
             for event in run_test(
                 endpoint,

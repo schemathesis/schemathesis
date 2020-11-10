@@ -23,6 +23,7 @@ def create_test(
     settings: Optional[hypothesis.settings] = None,
     seed: Optional[int] = None,
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+    media_type: Optional[str] = None,
     _given_args: Tuple[GivenInput, ...] = (),
     _given_kwargs: Optional[Dict[str, GivenInput]] = None,
 ) -> Callable:
@@ -34,7 +35,7 @@ def create_test(
     else:
         feedback = None
     strategy = endpoint.as_strategy(
-        hooks=hook_dispatcher, feedback=feedback, data_generation_method=data_generation_method
+        hooks=hook_dispatcher, feedback=feedback, data_generation_method=data_generation_method, media_type=media_type
     )
     _given_kwargs = (_given_kwargs or {}).copy()
     _given_kwargs.setdefault("case", strategy)
@@ -62,13 +63,19 @@ def setup_default_deadline(wrapped_test: Callable) -> None:
 def make_test_or_exception(
     endpoint: Endpoint,
     func: Callable,
+    media_type: Optional[str],
     settings: Optional[hypothesis.settings] = None,
     seed: Optional[int] = None,
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
 ) -> Union[Callable, InvalidSchema]:
     try:
         return create_test(
-            endpoint=endpoint, test=func, settings=settings, seed=seed, data_generation_method=data_generation_method
+            endpoint=endpoint,
+            test=func,
+            settings=settings,
+            seed=seed,
+            data_generation_method=data_generation_method,
+            media_type=media_type,
         )
     except InvalidSchema as exc:
         return exc

@@ -112,9 +112,7 @@ def get_strategies_from_examples(endpoint: Endpoint, examples_field: str = "exam
 
 def get_strategy(endpoint: Endpoint, static_parameters: Dict[str, Any]) -> SearchStrategy[Case]:
     strategies = {
-        parameter: prepare_strategy(
-            parameter, getattr(endpoint, parameter), endpoint.get_hypothesis_conversions(parameter)
-        )
+        parameter: prepare_strategy(parameter, getattr(endpoint, parameter), endpoint.get_data_serializerss(parameter))
         for parameter in PARAMETERS - set(static_parameters)
         if getattr(endpoint, parameter) is not None
     }

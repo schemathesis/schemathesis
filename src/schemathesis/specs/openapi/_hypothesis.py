@@ -74,6 +74,7 @@ def get_case_strategy(
     hooks: Optional[HookDispatcher] = None,
     feedback: Optional[Feedback] = None,
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+    media_type: Optional[str] = None,
 ) -> st.SearchStrategy:
     """Create a strategy for a complete test case.
 
@@ -83,10 +84,14 @@ def get_case_strategy(
     static_kwargs: Dict[str, Any] = {"feedback": feedback}
     for parameter in PARAMETERS:
         value = getattr(endpoint, parameter)
+        # TODO. The body structure should be the same across all usages, stateful, explicit examples, etc
+        if parameter == "body" and value is not None:
+            if media_type is not None and isinstance(value, dict):
+                value = value[media_type]["schema"]
         if value is not None:
             location = {"headers": "header", "cookies": "cookie", "path_parameters": "path"}.get(parameter, parameter)
             strategies[parameter] = prepare_strategy(
-                parameter, value, endpoint.get_hypothesis_conversions(location), data_generation_method
+                parameter, value, endpoint.get_data_serializerss(location), data_generation_method
             )
         else:
             static_kwargs[parameter] = None

@@ -76,6 +76,7 @@ class GraphQLSchema(BaseSchema):
         hooks: Optional[HookDispatcher] = None,
         feedback: Optional[Feedback] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        media_type: Optional[str] = None,
     ) -> SearchStrategy:
         constructor = partial(GraphQLCase, endpoint=endpoint)
         schema = graphql.build_client_schema(self.raw_schema)
@@ -84,5 +85,5 @@ class GraphQLSchema(BaseSchema):
     def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
         return []
 
-    def get_hypothesis_conversion(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
+    def get_data_serializers(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
         return None

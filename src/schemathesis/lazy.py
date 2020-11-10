@@ -72,7 +72,8 @@ class LazySchema:
                 settings = getattr(test, "_hypothesis_internal_use_settings", None)
                 tests = list(schema.get_all_tests(func, settings))
                 request.session.testscollected += len(tests)
-                for _endpoint, data_generation_method, sub_test in tests:
+                # TODO. Use media_type
+                for _endpoint, _, data_generation_method, sub_test in tests:
                     actual_test = get_test(sub_test)
                     subtests.item._nodeid = _get_node_name(node_id, _endpoint, data_generation_method)
                     run_subtest(_endpoint, fixtures, actual_test, subtests)

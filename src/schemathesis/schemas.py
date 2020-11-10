@@ -116,7 +116,11 @@ class BaseSchema(Mapping):
         """Get a list of additional tests, that should be executed after this response from the endpoint."""
         raise NotImplementedError
 
-    def get_hypothesis_conversion(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
+    def get_data_serializers(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
+        """Get a function that serializes the generated data into a format acceptable for sending to the app.
+
+        The format might depend on the API schema definitions relevant for a particular operation.
+        """
         raise NotImplementedError
 
     def get_all_tests(
@@ -124,13 +128,19 @@ class BaseSchema(Mapping):
         func: Callable,
         settings: Optional[hypothesis.settings] = None,
         seed: Optional[int] = None,
-    ) -> Generator[Tuple[Endpoint, DataGenerationMethod, Union[Callable, InvalidSchema]], None, None]:
+    ) -> Generator[Tuple[Endpoint, Optional[str], DataGenerationMethod, Union[Callable, InvalidSchema]], None, None]:
         """Generate all endpoints and Hypothesis tests for them."""
         test: Union[Callable, InvalidSchema]
         for endpoint in self.get_all_endpoints():
             for data_generation_method in self.data_generation_methods:
-                test = make_test_or_exception(endpoint, func, settings, seed, data_generation_method)
-                yield endpoint, data_generation_method, test
+                media_types: Union[Tuple[str, ...], Tuple[None]]
+                if endpoint.body is not None:
+                    media_types = tuple(endpoint.body)
+                else:
+                    media_types = (None,)  # No payload
+                for media_type in media_types:
+                    test = make_test_or_exception(endpoint, func, media_type, settings, seed, data_generation_method)
+                    yield endpoint, media_type, data_generation_method, test
 
     def parametrize(
         self,
@@ -268,6 +278,7 @@ class BaseSchema(Mapping):
         hooks: Optional[HookDispatcher] = None,
         feedback: Optional[Feedback] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        media_type: Optional[str] = None,
     ) -> SearchStrategy:
         raise NotImplementedError
 
