@@ -83,6 +83,11 @@ In order to grow the community of contributors and users, and allow me to devote
 
 Also, I occasionally write posts about Schemathesis in `my blog <https://dygalo.dev/>`_ and offer consulting services for businesses.
 
+Commercial support
+------------------
+
+If you are interested in the effective integration of Schemathesis to your private project, you can `schedule an appointment <https://app.acuityscheduling.com/schedule.php?owner=21203869&appointmentType=18278663>` and I will help you do that.
+
 Links
 -----
 
