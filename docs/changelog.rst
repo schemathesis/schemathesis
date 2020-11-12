@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`2.7.6`_ - 2020-11-12
+---------------------
+
 **Added**
 
 - An option to set data generation methods. At the moment, it includes only "positive", which means that Schemathesis will
@@ -1378,7 +1381,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.7.5...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.7.6...HEAD
+.. _2.7.6: https://github.com/schemathesis/schemathesis/compare/v2.7.5...v2.7.6
 .. _2.7.5: https://github.com/schemathesis/schemathesis/compare/v2.7.4...v2.7.5
 .. _2.7.4: https://github.com/schemathesis/schemathesis/compare/v2.7.3...v2.7.4
 .. _2.7.3: https://github.com/schemathesis/schemathesis/compare/v2.7.2...v2.7.3
