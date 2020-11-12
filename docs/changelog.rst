@@ -9,6 +9,10 @@ Changelog
 - An option to set data generation methods. At the moment, it includes only "positive", which means that Schemathesis will
   generate data that matches the schema.
 
+**Fixed**
+
+- Pinned dependency on ``attrs`` that caused an error on fresh installations. `#858`_
+
 `2.7.5`_ - 2020-11-09
 ---------------------
 
@@ -1481,6 +1485,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#858: https://github.com/schemathesis/schemathesis/issues/858
 .. _#851: https://github.com/schemathesis/schemathesis/issues/851
 .. _#841: https://github.com/schemathesis/schemathesis/issues/841
 .. _#839: https://github.com/schemathesis/schemathesis/issues/839
