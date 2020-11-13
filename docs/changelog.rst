@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Missed ``headers`` in ``Endpoint.partial_deepcopy``.
+
 `2.7.6`_ - 2020-11-12
 ---------------------
 
