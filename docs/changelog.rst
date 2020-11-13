@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`2.7.7`_ - 2020-11-13
+---------------------
+
 **Fixed**
 
 - Missed ``headers`` in ``Endpoint.partial_deepcopy``.
@@ -1385,7 +1388,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.7.6...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.7.7...HEAD
+.. _2.7.7: https://github.com/schemathesis/schemathesis/compare/v2.7.6...v2.7.7
 .. _2.7.6: https://github.com/schemathesis/schemathesis/compare/v2.7.5...v2.7.6
 .. _2.7.5: https://github.com/schemathesis/schemathesis/compare/v2.7.4...v2.7.5
 .. _2.7.4: https://github.com/schemathesis/schemathesis/compare/v2.7.3...v2.7.4
