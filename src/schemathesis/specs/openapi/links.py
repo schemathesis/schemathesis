@@ -201,7 +201,7 @@ class OpenAPILink(Direction):
             # Therefore the container is empty, otherwise it will be at least an empty object
             if container is None:
                 message = f"No such parameter in `{case.endpoint.verbose_name}`: `{name}`."
-                possibilities = [param["name"] for param in case.endpoint.definition.parameters]
+                possibilities = [param.name for param in case.endpoint.definition.parameters]
                 matches = get_close_matches(name, possibilities)
                 if matches:
                     message += f" Did you mean `{matches[0]}`?"
@@ -224,8 +224,8 @@ def get_container(case: Case, location: Optional[str], name: str) -> Optional[Di
         container_name = LOCATION_TO_CONTAINER[location]
     else:
         for param in case.endpoint.definition.parameters:
-            if param["name"] == name:
-                container_name = LOCATION_TO_CONTAINER[param["in"]]
+            if param.name == name:
+                container_name = LOCATION_TO_CONTAINER[param.location]
                 break
         else:
             raise ValueError(f"Parameter `{name}` is not defined in endpoint `{case.endpoint.verbose_name}`")

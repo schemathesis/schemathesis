@@ -86,7 +86,8 @@ def make_async_test(test: Callable) -> Callable:
 
 def add_examples(test: Callable, endpoint: Endpoint, hook_dispatcher: Optional[HookDispatcher] = None) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
-    examples: List[Case] = [get_single_example(strategy) for strategy in endpoint.get_strategies_from_examples()]
+    # TODO. fix examples
+    examples: List[Case] = []
     context = HookContext(endpoint)  # context should be passed here instead
     GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, examples)
     endpoint.schema.hooks.dispatch("before_add_examples", context, examples)

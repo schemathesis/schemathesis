@@ -4,6 +4,7 @@ import pytest
 
 import schemathesis
 from schemathesis.models import Endpoint, EndpointDefinition
+from schemathesis.specs.openapi.parameters import OpenAPI30Body
 
 from .utils import as_param, get_schema, integer
 
@@ -555,22 +556,31 @@ def test_complex_dereference(testdir, complex_schema):
             scope=f"{path.as_uri()}/root/paths/teapot.yaml#/TeapotCreatePath",
             parameters=[],
         ),
-        body={
-            "additionalProperties": False,
-            "description": "Test",
-            "properties": {
-                "profile": {
-                    "additionalProperties": False,
-                    "description": "Test",
-                    "properties": {"id": {"type": "integer"}},
-                    "required": ["id"],
-                    "type": "object",
+        body=[],
+        body_alternatives=[
+            OpenAPI30Body(
+                {
+                    "schema": {
+                        "additionalProperties": False,
+                        "description": "Test",
+                        "properties": {
+                            "profile": {
+                                "additionalProperties": False,
+                                "description": "Test",
+                                "properties": {"id": {"type": "integer"}},
+                                "required": ["id"],
+                                "type": "object",
+                            },
+                            "username": {"type": "string"},
+                        },
+                        "required": ["username", "profile"],
+                        "type": "object",
+                    }
                 },
-                "username": {"type": "string"},
-            },
-            "required": ["username", "profile"],
-            "type": "object",
-        },
+                is_alternative=True,
+                media_type="application/json",
+            )
+        ],
         schema=schema,
     )
 

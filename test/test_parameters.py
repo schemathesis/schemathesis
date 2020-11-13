@@ -125,18 +125,18 @@ def test_(case):
 
 
 def test_form_data(testdir):
-    # When parameter is specified for "form_data"
+    # When parameter is specified for "formData"
     testdir.make_test(
         """
 @schema.parametrize()
 @settings(max_examples=1, deadline=None)
 def test_(case):
-    assert_str(case.form_data["status"])
+    assert_str(case.body["status"])
     assert_requests_call(case)
         """,
         **as_param({"name": "status", "in": "formData", "required": True, "type": "string"}),
     )
-    # Then the generated test case should contain it in its `form_data` attribute
+    # Then the generated test case should contain it in its `body` attribute
     testdir.run_and_assert(passed=1)
 
 
@@ -216,13 +216,23 @@ def test_(case):
 
 
 def _assert_parameter(schema, schema_spec, location, expected=None):
-    expected = expected if expected is not None else [{"in": location, "name": "api_key", "type": "string"}]
+    # expected = expected if expected is not None else [{"in": location, "name": "api_key", "type": "string", "required": True}]
     # When security definition is defined as "apiKey"
     schema = schemathesis.from_dict(schema)
     if schema_spec == "swagger":
         endpoint = schema["/users"]["get"]
+        expected = (
+            expected
+            if expected is not None
+            else [{"in": location, "name": "api_key", "type": "string", "required": True}]
+        )
     else:
         endpoint = schema["/query"]["get"]
+        expected = (
+            expected
+            if expected is not None
+            else [{"in": location, "name": "api_key", "schema": {"type": "string"}, "required": True}]
+        )
     parameters = schema.security.get_security_definitions_as_parameters(
         schema.raw_schema, endpoint, schema.resolver, location
     )

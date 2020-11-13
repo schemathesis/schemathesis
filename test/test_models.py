@@ -5,8 +5,12 @@ import requests
 from hypothesis import given, settings
 
 import schemathesis
+from schemathesis import serializers
 from schemathesis.constants import USER_AGENT
 from schemathesis.models import Case, Endpoint, Request, Response
+from schemathesis.parameters import Parameter
+from schemathesis.serializers import SERIALIZERS
+from schemathesis.specs.openapi.parameters import OpenAPI20Parameter
 
 
 def test_path(swagger_20):
@@ -44,7 +48,6 @@ def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
         data = case.as_requests_kwargs()
     assert data == {
         "headers": {"User-Agent": USER_AGENT},
-        "json": None,
         "method": "GET",
         "params": None,
         "cookies": {"TOKEN": "secret"},
@@ -71,7 +74,6 @@ def test_as_requests_kwargs_override_user_agent(server, openapi2_base_url, swagg
     data = case.as_requests_kwargs(headers={"X-Key": "foo"})
     assert data == {
         "headers": expected,
-        "json": None,
         "method": "GET",
         "params": None,
         "cookies": None,
@@ -121,7 +123,6 @@ def test_case_partial_deepcopy(swagger_20):
         cookies={"TOKEN": "secret"},
         query={"a": 1},
         body={"b": 1},
-        form_data={"first": "John", "last": "Doe"},
     )
 
     copied_case = original_case.partial_deepcopy()
@@ -131,7 +132,6 @@ def test_case_partial_deepcopy(swagger_20):
     copied_case.cookies["TOKEN"] = "overwritten"
     copied_case.query["a"] = "overwritten"
     copied_case.body["b"] = "overwritten"
-    copied_case.form_data["first"] = "overwritten"
 
     assert original_case.endpoint.path == "/example/path"
     assert original_case.path_parameters["test"] == "test"
@@ -139,11 +139,17 @@ def test_case_partial_deepcopy(swagger_20):
     assert original_case.cookies["TOKEN"] == "secret"
     assert original_case.query["a"] == 1
     assert original_case.body["b"] == 1
-    assert original_case.form_data["first"] == "John"
 
 
 schema = schemathesis.from_path(SIMPLE_PATH)
 ENDPOINT = Endpoint("/api/success", "GET", {}, base_url="http://example.com", schema=schema)
+
+
+def make_case(**kwargs):
+    parameter = OpenAPI20Parameter({}, media_type="application/json")
+    if "body" in kwargs:
+        kwargs["serializers"] = {"body": serializers.get(parameter)}
+    return Case(ENDPOINT, **kwargs)
 
 
 @pytest.mark.parametrize(
@@ -151,40 +157,40 @@ ENDPOINT = Endpoint("/api/success", "GET", {}, base_url="http://example.com", sc
     (
         # Body can be of any primitive type supported by Open API
         (
-            Case(ENDPOINT, body={"test": 1}),
+            make_case(body={"test": 1}),
             f"requests.get('http://example.com/api/success', "
-            f"headers={{'User-Agent': '{USER_AGENT}'}}, json={{'test': 1}})",
+            f"headers={{'User-Agent': '{USER_AGENT}'}}, data='{{\"test\": 1}}')",
         ),
         (
-            Case(ENDPOINT, body=["foo"]),
-            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, json=['foo'])",
+            make_case(body=["foo"]),
+            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, data='[\"foo\"]')",
         ),
         (
-            Case(ENDPOINT, body="foo"),
-            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, json='foo')",
+            make_case(body="foo"),
+            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, data='\"foo\"')",
         ),
         (
-            Case(ENDPOINT, body=1),
-            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, json=1)",
+            make_case(body=1),
+            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, data='1')",
         ),
         (
-            Case(ENDPOINT, body=1.1),
-            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, json=1.1)",
+            make_case(body=1.1),
+            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, data='1.1')",
         ),
         (
-            Case(ENDPOINT, body=True),
-            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, json=True)",
+            make_case(body=True),
+            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, data='true')",
         ),
-        (Case(ENDPOINT), f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}})"),
+        (make_case(), f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}})"),
         (
-            Case(ENDPOINT, query={"a": 1}),
+            make_case(query={"a": 1}),
             f"requests.get('http://example.com/api/success', "
             f"headers={{'User-Agent': '{USER_AGENT}'}}, params={{'a': 1}})",
         ),
     ),
 )
 def test_get_code_to_reproduce(case, expected):
-    assert case.get_code_to_reproduce() == expected
+    assert case.get_code_to_reproduce() == expected, case.get_code_to_reproduce()
 
 
 def test_code_to_reproduce():

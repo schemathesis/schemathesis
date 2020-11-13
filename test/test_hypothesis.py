@@ -13,8 +13,8 @@ from schemathesis.specs.openapi._hypothesis import (
     filter_path_parameters,
     get_case_strategy,
     is_valid_query,
-    prepare_headers_schema,
 )
+from schemathesis.specs.openapi.parameters import OpenAPI20Parameter
 
 
 def make_endpoint(schema, **kwargs) -> Endpoint:
@@ -28,13 +28,17 @@ def test_get_examples(name, swagger_20):
     endpoint = make_endpoint(
         swagger_20,
         **{
-            name: {
-                "required": ["name"],
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {"name": {"type": "string"}},
-                "example": example,
-            }
+            name: [
+                OpenAPI20Parameter(
+                    {
+                        "in": name,
+                        "name": "name",
+                        "required": True,
+                        "type": "string",
+                        "example": example,
+                    }
+                )
+            ]
         },
     )
     strategies = endpoint.get_strategies_from_examples()
@@ -49,13 +53,16 @@ def test_no_body_in_get(swagger_20):
         method="GET",
         definition=EndpointDefinition({}, {}, "foo", []),
         schema=swagger_20,
-        query={
-            "required": ["name"],
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {"name": {"type": "string"}},
-            "example": {"name": "John"},
-        },
+        query=[
+            OpenAPI20Parameter(
+                {
+                    "required": True,
+                    "in": "query",
+                    "type": "string",
+                    "example": "John",
+                }
+            )
+        ],
     )
     strategies = endpoint.get_strategies_from_examples()
     assert len(strategies) == 1
@@ -68,7 +75,16 @@ def test_invalid_body_in_get(swagger_20):
         method="GET",
         definition=EndpointDefinition({}, {}, "foo", []),
         schema=swagger_20,
-        body={"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
+        body=[
+            OpenAPI20Parameter(
+                {
+                    "name": "attributes",
+                    "in": "body",
+                    "required": True,
+                    "schema": {"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
+                }
+            )
+        ],
     )
     with pytest.raises(InvalidSchema, match=r"^Body parameters are defined for GET request.$"):
         get_case_strategy(endpoint)
@@ -82,7 +98,17 @@ def test_invalid_body_in_get_disable_validation(simple_schema):
         method="GET",
         definition=EndpointDefinition({}, {}, "foo", []),
         schema=schema,
-        body={"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
+        body=[
+            OpenAPI20Parameter(
+                {
+                    "name": "attributes",
+                    "in": "body",
+                    "required": True,
+                    "schema": {"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
+                },
+                media_type="application/json",
+            )
+        ],
     )
     strategy = get_case_strategy(endpoint)
 
@@ -99,12 +125,11 @@ def test_custom_strategies(swagger_20):
     register_string_format("even_4_digits", strategies.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
     endpoint = make_endpoint(
         swagger_20,
-        query={
-            "required": ["id"],
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {"id": {"type": "string", "format": "even_4_digits"}},
-        },
+        query=[
+            OpenAPI20Parameter(
+                {"name": "id", "in": "query", "required": True, "type": "string", "format": "even_4_digits"}
+            )
+        ],
     )
     result = get_case_strategy(endpoint).example()
     assert len(result.query["id"]) == 4
@@ -120,27 +145,32 @@ def test_register_default_strategies():
 def test_default_strategies_binary(swagger_20):
     endpoint = make_endpoint(
         swagger_20,
-        form_data={
-            "required": ["file"],
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {"file": {"type": "string", "format": "binary"}},
-        },
+        body=[
+            OpenAPI20Parameter(
+                {
+                    "name": "upfile",
+                    "in": "formData",
+                    "type": "file",
+                    "required": True,
+                },
+                media_type="multipart/form-data",
+            )
+        ],
     )
     result = get_case_strategy(endpoint).example()
-    assert isinstance(result.form_data["file"], bytes)
+    assert isinstance(result.body["upfile"], bytes)
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_default_strategies_bytes(swagger_20):
     endpoint = make_endpoint(
         swagger_20,
-        body={
-            "required": ["byte"],
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {"byte": {"type": "string", "format": "byte"}},
-        },
+        body=[
+            OpenAPI20Parameter(
+                {"in": "body", "name": "byte", "required": True, "schema": {"type": "string", "format": "byte"}},
+                media_type="application/octet-stream",
+            )
+        ],
     )
     result = get_case_strategy(endpoint).example()
     assert isinstance(result.body["byte"], str)
@@ -171,12 +201,7 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
         definition=EndpointDefinition({}, {}, "foo", []),
         schema=swagger_20,
         base_url=openapi2_base_url,
-        headers={
-            "properties": {"api_key": definition},
-            "additionalProperties": False,
-            "type": "object",
-            "required": ["api_key"],
-        },
+        headers=[OpenAPI20Parameter(definition)],
     )
 
     @given(case=get_case_strategy(endpoint))
@@ -287,6 +312,7 @@ def test_is_valid_query_strategy():
     test()
 
 
+# TODO .move this test
 def test_prepare_headers_schema():
     schema = {
         "properties": {"api_key": {"name": "api_key", "in": "header"}},

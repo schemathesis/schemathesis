@@ -6,7 +6,22 @@ from contextlib import contextmanager
 from copy import deepcopy
 from enum import IntEnum
 from logging import LogRecord
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    Generic,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import attr
@@ -18,6 +33,7 @@ from starlette.testclient import TestClient as ASGIClient
 
 from .constants import USER_AGENT, DataGenerationMethod
 from .exceptions import CheckFailed, InvalidSchema, get_grouped_exception
+from .parameters import Parameter
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse, get_response_payload
 
@@ -51,10 +67,11 @@ class Case:  # pylint: disable=too-many-public-methods
     cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
     query: Optional[Query] = attr.ib(default=None)  # pragma: no mutate
     body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
-    form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
+    # form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
 
     feedback: "Feedback" = attr.ib(default=None)  # pragma: no mutate
     source: Optional[CaseSource] = attr.ib(default=None)  # pragma: no mutate
+    serializers: Dict[str, Callable[[Any], Dict[str, Any]]] = attr.ib(repr=False, factory=dict)  # pragma: no mutate
 
     def __repr__(self) -> str:
         parts = [f"{self.__class__.__name__}("]
@@ -121,7 +138,6 @@ class Case:  # pylint: disable=too-many-public-methods
             "Cookies": self.cookies,
             "Query": self.query,
             "Body": self.body,
-            "Form data": self.form_data,
         }
         max_length = max(map(len, output))
         template = f"{{:<{max_length}}} : {{}}"
@@ -199,15 +215,19 @@ class Case:  # pylint: disable=too-many-public-methods
         base_url = self._get_base_url(base_url)
         formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
         url = urljoin(base_url + "/", formatted_path)
-        # Form data and body are mutually exclusive
-        extra: Dict[str, Optional[Body]]
-        if self.form_data:
-            files, data = self.endpoint.prepare_multipart(self.form_data)
-            extra = {"files": files, "data": data}
-        elif is_multipart(self.body):
-            extra = {"data": self.body}
+        # TODO. add proper content type
+        # if self.form_data:
+        #     files, data = self.endpoint.prepare_multipart(self.form_data)
+        #     extra = {"files": files, "data": data}
+        # elif is_multipart(self.body):
+        #     extra = {"data": self.body}
+        # else:
+        #     extra = {"json": self.body}
+        extra: Dict  # TODO. be more specific
+        if "body" in self.serializers:
+            extra = self.serializers["body"](self.body)
         else:
-            extra = {"json": self.body}
+            extra = {}
         return {
             "method": self.method,
             "url": url,
@@ -247,16 +267,11 @@ class Case:  # pylint: disable=too-many-public-methods
     def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
         final_headers = self._get_headers(headers)
-        extra: Dict[str, Optional[Body]]
-        if self.form_data:
-            extra = {"data": self.form_data}
-            final_headers = final_headers or {}
-            if "multipart/form-data" in self.endpoint.get_request_payload_content_types():
-                final_headers.setdefault("Content-Type", "multipart/form-data")
-        elif is_multipart(self.body):
-            extra = {"data": self.body}
+        extra: Dict
+        if "body" in self.serializers:
+            extra = self.serializers["body"](self.body)
         else:
-            extra = {"json": self.body}
+            extra = {}
         return {
             "method": self.method,
             "path": self.endpoint.schema.get_full_path(self.formatted_path),
@@ -352,7 +367,6 @@ class Case:  # pylint: disable=too-many-public-methods
             cookies=deepcopy(self.cookies),
             query=deepcopy(self.query),
             body=deepcopy(self.body),
-            form_data=deepcopy(self.form_data),
         )
 
 
@@ -390,10 +404,6 @@ def cookie_handler(client: werkzeug.Client, cookies: Optional[Cookies]) -> Gener
             client.delete_cookie("localhost", key)
 
 
-def empty_object() -> Dict[str, Any]:
-    return {"properties": {}, "additionalProperties": False, "type": "object", "required": []}
-
-
 @attr.s(slots=True)  # pragma: no mutate
 class EndpointDefinition:
     """A wrapper to store not resolved endpoint definitions.
@@ -406,11 +416,14 @@ class EndpointDefinition:
     raw: Dict[str, Any] = attr.ib()  # pragma: no mutate
     resolved: Dict[str, Any] = attr.ib()  # pragma: no mutate
     scope: str = attr.ib()  # pragma: no mutate
-    parameters: List[Dict[str, Any]] = attr.ib()  # pragma: no mutate
+    parameters: Sequence[Parameter] = attr.ib()  # pragma: no mutate
+
+
+P = TypeVar("P", bound=Parameter)
 
 
 @attr.s(slots=True)  # pragma: no mutate
-class Endpoint:
+class Endpoint(Generic[P]):
     """A container that could be used for test cases generation."""
 
     # `path` does not contain `basePath`
@@ -422,12 +435,14 @@ class Endpoint:
     schema: "BaseSchema" = attr.ib()  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
-    path_parameters: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
-    headers: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
-    cookies: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
-    query: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
-    body: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
-    form_data: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
+    path_parameters: List[P] = attr.ib(factory=list)  # pragma: no mutate
+    headers: List[P] = attr.ib(factory=list)  # pragma: no mutate
+    cookies: List[P] = attr.ib(factory=list)  # pragma: no mutate
+    query: List[P] = attr.ib(factory=list)  # pragma: no mutate
+    # Separate body parameters that are parts of the same payload
+    body: List[P] = attr.ib(factory=list)  # pragma: no mutate
+    # Alternative payload variants
+    body_alternatives: List[P] = attr.ib(factory=list)  # pragma: no mutate
 
     @property
     def verbose_name(self) -> str:
@@ -440,6 +455,21 @@ class Endpoint:
     @property
     def links(self) -> Dict[str, Dict[str, Any]]:
         return self.schema.get_links(self)
+
+    def add_parameter(self, parameter: P) -> None:
+        if parameter.is_alternative:
+            self.body_alternatives.append(parameter)
+        else:
+            lookup_table = {
+                "path": self.path_parameters,
+                "header": self.headers,
+                "cookie": self.cookies,
+                "query": self.query,
+                "body": self.body,
+            }
+            if parameter.location in lookup_table:
+                container = lookup_table[parameter.location]
+                container.append(parameter)
 
     def as_strategy(
         self,
@@ -480,7 +510,7 @@ class Endpoint:
             cookies=deepcopy(self.cookies),
             query=deepcopy(self.query),
             body=deepcopy(self.body),
-            form_data=deepcopy(self.form_data),
+            # TODO. copy alternatives
         )
 
     def clone(self, **components: Any) -> "Endpoint":
@@ -497,7 +527,6 @@ class Endpoint:
             headers=components["headers"],
             cookies=components["cookies"],
             body=components["body"],
-            form_data=self.form_data,
         )
 
     def make_case(
@@ -508,7 +537,6 @@ class Endpoint:
         cookies: Optional[Cookies] = None,
         query: Optional[Query] = None,
         body: Optional[Body] = None,
-        form_data: Optional[FormData] = None,
     ) -> Case:
         return Case(
             endpoint=self,
@@ -517,7 +545,6 @@ class Endpoint:
             cookies=cookies,
             query=query,
             body=body,
-            form_data=form_data,
         )
 
     @property

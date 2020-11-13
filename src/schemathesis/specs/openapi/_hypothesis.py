@@ -1,21 +1,21 @@
 import re
 from base64 import b64encode
 from functools import partial
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, cast
 from urllib.parse import quote_plus
 
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from requests.auth import _basic_auth_str
 
-from ... import utils
+from ... import serializers, utils
 from ...constants import DataGenerationMethod
-from ...exceptions import InvalidSchema
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import Case, Endpoint
 from ...stateful import Feedback
+from .parameters import OpenAPIParameter
 
-PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
+PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
 SLASH = "/"
 STRING_FORMATS = {}
 
@@ -69,6 +69,9 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
     return True
 
 
+T = TypeVar("T")
+
+
 def get_case_strategy(
     endpoint: Endpoint,
     hooks: Optional[HookDispatcher] = None,
@@ -79,62 +82,65 @@ def get_case_strategy(
 
     Path & endpoint are static, the others are JSON schemas.
     """
-    strategies = {}
-    static_kwargs: Dict[str, Any] = {"feedback": feedback}
-    for parameter in PARAMETERS:
-        value = getattr(endpoint, parameter)
-        if value is not None:
-            location = {"headers": "header", "cookies": "cookie", "path_parameters": "path"}.get(parameter, parameter)
-            strategies[parameter] = prepare_strategy(
-                parameter, value, endpoint.get_hypothesis_conversions(location), data_generation_method
-            )
-        else:
-            static_kwargs[parameter] = None
-    return _get_case_strategy(endpoint, static_kwargs, strategies, hooks)
 
+    to_strategy = {DataGenerationMethod.positive: make_positive_strategy}[data_generation_method]
 
-def to_bytes(value: Union[str, bytes, int, bool, float]) -> bytes:
-    return str(value).encode(errors="ignore")
+    @st.composite  # type: ignore
+    def generate_case(draw: Callable) -> Any:
+        kwargs: Dict[str, Any] = {}
+        _serializers = {}
+        if endpoint.body_alternatives:
+            options = [parameter for parameter in endpoint.body_alternatives if serializers.can_serialize(parameter)]
+            if options:
+                # TODO. what if there is no serializer?
+                body = draw(st.sampled_from(options))
+                body_schema = body.as_json_schema()
+                kwargs["body"] = draw(to_strategy(body_schema))
+                _serializers["body"] = cast(Callable[[Any], Dict[str, Any]], serializers.get(body))
+        elif endpoint.body:
+            body_schema = parameters_to_json_schema(endpoint.body)
+            kwargs["body"] = draw(to_strategy(body_schema))
+            serializer = serializers.get(endpoint.body[0])
+            if serializer:  # TODO. what if there is no serializer?
+                _serializers["body"] = serializer
+        if endpoint.path_parameters:
+            serialize = endpoint.get_hypothesis_conversions("path")
+            schema = parameters_to_json_schema(endpoint.path_parameters)
+            strategy = to_strategy(schema)
+            if serialize is not None:
+                strategy = strategy.map(serialize)
+            strategy = strategy.filter(filter_path_parameters).map(quote_all)
+            kwargs["path_parameters"] = draw(strategy)
+        for name in ("path_parameters", "headers", "cookies", "query"):
+            parameters = getattr(endpoint, name)
+            if parameters:
+                schema = parameters_to_json_schema(parameters)
+                strategy = to_strategy(schema)
+                location = {"headers": "header", "cookies": "cookie", "path_parameters": "path"}.get(name, name)
+                serialize = endpoint.get_hypothesis_conversions(location)
+                if serialize is not None:
+                    strategy = strategy.map(serialize)
+                if name == "path_parameters":
+                    strategy = strategy.filter(filter_path_parameters).map(quote_all)
+                elif name in ("headers", "cookies"):
+                    strategy = strategy.filter(is_valid_header)
+                elif name == "query":
+                    strategy = strategy.filter(is_valid_query)
+                kwargs[name] = draw(strategy)
+        return Case(endpoint=endpoint, serializers=_serializers, **kwargs)
 
-
-def prepare_form_data(form_data: Dict[str, Any]) -> Dict[str, Any]:
-    for name, value in form_data.items():
-        if isinstance(value, list):
-            form_data[name] = [to_bytes(item) if not isinstance(item, (bytes, str, int)) else item for item in value]
-        elif not isinstance(value, (bytes, str, int)):
-            form_data[name] = to_bytes(value)
-    return form_data
-
-
-def prepare_headers_schema(value: Dict[str, Any]) -> Dict[str, Any]:
-    """Improve schemas for headers.
-
-    Headers are strings, but it is not always explicitly defined in the schema. By preparing them properly we
-    can achieve significant performance improvements for such cases.
-    For reference (my machine) - running a single test with 100 examples with the resulting strategy:
-      - without: 4.37 s
-      - with: 294 ms
-
-    It also reduces the number of cases when the "filter_too_much" health check fails during testing.
-    """
-    for schema in value.get("properties", {}).values():
-        schema.setdefault("type", "string")
-    return value
+    return generate_case()
 
 
 def prepare_strategy(
     parameter: str,
-    value: Dict[str, Any],
+    schema: Dict[str, Any],
     map_func: Optional[Callable],
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
 ) -> st.SearchStrategy:
     """Create a strategy for a schema and add location-specific filters & maps."""
-    if parameter in ("headers", "cookies"):
-        value = prepare_headers_schema(value)
-    if parameter == "form_data":
-        value.setdefault("type", "object")
     to_strategy = {DataGenerationMethod.positive: make_positive_strategy}[data_generation_method]
-    strategy = to_strategy(value)
+    strategy = to_strategy(schema)
     if map_func is not None:
         strategy = strategy.map(map_func)
     if parameter == "path_parameters":
@@ -143,9 +149,51 @@ def prepare_strategy(
         strategy = strategy.filter(is_valid_header)  # type: ignore
     elif parameter == "query":
         strategy = strategy.filter(is_valid_query)  # type: ignore
-    elif parameter == "form_data":
-        strategy = strategy.map(prepare_form_data)  # type: ignore
     return strategy
+
+
+def parameters_to_json_schema(parameters: List[OpenAPIParameter]) -> Dict[str, Any]:
+    """Create an "object" JSON schema from a list of Open API parameters.
+
+    :param List[OpenAPIParameter] parameters: A list of Open API parameters, related to the same location. All of
+        them are expected to have the same "in" value.
+
+    For each input parameter there will be a property in the output schema.
+
+    This:
+
+        [
+            {
+                "in": "query",
+                "name": "id",
+                "type": "string",
+                "required": True
+            }
+        ]
+
+    Will become:
+
+        {
+            "properties": {
+                "id": {"type": "string"}
+            },
+            "additionalProperties": False,
+            "type": "object",
+            "required": ["id"]
+        }
+
+    We need this transformation for locations that imply multiple components with unique name within the same location.
+    For example, "query" - first, we generate an object, that contains all defined parameters and then serialize it
+    to the proper format.
+    """
+    properties = {}
+    required = []
+    for parameter in parameters:
+        name = parameter.name
+        properties[name] = parameter.as_json_schema()
+        if parameter.is_required:
+            required.append(name)
+    return {"properties": properties, "additionalProperties": False, "type": "object", "required": required}
 
 
 def make_positive_strategy(schema: Dict[str, Any]) -> st.SearchStrategy:
@@ -183,11 +231,6 @@ def _get_case_strategy(
     hook_dispatcher: Optional[HookDispatcher] = None,
 ) -> st.SearchStrategy[Case]:
     static_parameters: Dict[str, Any] = {"endpoint": endpoint, **extra_static_parameters}
-    if endpoint.schema.validate_schema and endpoint.method.upper() == "GET":
-        if endpoint.body is not None:
-            raise InvalidSchema("Body parameters are defined for GET request.")
-        static_parameters["body"] = None
-        strategies.pop("body", None)
     context = HookContext(endpoint)
     _apply_hooks(strategies, GLOBAL_HOOK_DISPATCHER, context)
     _apply_hooks(strategies, endpoint.schema.hooks, context)

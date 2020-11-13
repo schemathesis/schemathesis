@@ -123,7 +123,7 @@ def _print_case(case: Case) -> str:
     endpoint = f"state.schema['{case.endpoint.path}']['{case.endpoint.method.upper()}']"
     data = [
         f"{name}={getattr(case, name)}"
-        for name in ("path_parameters", "headers", "cookies", "query", "body", "form_data")
+        for name in ("path_parameters", "headers", "cookies", "query", "body")
         if getattr(case, name) is not None
     ]
     return f"{endpoint}.make_case({', '.join(data)})"

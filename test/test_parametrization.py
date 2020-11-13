@@ -701,7 +701,7 @@ def test_loose_multipart_definition():
     @given(case=schema.endpoints["/body"]["POST"].as_strategy())
     @settings(max_examples=5)
     def test(case):
-        assert isinstance(case.form_data, dict)
+        assert isinstance(case.body, dict)
 
     # And the resulting values should be valid
     test()

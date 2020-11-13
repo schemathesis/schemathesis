@@ -75,9 +75,10 @@ def get_request_body_example_from_properties(endpoint_def: Dict[str, Any]) -> Di
 def get_static_parameters_from_example(endpoint: Endpoint) -> Dict[str, Any]:
     static_parameters = {}
     for name in PARAMETERS:
-        parameter = getattr(endpoint, name)
-        if parameter is not None and "example" in parameter:
-            static_parameters[name] = parameter["example"]
+        parameters = getattr(endpoint, name)
+        examples = {parameter.example for parameter in parameters if parameter.example}
+        if examples:
+            static_parameters[name] = examples
     return static_parameters
 
 
