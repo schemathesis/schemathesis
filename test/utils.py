@@ -7,6 +7,7 @@ from typing import Any, Callable, Dict, Type
 import click
 import pytest
 import requests
+import urllib3
 import yaml
 
 import schemathesis
@@ -117,7 +118,7 @@ def assert_datetime(value: str) -> bool:
 
 def assert_requests_call(case: Case):
     """Verify that all generated input parameters are usable by requests."""
-    with pytest.raises(requests.exceptions.ConnectionError):
+    with pytest.raises((requests.exceptions.ConnectionError, urllib3.exceptions.NewConnectionError)):
         case.call(base_url="http://127.0.0.1:1")
 
 
