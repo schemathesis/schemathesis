@@ -462,7 +462,7 @@ class Endpoint:
             app=self.app,  # not deepcopyable
             base_url=self.base_url,  # string, immutable
             path_parameters=deepcopy(self.path_parameters),
-            headers=deepcopy(self.path_parameters),
+            headers=deepcopy(self.headers),
             cookies=deepcopy(self.cookies),
             query=deepcopy(self.query),
             body=deepcopy(self.body),
