@@ -31,6 +31,7 @@ import werkzeug
 from hypothesis.strategies import SearchStrategy
 from starlette.testclient import TestClient as ASGIClient
 
+from . import serializers
 from .constants import USER_AGENT, DataGenerationMethod
 from .exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from .parameters import Parameter
@@ -67,11 +68,10 @@ class Case:  # pylint: disable=too-many-public-methods
     cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
     query: Optional[Query] = attr.ib(default=None)  # pragma: no mutate
     body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
-    # form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
 
-    feedback: "Feedback" = attr.ib(default=None)  # pragma: no mutate
+    feedback: Optional["Feedback"] = attr.ib(default=None)  # pragma: no mutate
     source: Optional[CaseSource] = attr.ib(default=None)  # pragma: no mutate
-    serializers: Dict[str, Callable[[Any], Dict[str, Any]]] = attr.ib(repr=False, factory=dict)  # pragma: no mutate
+    media_type: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
     def __repr__(self) -> str:
         parts = [f"{self.__class__.__name__}("]
@@ -201,6 +201,8 @@ class Case:  # pylint: disable=too-many-public-methods
 
     def _get_headers(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         final_headers = self.headers.copy() if self.headers is not None else {}
+        if self.media_type:
+            final_headers["Content-Type"] = self.media_type
         if headers:
             final_headers.update(headers)
         if "user-agent" not in {header.lower() for header in final_headers}:
@@ -215,17 +217,12 @@ class Case:  # pylint: disable=too-many-public-methods
         base_url = self._get_base_url(base_url)
         formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
         url = urljoin(base_url + "/", formatted_path)
-        # TODO. add proper content type
-        # if self.form_data:
-        #     files, data = self.endpoint.prepare_multipart(self.form_data)
-        #     extra = {"files": files, "data": data}
-        # elif is_multipart(self.body):
-        #     extra = {"data": self.body}
-        # else:
-        #     extra = {"json": self.body}
-        extra: Dict  # TODO. be more specific
-        if "body" in self.serializers:
-            extra = self.serializers["body"](self.body)
+        extra: Dict[str, Any]
+        if self.media_type is not None:
+            serializer = serializers.get(self.media_type)
+            if serializer is None:
+                raise RuntimeError(f"Can't serialize `{self.media_type}`")
+            extra = serializer(self.body)
         else:
             extra = {}
         return {
@@ -267,9 +264,16 @@ class Case:  # pylint: disable=too-many-public-methods
     def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
         final_headers = self._get_headers(headers)
-        extra: Dict
-        if "body" in self.serializers:
-            extra = self.serializers["body"](self.body)
+        extra: Dict[str, Any]
+        if self.media_type is not None:
+            serializer = serializers.get(self.media_type)
+            if serializer is None:
+                # TODO. suggest the user register a serializer, or pass kwargs to requests manually
+                raise RuntimeError(f"Can't serialize `{self.media_type}`")
+            extra = serializer(self.body)
+            if "files" in extra:
+                # TODO. It should return the right format
+                extra = {"data": extra["files"]}
         else:
             extra = {}
         return {

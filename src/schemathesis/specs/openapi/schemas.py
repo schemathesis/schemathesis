@@ -410,7 +410,7 @@ class SwaggerV20(BaseOpenAPISchema):
             if location == "formData":
                 # TODO. CHeck the following
                 # If no "consumes" is specified, then it is "application/x-www-form-urlencoded"
-                for media_type in media_types or ("application/x-www-form-urlencoded",):
+                for media_type in media_types or ("multipart/form-data",):
                     parameters.append(self.parameter_cls(definition=definition, media_type=media_type))
             elif location == "body":
                 # "application/json" is implied by default

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Generator
+from typing import Any, ClassVar, Dict, Generator
 
 import attr
 
@@ -14,8 +14,8 @@ class OpenAPIParameter(Parameter):
     Open API 3.0: https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#parameter-object
     """
 
-    example_field: str
-    examples_field: str
+    example_field: ClassVar[str]
+    examples_field: ClassVar[str]
 
     def prepare_schema(self, schema: Dict[str, Any]) -> Dict[str, Any]:
         """Return an updated underlying parameter definition.

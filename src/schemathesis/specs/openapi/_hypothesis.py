@@ -1,14 +1,14 @@
 import re
 from base64 import b64encode
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 from urllib.parse import quote_plus
 
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from requests.auth import _basic_auth_str
 
-from ... import serializers, utils
+from ... import utils
 from ...constants import DataGenerationMethod
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import Case, Endpoint
@@ -69,6 +69,37 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
     return True
 
 
+def prepare_form_data(form_data: Dict[str, Any]) -> Dict[str, Any]:
+    for name, value in form_data.items():
+        if isinstance(value, list):
+            form_data[name] = [to_bytes(item) if not isinstance(item, (bytes, str, int)) else item for item in value]
+        elif not isinstance(value, (bytes, str, int)):
+            form_data[name] = to_bytes(value)
+    return form_data
+
+
+def to_bytes(value: Union[str, bytes, int, bool, float]) -> bytes:
+    return str(value).encode(errors="ignore")
+
+
+def prepare_multipart(schema: Dict[str, Any], value: Dict[str, Any]) -> List:
+    value = prepare_form_data(value)
+    files = []
+    for name, property_schema in schema.get("properties", {}).items():
+        if name in value:
+            if isinstance(value[name], list):
+                files.extend([(name, item) for item in value[name]])
+            elif is_file(property_schema):
+                files.append((name, value[name]))
+            else:
+                files.append((name, (None, value[name])))
+    return files
+
+
+def is_file(schema: Dict[str, Any]) -> bool:
+    return schema.get("format") in ("binary", "base64")
+
+
 T = TypeVar("T")
 
 
@@ -88,29 +119,21 @@ def get_case_strategy(
     @st.composite  # type: ignore
     def generate_case(draw: Callable) -> Any:
         kwargs: Dict[str, Any] = {}
-        _serializers = {}
+        media_type = None
         if endpoint.body_alternatives:
-            options = [parameter for parameter in endpoint.body_alternatives if serializers.can_serialize(parameter)]
-            if options:
-                # TODO. what if there is no serializer?
-                body = draw(st.sampled_from(options))
-                body_schema = body.as_json_schema()
-                kwargs["body"] = draw(to_strategy(body_schema))
-                _serializers["body"] = cast(Callable[[Any], Dict[str, Any]], serializers.get(body))
-        elif endpoint.body:
-            body_schema = parameters_to_json_schema(endpoint.body)
-            kwargs["body"] = draw(to_strategy(body_schema))
-            serializer = serializers.get(endpoint.body[0])
-            if serializer:  # TODO. what if there is no serializer?
-                _serializers["body"] = serializer
-        if endpoint.path_parameters:
-            serialize = endpoint.get_hypothesis_conversions("path")
-            schema = parameters_to_json_schema(endpoint.path_parameters)
+            body = draw(st.sampled_from(endpoint.body_alternatives))
+            schema = body.as_json_schema()
             strategy = to_strategy(schema)
-            if serialize is not None:
-                strategy = strategy.map(serialize)
-            strategy = strategy.filter(filter_path_parameters).map(quote_all)
-            kwargs["path_parameters"] = draw(strategy)
+            if body.media_type == "multipart/form-data":
+                # TODO. multipart preparation is different for Open API 2 / 3
+                strategy = strategy.map(lambda v: prepare_multipart(schema, v))
+            kwargs["body"] = draw(strategy)
+            media_type = body.media_type
+        elif endpoint.body:
+            schema = parameters_to_json_schema(endpoint.body)
+            strategy = to_strategy(schema)
+            kwargs["body"] = draw(strategy)
+            media_type = endpoint.body[0].media_type
         for name in ("path_parameters", "headers", "cookies", "query"):
             parameters = getattr(endpoint, name)
             if parameters:
@@ -127,7 +150,7 @@ def get_case_strategy(
                 elif name == "query":
                     strategy = strategy.filter(is_valid_query)
                 kwargs[name] = draw(strategy)
-        return Case(endpoint=endpoint, serializers=_serializers, **kwargs)
+        return Case(endpoint=endpoint, feedback=feedback, media_type=media_type, **kwargs)
 
     return generate_case()
 
