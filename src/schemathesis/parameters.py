@@ -29,12 +29,6 @@ class Parameter:
 
     # The parameter definition in the language acceptable by the API
     definition: Any = attr.ib()
-    # TODO. improve
-    # Doesn't make sense for individual parameters, that are part of something bigger
-    media_type: Optional[str] = attr.ib(default=None)
-    # Whether this parameter is considered as an alternative payload.
-    # TODO. expand what it means
-    is_alternative: bool = attr.ib(default=False)
 
     def __attrs_post_init__(self) -> None:
         # Do not use `converter=deepcopy` on the field, due to mypy not detecting type annotations

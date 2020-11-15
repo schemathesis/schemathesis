@@ -1,28 +1,25 @@
-from typing import Any, ClassVar, Dict, Generator
+from typing import Any, ClassVar, Dict, Generator, List, Tuple
 
 import attr
 
 from ...parameters import Example, Parameter
-from .converter import to_json_schema
+from .converter import to_json_schema_recursive
+
+# TODO. improve inheritance with composition? there should be no many "example_field", etc.
 
 
 @attr.s(slots=True)
 class OpenAPIParameter(Parameter):
     """A single operation parameter.
 
-    Open API 2.0: https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#operationObject
+    Open API 2.0: https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#parameterObject
     Open API 3.0: https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#parameter-object
     """
 
     example_field: ClassVar[str]
     examples_field: ClassVar[str]
-
-    def prepare_schema(self, schema: Dict[str, Any]) -> Dict[str, Any]:
-        """Return an updated underlying parameter definition.
-
-        It might be needed to improve data generation performance.
-        """
-        raise NotImplementedError
+    nullable_field: ClassVar[str]
+    supported_jsonschema_keywords: ClassVar[Tuple[str, ...]]
 
     def iter_examples(self) -> Generator[Example, None, None]:
         """Iterate over all examples defined for the parameter."""
@@ -57,6 +54,10 @@ class OpenAPIParameter(Parameter):
     @property
     def is_required(self) -> bool:
         return self.definition.get("required", False)
+
+    @property
+    def is_header(self) -> bool:
+        raise NotImplementedError
 
     @property
     def example(self) -> Any:
@@ -95,91 +96,254 @@ class OpenAPIParameter(Parameter):
 
     def as_json_schema(self) -> Dict[str, Any]:
         """Convert parameter's definition to JSON Schema."""
-        schema = self._as_json_schema(self.definition)
-        return self.prepare_schema(schema)
+        schema = self.from_open_api_to_json_schema(self.definition)
+        return self.transform_keywords(schema)
 
-    def _as_json_schema(self, definition: Dict[str, Any]) -> Dict[str, Any]:
+    def transform_keywords(self, schema: Dict[str, Any]) -> Dict[str, Any]:
+        """Transform Open API specific keywords into JSON Schema compatible form."""
+        definition = to_json_schema_recursive(schema, self.nullable_field)
+        # Headers are strings, but it is not always explicitly defined in the schema. By preparing them properly we
+        # can achieve significant performance improvements for such cases.
+        # For reference (my machine) - running a single test with 100 examples with the resulting strategy:
+        #   - without: 4.37 s
+        #   - with: 294 ms
+        #
+        # It also reduces the number of cases when the "filter_too_much" health check fails during testing.
+        if self.is_header:
+            definition.setdefault("type", "string")
+        return definition
+
+    def from_open_api_to_json_schema(self, open_api_schema: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert Open API's `Schema` to JSON Schema."""
         return {
             key: value
-            for key, value in definition.items()
-            # Do not include keys not supported by JSON schema
-            if not (key == "required" and not isinstance(value, list))
+            for key, value in open_api_schema.items()
+            # Allow only supported keywords or vendor extensions
+            if key in self.supported_jsonschema_keywords or key.startswith("x-")
         }
 
 
 class OpenAPI20Parameter(OpenAPIParameter):
     example_field = "x-example"
     examples_field = "x-examples"
+    nullable_field = "x-nullable"
+    # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#schema-object
+    # Excluding informative keywords - `title`, `description`, `default`
+    # And `required`, because it has a different meaning here. It determines whether ot not this parameter is required
+    # or optional, which is not relevant because these parameters are later constructed into an "object" schema,
+    # and the value of this keyword is used there.
+    supported_jsonschema_keywords = (
+        "$ref",
+        "format",
+        "multipleOf",
+        "multipleOf",
+        "maximum",
+        "exclusiveMaximum",
+        "minimum",
+        "exclusiveMinimum",
+        "maxLength",
+        "minLength",
+        "pattern",
+        "maxItems",
+        "minItems",
+        "uniqueItems",
+        "maxProperties",
+        "minProperties",
+        "enum",
+        "type",
+    )
 
-    def prepare_schema(self, schema: Dict[str, Any]) -> Dict[str, Any]:
-        definition = to_json_schema(schema, "x-nullable")
-        if self.location == "header":
-            definition.setdefault("type", "string")
-            prepare_headers_schema(definition)
-        if self.media_type in ("multipart/form-data", "application/x-www-form-urlencoded"):
-            definition.setdefault("type", "object")
-        return definition
-
-    def _as_json_schema(self, definition: Dict[str, Any]) -> Dict[str, Any]:
-        if self.raw_location == "body":
-            definition = get_schema_from_parameter(definition)
-        return super()._as_json_schema(definition)
+    @property
+    def is_header(self) -> bool:
+        return self.location == "header"
 
 
 class OpenAPI30Parameter(OpenAPIParameter):
     example_field = "example"
     examples_field = "examples"
+    nullable_field = "nullable"
+    # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#schema-object
+    # Excluding informative keywords - `title`, `description`, `default`
+    supported_jsonschema_keywords = (
+        "multipleOf",
+        "maximum",
+        "exclusiveMaximum",
+        "minimum",
+        "exclusiveMinimum",
+        "maxLength",
+        "minLength",
+        "pattern",
+        "maxItems",
+        "minItems",
+        "uniqueItems",
+        "maxProperties",
+        "minProperties",
+        "required",
+        "enum",
+        "type",
+        "allOf",
+        "oneOf",
+        "anyOf",
+        "not",
+        "items",
+        "properties",
+        "additionalProperties",
+        "format",
+    )
 
-    def prepare_schema(self, schema: Dict[str, Any]) -> Dict[str, Any]:
-        definition = to_json_schema(schema, "nullable")
-        if self.media_type in ("multipart/form-data", "application/x-www-form-urlencoded"):
-            definition.setdefault("type", "object")
-        if self.location in ("header", "cookie"):
-            definition.setdefault("type", "string")
-        return definition
+    @property
+    def is_header(self) -> bool:
+        return self.location in ("header", "cookie")
 
-    def _as_json_schema(self, definition: Dict[str, Any]) -> Dict[str, Any]:
-        definition = get_schema_from_parameter(definition)
-        return super()._as_json_schema(definition)
+    def from_open_api_to_json_schema(self, open_api_schema: Dict[str, Any]) -> Dict[str, Any]:
+        open_api_schema = get_parameter_schema(open_api_schema)
+        return super().from_open_api_to_json_schema(open_api_schema)
 
 
-class OpenAPI30Body(OpenAPI30Parameter):
+@attr.s(slots=True)
+class OpenAPIBody(OpenAPIParameter):
+    media_type: str = attr.ib()
+
     @property
     def location(self) -> str:
         return "body"
 
     @property
     def name(self) -> str:
-        return "attributes"
+        # The name doesn't matter, but is here for the interface completeness.
+        return "body"
 
 
-def prepare_headers_schema(value: Dict[str, Any]) -> Dict[str, Any]:
-    """Improve schemas for headers.
+@attr.s(slots=True)
+class OpenAPI20Body(OpenAPIBody):
+    """Open API 2.0 body variant."""
 
-    Headers are strings, but it is not always explicitly defined in the schema. By preparing them properly we
-    can achieve significant performance improvements for such cases.
-    For reference (my machine) - running a single test with 100 examples with the resulting strategy:
-      - without: 4.37 s
-      - with: 294 ms
+    example_field = "x-example"
+    examples_field = "x-examples"
+    nullable_field = "x-nullable"
 
-    It also reduces the number of cases when the "filter_too_much" health check fails during testing.
+    def as_json_schema(self) -> Dict[str, Any]:
+        """Convert body definition to JSON Schema."""
+        # `schema` is required in Open API 2.0 bodies.
+        schema = self.definition["schema"]
+        return self.transform_keywords(schema)
+
+    def transform_keywords(self, schema: Dict[str, Any]) -> Dict[str, Any]:
+        # NOTE. Unlike Open API 3.0, forms are not handled here
+        return to_json_schema_recursive(schema, "x-nullable")
+
+
+@attr.s(slots=True)
+class OpenAPI30Body(OpenAPIBody):
+    """Open API 3.0 body variant.
+
+    We consider each media type defined in the schema as a separate variant, that can be chosen for generation.
+    The value of the `definition` field is essentially the Open API 3.0 `MediaType`.
     """
-    # TODO. not needed?
-    for schema in value.get("properties", {}).values():
-        schema.setdefault("type", "string")
-    return value
+
+    # `required` keyword is located above the schema for concrete media-type; therefore it is passed here explicitly
+    required: bool = attr.ib(default=False)
+    example_field = "example"
+    examples_field = "examples"
+    nullable_field = "nullable"
+
+    def as_json_schema(self) -> Dict[str, Any]:
+        """Convert body definition to JSON Schema."""
+        schema = get_media_type_schema(self.definition)
+        return self.transform_keywords(schema)
+
+    def transform_keywords(self, schema: Dict[str, Any]) -> Dict[str, Any]:
+        definition = to_json_schema_recursive(schema, "nullable")
+        if self.is_form:
+            definition.setdefault("type", "object")
+        return definition
+
+    @property
+    def is_form(self) -> bool:
+        """Whether this payload represent a form."""
+        return self.media_type in ("multipart/form-data", "application/x-www-form-urlencoded")
+
+    @property
+    def is_required(self) -> bool:
+        return self.required
 
 
-def get_schema_from_parameter(data: Dict[str, Any]) -> Dict[str, Any]:
+@attr.s(slots=True)
+class OpenAPI20CompositeBody(OpenAPIBody):
+    example_field = "x-example"
+    examples_field = "x-examples"
+    nullable_field = "x-nullable"
+
+    @classmethod
+    def from_parameters(cls, *parameters: Dict[str, Any], media_type: str) -> "OpenAPI20CompositeBody":
+        return cls(
+            definition=[OpenAPI20Parameter(parameter) for parameter in parameters],
+            media_type=media_type,
+        )
+
+    def as_json_schema(self) -> Dict[str, Any]:
+        """Composite body is transformed into an "object" JSON Schema."""
+        return parameters_to_json_schema(self.definition)
+
+
+def parameters_to_json_schema(parameters: List[OpenAPIParameter]) -> Dict[str, Any]:
+    """Create an "object" JSON schema from a list of Open API parameters.
+
+    :param List[OpenAPIParameter] parameters: A list of Open API parameters, related to the same location. All of
+        them are expected to have the same "in" value.
+
+    For each input parameter there will be a property in the output schema.
+
+    This:
+
+        [
+            {
+                "in": "query",
+                "name": "id",
+                "type": "string",
+                "required": True
+            }
+        ]
+
+    Will become:
+
+        {
+            "properties": {
+                "id": {"type": "string"}
+            },
+            "additionalProperties": False,
+            "type": "object",
+            "required": ["id"]
+        }
+
+    We need this transformation for locations that imply multiple components with unique name within the same location.
+    For example, "query" - first, we generate an object, that contains all defined parameters and then serialize it
+    to the proper format.
+    """
+    properties = {}
+    required = []
+    for parameter in parameters:
+        name = parameter.name
+        properties[name] = parameter.as_json_schema()
+        if parameter.is_required:
+            required.append(name)
+    return {"properties": properties, "additionalProperties": False, "type": "object", "required": required}
+
+
+def get_parameter_schema(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract `schema` from Open API 3.0 `Parameter`."""
     # In Open API 3.0 there could be "schema" or "content" field. They are mutually exclusive.
-    # TODO. check when it can be applied
     if "schema" in data:
         return data["schema"]
+    # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#fixed-fields-10
+    # > The map MUST only contain one entry.
     options = iter(data["content"].values())
-    return next(options)["schema"]
+    media_type_object = next(options)
+    return get_media_type_schema(media_type_object)
 
 
-# TODO. handle body
-# - Make body parameter more specific. Each has a media-type
-# - then endpoint.body is a list of possible
-# - How can we let the user modify "case"? save body serialization function in "case" for later?
+def get_media_type_schema(definition: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract `schema` from Open API 3.0 `MediaType`."""
+    # The `schema` keyword is optional and we treat it as the payload could be any value of the specified media type
+    # Note, the main reason to have this function is to have an explicit name for the action we're doing.
+    return definition.get("schema", {})

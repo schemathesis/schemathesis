@@ -71,6 +71,7 @@ class Case:  # pylint: disable=too-many-public-methods
 
     feedback: Optional["Feedback"] = attr.ib(default=None)  # pragma: no mutate
     source: Optional[CaseSource] = attr.ib(default=None)  # pragma: no mutate
+    # MediaType for cases with payload.For example, "application/json"
     media_type: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
     def __repr__(self) -> str:
@@ -443,10 +444,8 @@ class Endpoint(Generic[P]):
     headers: List[P] = attr.ib(factory=list)  # pragma: no mutate
     cookies: List[P] = attr.ib(factory=list)  # pragma: no mutate
     query: List[P] = attr.ib(factory=list)  # pragma: no mutate
-    # Separate body parameters that are parts of the same payload
+    # Each parameter in the "body" list is considered as an alternative payload type
     body: List[P] = attr.ib(factory=list)  # pragma: no mutate
-    # Alternative payload variants
-    body_alternatives: List[P] = attr.ib(factory=list)  # pragma: no mutate
 
     @property
     def verbose_name(self) -> str:
@@ -461,19 +460,16 @@ class Endpoint(Generic[P]):
         return self.schema.get_links(self)
 
     def add_parameter(self, parameter: P) -> None:
-        if parameter.is_alternative:
-            self.body_alternatives.append(parameter)
-        else:
-            lookup_table = {
-                "path": self.path_parameters,
-                "header": self.headers,
-                "cookie": self.cookies,
-                "query": self.query,
-                "body": self.body,
-            }
-            if parameter.location in lookup_table:
-                container = lookup_table[parameter.location]
-                container.append(parameter)
+        lookup_table = {
+            "path": self.path_parameters,
+            "header": self.headers,
+            "cookie": self.cookies,
+            "query": self.query,
+            "body": self.body,
+        }
+        if parameter.location in lookup_table:
+            container = lookup_table[parameter.location]
+            container.append(parameter)
 
     def as_strategy(
         self,

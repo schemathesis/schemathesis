@@ -146,10 +146,7 @@ ENDPOINT = Endpoint("/api/success", "GET", {}, base_url="http://example.com", sc
 
 
 def make_case(**kwargs):
-    parameter = OpenAPI20Parameter({}, media_type="application/json")
-    if "body" in kwargs:
-        kwargs["serializers"] = {"body": serializers.get(parameter)}
-    return Case(ENDPOINT, **kwargs)
+    return Case(ENDPOINT, media_type="application/json", **kwargs)
 
 
 @pytest.mark.parametrize(

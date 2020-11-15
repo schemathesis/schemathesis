@@ -13,7 +13,7 @@ from ...constants import DataGenerationMethod
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import Case, Endpoint
 from ...stateful import Feedback
-from .parameters import OpenAPIParameter
+from .parameters import parameters_to_json_schema
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
 SLASH = "/"
@@ -120,8 +120,8 @@ def get_case_strategy(
     def generate_case(draw: Callable) -> Any:
         kwargs: Dict[str, Any] = {}
         media_type = None
-        if endpoint.body_alternatives:
-            body = draw(st.sampled_from(endpoint.body_alternatives))
+        if endpoint.body:
+            body = draw(st.sampled_from(endpoint.body))
             schema = body.as_json_schema()
             strategy = to_strategy(schema)
             if body.media_type == "multipart/form-data":
@@ -129,11 +129,6 @@ def get_case_strategy(
                 strategy = strategy.map(lambda v: prepare_multipart(schema, v))
             kwargs["body"] = draw(strategy)
             media_type = body.media_type
-        elif endpoint.body:
-            schema = parameters_to_json_schema(endpoint.body)
-            strategy = to_strategy(schema)
-            kwargs["body"] = draw(strategy)
-            media_type = endpoint.body[0].media_type
         for name in ("path_parameters", "headers", "cookies", "query"):
             parameters = getattr(endpoint, name)
             if parameters:
@@ -173,50 +168,6 @@ def prepare_strategy(
     elif parameter == "query":
         strategy = strategy.filter(is_valid_query)  # type: ignore
     return strategy
-
-
-def parameters_to_json_schema(parameters: List[OpenAPIParameter]) -> Dict[str, Any]:
-    """Create an "object" JSON schema from a list of Open API parameters.
-
-    :param List[OpenAPIParameter] parameters: A list of Open API parameters, related to the same location. All of
-        them are expected to have the same "in" value.
-
-    For each input parameter there will be a property in the output schema.
-
-    This:
-
-        [
-            {
-                "in": "query",
-                "name": "id",
-                "type": "string",
-                "required": True
-            }
-        ]
-
-    Will become:
-
-        {
-            "properties": {
-                "id": {"type": "string"}
-            },
-            "additionalProperties": False,
-            "type": "object",
-            "required": ["id"]
-        }
-
-    We need this transformation for locations that imply multiple components with unique name within the same location.
-    For example, "query" - first, we generate an object, that contains all defined parameters and then serialize it
-    to the proper format.
-    """
-    properties = {}
-    required = []
-    for parameter in parameters:
-        name = parameter.name
-        properties[name] = parameter.as_json_schema()
-        if parameter.is_required:
-            required.append(name)
-    return {"properties": properties, "additionalProperties": False, "type": "object", "required": required}
 
 
 def make_positive_strategy(schema: Dict[str, Any]) -> st.SearchStrategy:

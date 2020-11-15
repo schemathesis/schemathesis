@@ -14,7 +14,7 @@ from schemathesis.specs.openapi._hypothesis import (
     get_case_strategy,
     is_valid_query,
 )
-from schemathesis.specs.openapi.parameters import OpenAPI20Parameter
+from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20CompositeBody, OpenAPI20Parameter
 
 
 def make_endpoint(schema, **kwargs) -> Endpoint:
@@ -99,7 +99,7 @@ def test_invalid_body_in_get_disable_validation(simple_schema):
         definition=EndpointDefinition({}, {}, "foo", []),
         schema=schema,
         body=[
-            OpenAPI20Parameter(
+            OpenAPI20Body(
                 {
                     "name": "attributes",
                     "in": "body",
@@ -146,7 +146,7 @@ def test_default_strategies_binary(swagger_20):
     endpoint = make_endpoint(
         swagger_20,
         body=[
-            OpenAPI20Parameter(
+            OpenAPI20CompositeBody.from_parameters(
                 {
                     "name": "upfile",
                     "in": "formData",
@@ -158,7 +158,7 @@ def test_default_strategies_binary(swagger_20):
         ],
     )
     result = get_case_strategy(endpoint).example()
-    assert isinstance(result.body["upfile"], bytes)
+    assert isinstance(result.body[0][1], bytes)
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
@@ -166,15 +166,15 @@ def test_default_strategies_bytes(swagger_20):
     endpoint = make_endpoint(
         swagger_20,
         body=[
-            OpenAPI20Parameter(
+            OpenAPI20Body(
                 {"in": "body", "name": "byte", "required": True, "schema": {"type": "string", "format": "byte"}},
-                media_type="application/octet-stream",
+                media_type="text/plain",
             )
         ],
     )
     result = get_case_strategy(endpoint).example()
-    assert isinstance(result.body["byte"], str)
-    b64decode(result.body["byte"])
+    assert isinstance(result.body, str)
+    b64decode(result.body)
 
 
 @pytest.mark.parametrize(
