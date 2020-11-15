@@ -468,12 +468,13 @@ class SwaggerV20(BaseOpenAPISchema):
         files, data = [], {}
         # If there is no content types specified for the request or "application/x-www-form-urlencoded" is specified
         # explicitly, then use it., but if "multipart/form-data" is specified, then use it
+        # TODO. It might use the new Parameter API
         consumes = self.get_request_payload_content_types(endpoint)
         is_multipart = "multipart/form-data" in consumes
         for parameter in endpoint.definition.resolved.get("parameters", ()):
             name = parameter["name"]
             if name in form_data:
-                if parameter["in"] == "formData" and (is_file(parameter) or is_multipart):
+                if parameter["in"] == "formData" and (parameter.get("type") == "file" or is_multipart):
                     if isinstance(form_data[name], list):
                         for item in form_data[name]:
                             files.append((name, (None, item)))
@@ -574,7 +575,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
                 if is_multipart:
                     if isinstance(form_data[name], list):
                         files.extend([(name, item) for item in form_data[name]])
-                    elif is_file(property_schema):
+                    elif property_schema.get("format") in ("binary", "base64"):
                         files.append((name, form_data[name]))
                     else:
                         files.append((name, (None, form_data[name])))
@@ -582,10 +583,6 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
                     data[name] = form_data[name]
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, data or None
-
-
-def is_file(schema: Dict[str, Any]) -> bool:
-    return schema.get("format") in ("binary", "base64")
 
 
 def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:

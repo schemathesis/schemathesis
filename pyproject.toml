@@ -78,7 +78,7 @@ multi_line_output = 3
 default_section = "THIRDPARTY"
 include_trailing_comma = true
 known_first_party = "schemathesis"
-known_third_party = ["_pytest", "aiohttp", "attr", "click", "curlify", "fastapi", "flask", "graphene", "graphql", "graphql_server", "hypothesis", "hypothesis_graphql", "hypothesis_jsonschema", "jsonschema", "junit_xml", "packaging", "pydantic", "pytest", "pytest_subtests", "requests", "schemathesis", "starlette", "urllib3", "werkzeug", "yaml", "yarl"]
+known_third_party = ["_pytest", "aiohttp", "attr", "click", "curlify", "fastapi", "flask", "graphene", "graphql", "graphql_server", "hypothesis", "hypothesis_graphql", "hypothesis_jsonschema", "jsonschema", "junit_xml", "packaging", "pydantic", "pytest", "pytest_subtests", "requests", "schemathesis", "starlette", "typing_extensions", "urllib3", "werkzeug", "yaml", "yarl"]
 
 [build-system]
 requires = ["poetry>=0.12"]

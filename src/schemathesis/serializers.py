@@ -1,50 +1,105 @@
-from typing import Any, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, Union
+
+import attr
+from typing_extensions import Protocol
+
+if TYPE_CHECKING:
+    from .models import Case
+
 
 SERIALIZERS = {}
 
 
-Serializer = Callable[[Any], Dict[str, Any]]
+@attr.s(slots=True)
+class SerializerContext:
+    """Context for serialization process."""
+
+    case: "Case" = attr.ib()
 
 
-def register(media_type: str) -> Callable[[Serializer], Serializer]:
-    def wrapper(function: Serializer) -> Serializer:
+class Serializer(Protocol):
+    """Transform generated data to a form, supported by the transport layer.
+
+    For example, to handle multipart forms we need to serialize them differently for
+    `requests` and `werkzeug` transports.
+    """
+
+    def as_requests(self, context: SerializerContext, payload: Any) -> Any:
+        raise NotImplementedError
+
+    def as_werkzeug(self, context: SerializerContext, payload: Any) -> Any:
+        raise NotImplementedError
+
+
+def register(media_type: str) -> Callable[[Type[Serializer]], Type[Serializer]]:
+    def wrapper(function: Type[Serializer]) -> Type[Serializer]:
         SERIALIZERS[media_type] = function
         return function
 
     return wrapper
 
 
-# TODO.
-# SerializationContext
-# - raw value
-# -
-
-
-@register("text/plain")
-def serialize_text(value: Any) -> Dict[str, Any]:
-    return {"data": str(value)}
-
-
 @register("application/json")
-def serialize_json(value: Any) -> Dict[str, Any]:
-    return {"json": value}
+class JSONSerializer:
+    def as_requests(self, context: SerializerContext, value: Any) -> Any:
+        return {"json": value}
+
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
+        return {"json": value}
+
+
+def prepare_form_data(form_data: Dict[str, Any]) -> Dict[str, Any]:
+    for name, value in form_data.items():
+        if isinstance(value, list):
+            form_data[name] = [to_bytes(item) if not isinstance(item, (bytes, str, int)) else item for item in value]
+        elif not isinstance(value, (bytes, str, int)):
+            form_data[name] = to_bytes(value)
+    return form_data
+
+
+def to_bytes(value: Union[str, bytes, int, bool, float]) -> bytes:
+    return str(value).encode(errors="ignore")
 
 
 @register("multipart/form-data")
-def serialize_multipart(value: Any) -> Dict[str, Any]:
-    return {"files": value or None}
+class MultipartSerializer:
+    def as_requests(self, context: SerializerContext, value: Dict[str, Any]) -> Any:
+        # Form data always is generated as a dictionary
+        multipart = prepare_form_data(value)
+        files, data = context.case.endpoint.prepare_multipart(multipart)
+        return {"files": files, "data": data}
+
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
+        return {"data": value}
 
 
 @register("application/x-www-form-urlencoded")
-def serialize_form(value: Any) -> Dict[str, Any]:
-    return {"data": value}
+class URLEncodedFormSerializer:
+    def as_requests(self, context: SerializerContext, value: Any) -> Any:
+        return {"data": value}
+
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
+        return {"data": value}
+
+
+@register("text/plain")
+class TextSerializer:
+    def as_requests(self, context: SerializerContext, value: Any) -> Any:
+        return {"data": str(value)}
+
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
+        return {"data": str(value)}
 
 
 @register("application/octet-stream")
-def serialize_binary(value: Any) -> Dict[str, Any]:
-    return {"data": value}
+class GenericPayloadSerializer:
+    def as_requests(self, context: SerializerContext, value: Any) -> Any:
+        return {"data": value}
+
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
+        return {"data": value}
 
 
-def get(media_type: str) -> Optional[Callable[[Any], Dict[str, Any]]]:
+def get(media_type: str) -> Optional[Type[Serializer]]:
     # if there is a specific serializer for this media type, use it, otherwise use the generic one
     return SERIALIZERS.get(media_type)

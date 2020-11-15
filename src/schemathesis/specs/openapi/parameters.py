@@ -126,7 +126,7 @@ class OpenAPI20Parameter(OpenAPIParameter):
     example_field = "x-example"
     examples_field = "x-examples"
     nullable_field = "x-nullable"
-    # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#schema-object
+    # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#schemaObject
     # Excluding informative keywords - `title`, `description`, `default`
     # And `required`, because it has a different meaning here. It determines whether ot not this parameter is required
     # or optional, which is not relevant because these parameters are later constructed into an "object" schema,
@@ -150,6 +150,10 @@ class OpenAPI20Parameter(OpenAPIParameter):
         "minProperties",
         "enum",
         "type",
+        "items",
+        "allOf",
+        "properties",
+        "additionalProperties",
     )
 
     @property

@@ -35,6 +35,7 @@ from . import serializers
 from .constants import USER_AGENT, DataGenerationMethod
 from .exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from .parameters import Parameter
+from .serializers import SerializerContext
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse, get_response_payload
 
@@ -223,7 +224,8 @@ class Case:  # pylint: disable=too-many-public-methods
             serializer = serializers.get(self.media_type)
             if serializer is None:
                 raise RuntimeError(f"Can't serialize `{self.media_type}`")
-            extra = serializer(self.body)
+            context = SerializerContext(case=self)
+            extra = serializer().as_requests(context, self.body)
         else:
             extra = {}
         return {
@@ -271,10 +273,8 @@ class Case:  # pylint: disable=too-many-public-methods
             if serializer is None:
                 # TODO. suggest the user register a serializer, or pass kwargs to requests manually
                 raise RuntimeError(f"Can't serialize `{self.media_type}`")
-            extra = serializer(self.body)
-            if "files" in extra:
-                # TODO. It should return the right format
-                extra = {"data": extra["files"]}
+            context = SerializerContext(case=self)
+            extra = serializer().as_werkzeug(context, self.body)
         else:
             extra = {}
         return {

@@ -6,6 +6,7 @@ from jsonschema import ValidationError
 
 import schemathesis
 from schemathesis.exceptions import InvalidSchema
+from schemathesis.specs.openapi.parameters import OpenAPI20Body
 from schemathesis.specs.openapi.schemas import ConvertingResolver
 
 
@@ -81,20 +82,30 @@ def test_resolving_multiple_files():
         },
     }
     schema = schemathesis.from_dict(raw_schema)
-    assert schema["/teapot"]["post"].body == {
-        "type": "object",
-        "properties": {
-            "id": {"type": "integer", "format": "int64"},
-            "username": {"type": "string"},
-            "firstName": {"type": "string"},
-            "lastName": {"type": "string"},
-            "email": {"type": "string"},
-            "password": {"type": "string"},
-            "phone": {"type": "string"},
-            "userStatus": {"type": "integer", "format": "int32", "description": "User Status"},
-        },
-        "xml": {"name": "User"},
-    }
+    assert schema["/teapot"]["post"].body == [
+        OpenAPI20Body(
+            {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer", "format": "int64"},
+                        "username": {"type": "string"},
+                        "firstName": {"type": "string"},
+                        "lastName": {"type": "string"},
+                        "email": {"type": "string"},
+                        "password": {"type": "string"},
+                        "phone": {"type": "string"},
+                        "userStatus": {"type": "integer", "format": "int32", "description": "User Status"},
+                    },
+                    "xml": {"name": "User"},
+                },
+                "in": "body",
+                "name": "user",
+                "required": True,
+            },
+            media_type="application/json",
+        )
+    ]
 
 
 @pytest.mark.parametrize("validate_schema, expected_exception", ((False, InvalidSchema), (True, ValidationError)))

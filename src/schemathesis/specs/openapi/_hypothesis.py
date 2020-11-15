@@ -1,7 +1,7 @@
 import re
 from base64 import b64encode
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple
 from urllib.parse import quote_plus
 
 from hypothesis import strategies as st
@@ -70,37 +70,6 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
     return True
 
 
-def prepare_form_data(form_data: Dict[str, Any]) -> Dict[str, Any]:
-    for name, value in form_data.items():
-        if isinstance(value, list):
-            form_data[name] = [to_bytes(item) if not isinstance(item, (bytes, str, int)) else item for item in value]
-        elif not isinstance(value, (bytes, str, int)):
-            form_data[name] = to_bytes(value)
-    return form_data
-
-
-def to_bytes(value: Union[str, bytes, int, bool, float]) -> bytes:
-    return str(value).encode(errors="ignore")
-
-
-def prepare_multipart(schema: Dict[str, Any], value: Dict[str, Any]) -> List:
-    value = prepare_form_data(value)
-    files = []
-    for name, property_schema in schema.get("properties", {}).items():
-        if name in value:
-            if isinstance(value[name], list):
-                files.extend([(name, item) for item in value[name]])
-            elif is_file(property_schema):
-                files.append((name, value[name]))
-            else:
-                files.append((name, (None, value[name])))
-    return files
-
-
-def is_file(schema: Dict[str, Any]) -> bool:
-    return schema.get("format") in ("binary", "base64")
-
-
 @st.composite  # type: ignore
 def get_case_strategy(  # pylint: disable=too-many-locals
     draw: Callable,
@@ -141,11 +110,6 @@ def get_case_strategy(  # pylint: disable=too-many-locals
             parameter = draw(st.sampled_from(endpoint.body))
             schema = parameter.as_json_schema()
             strategy = to_strategy(schema)
-            if parameter.media_type == "multipart/form-data":
-                # TODO. multipart preparation is different for Open API 2 / 3
-                # TODO. the current preparation is also `requests`-specific,
-                #  but it should be generic to support werkzeug
-                strategy = strategy.map(lambda v: prepare_multipart(schema, v))
             media_type = parameter.media_type
             body = draw(strategy)
         else:
