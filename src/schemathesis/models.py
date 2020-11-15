@@ -71,7 +71,7 @@ class Case:  # pylint: disable=too-many-public-methods
 
     feedback: Optional["Feedback"] = attr.ib(default=None)  # pragma: no mutate
     source: Optional[CaseSource] = attr.ib(default=None)  # pragma: no mutate
-    # MediaType for cases with payload.For example, "application/json"
+    # MediaType for cases with payload. For example, "application/json"
     media_type: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
     def __repr__(self) -> str:
@@ -510,7 +510,6 @@ class Endpoint(Generic[P]):
             cookies=deepcopy(self.cookies),
             query=deepcopy(self.query),
             body=deepcopy(self.body),
-            # TODO. copy alternatives
         )
 
     def clone(self, **components: Any) -> "Endpoint":

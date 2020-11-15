@@ -1,7 +1,7 @@
 import re
 from base64 import b64encode
 from functools import partial
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import quote_plus
 
 from hypothesis import strategies as st
@@ -13,6 +13,7 @@ from ...constants import DataGenerationMethod
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import Case, Endpoint
 from ...stateful import Feedback
+from ...utils import NOT_SET
 from .parameters import parameters_to_json_schema
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
@@ -100,54 +101,86 @@ def is_file(schema: Dict[str, Any]) -> bool:
     return schema.get("format") in ("binary", "base64")
 
 
-T = TypeVar("T")
-
-
-def get_case_strategy(
+@st.composite  # type: ignore
+def get_case_strategy(  # pylint: disable=too-many-locals
+    draw: Callable,
     endpoint: Endpoint,
     hooks: Optional[HookDispatcher] = None,
     feedback: Optional[Feedback] = None,
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
-) -> st.SearchStrategy:
-    """Create a strategy for a complete test case.
-
-    Path & endpoint are static, the others are JSON schemas.
-    """
-
+    path_parameters: Any = NOT_SET,
+    headers: Any = NOT_SET,
+    cookies: Any = NOT_SET,
+    query: Any = NOT_SET,
+    body: Any = NOT_SET,
+) -> Any:
     to_strategy = {DataGenerationMethod.positive: make_positive_strategy}[data_generation_method]
 
-    @st.composite  # type: ignore
-    def generate_case(draw: Callable) -> Any:
-        kwargs: Dict[str, Any] = {}
-        media_type = None
-        if endpoint.body:
-            body = draw(st.sampled_from(endpoint.body))
-            schema = body.as_json_schema()
-            strategy = to_strategy(schema)
-            if body.media_type == "multipart/form-data":
-                # TODO. multipart preparation is different for Open API 2 / 3
-                strategy = strategy.map(lambda v: prepare_multipart(schema, v))
-            kwargs["body"] = draw(strategy)
-            media_type = body.media_type
-        for name in ("path_parameters", "headers", "cookies", "query"):
-            parameters = getattr(endpoint, name)
-            if parameters:
-                schema = parameters_to_json_schema(parameters)
-                strategy = to_strategy(schema)
-                location = {"headers": "header", "cookies": "cookie", "path_parameters": "path"}.get(name, name)
-                serialize = endpoint.get_hypothesis_conversions(location)
-                if serialize is not None:
-                    strategy = strategy.map(serialize)
-                if name == "path_parameters":
-                    strategy = strategy.filter(filter_path_parameters).map(quote_all)
-                elif name in ("headers", "cookies"):
-                    strategy = strategy.filter(is_valid_header)
-                elif name == "query":
-                    strategy = strategy.filter(is_valid_query)
-                kwargs[name] = draw(strategy)
-        return Case(endpoint=endpoint, feedback=feedback, media_type=media_type, **kwargs)
+    context = HookContext(endpoint)
 
-    return generate_case()
+    if path_parameters is NOT_SET:
+        strategy = get_parameters_strategy(endpoint, to_strategy, "path_parameters")
+        strategy = apply_hooks(endpoint, context, hooks, strategy, "path_parameters")
+        path_parameters = draw(strategy)
+    if headers is NOT_SET:
+        strategy = get_parameters_strategy(endpoint, to_strategy, "headers")
+        strategy = apply_hooks(endpoint, context, hooks, strategy, "headers")
+        headers = draw(strategy)
+    if cookies is NOT_SET:
+        strategy = get_parameters_strategy(endpoint, to_strategy, "cookies")
+        strategy = apply_hooks(endpoint, context, hooks, strategy, "cookies")
+        cookies = draw(strategy)
+    if query is NOT_SET:
+        strategy = get_parameters_strategy(endpoint, to_strategy, "query")
+        strategy = apply_hooks(endpoint, context, hooks, strategy, "query")
+        query = draw(strategy)
+
+    media_type = None
+    if body is NOT_SET:
+        if endpoint.body:
+            parameter = draw(st.sampled_from(endpoint.body))
+            schema = parameter.as_json_schema()
+            strategy = to_strategy(schema)
+            if parameter.media_type == "multipart/form-data":
+                # TODO. multipart preparation is different for Open API 2 / 3
+                # TODO. the current preparation is also `requests`-specific,
+                #  but it should be generic to support werkzeug
+                strategy = strategy.map(lambda v: prepare_multipart(schema, v))
+            media_type = parameter.media_type
+            body = draw(strategy)
+        else:
+            body = None
+    return Case(
+        endpoint=endpoint,
+        feedback=feedback,
+        media_type=media_type,
+        path_parameters=path_parameters,
+        headers=headers,
+        cookies=cookies,
+        query=query,
+        body=body,
+    )
+
+
+def get_parameters_strategy(
+    endpoint: Endpoint, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], name: str
+) -> st.SearchStrategy:
+    parameters = getattr(endpoint, name)
+    if parameters:
+        schema = parameters_to_json_schema(parameters)
+        strategy = to_strategy(schema)
+        location = {"headers": "header", "cookies": "cookie", "path_parameters": "path"}.get(name, name)
+        serialize = endpoint.get_hypothesis_conversions(location)
+        if serialize is not None:
+            strategy = strategy.map(serialize)
+        if name == "path_parameters":
+            strategy = strategy.filter(filter_path_parameters).map(quote_all)
+        elif name in ("headers", "cookies"):
+            strategy = strategy.filter(is_valid_header)
+        elif name == "query":
+            strategy = strategy.filter(is_valid_query)
+        return strategy
+    return st.just(None)
 
 
 def prepare_strategy(
@@ -213,9 +246,27 @@ def _get_case_strategy(
     return st.builds(partial(Case, **static_parameters), **strategies)
 
 
+def apply_hooks(
+    endpoint: Endpoint, context: HookContext, hooks: Optional[HookDispatcher], strategy: st.SearchStrategy, key: str
+) -> st.SearchStrategy:
+    strategy = __apply_hooks(context, GLOBAL_HOOK_DISPATCHER, strategy, key)
+    strategy = __apply_hooks(context, endpoint.schema.hooks, strategy, key)
+    if hooks is not None:
+        strategy = __apply_hooks(context, hooks, strategy, key)
+    return strategy
+
+
 def _apply_hooks(strategies: Dict[str, st.SearchStrategy], dispatcher: HookDispatcher, context: HookContext) -> None:
     for key in strategies:
         for hook in dispatcher.get_all_by_name(f"before_generate_{key}"):
             # Get the strategy on each hook to pass the first hook output as an input to the next one
             strategy = strategies[key]
             strategies[key] = hook(context, strategy)
+
+
+def __apply_hooks(
+    context: HookContext, hooks: HookDispatcher, strategy: st.SearchStrategy, key: str
+) -> st.SearchStrategy:
+    for hook in hooks.get_all_by_name(f"before_generate_{key}"):
+        strategy = hook(context, strategy)
+    return strategy

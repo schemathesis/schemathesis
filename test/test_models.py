@@ -142,48 +142,34 @@ def test_case_partial_deepcopy(swagger_20):
 
 
 schema = schemathesis.from_path(SIMPLE_PATH)
-ENDPOINT = Endpoint("/api/success", "GET", {}, base_url="http://example.com", schema=schema)
+ENDPOINT = Endpoint("/api/success", "POST", {}, base_url="http://example.com", schema=schema)
 
 
 def make_case(**kwargs):
     return Case(ENDPOINT, media_type="application/json", **kwargs)
 
 
+def expected(payload=""):
+    if payload:
+        payload = f", {payload}"
+    return (
+        f"requests.post('http://example.com/api/success', "
+        f"headers={{'Content-Type': 'application/json', 'User-Agent': '{USER_AGENT}'}}{payload})"
+    )
+
+
 @pytest.mark.parametrize(
     "case, expected",
     (
         # Body can be of any primitive type supported by Open API
-        (
-            make_case(body={"test": 1}),
-            f"requests.get('http://example.com/api/success', "
-            f"headers={{'User-Agent': '{USER_AGENT}'}}, data='{{\"test\": 1}}')",
-        ),
-        (
-            make_case(body=["foo"]),
-            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, data='[\"foo\"]')",
-        ),
-        (
-            make_case(body="foo"),
-            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, data='\"foo\"')",
-        ),
-        (
-            make_case(body=1),
-            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, data='1')",
-        ),
-        (
-            make_case(body=1.1),
-            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, data='1.1')",
-        ),
-        (
-            make_case(body=True),
-            f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}}, data='true')",
-        ),
-        (make_case(), f"requests.get('http://example.com/api/success', headers={{'User-Agent': '{USER_AGENT}'}})"),
-        (
-            make_case(query={"a": 1}),
-            f"requests.get('http://example.com/api/success', "
-            f"headers={{'User-Agent': '{USER_AGENT}'}}, params={{'a': 1}})",
-        ),
+        (make_case(body={"test": 1}), expected("json={'test': 1}")),
+        (make_case(body=["foo"]), expected("json=['foo']")),
+        (make_case(body="foo"), expected("json='foo'")),
+        (make_case(body=1), expected("json=1")),
+        (make_case(body=1.1), expected("json=1.1")),
+        (make_case(body=True), expected("json=True")),
+        (make_case(), expected()),
+        (make_case(query={"a": 1}), expected("params={'a': 1}")),
     ),
 )
 def test_get_code_to_reproduce(case, expected):

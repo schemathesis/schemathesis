@@ -5,16 +5,10 @@ import attr
 from ...parameters import Example, Parameter
 from .converter import to_json_schema_recursive
 
-# TODO. improve inheritance with composition? there should be no many "example_field", etc.
-
 
 @attr.s(slots=True)
 class OpenAPIParameter(Parameter):
-    """A single operation parameter.
-
-    Open API 2.0: https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#parameterObject
-    Open API 3.0: https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#parameter-object
-    """
+    """A single Open API operation parameter."""
 
     example_field: ClassVar[str]
     examples_field: ClassVar[str]
@@ -124,6 +118,11 @@ class OpenAPIParameter(Parameter):
 
 
 class OpenAPI20Parameter(OpenAPIParameter):
+    """Open API 2.0 parameter.
+
+    https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#parameterObject
+    """
+
     example_field = "x-example"
     examples_field = "x-examples"
     nullable_field = "x-nullable"
@@ -159,6 +158,11 @@ class OpenAPI20Parameter(OpenAPIParameter):
 
 
 class OpenAPI30Parameter(OpenAPIParameter):
+    """Open API 3.0 parameter.
+
+    https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#parameter-object
+    """
+
     example_field = "example"
     examples_field = "examples"
     nullable_field = "nullable"
@@ -215,12 +219,8 @@ class OpenAPIBody(OpenAPIParameter):
 
 
 @attr.s(slots=True)
-class OpenAPI20Body(OpenAPIBody):
+class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
     """Open API 2.0 body variant."""
-
-    example_field = "x-example"
-    examples_field = "x-examples"
-    nullable_field = "x-nullable"
 
     def as_json_schema(self) -> Dict[str, Any]:
         """Convert body definition to JSON Schema."""
@@ -228,13 +228,9 @@ class OpenAPI20Body(OpenAPIBody):
         schema = self.definition["schema"]
         return self.transform_keywords(schema)
 
-    def transform_keywords(self, schema: Dict[str, Any]) -> Dict[str, Any]:
-        # NOTE. Unlike Open API 3.0, forms are not handled here
-        return to_json_schema_recursive(schema, "x-nullable")
-
 
 @attr.s(slots=True)
-class OpenAPI30Body(OpenAPIBody):
+class OpenAPI30Body(OpenAPIBody, OpenAPI30Parameter):
     """Open API 3.0 body variant.
 
     We consider each media type defined in the schema as a separate variant, that can be chosen for generation.
@@ -243,9 +239,6 @@ class OpenAPI30Body(OpenAPIBody):
 
     # `required` keyword is located above the schema for concrete media-type; therefore it is passed here explicitly
     required: bool = attr.ib(default=False)
-    example_field = "example"
-    examples_field = "examples"
-    nullable_field = "nullable"
 
     def as_json_schema(self) -> Dict[str, Any]:
         """Convert body definition to JSON Schema."""
@@ -253,7 +246,7 @@ class OpenAPI30Body(OpenAPIBody):
         return self.transform_keywords(schema)
 
     def transform_keywords(self, schema: Dict[str, Any]) -> Dict[str, Any]:
-        definition = to_json_schema_recursive(schema, "nullable")
+        definition = super().transform_keywords(schema)
         if self.is_form:
             definition.setdefault("type", "object")
         return definition
@@ -269,11 +262,7 @@ class OpenAPI30Body(OpenAPIBody):
 
 
 @attr.s(slots=True)
-class OpenAPI20CompositeBody(OpenAPIBody):
-    example_field = "x-example"
-    examples_field = "x-examples"
-    nullable_field = "x-nullable"
-
+class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
     @classmethod
     def from_parameters(cls, *parameters: Dict[str, Any], media_type: str) -> "OpenAPI20CompositeBody":
         return cls(

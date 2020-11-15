@@ -336,16 +336,6 @@ def make_nullable_test_data(spec_version):
     )
 
 
-@pytest.mark.parametrize("nullable, expected", make_nullable_test_data("swagger"))
-def test_x_nullable(petstore, nullable, expected):
-    assert petstore.resolver.resolve_all(nullable) == expected
-
-
-@pytest.mark.parametrize("nullable, expected", make_nullable_test_data("openapi"))
-def test_nullable(openapi_30, nullable, expected):
-    assert openapi_30.resolver.resolve_all(nullable) == expected
-
-
 def test_nullable_parameters(testdir):
     testdir.make_test(
         """
@@ -490,6 +480,28 @@ def test_(request, case):
 def test_complex_dereference(testdir, complex_schema):
     schema = schemathesis.from_path(complex_schema)
     path = Path(str(testdir))
+    body = OpenAPI30Body(
+        {
+            "schema": {
+                "additionalProperties": False,
+                "description": "Test",
+                "properties": {
+                    "profile": {
+                        "additionalProperties": False,
+                        "description": "Test",
+                        "properties": {"id": {"type": "integer"}},
+                        "required": ["id"],
+                        "type": "object",
+                    },
+                    "username": {"type": "string"},
+                },
+                "required": ["username", "profile"],
+                "type": "object",
+            }
+        },
+        required=True,
+        media_type="application/json",
+    )
     assert schema.endpoints["/teapot"]["POST"] == Endpoint(
         base_url="file:///",
         path="/teapot",
@@ -554,33 +566,9 @@ def test_complex_dereference(testdir, complex_schema):
                 "tags": ["ancillaries"],
             },
             scope=f"{path.as_uri()}/root/paths/teapot.yaml#/TeapotCreatePath",
-            parameters=[],
+            parameters=[body],
         ),
-        body=[],
-        body_alternatives=[
-            OpenAPI30Body(
-                {
-                    "schema": {
-                        "additionalProperties": False,
-                        "description": "Test",
-                        "properties": {
-                            "profile": {
-                                "additionalProperties": False,
-                                "description": "Test",
-                                "properties": {"id": {"type": "integer"}},
-                                "required": ["id"],
-                                "type": "object",
-                            },
-                            "username": {"type": "string"},
-                        },
-                        "required": ["username", "profile"],
-                        "type": "object",
-                    }
-                },
-                is_alternative=True,
-                media_type="application/json",
-            )
-        ],
+        body=[body],
         schema=schema,
     )
 

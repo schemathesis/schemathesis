@@ -104,6 +104,10 @@ def get_strategies_from_examples(endpoint: Endpoint, examples_field: str = "exam
         for static_parameters in get_static_parameters_from_examples(endpoint, examples_field)
         if static_parameters
     ]
+    # these static parameters are passed to Case as is
+    t = get_static_parameters_from_examples(endpoint, examples_field)
+    if t:
+        raise AssertionError(str(t))
     for static_parameters in static_parameters_union(
         get_static_parameters_from_example(endpoint), get_static_parameters_from_properties(endpoint)
     ):
