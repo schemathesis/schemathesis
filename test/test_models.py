@@ -154,7 +154,7 @@ def expected(payload=""):
         payload = f", {payload}"
     return (
         f"requests.post('http://example.com/api/success', "
-        f"headers={{'Content-Type': 'application/json', 'User-Agent': '{USER_AGENT}'}}{payload})"
+        f"headers={{'User-Agent': '{USER_AGENT}', 'Content-Type': 'application/json'}}{payload})"
     )
 
 

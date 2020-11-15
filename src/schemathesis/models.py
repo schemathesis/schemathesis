@@ -203,8 +203,6 @@ class Case:  # pylint: disable=too-many-public-methods
 
     def _get_headers(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         final_headers = self.headers.copy() if self.headers is not None else {}
-        if self.media_type:
-            final_headers["Content-Type"] = self.media_type
         if headers:
             final_headers.update(headers)
         if "user-agent" not in {header.lower() for header in final_headers}:
@@ -216,6 +214,9 @@ class Case:  # pylint: disable=too-many-public-methods
     ) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by requests."""
         final_headers = self._get_headers(headers)
+        if self.media_type and self.media_type != "multipart/form-data":
+            # `requests` will handle multipart form headers with the proper `boundary` value.
+            final_headers["Content-Type"] = self.media_type
         base_url = self._get_base_url(base_url)
         formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
         url = urljoin(base_url + "/", formatted_path)
@@ -267,6 +268,8 @@ class Case:  # pylint: disable=too-many-public-methods
     def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
         final_headers = self._get_headers(headers)
+        if self.media_type:
+            final_headers["Content-Type"] = self.media_type
         extra: Dict[str, Any]
         if self.media_type is not None:
             serializer = serializers.get(self.media_type)

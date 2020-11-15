@@ -158,7 +158,7 @@ def test_default_strategies_binary(swagger_20):
         ],
     )
     result = get_case_strategy(endpoint).example()
-    assert isinstance(result.body[0][1], bytes)
+    assert isinstance(result.body["upfile"], bytes)
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
@@ -310,19 +310,3 @@ def test_is_valid_query_strategy():
         assert value == {"key": "1"}
 
     test()
-
-
-# TODO .move this test
-def test_prepare_headers_schema():
-    schema = {
-        "properties": {"api_key": {"name": "api_key", "in": "header"}},
-        "additionalProperties": False,
-        "type": "object",
-        "required": ["api_key"],
-    }
-    assert prepare_headers_schema(schema) == {
-        "properties": {"api_key": {"name": "api_key", "in": "header", "type": "string"}},
-        "additionalProperties": False,
-        "type": "object",
-        "required": ["api_key"],
-    }
