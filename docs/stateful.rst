@@ -156,27 +156,17 @@ gets a freshly created state machine instance that runs a sequence of steps.
 
     .. automethod:: setup
 
-    |
-
     .. automethod:: teardown
 
     These methods might be called multiple times per test scenario.
 
     .. automethod:: before_call
 
-    |
-
     .. automethod:: get_call_kwargs
-
-    |
 
     .. automethod:: call
 
-    |
-
     .. automethod:: after_call
-
-    |
 
     .. automethod:: validate_response
 
