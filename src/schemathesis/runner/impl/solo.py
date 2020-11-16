@@ -1,5 +1,5 @@
 # weird mypy bug with imports
-from typing import Any, Dict, Generator  # pylint: disable=unused-import
+from typing import Any, Dict, Generator, Union  # pylint: disable=unused-import
 
 import attr
 
@@ -12,6 +12,8 @@ from .core import BaseRunner, asgi_test, get_session, network_test, wsgi_test
 @attr.s(slots=True)  # pragma: no mutate
 class SingleThreadRunner(BaseRunner):
     """Fast runner that runs tests sequentially in the main thread."""
+
+    request_tls_verify: Union[bool, str] = attr.ib(default=True)  # pragma: no mutate
 
     def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         auth = get_requests_auth(self.auth, self.auth_type)
@@ -28,6 +30,7 @@ class SingleThreadRunner(BaseRunner):
                 session=session,
                 headers=self.headers,
                 request_timeout=self.request_timeout,
+                request_tls_verify=self.request_tls_verify,
                 store_interactions=self.store_interactions,
             )
 
