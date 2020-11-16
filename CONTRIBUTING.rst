@@ -100,7 +100,7 @@ Both ``openapi2`` and ``openapi3`` expose semantically the same schema with vers
 By default, the server will generate an API schema with the following endpoints:
 
 - ``GET /api/success`` - returns ``{"success": true}``
-- ``GET /api/failure`` - returns 500 with the ``plain/text`` content type
+- ``GET /api/failure`` - returns 500 with the ``text/plain`` content type
 - ``POST /api/payload`` - returns the request's payload
 - ``GET /api/get_payload`` - returns the request's payload, but accepts only GET requests
 - ``GET /api/multiple_failures`` - returns different response statuses, depending on the provided integer ``id`` parameter. For negative values returns 200 with ``{"result": "OK"}`` payload, 500 if ``id`` is 0, and 504 for positive ``id`` values.
@@ -114,7 +114,7 @@ By default, the server will generate an API schema with the following endpoints:
 - ``POST /api/upload_file`` - accepts a file and a body parameter
 - ``POST /api/form`` - accepts ``application/x-www-form-urlencoded`` payload
 - ``POST /api/teapot`` - returns 418 status code that is not listed in the schema
-- ``GET /api/text`` - returns ``plain/text`` responses, which are not declared in the schema
+- ``GET /api/text`` - returns ``text/plain`` responses, which are not declared in the schema
 - ``GET /api/malformed_json`` - returns malformed JSON with ``application/json`` content type header
 - ``GET /api/custom_format`` - accepts a string in the custom "digits" format. This endpoint is used to verify custom string formats
 - ``GET /api/headers`` - returns the passed headers
