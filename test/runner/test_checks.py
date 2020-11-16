@@ -25,10 +25,12 @@ def make_case(schema: BaseSchema, definition: Dict[str, Any]) -> models.Case:
     return models.Case(endpoint)
 
 
-def make_response(content=b"{}", content_type: Optional[str] = "application/json") -> requests.Response:
+def make_response(
+    content: bytes = b"{}", content_type: Optional[str] = "application/json", status_code: int = 200
+) -> requests.Response:
     response = requests.Response()
     response._content = content
-    response.status_code = 200
+    response.status_code = status_code
     if content_type:
         response.headers["Content-Type"] = content_type
     return response
@@ -269,15 +271,6 @@ def test_response_schema_conformance_swagger(swagger_20, content, definition):
     assert case.endpoint.is_response_valid(response)
 
 
-def test_response_schema_conformance_swagger_no_content_header(swagger_20):
-    """Regression: response_schema_conformance does not raise KeyError when response does not have a "Content-Type"."""
-    response = requests.Response()
-    case = make_case(swagger_20, {})
-
-    with pytest.raises(CheckFailed, match="Response is missing the `Content-Type` header"):
-        response_schema_conformance(response, case)
-
-
 @pytest.mark.parametrize(
     "content, definition",
     (
@@ -326,6 +319,62 @@ def test_response_schema_conformance_openapi(openapi_30, content, definition):
     case = make_case(openapi_30, definition)
     assert response_schema_conformance(response, case) is None
     assert case.endpoint.is_response_valid(response)
+
+
+@pytest.mark.parametrize(
+    "extra",
+    (
+        # "content" is not required
+        {},
+        # "content" can be empty
+        {"content": {}},
+    ),
+)
+def test_response_conformance_openapi_no_media_types(openapi_30, extra):
+    # When there is no media type defined in the schema
+    definition = {"responses": {"default": {"description": "text", **extra}}}
+    assert_no_media_types(openapi_30, definition)
+
+
+def test_response_conformance_swagger_no_media_types(swagger_20):
+    # When there is no media type defined in the schema
+    definition = {"responses": {"default": {"description": "text"}}}
+    assert_no_media_types(swagger_20, definition)
+
+
+def assert_no_media_types(schema, definition):
+    case = make_case(schema, definition)
+    # And no "Content-Type" header in the received response
+    response = make_response(content_type=None, status_code=204)
+    # Then there should be no errors
+    assert response_schema_conformance(response, case) is None
+
+
+@pytest.mark.parametrize("spec", ("swagger_20", "openapi_30"))
+def test_response_conformance_no_content_type(request, spec):
+    # When there is a media type defined in the schema
+    schema = request.getfixturevalue(spec)
+    if spec == "swagger_20":
+        definition = {
+            "produces": ["application/json"],
+            "responses": {"default": {"description": "text", "schema": SUCCESS_SCHEMA}},
+        }
+    else:
+        definition = {
+            "responses": {
+                "default": {"description": "text", "content": {"application/json": {"schema": SUCCESS_SCHEMA}}}
+            }
+        }
+    case = make_case(schema, definition)
+    # And no "Content-Type" header in the received response
+    response = make_response(content_type=None, status_code=200)
+    # Then the check should fail
+    with pytest.raises(
+        CheckFailed,
+        match="The response is missing the `Content-Type` header. "
+        "The schema defines the following media types:\n\n    application/json",
+    ):
+        response_schema_conformance(response, case)
 
 
 @pytest.mark.parametrize(

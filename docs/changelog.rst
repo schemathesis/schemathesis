@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Handling of 204 responses in the ``response_schema_conformance`` check. Before, all responses were required to have the
+  ``Content-Type`` header. `#844`_
+
 **Deprecated**
 
 - Using of ``Case.form_data`` and ``Endpoint.form_data``. In the ``3.0`` release, you'll need to use relevant ``body`` attributes instead.
@@ -1505,6 +1510,7 @@ Deprecated
 
 .. _#858: https://github.com/schemathesis/schemathesis/issues/858
 .. _#851: https://github.com/schemathesis/schemathesis/issues/851
+.. _#844: https://github.com/schemathesis/schemathesis/issues/844
 .. _#841: https://github.com/schemathesis/schemathesis/issues/841
 .. _#839: https://github.com/schemathesis/schemathesis/issues/839
 .. _#836: https://github.com/schemathesis/schemathesis/issues/836

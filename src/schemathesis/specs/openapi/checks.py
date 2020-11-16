@@ -78,9 +78,4 @@ def response_headers_conformance(response: GenericResponse, case: "Case") -> Opt
 def response_schema_conformance(response: GenericResponse, case: "Case") -> None:
     if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
-    content_type = response.headers.get("Content-Type")
-    if content_type is None:
-        raise get_missing_content_type_error()("Response is missing the `Content-Type` header")
-    if not content_type.startswith("application/json"):
-        return
     return case.endpoint.validate_response(response)
