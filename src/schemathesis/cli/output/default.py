@@ -14,6 +14,12 @@ from ...runner.serialization import SerializedCase, SerializedTestResult
 from ..context import ExecutionContext
 from ..handlers import EventHandler, get_unique_failures
 
+DISABLE_SCHEMA_VALIDATION_MESSAGE = (
+    "\nYou can disable input schema validation with --validate-schema=false "
+    "command-line option\nIn this case, Schemathesis cannot guarantee proper"
+    " behavior during the test run"
+)
+
 
 def get_terminal_width() -> int:
     return shutil.get_terminal_size().columns
@@ -127,6 +133,8 @@ def display_single_error(context: ExecutionContext, result: SerializedTestResult
             message = error.exception_with_traceback
         else:
             message = error.exception
+        if error.exception.startswith("schemathesis.exceptions.InvalidSchema"):
+            message += DISABLE_SCHEMA_VALIDATION_MESSAGE + "\n"
         click.secho(message, fg="red")
         if error.example is not None:
             display_example(context, error.example, seed=result.seed)
@@ -266,11 +274,7 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
             f"Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks"
         )
         if event.exception_type == "jsonschema.exceptions.ValidationError":
-            message += (
-                "\n\nYou can disable input schema validation with --validate-schema=false "
-                "command-line option\nIn this case, Schemathesis cannot guarantee proper"
-                " behavior during the test run"
-            )
+            message += "\n" + DISABLE_SCHEMA_VALIDATION_MESSAGE
         click.secho(message, fg="red")
 
 
