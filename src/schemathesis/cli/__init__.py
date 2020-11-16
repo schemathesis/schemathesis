@@ -193,6 +193,14 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     help="Timeout in milliseconds for network requests during the test run.",
     type=click.IntRange(1),
 )
+@click.option(
+    "--request-tls-verify",
+    help="Controls whether Schemathesis verifies the server's TLS certificate. "
+    "You can also pass the path to a CA_BUNDLE file for private certs.",
+    type=str,
+    default="true",
+    callback=callbacks.convert_request_tls_verify,
+)
 @click.option("--validate-schema", help="Enable or disable validation of input schema.", type=bool, default=True)
 @click.option(
     "--skip-deprecated-endpoints",
@@ -279,6 +287,7 @@ def run(
     base_url: Optional[str] = None,
     app: Optional[str] = None,
     request_timeout: Optional[int] = None,
+    request_tls_verify: bool = True,
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
     junit_xml: Optional[click.utils.LazyFile] = None,
@@ -315,6 +324,7 @@ def run(
         auth_type=auth_type,
         headers=headers,
         request_timeout=request_timeout,
+        request_tls_verify=request_tls_verify,
         base_url=base_url,
         endpoint=endpoints,
         method=methods,

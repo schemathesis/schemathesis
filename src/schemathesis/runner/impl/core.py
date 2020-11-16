@@ -239,6 +239,7 @@ def network_test(
     result: TestResult,
     session: requests.Session,
     request_timeout: Optional[int],
+    request_tls_verify: bool,
     store_interactions: bool,
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
@@ -259,6 +260,7 @@ def network_test(
         store_interactions,
         headers,
         feedback,
+        request_tls_verify,
         max_response_time,
     )
     add_cases(
@@ -273,6 +275,7 @@ def network_test(
         store_interactions,
         headers,
         feedback,
+        request_tls_verify,
         max_response_time,
     )
 
@@ -287,9 +290,10 @@ def _network_test(
     store_interactions: bool,
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
+    request_tls_verify: bool,
     max_response_time: Optional[int],
 ) -> requests.Response:
-    response = case.call(session=session, headers=headers, timeout=timeout)
+    response = case.call(session=session, headers=headers, timeout=timeout, verify=request_tls_verify)
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
     status = Status.success
