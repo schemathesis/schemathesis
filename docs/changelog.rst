@@ -9,6 +9,10 @@ Changelog
 - ``--request-tls-verify`` CLI option, that controls whether Schemathesis verifies the server's TLS certificate.
   You can also pass the path to a CA_BUNDLE file for private certs. `#830`_
 
+**Changed**
+
+- In CLI if an endpoint contains an invalid schema, show a message about the ``--validate-schema`` CLI option. `#855`_
+
 **Fixed**
 
 - Handling of 204 responses in the ``response_schema_conformance`` check. Before, all responses were required to have the
@@ -1514,6 +1518,7 @@ Deprecated
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#858: https://github.com/schemathesis/schemathesis/issues/858
+.. _#855: https://github.com/schemathesis/schemathesis/issues/855
 .. _#851: https://github.com/schemathesis/schemathesis/issues/851
 .. _#844: https://github.com/schemathesis/schemathesis/issues/844
 .. _#841: https://github.com/schemathesis/schemathesis/issues/841
