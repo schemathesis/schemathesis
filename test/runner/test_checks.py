@@ -210,7 +210,7 @@ def test_status_code_conformance_invalid(value, swagger_20):
 @pytest.mark.parametrize("spec", ("swagger", "openapi"), indirect=["spec"])
 @pytest.mark.parametrize(
     "response, case",
-    (("plain/text", ["application/json"]), ("plain/text;charset=utf-8", ["application/json"])),
+    (("text/plain", ["application/json"]), ("text/plain;charset=utf-8", ["application/json"])),
     indirect=["response", "case"],
 )
 def test_content_type_conformance_invalid(spec, response, case):
