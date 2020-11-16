@@ -4,6 +4,12 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Deprecated**
+
+- Using of ``Case.form_data`` and ``Endpoint.form_data``. In the ``3.0`` release, you'll need to use relevant ``body`` attributes instead.
+  This change includes deprecation of the ``before_generate_form_data`` hook, use ``before_generate_body`` instead.
+  The reason for this is the upcoming unification of parameter handling and their serialization.
+
 `2.7.7`_ - 2020-11-13
 ---------------------
 
