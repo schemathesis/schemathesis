@@ -85,7 +85,7 @@ class URLEncodedFormSerializer:
 @register("text/plain")
 class TextSerializer:
     def as_requests(self, context: SerializerContext, value: Any) -> Any:
-        return {"data": str(value)}
+        return {"data": str(value).encode("utf8")}
 
     def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
         return {"data": str(value)}

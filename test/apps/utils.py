@@ -21,6 +21,7 @@ class Endpoint(Enum):
     form = ("POST", "/api/form")
     teapot = ("POST", "/api/teapot")
     text = ("GET", "/api/text")
+    plain_text_body = ("POST", "/api/text")
     malformed_json = ("GET", "/api/malformed_json")
     invalid_response = ("GET", "/api/invalid_response")
     custom_format = ("GET", "/api/custom_format")
@@ -189,6 +190,15 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
             }
         elif endpoint == "teapot":
             schema = {"produces": ["application/json"], "responses": {"200": {"description": "OK"}}}
+        elif endpoint == "plain_text_body":
+            schema = {
+                "parameters": [
+                    {"in": "body", "name": "value", "required": True, "schema": {"type": "string"}},
+                ],
+                "consumes": ["text/plain"],
+                "produces": ["text/plain"],
+                "responses": {"200": {"description": "OK"}},
+            }
         elif endpoint == "invalid_path_parameter":
             schema = {
                 "parameters": [{"name": "id", "in": "path", "required": False, "type": "integer"}],
@@ -351,6 +361,11 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
         elif endpoint == "performance":
             schema = {
                 "requestBody": {"content": {"application/json": {"schema": {"type": "integer"}}}},
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif endpoint == "plain_text_body":
+            schema = {
+                "requestBody": {"content": {"text/plain": {"schema": {"type": "string"}}}},
                 "responses": {"200": {"description": "OK"}},
             }
         elif endpoint in ("flaky", "multiple_failures"):

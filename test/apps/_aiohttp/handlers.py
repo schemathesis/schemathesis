@@ -38,6 +38,13 @@ async def text(request: web.Request) -> web.Response:
     return web.Response(body="Text response", content_type="text/plain")
 
 
+async def plain_text_body(request: web.Request) -> web.Response:
+    if request.headers.get("Content-Type", "") != "text/plain":
+        raise web.HTTPInternalServerError(text="Expected text/plain payload")
+    read_ = await request.read()
+    return web.Response(body=read_, content_type="text/plain")
+
+
 async def headers(request: web.Request) -> web.Response:
     values = dict(request.headers)
     return web.json_response(values, headers=values)

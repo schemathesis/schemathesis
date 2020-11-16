@@ -122,6 +122,12 @@ def create_openapi_app(
     def text():
         return Response("Text response", content_type="text/plain")
 
+    @app.route("/api/text", methods=["POST"])
+    def plain_text_body():
+        if request.headers["Content-Type"] != "text/plain":
+            raise InternalServerError("Expected text/plain payload")
+        return Response(request.data, content_type="text/plain")
+
     @app.route("/api/malformed_json", methods=["GET"])
     def malformed_json():
         return Response("{malformed}", content_type="application/json")
