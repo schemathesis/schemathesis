@@ -61,7 +61,7 @@ User's Guide
 Commercial support
 ------------------
 
-If you are interested in the effective integration of Schemathesis to your private project, you can `schedule an appointment <https://app.acuityscheduling.com/schedule.php?owner=21203869&appointmentType=18278663>` and I will help you do that.
+If you are interested in the effective integration of Schemathesis to your private project, you can `schedule an appointment <https://app.acuityscheduling.com/schedule.php?owner=21203869&appointmentType=18278663>`_ and I will help you do that.
 
 Resources
 ---------
