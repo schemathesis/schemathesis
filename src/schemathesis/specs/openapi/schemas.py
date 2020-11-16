@@ -13,7 +13,12 @@ import requests
 from hypothesis.strategies import SearchStrategy
 
 from ...constants import DataGenerationMethod
-from ...exceptions import InvalidSchema, get_response_parsing_error, get_schema_validation_error
+from ...exceptions import (
+    InvalidSchema,
+    get_missing_content_type_error,
+    get_response_parsing_error,
+    get_schema_validation_error,
+)
 from ...hooks import HookContext, HookDispatcher
 from ...models import Case, Endpoint, EndpointDefinition, empty_object
 from ...schemas import BaseSchema
@@ -312,6 +317,16 @@ class BaseOpenAPISchema(BaseSchema):
             return
         scopes, schema = self.get_response_schema(definition, endpoint.definition.scope)
         if not schema:
+            # No schema to check against
+            return
+        content_type = response.headers.get("Content-Type")
+        if content_type is None:
+            media_types = "\n    ".join(self.get_content_types(endpoint, response))
+            raise get_missing_content_type_error()(
+                "The response is missing the `Content-Type` header. The schema defines the following media types:\n\n"
+                f"    {media_types}"
+            )
+        if not content_type.startswith("application/json"):
             return
         try:
             if isinstance(response, requests.Response):
