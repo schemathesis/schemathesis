@@ -251,7 +251,7 @@ This release contains only documentation updates which are necessary to upload t
 
 
 - ``ValueError`` during sending a request with test payload if the endpoint defines a parameter with ``type: array`` and ``in: formData``. `#661`_
-- ``KeyError``while processing a schema with nullable parameters and ``in: body``. `#660`_
+- ``KeyError`` while processing a schema with nullable parameters and ``in: body``. `#660`_
 - ``StopIteration`` during ``requestBody`` processing if it has empty "content" value. `#673`_
 - ``AttributeError`` during generation of "multipart/form-data" parameters that have no "type" defined. `#675`_
 - Support for properties named "$ref" in object schemas. Previously, it was causing ``TypeError``. `#672`_
@@ -666,7 +666,7 @@ Deprecated
 **Changed**
 
 
-- Move processing of ``runner`` parameters to ``runner.prepare``. This change will provide better code reuse since all users of ``runner`` (e.g., if you extended it in your project`) need some kind of input parameters handling, which was implemented only in Schemathesis CLI. It is not backward-compatible. If you didn't use ``runner`` directly, then this change should not have a visible effect on your use-case.
+- Move processing of ``runner`` parameters to ``runner.prepare``. This change will provide better code reuse since all users of ``runner`` (e.g., if you extended it in your project) need some kind of input parameters handling, which was implemented only in Schemathesis CLI. It is not backward-compatible. If you didn't use ``runner`` directly, then this change should not have a visible effect on your use-case.
 
 `0.28.0`_ - 2020-03-31
 ----------------------
