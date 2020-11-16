@@ -1,6 +1,6 @@
 import re
 from contextlib import contextmanager
-from typing import Dict, Generator, Optional, Tuple
+from typing import Dict, Generator, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import click
@@ -123,6 +123,14 @@ def convert_stateful(ctx: click.core.Context, param: click.core.Parameter, value
     if value is None:
         return value
     return Stateful[value]
+
+
+def convert_request_tls_verify(ctx: click.core.Context, param: click.core.Parameter, value: str) -> Union[str, bool]:
+    if value.lower() in ("y", "yes", "t", "true", "on", "1"):
+        return True
+    if value.lower() in ("n", "no", "f", "false", "off", "0"):
+        return False
+    return value
 
 
 @contextmanager

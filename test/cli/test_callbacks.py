@@ -75,3 +75,15 @@ def test_reraise_format_error():
 def test_validate_regex(value):
     with pytest.raises(click.BadParameter, match="Invalid regex: "):
         callbacks.validate_regex(None, None, (value,))
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    (
+        ("On", True),
+        ("F", False),
+        ("/tmp/cert.pem", "/tmp/cert.pem"),
+    ),
+)
+def test_convert_request_tls_verify(value, expected):
+    assert callbacks.convert_request_tls_verify(None, None, value) == expected

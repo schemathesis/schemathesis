@@ -2,7 +2,7 @@ import ctypes
 import threading
 import time
 from queue import Queue
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, cast
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Union, cast
 
 import attr
 import hypothesis
@@ -161,6 +161,7 @@ class ThreadPoolRunner(BaseRunner):
     """Spread different tests among multiple worker threads."""
 
     workers_num: int = attr.ib(default=2)  # pragma: no mutate
+    request_tls_verify: Union[bool, str] = attr.ib(default=True)  # pragma: no mutate
 
     def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         """All events come from a queue where different workers push their events."""
@@ -241,6 +242,7 @@ class ThreadPoolRunner(BaseRunner):
             "stateful_recursion_limit": self.stateful_recursion_limit,
             "kwargs": {
                 "request_timeout": self.request_timeout,
+                "request_tls_verify": self.request_tls_verify,
                 "store_interactions": self.store_interactions,
                 "max_response_time": self.max_response_time,
             },

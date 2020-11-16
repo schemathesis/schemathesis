@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- ``--request-tls-verify`` CLI option, that controls whether Schemathesis verifies the server's TLS certificate.
+  You can also pass the path to a CA_BUNDLE file for private certs. `#830`_
+
 **Fixed**
 
 - Handling of 204 responses in the ``response_schema_conformance`` check. Before, all responses were required to have the
@@ -1515,6 +1520,7 @@ Deprecated
 .. _#839: https://github.com/schemathesis/schemathesis/issues/839
 .. _#836: https://github.com/schemathesis/schemathesis/issues/836
 .. _#832: https://github.com/schemathesis/schemathesis/issues/832
+.. _#830: https://github.com/schemathesis/schemathesis/issues/830
 .. _#824: https://github.com/schemathesis/schemathesis/issues/824
 .. _#816: https://github.com/schemathesis/schemathesis/issues/816
 .. _#814: https://github.com/schemathesis/schemathesis/issues/814
