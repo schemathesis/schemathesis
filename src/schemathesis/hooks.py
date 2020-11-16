@@ -1,4 +1,5 @@
 import inspect
+import warnings
 from collections import defaultdict
 from enum import Enum, unique
 from typing import TYPE_CHECKING, Any, Callable, DefaultDict, Dict, List, Optional, Union, cast
@@ -154,6 +155,12 @@ class HookDispatcher:
 
     def dispatch(self, name: str, context: HookContext, *args: Any, **kwargs: Any) -> None:
         """Run all hooks for the given name."""
+        if name == "before_generate_form_data":
+            warnings.warn(
+                "The `before_generate_form_data` hook is deprecated and will be removed in Schemathesis 3.0."
+                "From that release you'll need to use `before_generate_body` instead.",
+                DeprecationWarning,
+            )
         for hook in self.get_all_by_name(name):
             hook(context, *args, **kwargs)
 
