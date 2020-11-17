@@ -113,7 +113,6 @@ def prepare(
         store_interactions=store_interactions,
         fixups=fixups,
         stateful=stateful,
-        stateful_recursion_limit=stateful_recursion_limit,
     )
 
 
@@ -166,7 +165,6 @@ def execute_from_schema(
     store_interactions: bool = False,
     fixups: Iterable[str] = (),
     stateful: Optional[Stateful] = None,
-    stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Execute tests for the given schema.
 
@@ -221,7 +219,6 @@ def execute_from_schema(
                     dry_run=dry_run,
                     store_interactions=store_interactions,
                     stateful=stateful,
-                    stateful_recursion_limit=stateful_recursion_limit,
                 )
             elif isinstance(schema.app, Starlette):
                 runner = ThreadPoolASGIRunner(
@@ -238,7 +235,6 @@ def execute_from_schema(
                     dry_run=dry_run,
                     store_interactions=store_interactions,
                     stateful=stateful,
-                    stateful_recursion_limit=stateful_recursion_limit,
                 )
 
             else:
@@ -257,7 +253,6 @@ def execute_from_schema(
                     dry_run=dry_run,
                     store_interactions=store_interactions,
                     stateful=stateful,
-                    stateful_recursion_limit=stateful_recursion_limit,
                 )
 
         else:
@@ -278,7 +273,6 @@ def execute_from_schema(
                     dry_run=dry_run,
                     store_interactions=store_interactions,
                     stateful=stateful,
-                    stateful_recursion_limit=stateful_recursion_limit,
                 )
             elif isinstance(schema.app, Starlette):
                 runner = SingleThreadASGIRunner(
@@ -295,7 +289,6 @@ def execute_from_schema(
                     dry_run=dry_run,
                     store_interactions=store_interactions,
                     stateful=stateful,
-                    stateful_recursion_limit=stateful_recursion_limit,
                 )
             else:
                 runner = SingleThreadWSGIRunner(
@@ -312,7 +305,6 @@ def execute_from_schema(
                     dry_run=dry_run,
                     store_interactions=store_interactions,
                     stateful=stateful,
-                    stateful_recursion_limit=stateful_recursion_limit,
                 )
 
         yield from runner.execute()

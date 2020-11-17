@@ -342,7 +342,6 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "dry_run": False,
         "fixups": (),
         "stateful": None,
-        "stateful_recursion_limit": 5,
         "auth": None,
         "auth_type": None,
         "headers": {},
