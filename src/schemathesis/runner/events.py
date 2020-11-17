@@ -58,15 +58,13 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
     method: str = attr.ib()  # pragma: no mutate
     path: str = attr.ib()  # pragma: no mutate
     relative_path: str = attr.ib()  # pragma: no mutate
-    recursion_level: int = attr.ib()  # pragma: no mutate
 
     @classmethod
-    def from_operation(cls, operation: APIOperation, recursion_level: int) -> "BeforeExecution":
+    def from_operation(cls, operation: APIOperation) -> "BeforeExecution":
         return cls(
             method=operation.method.upper(),
             path=operation.full_path,
             relative_path=operation.path,
-            recursion_level=recursion_level,
         )
 
 

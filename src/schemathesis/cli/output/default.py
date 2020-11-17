@@ -322,11 +322,6 @@ def handle_before_execution(context: ExecutionContext, event: events.BeforeExecu
     # We should display execution result + percentage in the end. For example:
     max_length = get_terminal_width() - len(" . [XXX%]") - len(TRUNCATION_PLACEHOLDER)
     message = f"{event.method} {event.path}"
-    if event.recursion_level > 0:
-        message = f"{'    ' * event.recursion_level}-> {message}"
-        # This value is not `None` - the value is set in runtime before this line
-        context.operations_count += 1  # type: ignore
-
     message = message[:max_length] + (message[max_length:] and "[...]") + " "
     context.current_line_length = len(message)
     click.echo(message, nl=False)

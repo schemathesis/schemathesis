@@ -19,7 +19,6 @@ class SingleThreadRunner(BaseRunner):
         auth = get_requests_auth(self.auth, self.auth_type)
         with get_session(auth) as session:
             yield from self._run_tests(
-                self.schema.get_all_tests,
                 network_test,
                 self.hypothesis_settings,
                 self.seed,
@@ -40,7 +39,6 @@ class SingleThreadRunner(BaseRunner):
 class SingleThreadWSGIRunner(SingleThreadRunner):
     def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         yield from self._run_tests(
-            self.schema.get_all_tests,
             wsgi_test,
             self.hypothesis_settings,
             self.seed,
@@ -60,7 +58,6 @@ class SingleThreadWSGIRunner(SingleThreadRunner):
 class SingleThreadASGIRunner(SingleThreadRunner):
     def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         yield from self._run_tests(
-            self.schema.get_all_tests,
             asgi_test,
             self.hypothesis_settings,
             self.seed,

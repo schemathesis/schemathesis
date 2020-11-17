@@ -1563,35 +1563,6 @@ def test_colon_in_headers(cli, schema_url, app):
     assert app["incoming_requests"][0].headers[header] == value
 
 
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_openapi_links(cli, cli_args, schema_url, hypothesis_max_examples):
-    # When the schema contains Open API links or Swagger 2 extension for links
-    # And these links are nested - API operations in these links contain links to another operations
-    result = cli.run(
-        *cli_args,
-        f"--hypothesis-max-examples={hypothesis_max_examples or 2}",
-        "--hypothesis-seed=1",
-        "--hypothesis-derandomize",
-        "--hypothesis-deadline=None",
-        "--show-errors-tracebacks",
-        "--stateful=links",
-    )
-    lines = result.stdout.splitlines()
-    # Note, it might fail if it uncovers the placed bug, which this version of stateful testing should not uncover
-    # It is pretty rare and requires a high number for the `max_examples` setting. This version is staged for removal
-    # Therefore it won't be fixed
-    assert result.exit_code == ExitCode.OK, result.stdout
-    # Then these links should be tested
-    # And lines with the results of these tests should be indented
-    assert lines[11].startswith("    -> GET /api/users/{user_id} .")
-    # And percentage should be adjusted appropriately
-    assert lines[11].endswith("[ 50%]")
-    assert lines[12].startswith("        -> PATCH /api/users/{user_id} .")
-    assert lines[12].endswith("[ 60%]")
-    assert lines[13].startswith("    -> PATCH /api/users/{user_id} .")
-    assert lines[13].endswith("[ 66%]")
-
-
 @pytest.mark.parametrize("recursion_limit, expected", ((1, "....."), (5, "......")))
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_limit, hypothesis_max_examples, expected):

@@ -16,7 +16,6 @@ from requests.auth import HTTPDigestAuth, _basic_auth_str
 
 from ...constants import (
     DEFAULT_DEADLINE,
-    DEFAULT_STATEFUL_RECURSION_LIMIT,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
     USER_AGENT,
     DataGenerationMethod,
@@ -26,7 +25,7 @@ from ...hooks import HookContext, get_all_by_name
 from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResult, TestResultSet
 from ...runner import events
 from ...schemas import BaseSchema
-from ...stateful import Feedback, Stateful
+from ...stateful import Stateful
 from ...targets import Target, TargetContext
 from ...types import RawAuth
 from ...utils import GenericResponse, Ok, WSGIResponse, capture_hypothesis_output, format_exception
@@ -79,43 +78,26 @@ class BaseRunner:
 
     def _run_tests(
         self,
-        maker: Callable,
         template: Callable,
         settings: hypothesis.settings,
         seed: Optional[int],
         results: TestResultSet,
-        recursion_level: int = 0,
         **kwargs: Any,
     ) -> Generator[events.ExecutionEvent, None, None]:
         """Run tests and recursively run additional tests."""
-        if recursion_level > DEFAULT_STATEFUL_RECURSION_LIMIT:
-            return
-        for result, data_generation_method in maker(template, settings, seed):
+        for result, data_generation_method in self.schema.get_all_tests(template, settings, seed):
             if isinstance(result, Ok):
                 operation, test = result.ok()
-                feedback = Feedback(self.stateful, operation)
                 for event in run_test(
                     operation,
                     test,
                     results=results,
-                    feedback=feedback,
-                    recursion_level=recursion_level,
                     data_generation_method=data_generation_method,
                     **kwargs,
                 ):
                     yield event
                     if isinstance(event, events.Interrupted):
                         return
-                # Additional tests, generated via the `feedback` instance
-                yield from self._run_tests(
-                    feedback.get_stateful_tests,
-                    template,
-                    settings,
-                    seed,
-                    recursion_level=recursion_level + 1,
-                    results=results,
-                    **kwargs,
-                )
             else:
                 # Schema errors
                 yield from handle_schema_error(result.err(), results, data_generation_method, recursion_level)
@@ -162,7 +144,6 @@ def run_test(  # pylint: disable=too-many-locals
     targets: Iterable[Target],
     results: TestResultSet,
     headers: Optional[Dict[str, Any]],
-    recursion_level: int,
     **kwargs: Any,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """A single test run with all error handling needed."""
@@ -172,7 +153,7 @@ def run_test(  # pylint: disable=too-many-locals
         overridden_headers=headers,
         data_generation_method=data_generation_method,
     )
-    yield events.BeforeExecution.from_operation(operation=operation, recursion_level=recursion_level)
+    yield events.BeforeExecution.from_operation(operation=operation)
     hypothesis_output: List[str] = []
     errors: List[Exception] = []
     test_start_time = time.monotonic()
@@ -374,7 +355,6 @@ def network_test(
     request_tls_verify: bool,
     store_interactions: bool,
     headers: Optional[Dict[str, Any]],
-    feedback: Feedback,
     max_response_time: Optional[int],
     dry_run: bool,
     errors: List[Exception],
@@ -395,22 +375,20 @@ def network_test(
                 timeout,
                 store_interactions,
                 headers,
-                feedback,
                 request_tls_verify,
-                max_response_time,
-            )
-            add_cases(
-                case,
-                response,
-                _network_test,
-                checks,
-                targets,
-                result,
-                session,
-                timeout,
-                store_interactions,
-                headers,
-                feedback,
+        max_response_time,
+    )
+    add_cases(
+        case,
+        response,
+        _network_test,
+        checks,
+        targets,
+        result,
+        session,
+        timeout,
+        store_interactions,
+        headers,
                 request_tls_verify,
                 max_response_time,
             )
@@ -425,7 +403,6 @@ def _network_test(
     timeout: Optional[float],
     store_interactions: bool,
     headers: Optional[Dict[str, Any]],
-    feedback: Feedback,
     request_tls_verify: bool,
     max_response_time: Optional[int],
 ) -> requests.Response:
@@ -442,7 +419,6 @@ def _network_test(
     finally:
         if store_interactions:
             result.store_requests_response(response, status, check_results)
-    feedback.add_test_case(case, response)
     return response
 
 
@@ -471,7 +447,6 @@ def wsgi_test(
     auth_type: Optional[str],
     headers: Optional[Dict[str, Any]],
     store_interactions: bool,
-    feedback: Feedback,
     max_response_time: Optional[int],
     dry_run: bool,
     errors: List[Exception],
@@ -480,19 +455,8 @@ def wsgi_test(
         headers = _prepare_wsgi_headers(headers, auth, auth_type)
         if not dry_run:
             response = _wsgi_test(
-                case, checks, targets, result, headers, store_interactions, feedback, max_response_time
-            )
-            add_cases(
-                case,
-                response,
-                _wsgi_test,
-                checks,
-                targets,
-                result,
-                headers,
-                store_interactions,
-                feedback,
-                max_response_time,
+                case, checks, targets, result, headers, store_interactions, max_response_time
+            )add_cases(case, response, _wsgi_test, checks, targets, result, headers, store_interactions, max_response_time,
             )
 
 
@@ -503,7 +467,6 @@ def _wsgi_test(
     result: TestResult,
     headers: Dict[str, Any],
     store_interactions: bool,
-    feedback: Feedback,
     max_response_time: Optional[int],
 ) -> WSGIResponse:
     with catching_logs(LogCaptureHandler(), level=logging.DEBUG) as recorded:
@@ -523,7 +486,6 @@ def _wsgi_test(
     finally:
         if store_interactions:
             result.store_wsgi_response(case, response, headers, elapsed, status, check_results)
-    feedback.add_test_case(case, response)
     return response
 
 
@@ -554,7 +516,6 @@ def asgi_test(
     result: TestResult,
     store_interactions: bool,
     headers: Optional[Dict[str, Any]],
-    feedback: Feedback,
     max_response_time: Optional[int],
     dry_run: bool,
     errors: List[Exception],
@@ -565,19 +526,8 @@ def asgi_test(
 
         if not dry_run:
             response = _asgi_test(
-                case, checks, targets, result, store_interactions, headers, feedback, max_response_time
-            )
-            add_cases(
-                case,
-                response,
-                _asgi_test,
-                checks,
-                targets,
-                result,
-                store_interactions,
-                headers,
-                feedback,
-                max_response_time,
+                case, checks, targets, result, store_interactions, headers, max_response_time)
+    add_cases(case, response, _asgi_test, checks, targets, result, store_interactions, headers, max_response_time,
             )
 
 
@@ -588,7 +538,6 @@ def _asgi_test(
     result: TestResult,
     store_interactions: bool,
     headers: Optional[Dict[str, Any]],
-    feedback: Feedback,
     max_response_time: Optional[int],
 ) -> requests.Response:
     response = case.call_asgi(headers=headers)
@@ -604,5 +553,4 @@ def _asgi_test(
     finally:
         if store_interactions:
             result.store_requests_response(response, status, check_results)
-    feedback.add_test_case(case, response)
     return response
