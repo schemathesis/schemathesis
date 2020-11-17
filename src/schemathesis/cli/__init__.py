@@ -2,7 +2,7 @@ import os
 import sys
 import traceback
 from enum import Enum
-from typing import Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
 
 import click
 import hypothesis
@@ -76,6 +76,22 @@ def reset_targets() -> None:
     # Useful in tests
     targets_module.ALL_TARGETS = targets_module.DEFAULT_TARGETS + targets_module.OPTIONAL_TARGETS
     TARGETS_TYPE.choices = _get_callable_names(targets_module.ALL_TARGETS) + ("all",)
+
+
+class DeprecatedOption(click.Option):
+    def __init__(self, *args: Any, removed_in: str, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.removed_in = removed_in
+
+    def handle_parse_result(self, ctx: click.Context, opts: Dict[str, Any], args: List[str]) -> Tuple[Any, List[str]]:
+        if self.name in opts:
+            opt_names = "/".join(f"`{name}`" for name in self.opts)
+            verb = "is" if len(self.opts) == 1 else "are"
+            click.secho(
+                f"\nWARNING: {opt_names} {verb} deprecated and will be removed in Schemathesis {self.removed_in}\n",
+                fg="yellow",
+            )
+        return super().handle_parse_result(ctx, opts, args)
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -239,6 +255,8 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     help="Limit recursion depth for stateful testing.",
     default=DEFAULT_STATEFUL_RECURSION_LIMIT,
     type=click.IntRange(1, 100),
+    cls=DeprecatedOption,
+    removed_in="3.0",
 )
 @click.option(
     "--hypothesis-deadline",
