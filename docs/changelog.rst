@@ -11,7 +11,7 @@ Changelog
 
 **Changed**
 
-- In CLI if an endpoint contains an invalid schema, show a message about the ``--validate-schema`` CLI option. `#855`_
+- In CLI, if an endpoint contains an invalid schema, show a message about the ``--validate-schema`` CLI option. `#855`_
 
 **Fixed**
 
@@ -23,6 +23,8 @@ Changelog
 - Using of ``Case.form_data`` and ``Endpoint.form_data``. In the ``3.0`` release, you'll need to use relevant ``body`` attributes instead.
   This change includes deprecation of the ``before_generate_form_data`` hook, use ``before_generate_body`` instead.
   The reason for this is the upcoming unification of parameter handling and their serialization.
+- ``--stateful-recursion-limit``. It will be removed in ``3.0`` as a part of removing the old stateful testing approach.
+  This parameter is no-op.
 
 `2.7.7`_ - 2020-11-13
 ---------------------
