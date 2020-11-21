@@ -17,6 +17,7 @@ Changelog
 
 - Handling of 204 responses in the ``response_schema_conformance`` check. Before, all responses were required to have the
   ``Content-Type`` header. `#844`_
+- Catch ``OverflowError`` when an invalid regex is passed to ``-E`` / ``-M`` / ``-T`` / ``-O`` CLI options. `#870`_
 
 **Deprecated**
 
@@ -1519,6 +1520,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#870: https://github.com/schemathesis/schemathesis/issues/870
 .. _#858: https://github.com/schemathesis/schemathesis/issues/858
 .. _#855: https://github.com/schemathesis/schemathesis/issues/855
 .. _#851: https://github.com/schemathesis/schemathesis/issues/851
