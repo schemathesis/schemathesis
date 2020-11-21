@@ -42,7 +42,7 @@ def test_validate_app(value):
 def is_invalid_header(header):
     try:
         # We need to avoid generating known valid headers
-        key, value = header.split(":")
+        key, value = header.split(":", maxsplit=1)
         return not (key.strip() and utils.is_latin_1_encodable(key))
     except ValueError:
         return True
