@@ -1532,6 +1532,7 @@ def test_openapi_links(cli, cli_args, schema_url, hypothesis_max_examples):
         f"--hypothesis-max-examples={hypothesis_max_examples or 2}",
         "--hypothesis-seed=1",
         "--hypothesis-derandomize",
+        "--hypothesis-deadline=None",
         "--show-errors-tracebacks",
         "--stateful=links",
     )
@@ -1558,6 +1559,7 @@ def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_lim
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         "--hypothesis-seed=1",
         "--hypothesis-derandomize",
+        "--hypothesis-deadline=None",
         "--show-errors-tracebacks",
         "--stateful=links",
         f"--stateful-recursion-limit={recursion_limit}",
