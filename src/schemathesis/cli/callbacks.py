@@ -13,7 +13,11 @@ from ..stateful import Stateful
 
 def validate_schema(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
     if "app" not in ctx.params:
-        if not urlparse(raw_value).netloc:
+        try:
+            netloc = urlparse(raw_value).netloc
+        except ValueError as exc:
+            raise click.UsageError("Invalid SCHEMA, must be a valid URL or file path.") from exc
+        if not netloc:
             if "\x00" in raw_value or not utils.file_exists(raw_value):
                 raise click.UsageError("Invalid SCHEMA, must be a valid URL or file path.")
             if "base_url" not in ctx.params:

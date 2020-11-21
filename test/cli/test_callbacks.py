@@ -14,6 +14,7 @@ from ..utils import SIMPLE_PATH
 @given(value=st.text().filter(lambda x: "//" not in x))
 @example("0" * 1000)
 @example("//test")
+@example("//ÿ[")
 def test_validate_schema(value):
     with pytest.raises(click.UsageError):
         callbacks.validate_schema(SimpleNamespace(params={}), None, value)
