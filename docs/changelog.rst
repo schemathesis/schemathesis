@@ -12,6 +12,10 @@ Changelog
 
 - The ``content_type_conformance`` check now raises a well-formed error message when encounters a malformed media type value. `#877`_
 
+**Fixed**
+
+- Internal error during verifying explicit examples if an example has no ``value`` key. `#882`_
+
 `2.8.0`_ - 2020-11-24
 ---------------------
 
@@ -1534,6 +1538,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#882: https://github.com/schemathesis/schemathesis/issues/882
 .. _#877: https://github.com/schemathesis/schemathesis/issues/877
 .. _#876: https://github.com/schemathesis/schemathesis/issues/876
 .. _#874: https://github.com/schemathesis/schemathesis/issues/874

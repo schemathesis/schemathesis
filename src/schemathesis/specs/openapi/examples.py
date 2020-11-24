@@ -21,7 +21,7 @@ def get_parameter_examples(endpoint_def: Dict[str, Any], examples_field: str) ->
         {
             "type": LOCATION_TO_CONTAINER.get(parameter["in"]),
             "name": parameter["name"],
-            "examples": [example["value"] for example in parameter[examples_field].values()],
+            "examples": [example["value"] for example in parameter[examples_field].values() if "value" in example],
         }
         for parameter in endpoint_def.get("parameters", [])
         if examples_field in parameter
@@ -55,7 +55,7 @@ def get_request_body_examples(endpoint_def: Dict[str, Any], examples_field: str)
     parameter_type = "body" if media_type != "multipart/form-data" else "form_data"
     return {
         "type": parameter_type,
-        "examples": [example["value"] for example in schema.get(examples_field, {}).values()],
+        "examples": [example["value"] for example in schema.get(examples_field, {}).values() if "value" in example],
     }
 
 
