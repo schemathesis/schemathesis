@@ -24,7 +24,8 @@ disable =
   inconsistent-return-statements,
   too-many-arguments,
   too-many-instance-attributes,
-  too-many-public-methods
+  too-many-public-methods,
+  too-many-locals
 
 
 [REPORTS]
