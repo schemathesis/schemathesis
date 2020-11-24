@@ -343,3 +343,49 @@ def test_static_parameters_union_0():
     assert len(full_sp) == 1
     assert "header1" in full_sp1["headers"] and full_sp1["headers"]["header1"] == "example1 string"
     assert full_sp1["body"] == {"foo1": "example1 string"}
+
+
+EXAMPLE_SCHEMA = {
+    "openapi": "3.0.0",
+    "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
+    "paths": {
+        "/test": {
+            "post": {
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "id",
+                        "schema": {"type": "string"},
+                        "examples": {"foo": {"externalValue": "http://example.com/examples/example.pdf"}},
+                    }
+                ],
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                            },
+                            "examples": {"foo": {"externalValue": "http://example.com/examples/example.pdf"}},
+                        }
+                    },
+                },
+                "responses": {"default": {"description": "test"}},
+            }
+        },
+    },
+}
+
+
+@pytest.mark.parametrize(
+    "func, expected",
+    (
+        (examples.get_request_body_examples, {"examples": [], "type": "body"}),
+        (examples.get_parameter_examples, [{"examples": [], "name": "id", "type": "query"}]),
+    ),
+)
+def test_example_external_value_failure(func, expected):
+    # See GH-882
+    schema = schemathesis.from_dict(EXAMPLE_SCHEMA)
+    endpoint = schema["/test"]["POST"]
+    assert func(endpoint.definition.resolved, "examples") == expected
