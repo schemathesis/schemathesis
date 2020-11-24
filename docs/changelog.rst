@@ -19,6 +19,7 @@ Changelog
   ``Content-Type`` header. `#844`_
 - Catch ``OverflowError`` when an invalid regex is passed to ``-E`` / ``-M`` / ``-T`` / ``-O`` CLI options. `#870`_
 - Internal error in CLI, when the schema location is an invalid IPv6. `#872`_
+- Collecting Open API links behind references via CLI. `#874`_
 
 **Deprecated**
 
@@ -1521,6 +1522,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#874: https://github.com/schemathesis/schemathesis/issues/874
 .. _#872: https://github.com/schemathesis/schemathesis/issues/872
 .. _#870: https://github.com/schemathesis/schemathesis/issues/870
 .. _#858: https://github.com/schemathesis/schemathesis/issues/858
