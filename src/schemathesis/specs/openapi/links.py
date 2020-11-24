@@ -156,7 +156,7 @@ class Link(StatefulTest):
 
 def get_links(response: GenericResponse, endpoint: Endpoint, field: str) -> Sequence[Link]:
     """Get `x-links` / `links` definitions from the schema."""
-    responses = endpoint.definition.raw["responses"]
+    responses = endpoint.definition.resolved["responses"]
     if str(response.status_code) in responses:
         response_definition = responses[str(response.status_code)]
     else:

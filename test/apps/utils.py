@@ -221,21 +221,7 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
                         },
                     }
                 ],
-                "responses": {
-                    "201": {
-                        "description": "OK",
-                        "x-links": {
-                            "GetUserByUserId": {
-                                "operationId": "getUser",
-                                "parameters": {
-                                    "path.user_id": "$response.body#/id",
-                                    "query.user_id": "$response.body#/id",
-                                },
-                            },
-                            "UpdateUserById": {"$ref": "#/x-components/x-links/UpdateUserById"},
-                        },
-                    }
-                },
+                "responses": {"201": {"$ref": "#/x-components/responses/ResponseWithLinks"}},
             }
             add_link(
                 "UpdateUserById",
@@ -245,6 +231,21 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
                     "requestBody": {"username": "foo"},
                 },
             )
+            template["x-components"]["responses"] = {
+                "ResponseWithLinks": {
+                    "description": "OK",
+                    "x-links": {
+                        "GetUserByUserId": {
+                            "operationId": "getUser",
+                            "parameters": {
+                                "path.user_id": "$response.body#/id",
+                                "query.user_id": "$response.body#/id",
+                            },
+                        },
+                        "UpdateUserById": {"$ref": "#/x-components/x-links/UpdateUserById"},
+                    },
+                }
+            }
         elif endpoint == "get_user":
             parent = template["paths"].setdefault(path, {})
             parent["parameters"] = [{"in": "path", "name": "user_id", "required": True, "type": "integer"}]
@@ -479,21 +480,7 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                         }
                     },
                 },
-                "responses": {
-                    "201": {
-                        "description": "OK",
-                        "links": {
-                            "GetUserByUserId": {
-                                "operationId": "getUser",
-                                "parameters": {
-                                    "path.user_id": "$response.body#/id",
-                                    "query.user_id": "$response.body#/id",
-                                },
-                            },
-                            "UpdateUserById": {"$ref": "#/components/links/UpdateUserById"},
-                        },
-                    }
-                },
+                "responses": {"201": {"$ref": "#/components/responses/ResponseWithLinks"}},
             }
             add_link(
                 "UpdateUserById",
@@ -503,6 +490,21 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                     "requestBody": {"username": "foo"},
                 },
             )
+            template["components"]["responses"] = {
+                "ResponseWithLinks": {
+                    "description": "OK",
+                    "links": {
+                        "GetUserByUserId": {
+                            "operationId": "getUser",
+                            "parameters": {
+                                "path.user_id": "$response.body#/id",
+                                "query.user_id": "$response.body#/id",
+                            },
+                        },
+                        "UpdateUserById": {"$ref": "#/components/links/UpdateUserById"},
+                    },
+                }
+            }
         elif endpoint == "get_user":
             parent = template["paths"].setdefault(path, {})
             parent["parameters"] = [{"in": "path", "name": "user_id", "required": True, "schema": {"type": "integer"}}]
