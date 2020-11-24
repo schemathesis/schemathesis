@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Any, Dict, Generator, Optional, Union
 
 from ...exceptions import (
     get_headers_error,
+    get_malformed_media_type_error,
     get_missing_content_type_error,
     get_response_type_error,
     get_status_code_error,
@@ -48,8 +49,11 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> Optiona
     if not content_type:
         raise get_missing_content_type_error()("Response is missing the `Content-Type` header")
     for option in content_types:
-        if are_content_types_equal(option, content_type):
-            return None
+        try:
+            if are_content_types_equal(option, content_type):
+                return None
+        except ValueError as exc:
+            raise get_malformed_media_type_error(str(exc))(str(exc)) from exc
         expected_main, expected_sub = parse_content_type(option)
         received_main, received_sub = parse_content_type(content_type)
     exc_class = get_response_type_error(f"{expected_main}_{expected_sub}", f"{received_main}_{received_sub}")

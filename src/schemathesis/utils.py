@@ -130,8 +130,11 @@ def format_exception(error: Exception, include_traceback: bool = False) -> str:
 
 def parse_content_type(content_type: str) -> Tuple[str, str]:
     """Parse Content Type and return main type and subtype."""
-    content_type, _ = cgi.parse_header(content_type)
-    main_type, sub_type = content_type.split("/", 1)
+    try:
+        content_type, _ = cgi.parse_header(content_type)
+        main_type, sub_type = content_type.split("/", 1)
+    except ValueError as exc:
+        raise ValueError(f"Malformed media type: `{content_type}`") from exc
     return main_type.lower(), sub_type.lower()
 
 
