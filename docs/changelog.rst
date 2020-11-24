@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`2.8.0`_ - 2020-11-24
+---------------------
+
 **Added**
 
 - ``--request-tls-verify`` CLI option, that controls whether Schemathesis verifies the server's TLS certificate.
@@ -1413,7 +1416,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.7.7...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.8.0...HEAD
+.. _2.8.0: https://github.com/schemathesis/schemathesis/compare/v2.7.7...v2.8.0
 .. _2.7.7: https://github.com/schemathesis/schemathesis/compare/v2.7.6...v2.7.7
 .. _2.7.6: https://github.com/schemathesis/schemathesis/compare/v2.7.5...v2.7.6
 .. _2.7.5: https://github.com/schemathesis/schemathesis/compare/v2.7.4...v2.7.5
