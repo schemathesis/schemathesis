@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- ``--force-schema-version`` CLI option to force Schemathesis to use the specific Open API spec version when parsing the schema. `#876`_
+
 `2.8.0`_ - 2020-11-24
 ---------------------
 
@@ -1526,6 +1530,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#876: https://github.com/schemathesis/schemathesis/issues/876
 .. _#874: https://github.com/schemathesis/schemathesis/issues/874
 .. _#872: https://github.com/schemathesis/schemathesis/issues/872
 .. _#870: https://github.com/schemathesis/schemathesis/issues/870

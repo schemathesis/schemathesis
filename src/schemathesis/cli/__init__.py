@@ -259,6 +259,11 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     removed_in="3.0",
 )
 @click.option(
+    "--force-schema-version",
+    help="Force Schemathesis to parse the input schema with the specified spec version.",
+    type=click.Choice(["20", "30"]),
+)
+@click.option(
     "--hypothesis-deadline",
     help="Duration in milliseconds that each individual example with a test is not allowed to exceed.",
     # max value to avoid overflow. It is the maximum amount of days in milliseconds
@@ -314,6 +319,7 @@ def run(
     fixups: Tuple[str] = (),  # type: ignore
     stateful: Optional[Stateful] = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
+    force_schema_version: Optional[str] = None,
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
     hypothesis_derandomize: Optional[bool] = None,
     hypothesis_max_examples: Optional[int] = None,
@@ -362,6 +368,7 @@ def run(
         fixups=fixups,
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,
+        force_schema_version=force_schema_version,
         hypothesis_deadline=hypothesis_deadline,
         hypothesis_derandomize=hypothesis_derandomize,
         hypothesis_max_examples=hypothesis_max_examples,

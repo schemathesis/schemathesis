@@ -33,6 +33,7 @@ def from_path(
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    force_schema_version: Optional[str] = None,
 ) -> BaseOpenAPISchema:
     """Load a file from OS path and parse to schema instance."""
     with open(path) as fd:
@@ -48,6 +49,7 @@ def from_path(
             validate_schema=validate_schema,
             skip_deprecated_endpoints=skip_deprecated_endpoints,
             data_generation_methods=data_generation_methods,
+            force_schema_version=force_schema_version,
         )
 
 
@@ -64,6 +66,7 @@ def from_uri(
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    force_schema_version: Optional[str] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load a remote resource and parse to schema instance."""
@@ -89,6 +92,7 @@ def from_uri(
         validate_schema=validate_schema,
         skip_deprecated_endpoints=skip_deprecated_endpoints,
         data_generation_methods=data_generation_methods,
+        force_schema_version=force_schema_version,
     )
 
 
@@ -105,6 +109,7 @@ def from_file(
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    force_schema_version: Optional[str] = None,
     **kwargs: Any,  # needed in the runner to have compatible API across all loaders
 ) -> BaseOpenAPISchema:
     """Load a file content and parse to schema instance.
@@ -124,6 +129,7 @@ def from_file(
         validate_schema=validate_schema,
         skip_deprecated_endpoints=skip_deprecated_endpoints,
         data_generation_methods=data_generation_methods,
+        force_schema_version=force_schema_version,
     )
 
 
@@ -140,10 +146,12 @@ def from_dict(
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    force_schema_version: Optional[str] = None,
 ) -> BaseOpenAPISchema:
     """Get a proper abstraction for the given raw schema."""
     dispatch("before_load_schema", HookContext(), raw_schema)
-    if "swagger" in raw_schema:
+
+    def init_openapi_2() -> SwaggerV20:
         _maybe_validate_schema(raw_schema, definitions.SWAGGER_20, validate_schema)
         return SwaggerV20(
             raw_schema,
@@ -159,7 +167,7 @@ def from_dict(
             data_generation_methods=data_generation_methods,
         )
 
-    if "openapi" in raw_schema:
+    def init_openapi_3() -> OpenApi30:
         _maybe_validate_schema(raw_schema, definitions.OPENAPI_30, validate_schema)
         return OpenApi30(
             raw_schema,
@@ -174,6 +182,15 @@ def from_dict(
             skip_deprecated_endpoints=skip_deprecated_endpoints,
             data_generation_methods=data_generation_methods,
         )
+
+    if force_schema_version == "20":
+        return init_openapi_2()
+    if force_schema_version == "30":
+        return init_openapi_3()
+    if "swagger" in raw_schema:
+        return init_openapi_2()
+    if "openapi" in raw_schema:
+        return init_openapi_3()
     raise ValueError("Unsupported schema type")
 
 
@@ -219,6 +236,7 @@ def from_wsgi(
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    force_schema_version: Optional[str] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     headers = kwargs.setdefault("headers", {})
@@ -242,6 +260,7 @@ def from_wsgi(
         validate_schema=validate_schema,
         skip_deprecated_endpoints=skip_deprecated_endpoints,
         data_generation_methods=data_generation_methods,
+        force_schema_version=force_schema_version,
     )
 
 
@@ -265,6 +284,7 @@ def from_aiohttp(
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    force_schema_version: Optional[str] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     from .extra._aiohttp import run_server  # pylint: disable=import-outside-toplevel
@@ -282,6 +302,7 @@ def from_aiohttp(
         validate_schema=validate_schema,
         skip_deprecated_endpoints=skip_deprecated_endpoints,
         data_generation_methods=data_generation_methods,
+        force_schema_version=force_schema_version,
         **kwargs,
     )
 
@@ -296,6 +317,7 @@ def from_asgi(
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    force_schema_version: Optional[str] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     headers = kwargs.setdefault("headers", {})
@@ -318,4 +340,5 @@ def from_asgi(
         validate_schema=validate_schema,
         skip_deprecated_endpoints=skip_deprecated_endpoints,
         data_generation_methods=data_generation_methods,
+        force_schema_version=force_schema_version,
     )

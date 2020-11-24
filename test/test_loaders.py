@@ -6,6 +6,7 @@ from yarl import URL
 
 import schemathesis
 from schemathesis.constants import USER_AGENT
+from schemathesis.specs.openapi.schemas import OpenApi30, SwaggerV20
 
 from .utils import SIMPLE_PATH, make_schema
 
@@ -119,3 +120,20 @@ def test_number_deserializing(testdir):
     # and the value should be a number
     value = parsed.raw_schema["paths"]["/teapot"]["get"]["parameters"][0]["schema"]["multipleOf"]
     assert isinstance(value, float)
+
+
+@pytest.mark.parametrize(
+    "version, expected",
+    (
+        ("20", SwaggerV20),
+        ("30", OpenApi30),
+    ),
+)
+def test_force_open_api_version(version, expected):
+    schema = {
+        # Invalid schema, but it happens in real applications
+        "swagger": "2.0",
+        "openapi": "3.0.0",
+    }
+    loaded = schemathesis.from_dict(schema, force_schema_version=version, validate_schema=False)
+    assert isinstance(loaded, expected)

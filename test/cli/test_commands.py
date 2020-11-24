@@ -223,6 +223,9 @@ def test_commands_run_help(cli):
         "  --stateful [links]              Utilize stateful testing capabilities.",
         "  --stateful-recursion-limit INTEGER RANGE",
         "                                  Limit recursion depth for stateful testing.",
+        "  --force-schema-version [20|30]  Force Schemathesis to parse the input schema",
+        "                                  with the specified spec version.",
+        "",
         "  --hypothesis-deadline INTEGER RANGE",
         "                                  Duration in milliseconds that each individual",
         "                                  example with a test is not allowed to exceed.",
@@ -308,6 +311,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "validate_schema": True,
         "data_generation_methods": [DataGenerationMethod.default()],
         "skip_deprecated_endpoints": False,
+        "force_schema_version": None,
         "loader": from_uri,
         "hypothesis_options": {},
         "workers_num": 1,
@@ -365,6 +369,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
         "operation_id": (),
         "validate_schema": True,
         "skip_deprecated_endpoints": False,
+        "force_schema_version": None,
         **expected,
     }
 
