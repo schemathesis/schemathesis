@@ -56,6 +56,7 @@ def prepare(
     app: Optional[str] = None,
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
+    force_schema_version: Optional[str] = None,
     # Hypothesis-specific configuration
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
     hypothesis_derandomize: Optional[bool] = None,
@@ -93,6 +94,7 @@ def prepare(
         app=app,
         validate_schema=validate_schema,
         skip_deprecated_endpoints=skip_deprecated_endpoints,
+        force_schema_version=force_schema_version,
         checks=checks,
         data_generation_methods=data_generation_methods,
         max_response_time=max_response_time,
@@ -144,6 +146,7 @@ def execute_from_schema(
     app: Optional[str] = None,
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
+    force_schema_version: Optional[str] = None,
     checks: Iterable[CheckFunction],
     data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
     max_response_time: Optional[int] = None,
@@ -191,6 +194,7 @@ def execute_from_schema(
             tag=tag,
             operation_id=operation_id,
             data_generation_methods=data_generation_methods,
+            force_schema_version=force_schema_version,
         )
 
         runner: BaseRunner
@@ -315,6 +319,7 @@ def load_schema(
     validate_schema: bool = True,
     skip_deprecated_endpoints: bool = False,
     data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
+    force_schema_version: Optional[str] = None,
     # Network request parameters
     auth: Optional[Tuple[str, str]] = None,
     auth_type: Optional[str] = None,
@@ -354,6 +359,7 @@ def load_schema(
         schema_uri,
         validate_schema=validate_schema,
         skip_deprecated_endpoints=skip_deprecated_endpoints,
+        force_schema_version=force_schema_version,
         **loader_options,
     )
 
