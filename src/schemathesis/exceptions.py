@@ -52,6 +52,11 @@ def get_response_type_error(expected: str, received: str) -> Type[CheckFailed]:
     return get_exception(name)
 
 
+def get_malformed_media_type_error(media_type: str) -> Type[CheckFailed]:
+    name = f"MalformedMediaType{media_type}"
+    return get_exception(name)
+
+
 def get_missing_content_type_error() -> Type[CheckFailed]:
     """Return new exception for a missing Content-Type header."""
     return get_exception("MissingContentTypeError")

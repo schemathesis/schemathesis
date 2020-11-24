@@ -151,6 +151,23 @@ def test_content_type_conformance_default_response(content_type, is_error):
     assert_content_type_conformance(raw_schema, content_type, is_error)
 
 
+def test_malformed_content_type():
+    # When the verified content type is malformed
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {"default": {"description": "OK", "content": {"application:json": {"schema": {}}}}},
+                }
+            }
+        },
+    }
+    # Then it should raise an assertion error, rather than an internal one
+    assert_content_type_conformance(raw_schema, "application/json", True, "Malformed media type: `application:json`")
+
+
 def test_content_type_conformance_another_status_code():
     # When the schema only defines a response for status code 400
     raw_schema = {
@@ -169,7 +186,7 @@ def test_content_type_conformance_another_status_code():
     assert_content_type_conformance(raw_schema, "application/xml", False)
 
 
-def assert_content_type_conformance(raw_schema, content_type, is_error):
+def assert_content_type_conformance(raw_schema, content_type, is_error, match=None):
     schema = schemathesis.from_dict(raw_schema)
     endpoint = schema.endpoints["/users"]["get"]
     case = models.Case(endpoint)
@@ -177,7 +194,7 @@ def assert_content_type_conformance(raw_schema, content_type, is_error):
     if not is_error:
         assert content_type_conformance(response, case) is None
     else:
-        with pytest.raises(AssertionError):
+        with pytest.raises(AssertionError, match=match):
             content_type_conformance(response, case)
 
 
