@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`2.8.2`_ - 2020-11-25
+---------------------
+
 **Fixed**
 
 - Internal error in CLI, when the ``base_url`` is an invalid IPv6. `#890`_
@@ -1436,7 +1439,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.8.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.8.2...HEAD
+.. _2.8.2: https://github.com/schemathesis/schemathesis/compare/v2.8.1...v2.8.2
 .. _2.8.1: https://github.com/schemathesis/schemathesis/compare/v2.8.0...v2.8.1
 .. _2.8.0: https://github.com/schemathesis/schemathesis/compare/v2.7.7...v2.8.0
 .. _2.7.7: https://github.com/schemathesis/schemathesis/compare/v2.7.6...v2.7.7
