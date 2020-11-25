@@ -1,6 +1,6 @@
 import enum
 import json
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, Generator, List, Optional, Tuple, Union
 
 import attr
 import hypothesis
@@ -147,11 +147,14 @@ class APIStateMachine(RuleBasedStateMachine):
     Exposes additional extension points in the testing process.
     """
 
-    bundles: Dict[str, CaseInsensitiveDict]
+    # This is a convenience attribute, which happened to clash with `RuleBasedStateMachine` instance level attribute
+    # They don't interfere, since it is properly overridden on the Hypothesis side, but it is likely that this
+    # attribute will be renamed in the future
+    bundles: ClassVar[Dict[str, CaseInsensitiveDict]]  # type: ignore
     schema: "BaseSchema"
 
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__()  # type: ignore
         self.setup()
 
     def _pretty_print(self, value: Any) -> str:
@@ -160,8 +163,8 @@ class APIStateMachine(RuleBasedStateMachine):
         if isinstance(value, tuple) and len(value) == 2:
             result, direction = value
             wrapper = _DirectionWrapper(direction)
-            return super()._pretty_print((result, wrapper))
-        return super()._pretty_print(value)
+            return super()._pretty_print((result, wrapper))  # type: ignore
+        return super()._pretty_print(value)  # type: ignore
 
     def setup(self) -> None:
         """Hook method that runs unconditionally in the beginning of each test scenario.
