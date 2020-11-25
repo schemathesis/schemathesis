@@ -308,7 +308,7 @@ class Case:  # pylint: disable=too-many-public-methods
             code = self.get_code_to_reproduce(request=response.request)
             raise exception_cls(
                 f"\n\n{formatted_errors}\n\n----------\n\n"
-                f"Run this Python code to reproduce this response: \n\n    {code}"
+                f"Run this Python code to reproduce this response: \n\n    {code}\n"
             )
 
     def call_and_validate(

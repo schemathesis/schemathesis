@@ -21,6 +21,8 @@ def get_exception(name: str) -> Type[CheckFailed]:
         exception_class = CACHE[name]
     else:
         exception_class = type(name, (CheckFailed,), {})
+        exception_class.__qualname__ = CheckFailed.__name__
+        exception_class.__name__ = CheckFailed.__name__
         CACHE[name] = exception_class
     return exception_class
 

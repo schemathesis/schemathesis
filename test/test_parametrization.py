@@ -4,6 +4,7 @@ from packaging import version
 
 import schemathesis
 
+from .apps import OpenAPIVersion
 from .utils import integer
 
 
@@ -763,3 +764,23 @@ def test_(request, case):
     # Then it should not be propagated & collection should be continued
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r".*\[GET:/v1/users\]"])
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.endpoints("multiple_failures")
+def test_exceptions_output(testdir, app_schema, openapi3_base_url, openapi_version):
+    # When Schemathesis exceptions are in the pytest's output
+    testdir.make_test(
+        f"""
+schema.base_url = "{openapi3_base_url}"
+
+@schema.parametrize()
+@settings(max_examples=10)
+def test_(case):
+    case.call_and_validate()
+""",
+        schema=app_schema,
+    )
+    result = testdir.runpytest("--hypothesis-seed=42")
+    # Then it should not output the internal name of the exception class, but a common name instead
+    assert "schemathesis.exceptions.CheckFailed: " in result.outlines
