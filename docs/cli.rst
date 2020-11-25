@@ -398,6 +398,12 @@ And if your schema defines ``servers`` like this:
 
 Then the tests will be executed against ``/api/v2`` base path.
 
+The ``--base-url`` argument is also used if you wish to load the OpenAPI specification from a local file.
+
+.. code:: bash
+
+    schemathesis run --base-url=http://127.0.0.1:8080/api/v1 path/to/openapi.json
+
 Extending CLI
 -------------
 
