@@ -164,7 +164,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
             message = f"{idx}. {check.message}"
         else:
             message = None
-        example = cast(SerializedCase, check.example)  # filtered in `_get_unique_failures`
+        example = cast(SerializedCase, check.example)  # filtered in `get_unique_failures`
         display_example(context, example, message, result.seed)
         # Display every time except the last check
         if idx != len(checks):
@@ -194,9 +194,9 @@ def display_example(
         click.secho(line, fg="red")
     if case.text_lines:
         click.echo()
-    click.secho(f"Run this Python code to reproduce this failure: \n\n    {case.requests_code}", fg="red")
+    click.secho(f"Run this Python code to reproduce this failure: \n\n    {case.requests_code}\n", fg="red")
     if seed is not None:
-        click.secho(f"\nOr add this option to your command line parameters: --hypothesis-seed={seed}", fg="red")
+        click.secho(f"Or add this option to your command line parameters: --hypothesis-seed={seed}", fg="red")
 
 
 def display_application_logs(context: ExecutionContext, event: events.Finished) -> None:

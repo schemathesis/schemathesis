@@ -153,6 +153,7 @@ def run_test(  # pylint: disable=too-many-locals
         result.add_error(error)
     test_elapsed_time = time.monotonic() - test_start_time
     # Fetch seed value, hypothesis generates it during test execution
+    # It may be `None` if the `derandomize` config option is set to `True`
     result.seed = getattr(test, "_hypothesis_internal_use_seed", None) or getattr(
         test, "_hypothesis_internal_use_generated_seed", None
     )
