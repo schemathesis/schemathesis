@@ -205,7 +205,7 @@ def test_not_a_server_error(value, swagger_20):
     case = make_case(swagger_20, {})
     with pytest.raises(AssertionError) as exc_info:
         not_a_server_error(response, case)
-    assert exc_info.type.__name__ == f"StatusCodeError{value}"
+    assert exc_info.type.__name__ == "CheckFailed"
 
 
 @pytest.mark.parametrize("value", (400, 405))
@@ -223,7 +223,7 @@ def test_status_code_conformance_invalid(value, swagger_20):
     case = make_case(swagger_20, {"responses": {"5XX"}})
     with pytest.raises(AssertionError) as exc_info:
         status_code_conformance(response, case)
-    assert exc_info.type.__name__ == f"StatusCodeError{value}"
+    assert exc_info.type.__name__ == "CheckFailed"
 
 
 @pytest.mark.parametrize("spec", ("swagger", "openapi"), indirect=["spec"])
@@ -239,7 +239,7 @@ def test_content_type_conformance_invalid(spec, response, case):
     )
     with pytest.raises(AssertionError, match=message) as exc_info:
         content_type_conformance(response, case)
-    assert "SchemaValidationError" in exc_info.type.__name__
+    assert exc_info.type.__name__ == "CheckFailed"
 
 
 def test_invalid_schema_on_content_type_check():
@@ -407,7 +407,7 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
     with pytest.raises(AssertionError) as exc_info:
         response_schema_conformance(response, case)
     assert not case.endpoint.is_response_valid(response)
-    assert "SchemaValidationError" in exc_info.type.__name__
+    assert exc_info.type.__name__ == "CheckFailed"
 
 
 @pytest.mark.parametrize(

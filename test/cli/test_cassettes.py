@@ -66,7 +66,8 @@ def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, c
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     cassette = load_cassette(cassette_path)
-    assert len(cassette["http_interactions"]) == 3
+    # Note. There could be more than 3 calls, depends on Hypothesis internals
+    assert len(cassette["http_interactions"]) >= 3
     # Then their statuses should be reflected in the "status" field
     # And it should not be overridden by the overall test status
     assert cassette["http_interactions"][0]["status"] == "FAILURE"
@@ -187,20 +188,26 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
     assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
     interactions = cassette["http_interactions"]
-    # Then there should be the same number of requests made to the app as there are in the cassette
-    assert len(app["incoming_requests"]) == len(interactions)
-    for interaction, request in zip(interactions, app["incoming_requests"]):
-        # And these requests should be equal
-        serialized = interaction["request"]
-        assert request.method == serialized["method"]
-        parsed = urlparse(str(request.url))
-        encoded_query = urlencode(parse_qsl(parsed.query, keep_blank_values=True))
-        encoded_path = quote_plus(unquote_plus(parsed.path), "/")
-        url = urlunparse((parsed.scheme, parsed.netloc, encoded_path, parsed.params, encoded_query, parsed.fragment))
-        assert url == serialized["uri"], request.url
-        content = await request.read()
-        assert content == base64.b64decode(serialized["body"]["base64_string"])
-        compare_headers(request, serialized["headers"])
+    # Then there should be the same number or fewer of requests made to the app as there are in the cassette
+    # Note. Some requests that Schemathesis can send aren't parsed by aiohttp, because of e.g. invalid characters in
+    # headers
+    assert len(app["incoming_requests"]) <= len(interactions)
+    # And if there were no requests that aiohttp failed to parse, we can compare cassette & app records
+    if len(app["incoming_requests"]) == len(interactions):
+        for interaction, request in zip(interactions, app["incoming_requests"]):
+            # And these requests should be equal
+            serialized = interaction["request"]
+            assert request.method == serialized["method"]
+            parsed = urlparse(str(request.url))
+            encoded_query = urlencode(parse_qsl(parsed.query, keep_blank_values=True))
+            encoded_path = quote_plus(unquote_plus(parsed.path), "/")
+            url = urlunparse(
+                (parsed.scheme, parsed.netloc, encoded_path, parsed.params, encoded_query, parsed.fragment)
+            )
+            assert url == serialized["uri"], request.url
+            content = await request.read()
+            assert content == base64.b64decode(serialized["body"]["base64_string"])
+            compare_headers(request, serialized["headers"])
 
 
 @pytest.mark.endpoints("headers")

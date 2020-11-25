@@ -1138,7 +1138,7 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
             position = 22
     else:
         position = 13
-    assert "== SUMMARY ==" in lines[position], position
+    assert "== SUMMARY ==" in lines[position], (position, "\n".join(lines))
 
 
 @pytest.mark.parametrize("workers", (1, 2))
@@ -1192,7 +1192,7 @@ def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
         return original(*args, **kwargs)
 
     mocker.patch("schemathesis.runner.impl.threadpool.time.sleep", autospec=True, wraps=mocked)
-    result = cli.run(*cli_args, "--workers=2")
+    result = cli.run(*cli_args, "--workers=2", "--hypothesis-derandomize")
     # the exit status depends on what thread finished first
     assert result.exit_code in (ExitCode.OK, ExitCode.TESTS_FAILED), result.stdout
     # Then execution stops, and a message about interruption is displayed
@@ -1307,12 +1307,12 @@ def test_wsgi_app_internal_exception(testdir, cli):
         app.config["internal_exception"] = True
         """
     )
-    result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app")
+    result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--hypothesis-derandomize")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
-    assert "== APPLICATION LOGS ==" in lines[30]
-    assert "ERROR in app: Exception on /api/success [GET]" in lines[32]
-    assert lines[48] == "ZeroDivisionError: division by zero"
+    assert "== APPLICATION LOGS ==" in lines[28], result.stdout.strip()
+    assert "ERROR in app: Exception on /api/success [GET]" in lines[30]
+    assert lines[46] == "ZeroDivisionError: division by zero"
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
@@ -1542,6 +1542,9 @@ def test_openapi_links(cli, cli_args, schema_url, hypothesis_max_examples):
         "--stateful=links",
     )
     lines = result.stdout.splitlines()
+    # Note, it might fail if it uncovers the placed bug, which this version of stateful testing should not uncover
+    # It is pretty rare and requires a high number for the `max_examples` setting. This version is staged for removal
+    # Therefore it won't be fixed
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then these links should be tested
     # And lines with the results of these tests should be indented
