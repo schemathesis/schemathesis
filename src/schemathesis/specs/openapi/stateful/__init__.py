@@ -1,7 +1,7 @@
 import functools
 import operator
 from collections import defaultdict
-from typing import TYPE_CHECKING, Dict, List, Tuple, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Type
 
 from hypothesis.stateful import Bundle, Rule, rule
 from hypothesis.strategies import SearchStrategy, none
@@ -39,7 +39,8 @@ def create_state_machine(schema: "BaseOpenAPISchema") -> Type[APIStateMachine]:
 
     rules = make_all_rules(schema, bundles, connections)
 
-    return type("APIWorkflow", (OpenAPIStateMachine,), {"bundles": bundles, "schema": schema, **rules})
+    kwargs: Dict[str, Any] = {"bundles": bundles, "schema": schema}
+    return type("APIWorkflow", (OpenAPIStateMachine,), {**kwargs, **rules})
 
 
 def init_bundles(schema: "BaseOpenAPISchema") -> Dict[str, CaseInsensitiveDict]:
@@ -51,7 +52,7 @@ def init_bundles(schema: "BaseOpenAPISchema") -> Dict[str, CaseInsensitiveDict]:
     output: Dict[str, CaseInsensitiveDict] = {}
     for endpoint in schema.get_all_endpoints():
         output.setdefault(endpoint.path, CaseInsensitiveDict())
-        output[endpoint.path][endpoint.method.upper()] = Bundle(endpoint.verbose_name)
+        output[endpoint.path][endpoint.method.upper()] = Bundle(endpoint.verbose_name)  # type: ignore
     return output
 
 
@@ -74,7 +75,7 @@ def make_rule(endpoint: "Endpoint", bundle: Bundle, connections: EndpointConnect
         previous = _combine_strategies(previous_strategies)
     else:
         previous = none()
-    return rule(target=bundle, previous=previous, case=endpoint.as_strategy())(APIStateMachine.step)
+    return rule(target=bundle, previous=previous, case=endpoint.as_strategy())(APIStateMachine.step)  # type: ignore
 
 
 def _combine_strategies(strategies: List[SearchStrategy]) -> SearchStrategy:
