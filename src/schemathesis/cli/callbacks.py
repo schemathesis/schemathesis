@@ -35,7 +35,11 @@ def _validate_url(value: str) -> None:
 
 
 def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
-    if raw_value and not urlparse(raw_value).netloc:
+    try:
+        netloc = urlparse(raw_value).netloc
+    except ValueError as exc:
+        raise click.UsageError("Invalid base URL") from exc
+    if raw_value and not netloc:
         raise click.UsageError("Invalid base URL")
     return raw_value
 
