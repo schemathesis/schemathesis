@@ -114,7 +114,7 @@ def validate_regex(ctx: click.core.Context, param: click.core.Parameter, raw_val
     for value in raw_value:
         try:
             re.compile(value)
-        except (re.error, OverflowError) as exc:
+        except (re.error, OverflowError, RuntimeError) as exc:
             raise click.BadParameter(f"Invalid regex: {exc.args[0]}")
     return raw_value
 
