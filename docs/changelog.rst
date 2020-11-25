@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Internal error in CLI, when the ``base_url`` is an invalid IPv6. `#890`_
+- Internal error in CLI, when a malformed regex is passed to ``-E`` / ``-M`` / ``-T`` / ``-O`` CLI options. `#889`_
 
 `2.8.1`_ - 2020-11-24
 ---------------------
@@ -1547,6 +1548,7 @@ Deprecated
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#890: https://github.com/schemathesis/schemathesis/issues/890
+.. _#889: https://github.com/schemathesis/schemathesis/issues/889
 .. _#882: https://github.com/schemathesis/schemathesis/issues/882
 .. _#877: https://github.com/schemathesis/schemathesis/issues/877
 .. _#876: https://github.com/schemathesis/schemathesis/issues/876
