@@ -170,6 +170,11 @@ Most of the APIs are not public and require some form of authorization.
 Schemathesis CLI accepts ``--auth`` option for Basic Auth and ``--header`` to specify custom headers to be sent with each request.
 You can use it to set the ``Authorization`` header:
 
+
+.. code:: bash
+
+    schemathesis run --auth username:$PASSWORD ...
+
 .. code:: bash
 
     schemathesis run -H "Authorization: Bearer TOKEN" ...
