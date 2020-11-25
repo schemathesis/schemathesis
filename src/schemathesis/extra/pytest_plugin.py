@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any, Callable, Generator, List, Optional, Type, Union, cast
+from typing import Any, Callable, Generator, List, Optional, Type, TypeVar, Union, cast
 
 import pytest
 from _pytest import fixtures, nodes
@@ -21,11 +21,86 @@ from ..utils import is_schemathesis_test
 
 USE_FROM_PARENT = version.parse(pytest.__version__) >= version.parse("5.4.0")
 
+T = TypeVar("T", bound=Node)
 
-def create(cls: Type[Node], *args: Any, **kwargs: Any) -> Node:
+
+def create(cls: Type[T], *args: Any, **kwargs: Any) -> T:
     if USE_FROM_PARENT:
-        return cls.from_parent(*args, **kwargs)
+        return cls.from_parent(*args, **kwargs)  # type: ignore
     return cls(*args, **kwargs)
+
+
+class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
+    def __init__(
+        self,
+        *args: Any,
+        test_func: Callable,
+        test_name: Optional[str] = None,
+        recursion_level: int = 0,
+        data_generation_method: DataGenerationMethod,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.test_function = test_func
+        self.test_name = test_name
+        self.recursion_level = recursion_level
+        self.data_generation_method = data_generation_method
+
+    def _getobj(self) -> partial:
+        """Tests defined as methods require `self` as the first argument.
+
+        This method is called only for this case.
+        """
+        return partial(self.obj, self.parent.obj)  # type: ignore
+
+    @property
+    def feedback(self) -> Optional[Feedback]:
+        return getattr(self.obj, "_schemathesis_feedback", None)
+
+    def warn_if_stateful_responses_not_stored(self) -> None:
+        feedback = self.feedback
+        if feedback is not None and not feedback.stateful_tests:
+            self.warn(PytestWarning(NOT_USED_STATEFUL_TESTING_MESSAGE))
+
+    def _get_stateful_tests(self) -> List["SchemathesisFunction"]:
+        feedback = self.feedback
+        recursion_level = self.recursion_level
+        if feedback is None or recursion_level >= feedback.endpoint.schema.stateful_recursion_limit:
+            return []
+        previous_test_name = self.test_name or f"{feedback.endpoint.method.upper()}:{feedback.endpoint.full_path}"
+
+        def make_test(
+            endpoint: Endpoint,
+            test: Union[Callable, InvalidSchema],
+            data_generation_method: DataGenerationMethod,
+            previous_tests: str,
+        ) -> "SchemathesisFunction":
+            test_name = f"{previous_tests} -> {endpoint.method.upper()}:{endpoint.full_path}"
+            return create(
+                self.__class__,
+                name=f"{self.originalname}[{test_name}][{self.data_generation_method.as_short_name()}]",
+                parent=self.parent,
+                callspec=getattr(self, "callspec", None),
+                callobj=test,
+                fixtureinfo=self._fixtureinfo,
+                keywords=self.keywords,
+                originalname=self.originalname,
+                test_func=self.test_function,
+                test_name=test_name,
+                recursion_level=recursion_level + 1,
+                data_generation_method=data_generation_method,
+            )
+
+        return [
+            make_test(endpoint, test, data_generation_method, previous_test_name)
+            for (endpoint, data_generation_method, test) in feedback.get_stateful_tests(self.test_function, None, None)
+        ]
+
+    def add_stateful_tests(self) -> None:
+        idx = self.session.items.index(self) + 1
+        tests = self._get_stateful_tests()
+        self.session.items[idx:idx] = tests
+        self.session.testscollected += len(tests)
 
 
 class SchemathesisCase(PyCollector):
@@ -41,7 +116,7 @@ class SchemathesisCase(PyCollector):
 
     def _gen_items(
         self, endpoint: Endpoint, data_generation_method: DataGenerationMethod
-    ) -> Generator[Function, None, None]:
+    ) -> Generator[SchemathesisFunction, None, None]:
         """Generate all items for the given endpoint.
 
         Could produce more than one test item if
@@ -54,7 +129,7 @@ class SchemathesisCase(PyCollector):
         funcobj = self._make_test(endpoint, data_generation_method)
 
         cls = self._get_class_parent()
-        definition = create(FunctionDefinition, name=self.name, parent=self.parent, callobj=funcobj)
+        definition: FunctionDefinition = create(FunctionDefinition, name=self.name, parent=self.parent, callobj=funcobj)
         fixturemanager = self.session._fixturemanager
         fixtureinfo = fixturemanager.getfixtureinfo(definition, funcobj, cls)
 
@@ -96,7 +171,8 @@ class SchemathesisCase(PyCollector):
     def _parametrize(
         self, cls: Optional[Type], definition: FunctionDefinition, fixtureinfo: FuncFixtureInfo
     ) -> Metafunc:
-        module = self.getparent(Module).obj
+        parent = self.getparent(Module)
+        module = parent.obj if parent is not None else parent
         metafunc = Metafunc(definition, fixtureinfo, self.config, cls=cls, module=module)
         methods = []
         if hasattr(module, "pytest_generate_tests"):
@@ -137,79 +213,6 @@ NOT_USED_STATEFUL_TESTING_MESSAGE = (
     "You are using stateful testing, but no responses were stored during the test! "
     "Please, use `case.call` or `case.store_response` in your test to enable stateful tests."
 )
-
-
-class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
-    def __init__(
-        self,
-        *args: Any,
-        test_func: Callable,
-        test_name: Optional[str] = None,
-        recursion_level: int = 0,
-        data_generation_method: DataGenerationMethod,
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(*args, **kwargs)
-        self.test_function = test_func
-        self.test_name = test_name
-        self.recursion_level = recursion_level
-        self.data_generation_method = data_generation_method
-
-    def _getobj(self) -> partial:
-        """Tests defined as methods require `self` as the first argument.
-
-        This method is called only for this case.
-        """
-        return partial(self.obj, self.parent.obj)
-
-    @property
-    def feedback(self) -> Optional[Feedback]:
-        return getattr(self.obj, "_schemathesis_feedback", None)
-
-    def warn_if_stateful_responses_not_stored(self) -> None:
-        feedback = self.feedback
-        if feedback is not None and not feedback.stateful_tests:
-            self.warn(PytestWarning(NOT_USED_STATEFUL_TESTING_MESSAGE))
-
-    def _get_stateful_tests(self) -> List["SchemathesisFunction"]:
-        feedback = self.feedback
-        recursion_level = self.recursion_level
-        if feedback is None or recursion_level >= feedback.endpoint.schema.stateful_recursion_limit:
-            return []
-        previous_test_name = self.test_name or f"{feedback.endpoint.method.upper()}:{feedback.endpoint.full_path}"
-
-        def make_test(
-            endpoint: Endpoint,
-            test: Union[Callable, InvalidSchema],
-            data_generation_method: DataGenerationMethod,
-            previous_tests: str,
-        ) -> SchemathesisFunction:
-            test_name = f"{previous_tests} -> {endpoint.method.upper()}:{endpoint.full_path}"
-            return create(
-                self.__class__,
-                name=f"{self.originalname}[{test_name}][{self.data_generation_method.as_short_name()}]",
-                parent=self.parent,
-                callspec=getattr(self, "callspec", None),
-                callobj=test,
-                fixtureinfo=self._fixtureinfo,
-                keywords=self.keywords,
-                originalname=self.originalname,
-                test_func=self.test_function,
-                test_name=test_name,
-                recursion_level=recursion_level + 1,
-                data_generation_method=data_generation_method,
-            )
-
-        return [
-            make_test(endpoint, test, data_generation_method, previous_test_name)
-            for (endpoint, data_generation_method, test) in feedback.get_stateful_tests(self.test_function, None, None)
-        ]
-
-    def add_stateful_tests(self) -> None:
-        idx = self.session.items.index(self) + 1
-        tests = self._get_stateful_tests()
-        self.session.items[idx:idx] = tests
-        self.session.testscollected += len(tests)
 
 
 @hookimpl(hookwrapper=True)  # type:ignore # pragma: no mutate
