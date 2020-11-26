@@ -1126,19 +1126,13 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
     # But after, another thread will have interruption and will push this event before the
     # first thread will finish. Race condition: "" is for this case and "." for the other
     # way around
-    assert lines[10] in expected, lines
+    # The app under test was killed ungracefully and since we run it in a child or the main thread
+    # its output might occur in the captured stdout.
+    ignored_exception = lines[10].startswith("Exception ignored in: ")
+    assert lines[10] in expected or ignored_exception, lines
     if not optional_interrupt:
         assert "!! KeyboardInterrupt !!" in lines[11], lines
-    if "F" in lines[10]:
-        if "!! KeyboardInterrupt !!" not in lines[11]:
-            assert "=== FAILURES ===" in lines[12], lines
-            position = 21
-        else:
-            assert "=== FAILURES ===" in lines[13], lines
-            position = 22
-    else:
-        position = 13
-    assert "== SUMMARY ==" in lines[position], (position, "\n".join(lines))
+    assert any("=== SUMMARY ===" in line for line in lines[10:])
 
 
 @pytest.mark.parametrize("workers", (1, 2))
@@ -1180,7 +1174,7 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
 
 
 def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
-    # When a Schemathesis run in interrupted by the keyboard or via SIGINT
+    # When a Schemathesis run is interrupted by the keyboard or via SIGINT
     original = time.sleep
     counter = 0
 
