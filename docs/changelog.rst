@@ -7,6 +7,7 @@ Changelog
 **Changed**
 
 - In pytest plugin output, Schemathesis error classes use the `CheckFailed` name. Before, they had not readable "internal" names.
+- Hypothesis falsifying examples. The code does not include ``Case`` attributes with default values to improve readability. `#886`_
 
 `2.8.2`_ - 2020-11-25
 ---------------------
@@ -1557,6 +1558,7 @@ Deprecated
 
 .. _#890: https://github.com/schemathesis/schemathesis/issues/890
 .. _#889: https://github.com/schemathesis/schemathesis/issues/889
+.. _#886: https://github.com/schemathesis/schemathesis/issues/886
 .. _#882: https://github.com/schemathesis/schemathesis/issues/882
 .. _#877: https://github.com/schemathesis/schemathesis/issues/877
 .. _#876: https://github.com/schemathesis/schemathesis/issues/876

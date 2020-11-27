@@ -41,11 +41,11 @@ class CaseSource:
     response: GenericResponse = attr.ib()  # pragma: no mutate
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@attr.s(slots=True, repr=False)  # pragma: no mutate
 class Case:  # pylint: disable=too-many-public-methods
     """A single test case parameters."""
 
-    endpoint: "Endpoint" = attr.ib(repr=False)  # pragma: no mutate
+    endpoint: "Endpoint" = attr.ib()  # pragma: no mutate
     path_parameters: Optional[PathParameters] = attr.ib(default=None)  # pragma: no mutate
     headers: Optional[Headers] = attr.ib(default=None)  # pragma: no mutate
     cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
@@ -53,8 +53,21 @@ class Case:  # pylint: disable=too-many-public-methods
     body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
     form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
 
-    feedback: "Feedback" = attr.ib(repr=False, default=None)  # pragma: no mutate
-    source: Optional[CaseSource] = attr.ib(repr=False, default=None)  # pragma: no mutate
+    feedback: "Feedback" = attr.ib(default=None)  # pragma: no mutate
+    source: Optional[CaseSource] = attr.ib(default=None)  # pragma: no mutate
+
+    def __repr__(self) -> str:
+        parts = [f"{self.__class__.__name__}("]
+        first = True
+        for name in ("path_parameters", "headers", "cookies", "query", "body", "form_data"):
+            value = getattr(self, name)
+            if value is not None:
+                if first:
+                    first = False
+                else:
+                    parts.append(", ")
+                parts.extend((name, "=", repr(value)))
+        return "".join(parts) + ")"
 
     @property
     def path(self) -> str:
