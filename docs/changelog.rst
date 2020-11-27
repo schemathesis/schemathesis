@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Use ``--request-tls-verify`` during schema loading as well. `#897`_
+
 `2.8.3`_ - 2020-11-27
 ---------------------
 
@@ -1564,6 +1568,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#897: https://github.com/schemathesis/schemathesis/issues/897
 .. _#895: https://github.com/schemathesis/schemathesis/issues/895
 .. _#890: https://github.com/schemathesis/schemathesis/issues/890
 .. _#889: https://github.com/schemathesis/schemathesis/issues/889
