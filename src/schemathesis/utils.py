@@ -191,6 +191,12 @@ def get_requests_auth(auth: Optional[RawAuth], auth_type: Optional[str]) -> Opti
 GenericResponse = Union[requests.Response, WSGIResponse]  # pragma: no mutate
 
 
+def get_response_payload(response: GenericResponse) -> str:
+    if isinstance(response, requests.Response):
+        return response.text
+    return response.get_data(as_text=True)
+
+
 def import_app(path: str) -> Any:
     """Import an application from a string."""
     path, name = (re.split(r":(?![\\/])", path, 1) + [""])[:2]

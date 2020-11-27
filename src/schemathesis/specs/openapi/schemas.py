@@ -24,7 +24,7 @@ from ...models import Case, Endpoint, EndpointDefinition, empty_object
 from ...schemas import BaseSchema
 from ...stateful import APIStateMachine, Feedback, Stateful, StatefulTest
 from ...types import FormData
-from ...utils import GenericResponse
+from ...utils import GenericResponse, get_response_payload
 from . import links, serialization
 from ._hypothesis import get_case_strategy
 from .converter import to_json_schema_recursive
@@ -335,11 +335,7 @@ class BaseOpenAPISchema(BaseSchema):
                 data = response.json
         except JSONDecodeError as exc:
             exc_class = get_response_parsing_error(exc)
-            if isinstance(response, requests.Response):
-                raw_content = response.content
-            else:
-                raw_content = response.get_data()
-            payload = raw_content.decode(errors="replace")
+            payload = get_response_payload(response)
             raise exc_class(
                 f"The received response is not valid JSON:\n\n    {payload}\n\nException: \n\n    {exc}"
             ) from exc

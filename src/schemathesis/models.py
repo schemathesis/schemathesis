@@ -19,7 +19,7 @@ from starlette.testclient import TestClient as ASGIClient
 from .constants import USER_AGENT, DataGenerationMethod
 from .exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
-from .utils import GenericResponse, WSGIResponse
+from .utils import GenericResponse, WSGIResponse, get_response_payload
 
 if TYPE_CHECKING:
     from .hooks import HookDispatcher
@@ -319,8 +319,9 @@ class Case:  # pylint: disable=too-many-public-methods
             exception_cls = get_grouped_exception(self.endpoint.verbose_name, *errors)
             formatted_errors = "\n\n".join(f"{idx}. {error.args[0]}" for idx, error in enumerate(errors, 1))
             code = self.get_code_to_reproduce(request=response.request)
+            payload = get_response_payload(response)
             raise exception_cls(
-                f"\n\n{formatted_errors}\n\n----------\n\n"
+                f"\n\n{formatted_errors}\n\n----------\n\nResponse payload: `{payload}`\n\n"
                 f"Run this Python code to reproduce this response: \n\n    {code}\n"
             )
 
