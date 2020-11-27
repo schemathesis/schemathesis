@@ -217,6 +217,8 @@ def test_(case):
           "",
           "----------",
           "",
+          "Response payload: ``",
+          "",
           "Run this Python code to reproduce this response: ",
           "",
           "    requests.get('http://localhost/v1/users', headers={{'User-Agent': '{USER_AGENT}'}})",

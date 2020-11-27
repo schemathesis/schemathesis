@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Display failed response payload in the error output for the ``pytest`` plugin. `#895`_
+
 **Changed**
 
 - In pytest plugin output, Schemathesis error classes use the `CheckFailed` name. Before, they had not readable "internal" names.
@@ -1556,6 +1560,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#895: https://github.com/schemathesis/schemathesis/issues/895
 .. _#890: https://github.com/schemathesis/schemathesis/issues/890
 .. _#889: https://github.com/schemathesis/schemathesis/issues/889
 .. _#886: https://github.com/schemathesis/schemathesis/issues/886
