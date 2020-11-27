@@ -15,6 +15,22 @@ def test_path(swagger_20):
     assert case.formatted_path == "/users/test"
 
 
+@pytest.mark.parametrize(
+    "kwargs, expected",
+    (
+        ({"path_parameters": {"name": "test"}}, "Case(path_parameters={'name': 'test'})"),
+        (
+            {"path_parameters": {"name": "test"}, "query": {"q": 1}},
+            "Case(path_parameters={'name': 'test'}, query={'q': 1})",
+        ),
+    ),
+)
+def test_case_repr(swagger_20, kwargs, expected):
+    endpoint = Endpoint("/users/{name}", "GET", {}, swagger_20)
+    case = endpoint.make_case(**kwargs)
+    assert repr(case) == expected
+
+
 @pytest.mark.parametrize("override", (False, True))
 @pytest.mark.parametrize("converter", (lambda x: x, lambda x: x + "/"))
 def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
