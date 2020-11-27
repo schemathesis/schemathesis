@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`2.8.4`_ - 2020-11-27
+---------------------
+
 **Fixed**
 
 - Use ``--request-tls-verify`` during schema loading as well. `#897`_
@@ -1455,7 +1458,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.8.3...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.8.4...HEAD
+.. _2.8.4: https://github.com/schemathesis/schemathesis/compare/v2.8.3...v2.8.4
 .. _2.8.3: https://github.com/schemathesis/schemathesis/compare/v2.8.2...v2.8.3
 .. _2.8.2: https://github.com/schemathesis/schemathesis/compare/v2.8.1...v2.8.2
 .. _2.8.1: https://github.com/schemathesis/schemathesis/compare/v2.8.0...v2.8.1
