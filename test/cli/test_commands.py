@@ -370,6 +370,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
         "validate_schema": True,
         "skip_deprecated_endpoints": False,
         "force_schema_version": None,
+        "request_tls_verify": True,
         **expected,
     }
 

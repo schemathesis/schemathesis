@@ -195,6 +195,7 @@ def execute_from_schema(
             operation_id=operation_id,
             data_generation_methods=data_generation_methods,
             force_schema_version=force_schema_version,
+            request_tls_verify=request_tls_verify,
         )
 
         runner: BaseRunner
@@ -320,6 +321,7 @@ def load_schema(
     skip_deprecated_endpoints: bool = False,
     data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
+    request_tls_verify: Union[bool, str] = True,
     # Network request parameters
     auth: Optional[Tuple[str, str]] = None,
     auth_type: Optional[str] = None,
@@ -354,6 +356,8 @@ def load_schema(
 
     if loader is loaders.from_uri and loader_options.get("auth"):
         loader_options["auth"] = get_requests_auth(loader_options["auth"], loader_options.pop("auth_type", None))
+    if loader in (loaders.from_uri, loaders.from_aiohttp):
+        loader_options["verify"] = request_tls_verify
 
     return loader(
         schema_uri,
