@@ -67,6 +67,7 @@ class BaseRunner:
         yield initialized
 
         yield from self.run_unit_tests(results)
+        yield from self.run_stateful_tests(results)
 
         yield events.Finished.from_results(results=results, running_time=time.monotonic() - initialized.start_time)
 
@@ -85,6 +86,10 @@ class BaseRunner:
 
     def _run_unit_tests(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         raise NotImplementedError
+
+    def run_stateful_tests(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
+        yield events.BeforePhase(phase=Phase.stateful_testing)
+        yield events.AfterPhase(phase=Phase.stateful_testing)
 
     def _run_tests(
         self,

@@ -17,10 +17,11 @@ class Phase(str, Enum):
     """Schemathesis engine execution phases.
 
     Each phase represents a logical step of execution, for example, running unit-tests.
-    In the future we might introduce other phases for links inference, stateful tests, re-running, etc.
+    In the future we might introduce other phases for links inference, re-running, schema pre-processing, etc.
     """
 
     unit_testing = "unit_testing"
+    stateful_testing = "stateful_testing"
 
     def __repr__(self) -> str:
         return f"Phase.{self.name}"
