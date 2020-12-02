@@ -30,6 +30,7 @@ from ...targets import Target, TargetContext
 from ...types import RawAuth
 from ...utils import GenericResponse, Ok, WSGIResponse, capture_hypothesis_output, format_exception
 from ..serialization import SerializedTestResult
+from ..events import Phase
 
 
 def get_hypothesis_settings(hypothesis_options: Dict[str, Any]) -> hypothesis.settings:
@@ -56,13 +57,22 @@ class BaseRunner:
     stateful: Optional[Stateful] = attr.ib(default=None)  # pragma: no mutate
 
     def execute(self) -> Generator[events.ExecutionEvent, None, None]:
-        """Common logic for all runners."""
+        """Common logic for all runners.
+
+        Runs all the available phases.
+        """
         results = TestResultSet()
 
         initialized = events.Initialized.from_schema(schema=self.schema)
         yield initialized
 
-        for event in self._execute(results):
+        yield from self.run_unit_tests(results)
+
+        yield events.Finished.from_results(results=results, running_time=time.monotonic() - initialized.start_time)
+
+    def run_unit_tests(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
+        yield events.BeforePhase(phase=Phase.unit_testing)
+        for event in self._run_unit_tests(results):
             yield event
             if (
                 self.exit_first
@@ -70,10 +80,10 @@ class BaseRunner:
                 and event.status in (Status.error, Status.failure)
             ):
                 break
+            yield event
+        yield events.AfterPhase(phase=Phase.unit_testing)
 
-        yield events.Finished.from_results(results=results, running_time=time.monotonic() - initialized.start_time)
-
-    def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
+    def _run_unit_tests(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         raise NotImplementedError
 
     def _run_tests(

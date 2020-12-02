@@ -1,4 +1,5 @@
 import time
+from enum import Enum, unique
 from typing import Dict, List, Optional, Union
 
 import attr
@@ -9,6 +10,20 @@ from ..models import APIOperation, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
 from ..utils import format_exception
 from .serialization import SerializedError, SerializedTestResult
+
+
+@unique
+class Phase(str, Enum):
+    """Schemathesis engine execution phases.
+
+    Each phase represents a logical step of execution, for example, running unit-tests.
+    In the future we might introduce other phases for links inference, stateful tests, re-running, etc.
+    """
+
+    unit_testing = "unit_testing"
+
+    def __repr__(self) -> str:
+        return f"Phase.{self.name}"
 
 
 @attr.s()  # pragma: no mutate
@@ -37,6 +52,20 @@ class Initialized(ExecutionEvent):
             base_url=schema.get_base_url(),
             specification_name=schema.verbose_name,
         )
+
+
+@attr.s(slots=True)  # pragma: no mutate
+class BeforePhase(ExecutionEvent):
+    """Emitted before a new phase starts."""
+
+    phase: Phase = attr.ib()  # pragma: no mutate
+
+
+@attr.s(slots=True)  # pragma: no mutate
+class AfterPhase(ExecutionEvent):
+    """Emitted after a phase finishes."""
+
+    phase: Phase = attr.ib()  # pragma: no mutate
 
 
 class CurrentOperationMixin:
