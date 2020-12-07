@@ -9,7 +9,6 @@ import hypothesis
 
 from ..._hypothesis import create_test
 from ...models import CheckFunction, TestResultSet
-from ...stateful import Stateful
 from ...targets import Target
 from ...types import RawAuth
 from ...utils import Ok, capture_hypothesis_output, get_requests_auth
@@ -26,7 +25,6 @@ def _run_task(
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
-    stateful: Optional[Stateful],
     **kwargs: Any,
 ) -> None:
     def _run_tests(maker: Callable) -> None:
@@ -79,7 +77,6 @@ def thread_task(
     headers: Optional[Dict[str, Any]],
     seed: Optional[int],
     results: TestResultSet,
-    stateful: Optional[Stateful],
     kwargs: Any,
 ) -> None:
     """A single task, that threads do.
@@ -97,7 +94,6 @@ def thread_task(
             settings,
             seed,
             results,
-            stateful=stateful,
             session=session,
             headers=headers,
             **kwargs,
@@ -112,7 +108,6 @@ def wsgi_thread_task(
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
-    stateful: Optional[Stateful],
     kwargs: Any,
 ) -> None:
     _run_task(
@@ -124,7 +119,6 @@ def wsgi_thread_task(
         settings,
         seed,
         results,
-        stateful=stateful,
         **kwargs,
     )
 
@@ -138,7 +132,6 @@ def asgi_thread_task(
     headers: Optional[Dict[str, Any]],
     seed: Optional[int],
     results: TestResultSet,
-    stateful: Optional[Stateful],
     kwargs: Any,
 ) -> None:
     _run_task(
@@ -150,7 +143,6 @@ def asgi_thread_task(
         settings,
         seed,
         results,
-        stateful=stateful,
         headers=headers,
         **kwargs,
     )
@@ -243,7 +235,6 @@ class ThreadPoolRunner(BaseRunner):
             "headers": self.headers,
             "seed": self.seed,
             "results": results,
-            "stateful": self.stateful,
             "kwargs": {
                 "request_timeout": self.request_timeout,
                 "request_tls_verify": self.request_tls_verify,
@@ -267,7 +258,6 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
             "settings": self.hypothesis_settings,
             "seed": self.seed,
             "results": results,
-            "stateful": self.stateful,
             "kwargs": {
                 "auth": self.auth,
                 "auth_type": self.auth_type,
@@ -293,7 +283,6 @@ class ThreadPoolASGIRunner(ThreadPoolRunner):
             "headers": self.headers,
             "seed": self.seed,
             "results": results,
-            "stateful": self.stateful,
             "kwargs": {
                 "store_interactions": self.store_interactions,
                 "max_response_time": self.max_response_time,
