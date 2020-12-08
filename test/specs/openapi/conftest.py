@@ -1,8 +1,10 @@
 from copy import deepcopy
 
+import jsonschema
 import pytest
 
 import schemathesis
+from schemathesis.specs.openapi.definitions import OPENAPI_30, SWAGGER_20
 
 
 def make_object_schema(is_loose=False, **properties):
@@ -91,6 +93,7 @@ def make_openapi_2_schema(empty_open_api_2_schema):
                 "responses": {"200": {"description": "OK"}},
             }
         }
+        jsonschema.validate(schema, SWAGGER_20)
         return schema
 
     return maker
@@ -124,6 +127,7 @@ def make_openapi_3_schema(empty_open_api_3_schema):
         if parameters is not None:
             definition["parameters"] = parameters
         schema["paths"]["/users"] = {"post": definition}
+        jsonschema.validate(schema, OPENAPI_30)
         return schema
 
     return maker

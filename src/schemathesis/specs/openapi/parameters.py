@@ -1,8 +1,8 @@
-from typing import Any, ClassVar, Dict, Generator, List, Tuple
+from typing import Any, ClassVar, Dict, List, Tuple
 
 import attr
 
-from ...parameters import Example, Parameter
+from ...parameters import Parameter
 from .converter import to_json_schema_recursive
 
 
@@ -15,17 +15,15 @@ class OpenAPIParameter(Parameter):
     nullable_field: ClassVar[str]
     supported_jsonschema_keywords: ClassVar[Tuple[str, ...]]
 
-    def iter_examples(self) -> Generator[Example, None, None]:
+    @property
+    def example(self) -> Any:
         """Iterate over all examples defined for the parameter."""
-        if self.example:
-            yield Example(None, self.example)
-        elif self.named_examples:
-            for name, value in self.named_examples.items():
-                yield Example(name, value)
-        elif self.schema_example:
+        if self._example:
+            return self._example
+        if self._schema_example:
             # It is processed only if there is no `example` / `examples` in the root, overridden otherwise
             # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#fixed-fields-10
-            yield Example(None, self.schema_example)
+            return self._schema_example
 
     @property
     def location(self) -> str:
@@ -54,7 +52,7 @@ class OpenAPIParameter(Parameter):
         raise NotImplementedError
 
     @property
-    def example(self) -> Any:
+    def _example(self) -> Any:
         """A not-named example, defined in the parameter root.
 
         {
@@ -72,7 +70,7 @@ class OpenAPIParameter(Parameter):
         return self.definition.get(self.examples_field, {})
 
     @property
-    def schema_example(self) -> Any:
+    def _schema_example(self) -> Any:
         """Example defined on the schema-level.
 
         Open API 3.0:
@@ -273,6 +271,14 @@ class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
             definition=[OpenAPI20Parameter(parameter) for parameter in parameters],
             media_type=media_type,
         )
+
+    @property
+    def _example(self) -> Any:
+        return {parameter.name: parameter._example for parameter in self.definition if parameter._example}
+
+    @property
+    def _schema_example(self) -> Any:
+        return {parameter.name: parameter._schema_example for parameter in self.definition if parameter._schema_example}
 
     def as_json_schema(self) -> Dict[str, Any]:
         """Composite body is transformed into an "object" JSON Schema."""

@@ -128,13 +128,20 @@ def test_form_data(testdir):
     # When parameter is specified for "formData"
     testdir.make_test(
         """
-@schema.parametrize()
+@schema.parametrize(method="POST")
 @settings(max_examples=1, deadline=None)
 def test_(case):
     assert_str(case.body["status"])
     assert_requests_call(case)
         """,
-        **as_param({"name": "status", "in": "formData", "required": True, "type": "string"}),
+        paths={
+            "/users": {
+                "post": {
+                    "parameters": [{"name": "status", "in": "formData", "required": True, "type": "string"}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
     )
     # Then the generated test case should contain it in its `body` attribute
     testdir.run_and_assert(passed=1)
@@ -216,7 +223,6 @@ def test_(case):
 
 
 def _assert_parameter(schema, schema_spec, location, expected=None):
-    # expected = expected if expected is not None else [{"in": location, "name": "api_key", "type": "string", "required": True}]
     # When security definition is defined as "apiKey"
     schema = schemathesis.from_dict(schema)
     if schema_spec == "swagger":
@@ -405,4 +411,6 @@ def test_(case):
     )
     # Then an error should be propagated with a relevant error message
     result = testdir.run_and_assert(failed=1)
-    result.stdout.re_match_lines([r"E   Failed: Body parameters are defined for GET request."])
+    result.stdout.re_match_lines(
+        [r"E +schemathesis.exceptions.InvalidSchema: Body parameters are defined for GET request."]
+    )

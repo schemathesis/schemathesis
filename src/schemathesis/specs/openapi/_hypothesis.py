@@ -1,6 +1,5 @@
 import re
 from base64 import b64encode
-from functools import partial
 from typing import Any, Callable, Dict, Optional, Tuple
 from urllib.parse import quote_plus
 
@@ -10,6 +9,7 @@ from requests.auth import _basic_auth_str
 
 from ... import utils
 from ...constants import DataGenerationMethod
+from ...exceptions import InvalidSchema
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import Case, Endpoint
 from ...stateful import Feedback
@@ -114,6 +114,11 @@ def get_case_strategy(  # pylint: disable=too-many-locals
             body = draw(strategy)
         else:
             body = None
+    else:
+        # TODO. detect the proper one
+        media_type = "application/json"
+    if endpoint.schema.validate_schema and endpoint.method.upper() == "GET" and endpoint.body:
+        raise InvalidSchema("Body parameters are defined for GET request.")
     return Case(
         endpoint=endpoint,
         feedback=feedback,
@@ -195,21 +200,6 @@ def quote_all(parameters: Dict[str, Any]) -> Dict[str, Any]:
     return {key: quote_plus(value) if isinstance(value, str) else value for key, value in parameters.items()}
 
 
-def _get_case_strategy(
-    endpoint: Endpoint,
-    extra_static_parameters: Dict[str, Any],
-    strategies: Dict[str, st.SearchStrategy],
-    hook_dispatcher: Optional[HookDispatcher] = None,
-) -> st.SearchStrategy[Case]:
-    static_parameters: Dict[str, Any] = {"endpoint": endpoint, **extra_static_parameters}
-    context = HookContext(endpoint)
-    _apply_hooks(strategies, GLOBAL_HOOK_DISPATCHER, context)
-    _apply_hooks(strategies, endpoint.schema.hooks, context)
-    if hook_dispatcher is not None:
-        _apply_hooks(strategies, hook_dispatcher, context)
-    return st.builds(partial(Case, **static_parameters), **strategies)
-
-
 def apply_hooks(
     endpoint: Endpoint, context: HookContext, hooks: Optional[HookDispatcher], strategy: st.SearchStrategy, key: str
 ) -> st.SearchStrategy:
@@ -218,14 +208,6 @@ def apply_hooks(
     if hooks is not None:
         strategy = __apply_hooks(context, hooks, strategy, key)
     return strategy
-
-
-def _apply_hooks(strategies: Dict[str, st.SearchStrategy], dispatcher: HookDispatcher, context: HookContext) -> None:
-    for key in strategies:
-        for hook in dispatcher.get_all_by_name(f"before_generate_{key}"):
-            # Get the strategy on each hook to pass the first hook output as an input to the next one
-            strategy = strategies[key]
-            strategies[key] = hook(context, strategy)
 
 
 def __apply_hooks(

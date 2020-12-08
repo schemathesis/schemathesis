@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Type, Union
 
 import attr
 from typing_extensions import Protocol
@@ -100,6 +100,4 @@ class GenericPayloadSerializer:
         return {"data": value}
 
 
-def get(media_type: str) -> Optional[Type[Serializer]]:
-    # if there is a specific serializer for this media type, use it, otherwise use the generic one
-    return SERIALIZERS.get(media_type)
+get = SERIALIZERS.get

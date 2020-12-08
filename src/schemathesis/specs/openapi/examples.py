@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 from hypothesis.strategies import SearchStrategy
 
 from ...models import Case, Endpoint
-from ._hypothesis import PARAMETERS, _get_case_strategy, prepare_strategy
+from ._hypothesis import PARAMETERS, get_case_strategy
 from .constants import LOCATION_TO_CONTAINER
 
 
@@ -76,9 +76,12 @@ def get_static_parameters_from_example(endpoint: Endpoint) -> Dict[str, Any]:
     static_parameters = {}
     for name in PARAMETERS:
         parameters = getattr(endpoint, name)
-        examples = {parameter.example for parameter in parameters if parameter.example}
-        if examples:
-            static_parameters[name] = examples
+        if name == "body" and parameters and parameters[0].example:
+            static_parameters[name] = parameters[0].example
+        else:
+            examples = {parameter.name: parameter.example for parameter in parameters if parameter.example}
+            if examples:
+                static_parameters[name] = examples
     return static_parameters
 
 
@@ -104,10 +107,6 @@ def get_strategies_from_examples(endpoint: Endpoint, examples_field: str = "exam
         for static_parameters in get_static_parameters_from_examples(endpoint, examples_field)
         if static_parameters
     ]
-    # these static parameters are passed to Case as is
-    t = get_static_parameters_from_examples(endpoint, examples_field)
-    if t:
-        raise AssertionError(str(t))
     for static_parameters in static_parameters_union(
         get_static_parameters_from_example(endpoint), get_static_parameters_from_properties(endpoint)
     ):
@@ -116,14 +115,7 @@ def get_strategies_from_examples(endpoint: Endpoint, examples_field: str = "exam
 
 
 def get_strategy(endpoint: Endpoint, static_parameters: Dict[str, Any]) -> SearchStrategy[Case]:
-    strategies = {
-        parameter: prepare_strategy(
-            parameter, getattr(endpoint, parameter), endpoint.get_hypothesis_conversions(parameter)
-        )
-        for parameter in PARAMETERS - set(static_parameters)
-        if getattr(endpoint, parameter) is not None
-    }
-    return _get_case_strategy(endpoint, static_parameters, strategies)
+    return get_case_strategy(endpoint, **static_parameters)
 
 
 def merge_examples(

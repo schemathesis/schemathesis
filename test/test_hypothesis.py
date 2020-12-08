@@ -24,7 +24,14 @@ def make_endpoint(schema, **kwargs) -> Endpoint:
 @pytest.mark.parametrize("name", sorted(PARAMETERS))
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_get_examples(name, swagger_20):
-    example = {"name": "John"}
+    if name == "body":
+        # TODO. explain why
+        example = expected = {"name": "John"}
+        media_type = "application/json"
+    else:
+        example = "John"
+        expected = {"name": "John"}
+        media_type = None
     endpoint = make_endpoint(
         swagger_20,
         **{
@@ -35,7 +42,7 @@ def test_get_examples(name, swagger_20):
                         "name": "name",
                         "required": True,
                         "type": "string",
-                        "example": example,
+                        "x-example": example,
                     }
                 )
             ]
@@ -43,7 +50,7 @@ def test_get_examples(name, swagger_20):
     )
     strategies = endpoint.get_strategies_from_examples()
     assert len(strategies) == 1
-    assert strategies[0].example() == Case(endpoint, **{name: example})
+    assert strategies[0].example() == Case(endpoint, media_type=media_type, **{name: expected})
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
@@ -59,7 +66,8 @@ def test_no_body_in_get(swagger_20):
                     "required": True,
                     "in": "query",
                     "type": "string",
-                    "example": "John",
+                    "name": "key",
+                    "x-example": "John",
                 }
             )
         ],
@@ -69,6 +77,7 @@ def test_no_body_in_get(swagger_20):
     assert strategies[0].example().body is None
 
 
+@pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_invalid_body_in_get(swagger_20):
     endpoint = Endpoint(
         path="/foo",
@@ -76,18 +85,19 @@ def test_invalid_body_in_get(swagger_20):
         definition=EndpointDefinition({}, {}, "foo", []),
         schema=swagger_20,
         body=[
-            OpenAPI20Parameter(
+            OpenAPI20Body(
                 {
                     "name": "attributes",
                     "in": "body",
                     "required": True,
                     "schema": {"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
-                }
+                },
+                media_type="application/json",
             )
         ],
     )
     with pytest.raises(InvalidSchema, match=r"^Body parameters are defined for GET request.$"):
-        get_case_strategy(endpoint)
+        get_case_strategy(endpoint).example()
 
 
 @pytest.mark.hypothesis_nested

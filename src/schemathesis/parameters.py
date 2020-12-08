@@ -3,20 +3,9 @@
 These are basic entities, that describe what data could be sent to the API.
 """
 from copy import deepcopy
-from typing import Any, Generator, Optional
+from typing import Any
 
 import attr
-
-
-@attr.s(slots=True)
-class Example:
-    """A free-form parameter example.
-
-    Optionally named, the value can be anything accepted by the API.
-    """
-
-    name: Optional[str] = attr.ib()
-    value: Any = attr.ib()
 
 
 @attr.s(slots=True)
@@ -33,10 +22,6 @@ class Parameter:
     def __attrs_post_init__(self) -> None:
         # Do not use `converter=deepcopy` on the field, due to mypy not detecting type annotations
         self.definition = deepcopy(self.definition)
-
-    def iter_examples(self) -> Generator[Example, None, None]:
-        """Iterate over all examples defined for the parameter."""
-        raise NotImplementedError
 
     @property
     def location(self) -> str:
