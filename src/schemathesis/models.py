@@ -78,7 +78,7 @@ class Case:  # pylint: disable=too-many-public-methods
     def __repr__(self) -> str:
         parts = [f"{self.__class__.__name__}("]
         first = True
-        for name in ("path_parameters", "headers", "cookies", "query", "body", "form_data"):
+        for name in ("path_parameters", "headers", "cookies", "query", "body"):
             value = getattr(self, name)
             if value is not None:
                 if first:

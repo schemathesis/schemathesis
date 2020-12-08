@@ -7,6 +7,7 @@ import requests
 import schemathesis
 from schemathesis.models import Case, Endpoint, EndpointDefinition
 from schemathesis.specs.openapi.links import Link, get_container
+from schemathesis.specs.openapi.parameters import OpenAPI30Parameter
 from schemathesis.stateful import ParsedData, Stateful
 
 ENDPOINT = Endpoint(
@@ -15,22 +16,14 @@ ENDPOINT = Endpoint(
     definition=ANY,
     schema=ANY,
     base_url=ANY,
-    path_parameters={
-        "properties": {"user_id": {"in": "path", "name": "user_id", "type": "integer"}},
-        "additionalProperties": False,
-        "type": "object",
-        "required": ["user_id"],
-    },
-    query={
-        "properties": {
-            "code": {"in": "query", "name": "code", "type": "integer"},
-            "user_id": {"in": "query", "name": "user_id", "type": "integer"},
-            "common": {"in": "query", "name": "common", "type": "integer"},
-        },
-        "additionalProperties": False,
-        "type": "object",
-        "required": ["code", "user_id", "common"],
-    },
+    path_parameters=[
+        OpenAPI30Parameter({"in": "path", "name": "user_id", "schema": {"type": "integer"}}),
+    ],
+    query=[
+        OpenAPI30Parameter({"in": "query", "name": "code", "schema": {"type": "integer"}}),
+        OpenAPI30Parameter({"in": "query", "name": "user_id", "schema": {"type": "integer"}}),
+        OpenAPI30Parameter({"in": "query", "name": "common", "schema": {"type": "integer"}}),
+    ],
 )
 LINK = Link(
     name="GetUserByUserId",
@@ -111,88 +104,58 @@ EXPECTED_PATH_PARAMETERS = [
 
 
 @pytest.mark.parametrize(
-    "value, path_parameters, query",
+    "value, path_user_id, query_user_id, code",
     (
         (
             [{"path.user_id": 1, "query.user_id": 2, "code": 7}, {"path.user_id": 3, "query.user_id": 4, "code": 5}],
-            EXPECTED_PATH_PARAMETERS,
-            [
-                {
-                    "additionalProperties": False,
-                    "properties": {
-                        "code": {"const": 5, "in": "query", "name": "code", "type": "integer"},
-                        "user_id": {"const": 4, "in": "query", "name": "user_id", "type": "integer"},
-                        "common": {"in": "query", "name": "common", "type": "integer"},
-                    },
-                    "required": ["code", "user_id", "common"],
-                    "type": "object",
-                },
-                {
-                    "additionalProperties": False,
-                    "properties": {
-                        "code": {"const": 7, "in": "query", "name": "code", "type": "integer"},
-                        "user_id": {"const": 2, "in": "query", "name": "user_id", "type": "integer"},
-                        "common": {"in": "query", "name": "common", "type": "integer"},
-                    },
-                    "required": ["code", "user_id", "common"],
-                    "type": "object",
-                },
-            ],
+            [1, 3],
+            {"enum": [2, 4]},
+            {"enum": [7, 5]},
         ),
         (
             [{"path.user_id": 1}, {"path.user_id": 3}],
-            EXPECTED_PATH_PARAMETERS,
-            [
-                {
-                    "additionalProperties": False,
-                    "properties": {
-                        "code": {"in": "query", "name": "code", "type": "integer"},
-                        "user_id": {"in": "query", "name": "user_id", "type": "integer"},
-                        "common": {"in": "query", "name": "common", "type": "integer"},
-                    },
-                    "required": ["code", "user_id", "common"],
-                    "type": "object",
-                },
-                {
-                    "additionalProperties": False,
-                    "properties": {
-                        "code": {"in": "query", "name": "code", "type": "integer"},
-                        "user_id": {"in": "query", "name": "user_id", "type": "integer"},
-                        "common": {"in": "query", "name": "common", "type": "integer"},
-                    },
-                    "required": ["code", "user_id", "common"],
-                    "type": "object",
-                },
-            ],
+            [1, 3],
+            {"type": "integer"},
+            {"type": "integer"},
         ),
     ),
 )
-def test_make_endpoint(value, path_parameters, query):
+def test_make_endpoint(value, path_user_id, query_user_id, code):
     endpoint = LINK.make_endpoint(list(map(ParsedData, value)))
+    # There is only one path parameter
     assert len(endpoint.path_parameters) == 1
-    assert sorted(endpoint.path_parameters["anyOf"], key=json.dumps) == path_parameters
-    assert len(endpoint.query) == 1
-    assert sorted(endpoint.query["anyOf"], key=json.dumps) == query
+    assert sorted(endpoint.path_parameters[0].definition["schema"]["enum"], key=json.dumps) == path_user_id
+    assert len(endpoint.query) == 3
+
+    for item in endpoint.query:
+        schema = item.definition["schema"]
+        if item.name == "code":
+            assert_schema(schema, code)
+        elif item.name == "user_id":
+            assert_schema(schema, query_user_id)
+        else:
+            assert schema == {"type": "integer"}
+
+
+def assert_schema(target, expected):
+    if "enum" in expected:
+        assert len(target) == 1
+        assert sorted(target["enum"]) == sorted(expected["enum"])
+    else:
+        assert target == expected
 
 
 def test_make_endpoint_single():
     endpoint = LINK.make_endpoint([ParsedData({"path.user_id": 1, "query.user_id": 2, "code": 7})])
-    assert endpoint.path_parameters == {
-        "properties": {"user_id": {"in": "path", "name": "user_id", "type": "integer", "const": 1}},
-        "additionalProperties": False,
-        "type": "object",
-        "required": ["user_id"],
-    }
-    assert endpoint.query == {
-        "properties": {
-            "code": {"in": "query", "name": "code", "type": "integer", "const": 7},
-            "user_id": {"in": "query", "name": "user_id", "type": "integer", "const": 2},
-            "common": {"in": "query", "name": "common", "type": "integer"},
-        },
-        "additionalProperties": False,
-        "type": "object",
-        "required": ["code", "user_id", "common"],
-    }
+    assert endpoint.path_parameters == [OpenAPI30Parameter({"in": "path", "name": "user_id", "schema": {"enum": [1]}})]
+    for item in endpoint.query:
+        schema = item.definition["schema"]
+        if item.name == "code":
+            assert schema == {"enum": [7]}
+        elif item.name == "user_id":
+            assert schema == {"enum": [2]}
+        else:
+            assert schema == {"type": "integer"}
 
 
 @pytest.mark.parametrize("parameter", ("wrong.id", "unknown", "header.id"))
@@ -211,9 +174,9 @@ def test_get_container_invalid_location():
             resolved={},
             scope="",
             parameters=[
-                {"in": "query", "name": "code", "type": "integer"},
-                {"in": "query", "name": "user_id", "type": "integer"},
-                {"in": "query", "name": "common", "type": "integer"},
+                OpenAPI30Parameter({"in": "query", "name": "code", "type": "integer"}),
+                OpenAPI30Parameter({"in": "query", "name": "user_id", "type": "integer"}),
+                OpenAPI30Parameter({"in": "query", "name": "common", "type": "integer"}),
             ],
         ),
     )

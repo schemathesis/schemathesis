@@ -675,7 +675,7 @@ def test_empty_content():
     schema = schemathesis.from_dict(raw_schema)
     # Then the body processing should be no-op
     endpoint = schema.endpoints["/body"]["POST"]
-    assert endpoint.body is None
+    assert endpoint.body == []
 
 
 @pytest.mark.hypothesis_nested

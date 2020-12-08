@@ -9,6 +9,7 @@ from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tup
 import attr
 
 from ...models import Case, Endpoint
+from ...parameters import Parameter
 from ...stateful import Direction, ParsedData, StatefulTest
 from ...types import NotSet
 from ...utils import NOT_SET, GenericResponse
@@ -58,57 +59,40 @@ class Link(StatefulTest):
 
     def make_endpoint(self, data: List[ParsedData]) -> Endpoint:
         """Create a modified version of the original endpoint with additional data merged in."""
-        # For each response from the previous endpoint run we create a new JSON schema and collect all results
-        # Instead of unconditionally creating `oneOf` list we gather it separately to optimize
-        # the resulting schema later
-        variants: Dict[str, List[Dict[str, Any]]] = {
-            "path_parameters": [],
-            "query": [],
-            "headers": [],
-            "cookies": [],
-            "body": [],
+        templates = {
+            location: {
+                parameter.name: {"options": [], "parameter": parameter}
+                for parameter in getattr(self.endpoint, container_name)
+            }
+            for location, container_name in LOCATION_TO_CONTAINER.items()
+        }
+        for item in set(data):
+            for name, value in item.parameters.items():
+                name, container = self._get_container_by_parameter_name(name, templates)
+                container[name]["options"].append(value)
+        components: Dict[str, List[Parameter]] = {
+            container_name: [] for location, container_name in LOCATION_TO_CONTAINER.items()
         }
 
-        def make_variants(_item: ParsedData, _templates: Dict[str, Optional[Dict[str, Any]]]) -> None:
-            """Add each item from the previous test run to the proper place in the schema.
-
-            Example:
-                 If there is `user_id` parameter defined in the query, and we have `{"user_id": 1}` as data, then
-                 `1` will be added as a constant in a schema that is responsible for query generation
-
-            """
-            for name, value in _item.parameters.items():
-                name, container = self._get_container_by_parameter_name(name, _templates)
-                container["properties"][name]["const"] = value
-            if _item.body is not NOT_SET:
-                variants["body"].append({"const": _item.body})
-
-        def add_variants(_templates: Dict[str, Optional[Dict[str, Any]]]) -> None:
-            """Add all created schemas as variants to their locations."""
-            for location, container_name in LOCATION_TO_CONTAINER.items():
-                variant = _templates[location]
-                # There could be no schema defined for e.g. `query`, then the container in the `Endpoint` instance
-                # is `None`.
-                if variant is not None:
-                    variants[container_name].append(variant)
-
-        # It is possible that on the previous test level we gathered non-unique data samples, we can remove duplicates
-        # It might happen because of how shrinking works, some examples are retried
-        for item in set(data):
-            # Copies of the original schemas are templates that could be extended from the data gathered in the
-            # previous endpoint test
-            templates: Dict[str, Optional[Dict[str, Any]]] = {
-                location: deepcopy(getattr(self.endpoint, container_name))
-                for location, container_name in LOCATION_TO_CONTAINER.items()
-            }
-            make_variants(item, templates)
-            add_variants(templates)
-        components = self._convert_to_schema(variants)
+        for location, parameters in templates.items():
+            for name, temp in parameters.items():
+                options = temp["options"]
+                container_name = LOCATION_TO_CONTAINER[location]
+                output = components[container_name]
+                if options:
+                    definition = deepcopy(temp["parameter"].definition)
+                    if "schema" in definition:
+                        definition["schema"] = {"enum": options}
+                    else:
+                        definition["enum"] = options
+                    output.append(temp["parameter"].__class__(definition))
+                else:
+                    output.append(temp["parameter"])
         return self.endpoint.clone(**components)
 
     def _get_container_by_parameter_name(
-        self, full_name: str, templates: Dict[str, Optional[Dict[str, Any]]]
-    ) -> Tuple[str, Dict[str, Any]]:
+        self, full_name: str, templates: Dict[str, Dict[str, Dict[str, Any]]]
+    ) -> Tuple[str, Dict[str, Dict[str, Any]]]:
         """Detect in what request part the parameters is defined."""
         location: Optional[str]
         try:
@@ -118,35 +102,18 @@ class Link(StatefulTest):
             location, name = None, full_name
         if location:
             try:
-                schema = templates[location]
+                parameters = templates[location]
             except KeyError:
                 self._unknown_parameter(full_name)
         else:
-            for schema in templates.values():
-                if schema is not None and name in schema["properties"]:
+            for parameters in templates.values():
+                if name in parameters:
                     break
             else:
                 self._unknown_parameter(full_name)
-        if schema is None:
+        if not parameters:
             self._unknown_parameter(full_name)
-        return name, schema
-
-    def _convert_to_schema(self, variants: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
-        """Convert gathered schema variants to a JSON schema.
-
-        No variants gathered - the original schema is used
-        One variant - it is used directly
-        Many variants - they are combined via `anyOf`
-        """
-
-        def convert(name: str, component: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-            if len(component) == 0:
-                return getattr(self.endpoint, name)
-            if len(component) == 1:
-                return component[0]
-            return {"anyOf": component}
-
-        return {name: convert(name, component) for name, component in variants.items()}
+        return name, parameters
 
     def _unknown_parameter(self, name: str) -> NoReturn:
         raise ValueError(
