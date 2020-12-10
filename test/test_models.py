@@ -5,12 +5,8 @@ import requests
 from hypothesis import given, settings
 
 import schemathesis
-from schemathesis import serializers
 from schemathesis.constants import USER_AGENT
 from schemathesis.models import Case, Endpoint, Request, Response
-from schemathesis.parameters import Parameter
-from schemathesis.serializers import SERIALIZERS
-from schemathesis.specs.openapi.parameters import OpenAPI20Parameter
 
 
 def test_path(swagger_20):

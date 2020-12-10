@@ -103,19 +103,15 @@ def get_static_parameters_from_properties(endpoint: Endpoint) -> Dict[str, Any]:
 
 def get_strategies_from_examples(endpoint: Endpoint, examples_field: str = "examples") -> List[SearchStrategy[Case]]:
     strategies = [
-        get_strategy(endpoint, static_parameters)
+        get_case_strategy(endpoint=endpoint, **static_parameters)
         for static_parameters in get_static_parameters_from_examples(endpoint, examples_field)
         if static_parameters
     ]
     for static_parameters in static_parameters_union(
         get_static_parameters_from_example(endpoint), get_static_parameters_from_properties(endpoint)
     ):
-        strategies.append(get_strategy(endpoint, static_parameters))
+        strategies.append(get_case_strategy(endpoint=endpoint, **static_parameters))
     return strategies
-
-
-def get_strategy(endpoint: Endpoint, static_parameters: Dict[str, Any]) -> SearchStrategy[Case]:
-    return get_case_strategy(endpoint, **static_parameters)
 
 
 def merge_examples(

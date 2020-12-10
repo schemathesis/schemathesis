@@ -17,7 +17,7 @@ class OpenAPIParameter(Parameter):
 
     @property
     def example(self) -> Any:
-        """Iterate over all examples defined for the parameter."""
+        """The primary example defined for this parameter."""
         if self._example:
             return self._example
         if self._schema_example:
@@ -65,15 +65,8 @@ class OpenAPIParameter(Parameter):
         return self.definition.get(self.example_field)
 
     @property
-    def named_examples(self) -> Dict[str, Any]:
-        """Named examples, defined in the parameter root."""
-        return self.definition.get(self.examples_field, {})
-
-    @property
     def _schema_example(self) -> Any:
         """Example defined on the schema-level.
-
-        Open API 3.0:
 
         {
             "in": "query",  (only "body" is possible for Open API 2.0)
@@ -226,9 +219,12 @@ class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
 
     def as_json_schema(self) -> Dict[str, Any]:
         """Convert body definition to JSON Schema."""
-        # `schema` is required in Open API 2.0 bodies.
+        # `schema` is required in Open API 2.0 when the `in` keyword is `body`
         schema = self.definition["schema"]
         return self.transform_keywords(schema)
+
+
+FORM_MEDIA_TYPES = ("multipart/form-data", "application/x-www-form-urlencoded")
 
 
 @attr.s(slots=True)
@@ -256,7 +252,7 @@ class OpenAPI30Body(OpenAPIBody, OpenAPI30Parameter):
     @property
     def is_form(self) -> bool:
         """Whether this payload represent a form."""
-        return self.media_type in ("multipart/form-data", "application/x-www-form-urlencoded")
+        return self.media_type in FORM_MEDIA_TYPES
 
     @property
     def is_required(self) -> bool:
@@ -265,6 +261,10 @@ class OpenAPI30Body(OpenAPIBody, OpenAPI30Parameter):
 
 @attr.s(slots=True)
 class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
+    """A special container to abstract over multiple `formData` parameters."""
+
+    definition: List[OpenAPIParameter] = attr.ib()
+
     @classmethod
     def from_parameters(cls, *parameters: Dict[str, Any], media_type: str) -> "OpenAPI20CompositeBody":
         return cls(

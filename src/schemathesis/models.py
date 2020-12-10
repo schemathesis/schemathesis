@@ -463,6 +463,11 @@ class Endpoint(Generic[P]):
         return self.schema.get_links(self)
 
     def add_parameter(self, parameter: P) -> None:
+        """Add a new processed parameter to an endpoint.
+
+        :param parameter: A parameter that will be used with this endpoint.
+        :rtype: None
+        """
         lookup_table = {
             "path": self.path_parameters,
             "header": self.headers,
@@ -470,6 +475,10 @@ class Endpoint(Generic[P]):
             "query": self.query,
             "body": self.body,
         }
+        # If the parameter has a typo, then by default, there will be an error from `jsonschema` earlier.
+        # But if the user wants to skip schema validation, we choose to ignore a malformed parameter.
+        # In this case, we still might generate some tests for an endpoint, but without this parameter, which is better
+        # than skip the whole endpoint from testing.
         if parameter.location in lookup_table:
             container = lookup_table[parameter.location]
             container.append(parameter)

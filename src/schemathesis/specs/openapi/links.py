@@ -57,42 +57,46 @@ class Link(StatefulTest):
             body=expressions.evaluate(self.request_body, context),
         )
 
-    def make_endpoint(self, data: List[ParsedData]) -> Endpoint:
+    def make_endpoint(self, collected: List[ParsedData]) -> Endpoint:
         """Create a modified version of the original endpoint with additional data merged in."""
-        templates = {
+        # We split the gathered data among all locations & store the original parameter
+        containers = {
             location: {
                 parameter.name: {"options": [], "parameter": parameter}
                 for parameter in getattr(self.endpoint, container_name)
             }
             for location, container_name in LOCATION_TO_CONTAINER.items()
         }
-        for item in set(data):
+        # There might be duplicates in data
+        for item in set(collected):
             for name, value in item.parameters.items():
-                name, container = self._get_container_by_parameter_name(name, templates)
-                container[name]["options"].append(value)
+                container = self._get_container_by_parameter_name(name, containers)
+                container.append(value)
+        # These are final `path_parameters`, `query`, and other endpoint components
         components: Dict[str, List[Parameter]] = {
             container_name: [] for location, container_name in LOCATION_TO_CONTAINER.items()
         }
-
-        for location, parameters in templates.items():
-            for name, temp in parameters.items():
-                options = temp["options"]
-                container_name = LOCATION_TO_CONTAINER[location]
-                output = components[container_name]
-                if options:
-                    definition = deepcopy(temp["parameter"].definition)
+        # Here are all components are filled with parameters
+        for location, parameters in containers.items():
+            for name, parameter_data in parameters.items():
+                if parameter_data["options"]:
+                    definition = deepcopy(parameter_data["parameter"].definition)
                     if "schema" in definition:
-                        definition["schema"] = {"enum": options}
+                        # The actual schema doesn't matter since we have a list of allowed values
+                        definition["schema"] = {"enum": parameter_data["options"]}
                     else:
-                        definition["enum"] = options
-                    output.append(temp["parameter"].__class__(definition))
+                        # Other schema-related keywords will be ignored later, during the canonicalisation step
+                        # inside `hypothesis-jsonschema`
+                        definition["enum"] = parameter_data["options"]
+                    components[LOCATION_TO_CONTAINER[location]].append(
+                        parameter_data["parameter"].__class__(definition)
+                    )
                 else:
-                    output.append(temp["parameter"])
+                    # No options were gathered for this parameter, use the original one
+                    components[LOCATION_TO_CONTAINER[location]].append(parameter_data["parameter"])
         return self.endpoint.clone(**components)
 
-    def _get_container_by_parameter_name(
-        self, full_name: str, templates: Dict[str, Dict[str, Dict[str, Any]]]
-    ) -> Tuple[str, Dict[str, Dict[str, Any]]]:
+    def _get_container_by_parameter_name(self, full_name: str, templates: Dict[str, Dict[str, Dict[str, Any]]]) -> List:
         """Detect in what request part the parameters is defined."""
         location: Optional[str]
         try:
@@ -113,7 +117,7 @@ class Link(StatefulTest):
                 self._unknown_parameter(full_name)
         if not parameters:
             self._unknown_parameter(full_name)
-        return name, parameters
+        return parameters[name]["options"]
 
     def _unknown_parameter(self, name: str) -> NoReturn:
         raise ValueError(

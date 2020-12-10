@@ -53,7 +53,7 @@ class StatefulTest:
     def parse(self, case: Case, response: GenericResponse) -> ParsedData:
         raise NotImplementedError
 
-    def make_endpoint(self, data: List[ParsedData]) -> Endpoint:
+    def make_endpoint(self, collected: List[ParsedData]) -> Endpoint:
         raise NotImplementedError
 
 

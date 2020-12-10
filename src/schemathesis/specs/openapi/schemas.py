@@ -465,23 +465,36 @@ class SwaggerV20(BaseOpenAPISchema):
     def prepare_multipart(
         self, form_data: FormData, endpoint: Endpoint
     ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
+        """Prepare form data for sending with `requests`.
+
+        :param form_data: Raw generated data as a dictionary.
+        :param endpoint: The tested endpoint for which the data was generated.
+        :return: `files` and `data` values for `requests.request`.
+        """
         files, data = [], {}
         # If there is no content types specified for the request or "application/x-www-form-urlencoded" is specified
         # explicitly, then use it., but if "multipart/form-data" is specified, then use it
-        # TODO. It might use the new Parameter API
-        consumes = self.get_request_payload_content_types(endpoint)
-        is_multipart = "multipart/form-data" in consumes
-        for parameter in endpoint.definition.resolved.get("parameters", ()):
-            name = parameter["name"]
-            if name in form_data:
-                if parameter["in"] == "formData" and (parameter.get("type") == "file" or is_multipart):
-                    if isinstance(form_data[name], list):
-                        for item in form_data[name]:
-                            files.append((name, (None, item)))
-                    else:
-                        files.append((name, form_data[name]))
-                else:
-                    data[name] = form_data[name]
+        content_types = self.get_request_payload_content_types(endpoint)
+        is_multipart = "multipart/form-data" in content_types
+
+        def add_file(file_value: Any) -> None:
+            if isinstance(file_value, list):
+                for item in file_value:
+                    files.append((name, (None, item)))
+            else:
+                files.append((name, file_value))
+
+        for parameter in endpoint.definition.parameters:
+            if isinstance(parameter, OpenAPI20CompositeBody):
+                for form_parameter in parameter.definition:
+                    name = form_parameter.name
+                    # It might be not in `form_data`, if the parameter is optional
+                    if name in form_data:
+                        value = form_data[name]
+                        if form_parameter.definition.get("type") == "file" or is_multipart:
+                            add_file(value)
+                        else:
+                            data[name] = value
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, data or None
 
@@ -489,6 +502,12 @@ class SwaggerV20(BaseOpenAPISchema):
         return self._get_consumes_for_endpoint(endpoint.definition.resolved)
 
     def _get_consumes_for_endpoint(self, endpoint_definition: Dict[str, Any]) -> List[str]:
+        """Get the `consumes` value for the given endpoint.
+
+        :param endpoint_definition: Raw endpoint definition.
+        :return: A list of media-types for this endpoint.
+        :rtype: List[str]
+        """
         global_consumes = self.raw_schema.get("consumes", [])
         consumes = endpoint_definition.get("consumes", [])
         if not consumes:
@@ -562,6 +581,12 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     def prepare_multipart(
         self, form_data: FormData, endpoint: Endpoint
     ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
+        """Prepare form data for sending with `requests`.
+
+        :param form_data: Raw generated data as a dictionary.
+        :param endpoint: The tested endpoint for which the data was generated.
+        :return: `files` and `data` values for `requests.request`.
+        """
         files, data = [], {}
         content = endpoint.definition.resolved["requestBody"]["content"]
         if "multipart/form-data" in content:

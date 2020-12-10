@@ -201,18 +201,24 @@ def quote_all(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def apply_hooks(
-    endpoint: Endpoint, context: HookContext, hooks: Optional[HookDispatcher], strategy: st.SearchStrategy, key: str
-) -> st.SearchStrategy:
-    strategy = __apply_hooks(context, GLOBAL_HOOK_DISPATCHER, strategy, key)
-    strategy = __apply_hooks(context, endpoint.schema.hooks, strategy, key)
+    endpoint: Endpoint,
+    context: HookContext,
+    hooks: Optional[HookDispatcher],
+    strategy: st.SearchStrategy[Case],
+    location: str,
+) -> st.SearchStrategy[Case]:
+    """Apply all `before_generate_` hooks related to the given location."""
+    strategy = _apply_hooks(context, GLOBAL_HOOK_DISPATCHER, strategy, location)
+    strategy = _apply_hooks(context, endpoint.schema.hooks, strategy, location)
     if hooks is not None:
-        strategy = __apply_hooks(context, hooks, strategy, key)
+        strategy = _apply_hooks(context, hooks, strategy, location)
     return strategy
 
 
-def __apply_hooks(
-    context: HookContext, hooks: HookDispatcher, strategy: st.SearchStrategy, key: str
-) -> st.SearchStrategy:
-    for hook in hooks.get_all_by_name(f"before_generate_{key}"):
+def _apply_hooks(
+    context: HookContext, hooks: HookDispatcher, strategy: st.SearchStrategy[Case], location: str
+) -> st.SearchStrategy[Case]:
+    """Apply all `before_generate_` hooks related to the given location & dispatcher."""
+    for hook in hooks.get_all_by_name(f"before_generate_{location}"):
         strategy = hook(context, strategy)
     return strategy

@@ -1,7 +1,8 @@
 from base64 import b64decode
 
 import pytest
-from hypothesis import HealthCheck, given, settings, strategies
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis import Case, register_string_format
@@ -25,13 +26,14 @@ def make_endpoint(schema, **kwargs) -> Endpoint:
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_get_examples(name, swagger_20):
     if name == "body":
-        # TODO. explain why
+        # In Open API 2.0, `body` parameter has a name, which is ignored
+        # But we'd like to use this object as a payload, therefore we put one extra level of nesting
         example = expected = {"name": "John"}
         media_type = "application/json"
     else:
         example = "John"
-        expected = {"name": "John"}
-        media_type = None
+        expected = {"name": example}
+        media_type = None  # there is no payload
     endpoint = make_endpoint(
         swagger_20,
         **{
@@ -132,7 +134,7 @@ def test_invalid_body_in_get_disable_validation(simple_schema):
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_custom_strategies(swagger_20):
-    register_string_format("even_4_digits", strategies.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
+    register_string_format("even_4_digits", st.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
     endpoint = make_endpoint(
         swagger_20,
         query=[
@@ -190,8 +192,8 @@ def test_default_strategies_bytes(swagger_20):
 @pytest.mark.parametrize(
     "values, error",
     (
-        (("valid", "invalid"), f"strategy must be of type {strategies.SearchStrategy}, not {str}"),
-        ((123, strategies.from_regex(r"\d")), f"name must be of type {str}, not {int}"),
+        (("valid", "invalid"), f"strategy must be of type {st.SearchStrategy}, not {str}"),
+        ((123, st.from_regex(r"\d")), f"name must be of type {str}, not {int}"),
     ),
 )
 def test_invalid_custom_strategy(values, error):
@@ -282,6 +284,7 @@ def make_swagger(*parameters):
         },
     ),
 )
+@pytest.mark.hypothesis_nested
 def test_valid_form_data(request, raw_schema):
     if "swagger" in raw_schema:
         base_url = request.getfixturevalue("openapi2_base_url")
@@ -292,7 +295,7 @@ def test_valid_form_data(request, raw_schema):
     schema = schemathesis.from_dict(raw_schema, base_url=base_url)
 
     @given(case=schema["/form"]["POST"].as_strategy())
-    @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow], max_examples=100)
+    @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow], max_examples=10)
     def inner(case):
         case.call()
 
@@ -312,7 +315,7 @@ def test_filter_path_parameters(value):
 
 @pytest.mark.hypothesis_nested
 def test_is_valid_query_strategy():
-    strategy = strategies.sampled_from([{"key": "1"}, {"key": "\udcff"}]).filter(is_valid_query)
+    strategy = st.sampled_from([{"key": "1"}, {"key": "\udcff"}]).filter(is_valid_query)
 
     @given(strategy)
     @settings(max_examples=10)
