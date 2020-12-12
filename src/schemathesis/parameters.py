@@ -44,7 +44,7 @@ class Parameter:
     @property
     def example(self) -> Any:
         """Parameter example."""
-        return None
+        raise NotImplementedError
 
 
 P = TypeVar("P", bound=Parameter)

@@ -12,8 +12,8 @@ from schemathesis.parameters import ParameterSet, PayloadAlternatives
 from schemathesis.specs.openapi._hypothesis import (
     PARAMETERS,
     STRING_FORMATS,
-    filter_path_parameters,
     get_case_strategy,
+    is_valid_path,
     is_valid_query,
 )
 from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20CompositeBody, OpenAPI20Parameter
@@ -327,7 +327,7 @@ def test_is_valid_query(value, expected):
 
 @pytest.mark.parametrize("value", ("/", "\udc9b"))
 def test_filter_path_parameters(value):
-    assert not filter_path_parameters({"foo": value})
+    assert not is_valid_path({"foo": value})
 
 
 @pytest.mark.hypothesis_nested

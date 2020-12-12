@@ -14,6 +14,7 @@ from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import Case, Endpoint
 from ...stateful import Feedback
 from ...utils import NOT_SET
+from .constants import LOCATION_TO_CONTAINER
 from .parameters import parameters_to_json_schema
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
@@ -93,16 +94,16 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     context = HookContext(endpoint)
 
     if path_parameters is NOT_SET:
-        strategy = get_parameters_strategy(endpoint, to_strategy, "path_parameters")
-        strategy = apply_hooks(endpoint, context, hooks, strategy, "path_parameters")
+        strategy = get_parameters_strategy(endpoint, to_strategy, "path")
+        strategy = apply_hooks(endpoint, context, hooks, strategy, "path")
         path_parameters = draw(strategy)
     if headers is NOT_SET:
-        strategy = get_parameters_strategy(endpoint, to_strategy, "headers")
-        strategy = apply_hooks(endpoint, context, hooks, strategy, "headers")
+        strategy = get_parameters_strategy(endpoint, to_strategy, "header")
+        strategy = apply_hooks(endpoint, context, hooks, strategy, "header")
         headers = draw(strategy)
     if cookies is NOT_SET:
-        strategy = get_parameters_strategy(endpoint, to_strategy, "cookies")
-        strategy = apply_hooks(endpoint, context, hooks, strategy, "cookies")
+        strategy = get_parameters_strategy(endpoint, to_strategy, "cookie")
+        strategy = apply_hooks(endpoint, context, hooks, strategy, "cookie")
         cookies = draw(strategy)
     if query is NOT_SET:
         strategy = get_parameters_strategy(endpoint, to_strategy, "query")
@@ -142,52 +143,36 @@ def get_case_strategy(  # pylint: disable=too-many-locals
 
 
 def get_parameters_strategy(
-    endpoint: Endpoint, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], name: str
+    endpoint: Endpoint, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], location: str
 ) -> st.SearchStrategy:
     """Create a new strategy for case's component from the endpoint parameters."""
-    parameters = getattr(endpoint, name)
+    parameters = getattr(endpoint, LOCATION_TO_CONTAINER[location])
     if parameters:
         schema = parameters_to_json_schema(parameters)
         strategy = to_strategy(schema)
-        location = {"headers": "header", "cookies": "cookie", "path_parameters": "path"}.get(name, name)
         serialize = endpoint.get_hypothesis_conversions(location)
         if serialize is not None:
             strategy = strategy.map(serialize)
-        if name == "path_parameters":
-            strategy = strategy.filter(filter_path_parameters).map(quote_all)
-        elif name in ("headers", "cookies"):
-            strategy = strategy.filter(is_valid_header)
-        elif name == "query":
-            strategy = strategy.filter(is_valid_query)
+        filter_func = {
+            "path": is_valid_path,
+            "header": is_valid_header,
+            "cookie": is_valid_header,
+            "query": is_valid_query,
+        }[location]
+        strategy = strategy.filter(filter_func)
+        map_func = {"path": quote_all}.get(location)
+        if map_func:
+            strategy = strategy.map(map_func)
         return strategy
+    # No parameters defined for this location
     return st.just(None)
-
-
-def prepare_strategy(
-    parameter: str,
-    schema: Dict[str, Any],
-    map_func: Optional[Callable],
-    data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
-) -> st.SearchStrategy:
-    """Create a strategy for a schema and add location-specific filters & maps."""
-    to_strategy = {DataGenerationMethod.positive: make_positive_strategy}[data_generation_method]
-    strategy = to_strategy(schema)
-    if map_func is not None:
-        strategy = strategy.map(map_func)
-    if parameter == "path_parameters":
-        strategy = strategy.filter(filter_path_parameters).map(quote_all)  # type: ignore
-    elif parameter in ("headers", "cookies"):
-        strategy = strategy.filter(is_valid_header)  # type: ignore
-    elif parameter == "query":
-        strategy = strategy.filter(is_valid_query)  # type: ignore
-    return strategy
 
 
 def make_positive_strategy(schema: Dict[str, Any]) -> st.SearchStrategy:
     return from_schema(schema, custom_formats=STRING_FORMATS)
 
 
-def filter_path_parameters(parameters: Dict[str, Any]) -> bool:
+def is_valid_path(parameters: Dict[str, Any]) -> bool:
     """Single "." chars and empty strings "" are excluded from path by urllib3.
 
     A path containing to "/" or "%2F" will lead to ambiguous path resolution in
@@ -230,6 +215,7 @@ def _apply_hooks(
     context: HookContext, hooks: HookDispatcher, strategy: st.SearchStrategy[Case], location: str
 ) -> st.SearchStrategy[Case]:
     """Apply all `before_generate_` hooks related to the given location & dispatcher."""
-    for hook in hooks.get_all_by_name(f"before_generate_{location}"):
+    container = LOCATION_TO_CONTAINER[location]
+    for hook in hooks.get_all_by_name(f"before_generate_{container}"):
         strategy = hook(context, strategy)
     return strategy
