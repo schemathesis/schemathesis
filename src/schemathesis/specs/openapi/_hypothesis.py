@@ -115,8 +115,13 @@ def get_case_strategy(  # pylint: disable=too-many-locals
         else:
             body = None
     else:
-        # TODO. detect the proper one
-        media_type = "application/json"
+        media_types = endpoint.get_request_payload_content_types() or ["application/json"]
+        # Take the first available media type.
+        # POSSIBLE IMPROVEMENT:
+        #   - Test examples for each available media type on Open API 2.0;
+        #   - On Open API 3.0 media types are explicit and each example has it. We can pass `OpenAPIBody.media_type`
+        #     here from the examples handling code.
+        media_type = media_types[0]
     if endpoint.schema.validate_schema and endpoint.method.upper() == "GET" and endpoint.body:
         raise InvalidSchema("Body parameters are defined for GET request.")
     return Case(
