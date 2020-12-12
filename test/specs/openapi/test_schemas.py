@@ -2,6 +2,7 @@ import pytest
 
 import schemathesis
 from schemathesis.models import Endpoint
+from schemathesis.parameters import ParameterSet
 from schemathesis.specs.openapi.parameters import OpenAPI20Parameter, OpenAPI30Parameter
 
 
@@ -14,10 +15,10 @@ def test_get_endpoint_via_remote_reference(openapi_version, schema_url):
     assert resolved.method.upper() == "PATCH"
     # Via common parameters for all methods
     if openapi_version.is_openapi_2:
-        assert resolved.query == [
-            OpenAPI20Parameter({"in": "query", "name": "common", "required": True, "type": "integer"})
-        ]
+        assert resolved.query == ParameterSet(
+            [OpenAPI20Parameter({"in": "query", "name": "common", "required": True, "type": "integer"})]
+        )
     if openapi_version.is_openapi_3:
-        assert resolved.query == [
-            OpenAPI30Parameter({"in": "query", "name": "common", "required": True, "schema": {"type": "integer"}})
-        ]
+        assert resolved.query == ParameterSet(
+            [OpenAPI30Parameter({"in": "query", "name": "common", "required": True, "schema": {"type": "integer"}})]
+        )

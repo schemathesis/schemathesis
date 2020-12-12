@@ -1,6 +1,7 @@
 """Tests for parsing of parameters related to forms."""
 import pytest
 
+from schemathesis.parameters import PayloadAlternatives
 from schemathesis.specs.openapi.parameters import OpenAPI20CompositeBody, OpenAPI20Parameter, OpenAPI30Body
 
 
@@ -18,14 +19,16 @@ def test_forms_open_api_2(
     schema = make_openapi_2_schema(consumes, open_api_2_user_form_parameters)
     assert_parameters(
         schema,
-        [
-            # They are represented as a single "composite" body for each media type
-            OpenAPI20CompositeBody(
-                definition=[OpenAPI20Parameter(parameter) for parameter in open_api_2_user_form_parameters],
-                media_type=value,
-            )
-            for value in consumes
-        ],
+        PayloadAlternatives(
+            [
+                # They are represented as a single "composite" body for each media type
+                OpenAPI20CompositeBody(
+                    definition=[OpenAPI20Parameter(parameter) for parameter in open_api_2_user_form_parameters],
+                    media_type=value,
+                )
+                for value in consumes
+            ]
+        ),
         # Each converted schema should correspond to the default User schema.
         [user_jsonschema] * len(consumes),
     )
@@ -50,13 +53,17 @@ def test_multipart_form_open_api_2(
     schema = make_openapi_2_schema(consumes, open_api_2_user_form_with_file_parameters)
     assert_parameters(
         schema,
-        [
-            # Is represented with a "composite" body
-            OpenAPI20CompositeBody(
-                definition=[OpenAPI20Parameter(parameter) for parameter in open_api_2_user_form_with_file_parameters],
-                media_type="multipart/form-data",
-            )
-        ],
+        PayloadAlternatives(
+            [
+                # Is represented with a "composite" body
+                OpenAPI20CompositeBody(
+                    definition=[
+                        OpenAPI20Parameter(parameter) for parameter in open_api_2_user_form_with_file_parameters
+                    ],
+                    media_type="multipart/form-data",
+                )
+            ]
+        ),
         [user_jsonschema_with_file],
     )
 
@@ -71,11 +78,15 @@ def test_urlencoded_form_open_api_3(assert_parameters, make_openapi_3_schema, op
     )
     assert_parameters(
         schema,
-        [
-            OpenAPI30Body(
-                definition={"schema": open_api_3_user}, media_type="application/x-www-form-urlencoded", required=True
-            )
-        ],
+        PayloadAlternatives(
+            [
+                OpenAPI30Body(
+                    definition={"schema": open_api_3_user},
+                    media_type="application/x-www-form-urlencoded",
+                    required=True,
+                )
+            ]
+        ),
         # It should correspond to the default User schema
         [user_jsonschema],
     )
@@ -92,7 +103,9 @@ def test_loose_urlencoded_form_open_api_3(assert_parameters, make_openapi_3_sche
     )
     assert_parameters(
         schema,
-        [OpenAPI30Body(definition=loose_schema, media_type="application/x-www-form-urlencoded", required=True)],
+        PayloadAlternatives(
+            [OpenAPI30Body(definition=loose_schema, media_type="application/x-www-form-urlencoded", required=True)]
+        ),
         # But when it is converted to JSON Schema, Schemathesis sets `type` to `object`
         # Therefore it corresponds to the default JSON Schema defined for a User
         [user_jsonschema],
@@ -111,11 +124,13 @@ def test_multipart_form_open_api_3(
     )
     assert_parameters(
         schema,
-        [
-            OpenAPI30Body(
-                definition={"schema": open_api_3_user_with_file}, media_type="multipart/form-data", required=True
-            )
-        ],
+        PayloadAlternatives(
+            [
+                OpenAPI30Body(
+                    definition={"schema": open_api_3_user_with_file}, media_type="multipart/form-data", required=True
+                )
+            ]
+        ),
         # When converted, the schema corresponds the default schema defined for a User object with a file
         [user_jsonschema_with_file],
     )

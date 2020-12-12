@@ -4,6 +4,7 @@ import pytest
 
 import schemathesis
 from schemathesis.models import Endpoint, EndpointDefinition
+from schemathesis.parameters import PayloadAlternatives
 from schemathesis.specs.openapi.parameters import OpenAPI30Body
 
 from .utils import as_param, get_schema, integer
@@ -568,7 +569,7 @@ def test_complex_dereference(testdir, complex_schema):
             scope=f"{path.as_uri()}/root/paths/teapot.yaml#/TeapotCreatePath",
             parameters=[body],
         ),
-        body=[body],
+        body=PayloadAlternatives([body]),
         schema=schema,
     )
 

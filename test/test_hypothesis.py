@@ -8,6 +8,7 @@ import schemathesis
 from schemathesis import Case, register_string_format
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import Endpoint, EndpointDefinition
+from schemathesis.parameters import ParameterSet, PayloadAlternatives
 from schemathesis.specs.openapi._hypothesis import (
     PARAMETERS,
     STRING_FORMATS,
@@ -30,24 +31,28 @@ def test_get_examples(name, swagger_20):
         # But we'd like to use this object as a payload, therefore we put one extra level of nesting
         example = expected = {"name": "John"}
         media_type = "application/json"
+        cls = PayloadAlternatives
     else:
         example = "John"
         expected = {"name": example}
         media_type = None  # there is no payload
+        cls = ParameterSet
     endpoint = make_endpoint(
         swagger_20,
         **{
-            name: [
-                OpenAPI20Parameter(
-                    {
-                        "in": name,
-                        "name": "name",
-                        "required": True,
-                        "type": "string",
-                        "x-example": example,
-                    }
-                )
-            ]
+            name: cls(
+                [
+                    OpenAPI20Parameter(
+                        {
+                            "in": name,
+                            "name": "name",
+                            "required": True,
+                            "type": "string",
+                            "x-example": example,
+                        }
+                    )
+                ]
+            )
         },
     )
     strategies = endpoint.get_strategies_from_examples()
@@ -62,17 +67,19 @@ def test_no_body_in_get(swagger_20):
         method="GET",
         definition=EndpointDefinition({}, {}, "foo", []),
         schema=swagger_20,
-        query=[
-            OpenAPI20Parameter(
-                {
-                    "required": True,
-                    "in": "query",
-                    "type": "string",
-                    "name": "key",
-                    "x-example": "John",
-                }
-            )
-        ],
+        query=ParameterSet(
+            [
+                OpenAPI20Parameter(
+                    {
+                        "required": True,
+                        "in": "query",
+                        "type": "string",
+                        "name": "key",
+                        "x-example": "John",
+                    }
+                )
+            ]
+        ),
     )
     strategies = endpoint.get_strategies_from_examples()
     assert len(strategies) == 1
@@ -86,17 +93,19 @@ def test_invalid_body_in_get(swagger_20):
         method="GET",
         definition=EndpointDefinition({}, {}, "foo", []),
         schema=swagger_20,
-        body=[
-            OpenAPI20Body(
-                {
-                    "name": "attributes",
-                    "in": "body",
-                    "required": True,
-                    "schema": {"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
-                },
-                media_type="application/json",
-            )
-        ],
+        body=PayloadAlternatives(
+            [
+                OpenAPI20Body(
+                    {
+                        "name": "attributes",
+                        "in": "body",
+                        "required": True,
+                        "schema": {"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
+                    },
+                    media_type="application/json",
+                )
+            ]
+        ),
     )
     with pytest.raises(InvalidSchema, match=r"^Body parameters are defined for GET request.$"):
         get_case_strategy(endpoint).example()
@@ -110,17 +119,19 @@ def test_invalid_body_in_get_disable_validation(simple_schema):
         method="GET",
         definition=EndpointDefinition({}, {}, "foo", []),
         schema=schema,
-        body=[
-            OpenAPI20Body(
-                {
-                    "name": "attributes",
-                    "in": "body",
-                    "required": True,
-                    "schema": {"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
-                },
-                media_type="application/json",
-            )
-        ],
+        body=PayloadAlternatives(
+            [
+                OpenAPI20Body(
+                    {
+                        "name": "attributes",
+                        "in": "body",
+                        "required": True,
+                        "schema": {"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
+                    },
+                    media_type="application/json",
+                )
+            ]
+        ),
     )
     strategy = get_case_strategy(endpoint)
 
@@ -137,11 +148,13 @@ def test_custom_strategies(swagger_20):
     register_string_format("even_4_digits", st.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
     endpoint = make_endpoint(
         swagger_20,
-        query=[
-            OpenAPI20Parameter(
-                {"name": "id", "in": "query", "required": True, "type": "string", "format": "even_4_digits"}
-            )
-        ],
+        query=ParameterSet(
+            [
+                OpenAPI20Parameter(
+                    {"name": "id", "in": "query", "required": True, "type": "string", "format": "even_4_digits"}
+                )
+            ]
+        ),
     )
     result = get_case_strategy(endpoint).example()
     assert len(result.query["id"]) == 4
@@ -157,17 +170,19 @@ def test_register_default_strategies():
 def test_default_strategies_binary(swagger_20):
     endpoint = make_endpoint(
         swagger_20,
-        body=[
-            OpenAPI20CompositeBody.from_parameters(
-                {
-                    "name": "upfile",
-                    "in": "formData",
-                    "type": "file",
-                    "required": True,
-                },
-                media_type="multipart/form-data",
-            )
-        ],
+        body=PayloadAlternatives(
+            [
+                OpenAPI20CompositeBody.from_parameters(
+                    {
+                        "name": "upfile",
+                        "in": "formData",
+                        "type": "file",
+                        "required": True,
+                    },
+                    media_type="multipart/form-data",
+                )
+            ]
+        ),
     )
     result = get_case_strategy(endpoint).example()
     assert isinstance(result.body["upfile"], bytes)
@@ -177,12 +192,14 @@ def test_default_strategies_binary(swagger_20):
 def test_default_strategies_bytes(swagger_20):
     endpoint = make_endpoint(
         swagger_20,
-        body=[
-            OpenAPI20Body(
-                {"in": "body", "name": "byte", "required": True, "schema": {"type": "string", "format": "byte"}},
-                media_type="text/plain",
-            )
-        ],
+        body=PayloadAlternatives(
+            [
+                OpenAPI20Body(
+                    {"in": "body", "name": "byte", "required": True, "schema": {"type": "string", "format": "byte"}},
+                    media_type="text/plain",
+                )
+            ]
+        ),
     )
     result = get_case_strategy(endpoint).example()
     assert isinstance(result.body, str)
@@ -213,7 +230,7 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
         definition=EndpointDefinition({}, {}, "foo", []),
         schema=swagger_20,
         base_url=openapi2_base_url,
-        headers=[OpenAPI20Parameter(definition)],
+        headers=ParameterSet([OpenAPI20Parameter(definition)]),
     )
 
     @given(case=get_case_strategy(endpoint))

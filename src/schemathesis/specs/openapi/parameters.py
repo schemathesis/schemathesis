@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Dict, List, Tuple
+from typing import Any, ClassVar, Dict, Iterable, List, Tuple
 
 import attr
 
@@ -321,7 +321,7 @@ class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
         return parameters_to_json_schema(self.definition)
 
 
-def parameters_to_json_schema(parameters: List[OpenAPIParameter]) -> Dict[str, Any]:
+def parameters_to_json_schema(parameters: Iterable[OpenAPIParameter]) -> Dict[str, Any]:
     """Create an "object" JSON schema from a list of Open API parameters.
 
     :param List[OpenAPIParameter] parameters: A list of Open API parameters, related to the same location. All of

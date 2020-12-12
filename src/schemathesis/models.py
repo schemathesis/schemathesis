@@ -34,7 +34,7 @@ from starlette.testclient import TestClient as ASGIClient
 from . import serializers
 from .constants import USER_AGENT, DataGenerationMethod
 from .exceptions import CheckFailed, InvalidSchema, get_grouped_exception
-from .parameters import Parameter
+from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .serializers import SerializerContext
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse, get_response_payload
@@ -443,12 +443,11 @@ class Endpoint(Generic[P]):
     schema: "BaseSchema" = attr.ib()  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
-    path_parameters: List[P] = attr.ib(factory=list)  # pragma: no mutate
-    headers: List[P] = attr.ib(factory=list)  # pragma: no mutate
-    cookies: List[P] = attr.ib(factory=list)  # pragma: no mutate
-    query: List[P] = attr.ib(factory=list)  # pragma: no mutate
-    # Each parameter in the "body" list is considered as an alternative payload type
-    body: List[P] = attr.ib(factory=list)  # pragma: no mutate
+    path_parameters: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
+    headers: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
+    cookies: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
+    query: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
+    body: PayloadAlternatives[P] = attr.ib(factory=PayloadAlternatives)  # pragma: no mutate
 
     @property
     def verbose_name(self) -> str:
@@ -481,7 +480,7 @@ class Endpoint(Generic[P]):
         # than skip the whole endpoint from testing.
         if parameter.location in lookup_table:
             container = lookup_table[parameter.location]
-            container.append(parameter)
+            container.add(parameter)
 
     def as_strategy(
         self,

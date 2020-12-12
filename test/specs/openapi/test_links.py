@@ -6,6 +6,7 @@ import requests
 
 import schemathesis
 from schemathesis.models import Case, Endpoint, EndpointDefinition
+from schemathesis.parameters import ParameterSet
 from schemathesis.specs.openapi.links import Link, get_container
 from schemathesis.specs.openapi.parameters import OpenAPI30Parameter
 from schemathesis.stateful import ParsedData, Stateful
@@ -16,14 +17,18 @@ ENDPOINT = Endpoint(
     definition=ANY,
     schema=ANY,
     base_url=ANY,
-    path_parameters=[
-        OpenAPI30Parameter({"in": "path", "name": "user_id", "schema": {"type": "integer"}}),
-    ],
-    query=[
-        OpenAPI30Parameter({"in": "query", "name": "code", "schema": {"type": "integer"}}),
-        OpenAPI30Parameter({"in": "query", "name": "user_id", "schema": {"type": "integer"}}),
-        OpenAPI30Parameter({"in": "query", "name": "common", "schema": {"type": "integer"}}),
-    ],
+    path_parameters=ParameterSet(
+        [
+            OpenAPI30Parameter({"in": "path", "name": "user_id", "schema": {"type": "integer"}}),
+        ]
+    ),
+    query=ParameterSet(
+        [
+            OpenAPI30Parameter({"in": "query", "name": "code", "schema": {"type": "integer"}}),
+            OpenAPI30Parameter({"in": "query", "name": "user_id", "schema": {"type": "integer"}}),
+            OpenAPI30Parameter({"in": "query", "name": "common", "schema": {"type": "integer"}}),
+        ]
+    ),
 )
 LINK = Link(
     name="GetUserByUserId",
@@ -147,7 +152,9 @@ def assert_schema(target, expected):
 
 def test_make_endpoint_single():
     endpoint = LINK.make_endpoint([ParsedData({"path.user_id": 1, "query.user_id": 2, "code": 7})])
-    assert endpoint.path_parameters == [OpenAPI30Parameter({"in": "path", "name": "user_id", "schema": {"enum": [1]}})]
+    assert endpoint.path_parameters == ParameterSet(
+        [OpenAPI30Parameter({"in": "path", "name": "user_id", "schema": {"enum": [1]}})]
+    )
     for item in endpoint.query:
         schema = item.definition["schema"]
         if item.name == "code":

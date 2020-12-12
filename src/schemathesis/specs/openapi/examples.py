@@ -76,12 +76,9 @@ def get_static_parameters_from_example(endpoint: Endpoint) -> Dict[str, Any]:
     static_parameters = {}
     for name in PARAMETERS:
         parameters = getattr(endpoint, name)
-        if name == "body" and parameters and parameters[0].example:
-            static_parameters[name] = parameters[0].example
-        else:
-            examples = {parameter.name: parameter.example for parameter in parameters if parameter.example}
-            if examples:
-                static_parameters[name] = examples
+        example = parameters.example
+        if example:
+            static_parameters[name] = example
     return static_parameters
 
 

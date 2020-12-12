@@ -3,6 +3,7 @@ from hypothesis import given, settings
 from packaging import version
 
 import schemathesis
+from schemathesis.parameters import PayloadAlternatives
 
 from .apps import OpenAPIVersion
 from .utils import integer
@@ -675,7 +676,7 @@ def test_empty_content():
     schema = schemathesis.from_dict(raw_schema)
     # Then the body processing should be no-op
     endpoint = schema.endpoints["/body"]["POST"]
-    assert endpoint.body == []
+    assert endpoint.body == PayloadAlternatives([])
 
 
 @pytest.mark.hypothesis_nested

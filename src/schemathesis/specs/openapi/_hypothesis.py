@@ -112,7 +112,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     media_type = None
     if body is NOT_SET:
         if endpoint.body:
-            parameter = draw(st.sampled_from(endpoint.body))
+            parameter = draw(st.sampled_from(endpoint.body.items))
             schema = parameter.as_json_schema()
             strategy = to_strategy(schema)
             media_type = parameter.media_type

@@ -9,7 +9,7 @@ from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tup
 import attr
 
 from ...models import Case, Endpoint
-from ...parameters import Parameter
+from ...parameters import ParameterSet
 from ...stateful import Direction, ParsedData, StatefulTest
 from ...types import NotSet
 from ...utils import NOT_SET, GenericResponse
@@ -73,8 +73,9 @@ class Link(StatefulTest):
                 container = self._get_container_by_parameter_name(name, containers)
                 container.append(value)
         # These are final `path_parameters`, `query`, and other endpoint components
-        components: Dict[str, List[Parameter]] = {
-            container_name: [] for location, container_name in LOCATION_TO_CONTAINER.items()
+        components: Dict[str, ParameterSet] = {
+            container_name: getattr(self.endpoint, container_name).__class__()
+            for location, container_name in LOCATION_TO_CONTAINER.items()
         }
         # Here are all components are filled with parameters
         for location, parameters in containers.items():
@@ -88,12 +89,10 @@ class Link(StatefulTest):
                         # Other schema-related keywords will be ignored later, during the canonicalisation step
                         # inside `hypothesis-jsonschema`
                         definition["enum"] = parameter_data["options"]
-                    components[LOCATION_TO_CONTAINER[location]].append(
-                        parameter_data["parameter"].__class__(definition)
-                    )
+                    components[LOCATION_TO_CONTAINER[location]].add(parameter_data["parameter"].__class__(definition))
                 else:
                     # No options were gathered for this parameter, use the original one
-                    components[LOCATION_TO_CONTAINER[location]].append(parameter_data["parameter"])
+                    components[LOCATION_TO_CONTAINER[location]].add(parameter_data["parameter"])
         return self.endpoint.clone(**components)
 
     def _get_container_by_parameter_name(self, full_name: str, templates: Dict[str, Dict[str, Dict[str, Any]]]) -> List:
