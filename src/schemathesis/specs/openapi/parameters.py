@@ -23,6 +23,7 @@ class OpenAPIParameter(Parameter):
         if self._schema_example:
             # It is processed only if there is no `example` / `examples` in the root, overridden otherwise
             # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#fixed-fields-10
+            # We mimic this behavior for Open API 2.0
             return self._schema_example
 
     @property
@@ -117,16 +118,16 @@ class OpenAPI20Parameter(OpenAPIParameter):
     example_field = "x-example"
     examples_field = "x-examples"
     nullable_field = "x-nullable"
-    # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#schemaObject
-    # Excluding informative keywords - `title`, `description`, `default`
-    # And `required`, because it has a different meaning here. It determines whether ot not this parameter is required
-    # or optional, which is not relevant because these parameters are later constructed into an "object" schema,
-    # and the value of this keyword is used there.
-    supported_jsonschema_keywords = (
-        "$ref",
+    # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#parameterObject
+    # Excluding informative keywords - `title`, `description`, `default`.
+    # `required` is not included, because it has a different meaning here. It determines whether ot not this parameter
+    # is required or optional, which is not relevant because these parameters are later constructed
+    # into an "object" schema, and the value of this keyword is used there.
+    # The following keywords are relevant only for non-body parameters.
+    supported_jsonschema_keywords: ClassVar[Tuple[str, ...]] = (
+        "type",  # only as a string
         "format",
-        "multipleOf",
-        "multipleOf",
+        "items",
         "maximum",
         "exclusiveMaximum",
         "minimum",
@@ -137,19 +138,18 @@ class OpenAPI20Parameter(OpenAPIParameter):
         "maxItems",
         "minItems",
         "uniqueItems",
-        "maxProperties",
-        "minProperties",
         "enum",
-        "type",
-        "items",
-        "allOf",
-        "properties",
-        "additionalProperties",
+        "multipleOf",
     )
 
     @property
     def is_header(self) -> bool:
         return self.location == "header"
+
+    @property
+    def _schema_example(self) -> Any:
+        # There are no "schema" in non-body parameters
+        return None
 
 
 class OpenAPI30Parameter(OpenAPIParameter):
@@ -162,7 +162,8 @@ class OpenAPI30Parameter(OpenAPIParameter):
     examples_field = "examples"
     nullable_field = "nullable"
     # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#schema-object
-    # Excluding informative keywords - `title`, `description`, `default`
+    # Excluding informative keywords - `title`, `description`, `default`.
+    # In contrast with Open API 2.0 non-body parameters, in Open API 3.0 all parameters have the `schema` keyword.
     supported_jsonschema_keywords = (
         "multipleOf",
         "maximum",
@@ -217,11 +218,46 @@ class OpenAPIBody(OpenAPIParameter):
 class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
     """Open API 2.0 body variant."""
 
+    # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#schemaObject
+    # The `body` parameter contains the `schema` keyword, that represents the `Schema Object`.
+    # It has slightly different keywords, than regular parameters. Informational parameters are excluded as well.
+    supported_jsonschema_keywords = (
+        "$ref",
+        "format",
+        "multipleOf",
+        "multipleOf",
+        "maximum",
+        "exclusiveMaximum",
+        "minimum",
+        "exclusiveMinimum",
+        "maxLength",
+        "minLength",
+        "pattern",
+        "maxItems",
+        "minItems",
+        "uniqueItems",
+        "maxProperties",
+        "minProperties",
+        "enum",
+        "type",
+        "items",
+        "allOf",
+        "properties",
+        "additionalProperties",
+    )
+    # NOTE. For Open API 2.0 bodies we still give `x-example` precedence over the schema-level `example` field to keep
+    # the precedence rules consistent.
+
     def as_json_schema(self) -> Dict[str, Any]:
         """Convert body definition to JSON Schema."""
         # `schema` is required in Open API 2.0 when the `in` keyword is `body`
         schema = self.definition["schema"]
         return self.transform_keywords(schema)
+
+    @property
+    def _schema_example(self) -> Any:
+        # In Open API 2.0, there is `example` keyword, so we
+        return super(OpenAPI20Parameter, self)._schema_example
 
 
 FORM_MEDIA_TYPES = ("multipart/form-data", "application/x-www-form-urlencoded")
