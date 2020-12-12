@@ -11,6 +11,8 @@ The application under test could be written in any language; the only thing you 
 
 Simple to use and yet powerful to uncover hard-to-find errors thanks to the property-based testing approach backed by state-of-the-art `Hypothesis <http://hypothesis.works/>`_ library.
 
+📣 **Please fill out our** `quick survey <https://forms.gle/dv4s5SXAYWzvuwFWA>`_ so that we can learn how satisfied you are with Schemathesis, and what improvements we should make. Thank you!
+
 Features
 --------
 
@@ -65,13 +67,6 @@ Contributing
 
 Any contribution to development, testing, or any other area is highly appreciated and useful to the project.
 For guidance on how to contribute to Schemathesis, see the `contributing guidelines <https://github.com/schemathesis/schemathesis/blob/master/CONTRIBUTING.rst>`_.
-
-**Please, help us to improve!**
-
-We'd kindly ask you to share your experience with Schemathesis. It will help me to make improvements to it and prioritize new features!
-It will take 5 minutes. The results are anonymous.
-
-**Survey**: https://forms.gle/dv4s5SXAYWzvuwFWA
 
 Support this project
 --------------------
