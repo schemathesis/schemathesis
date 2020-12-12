@@ -83,6 +83,11 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     query: Any = NOT_SET,
     body: Any = NOT_SET,
 ) -> Any:
+    """A strategy that creates `Case` instances.
+
+    Explicit `path_parameters`, `headers`, `cookies`, `query`, `body` arguments will be used in the resulting `Case`
+    object.
+    """
     to_strategy = {DataGenerationMethod.positive: make_positive_strategy}[data_generation_method]
 
     context = HookContext(endpoint)
@@ -139,6 +144,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
 def get_parameters_strategy(
     endpoint: Endpoint, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], name: str
 ) -> st.SearchStrategy:
+    """Create a new strategy for case's component from the endpoint parameters."""
     parameters = getattr(endpoint, name)
     if parameters:
         schema = parameters_to_json_schema(parameters)
