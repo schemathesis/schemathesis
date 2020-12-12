@@ -87,3 +87,7 @@ class InvalidSchema(Exception):
 class HTTPError(Exception):
     response: GenericResponse = attr.ib()  # pragma: no mutate
     url: str = attr.ib()  # pragma: no mutate
+
+
+class UnknownMediaType(Exception):
+    """Schemathesis doesn't know how to handle a media type."""

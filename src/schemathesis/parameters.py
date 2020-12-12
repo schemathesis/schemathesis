@@ -50,7 +50,7 @@ class Parameter:
 P = TypeVar("P", bound=Parameter)
 
 
-@attr.s(slots=True)
+@attr.s
 class ParameterSet(Generic[P]):
     """A set of parameters for the same location."""
 
@@ -76,7 +76,6 @@ class ParameterSet(Generic[P]):
         return self.items[item]
 
 
-@attr.s(slots=True)
 class PayloadAlternatives(ParameterSet[P]):
     """A set of alternative payloads."""
 

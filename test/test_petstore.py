@@ -9,9 +9,9 @@ def testdir(request, testdir):
 
     testdir.make_petstore_test = make_petstore_test
 
-    def assert_petstore(passed=1, tests_num=5):
+    def assert_petstore(passed=1, tests_num=5, skipped=0):
         result = testdir.runpytest("-v", "-s")
-        result.assert_outcomes(passed=passed)
+        result.assert_outcomes(passed=passed, skipped=skipped)
         result.stdout.re_match_lines([rf"Hypothesis calls: {tests_num}"])
 
     testdir.assert_petstore = assert_petstore
@@ -32,7 +32,11 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore(2, 12)
+    # This endpoint contains the `application/xml` media type, which Schemathesis doesn't know how to handle
+    # Therefore both tests are skipped.
+    # TODO. add a filter for media types here
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=0, skipped=2)
 
 
 def test_find_by_status(testdir):

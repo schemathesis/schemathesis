@@ -14,7 +14,7 @@ from packaging import version
 
 from .. import DataGenerationMethod
 from .._hypothesis import create_test
-from ..exceptions import InvalidSchema
+from ..exceptions import InvalidSchema, UnknownMediaType
 from ..models import Endpoint
 from ..stateful import Feedback
 from ..utils import is_schemathesis_test
@@ -236,6 +236,8 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
         outcome.get_result()
     except InvalidArgument as exc:
         pytest.fail(exc.args[0])
+    except UnknownMediaType as exc:
+        pytest.skip(exc.args[0])
 
 
 def pytest_runtest_protocol(item: Function, nextitem: Optional[Function]) -> bool:
