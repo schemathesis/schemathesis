@@ -4,6 +4,24 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Support for sending ``text/plain`` payload as test data. `#850`_
+- Generating data for all media types defined for an operation. `#690`_
+- Support for user-defined media types serialization. You can define how Schemathesis should handle media types defined
+  in your schema, or customize existing (like ``application/json``).
+
+**Changed**
+
+- Open API parameters parsing to unblock supporting multiple media types per operation. Their definitions aren't converted
+  to JSON Schema equivalents right away, but deferred instead and stored as is.
+
+**Removed**
+
+- ``Case.form_data``. Use ``Case.body`` instead.
+- ``Endpoint.form_data``. Use ``Endpoint.body`` instead.
+- ``before_generate_form_data`` hook. Use ``before_generate_body`` instead.
+
 `2.8.5`_ - 2020-12-15
 ---------------------
 
@@ -1595,6 +1613,7 @@ Deprecated
 .. _#858: https://github.com/schemathesis/schemathesis/issues/858
 .. _#855: https://github.com/schemathesis/schemathesis/issues/855
 .. _#851: https://github.com/schemathesis/schemathesis/issues/851
+.. _#850: https://github.com/schemathesis/schemathesis/issues/850
 .. _#844: https://github.com/schemathesis/schemathesis/issues/844
 .. _#841: https://github.com/schemathesis/schemathesis/issues/841
 .. _#839: https://github.com/schemathesis/schemathesis/issues/839
@@ -1628,6 +1647,7 @@ Deprecated
 .. _#702: https://github.com/schemathesis/schemathesis/issues/702
 .. _#695: https://github.com/schemathesis/schemathesis/issues/695
 .. _#692: https://github.com/schemathesis/schemathesis/issues/692
+.. _#690: https://github.com/schemathesis/schemathesis/issues/690
 .. _#689: https://github.com/schemathesis/schemathesis/issues/689
 .. _#686: https://github.com/schemathesis/schemathesis/issues/686
 .. _#684: https://github.com/schemathesis/schemathesis/issues/684
