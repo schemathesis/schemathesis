@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Callable, Dict, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, Union
 
 import attr
 from typing_extensions import Protocol
@@ -48,12 +48,16 @@ class JSONSerializer:
         return {"json": value}
 
 
-def prepare_form_data(form_data: Dict[str, Any]) -> Dict[str, Any]:
-    for name, value in form_data.items():
-        if isinstance(value, list):
-            form_data[name] = [to_bytes(item) if not isinstance(item, (bytes, str, int)) else item for item in value]
-        elif not isinstance(value, (bytes, str, int)):
-            form_data[name] = to_bytes(value)
+def prepare_form_data(form_data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    # form_data can be optional
+    if form_data is not None:
+        for name, value in form_data.items():
+            if isinstance(value, list):
+                form_data[name] = [
+                    to_bytes(item) if not isinstance(item, (bytes, str, int)) else item for item in value
+                ]
+            elif not isinstance(value, (bytes, str, int)):
+                form_data[name] = to_bytes(value)
     return form_data
 
 

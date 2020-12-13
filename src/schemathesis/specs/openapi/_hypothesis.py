@@ -15,7 +15,7 @@ from ...models import Case, Endpoint
 from ...stateful import Feedback
 from ...utils import NOT_SET
 from .constants import LOCATION_TO_CONTAINER
-from .parameters import parameters_to_json_schema
+from .parameters import OpenAPIParameter, parameters_to_json_schema
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
 SLASH = "/"
@@ -114,8 +114,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     if body is NOT_SET:
         if endpoint.body:
             parameter = draw(st.sampled_from(endpoint.body.items))
-            schema = parameter.as_json_schema()
-            strategy = to_strategy(schema)
+            strategy = _get_body_strategy(parameter, to_strategy)
             media_type = parameter.media_type
             body = draw(strategy)
         else:
@@ -142,6 +141,16 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     )
 
 
+def _get_body_strategy(
+    parameter: OpenAPIParameter, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy]
+) -> st.SearchStrategy:
+    schema = parameter.as_json_schema()
+    strategy = to_strategy(schema)
+    if not parameter.is_required:
+        strategy |= st.none()
+    return strategy
+
+
 def get_parameters_strategy(
     endpoint: Endpoint, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], location: str
 ) -> st.SearchStrategy:
@@ -165,7 +174,7 @@ def get_parameters_strategy(
             strategy = strategy.map(map_func)
         return strategy
     # No parameters defined for this location
-    return st.just(None)
+    return st.none()
 
 
 def make_positive_strategy(schema: Dict[str, Any]) -> st.SearchStrategy:

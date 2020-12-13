@@ -309,6 +309,11 @@ class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
         )
 
     @property
+    def is_required(self) -> bool:
+        # We generate an object for formData - it is always generated
+        return bool(self.definition)
+
+    @property
     def _example(self) -> Any:
         return {parameter.name: parameter._example for parameter in self.definition if parameter._example}
 

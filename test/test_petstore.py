@@ -91,10 +91,9 @@ def test_update_pet(testdir):
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["petId"])
-    assert case.body is not None
-    if "name" in case.body:
+    if case.body and "name" in case.body:
         assert_str(case.body["name"])
-    if "status" in case.body:
+    if case.body and "status" in case.body:
         assert_str(case.body["status"])
     assert_requests_call(case)
 """

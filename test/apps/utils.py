@@ -355,6 +355,7 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
             schema = {
                 "requestBody": {
                     "content": {"application/json": {"schema": {"allOf": [{"type": "integer"}, {"type": "string"}]}}},
+                    "required": True,
                 },
                 "responses": {"200": {"description": "OK"}},
             }
@@ -365,7 +366,7 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
             }
         elif endpoint == "plain_text_body":
             schema = {
-                "requestBody": {"content": {"text/plain": {"schema": {"type": "string"}}}},
+                "requestBody": {"content": {"text/plain": {"schema": {"type": "string"}}}, "required": True},
                 "responses": {"200": {"description": "OK"}},
             }
         elif endpoint in ("flaky", "multiple_failures"):
@@ -494,6 +495,7 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                             }
                         }
                     },
+                    "required": True,
                 },
                 "responses": {"201": {"$ref": "#/components/responses/ResponseWithLinks"}},
             }

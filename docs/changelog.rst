@@ -16,6 +16,10 @@ Changelog
 - Open API parameters parsing to unblock supporting multiple media types per operation. Their definitions aren't converted
   to JSON Schema equivalents right away, but deferred instead and stored as is.
 
+**Fixed**
+
+- Allow generating requests without payload if it is not required by the schema. `#916`_
+
 **Removed**
 
 - ``Case.form_data``. Use ``Case.body`` instead.
@@ -1599,6 +1603,7 @@ Deprecated
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#917: https://github.com/schemathesis/schemathesis/issues/917
+.. _#916: https://github.com/schemathesis/schemathesis/issues/916
 .. _#897: https://github.com/schemathesis/schemathesis/issues/897
 .. _#895: https://github.com/schemathesis/schemathesis/issues/895
 .. _#890: https://github.com/schemathesis/schemathesis/issues/890

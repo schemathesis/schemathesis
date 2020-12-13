@@ -689,7 +689,8 @@ def test_loose_multipart_definition():
             "/body": {
                 "post": {
                     "requestBody": {
-                        "content": {"multipart/form-data": {"schema": {"properties": {"foo": {"type": "string"}}}}}
+                        "content": {"multipart/form-data": {"schema": {"properties": {"foo": {"type": "string"}}}}},
+                        "required": True,
                     },
                     "responses": {"200": {"description": "OK"}},
                 }
@@ -725,7 +726,8 @@ def test_ref_field():
                                     "type": "object",
                                 }
                             }
-                        }
+                        },
+                        "required": True,
                     },
                     "responses": {"200": {"description": "OK"}},
                 }
