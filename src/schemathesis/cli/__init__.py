@@ -20,10 +20,11 @@ from ..stateful import Stateful
 from ..targets import Target
 from ..types import Filter
 from . import callbacks, cassettes, output
+from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
 from .context import ExecutionContext
 from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
-from .options import CSVOption, NotSet, OptionalInt
+from .options import CSVOption, CustomHelpMessageChoice, NotSet, OptionalInt
 
 try:
     from yaml import CSafeLoader as SafeLoader
@@ -45,9 +46,6 @@ CHECKS_TYPE = click.Choice((*ALL_CHECKS_NAMES, "all"))
 DEFAULT_TARGETS_NAMES = _get_callable_names(targets_module.DEFAULT_TARGETS)
 ALL_TARGETS_NAMES = _get_callable_names(targets_module.ALL_TARGETS)
 TARGETS_TYPE = click.Choice((*ALL_TARGETS_NAMES, "all"))
-
-DEFAULT_WORKERS = 1
-MAX_WORKERS = 64
 
 
 def register_target(function: Target) -> Target:
@@ -193,8 +191,12 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     "-w",
     "workers_num",
     help="Number of workers to run tests.",
-    type=click.IntRange(1, MAX_WORKERS),
-    default=DEFAULT_WORKERS,
+    type=CustomHelpMessageChoice(
+        ["auto"] + list(map(str, range(MIN_WORKERS, MAX_WORKERS + 1))),
+        choices_repr=f"[auto|{MIN_WORKERS}-{MAX_WORKERS}]",
+    ),
+    default=str(DEFAULT_WORKERS),
+    callback=callbacks.convert_workers,
 )
 @click.option(
     "--base-url",
