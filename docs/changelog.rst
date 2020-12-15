@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`2.8.5`_ - 2020-12-15
+---------------------
+
 **Added**
 
 - ``auto`` variant for the ``--workers`` CLI option that automatically detects the number of available CPU cores to run tests on. `#917`_
@@ -1462,7 +1465,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.8.4...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.8.5...HEAD
+.. _2.8.5: https://github.com/schemathesis/schemathesis/compare/v2.8.4...v2.8.5
 .. _2.8.4: https://github.com/schemathesis/schemathesis/compare/v2.8.3...v2.8.4
 .. _2.8.3: https://github.com/schemathesis/schemathesis/compare/v2.8.2...v2.8.3
 .. _2.8.2: https://github.com/schemathesis/schemathesis/compare/v2.8.1...v2.8.2
