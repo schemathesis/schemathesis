@@ -30,6 +30,16 @@ jobs:
           cache: true
           cache_registry: schemathesis/cache
 
+      - name: Dockerhub stable
+        uses: aevea/action-kaniko@master
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          image: schemathesis/schemathesis
+          cache: true
+          tag: stable
+          cache_registry: schemathesis/cache
+
   release_package:
     name: Build and publish package to pypi.org
     runs-on: ubuntu-latest
