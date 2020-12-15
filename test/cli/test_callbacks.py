@@ -1,3 +1,4 @@
+import os
 from types import SimpleNamespace
 
 import click
@@ -84,3 +85,8 @@ def test_validate_regex(value):
 )
 def test_convert_request_tls_verify(value, expected):
     assert callbacks.convert_request_tls_verify(None, None, value) == expected
+
+
+@pytest.mark.parametrize("value, expected", (("2", 2), ("auto", callbacks.get_workers_count())))
+def test_convert_workers(value, expected):
+    assert callbacks.convert_workers(None, None, value) == expected

@@ -1,3 +1,4 @@
+import os
 import re
 from contextlib import contextmanager
 from typing import Dict, Generator, Optional, Tuple, Union
@@ -9,6 +10,7 @@ from requests import PreparedRequest, RequestException
 
 from .. import utils
 from ..stateful import Stateful
+from .constants import DEFAULT_WORKERS
 
 
 def validate_schema(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
@@ -147,3 +149,21 @@ def reraise_format_error(raw_value: str) -> Generator[None, None, None]:
         yield
     except ValueError as exc:
         raise click.BadParameter(f"Should be in KEY:VALUE format. Got: {raw_value}") from exc
+
+
+def get_workers_count() -> int:
+    """Detect the number of available CPUs for the current process, if possible.
+
+    Use ``DEFAULT_WORKERS`` if not possible to detect.
+    """
+    if hasattr(os, "sched_getaffinity"):
+        # In contrast with `os.cpu_count` this call respects limits on CPU resources on some Unix systems
+        return len(os.sched_getaffinity(0))
+    # Number of CPUs in the system, or 1 if undetermined
+    return os.cpu_count() or DEFAULT_WORKERS
+
+
+def convert_workers(ctx: click.core.Context, param: click.core.Parameter, value: str) -> int:
+    if value == "auto":
+        return get_workers_count()
+    return int(value)
