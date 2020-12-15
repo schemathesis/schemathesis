@@ -198,7 +198,7 @@ def test_commands_run_help(cli):
         "  -O, --operation-id TEXT         Filter schemathesis test by operationId",
         "                                  pattern.",
         "",
-        "  -w, --workers INTEGER RANGE     Number of workers to run tests.",
+        "  -w, --workers [auto|1-64]       Number of workers to run tests.",
         "  -b, --base-url TEXT             Base URL address of the API, required for",
         "                                  SCHEMA if specified by file.",
         "",

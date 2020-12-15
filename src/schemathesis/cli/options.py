@@ -1,9 +1,20 @@
 from enum import Enum
-from typing import List, Optional, Type, Union
+from typing import Any, List, Optional, Type, Union
 
 import click
 
 from ..types import NotSet
+
+
+class CustomHelpMessageChoice(click.Choice):
+    """Allows you to customize how choices are displayed in the help message."""
+
+    def __init__(self, *args: Any, choices_repr: str, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self.choices_repr = choices_repr
+
+    def get_metavar(self, param: click.Parameter) -> str:
+        return self.choices_repr
 
 
 class CSVOption(click.Choice):
