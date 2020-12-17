@@ -1,4 +1,5 @@
 import pytest
+from hypothesis import settings
 
 
 @pytest.fixture(params=["petstore_v2.yaml", "petstore_v3.yaml"])
@@ -20,6 +21,14 @@ def testdir(request, testdir):
     return testdir
 
 
+@pytest.fixture
+def reload_profile():
+    # Setting Hypothesis profile in a pytester-style test leads to overriding it globally
+    yield
+    settings.load_profile("default")
+
+
+@pytest.mark.usefixtures("reload_profile")
 def test_pet(testdir):
     testdir.make_petstore_test(
         """
@@ -32,11 +41,9 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    # This endpoint contains the `application/xml` media type, which Schemathesis doesn't know how to handle
-    # Therefore both tests are skipped.
-    # TODO. add a filter for media types here
-    result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=0, skipped=2)
+    result = testdir.runpytest("-v", "-s", "--hypothesis-verbosity=verbose")
+    result.assert_outcomes(passed=2)
+    result.stdout.re_match_lines(["Can't serialize data to"])
 
 
 def test_find_by_status(testdir):

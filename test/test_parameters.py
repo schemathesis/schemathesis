@@ -420,7 +420,7 @@ def test_json_media_type(testdir):
     # When endpoint expects JSON-compatible media type
     testdir.make_test(
         """
-@settings(max_examples=10)
+@settings(max_examples=10, deadline=None)
 @schema.parametrize()
 def test_(case):
     kwargs = case.as_requests_kwargs()
