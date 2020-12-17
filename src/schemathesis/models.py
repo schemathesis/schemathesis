@@ -224,6 +224,7 @@ class Case:  # pylint: disable=too-many-public-methods
         if self.media_type is not None:
             serializer = serializers.get(self.media_type)
             if serializer is None:
+                # TODO. maybe use hypothesis.assume + note?
                 # TODO. Provide a suggestion to the user
                 raise UnknownMediaType(f"Can't serialize `{self.media_type}`")
             context = SerializerContext(case=self)

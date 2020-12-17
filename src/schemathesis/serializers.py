@@ -1,7 +1,9 @@
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Optional, Type, Union
 
 import attr
 from typing_extensions import Protocol
+
+from .utils import is_json_media_type
 
 if TYPE_CHECKING:
     from .models import Case
@@ -31,9 +33,35 @@ class Serializer(Protocol):
         raise NotImplementedError
 
 
-def register(media_type: str) -> Callable[[Type[Serializer]], Type[Serializer]]:
+def register(media_type: str, *, aliases: Collection[str] = ()) -> Callable[[Type[Serializer]], Type[Serializer]]:
+    """Register a serializer for the given media type.
+
+    Schemathesis uses ``requests`` for regular network calls and ``werkzeug`` for WSGI applications. Your serializer
+    should have two methods, ``as_requests`` and ``as_werkzeug``, providing keyword arguments that Schemathesis will
+    pass to ``requests.request`` and ``werkzeug.Client.open`` respectively.
+
+    Example:
+        @register("text/csv")
+        class CSVSerializer:
+
+            def as_requests(self, context, value):
+                payload = serialize_to_csv(value)
+                return {"data": payload}
+
+            def as_werkzeug(self, context, value):
+                payload = serialize_to_csv(value)
+                return {"data": payload}
+
+    The primary purpose of serializers is to transform data from its intermediate representation to the format suitable
+    for making an API call. The representation depends on your schema, but its type matches Python equivalents to the
+    JSON Schema types.
+
+    """
+
     def wrapper(function: Type[Serializer]) -> Type[Serializer]:
         SERIALIZERS[media_type] = function
+        for alias in aliases:
+            SERIALIZERS[alias] = function
         return function
 
     return wrapper
@@ -96,7 +124,7 @@ class TextSerializer:
 
 
 @register("application/octet-stream")
-class GenericPayloadSerializer:
+class OctetStreamSerializer:
     def as_requests(self, context: SerializerContext, value: Any) -> Any:
         return {"data": value}
 
@@ -104,4 +132,8 @@ class GenericPayloadSerializer:
         return {"data": value}
 
 
-get = SERIALIZERS.get
+def get(media_type: str) -> Optional[Type[Serializer]]:
+    """Get appropriate serializer for the given media type."""
+    if is_json_media_type(media_type):
+        media_type = "application/json"
+    return SERIALIZERS.get(media_type)

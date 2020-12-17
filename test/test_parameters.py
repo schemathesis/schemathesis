@@ -414,3 +414,48 @@ def test_(case):
     result.stdout.re_match_lines(
         [r"E +schemathesis.exceptions.InvalidSchema: Body parameters are defined for GET request."]
     )
+
+
+def test_json_media_type(testdir):
+    # When endpoint expects JSON-compatible media type
+    testdir.make_test(
+        """
+@settings(max_examples=10)
+@schema.parametrize()
+def test_(case):
+    kwargs = case.as_requests_kwargs()
+    assert kwargs["headers"]["Content-Type"] == "application/problem+json"
+    assert "key" in kwargs["json"]
+    assert_requests_call(case)
+        """,
+        schema={
+            "openapi": "3.0.2",
+            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+            "paths": {
+                "/users": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/problem+json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"key": {"type": "string"}},
+                                        "required": ["key"],
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {
+                            "200": {
+                                "description": "OK",
+                                "content": {"application/problem+json": {"schema": {"type": "object"}}},
+                            }
+                        },
+                    }
+                }
+            },
+        },
+    )
+    # Then the payload should be serialized as json
+    testdir.run_and_assert(passed=1)
