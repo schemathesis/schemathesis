@@ -45,12 +45,10 @@ def register(media_type: str, *, aliases: Collection[str] = ()) -> Callable[[Typ
         class CSVSerializer:
 
             def as_requests(self, context, value):
-                payload = serialize_to_csv(value)
-                return {"data": payload}
+                return {"data": to_csv(value)}
 
             def as_werkzeug(self, context, value):
-                payload = serialize_to_csv(value)
-                return {"data": payload}
+                return {"data": to_csv(value)}
 
     The primary purpose of serializers is to transform data from its intermediate representation to the format suitable
     for making an API call. The representation depends on your schema, but its type matches Python equivalents to the
@@ -65,6 +63,11 @@ def register(media_type: str, *, aliases: Collection[str] = ()) -> Callable[[Typ
         return function
 
     return wrapper
+
+
+def unregister(media_type: str) -> None:
+    """Remove registered serializer for the given media type."""
+    del SERIALIZERS[media_type]
 
 
 @register("application/json")

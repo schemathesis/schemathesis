@@ -22,6 +22,7 @@ class Endpoint(Enum):
     teapot = ("POST", "/api/teapot")
     text = ("GET", "/api/text")
     plain_text_body = ("POST", "/api/text")
+    csv_payload = ("POST", "/api/csv")
     malformed_json = ("GET", "/api/malformed_json")
     invalid_response = ("GET", "/api/invalid_response")
     custom_format = ("GET", "/api/custom_format")
@@ -302,6 +303,30 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
                 ],
                 "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
             }
+        elif endpoint == "csv_payload":
+            schema = {
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "payload",
+                        "required": True,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "additionalProperties": False,
+                                "type": "object",
+                                "properties": {
+                                    "first_name": {"type": "string", "pattern": r"\A[A-Za-z]*\Z"},
+                                    "last_name": {"type": "string", "pattern": r"\A[A-Za-z]*\Z"},
+                                },
+                                "required": ["first_name", "last_name"],
+                            },
+                        },
+                    },
+                ],
+                "consumes": ["text/csv"],
+                "responses": {"200": {"description": "OK"}},
+            }
         else:
             schema = {
                 "responses": {
@@ -566,6 +591,29 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                     },
                 },
                 "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+            }
+        elif endpoint == "csv_payload":
+            schema = {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "text/csv": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "additionalProperties": False,
+                                    "type": "object",
+                                    "properties": {
+                                        "first_name": {"type": "string", "pattern": r"\A[A-Za-z]*\Z"},
+                                        "last_name": {"type": "string", "pattern": r"\A[A-Za-z]*\Z"},
+                                    },
+                                    "required": ["first_name", "last_name"],
+                                },
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
             }
         else:
             schema = {

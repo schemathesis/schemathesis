@@ -1,5 +1,6 @@
 import asyncio
 import cgi
+import csv
 import io
 from typing import Dict
 
@@ -43,6 +44,18 @@ async def plain_text_body(request: web.Request) -> web.Response:
         raise web.HTTPInternalServerError(text="Expected text/plain payload")
     read_ = await request.read()
     return web.Response(body=read_, content_type="text/plain")
+
+
+async def csv_payload(request: web.Request) -> web.Response:
+    if request.headers.get("Content-Type", "") != "text/csv":
+        raise web.HTTPInternalServerError(text="Expected text/csv payload")
+    body = await request.read()
+    if body:
+        reader = csv.DictReader(body.decode().splitlines())
+        data = list(reader)
+    else:
+        data = []
+    return web.json_response(data)
 
 
 async def headers(request: web.Request) -> web.Response:
