@@ -1,10 +1,12 @@
 from pathlib import Path
 
+import jsonschema
 import pytest
 
 import schemathesis
 from schemathesis.models import Endpoint, EndpointDefinition
 from schemathesis.parameters import PayloadAlternatives
+from schemathesis.specs.openapi.definitions import OPENAPI_30, SWAGGER_20
 from schemathesis.specs.openapi.parameters import OpenAPI30Body
 
 from .utils import as_param, get_schema, integer
@@ -337,18 +339,33 @@ def make_nullable_test_data(spec_version):
     )
 
 
-def test_nullable_parameters(testdir):
+@pytest.mark.parametrize("extra", ({}, {"enum": ["foo"]}))
+@pytest.mark.parametrize("spec_version", ("open_api_2", "open_api_3"))
+def test_nullable_parameters(request, testdir, spec_version, extra):
+    schema = request.getfixturevalue(f"empty_{spec_version}_schema")
+    schema["paths"] = {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}
+    if spec_version == "open_api_2":
+        schema["paths"]["/users"]["get"]["parameters"] = [
+            {"in": "query", "name": "id", "type": "string", "x-nullable": True, "required": True, **extra}
+        ]
+        jsonschema.validate(schema, SWAGGER_20)
+    else:
+        schema["paths"]["/users"]["get"]["parameters"] = [
+            {"in": "query", "name": "id", "schema": {"type": "string", "nullable": True, **extra}, "required": True}
+        ]
+        jsonschema.validate(schema, OPENAPI_30)
     testdir.make_test(
         """
 @schema.parametrize()
 @settings(max_examples=1)
 def test_(request, case):
+    assume(case.query["id"] is None)
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/users"
     assert case.method == "GET"
     assert case.query["id"] is None
 """,
-        **as_param(integer(name="id", required=True, **{"x-nullable": True})),
+        schema=schema,
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")

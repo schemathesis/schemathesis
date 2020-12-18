@@ -105,7 +105,7 @@ class OpenAPIParameter(Parameter):
             key: value
             for key, value in open_api_schema.items()
             # Allow only supported keywords or vendor extensions
-            if key in self.supported_jsonschema_keywords or key.startswith("x-")
+            if key in self.supported_jsonschema_keywords or key.startswith("x-") or key == self.nullable_field
         }
 
 
