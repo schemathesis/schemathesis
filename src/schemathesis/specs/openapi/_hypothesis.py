@@ -157,7 +157,7 @@ def get_parameters_strategy(
     if parameters:
         schema = parameters_to_json_schema(parameters)
         strategy = to_strategy(schema)
-        serialize = endpoint.get_hypothesis_conversions(location)
+        serialize = endpoint.get_parameter_serializer(location)
         if serialize is not None:
             strategy = strategy.map(serialize)
         filter_func = {

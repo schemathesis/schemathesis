@@ -498,8 +498,13 @@ class Endpoint(Generic[P]):
     def get_stateful_tests(self, response: GenericResponse, stateful: Optional["Stateful"]) -> Sequence["StatefulTest"]:
         return self.schema.get_stateful_tests(response, self, stateful)
 
-    def get_hypothesis_conversions(self, location: str) -> Optional[Callable]:
-        return self.schema.get_hypothesis_conversion(self, location)
+    def get_parameter_serializer(self, location: str) -> Optional[Callable]:
+        """Get a function that serializes parameters for the given location.
+
+        It handles serializing data into various `collectionFormat` options and similar.
+        Note that payload is handled by this function - it is handled by serializers.
+        """
+        return self.schema.get_parameter_serializer(self, location)
 
     def prepare_multipart(self, form_data: Optional[FormData]) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
         if not form_data:
