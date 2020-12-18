@@ -1129,7 +1129,7 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
     # way around
     # The app under test was killed ungracefully and since we run it in a child or the main thread
     # its output might occur in the captured stdout.
-    ignored_exception = lines[10].startswith("Exception ignored in: ")
+    ignored_exception = "Exception ignored in: " in lines[10]
     assert lines[10] in expected or ignored_exception, lines
     if not optional_interrupt:
         assert "!! KeyboardInterrupt !!" in lines[11], lines
