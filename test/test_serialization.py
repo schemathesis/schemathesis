@@ -20,13 +20,16 @@ def to_csv(data):
 
 @pytest.fixture
 def csv_serializer():
-    @schemathesis.serializers.register("text/csv")
+    @schemathesis.serializers.register("text/csv", aliases=["text/tsv"])
     class CSVSerializer:
         def as_requests(self, context, value):
             return {"data": to_csv(value)}
 
         def as_werkzeug(self, context, value):
             return {"data": to_csv(value)}
+
+    assert schemathesis.serializers.SERIALIZERS["text/csv"] is CSVSerializer
+    assert schemathesis.serializers.SERIALIZERS["text/tsv"] is CSVSerializer
 
     yield
 

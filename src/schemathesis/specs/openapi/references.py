@@ -93,7 +93,3 @@ class ConvertingResolver(jsonschema.RefResolver):
                 new_scope, definition = deepcopy(self.resolve(definition["$ref"]))
             scopes.append(new_scope)
         return scopes, definition
-
-    def prepare(self, item: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse schema extension, e.g. "x-nullable" field."""
-        return to_json_schema(item, self.nullable_name)

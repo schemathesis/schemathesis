@@ -17,9 +17,8 @@ from hypothesis.strategies import SearchStrategy
 from hypothesis.utils.conventions import InferType
 from requests.structures import CaseInsensitiveDict
 
-from ._hypothesis import make_test_or_exception
+from ._hypothesis import create_test
 from .constants import DEFAULT_DATA_GENERATION_METHODS, DEFAULT_STATEFUL_RECURSION_LIMIT, DataGenerationMethod
-from .exceptions import InvalidSchema
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import Case, Endpoint
 from .stateful import APIStateMachine, Feedback, Stateful, StatefulTest
@@ -124,12 +123,17 @@ class BaseSchema(Mapping):
         func: Callable,
         settings: Optional[hypothesis.settings] = None,
         seed: Optional[int] = None,
-    ) -> Generator[Tuple[Endpoint, DataGenerationMethod, Union[Callable, InvalidSchema]], None, None]:
+    ) -> Generator[Tuple[Endpoint, DataGenerationMethod, Callable], None, None]:
         """Generate all endpoints and Hypothesis tests for them."""
-        test: Union[Callable, InvalidSchema]
         for endpoint in self.get_all_endpoints():
             for data_generation_method in self.data_generation_methods:
-                test = make_test_or_exception(endpoint, func, settings, seed, data_generation_method)
+                test = create_test(
+                    endpoint=endpoint,
+                    test=func,
+                    settings=settings,
+                    seed=seed,
+                    data_generation_method=data_generation_method,
+                )
                 yield endpoint, data_generation_method, test
 
     def parametrize(
