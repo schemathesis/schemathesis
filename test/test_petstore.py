@@ -1,4 +1,5 @@
 import pytest
+from hypothesis import settings
 
 
 @pytest.fixture(params=["petstore_v2.yaml", "petstore_v3.yaml"])
@@ -9,9 +10,9 @@ def testdir(request, testdir):
 
     testdir.make_petstore_test = make_petstore_test
 
-    def assert_petstore(passed=1, tests_num=5):
+    def assert_petstore(passed=1, tests_num=5, skipped=0):
         result = testdir.runpytest("-v", "-s")
-        result.assert_outcomes(passed=passed)
+        result.assert_outcomes(passed=passed, skipped=skipped)
         result.stdout.re_match_lines([rf"Hypothesis calls: {tests_num}"])
 
     testdir.assert_petstore = assert_petstore
@@ -20,6 +21,14 @@ def testdir(request, testdir):
     return testdir
 
 
+@pytest.fixture
+def reload_profile():
+    # Setting Hypothesis profile in a pytester-style test leads to overriding it globally
+    yield
+    settings.load_profile("default")
+
+
+@pytest.mark.usefixtures("reload_profile")
 def test_pet(testdir):
     testdir.make_petstore_test(
         """
@@ -32,7 +41,9 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore(2, 12)
+    result = testdir.runpytest("-v", "-s", "--hypothesis-verbosity=verbose")
+    result.assert_outcomes(passed=2)
+    result.stdout.re_match_lines(["Can't serialize data to"])
 
 
 def test_find_by_status(testdir):
@@ -87,10 +98,10 @@ def test_update_pet(testdir):
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["petId"])
-    if case.form_data is not None and "name" in case.form_data:
-        assert_str(case.form_data["name"])
-    if case.form_data is not None and "status" in case.form_data:
-        assert_str(case.form_data["status"])
+    if case.body and "name" in case.body:
+        assert_str(case.body["name"])
+    if case.body and "status" in case.body:
+        assert_str(case.body["status"])
     assert_requests_call(case)
 """
     )
@@ -120,8 +131,9 @@ def test_upload_image(testdir):
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["petId"])
-    if case.form_data is not None and "additionalMetadata" in case.form_data:
-        assert_str(case.form_data["additionalMetadata"])
+    if case.endpoint.schema.spec_version == "2.0":
+        if case.body is not None and "additionalMetadata" in case.body:
+            assert_str(case.body["additionalMetadata"])
     assert_requests_call(case)
 """
     )

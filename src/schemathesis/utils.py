@@ -138,6 +138,15 @@ def parse_content_type(content_type: str) -> Tuple[str, str]:
     return main_type.lower(), sub_type.lower()
 
 
+def is_json_media_type(value: str) -> bool:
+    """Detect whether the content type is JSON-compatible.
+
+    For example - `application/problem+json` matches.
+    """
+    main, sub = parse_content_type(value)
+    return main == "application" and (sub == "json" or sub.endswith("+json"))
+
+
 def are_content_types_equal(source: str, target: str) -> bool:
     """Check if two content types are the same excluding options."""
     return parse_content_type(source) == parse_content_type(target)

@@ -3,6 +3,7 @@ from hypothesis import given, settings
 from packaging import version
 
 import schemathesis
+from schemathesis.parameters import PayloadAlternatives
 
 from .apps import OpenAPIVersion
 from .utils import integer
@@ -675,7 +676,7 @@ def test_empty_content():
     schema = schemathesis.from_dict(raw_schema)
     # Then the body processing should be no-op
     endpoint = schema.endpoints["/body"]["POST"]
-    assert endpoint.body is None
+    assert endpoint.body == PayloadAlternatives([])
 
 
 @pytest.mark.hypothesis_nested
@@ -688,7 +689,8 @@ def test_loose_multipart_definition():
             "/body": {
                 "post": {
                     "requestBody": {
-                        "content": {"multipart/form-data": {"schema": {"properties": {"foo": {"type": "string"}}}}}
+                        "content": {"multipart/form-data": {"schema": {"properties": {"foo": {"type": "string"}}}}},
+                        "required": True,
                     },
                     "responses": {"200": {"description": "OK"}},
                 }
@@ -701,7 +703,7 @@ def test_loose_multipart_definition():
     @given(case=schema.endpoints["/body"]["POST"].as_strategy())
     @settings(max_examples=5)
     def test(case):
-        assert isinstance(case.form_data, dict)
+        assert isinstance(case.body, dict)
 
     # And the resulting values should be valid
     test()
@@ -724,7 +726,8 @@ def test_ref_field():
                                     "type": "object",
                                 }
                             }
-                        }
+                        },
+                        "required": True,
                     },
                     "responses": {"200": {"description": "OK"}},
                 }

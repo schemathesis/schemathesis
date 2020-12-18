@@ -4,5 +4,4 @@ LOCATION_TO_CONTAINER = {
     "header": "headers",
     "cookie": "cookies",
     "body": "body",
-    "formData": "form_data",
 }

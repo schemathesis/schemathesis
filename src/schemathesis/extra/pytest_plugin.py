@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any, Callable, Generator, List, Optional, Type, TypeVar, Union, cast
+from typing import Any, Callable, Generator, List, Optional, Type, TypeVar, cast
 
 import pytest
 from _pytest import fixtures, nodes
@@ -14,7 +14,6 @@ from packaging import version
 
 from .. import DataGenerationMethod
 from .._hypothesis import create_test
-from ..exceptions import InvalidSchema
 from ..models import Endpoint
 from ..stateful import Feedback
 from ..utils import is_schemathesis_test
@@ -71,7 +70,7 @@ class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
 
         def make_test(
             endpoint: Endpoint,
-            test: Union[Callable, InvalidSchema],
+            test: Callable,
             data_generation_method: DataGenerationMethod,
             previous_tests: str,
         ) -> "SchemathesisFunction":
@@ -126,7 +125,13 @@ class SchemathesisCase(PyCollector):
         to produce tests out of hypothesis ones.
         """
         name = self._get_test_name(endpoint, data_generation_method)
-        funcobj = self._make_test(endpoint, data_generation_method)
+        funcobj = create_test(
+            endpoint=endpoint,
+            test=self.test_function,
+            _given_args=self.given_args,
+            _given_kwargs=self.given_kwargs,
+            data_generation_method=data_generation_method,
+        )
 
         cls = self._get_class_parent()
         definition: FunctionDefinition = create(FunctionDefinition, name=self.name, parent=self.parent, callobj=funcobj)
@@ -182,19 +187,6 @@ class SchemathesisCase(PyCollector):
             methods.append(cls().pytest_generate_tests)
         self.ihook.pytest_generate_tests.call_extra(methods, {"metafunc": metafunc})
         return metafunc
-
-    def _make_test(self, endpoint: Endpoint, data_generation_method: DataGenerationMethod) -> Callable:
-        try:
-            return create_test(
-                endpoint=endpoint,
-                test=self.test_function,
-                _given_args=self.given_args,
-                _given_kwargs=self.given_kwargs,
-                data_generation_method=data_generation_method,
-            )
-        except InvalidSchema as exc:
-            message = exc.args[0]
-            return lambda: pytest.fail(message)
 
     def collect(self) -> List[Function]:  # type: ignore
         """Generate different test items for all endpoints available in the given schema."""

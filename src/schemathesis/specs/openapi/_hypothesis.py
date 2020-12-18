@@ -1,7 +1,6 @@
 import re
 from base64 import b64encode
-from functools import partial
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple
 from urllib.parse import quote_plus
 
 from hypothesis import strategies as st
@@ -14,8 +13,11 @@ from ...exceptions import InvalidSchema
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import Case, Endpoint
 from ...stateful import Feedback
+from ...utils import NOT_SET
+from .constants import LOCATION_TO_CONTAINER
+from .parameters import OpenAPIParameter, parameters_to_json_schema
 
-PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
+PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
 SLASH = "/"
 STRING_FORMATS = {}
 
@@ -69,90 +71,117 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
     return True
 
 
-def get_case_strategy(
+@st.composite  # type: ignore
+def get_case_strategy(  # pylint: disable=too-many-locals
+    draw: Callable,
     endpoint: Endpoint,
     hooks: Optional[HookDispatcher] = None,
     feedback: Optional[Feedback] = None,
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
-) -> st.SearchStrategy:
-    """Create a strategy for a complete test case.
+    path_parameters: Any = NOT_SET,
+    headers: Any = NOT_SET,
+    cookies: Any = NOT_SET,
+    query: Any = NOT_SET,
+    body: Any = NOT_SET,
+) -> Any:
+    """A strategy that creates `Case` instances.
 
-    Path & endpoint are static, the others are JSON schemas.
+    Explicit `path_parameters`, `headers`, `cookies`, `query`, `body` arguments will be used in the resulting `Case`
+    object.
     """
-    strategies = {}
-    static_kwargs: Dict[str, Any] = {"feedback": feedback}
-    for parameter in PARAMETERS:
-        value = getattr(endpoint, parameter)
-        if value is not None:
-            location = {"headers": "header", "cookies": "cookie", "path_parameters": "path"}.get(parameter, parameter)
-            strategies[parameter] = prepare_strategy(
-                parameter, value, endpoint.get_hypothesis_conversions(location), data_generation_method
-            )
-        else:
-            static_kwargs[parameter] = None
-    return _get_case_strategy(endpoint, static_kwargs, strategies, hooks)
-
-
-def to_bytes(value: Union[str, bytes, int, bool, float]) -> bytes:
-    return str(value).encode(errors="ignore")
-
-
-def prepare_form_data(form_data: Dict[str, Any]) -> Dict[str, Any]:
-    for name, value in form_data.items():
-        if isinstance(value, list):
-            form_data[name] = [to_bytes(item) if not isinstance(item, (bytes, str, int)) else item for item in value]
-        elif not isinstance(value, (bytes, str, int)):
-            form_data[name] = to_bytes(value)
-    return form_data
-
-
-def prepare_headers_schema(value: Dict[str, Any]) -> Dict[str, Any]:
-    """Improve schemas for headers.
-
-    Headers are strings, but it is not always explicitly defined in the schema. By preparing them properly we
-    can achieve significant performance improvements for such cases.
-    For reference (my machine) - running a single test with 100 examples with the resulting strategy:
-      - without: 4.37 s
-      - with: 294 ms
-
-    It also reduces the number of cases when the "filter_too_much" health check fails during testing.
-    """
-    for schema in value.get("properties", {}).values():
-        schema.setdefault("type", "string")
-    return value
-
-
-def prepare_strategy(
-    parameter: str,
-    value: Dict[str, Any],
-    map_func: Optional[Callable],
-    data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
-) -> st.SearchStrategy:
-    """Create a strategy for a schema and add location-specific filters & maps."""
-    if parameter in ("headers", "cookies"):
-        value = prepare_headers_schema(value)
-    if parameter == "form_data":
-        value.setdefault("type", "object")
     to_strategy = {DataGenerationMethod.positive: make_positive_strategy}[data_generation_method]
-    strategy = to_strategy(value)
-    if map_func is not None:
-        strategy = strategy.map(map_func)
-    if parameter == "path_parameters":
-        strategy = strategy.filter(filter_path_parameters).map(quote_all)  # type: ignore
-    elif parameter in ("headers", "cookies"):
-        strategy = strategy.filter(is_valid_header)  # type: ignore
-    elif parameter == "query":
-        strategy = strategy.filter(is_valid_query)  # type: ignore
-    elif parameter == "form_data":
-        strategy = strategy.map(prepare_form_data)  # type: ignore
+
+    context = HookContext(endpoint)
+
+    if path_parameters is NOT_SET:
+        strategy = get_parameters_strategy(endpoint, to_strategy, "path")
+        strategy = apply_hooks(endpoint, context, hooks, strategy, "path")
+        path_parameters = draw(strategy)
+    if headers is NOT_SET:
+        strategy = get_parameters_strategy(endpoint, to_strategy, "header")
+        strategy = apply_hooks(endpoint, context, hooks, strategy, "header")
+        headers = draw(strategy)
+    if cookies is NOT_SET:
+        strategy = get_parameters_strategy(endpoint, to_strategy, "cookie")
+        strategy = apply_hooks(endpoint, context, hooks, strategy, "cookie")
+        cookies = draw(strategy)
+    if query is NOT_SET:
+        strategy = get_parameters_strategy(endpoint, to_strategy, "query")
+        strategy = apply_hooks(endpoint, context, hooks, strategy, "query")
+        query = draw(strategy)
+
+    media_type = None
+    if body is NOT_SET:
+        if endpoint.body:
+            parameter = draw(st.sampled_from(endpoint.body.items))
+            strategy = _get_body_strategy(parameter, to_strategy)
+            media_type = parameter.media_type
+            body = draw(strategy)
+        else:
+            body = None
+    else:
+        media_types = endpoint.get_request_payload_content_types() or ["application/json"]
+        # Take the first available media type.
+        # POSSIBLE IMPROVEMENT:
+        #   - Test examples for each available media type on Open API 2.0;
+        #   - On Open API 3.0, media types are explicit, and each example has it. We can pass `OpenAPIBody.media_type`
+        #     here from the examples handling code.
+        media_type = media_types[0]
+    if endpoint.schema.validate_schema and endpoint.method.upper() == "GET" and endpoint.body:
+        raise InvalidSchema("Body parameters are defined for GET request.")
+    return Case(
+        endpoint=endpoint,
+        feedback=feedback,
+        media_type=media_type,
+        path_parameters=path_parameters,
+        headers=headers,
+        cookies=cookies,
+        query=query,
+        body=body,
+    )
+
+
+def _get_body_strategy(
+    parameter: OpenAPIParameter, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy]
+) -> st.SearchStrategy:
+    schema = parameter.as_json_schema()
+    strategy = to_strategy(schema)
+    if not parameter.is_required:
+        strategy |= st.none()
     return strategy
+
+
+def get_parameters_strategy(
+    endpoint: Endpoint, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], location: str
+) -> st.SearchStrategy:
+    """Create a new strategy for the case's component from the endpoint parameters."""
+    parameters = getattr(endpoint, LOCATION_TO_CONTAINER[location])
+    if parameters:
+        schema = parameters_to_json_schema(parameters)
+        strategy = to_strategy(schema)
+        serialize = endpoint.get_hypothesis_conversions(location)
+        if serialize is not None:
+            strategy = strategy.map(serialize)
+        filter_func = {
+            "path": is_valid_path,
+            "header": is_valid_header,
+            "cookie": is_valid_header,
+            "query": is_valid_query,
+        }[location]
+        strategy = strategy.filter(filter_func)
+        map_func = {"path": quote_all}.get(location)
+        if map_func:
+            strategy = strategy.map(map_func)
+        return strategy
+    # No parameters defined for this location
+    return st.none()
 
 
 def make_positive_strategy(schema: Dict[str, Any]) -> st.SearchStrategy:
     return from_schema(schema, custom_formats=STRING_FORMATS)
 
 
-def filter_path_parameters(parameters: Dict[str, Any]) -> bool:
+def is_valid_path(parameters: Dict[str, Any]) -> bool:
     """Single "." chars and empty strings "" are excluded from path by urllib3.
 
     A path containing to "/" or "%2F" will lead to ambiguous path resolution in
@@ -176,29 +205,26 @@ def quote_all(parameters: Dict[str, Any]) -> Dict[str, Any]:
     return {key: quote_plus(value) if isinstance(value, str) else value for key, value in parameters.items()}
 
 
-def _get_case_strategy(
+def apply_hooks(
     endpoint: Endpoint,
-    extra_static_parameters: Dict[str, Any],
-    strategies: Dict[str, st.SearchStrategy],
-    hook_dispatcher: Optional[HookDispatcher] = None,
+    context: HookContext,
+    hooks: Optional[HookDispatcher],
+    strategy: st.SearchStrategy[Case],
+    location: str,
 ) -> st.SearchStrategy[Case]:
-    static_parameters: Dict[str, Any] = {"endpoint": endpoint, **extra_static_parameters}
-    if endpoint.schema.validate_schema and endpoint.method.upper() == "GET":
-        if endpoint.body is not None:
-            raise InvalidSchema("Body parameters are defined for GET request.")
-        static_parameters["body"] = None
-        strategies.pop("body", None)
-    context = HookContext(endpoint)
-    _apply_hooks(strategies, GLOBAL_HOOK_DISPATCHER, context)
-    _apply_hooks(strategies, endpoint.schema.hooks, context)
-    if hook_dispatcher is not None:
-        _apply_hooks(strategies, hook_dispatcher, context)
-    return st.builds(partial(Case, **static_parameters), **strategies)
+    """Apply all `before_generate_` hooks related to the given location."""
+    strategy = _apply_hooks(context, GLOBAL_HOOK_DISPATCHER, strategy, location)
+    strategy = _apply_hooks(context, endpoint.schema.hooks, strategy, location)
+    if hooks is not None:
+        strategy = _apply_hooks(context, hooks, strategy, location)
+    return strategy
 
 
-def _apply_hooks(strategies: Dict[str, st.SearchStrategy], dispatcher: HookDispatcher, context: HookContext) -> None:
-    for key in strategies:
-        for hook in dispatcher.get_all_by_name(f"before_generate_{key}"):
-            # Get the strategy on each hook to pass the first hook output as an input to the next one
-            strategy = strategies[key]
-            strategies[key] = hook(context, strategy)
+def _apply_hooks(
+    context: HookContext, hooks: HookDispatcher, strategy: st.SearchStrategy[Case], location: str
+) -> st.SearchStrategy[Case]:
+    """Apply all `before_generate_` hooks related to the given location & dispatcher."""
+    container = LOCATION_TO_CONTAINER[location]
+    for hook in hooks.get_all_by_name(f"before_generate_{container}"):
+        strategy = hook(context, strategy)
+    return strategy

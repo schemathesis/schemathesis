@@ -1,9 +1,13 @@
 from pathlib import Path
 
+import jsonschema
 import pytest
 
 import schemathesis
 from schemathesis.models import Endpoint, EndpointDefinition
+from schemathesis.parameters import PayloadAlternatives
+from schemathesis.specs.openapi.definitions import OPENAPI_30, SWAGGER_20
+from schemathesis.specs.openapi.parameters import OpenAPI30Body
 
 from .utils import as_param, get_schema, integer
 
@@ -335,28 +339,33 @@ def make_nullable_test_data(spec_version):
     )
 
 
-@pytest.mark.parametrize("nullable, expected", make_nullable_test_data("swagger"))
-def test_x_nullable(petstore, nullable, expected):
-    assert petstore.resolver.resolve_all(nullable) == expected
-
-
-@pytest.mark.parametrize("nullable, expected", make_nullable_test_data("openapi"))
-def test_nullable(openapi_30, nullable, expected):
-    assert openapi_30.resolver.resolve_all(nullable) == expected
-
-
-def test_nullable_parameters(testdir):
+@pytest.mark.parametrize("extra", ({}, {"enum": ["foo"]}))
+@pytest.mark.parametrize("spec_version", ("open_api_2", "open_api_3"))
+def test_nullable_parameters(request, testdir, spec_version, extra):
+    schema = request.getfixturevalue(f"empty_{spec_version}_schema")
+    schema["paths"] = {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}
+    if spec_version == "open_api_2":
+        schema["paths"]["/users"]["get"]["parameters"] = [
+            {"in": "query", "name": "id", "type": "string", "x-nullable": True, "required": True, **extra}
+        ]
+        jsonschema.validate(schema, SWAGGER_20)
+    else:
+        schema["paths"]["/users"]["get"]["parameters"] = [
+            {"in": "query", "name": "id", "schema": {"type": "string", "nullable": True, **extra}, "required": True}
+        ]
+        jsonschema.validate(schema, OPENAPI_30)
     testdir.make_test(
         """
 @schema.parametrize()
 @settings(max_examples=1)
 def test_(request, case):
+    assume(case.query["id"] is None)
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/users"
     assert case.method == "GET"
     assert case.query["id"] is None
 """,
-        **as_param(integer(name="id", required=True, **{"x-nullable": True})),
+        schema=schema,
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
@@ -489,6 +498,28 @@ def test_(request, case):
 def test_complex_dereference(testdir, complex_schema):
     schema = schemathesis.from_path(complex_schema)
     path = Path(str(testdir))
+    body = OpenAPI30Body(
+        {
+            "schema": {
+                "additionalProperties": False,
+                "description": "Test",
+                "properties": {
+                    "profile": {
+                        "additionalProperties": False,
+                        "description": "Test",
+                        "properties": {"id": {"type": "integer"}},
+                        "required": ["id"],
+                        "type": "object",
+                    },
+                    "username": {"type": "string"},
+                },
+                "required": ["username", "profile"],
+                "type": "object",
+            }
+        },
+        required=True,
+        media_type="application/json",
+    )
     assert schema.endpoints["/teapot"]["POST"] == Endpoint(
         base_url="file:///",
         path="/teapot",
@@ -553,24 +584,9 @@ def test_complex_dereference(testdir, complex_schema):
                 "tags": ["ancillaries"],
             },
             scope=f"{path.as_uri()}/root/paths/teapot.yaml#/TeapotCreatePath",
-            parameters=[],
+            parameters=[body],
         ),
-        body={
-            "additionalProperties": False,
-            "description": "Test",
-            "properties": {
-                "profile": {
-                    "additionalProperties": False,
-                    "description": "Test",
-                    "properties": {"id": {"type": "integer"}},
-                    "required": ["id"],
-                    "type": "object",
-                },
-                "username": {"type": "string"},
-            },
-            "required": ["username", "profile"],
-            "type": "object",
-        },
+        body=PayloadAlternatives([body]),
         schema=schema,
     )
 

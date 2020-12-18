@@ -1,6 +1,6 @@
 import enum
 import json
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, Generator, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, Generator, List, Optional, Tuple
 
 import attr
 import hypothesis
@@ -9,7 +9,6 @@ from requests.structures import CaseInsensitiveDict
 from starlette.applications import Starlette
 
 from .constants import DataGenerationMethod
-from .exceptions import InvalidSchema
 from .models import Case, CheckFunction, Endpoint
 from .utils import NOT_SET, GenericResponse
 
@@ -53,7 +52,7 @@ class StatefulTest:
     def parse(self, case: Case, response: GenericResponse) -> ParsedData:
         raise NotImplementedError
 
-    def make_endpoint(self, data: List[ParsedData]) -> Endpoint:
+    def make_endpoint(self, collected: List[ParsedData]) -> Endpoint:
         raise NotImplementedError
 
 
@@ -92,15 +91,19 @@ class Feedback:
 
     def get_stateful_tests(
         self, test: Callable, settings: Optional[hypothesis.settings], seed: Optional[int]
-    ) -> Generator[Tuple[Endpoint, DataGenerationMethod, Union[Callable, InvalidSchema]], None, None]:
+    ) -> Generator[Tuple[Endpoint, DataGenerationMethod, Callable], None, None]:
         """Generate additional tests that use data from the previous ones."""
-        from ._hypothesis import make_test_or_exception  # pylint: disable=import-outside-toplevel
+        from ._hypothesis import create_test  # pylint: disable=import-outside-toplevel
 
         for data in self.stateful_tests.values():
             endpoint = data.make_endpoint()
             for data_generation_method in endpoint.schema.data_generation_methods:
-                yield endpoint, data_generation_method, make_test_or_exception(
-                    endpoint, test, settings, seed, data_generation_method
+                yield endpoint, data_generation_method, create_test(
+                    endpoint=endpoint,
+                    test=test,
+                    settings=settings,
+                    seed=seed,
+                    data_generation_method=data_generation_method,
                 )
 
 
@@ -123,7 +126,7 @@ def _print_case(case: Case) -> str:
     endpoint = f"state.schema['{case.endpoint.path}']['{case.endpoint.method.upper()}']"
     data = [
         f"{name}={getattr(case, name)}"
-        for name in ("path_parameters", "headers", "cookies", "query", "body", "form_data")
+        for name in ("path_parameters", "headers", "cookies", "query", "body")
         if getattr(case, name) is not None
     ]
     return f"{endpoint}.make_case({', '.join(data)})"

@@ -2,12 +2,10 @@ from inspect import signature
 from typing import Any, Callable, Dict, Iterable, Optional, Union
 
 import attr
-import pytest
 from _pytest.fixtures import FixtureRequest
 from pytest_subtests import SubTests
 
 from .constants import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
-from .exceptions import InvalidSchema
 from .hooks import HookDispatcher, HookScope
 from .models import Endpoint
 from .schemas import BaseSchema
@@ -73,9 +71,8 @@ class LazySchema:
                 tests = list(schema.get_all_tests(func, settings))
                 request.session.testscollected += len(tests)
                 for _endpoint, data_generation_method, sub_test in tests:
-                    actual_test = get_test(sub_test)
                     subtests.item._nodeid = _get_node_name(node_id, _endpoint, data_generation_method)
-                    run_subtest(_endpoint, fixtures, actual_test, subtests)
+                    run_subtest(_endpoint, fixtures, sub_test, subtests)
                 subtests.item._nodeid = node_id
 
             # Needed to prevent a failure when settings are applied to the test function
@@ -84,18 +81,6 @@ class LazySchema:
             return test
 
         return wrapper
-
-
-def get_test(test: Union[Callable, InvalidSchema]) -> Callable:
-    """For invalid schema exceptions construct a failing test function, return the original test otherwise."""
-    if isinstance(test, InvalidSchema):
-        message = test.args[0]
-
-        def actual_test(*args: Any, **kwargs: Any) -> None:
-            pytest.fail(message)
-
-        return actual_test
-    return test
 
 
 def _get_node_name(node_id: str, endpoint: Endpoint, data_generation_method: DataGenerationMethod) -> str:

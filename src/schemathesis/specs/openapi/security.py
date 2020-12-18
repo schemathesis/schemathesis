@@ -1,16 +1,18 @@
 """Processing of ``securityDefinitions`` or ``securitySchemes`` keywords."""
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import Any, ClassVar, Dict, Generator, List, Tuple, Type
 
 import attr
 from jsonschema import RefResolver
 
-from ...models import Endpoint, empty_object
+from ...models import Endpoint
+from .parameters import OpenAPI20Parameter, OpenAPI30Parameter, OpenAPIParameter
 
 
 @attr.s(slots=True)  # pragma: no mutate
 class BaseSecurityProcessor:
     api_key_locations: Tuple[str, ...] = ("header", "query")
     http_security_name = "basic"
+    parameter_cls: ClassVar[Type[OpenAPIParameter]] = OpenAPI20Parameter
 
     def process_definitions(self, schema: Dict[str, Any], endpoint: Endpoint, resolver: RefResolver) -> None:
         """Add relevant security parameters to data generation."""
@@ -47,14 +49,13 @@ class BaseSecurityProcessor:
         ]
 
     def process_api_key_security_definition(self, definition: Dict[str, Any], endpoint: Endpoint) -> None:
-        if definition["in"] == "query":
-            endpoint.query = add_security_definition(endpoint.query, definition)
-        elif definition["in"] == "header":
-            endpoint.headers = add_security_definition(endpoint.headers, definition)
+        parameter = self.parameter_cls(self._make_api_key_parameter(definition))
+        endpoint.add_parameter(parameter)
 
     def process_http_security_definition(self, definition: Dict[str, Any], endpoint: Endpoint) -> None:
-        if definition["type"] == "basic":
-            endpoint.headers = add_http_auth_definition(endpoint.headers)
+        if definition["type"] == self.http_security_name:
+            parameter = self.parameter_cls(self._make_http_auth_parameter(definition))
+            endpoint.add_parameter(parameter)
 
     def _is_match(self, definition: Dict[str, Any], location: str) -> bool:
         return (definition["type"] == "apiKey" and location in self.api_key_locations) or (
@@ -63,19 +64,30 @@ class BaseSecurityProcessor:
 
     def _to_parameter(self, definition: Dict[str, Any]) -> Dict[str, Any]:
         func = {
-            "apiKey": _make_api_key_parameter,
-            self.http_security_name: _make_http_auth_parameter,
+            "apiKey": self._make_api_key_parameter,
+            self.http_security_name: self._make_http_auth_parameter,
         }[definition["type"]]
         return func(definition)
 
+    def _make_http_auth_parameter(self, definition: Dict[str, Any]) -> Dict[str, Any]:
+        schema = make_auth_header_schema(definition)
+        return make_auth_header(**schema)
 
-def _make_api_key_parameter(definition: Dict[str, Any]) -> Dict[str, Any]:
-    return {"type": "string", "name": definition["name"], "in": definition["in"]}
+    def _make_api_key_parameter(self, definition: Dict[str, Any]) -> Dict[str, Any]:
+        return make_api_key_schema(definition, type="string")
 
 
-def _make_http_auth_parameter(definition: Dict[str, Any]) -> Dict[str, Any]:
-    scheme = definition.get("scheme", "basic").lower()
-    return {"type": "string", "name": "Authorization", "in": "header", "format": f"_{scheme}_auth"}
+def make_auth_header_schema(definition: Dict[str, Any]) -> Dict[str, str]:
+    schema = definition.get("scheme", "basic").lower()
+    return {"type": "string", "format": f"_{schema}_auth"}
+
+
+def make_auth_header(**kwargs: Any) -> Dict[str, Any]:
+    return {"name": "Authorization", "in": "header", "required": True, **kwargs}
+
+
+def make_api_key_schema(definition: Dict[str, Any], **kwargs: Any) -> Dict[str, Any]:
+    return {"name": definition["name"], "required": True, "in": definition["in"], **kwargs}
 
 
 SwaggerSecurityProcessor = BaseSecurityProcessor
@@ -85,6 +97,7 @@ SwaggerSecurityProcessor = BaseSecurityProcessor
 class OpenAPISecurityProcessor(BaseSecurityProcessor):
     api_key_locations = ("header", "cookie", "query")
     http_security_name = "http"
+    parameter_cls: ClassVar[Type[OpenAPIParameter]] = OpenAPI30Parameter
 
     def get_security_definitions(self, schema: Dict[str, Any], resolver: RefResolver) -> Dict[str, Any]:
         """In Open API 3 security definitions are located in ``components`` and may have references inside."""
@@ -94,31 +107,12 @@ class OpenAPISecurityProcessor(BaseSecurityProcessor):
             return resolver.resolve(security_schemes["$ref"])[1]
         return security_schemes
 
-    def process_api_key_security_definition(self, definition: Dict[str, Any], endpoint: Endpoint) -> None:
-        if definition["in"] == "cookie":
-            endpoint.cookies = add_security_definition(endpoint.cookies, definition)
-        super().process_api_key_security_definition(definition, endpoint)
+    def _make_http_auth_parameter(self, definition: Dict[str, Any]) -> Dict[str, Any]:
+        schema = make_auth_header_schema(definition)
+        return make_auth_header(schema=schema)
 
-    def process_http_security_definition(self, definition: Dict[str, Any], endpoint: Endpoint) -> None:
-        if definition["type"] == "http":
-            endpoint.headers = add_http_auth_definition(endpoint.headers, scheme=definition["scheme"].lower())
-
-
-def add_security_definition(container: Optional[Dict[str, Any]], definition: Dict[str, Any]) -> Dict[str, Any]:
-    """Create a JSON schema for the provided security definition."""
-    name = definition["name"]
-    container = container or empty_object()
-    container["properties"][name] = {"name": name, "type": "string"}
-    container["required"].append(name)
-    return container
-
-
-def add_http_auth_definition(container: Optional[Dict[str, Any]], scheme: str = "basic") -> Dict[str, Any]:
-    """HTTP auth is handled via a custom `format` that is registered by Schemathesis during the import time."""
-    container = container or empty_object()
-    container["properties"]["Authorization"] = {"type": "string", "format": f"_{scheme}_auth"}
-    container["required"].append("Authorization")
-    return container
+    def _make_api_key_parameter(self, definition: Dict[str, Any]) -> Dict[str, Any]:
+        return make_api_key_schema(definition, schema={"type": "string"})
 
 
 def get_security_requirements(schema: Dict[str, Any], endpoint: Endpoint) -> List[str]:
