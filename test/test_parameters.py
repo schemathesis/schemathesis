@@ -417,7 +417,7 @@ def test_(case):
 
 
 def test_json_media_type(testdir):
-    # When endpoint expects JSON-compatible media type
+    # When endpoint expects a JSON-compatible media type
     testdir.make_test(
         """
 @settings(max_examples=10, deadline=None)

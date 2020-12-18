@@ -112,7 +112,7 @@ class BaseOpenAPISchema(BaseSchema):
     ) -> List[OpenAPIParameter]:
         """Collect Open API parameters.
 
-        They should be used uniformly during the generation step; therefore we need to convert them into
+        They should be used uniformly during the generation step; therefore, we need to convert them into
         a spec-independent list of parameters.
         """
         raise NotImplementedError
@@ -405,14 +405,14 @@ class SwaggerV20(BaseOpenAPISchema):
     def collect_parameters(
         self, parameters: Iterable[Dict[str, Any]], endpoint_definition: Dict[str, Any]
     ) -> List[OpenAPIParameter]:
-        # The main difference with Open API 3.0 is that it has `body` and `form` parameters, that we need to handle
+        # The main difference with Open API 3.0 is that it has `body` and `form` parameters that we need to handle
         # differently.
         collected: List[OpenAPIParameter] = []
         # NOTE. The Open API 2.0 spec doesn't strictly imply having media types in the "consumes" keyword.
         # It is not enforced by the meta schema and has no "MUST" verb in the spec text.
         # Also, not every API has operations with payload (they might have only GET endpoints without payloads).
         # For these reasons, it might be (and often is) absent, and we need to provide the proper media type in case
-        # we have operations with payload.
+        # we have operations with a payload.
         media_types = self._get_consumes_for_endpoint(endpoint_definition)
         # For `in=body` parameters, we imply `application/json` as the default media type because it is the most common.
         body_media_types = media_types or (OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE,)

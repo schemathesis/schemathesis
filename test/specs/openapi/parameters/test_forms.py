@@ -15,7 +15,7 @@ from schemathesis.specs.openapi.parameters import OpenAPI20CompositeBody, OpenAP
 def test_forms_open_api_2(
     consumes, assert_parameters, make_openapi_2_schema, user_jsonschema, open_api_2_user_form_parameters
 ):
-    # In Open API 2 forms are separate "formData" parameters
+    # In Open API 2.0, forms are separate "formData" parameters
     schema = make_openapi_2_schema(consumes, open_api_2_user_form_parameters)
     assert_parameters(
         schema,

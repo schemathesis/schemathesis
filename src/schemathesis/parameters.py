@@ -1,6 +1,6 @@
 """API operation parameters.
 
-These are basic entities, that describe what data could be sent to the API.
+These are basic entities that describe what data could be sent to the API.
 """
 from copy import deepcopy
 from typing import Any, Dict, Generator, Generic, List, TypeVar
@@ -8,19 +8,19 @@ from typing import Any, Dict, Generator, Generic, List, TypeVar
 import attr
 
 
-@attr.s(slots=True)
+@attr.s(slots=True)  # pragma: no mutate
 class Parameter:
-    """A logically separate parameter bound to a location (e.g. to "query string").
+    """A logically separate parameter bound to a location (e.g., to "query string").
 
-    For example, if the API requires multiple headers to be present, then each header is presented as a separate
+    For example, if the API requires multiple headers to be present, each header is presented as a separate
     `Parameter` instance.
     """
 
     # The parameter definition in the language acceptable by the API
-    definition: Any = attr.ib()
+    definition: Any = attr.ib()  # pragma: no mutate
 
     def __attrs_post_init__(self) -> None:
-        # Do not use `converter=deepcopy` on the field, due to mypy not detecting type annotations
+        # Do not use `converter=deepcopy` on the field due to mypy not detecting type annotations
         self.definition = deepcopy(self.definition)
 
     @property
@@ -50,17 +50,19 @@ class Parameter:
 P = TypeVar("P", bound=Parameter)
 
 
-@attr.s
+@attr.s  # pragma: no mutate
 class ParameterSet(Generic[P]):
     """A set of parameters for the same location."""
 
-    items: List[P] = attr.ib(factory=list)
+    items: List[P] = attr.ib(factory=list)  # pragma: no mutate
 
     def add(self, parameter: P) -> None:
+        """Add a new parameter."""
         self.items.append(parameter)
 
     @property
     def example(self) -> Dict[str, Any]:
+        """Composite example gathered from individual parameters."""
         return {item.name: item.example for item in self.items if item.example}
 
     def __bool__(self) -> bool:

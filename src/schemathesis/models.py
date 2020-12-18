@@ -37,7 +37,7 @@ from . import serializers
 from .constants import USER_AGENT, DataGenerationMethod
 from .exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
-from .serializers import SerializerContext
+from .serializers import Serializer, SerializerContext
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse, get_response_payload
 
@@ -86,7 +86,7 @@ class Case:  # pylint: disable=too-many-public-methods
 
     feedback: Optional["Feedback"] = attr.ib(default=None)  # pragma: no mutate
     source: Optional[CaseSource] = attr.ib(default=None)  # pragma: no mutate
-    # MediaType for cases with payload. For example, "application/json"
+    # The media type for cases with a payload. For example, "application/json"
     media_type: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
     def __repr__(self) -> str:
@@ -223,6 +223,15 @@ class Case:  # pylint: disable=too-many-public-methods
             final_headers["User-Agent"] = USER_AGENT
         return final_headers
 
+    def _get_serializer(self) -> Optional[Serializer]:
+        """Get a serializer for the payload, if there is any."""
+        if self.media_type is not None:
+            cls = serializers.get(self.media_type)
+            if cls is None:
+                cant_serialize(self.media_type)
+            return cls()
+        return None
+
     def as_requests_kwargs(
         self, base_url: Optional[str] = None, headers: Optional[Dict[str, str]] = None
     ) -> Dict[str, Any]:
@@ -235,12 +244,10 @@ class Case:  # pylint: disable=too-many-public-methods
         formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
         url = urljoin(base_url + "/", formatted_path)
         extra: Dict[str, Any]
-        if self.media_type is not None:
-            serializer = serializers.get(self.media_type)
-            if serializer is None:
-                cant_serialize(self.media_type)
+        serializer = self._get_serializer()
+        if serializer is not None:
             context = SerializerContext(case=self)
-            extra = serializer().as_requests(context, self.body)
+            extra = serializer.as_requests(context, self.body)
         else:
             extra = {}
         return {
@@ -285,12 +292,10 @@ class Case:  # pylint: disable=too-many-public-methods
         if self.media_type:
             final_headers["Content-Type"] = self.media_type
         extra: Dict[str, Any]
-        if self.media_type is not None:
-            serializer = serializers.get(self.media_type)
-            if serializer is None:
-                cant_serialize(self.media_type)
+        serializer = self._get_serializer()
+        if serializer is not None:
             context = SerializerContext(case=self)
-            extra = serializer().as_werkzeug(context, self.body)
+            extra = serializer.as_werkzeug(context, self.body)
         else:
             extra = {}
         return {

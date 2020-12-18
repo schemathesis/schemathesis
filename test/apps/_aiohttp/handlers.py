@@ -7,6 +7,12 @@ from typing import Dict
 from aiohttp import web
 
 
+async def expect_content_type(request: web.Request, value: str):
+    if request.headers.get("Content-Type", "") != value:
+        raise web.HTTPInternalServerError(text=f"Expected {value} payload")
+    return await request.read()
+
+
 async def success(request: web.Request) -> web.Response:
     return web.json_response({"success": True})
 
@@ -40,16 +46,12 @@ async def text(request: web.Request) -> web.Response:
 
 
 async def plain_text_body(request: web.Request) -> web.Response:
-    if request.headers.get("Content-Type", "") != "text/plain":
-        raise web.HTTPInternalServerError(text="Expected text/plain payload")
-    read_ = await request.read()
-    return web.Response(body=read_, content_type="text/plain")
+    body = await expect_content_type(request, "text/plain")
+    return web.Response(body=body, content_type="text/plain")
 
 
 async def csv_payload(request: web.Request) -> web.Response:
-    if request.headers.get("Content-Type", "") != "text/csv":
-        raise web.HTTPInternalServerError(text="Expected text/csv payload")
-    body = await request.read()
+    body = await expect_content_type(request, "text/csv")
     if body:
         reader = csv.DictReader(body.decode().splitlines())
         data = list(reader)

@@ -31,8 +31,8 @@ def make_endpoint(schema, **kwargs) -> Endpoint:
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_get_examples(name, swagger_20):
     if name == "body":
-        # In Open API 2.0, `body` parameter has a name, which is ignored
-        # But we'd like to use this object as a payload, therefore we put one extra level of nesting
+        # In Open API 2.0, the `body` parameter has a name, which is ignored
+        # But we'd like to use this object as a payload; therefore, we put one extra level of nesting
         example = expected = {"name": "John"}
         media_type = "application/json"
         cls = PayloadAlternatives

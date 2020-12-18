@@ -9,16 +9,16 @@ Changelog
 - Support for sending ``text/plain`` payload as test data. `#850`_
 - Generating data for all media types defined for an operation. `#690`_
 - Support for user-defined media types serialization. You can define how Schemathesis should handle media types defined
-  in your schema, or customize existing (like ``application/json``).
+  in your schema or customize existing (like ``application/json``).
 
 **Changed**
 
 - Open API parameters parsing to unblock supporting multiple media types per operation. Their definitions aren't converted
-  to JSON Schema equivalents right away, but deferred instead and stored as is.
+  to JSON Schema equivalents right away but deferred instead and stored as-is.
 
 **Fixed**
 
-- Allow generating requests without payload if it is not required by the schema. `#916`_
+- Allow generating requests without payload if the schema does not require it. `#916`_
 
 **Removed**
 

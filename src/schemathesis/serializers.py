@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Optional, Type
 
 import attr
 from typing_extensions import Protocol, runtime_checkable
@@ -12,18 +12,18 @@ if TYPE_CHECKING:
 SERIALIZERS = {}
 
 
-@attr.s(slots=True)
+@attr.s(slots=True)  # pragma: no mutate
 class SerializerContext:
-    """Context for serialization process."""
+    """The context for serialization process."""
 
-    case: "Case" = attr.ib()
+    case: "Case" = attr.ib()  # pragma: no mutate
 
 
 @runtime_checkable
 class Serializer(Protocol):
-    """Transform generated data to a form, supported by the transport layer.
+    """Transform generated data to a form supported by the transport layer.
 
-    For example, to handle multipart forms we need to serialize them differently for
+    For example, to handle multipart payloads, we need to serialize them differently for
     `requests` and `werkzeug` transports.
     """
 
@@ -52,8 +52,8 @@ def register(media_type: str, *, aliases: Collection[str] = ()) -> Callable[[Typ
                 return {"data": to_csv(value)}
 
     The primary purpose of serializers is to transform data from its Python representation to the format suitable
-    for making an API call. The representation depends on your schema, but its type matches Python equivalents to the
-    JSON Schema types.
+    for making an API call. The generated data structure depends on your schema, but its type matches
+    Python equivalents to the JSON Schema types.
 
     """
 
@@ -85,26 +85,38 @@ class JSONSerializer:
         return {"json": value}
 
 
-def prepare_form_data(form_data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    # form_data can be optional
-    if form_data is not None:
-        for name, value in form_data.items():
+def _should_coerce_to_bytes(item: Any) -> bool:
+    """Whether the item should be converted to bytes."""
+    # These types are OK in forms, others should be coerced to bytes
+    return not isinstance(item, (bytes, str, int))
+
+
+def prepare_form_data(data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Make the generated data suitable for sending as multipart.
+
+    If the schema is loose, Schemathesis can generate data that can't be sent as multipart. In these cases,
+    we convert it to bytes and send it as-is, ignoring any conversion errors.
+
+    NOTE. This behavior might change in the future.
+    """
+    # Form data can be optional
+    if data is not None:
+        for name, value in data.items():
             if isinstance(value, list):
-                form_data[name] = [
-                    to_bytes(item) if not isinstance(item, (bytes, str, int)) else item for item in value
-                ]
-            elif not isinstance(value, (bytes, str, int)):
-                form_data[name] = to_bytes(value)
-    return form_data
+                data[name] = [to_bytes(item) if _should_coerce_to_bytes(item) else item for item in value]
+            elif _should_coerce_to_bytes(value):
+                data[name] = to_bytes(value)
+    return data
 
 
-def to_bytes(value: Union[str, bytes, int, bool, float]) -> bytes:
+def to_bytes(value: Any) -> bytes:
+    """Convert the input value to bytes and ignore any conversion errors."""
     return str(value).encode(errors="ignore")
 
 
 @register("multipart/form-data")
 class MultipartSerializer:
-    def as_requests(self, context: SerializerContext, value: Dict[str, Any]) -> Any:
+    def as_requests(self, context: SerializerContext, value: Optional[Dict[str, Any]]) -> Any:
         # Form data always is generated as a dictionary
         multipart = prepare_form_data(value)
         files, data = context.case.endpoint.prepare_multipart(multipart)
@@ -142,7 +154,7 @@ class OctetStreamSerializer:
 
 
 def get(media_type: str) -> Optional[Type[Serializer]]:
-    """Get appropriate serializer for the given media type."""
+    """Get an appropriate serializer for the given media type."""
     if is_json_media_type(media_type):
         media_type = "application/json"
     return SERIALIZERS.get(media_type)

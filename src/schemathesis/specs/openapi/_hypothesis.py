@@ -124,7 +124,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
         # Take the first available media type.
         # POSSIBLE IMPROVEMENT:
         #   - Test examples for each available media type on Open API 2.0;
-        #   - On Open API 3.0 media types are explicit and each example has it. We can pass `OpenAPIBody.media_type`
+        #   - On Open API 3.0, media types are explicit, and each example has it. We can pass `OpenAPIBody.media_type`
         #     here from the examples handling code.
         media_type = media_types[0]
     if endpoint.schema.validate_schema and endpoint.method.upper() == "GET" and endpoint.body:
@@ -154,7 +154,7 @@ def _get_body_strategy(
 def get_parameters_strategy(
     endpoint: Endpoint, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], location: str
 ) -> st.SearchStrategy:
-    """Create a new strategy for case's component from the endpoint parameters."""
+    """Create a new strategy for the case's component from the endpoint parameters."""
     parameters = getattr(endpoint, LOCATION_TO_CONTAINER[location])
     if parameters:
         schema = parameters_to_json_schema(parameters)
