@@ -1,13 +1,13 @@
-How it works
-============
+Data generation
+===============
 
-This section describes various aspects of Schemathesis behavior.
+This section describes how Schemathesis generates test examples and their serialization process.
 
 Payload serialization
 ---------------------
 
-When your API accepts a payload, requests should have a media type that is located in their ``Content-Type`` header.
-In Open API 3.0 you may write something like this:
+When your API accepts a payload, requests should have a media type located in their ``Content-Type`` header.
+In Open API 3.0, you may write something like this:
 
 .. code-block::
    :emphasize-lines: 7
@@ -26,17 +26,28 @@ In Open API 3.0 you may write something like this:
 In this example, operation ```POST /pet`` expects ``application/json`` payload. For each defined media type Schemathesis
 generates data according to the relevant schema (``{"type": "object"}`` in the example).
 
-.. note:: This data is stored in the ``case`` fixture that you use in tests when you use our ``pytest`` integration.
+.. note:: This data is stored in the ``case`` fixture you use in tests when you use our ``pytest`` integration.
 
-Before sending this data should be serialized to the format, expected for the tested operation. Schemathesis supports
+Before sending, this data should be serialized to the format expected by the tested operation. Schemathesis supports
 most common media types like ``application/json`` and ``text/plain`` out of the box and allows you to add support for other
 media types via the ``serializers`` mechanism.
 
-For example, it is possible to test the following API with CSV data:
+Schemathesis uses ``requests`` to send API requests over network and ``werkzeug.Client`` for direct WSGI integration.
+Serializers define the process of transforming generated Python objects into structures that can be sent by these tools.
 
+If Schemathesis is unable to serialize data for a media type, the generated samples will be rejected. If you do not have
+a different media type for the tested operation that Schemathesis can serialize, you will see a ``Unsatisfiable`` error.
+
+CSV data example
+~~~~~~~~~~~~~~~~
+
+In this example, we will define an operation that expects CSV data and setup a serializer for it.
+
+Even though, Open API does not define a standard way to describe the structure of CSV payload, we can use the ``array``
+type to describe it:
 
 .. code-block::
-   :emphasize-lines: 6-21
+   :emphasize-lines: 8-21
 
     paths:
       /csv:
@@ -64,24 +75,19 @@ For example, it is possible to test the following API with CSV data:
             '200':
               description: OK
 
-Then a basic serializer may look like this:
+This schema describes a CSV structure with two string fields - ``first_name`` and ``last_name``. Schemathesis will
+generate lists of Python dictionaries that can be serialized by ``csv.DictWriter``.
+
+You are free to write a schema of any complexity, but be aware that Schemathesis may generate uncommon data
+that your serializer will need to handle. In this example we restrict string characters only to ASCII letters
+to avoid handling Unicode symbols for simplicity.
+
+First, let's define a function that will transform lists of dictionaries to CSV strings:
 
 .. code-block:: python
 
     import csv
     from io import StringIO
-
-    import schemathesis
-
-    @schemathesis.serializers.register("text/csv")
-    class CSVSerializer:
-
-        def as_requests(self, context, value):
-            return {"data": to_csv(value)}
-
-        def as_werkzeug(self, context, value):
-            return {"data": to_csv(value)}
-
 
     def to_csv(data):
         if not data:
@@ -95,5 +101,42 @@ Then a basic serializer may look like this:
         writer.writerows(data)
         return output.getvalue()
 
-Please, note, that ``value`` will correspond to your schema in positive testing scenarios, and it is your responsibility
-to handle errors during data serialization.
+.. note::
+
+    You can take a look at the official `csv module documentation <https://docs.python.org/3/library/csv.html>`_ for more examples of CSV serialization.
+
+Second, register a serializer class via the ``schemathesis.serializers.register`` decorator:
+
+.. code-block:: python
+   :emphasize-lines: 3
+
+    import schemathesis
+
+    @schemathesis.serializers.register("text/csv")
+    class CSVSerializer:
+        ...
+
+This decorator requires the name of the media type you need to handle and optionally accepts additional media types via its ``aliases`` keyword argument.
+
+Third, the serializer should have two methods - ``as_requests`` and ``as_werkzeug``.
+
+.. code-block:: python
+
+    ...
+    class CSVSerializer:
+
+        def as_requests(self, context, value):
+            return {"data": to_csv(value)}
+
+        def as_werkzeug(self, context, value):
+            return {"data": to_csv(value)}
+
+They should return dictionaries of keyword arguments that will be passed to ``requests.request`` and ``werkzeug.Client.open``, respectively.
+With the CSV example, we create payload with the ``to_csv`` function defined earlier and return it as ``data``, which is valid for both cases.
+
+Additionally, you have ``context`` where you can access the current test case via ``context.case``.
+
+.. important::
+
+    Please, note that ``value`` will match your schema in positive testing scenarios, and it is your responsibility
+    to handle errors during data serialization.
