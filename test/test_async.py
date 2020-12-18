@@ -82,7 +82,7 @@ def app():
 async def test_(request, aiohttp_client, app, case):
     request.config.HYPOTHESIS_CASES += 1
     client = await aiohttp_client(app)
-    response = await client.request(case.method, f"/v1{case.formatted_path}", headers=case.headers, json=case.body)
+    response = await client.request(case.method, f"/v1{case.formatted_path}", headers=case.headers)
     assert response.status < 500
     assert len(app["saved_requests"]) == 1
     assert app["saved_requests"][0].method == "GET"

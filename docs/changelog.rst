@@ -19,6 +19,7 @@ Changelog
 **Fixed**
 
 - Allow generating requests without payload if the schema does not require it. `#916`_
+- Allow sending ``null`` as request payload if the schema expects it. `#919`_
 
 **Removed**
 
@@ -1602,6 +1603,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#919: https://github.com/schemathesis/schemathesis/issues/919
 .. _#917: https://github.com/schemathesis/schemathesis/issues/917
 .. _#916: https://github.com/schemathesis/schemathesis/issues/916
 .. _#897: https://github.com/schemathesis/schemathesis/issues/897

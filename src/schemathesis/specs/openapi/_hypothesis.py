@@ -117,8 +117,6 @@ def get_case_strategy(  # pylint: disable=too-many-locals
             strategy = _get_body_strategy(parameter, to_strategy)
             media_type = parameter.media_type
             body = draw(strategy)
-        else:
-            body = None
     else:
         media_types = endpoint.get_request_payload_content_types() or ["application/json"]
         # Take the first available media type.

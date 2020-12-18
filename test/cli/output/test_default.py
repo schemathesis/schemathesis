@@ -13,6 +13,7 @@ from schemathesis.cli.output.default import display_internal_error
 from schemathesis.constants import USER_AGENT, DataGenerationMethod
 from schemathesis.runner.events import Finished, InternalError
 from schemathesis.runner.serialization import SerializedTestResult
+from schemathesis.utils import NOT_SET
 
 from ...utils import strip_style_win32
 
@@ -186,8 +187,8 @@ def test_display_single_failure(capsys, swagger_20, execution_context, endpoint,
     lines = out.split("\n")
     # Then the endpoint name is displayed as a subsection
     assert " GET: /v1/success " in lines[0]
-    # And body should be displayed if it is not None
-    if body is None:
+    # And body should be displayed if it is not NOT_SET
+    if body is NOT_SET:
         assert "Body" not in out
     else:
         assert strip_style_win32(click.style(f"Body            : {body}", fg="red")) in lines

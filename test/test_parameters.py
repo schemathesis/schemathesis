@@ -1,11 +1,13 @@
 import datetime
 from copy import deepcopy
 
+import jsonschema
 import pytest
 import yaml
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, assume, given, settings
 
 import schemathesis
+from schemathesis.specs.openapi.definitions import OPENAPI_30, SWAGGER_20
 
 from .utils import as_param
 
@@ -449,7 +451,6 @@ def test_(case):
                         "responses": {
                             "200": {
                                 "description": "OK",
-                                "content": {"application/problem+json": {"schema": {"type": "object"}}},
                             }
                         },
                     }
@@ -459,3 +460,69 @@ def test_(case):
     )
     # Then the payload should be serialized as json
     testdir.run_and_assert(passed=1)
+
+
+@pytest.fixture(params=["aiohttp", "flask"])
+def api_schema(request, openapi_version):
+    if openapi_version.is_openapi_2:
+        schema = request.getfixturevalue("empty_open_api_2_schema")
+        schema["paths"] = {
+            "/payload": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "required": True,
+                            "name": "payload",
+                            "schema": {"type": "boolean", "x-nullable": True},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+        jsonschema.validate(schema, SWAGGER_20)
+    else:
+        schema = request.getfixturevalue("empty_open_api_3_schema")
+        schema["paths"] = {
+            "/payload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "boolean", "nullable": True}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+        jsonschema.validate(schema, OPENAPI_30)
+    if request.param == "aiohttp":
+        base_url = request.getfixturevalue("base_url")
+        return schemathesis.from_dict(schema, base_url=base_url)
+    app = request.getfixturevalue("flask_app")
+    return schemathesis.from_dict(schema, app=app, base_url="/api")
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.endpoints("payload")
+def test_null_body(testdir, api_schema):
+    # When endpoint expects `null` as payload
+
+    @given(case=api_schema["/payload"]["POST"].as_strategy())
+    @settings(max_examples=5)
+    def test(case):
+        assume(case.body is None)
+        # Then it should be possible to send `null`
+        if case.app is not None:
+            response = case.call_wsgi()
+        else:
+            response = case.call()
+        case.validate_response(response)
+        if case.app is None:
+            data = response.content
+        else:
+            data = response.data.strip()
+        # And the application should return what was send (`/payload` behaves this way)
+        assert data == b"null"
+
+    test()
