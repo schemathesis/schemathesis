@@ -210,6 +210,8 @@ def test_handle_after_execution(capsys, execution_context, after_execution, stat
     # When this event is handled
     default.handle_after_execution(execution_context, after_execution)
 
+    assert after_execution.current_endpoint == "GET /v1/success"
+
     lines = capsys.readouterr().out.strip().split("\n")
     symbol, percentage = lines[0].split()
     # Then the symbol corresponding to the status is displayed with a proper color
