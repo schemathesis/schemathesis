@@ -127,7 +127,7 @@ def _print_case(case: Case) -> str:
     data = [
         f"{name}={getattr(case, name)}"
         for name in ("path_parameters", "headers", "cookies", "query", "body")
-        if getattr(case, name) is not None
+        if getattr(case, name) not in (None, NOT_SET)
     ]
     return f"{endpoint}.make_case({', '.join(data)})"
 

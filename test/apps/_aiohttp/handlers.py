@@ -18,11 +18,8 @@ async def success(request: web.Request) -> web.Response:
 
 
 async def payload(request: web.Request) -> web.Response:
-    if request.can_read_body:
-        data = await request.read()
-    else:
-        data = None
-    return web.json_response(data)
+    kwargs = {"body": await request.read()}
+    return web.json_response(**kwargs)
 
 
 async def invalid_response(request: web.Request) -> web.Response:
