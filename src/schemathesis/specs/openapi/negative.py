@@ -45,14 +45,13 @@ class MutateType(Mutation):
 
 
 MUTATIONS = {
-    "headers": (MutateRequired(), MutateType()),
-    "cookies": (MutateRequired(), MutateType()),
+    "header": (MutateRequired(), MutateType()),
+    "cookie": (MutateRequired(), MutateType()),
     # We can't mutate `required` since it is required by the spec to be valid.
     # I.e. if any of path parameters is absent, then we can't reach the endpoint
-    "path_parameters": (MutateType(),),
+    "path": (MutateType(),),
     "query": (MutateRequired(), MutateType()),
     "body": (MutateRequired(), MutateType()),
-    "form_data": (MutateRequired(), MutateType()),
 }
 
 
@@ -62,10 +61,10 @@ MUTATIONS = {
 
 
 def negative_schema(
-    schema: Dict[str, Any], parameter: str, *, custom_formats: Dict[str, st.SearchStrategy[str]]
+    schema: Dict[str, Any], location: str, *, custom_formats: Dict[str, st.SearchStrategy[str]]
 ) -> st.SearchStrategy:
     """A strategy for instances, that DO NOT match the input schema."""
-    mutations = MUTATIONS[parameter]
+    mutations = MUTATIONS[location]
 
     # First we mutate the input schema, so any valid instance for it is invalid to the original schema
 
@@ -98,7 +97,7 @@ def mutate_object_schema(draw: Draw, schema: Schema, mutations: Tuple[Mutation, 
     mutation.mutate(draw, schema, mutated_property_schema, mutated_property_name)
 
     # Other properties & mutations are chosen with feature flags
-    features = draw(st.shared(FeatureStrategy(), key="features"))
+    features = draw(st.shared(FeatureStrategy(), key="features"))  # type: ignore
 
     for name, property_schema in properties:
         if name != mutated_property_name and features.is_enabled(name):

@@ -33,7 +33,7 @@ INTEGER_SCHEMA = {
 def test_negative(schema):
     validator = Draft4Validator(schema)
 
-    @given(negative_schema(schema, parameter="query", custom_formats={}))
+    @given(negative_schema(schema, location="query", custom_formats={}))
     @settings(max_examples=10)
     def test(instance):
         assert not validator.is_valid(instance)
