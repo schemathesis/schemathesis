@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Optional, Type, Union
 
 import attr
-from typing_extensions import Protocol
+from typing_extensions import Protocol, runtime_checkable
 
 from .utils import is_json_media_type
 
@@ -19,6 +19,7 @@ class SerializerContext:
     case: "Case" = attr.ib()
 
 
+@runtime_checkable
 class Serializer(Protocol):
     """Transform generated data to a form, supported by the transport layer.
 
@@ -50,17 +51,22 @@ def register(media_type: str, *, aliases: Collection[str] = ()) -> Callable[[Typ
             def as_werkzeug(self, context, value):
                 return {"data": to_csv(value)}
 
-    The primary purpose of serializers is to transform data from its intermediate representation to the format suitable
+    The primary purpose of serializers is to transform data from its Python representation to the format suitable
     for making an API call. The representation depends on your schema, but its type matches Python equivalents to the
     JSON Schema types.
 
     """
 
-    def wrapper(function: Type[Serializer]) -> Type[Serializer]:
-        SERIALIZERS[media_type] = function
+    def wrapper(serializer: Type[Serializer]) -> Type[Serializer]:
+        if not issubclass(serializer, Serializer):
+            raise TypeError(
+                f"`{serializer.__name__}` is not a valid serializer. "
+                f"Check `schemathesis.serializers.Serializer` documentation for examples."
+            )
+        SERIALIZERS[media_type] = serializer
         for alias in aliases:
-            SERIALIZERS[alias] = function
-        return function
+            SERIALIZERS[alias] = serializer
+        return serializer
 
     return wrapper
 

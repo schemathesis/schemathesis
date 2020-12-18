@@ -508,3 +508,14 @@ def test_text_csv(schema_url):
         assert response.json() == case.body
 
     test()
+
+
+def test_register_incomplete_serializer():
+    # When register a new serializer without a required method
+    # Then you'll have a TypeError
+    with pytest.raises(TypeError, match="`CSVSerializer` is not a valid serializer."):
+
+        @schemathesis.serializers.register("text/csv")
+        class CSVSerializer:
+            def as_requests(self, context, value):
+                return {}
