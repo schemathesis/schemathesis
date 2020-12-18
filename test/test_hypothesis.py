@@ -21,6 +21,7 @@ from schemathesis.specs.openapi._hypothesis import (
 )
 from schemathesis.specs.openapi.definitions import OPENAPI_30, SWAGGER_20
 from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20CompositeBody, OpenAPI20Parameter
+from schemathesis.utils import NOT_SET
 
 
 def make_endpoint(schema, **kwargs) -> Endpoint:
@@ -87,7 +88,7 @@ def test_no_body_in_get(swagger_20):
     )
     strategies = endpoint.get_strategies_from_examples()
     assert len(strategies) == 1
-    assert strategies[0].example().body is None
+    assert strategies[0].example().body is NOT_SET
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")

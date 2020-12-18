@@ -38,8 +38,8 @@ from .constants import USER_AGENT, DataGenerationMethod
 from .exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .serializers import Serializer, SerializerContext
-from .types import Body, Cookies, FormData, Headers, PathParameters, Query
-from .utils import GenericResponse, WSGIResponse, get_response_payload
+from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
+from .utils import NOT_SET, GenericResponse, WSGIResponse, get_response_payload
 
 if TYPE_CHECKING:
     from .hooks import HookDispatcher
@@ -82,7 +82,9 @@ class Case:  # pylint: disable=too-many-public-methods
     headers: Optional[Headers] = attr.ib(default=None)  # pragma: no mutate
     cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
     query: Optional[Query] = attr.ib(default=None)  # pragma: no mutate
-    body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
+    # By default, there is no body, but we can't use `None` as the default value because it clashes with `null`
+    # which is a valid payload.
+    body: Union[Body, NotSet] = attr.ib(default=NOT_SET)  # pragma: no mutate
 
     feedback: Optional["Feedback"] = attr.ib(default=None)  # pragma: no mutate
     source: Optional[CaseSource] = attr.ib(default=None)  # pragma: no mutate
@@ -94,7 +96,7 @@ class Case:  # pylint: disable=too-many-public-methods
         first = True
         for name in ("path_parameters", "headers", "cookies", "query", "body"):
             value = getattr(self, name)
-            if value is not None:
+            if value not in (None, NOT_SET):
                 if first:
                     first = False
                 else:
@@ -157,11 +159,13 @@ class Case:  # pylint: disable=too-many-public-methods
         }
         max_length = max(map(len, output))
         template = f"{{:<{max_length}}} : {{}}"
-        return [
-            template.format(key, value)
-            for key, value in output.items()
-            if (key == "Body" and value is not None) or value not in (None, {})
-        ]
+
+        def should_display(key: str, value: Any) -> bool:
+            if key == "Body":
+                return value is not NOT_SET
+            return value is not None
+
+        return [template.format(key, value) for key, value in output.items() if should_display(key, value)]
 
     def get_code_to_reproduce(
         self, headers: Optional[Dict[str, Any]] = None, request: Optional[requests.PreparedRequest] = None
@@ -186,7 +190,7 @@ class Case:  # pylint: disable=too-many-public-methods
         printed_kwargs = ", ".join(
             f"{key}={repr(value)}"
             for key, value in kwargs.items()
-            if key not in ("method", "url") and value is not None
+            if key not in ("method", "url") and value not in (None, NOT_SET)
         )
         args_repr = f"'{kwargs['url']}'"
         if printed_kwargs:
@@ -543,7 +547,7 @@ class Endpoint(Generic[P]):
         headers: Optional[Headers] = None,
         cookies: Optional[Cookies] = None,
         query: Optional[Query] = None,
-        body: Optional[Body] = None,
+        body: Union[Body, NotSet] = NOT_SET,
     ) -> Case:
         return Case(
             endpoint=self,

@@ -76,13 +76,22 @@ def unregister(media_type: str) -> None:
     del SERIALIZERS[media_type]
 
 
+def _to_json(value: Any) -> Dict[str, Any]:
+    if value is None:
+        # If the body is `None`, then the app expects `null`, but `None` is also the default value for the `json`
+        # argument in `requests.request` and `werkzeug.Client.open` which makes these cases indistinguishable.
+        # Therefore we explicitly create such payload
+        return {"data": b"null"}
+    return {"json": value}
+
+
 @register("application/json")
 class JSONSerializer:
     def as_requests(self, context: SerializerContext, value: Any) -> Any:
-        return {"json": value}
+        return _to_json(value)
 
     def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
-        return {"json": value}
+        return _to_json(value)
 
 
 def _should_coerce_to_bytes(item: Any) -> bool:

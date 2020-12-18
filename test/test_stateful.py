@@ -139,7 +139,7 @@ def test_(request, case):
         ]
     )
     # And a warning should be risen because responses were not stored
-    assert f"  test_stateful_not_used.py:10: PytestWarning: {NOT_USED_STATEFUL_TESTING_MESSAGE}" in result.stdout.lines
+    assert f"  test_stateful_not_used.py:11: PytestWarning: {NOT_USED_STATEFUL_TESTING_MESSAGE}" in result.stdout.lines
 
 
 @pytest.mark.endpoints("create_user", "get_user", "update_user")

@@ -148,7 +148,7 @@ def test_get_inventory(testdir):
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert not case.path_parameters
-    assert not case.body
+    assert case.body is NOT_SET
     assert not case.query
     assert_requests_call(case)
 """
@@ -250,7 +250,7 @@ def test_logout(testdir):
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert not case.path_parameters
-    assert not case.body
+    assert case.body is NOT_SET
     assert not case.query
     assert_requests_call(case)
 """
