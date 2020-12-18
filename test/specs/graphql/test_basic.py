@@ -16,6 +16,7 @@ def graphql_strategy(graphql_schema):
 
 
 def test_raw_schema(graphql_schema):
+    assert graphql_schema.verbose_name == "GraphQL"
     assert graphql_schema.raw_schema["__schema"]["types"][1] == {
         "kind": "OBJECT",
         "name": "Patron",

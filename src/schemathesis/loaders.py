@@ -70,9 +70,7 @@ def from_uri(
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load a remote resource and parse to schema instance."""
-    headers = kwargs.setdefault("headers", {})
-    if "user-agent" not in {header.lower() for header in headers}:
-        kwargs["headers"]["User-Agent"] = USER_AGENT
+    _setup_headers(kwargs)
     if not base_url and port:
         base_url = str(URL(uri).with_port(port))
     response = requests.get(uri, **kwargs)
@@ -239,9 +237,7 @@ def from_wsgi(
     force_schema_version: Optional[str] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
-    headers = kwargs.setdefault("headers", {})
-    if "user-agent" not in {header.lower() for header in headers}:
-        kwargs["headers"]["User-Agent"] = USER_AGENT
+    _setup_headers(kwargs)
     client = Client(app, WSGIResponse)
     response = client.get(schema_path, **kwargs)
     # Raising exception to provide unified behavior
@@ -320,9 +316,7 @@ def from_asgi(
     force_schema_version: Optional[str] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
-    headers = kwargs.setdefault("headers", {})
-    if "user-agent" not in {header.lower() for header in headers}:
-        kwargs["headers"]["User-Agent"] = USER_AGENT
+    _setup_headers(kwargs)
     client = ASGIClient(app)
     response = client.get(schema_path, **kwargs)
     # Raising exception to provide unified behavior
@@ -342,3 +336,9 @@ def from_asgi(
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
     )
+
+
+def _setup_headers(kwargs: Dict[str, Any]) -> None:
+    headers = kwargs.setdefault("headers", {})
+    if "user-agent" not in {header.lower() for header in headers}:
+        kwargs["headers"]["User-Agent"] = USER_AGENT

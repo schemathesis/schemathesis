@@ -94,7 +94,7 @@ def test_update_pet(testdir):
     testdir.make_petstore_test(
         """
 @schema.parametrize(method="POST", endpoint="/pet/{petId}$")
-@settings(max_examples=5, deadline=None)
+@settings(max_examples=5, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
 def test_(request, case):
     assume(case.body is not None)
     assume("name" in case.body)
