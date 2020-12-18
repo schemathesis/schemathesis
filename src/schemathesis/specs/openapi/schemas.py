@@ -587,27 +587,21 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         :param endpoint: The tested endpoint for which the data was generated.
         :return: `files` and `data` values for `requests.request`.
         """
-        files, data = [], {}
+        files = []
         content = endpoint.definition.resolved["requestBody"]["content"]
-        if "multipart/form-data" in content:
-            schema = content["multipart/form-data"]["schema"]
-            is_multipart = True
-        else:
-            schema = next(iter(content.values()))["schema"]
-            is_multipart = False
+        # Open API 3.0 requires media types to be present. We can get here only if the schema defines
+        # the "multipart/form-data" media type
+        schema = content["multipart/form-data"]["schema"]
         for name, property_schema in schema.get("properties", {}).items():
             if name in form_data:
-                if is_multipart:
-                    if isinstance(form_data[name], list):
-                        files.extend([(name, item) for item in form_data[name]])
-                    elif property_schema.get("format") in ("binary", "base64"):
-                        files.append((name, form_data[name]))
-                    else:
-                        files.append((name, (None, form_data[name])))
+                if isinstance(form_data[name], list):
+                    files.extend([(name, item) for item in form_data[name]])
+                elif property_schema.get("format") in ("binary", "base64"):
+                    files.append((name, form_data[name]))
                 else:
-                    data[name] = form_data[name]
+                    files.append((name, (None, form_data[name])))
         # `None` is the default value for `files` and `data` arguments in `requests.request`
-        return files or None, data or None
+        return files or None, None
 
 
 def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
