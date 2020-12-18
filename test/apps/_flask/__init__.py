@@ -1,3 +1,4 @@
+import csv
 import json
 from collections import defaultdict
 from time import sleep
@@ -113,6 +114,18 @@ def create_openapi_app(
         if request.headers["Content-Type"] != "application/x-www-form-urlencoded":
             raise InternalServerError("Not an urlencoded request!")
         return jsonify({"size": request.content_length})
+
+    @app.route("/api/csv", methods=["POST"])
+    def csv_payload():
+        if request.headers["Content-Type"] != "text/csv":
+            raise InternalServerError("Expected text/csv payload")
+        data = request.get_data(as_text=True)
+        if data:
+            reader = csv.DictReader(data.splitlines())
+            data = list(reader)
+        else:
+            data = []
+        return jsonify(data)
 
     @app.route("/api/teapot", methods=["POST"])
     def teapot():

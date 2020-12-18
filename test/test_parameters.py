@@ -1,7 +1,5 @@
-import csv
 import datetime
 from copy import deepcopy
-from io import StringIO
 
 import pytest
 import yaml
@@ -461,61 +459,3 @@ def test_(case):
     )
     # Then the payload should be serialized as json
     testdir.run_and_assert(passed=1)
-
-
-def to_csv(data):
-    if not data:
-        return ""
-    output = StringIO()
-    field_names = sorted(data[0].keys())
-    writer = csv.DictWriter(output, field_names)
-    writer.writeheader()
-    writer.writerows(data)
-    return output.getvalue()
-
-
-@pytest.fixture
-def csv_serializer():
-    @schemathesis.serializers.register("text/csv")
-    class CSVSerializer:
-        def as_requests(self, context, value):
-            return {"data": to_csv(value)}
-
-        def as_werkzeug(self, context, value):
-            return {"data": to_csv(value)}
-
-    yield
-
-    schemathesis.serializers.unregister("text/csv")
-
-
-@pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("csv_payload")
-@pytest.mark.usefixtures("csv_serializer")
-def test_text_csv(schema_url):
-    # When API expects `text/csv`
-    # And the user registers a custom serializer for it
-
-    api_schema = schemathesis.from_uri(schema_url)
-
-    @given(case=api_schema["/csv"]["POST"].as_strategy())
-    @settings(max_examples=5)
-    def test(case):
-        response = case.call()
-        # Then this serializer should be used
-        case.validate_response(response)
-        # And data should be successfully sent to the API as CSV
-        assert response.json() == case.body
-
-    test()
-
-
-def test_register_incomplete_serializer():
-    # When register a new serializer without a required method
-    # Then you'll have a TypeError
-    with pytest.raises(TypeError, match="`CSVSerializer` is not a valid serializer."):
-
-        @schemathesis.serializers.register("text/csv")
-        class CSVSerializer:
-            def as_requests(self, context, value):
-                return {}
