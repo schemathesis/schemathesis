@@ -84,5 +84,5 @@ class GraphQLSchema(BaseSchema):
     def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
         return []
 
-    def get_hypothesis_conversion(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
+    def get_parameter_serializer(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
         return None

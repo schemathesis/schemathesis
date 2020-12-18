@@ -213,7 +213,7 @@ class BaseOpenAPISchema(BaseSchema):
     ) -> SearchStrategy:
         return get_case_strategy(endpoint, hooks, feedback, data_generation_method)
 
-    def get_hypothesis_conversion(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
+    def get_parameter_serializer(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
         definitions = [item for item in endpoint.definition.resolved.get("parameters", []) if item["in"] == location]
         security_parameters = self.security.get_security_definitions_as_parameters(
             self.raw_schema, endpoint, self.resolver, location
@@ -221,10 +221,10 @@ class BaseOpenAPISchema(BaseSchema):
         if security_parameters:
             definitions.extend(security_parameters)
         if definitions:
-            return self._get_hypothesis_conversion(definitions)
+            return self._get_parameter_serializer(definitions)
         return None
 
-    def _get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
+    def _get_parameter_serializer(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         raise NotImplementedError
 
     def _get_response_definitions(self, endpoint: Endpoint, response: GenericResponse) -> Optional[Dict[str, Any]]:
@@ -459,7 +459,7 @@ class SwaggerV20(BaseOpenAPISchema):
             return produces
         return self.raw_schema.get("produces", [])
 
-    def _get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
+    def _get_parameter_serializer(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         return serialization.serialize_swagger2_parameters(definitions)
 
     def prepare_multipart(
@@ -572,7 +572,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
             return []
         return list(definitions.get("content", {}).keys())
 
-    def _get_hypothesis_conversion(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
+    def _get_parameter_serializer(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         return serialization.serialize_openapi3_parameters(definitions)
 
     def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
