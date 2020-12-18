@@ -1,9 +1,16 @@
 import asyncio
 import cgi
+import csv
 import io
 from typing import Dict
 
 from aiohttp import web
+
+
+async def expect_content_type(request: web.Request, value: str):
+    if request.headers.get("Content-Type", "") != value:
+        raise web.HTTPInternalServerError(text=f"Expected {value} payload")
+    return await request.read()
 
 
 async def success(request: web.Request) -> web.Response:
@@ -36,6 +43,21 @@ async def recursive(request: web.Request) -> web.Response:
 
 async def text(request: web.Request) -> web.Response:
     return web.Response(body="Text response", content_type="text/plain")
+
+
+async def plain_text_body(request: web.Request) -> web.Response:
+    body = await expect_content_type(request, "text/plain")
+    return web.Response(body=body, content_type="text/plain")
+
+
+async def csv_payload(request: web.Request) -> web.Response:
+    body = await expect_content_type(request, "text/csv")
+    if body:
+        reader = csv.DictReader(body.decode().splitlines())
+        data = list(reader)
+    else:
+        data = []
+    return web.json_response(data)
 
 
 async def headers(request: web.Request) -> web.Response:

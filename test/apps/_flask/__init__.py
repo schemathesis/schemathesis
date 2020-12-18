@@ -1,3 +1,4 @@
+import csv
 import json
 from collections import defaultdict
 from time import sleep
@@ -11,6 +12,11 @@ try:
     from ..utils import Endpoint, OpenAPIVersion, make_openapi_schema
 except (ImportError, ValueError):
     from utils import Endpoint, OpenAPIVersion, make_openapi_schema
+
+
+def expect_content_type(value: str):
+    if request.headers["Content-Type"] != value:
+        raise InternalServerError(f"Expected {value} payload")
 
 
 def create_openapi_app(
@@ -110,9 +116,19 @@ def create_openapi_app(
 
     @app.route("/api/form", methods=["POST"])
     def form():
-        if request.headers["Content-Type"] != "application/x-www-form-urlencoded":
-            raise InternalServerError("Not an urlencoded request!")
+        expect_content_type("application/x-www-form-urlencoded")
         return jsonify({"size": request.content_length})
+
+    @app.route("/api/csv", methods=["POST"])
+    def csv_payload():
+        expect_content_type("text/csv")
+        data = request.get_data(as_text=True)
+        if data:
+            reader = csv.DictReader(data.splitlines())
+            data = list(reader)
+        else:
+            data = []
+        return jsonify(data)
 
     @app.route("/api/teapot", methods=["POST"])
     def teapot():
@@ -121,6 +137,11 @@ def create_openapi_app(
     @app.route("/api/text", methods=["GET"])
     def text():
         return Response("Text response", content_type="text/plain")
+
+    @app.route("/api/text", methods=["POST"])
+    def plain_text_body():
+        expect_content_type("text/plain")
+        return Response(request.data, content_type="text/plain")
 
     @app.route("/api/malformed_json", methods=["GET"])
     def malformed_json():

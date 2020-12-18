@@ -125,18 +125,25 @@ def test_(case):
 
 
 def test_form_data(testdir):
-    # When parameter is specified for "form_data"
+    # When parameter is specified for "formData"
     testdir.make_test(
         """
-@schema.parametrize()
+@schema.parametrize(method="POST")
 @settings(max_examples=1, deadline=None)
 def test_(case):
-    assert_str(case.form_data["status"])
+    assert_str(case.body["status"])
     assert_requests_call(case)
         """,
-        **as_param({"name": "status", "in": "formData", "required": True, "type": "string"}),
+        paths={
+            "/users": {
+                "post": {
+                    "parameters": [{"name": "status", "in": "formData", "required": True, "type": "string"}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
     )
-    # Then the generated test case should contain it in its `form_data` attribute
+    # Then the generated test case should contain it in its `body` attribute
     testdir.run_and_assert(passed=1)
 
 
@@ -216,13 +223,22 @@ def test_(case):
 
 
 def _assert_parameter(schema, schema_spec, location, expected=None):
-    expected = expected if expected is not None else [{"in": location, "name": "api_key", "type": "string"}]
     # When security definition is defined as "apiKey"
     schema = schemathesis.from_dict(schema)
     if schema_spec == "swagger":
         endpoint = schema["/users"]["get"]
+        expected = (
+            expected
+            if expected is not None
+            else [{"in": location, "name": "api_key", "type": "string", "required": True}]
+        )
     else:
         endpoint = schema["/query"]["get"]
+        expected = (
+            expected
+            if expected is not None
+            else [{"in": location, "name": "api_key", "schema": {"type": "string"}, "required": True}]
+        )
     parameters = schema.security.get_security_definitions_as_parameters(
         schema.raw_schema, endpoint, schema.resolver, location
     )
@@ -395,4 +411,51 @@ def test_(case):
     )
     # Then an error should be propagated with a relevant error message
     result = testdir.run_and_assert(failed=1)
-    result.stdout.re_match_lines([r"E   Failed: Body parameters are defined for GET request."])
+    result.stdout.re_match_lines(
+        [r"E +schemathesis.exceptions.InvalidSchema: Body parameters are defined for GET request."]
+    )
+
+
+def test_json_media_type(testdir):
+    # When endpoint expects a JSON-compatible media type
+    testdir.make_test(
+        """
+@settings(max_examples=10, deadline=None)
+@schema.parametrize()
+def test_(case):
+    kwargs = case.as_requests_kwargs()
+    assert kwargs["headers"]["Content-Type"] == "application/problem+json"
+    assert "key" in kwargs["json"]
+    assert_requests_call(case)
+        """,
+        schema={
+            "openapi": "3.0.2",
+            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+            "paths": {
+                "/users": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/problem+json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"key": {"type": "string"}},
+                                        "required": ["key"],
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {
+                            "200": {
+                                "description": "OK",
+                                "content": {"application/problem+json": {"schema": {"type": "object"}}},
+                            }
+                        },
+                    }
+                }
+            },
+        },
+    )
+    # Then the payload should be serialized as json
+    testdir.run_and_assert(passed=1)

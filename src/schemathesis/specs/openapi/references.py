@@ -72,8 +72,8 @@ class ConvertingResolver(jsonschema.RefResolver):
         """Recursively resolve all references in the given object."""
         if recursion_level > RECURSION_DEPTH_LIMIT:
             return item
+        item = deepcopy(item)
         if isinstance(item, dict):
-            item = self.prepare(item)
             if "$ref" in item and isinstance(item["$ref"], str):
                 with self.resolving(item["$ref"]) as resolved:
                     return self.resolve_all(resolved, recursion_level + 1)
@@ -93,7 +93,3 @@ class ConvertingResolver(jsonschema.RefResolver):
                 new_scope, definition = deepcopy(self.resolve(definition["$ref"]))
             scopes.append(new_scope)
         return scopes, definition
-
-    def prepare(self, item: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse schema extension, e.g. "x-nullable" field."""
-        return to_json_schema(item, self.nullable_name)

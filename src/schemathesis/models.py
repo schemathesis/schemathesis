@@ -6,18 +6,38 @@ from contextlib import contextmanager
 from copy import deepcopy
 from enum import IntEnum
 from logging import LogRecord
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, Iterator, List, Optional, Sequence, Tuple, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    Generic,
+    Iterator,
+    List,
+    NoReturn,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import attr
 import curlify
 import requests
 import werkzeug
+from hypothesis import event, note, reject
 from hypothesis.strategies import SearchStrategy
 from starlette.testclient import TestClient as ASGIClient
 
+from . import serializers
 from .constants import USER_AGENT, DataGenerationMethod
 from .exceptions import CheckFailed, InvalidSchema, get_grouped_exception
+from .parameters import Parameter, ParameterSet, PayloadAlternatives
+from .serializers import Serializer, SerializerContext
 from .types import Body, Cookies, FormData, Headers, PathParameters, Query
 from .utils import GenericResponse, WSGIResponse, get_response_payload
 
@@ -41,6 +61,18 @@ class CaseSource:
     response: GenericResponse = attr.ib()  # pragma: no mutate
 
 
+def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
+    """Reject the current example if we don't know how to send this data to the application."""
+    event_text = f"Can't serialize data to `{media_type}`."
+    note(
+        f"{event_text}. "
+        f"You can register your own serializer with `schemathesis.serializers.register` and Schemathesis will be able "
+        f"to make API calls with this media type."
+    )
+    event(event_text)
+    reject()  # type: ignore
+
+
 @attr.s(slots=True, repr=False)  # pragma: no mutate
 class Case:  # pylint: disable=too-many-public-methods
     """A single test case parameters."""
@@ -51,15 +83,16 @@ class Case:  # pylint: disable=too-many-public-methods
     cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
     query: Optional[Query] = attr.ib(default=None)  # pragma: no mutate
     body: Optional[Body] = attr.ib(default=None)  # pragma: no mutate
-    form_data: Optional[FormData] = attr.ib(default=None)  # pragma: no mutate
 
-    feedback: "Feedback" = attr.ib(default=None)  # pragma: no mutate
+    feedback: Optional["Feedback"] = attr.ib(default=None)  # pragma: no mutate
     source: Optional[CaseSource] = attr.ib(default=None)  # pragma: no mutate
+    # The media type for cases with a payload. For example, "application/json"
+    media_type: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
     def __repr__(self) -> str:
         parts = [f"{self.__class__.__name__}("]
         first = True
-        for name in ("path_parameters", "headers", "cookies", "query", "body", "form_data"):
+        for name in ("path_parameters", "headers", "cookies", "query", "body"):
             value = getattr(self, name)
             if value is not None:
                 if first:
@@ -121,7 +154,6 @@ class Case:  # pylint: disable=too-many-public-methods
             "Cookies": self.cookies,
             "Query": self.query,
             "Body": self.body,
-            "Form data": self.form_data,
         }
         max_length = max(map(len, output))
         template = f"{{:<{max_length}}} : {{}}"
@@ -191,23 +223,33 @@ class Case:  # pylint: disable=too-many-public-methods
             final_headers["User-Agent"] = USER_AGENT
         return final_headers
 
+    def _get_serializer(self) -> Optional[Serializer]:
+        """Get a serializer for the payload, if there is any."""
+        if self.media_type is not None:
+            cls = serializers.get(self.media_type)
+            if cls is None:
+                cant_serialize(self.media_type)
+            return cls()
+        return None
+
     def as_requests_kwargs(
         self, base_url: Optional[str] = None, headers: Optional[Dict[str, str]] = None
     ) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by requests."""
         final_headers = self._get_headers(headers)
+        if self.media_type and self.media_type != "multipart/form-data":
+            # `requests` will handle multipart form headers with the proper `boundary` value.
+            final_headers["Content-Type"] = self.media_type
         base_url = self._get_base_url(base_url)
         formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
         url = urljoin(base_url + "/", formatted_path)
-        # Form data and body are mutually exclusive
-        extra: Dict[str, Optional[Body]]
-        if self.form_data:
-            files, data = self.endpoint.prepare_multipart(self.form_data)
-            extra = {"files": files, "data": data}
-        elif is_multipart(self.body):
-            extra = {"data": self.body}
+        extra: Dict[str, Any]
+        serializer = self._get_serializer()
+        if serializer is not None:
+            context = SerializerContext(case=self)
+            extra = serializer.as_requests(context, self.body)
         else:
-            extra = {"json": self.body}
+            extra = {}
         return {
             "method": self.method,
             "url": url,
@@ -247,16 +289,15 @@ class Case:  # pylint: disable=too-many-public-methods
     def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
         final_headers = self._get_headers(headers)
-        extra: Dict[str, Optional[Body]]
-        if self.form_data:
-            extra = {"data": self.form_data}
-            final_headers = final_headers or {}
-            if "multipart/form-data" in self.endpoint.get_request_payload_content_types():
-                final_headers.setdefault("Content-Type", "multipart/form-data")
-        elif is_multipart(self.body):
-            extra = {"data": self.body}
+        if self.media_type:
+            final_headers["Content-Type"] = self.media_type
+        extra: Dict[str, Any]
+        serializer = self._get_serializer()
+        if serializer is not None:
+            context = SerializerContext(case=self)
+            extra = serializer.as_werkzeug(context, self.body)
         else:
-            extra = {"json": self.body}
+            extra = {}
         return {
             "method": self.method,
             "path": self.endpoint.schema.get_full_path(self.formatted_path),
@@ -352,29 +393,7 @@ class Case:  # pylint: disable=too-many-public-methods
             cookies=deepcopy(self.cookies),
             query=deepcopy(self.query),
             body=deepcopy(self.body),
-            form_data=deepcopy(self.form_data),
         )
-
-
-def is_multipart(item: Optional[Body]) -> bool:
-    """A poor detection if the body should be a multipart request.
-
-    It traverses the structure and if it contains bytes in any value, then it is a multipart request, because
-    it may happen only if there was `format: binary`, which usually is in multipart payloads.
-    Probably a better way would be checking actual content types defined in `requestBody` and drive behavior based on
-    that fact.
-    """
-    if isinstance(item, bytes):
-        return True
-    if isinstance(item, dict):
-        for value in item.values():
-            if is_multipart(value):
-                return True
-    if isinstance(item, list):
-        for value in item:
-            if is_multipart(value):
-                return True
-    return False
 
 
 @contextmanager
@@ -390,10 +409,6 @@ def cookie_handler(client: werkzeug.Client, cookies: Optional[Cookies]) -> Gener
             client.delete_cookie("localhost", key)
 
 
-def empty_object() -> Dict[str, Any]:
-    return {"properties": {}, "additionalProperties": False, "type": "object", "required": []}
-
-
 @attr.s(slots=True)  # pragma: no mutate
 class EndpointDefinition:
     """A wrapper to store not resolved endpoint definitions.
@@ -406,11 +421,14 @@ class EndpointDefinition:
     raw: Dict[str, Any] = attr.ib()  # pragma: no mutate
     resolved: Dict[str, Any] = attr.ib()  # pragma: no mutate
     scope: str = attr.ib()  # pragma: no mutate
-    parameters: List[Dict[str, Any]] = attr.ib()  # pragma: no mutate
+    parameters: Sequence[Parameter] = attr.ib()  # pragma: no mutate
 
 
-@attr.s(slots=True)  # pragma: no mutate
-class Endpoint:
+P = TypeVar("P", bound=Parameter)
+
+
+@attr.s  # pragma: no mutate
+class Endpoint(Generic[P]):
     """A container that could be used for test cases generation."""
 
     # `path` does not contain `basePath`
@@ -422,12 +440,11 @@ class Endpoint:
     schema: "BaseSchema" = attr.ib()  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
-    path_parameters: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
-    headers: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
-    cookies: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
-    query: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
-    body: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
-    form_data: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
+    path_parameters: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
+    headers: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
+    cookies: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
+    query: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
+    body: PayloadAlternatives[P] = attr.ib(factory=PayloadAlternatives)  # pragma: no mutate
 
     @property
     def verbose_name(self) -> str:
@@ -440,6 +457,27 @@ class Endpoint:
     @property
     def links(self) -> Dict[str, Dict[str, Any]]:
         return self.schema.get_links(self)
+
+    def add_parameter(self, parameter: P) -> None:
+        """Add a new processed parameter to an endpoint.
+
+        :param parameter: A parameter that will be used with this endpoint.
+        :rtype: None
+        """
+        lookup_table = {
+            "path": self.path_parameters,
+            "header": self.headers,
+            "cookie": self.cookies,
+            "query": self.query,
+            "body": self.body,
+        }
+        # If the parameter has a typo, then by default, there will be an error from `jsonschema` earlier.
+        # But if the user wants to skip schema validation, we choose to ignore a malformed parameter.
+        # In this case, we still might generate some tests for an endpoint, but without this parameter, which is better
+        # than skip the whole endpoint from testing.
+        if parameter.location in lookup_table:
+            container = lookup_table[parameter.location]
+            container.add(parameter)
 
     def as_strategy(
         self,
@@ -480,7 +518,6 @@ class Endpoint:
             cookies=deepcopy(self.cookies),
             query=deepcopy(self.query),
             body=deepcopy(self.body),
-            form_data=deepcopy(self.form_data),
         )
 
     def clone(self, **components: Any) -> "Endpoint":
@@ -497,7 +534,6 @@ class Endpoint:
             headers=components["headers"],
             cookies=components["cookies"],
             body=components["body"],
-            form_data=self.form_data,
         )
 
     def make_case(
@@ -508,7 +544,6 @@ class Endpoint:
         cookies: Optional[Cookies] = None,
         query: Optional[Query] = None,
         body: Optional[Body] = None,
-        form_data: Optional[FormData] = None,
     ) -> Case:
         return Case(
             endpoint=self,
@@ -517,7 +552,6 @@ class Endpoint:
             cookies=cookies,
             query=query,
             body=body,
-            form_data=form_data,
         )
 
     @property

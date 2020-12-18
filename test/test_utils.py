@@ -6,6 +6,7 @@ from schemathesis.utils import (
     are_content_types_equal,
     dict_true_values,
     import_app,
+    is_json_media_type,
     is_schemathesis_test,
     parse_content_type,
 )
@@ -31,13 +32,26 @@ def test_dict_true_values(input_dict, expected_dict):
     "value, expected",
     (
         ("text/plain", ("text", "plain")),
-        ("application/json+problem", ("application", "json+problem")),
+        ("application/problem+json", ("application", "problem+json")),
         ("application/json;charset=utf-8", ("application", "json")),
         ("application/json/random", ("application", "json/random")),
     ),
 )
 def test_parse_content_type(value, expected):
     assert parse_content_type(value) == expected
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    (
+        ("application/problem+json", True),
+        ("application/json", True),
+        ("application/xml", False),
+        ("text/plain", False),
+    ),
+)
+def test_is_json_media_type(value, expected):
+    assert is_json_media_type(value) is expected
 
 
 @pytest.mark.parametrize(

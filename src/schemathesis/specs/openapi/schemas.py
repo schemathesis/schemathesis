@@ -5,7 +5,7 @@ from contextlib import ExitStack, contextmanager
 from copy import deepcopy
 from difflib import get_close_matches
 from json import JSONDecodeError
-from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Sequence, Tuple, Type, Union
 from urllib.parse import urlsplit
 
 import jsonschema
@@ -20,7 +20,7 @@ from ...exceptions import (
     get_schema_validation_error,
 )
 from ...hooks import HookContext, HookDispatcher
-from ...models import Case, Endpoint, EndpointDefinition, empty_object
+from ...models import Case, Endpoint, EndpointDefinition
 from ...schemas import BaseSchema
 from ...stateful import APIStateMachine, Feedback, Stateful, StatefulTest
 from ...types import FormData
@@ -36,6 +36,14 @@ from .filters import (
     should_skip_endpoint,
     should_skip_method,
 )
+from .parameters import (
+    OpenAPI20Body,
+    OpenAPI20CompositeBody,
+    OpenAPI20Parameter,
+    OpenAPI30Body,
+    OpenAPI30Parameter,
+    OpenAPIParameter,
+)
 from .references import ConvertingResolver
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
@@ -46,6 +54,7 @@ class BaseOpenAPISchema(BaseSchema):
     links_field: str
     operations: Tuple[str, ...]
     security: BaseSecurityProcessor
+    parameter_cls: Type[OpenAPIParameter]
     _endpoints_by_operation_id: Dict[str, Endpoint]
 
     @property  # pragma: no mutate
@@ -87,13 +96,26 @@ class BaseOpenAPISchema(BaseSchema):
                         or should_skip_by_operation_id(resolved_definition.get("operationId"), self.operation_id)
                     ):
                         continue
-                    parameters = list(itertools.chain(resolved_definition.get("parameters", ()), common_parameters))
+                    parameters = self.collect_parameters(
+                        itertools.chain(resolved_definition.get("parameters", ()), common_parameters),
+                        resolved_definition,
+                    )
                     # To prevent recursion errors we need to pass not resolved schema as well
                     # It could be used for response validation
                     raw_definition = EndpointDefinition(raw_methods[method], resolved_definition, scope, parameters)
-                    yield self.make_endpoint(path, method, parameters, resolved_definition, raw_definition)
+                    yield self.make_endpoint(path, method, parameters, raw_definition)
         except (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError) as exc:
             raise InvalidSchema("Schema parsing failed. Please check your schema.") from exc
+
+    def collect_parameters(
+        self, parameters: Iterable[Dict[str, Any]], endpoint_definition: Dict[str, Any]
+    ) -> List[OpenAPIParameter]:
+        """Collect Open API parameters.
+
+        They should be used uniformly during the generation step; therefore, we need to convert them into
+        a spec-independent list of parameters.
+        """
+        raise NotImplementedError
 
     def _resolve_methods(self, methods: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         # We need to know a proper scope in what methods are.
@@ -107,13 +129,12 @@ class BaseOpenAPISchema(BaseSchema):
         self,
         path: str,
         method: str,
-        parameters: List[Dict[str, Any]],
-        resolved_definition: Dict[str, Any],
+        parameters: List[OpenAPIParameter],
         raw_definition: EndpointDefinition,
     ) -> Endpoint:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         base_url = self.get_base_url()
-        endpoint = Endpoint(
+        endpoint: Endpoint[OpenAPIParameter] = Endpoint(
             path=path,
             method=method,
             definition=raw_definition,
@@ -122,18 +143,9 @@ class BaseOpenAPISchema(BaseSchema):
             schema=self,
         )
         for parameter in parameters:
-            self.process_parameter(endpoint, parameter)
+            endpoint.add_parameter(parameter)
         self.security.process_definitions(self.raw_schema, endpoint, self.resolver)
         return endpoint
-
-    def process_parameter(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        """Convert each Parameter object to a JSON schema."""
-        parameter = deepcopy(parameter)
-        parameter = self.resolver.resolve_all(parameter)
-        self.process_by_type(endpoint, parameter)
-
-    def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        raise NotImplementedError
 
     @property
     def resolver(self) -> ConvertingResolver:
@@ -168,11 +180,11 @@ class BaseOpenAPISchema(BaseSchema):
             for method, resolved_definition in methods.items():
                 if method not in self.operations or "operationId" not in resolved_definition:
                     continue
-                parameters = list(itertools.chain(resolved_definition.get("parameters", ()), common_parameters))
-                raw_definition = EndpointDefinition(raw_methods[method], resolved_definition, scope, parameters)
-                yield resolved_definition["operationId"], self.make_endpoint(
-                    path, method, parameters, resolved_definition, raw_definition
+                parameters = self.collect_parameters(
+                    itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
                 )
+                raw_definition = EndpointDefinition(raw_methods[method], resolved_definition, scope, parameters)
+                yield resolved_definition["operationId"], self.make_endpoint(path, method, parameters, raw_definition)
 
     def get_endpoint_by_reference(self, reference: str) -> Endpoint:
         """Get local or external `Endpoint` instance by reference.
@@ -186,9 +198,11 @@ class BaseOpenAPISchema(BaseSchema):
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
         _, methods = self.resolver.resolve(parent_ref)
         common_parameters = get_common_parameters(methods)
-        parameters = list(itertools.chain(resolved_definition.get("parameters", ()), common_parameters))
+        parameters = self.collect_parameters(
+            itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
+        )
         raw_definition = EndpointDefinition(data, resolved_definition, scope, parameters)
-        return self.make_endpoint(path, method, parameters, resolved_definition, raw_definition)
+        return self.make_endpoint(path, method, parameters, raw_definition)
 
     def get_case_strategy(
         self,
@@ -364,11 +378,16 @@ def in_scopes(resolver: jsonschema.RefResolver, scopes: List[str]) -> Generator[
         yield
 
 
+OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE = "application/json"
+OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE = "multipart/form-data"
+
+
 class SwaggerV20(BaseOpenAPISchema):
     nullable_name = "x-nullable"
     example_field = "x-example"
     examples_field = "x-examples"
     operations: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
+    parameter_cls: Type[OpenAPIParameter] = OpenAPI20Parameter
     security = SwaggerSecurityProcessor()
     links_field = "x-links"
 
@@ -383,62 +402,47 @@ class SwaggerV20(BaseOpenAPISchema):
     def _get_base_path(self) -> str:
         return self.raw_schema.get("basePath", "/")
 
+    def collect_parameters(
+        self, parameters: Iterable[Dict[str, Any]], endpoint_definition: Dict[str, Any]
+    ) -> List[OpenAPIParameter]:
+        # The main difference with Open API 3.0 is that it has `body` and `form` parameters that we need to handle
+        # differently.
+        collected: List[OpenAPIParameter] = []
+        # NOTE. The Open API 2.0 spec doesn't strictly imply having media types in the "consumes" keyword.
+        # It is not enforced by the meta schema and has no "MUST" verb in the spec text.
+        # Also, not every API has operations with payload (they might have only GET endpoints without payloads).
+        # For these reasons, it might be (and often is) absent, and we need to provide the proper media type in case
+        # we have operations with a payload.
+        media_types = self._get_consumes_for_endpoint(endpoint_definition)
+        # For `in=body` parameters, we imply `application/json` as the default media type because it is the most common.
+        body_media_types = media_types or (OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE,)
+        # If an endpoint has parameters with `in=formData`, Schemathesis should know how to serialize it.
+        # We can't be 100% sure what media type is expected by the server and chose `multipart/form-data` as
+        # the default because it is broader since it allows us to upload files.
+        form_data_media_types = media_types or (OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE,)
+
+        form_parameters = []
+        for parameter in parameters:
+            if parameter["in"] == "formData":
+                # We need to gather form parameters first before creating a composite parameter for them
+                form_parameters.append(parameter)
+            elif parameter["in"] == "body":
+                for media_type in body_media_types:
+                    collected.append(OpenAPI20Body(definition=parameter, media_type=media_type))
+            else:
+                collected.append(OpenAPI20Parameter(definition=parameter))
+
+        if form_parameters:
+            for media_type in form_data_media_types:
+                collected.append(
+                    # Individual `formData` parameters are joined into a single "composite" one.
+                    OpenAPI20CompositeBody.from_parameters(*form_parameters, media_type=media_type)
+                )
+        return collected
+
     def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
         """Get examples from the endpoint."""
         return get_strategies_from_examples(endpoint, self.examples_field)
-
-    def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        if parameter["in"] == "path":
-            self.process_path(endpoint, parameter)
-        elif parameter["in"] == "query":
-            self.process_query(endpoint, parameter)
-        elif parameter["in"] == "header":
-            self.process_header(endpoint, parameter)
-        elif parameter["in"] == "body":
-            # Could be only one parameter with "in=body"
-            self.process_body(endpoint, parameter)
-        elif parameter["in"] == "formData":
-            self.process_form_data(endpoint, parameter)
-
-    def process_path(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        endpoint.path_parameters = self.add_parameter(endpoint.path_parameters, parameter)
-
-    def process_header(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        endpoint.headers = self.add_parameter(endpoint.headers, parameter)
-
-    def process_query(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        endpoint.query = self.add_parameter(endpoint.query, parameter)
-
-    def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        # "schema" is a required field
-        endpoint.body = parameter["schema"]
-
-    def process_form_data(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        endpoint.form_data = self.add_parameter(endpoint.form_data, parameter)
-
-    def add_parameter(self, container: Optional[Dict[str, Any]], parameter: Dict[str, Any]) -> Dict[str, Any]:
-        """Add parameter object to the container."""
-        name = parameter["name"]
-        container = container or empty_object()
-        container["properties"][name] = self.parameter_to_json_schema(parameter)
-        if parameter.get("required", False):
-            container["required"].append(name)
-        return self.add_examples(container, parameter)
-
-    def add_examples(self, container: Dict[str, Any], parameter: Dict[str, Any]) -> Dict[str, Any]:
-        if self.example_field in parameter:
-            examples = container.setdefault("example", {})  # examples should be merged together
-            examples[parameter["name"]] = parameter[self.example_field]
-        return container
-
-    def parameter_to_json_schema(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Convert Parameter object to a JSON schema."""
-        return {
-            key: value
-            for key, value in data.items()
-            # Do not include keys not supported by JSON schema
-            if not (key == "required" and not isinstance(value, list))
-        }
 
     def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
         scopes, definition = self.resolver.resolve_in_scope(deepcopy(definition), scope)
@@ -461,28 +465,51 @@ class SwaggerV20(BaseOpenAPISchema):
     def prepare_multipart(
         self, form_data: FormData, endpoint: Endpoint
     ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
+        """Prepare form data for sending with `requests`.
+
+        :param form_data: Raw generated data as a dictionary.
+        :param endpoint: The tested endpoint for which the data was generated.
+        :return: `files` and `data` values for `requests.request`.
+        """
         files, data = [], {}
         # If there is no content types specified for the request or "application/x-www-form-urlencoded" is specified
         # explicitly, then use it., but if "multipart/form-data" is specified, then use it
-        consumes = self.get_request_payload_content_types(endpoint)
-        is_multipart = "multipart/form-data" in consumes
-        for parameter in endpoint.definition.resolved.get("parameters", ()):
-            name = parameter["name"]
-            if name in form_data:
-                if parameter["in"] == "formData" and (is_file(parameter) or is_multipart):
-                    if isinstance(form_data[name], list):
-                        for item in form_data[name]:
-                            files.append((name, (None, item)))
-                    else:
-                        files.append((name, form_data[name]))
-                else:
-                    data[name] = form_data[name]
+        content_types = self.get_request_payload_content_types(endpoint)
+        is_multipart = "multipart/form-data" in content_types
+
+        def add_file(file_value: Any) -> None:
+            if isinstance(file_value, list):
+                for item in file_value:
+                    files.append((name, (None, item)))
+            else:
+                files.append((name, file_value))
+
+        for parameter in endpoint.definition.parameters:
+            if isinstance(parameter, OpenAPI20CompositeBody):
+                for form_parameter in parameter.definition:
+                    name = form_parameter.name
+                    # It might be not in `form_data`, if the parameter is optional
+                    if name in form_data:
+                        value = form_data[name]
+                        if form_parameter.definition.get("type") == "file" or is_multipart:
+                            add_file(value)
+                        else:
+                            data[name] = value
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, data or None
 
     def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
-        global_consumes = endpoint.schema.raw_schema.get("consumes", [])
-        consumes = endpoint.definition.resolved.get("consumes", [])
+        return self._get_consumes_for_endpoint(endpoint.definition.resolved)
+
+    def _get_consumes_for_endpoint(self, endpoint_definition: Dict[str, Any]) -> List[str]:
+        """Get the `consumes` value for the given endpoint.
+
+        :param endpoint_definition: Raw endpoint definition.
+        :return: A list of media-types for this endpoint.
+        :rtype: List[str]
+        """
+        global_consumes = self.raw_schema.get("consumes", [])
+        consumes = endpoint_definition.get("consumes", [])
         if not consumes:
             consumes = global_consumes
         return consumes
@@ -494,6 +521,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     examples_field = "examples"
     operations = SwaggerV20.operations + ("trace",)
     security = OpenAPISecurityProcessor()
+    parameter_cls = OpenAPI30Parameter
     links_field = "links"
 
     @property
@@ -513,61 +541,16 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
             return urlsplit(url).path
         return "/"
 
-    def make_endpoint(
-        self,
-        path: str,
-        method: str,
-        parameters: List[Dict[str, Any]],
-        resolved_definition: Dict[str, Any],
-        raw_definition: EndpointDefinition,
-    ) -> Endpoint:
-        """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
-        endpoint = super().make_endpoint(path, method, parameters, resolved_definition, raw_definition)
-        if "requestBody" in resolved_definition:
-            self.process_body(endpoint, resolved_definition["requestBody"])
-        return endpoint
-
-    def process_by_type(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        if parameter["in"] == "cookie":
-            self.process_cookie(endpoint, parameter)
-        else:
-            super().process_by_type(endpoint, parameter)
-
-    def add_examples(self, container: Dict[str, Any], parameter: Dict[str, Any]) -> Dict[str, Any]:
-        schema = get_schema_from_parameter(parameter)
-        if self.example_field in schema:
-            examples = container.setdefault("example", {})  # examples should be merged together
-            examples[parameter["name"]] = schema[self.example_field]
-        # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#parameter-object
-        # > Furthermore, if referencing a schema which contains an example,
-        # > the example value SHALL override the example provided by the schema
-        return super().add_examples(container, parameter)
-
-    def process_cookie(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        endpoint.cookies = self.add_parameter(endpoint.cookies, parameter)
-
-    def process_body(self, endpoint: Endpoint, parameter: Dict[str, Any]) -> None:
-        # Take the first media type object
-        options = iter(parameter["content"].items())
-        try:
-            content_type, parameter = next(options)
-        except StopIteration:
-            # empty "content" value
-            return None
-        # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#media-type-object
-        # > Furthermore, if referencing a schema which contains an example,
-        # > the example value SHALL override the example provided by the schema
-        if "example" in parameter:
-            schema = get_schema_from_parameter(parameter)
-            schema["example"] = parameter["example"]
-        if content_type in ("multipart/form-data", "application/x-www-form-urlencoded"):
-            endpoint.form_data = parameter["schema"]
-        else:
-            super().process_body(endpoint, parameter)
-
-    def parameter_to_json_schema(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        schema = get_schema_from_parameter(data)
-        return super().parameter_to_json_schema(schema)
+    def collect_parameters(
+        self, parameters: Iterable[Dict[str, Any]], endpoint_definition: Dict[str, Any]
+    ) -> List[OpenAPIParameter]:
+        # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
+        collected: List[OpenAPIParameter] = [OpenAPI30Parameter(definition=parameter) for parameter in parameters]
+        if "requestBody" in endpoint_definition:
+            required = endpoint_definition["requestBody"].get("required", False)
+            for media_type, definition in endpoint_definition["requestBody"]["content"].items():
+                collected.append(OpenAPI30Body(definition, media_type=media_type, required=required))
+        return collected
 
     def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
         scopes, definition = self.resolver.resolve_in_scope(deepcopy(definition), scope)
@@ -598,31 +581,27 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     def prepare_multipart(
         self, form_data: FormData, endpoint: Endpoint
     ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
-        files, data = [], {}
+        """Prepare form data for sending with `requests`.
+
+        :param form_data: Raw generated data as a dictionary.
+        :param endpoint: The tested endpoint for which the data was generated.
+        :return: `files` and `data` values for `requests.request`.
+        """
+        files = []
         content = endpoint.definition.resolved["requestBody"]["content"]
-        if "multipart/form-data" in content:
-            schema = content["multipart/form-data"]["schema"]
-            is_multipart = True
-        else:
-            schema = next(iter(content.values()))["schema"]
-            is_multipart = False
+        # Open API 3.0 requires media types to be present. We can get here only if the schema defines
+        # the "multipart/form-data" media type
+        schema = content["multipart/form-data"]["schema"]
         for name, property_schema in schema.get("properties", {}).items():
             if name in form_data:
-                if is_multipart:
-                    if isinstance(form_data[name], list):
-                        files.extend([(name, item) for item in form_data[name]])
-                    elif is_file(property_schema):
-                        files.append((name, form_data[name]))
-                    else:
-                        files.append((name, (None, form_data[name])))
+                if isinstance(form_data[name], list):
+                    files.extend([(name, item) for item in form_data[name]])
+                elif property_schema.get("format") in ("binary", "base64"):
+                    files.append((name, form_data[name]))
                 else:
-                    data[name] = form_data[name]
+                    files.append((name, (None, form_data[name])))
         # `None` is the default value for `files` and `data` arguments in `requests.request`
-        return files or None, data or None
-
-
-def is_file(schema: Dict[str, Any]) -> bool:
-    return schema.get("format") in ("binary", "base64")
+        return files or None, None
 
 
 def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -634,11 +613,3 @@ def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
     if common_parameters is not None:
         return deepcopy(common_parameters)
     return []
-
-
-def get_schema_from_parameter(data: Dict[str, Any]) -> Dict[str, Any]:
-    # In Open API 3.0 there could be "schema" or "content" field. They are mutually exclusive.
-    if "schema" in data:
-        return data["schema"]
-    options = iter(data["content"].values())
-    return next(options)["schema"]

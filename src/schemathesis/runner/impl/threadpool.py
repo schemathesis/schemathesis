@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Uni
 import attr
 import hypothesis
 
-from ..._hypothesis import make_test_or_exception
+from ..._hypothesis import create_test
 from ...models import CheckFunction, TestResultSet
 from ...stateful import Feedback, Stateful
 from ...targets import Target
@@ -52,7 +52,17 @@ def _run_task(
     with capture_hypothesis_output():
         while not tasks_queue.empty():
             endpoint, data_generation_method = tasks_queue.get()
-            items = (endpoint, data_generation_method, make_test_or_exception(endpoint, test_template, settings, seed))
+            items = (
+                endpoint,
+                data_generation_method,
+                create_test(
+                    endpoint=endpoint,
+                    test=test_template,
+                    settings=settings,
+                    seed=seed,
+                    data_generation_method=data_generation_method,
+                ),
+            )
             # This lambda ignores the input arguments to support the same interface for `feedback.get_stateful_tests`
             _run_tests(lambda *_: (items,))
 

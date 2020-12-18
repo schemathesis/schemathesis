@@ -115,6 +115,8 @@ By default, the server will generate an API schema with the following endpoints:
 - ``POST /api/form`` - accepts ``application/x-www-form-urlencoded`` payload
 - ``POST /api/teapot`` - returns 418 status code that is not listed in the schema
 - ``GET /api/text`` - returns ``text/plain`` responses, which are not declared in the schema
+- ``POST /api/text`` - expects payload as ``text/plain``
+- ``POST /api/csv`` - expects payload as ``text/csv`` and returns its equivalent in JSON.
 - ``GET /api/malformed_json`` - returns malformed JSON with ``application/json`` content type header
 - ``GET /api/custom_format`` - accepts a string in the custom "digits" format. This endpoint is used to verify custom string formats
 - ``GET /api/headers`` - returns the passed headers

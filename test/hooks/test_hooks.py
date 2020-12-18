@@ -241,7 +241,7 @@ def test_before_process_path_hook(schema):
     @schema.hooks.register
     def before_process_path(context, path, methods):
         methods["get"]["parameters"][0]["name"] = "foo"
-        methods["get"]["parameters"][0]["const"] = "bar"
+        methods["get"]["parameters"][0]["enum"] = ["bar"]
 
     strategy = schema.endpoints["/custom_format"]["GET"].as_strategy()
 

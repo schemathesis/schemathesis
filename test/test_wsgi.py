@@ -76,7 +76,7 @@ def test_form_data(schema):
         response = case.call_wsgi()
         assert response.status_code == 200
         # converted to string in the app
-        assert response.json == {key: str(value) for key, value in case.form_data.items()}
+        assert response.json == {key: str(value) for key, value in case.body.items()}
 
     test()
 

@@ -8,7 +8,6 @@ from hypothesis.strategies import SearchStrategy
 from hypothesis.utils.conventions import InferType
 
 from .constants import DEFAULT_DEADLINE, DataGenerationMethod
-from .exceptions import InvalidSchema
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import Case, Endpoint
 from .stateful import Feedback, Stateful
@@ -57,21 +56,6 @@ def setup_default_deadline(wrapped_test: Callable) -> None:
     if existing_settings is not None and existing_settings.deadline == hypothesis.settings.default.deadline:
         new_settings = hypothesis.settings(existing_settings, deadline=DEFAULT_DEADLINE)
         wrapped_test._hypothesis_internal_use_settings = new_settings  # type: ignore
-
-
-def make_test_or_exception(
-    endpoint: Endpoint,
-    func: Callable,
-    settings: Optional[hypothesis.settings] = None,
-    seed: Optional[int] = None,
-    data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
-) -> Union[Callable, InvalidSchema]:
-    try:
-        return create_test(
-            endpoint=endpoint, test=func, settings=settings, seed=seed, data_generation_method=data_generation_method
-        )
-    except InvalidSchema as exc:
-        return exc
 
 
 def make_async_test(test: Callable) -> Callable:

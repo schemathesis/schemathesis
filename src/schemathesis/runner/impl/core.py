@@ -98,7 +98,7 @@ class BaseRunner:
 
 def run_test(  # pylint: disable=too-many-locals
     endpoint: Endpoint,
-    test: Union[Callable, InvalidSchema],
+    test: Callable,
     checks: Iterable[CheckFunction],
     data_generation_method: DataGenerationMethod,
     targets: Iterable[Target],
@@ -113,13 +113,9 @@ def run_test(  # pylint: disable=too-many-locals
     hypothesis_output: List[str] = []
     test_start_time = time.monotonic()
     try:
-        if isinstance(test, InvalidSchema):
-            status = Status.error
-            result.add_error(test)
-        else:
-            with capture_hypothesis_output() as hypothesis_output:
-                test(checks, targets, result, headers=headers, **kwargs)
-            status = Status.success
+        with capture_hypothesis_output() as hypothesis_output:
+            test(checks, targets, result, headers=headers, **kwargs)
+        status = Status.success
     except (CheckFailed, hypothesis.errors.MultipleFailures):
         status = Status.failure
     except hypothesis.errors.Flaky:
