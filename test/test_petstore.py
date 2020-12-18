@@ -54,8 +54,8 @@ def test_find_by_status(testdir):
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_list(case.query["status"])
-    if case.query["status"]:
-        assert case.query["status"][0] in ("available", "pending", "sold")
+    for item in case.query["status"]:
+        assert item in ("available", "pending", "sold")
     assert_requests_call(case)
 """
     )
@@ -96,12 +96,13 @@ def test_update_pet(testdir):
 @schema.parametrize(method="POST", endpoint="/pet/{petId}$")
 @settings(max_examples=5, deadline=None)
 def test_(request, case):
+    assume(case.body is not None)
+    assume("name" in case.body)
+    assume("status" in case.body)
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["petId"])
-    if case.body and "name" in case.body:
-        assert_str(case.body["name"])
-    if case.body and "status" in case.body:
-        assert_str(case.body["status"])
+    assert_str(case.body["name"])
+    assert_str(case.body["status"])
     assert_requests_call(case)
 """
     )
@@ -129,12 +130,13 @@ def test_upload_image(testdir):
 @schema.parametrize(endpoint="/pet/{petId}/uploadImage$")
 @settings(max_examples=5, deadline=None)
 def test_(request, case):
-    request.config.HYPOTHESIS_CASES += 1
+    assume(case.body is not None)
     assert_int(case.path_parameters["petId"])
     if case.endpoint.schema.spec_version == "2.0":
-        if case.body is not None and "additionalMetadata" in case.body:
-            assert_str(case.body["additionalMetadata"])
+        assume("additionalMetadata" in case.body)
+        assert_str(case.body["additionalMetadata"])
     assert_requests_call(case)
+    request.config.HYPOTHESIS_CASES += 1
 """
     )
     testdir.assert_petstore()
