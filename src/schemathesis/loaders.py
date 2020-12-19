@@ -240,10 +240,7 @@ def from_wsgi(
     _setup_headers(kwargs)
     client = Client(app, WSGIResponse)
     response = client.get(schema_path, **kwargs)
-    # Raising exception to provide unified behavior
-    # E.g. it will be handled in CLI - a proper error message will be shown
-    if 400 <= response.status_code < 600:
-        raise HTTPError(response=response, url=schema_path)
+    check_response(response, schema_path)
     return from_file(
         response.data,
         location=schema_path,
@@ -319,10 +316,7 @@ def from_asgi(
     _setup_headers(kwargs)
     client = ASGIClient(app)
     response = client.get(schema_path, **kwargs)
-    # Raising exception to provide unified behavior
-    # E.g. it will be handled in CLI - a proper error message will be shown
-    if 400 <= response.status_code < 600:
-        raise HTTPError(response=response, url=schema_path)
+    check_response(response, schema_path)
     return from_file(
         response.text,
         location=schema_path,
@@ -336,6 +330,13 @@ def from_asgi(
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
     )
+
+
+def check_response(response: requests.Response, schema_path: str) -> None:
+    # Raising exception to provide unified behavior
+    # E.g. it will be handled in CLI - a proper error message will be shown
+    if 400 <= response.status_code < 600:
+        raise HTTPError(response=response, url=schema_path)
 
 
 def _setup_headers(kwargs: Dict[str, Any]) -> None:
