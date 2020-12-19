@@ -241,7 +241,7 @@ class Case:  # pylint: disable=too-many-public-methods
     ) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by requests."""
         final_headers = self._get_headers(headers)
-        if self.media_type and self.media_type != "multipart/form-data":
+        if self.media_type and self.media_type != "multipart/form-data" and self.body is not NOT_SET:
             # `requests` will handle multipart form headers with the proper `boundary` value.
             final_headers["Content-Type"] = self.media_type
         base_url = self._get_base_url(base_url)
@@ -249,7 +249,7 @@ class Case:  # pylint: disable=too-many-public-methods
         url = urljoin(base_url + "/", formatted_path)
         extra: Dict[str, Any]
         serializer = self._get_serializer()
-        if serializer is not None:
+        if serializer is not None and self.body is not NOT_SET:
             context = SerializerContext(case=self)
             extra = serializer.as_requests(context, self.body)
         else:
@@ -293,11 +293,12 @@ class Case:  # pylint: disable=too-many-public-methods
     def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
         final_headers = self._get_headers(headers)
-        if self.media_type:
+        if self.media_type and self.body is not NOT_SET:
+            # If we need to send a payload, then the Content-Type header should be set
             final_headers["Content-Type"] = self.media_type
         extra: Dict[str, Any]
         serializer = self._get_serializer()
-        if serializer is not None:
+        if serializer is not None and self.body is not NOT_SET:
             context = SerializerContext(case=self)
             extra = serializer.as_werkzeug(context, self.body)
         else:
