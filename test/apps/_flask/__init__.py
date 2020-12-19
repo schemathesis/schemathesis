@@ -88,7 +88,7 @@ def create_openapi_app(
     @app.route("/api/slow", methods=["GET"])
     def slow():
         sleep(0.1)
-        return jsonify({"slow": True})
+        return jsonify({"success": True})
 
     @app.route("/api/path_variable/<key>", methods=["GET"])
     def path_variable(key):
@@ -100,6 +100,16 @@ def create_openapi_app(
 
     @app.route("/api/invalid", methods=["POST"])
     def invalid():
+        return jsonify({"success": True})
+
+    @app.route("/api/performance", methods=["POST"])
+    def performance():
+        data = request.json
+        number = str(data).count("0")
+        if number > 0:
+            sleep(0.01 * number)
+        if number > 10:
+            raise InternalServerError
         return jsonify({"success": True})
 
     @app.route("/api/flaky", methods=["GET"])
