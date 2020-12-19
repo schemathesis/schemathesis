@@ -1602,3 +1602,11 @@ def test_max_response_time(cli, server, schema_url, workers):
     # And the proper error message should be displayed
     assert "max_response_time                     0 / 2 passed          FAILED" in result.stdout
     assert "Response time exceeded the limit of 50 ms" in result.stdout
+
+
+@pytest.mark.endpoints("slow")
+def test_max_response_time(cli, server, schema_url):
+    # When maximum response time check is specified in the CLI and the request takes less time
+    result = cli.run(schema_url, "--max-response-time=200")
+    # Then no errors should occur
+    assert result.exit_code == ExitCode.OK, result.stdout
