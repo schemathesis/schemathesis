@@ -44,7 +44,7 @@ You can use Schemathesis in the command line:
 
   schemathesis run --stateful=links --checks all http://0.0.0.0:8081/schema.yaml
 
-.. image:: https://github.com/schemathesis/schemathesis/blob/master/img/schemathesis.gif
+.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/schemathesis.gif
 
 Or in your Python tests:
 
