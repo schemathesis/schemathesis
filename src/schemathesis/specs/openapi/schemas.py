@@ -211,7 +211,9 @@ class BaseOpenAPISchema(BaseSchema):
         feedback: Optional[Feedback] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
-        return get_case_strategy(endpoint, hooks, feedback, data_generation_method)
+        return get_case_strategy(
+            endpoint=endpoint, hooks=hooks, feedback=feedback, data_generation_method=data_generation_method
+        )
 
     def get_parameter_serializer(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
         definitions = [item for item in endpoint.definition.resolved.get("parameters", []) if item["in"] == location]
