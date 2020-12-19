@@ -386,7 +386,7 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
             }
         elif endpoint == "performance":
             schema = {
-                "requestBody": {"content": {"application/json": {"schema": {"type": "integer"}}}},
+                "requestBody": {"content": {"application/json": {"schema": {"type": "integer"}}}, "required": True},
                 "responses": {"200": {"description": "OK"}},
             }
         elif endpoint == "plain_text_body":
@@ -589,6 +589,7 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                             }
                         }
                     },
+                    "required": True,
                 },
                 "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
             }
