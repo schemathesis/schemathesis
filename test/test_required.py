@@ -86,18 +86,18 @@ def test_without_required(request, testdir, spec_version, param):
 @schema.parametrize()
 @settings(max_examples=10)
 def test_has_none(request, case):
-    # This test should find `None` values
+    # This test should find `NOT_SET` values
     if "{location}" == "body":
-        assert case.{location} is not None
+        assert case.{location} is not NOT_SET
     else:
         assert case.{location}.get("key") is not None
 
 @schema.parametrize()
 @settings(max_examples=10)
 def test_has_not_only_none(request, case):
-    # This test should find values other than `None`
+    # This test should find values other than `NOT_SET`
     if "{location}" == "body":
-        assert case.{location} is None
+        assert case.{location} is NOT_SET
     else:
         assert case.{location}.get("key") is None
 """,
