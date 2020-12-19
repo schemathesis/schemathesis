@@ -411,9 +411,10 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
 
 
 @pytest.mark.parametrize(
-    "content, definition",
+    "media_type, content, definition",
     (
         (
+            "application/json",
             b'{"random": "text"}',
             {
                 "responses": {
@@ -422,6 +423,7 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
             },
         ),
         (
+            "application/json",
             b'{"random": "text"}',
             {
                 "responses": {
@@ -429,10 +431,22 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
                 }
             },
         ),
+        (
+            "application/problem+json",
+            b'{"random": "text"}',
+            {
+                "responses": {
+                    "default": {
+                        "description": "text",
+                        "content": {"application/problem+json": {"schema": SUCCESS_SCHEMA}},
+                    }
+                }
+            },
+        ),
     ),
 )
-def test_response_schema_conformance_invalid_openapi(openapi_30, content, definition):
-    response = make_response(content)
+def test_response_schema_conformance_invalid_openapi(openapi_30, media_type, content, definition):
+    response = make_response(content, media_type)
     case = make_case(openapi_30, definition)
     with pytest.raises(AssertionError):
         response_schema_conformance(response, case)
