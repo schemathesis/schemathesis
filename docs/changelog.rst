@@ -21,6 +21,7 @@ Changelog
 
 - Allow generating requests without payload if the schema does not require it. `#916`_
 - Allow sending ``null`` as request payload if the schema expects it. `#919`_
+- CLI failure if the tested operation is `GET` and has payload examples. `#925`_
 
 **Removed**
 
@@ -1604,6 +1605,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#925: https://github.com/schemathesis/schemathesis/issues/925
 .. _#920: https://github.com/schemathesis/schemathesis/issues/920
 .. _#919: https://github.com/schemathesis/schemathesis/issues/919
 .. _#917: https://github.com/schemathesis/schemathesis/issues/917
