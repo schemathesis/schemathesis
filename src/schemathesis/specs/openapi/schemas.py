@@ -24,7 +24,7 @@ from ...models import Case, Endpoint, EndpointDefinition
 from ...schemas import BaseSchema
 from ...stateful import APIStateMachine, Feedback, Stateful, StatefulTest
 from ...types import FormData
-from ...utils import GenericResponse, get_response_payload
+from ...utils import GenericResponse, get_response_payload, is_json_media_type
 from . import links, serialization
 from ._hypothesis import get_case_strategy
 from .converter import to_json_schema_recursive
@@ -340,7 +340,7 @@ class BaseOpenAPISchema(BaseSchema):
                 "The response is missing the `Content-Type` header. The schema defines the following media types:\n\n"
                 f"    {media_types}"
             )
-        if not content_type.startswith("application/json"):
+        if not is_json_media_type(content_type):
             return
         try:
             if isinstance(response, requests.Response):
