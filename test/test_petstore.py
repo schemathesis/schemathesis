@@ -96,7 +96,7 @@ def test_update_pet(testdir):
 @schema.parametrize(method="POST", endpoint="/pet/{petId}$")
 @settings(max_examples=5, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
 def test_(request, case):
-    assume(case.body is not None)
+    assume(case.body is not NOT_SET)
     assume("name" in case.body)
     assume("status" in case.body)
     request.config.HYPOTHESIS_CASES += 1
@@ -130,7 +130,7 @@ def test_upload_image(testdir):
 @schema.parametrize(endpoint="/pet/{petId}/uploadImage$")
 @settings(max_examples=5, deadline=None)
 def test_(request, case):
-    assume(case.body is not None)
+    assume(case.body is not NOT_SET)
     assert_int(case.path_parameters["petId"])
     if case.endpoint.schema.spec_version == "2.0":
         assume("additionalMetadata" in case.body)

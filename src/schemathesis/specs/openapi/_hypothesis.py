@@ -145,7 +145,7 @@ def _get_body_strategy(
     schema = parameter.as_json_schema()
     strategy = to_strategy(schema)
     if not parameter.is_required:
-        strategy |= st.none()
+        strategy |= st.just(NOT_SET)
     return strategy
 
 

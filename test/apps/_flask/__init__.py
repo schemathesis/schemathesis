@@ -6,7 +6,7 @@ from typing import Tuple
 
 import yaml
 from flask import Flask, Response, _request_ctx_stack, jsonify, request
-from werkzeug.exceptions import GatewayTimeout, InternalServerError
+from werkzeug.exceptions import BadRequest, GatewayTimeout, InternalServerError
 
 try:
     from ..utils import Endpoint, OpenAPIVersion, make_openapi_schema
@@ -57,7 +57,11 @@ def create_openapi_app(
 
     @app.route("/api/payload", methods=["POST"])
     def payload():
-        return jsonify(request.json)
+        try:
+            data = request.json
+        except BadRequest:
+            data = {"name": "Nothing!"}
+        return jsonify(data)
 
     @app.route("/api/get_payload", methods=["GET"])
     def get_payload():

@@ -146,11 +146,16 @@ def make_case(**kwargs):
 
 
 def expected(payload=""):
+    # Simple way to detect json for these tests
+    if payload.startswith("json"):
+        headers = ", 'Content-Type': 'application/json'"
+    else:
+        headers = ""
     if payload:
         payload = f", {payload}"
     return (
         f"requests.post('http://example.com/api/success', "
-        f"headers={{'User-Agent': '{USER_AGENT}', 'Content-Type': 'application/json'}}{payload})"
+        f"headers={{'User-Agent': '{USER_AGENT}'{headers}}}{payload})"
     )
 
 

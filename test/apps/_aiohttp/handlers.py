@@ -18,8 +18,10 @@ async def success(request: web.Request) -> web.Response:
 
 
 async def payload(request: web.Request) -> web.Response:
-    kwargs = {"body": await request.read()}
-    return web.json_response(**kwargs)
+    body = await request.read()
+    if body:
+        return web.json_response(body=body)
+    return web.json_response({"name": "Nothing!"})
 
 
 async def invalid_response(request: web.Request) -> web.Response:
