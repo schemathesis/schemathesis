@@ -10,6 +10,7 @@ Changelog
 - Generating data for all media types defined for an operation. `#690`_
 - Support for user-defined media types serialization. You can define how Schemathesis should handle media types defined
   in your schema or customize existing (like ``application/json``).
+- The `response_schema_conformance` check now runs on media types that are encoded with JSON. For example, ``application/problem+json``. `#920`_
 
 **Changed**
 
@@ -1603,6 +1604,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#920: https://github.com/schemathesis/schemathesis/issues/920
 .. _#919: https://github.com/schemathesis/schemathesis/issues/919
 .. _#917: https://github.com/schemathesis/schemathesis/issues/917
 .. _#916: https://github.com/schemathesis/schemathesis/issues/916
