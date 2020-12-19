@@ -8,6 +8,7 @@ from hypothesis.strategies import SearchStrategy
 from hypothesis.utils.conventions import InferType
 
 from .constants import DEFAULT_DEADLINE, DataGenerationMethod
+from .exceptions import InvalidSchema
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import Case, Endpoint
 from .stateful import Feedback, Stateful
@@ -70,7 +71,12 @@ def make_async_test(test: Callable) -> Callable:
 
 def add_examples(test: Callable, endpoint: Endpoint, hook_dispatcher: Optional[HookDispatcher] = None) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
-    examples: List[Case] = [get_single_example(strategy) for strategy in endpoint.get_strategies_from_examples()]
+    try:
+        examples: List[Case] = [get_single_example(strategy) for strategy in endpoint.get_strategies_from_examples()]
+    except InvalidSchema:
+        # In this case, the user didn't pass `--validate-schema=false` and see an error in the output anyway,
+        # and no tests will be executed. For this reason, examples can be skipped
+        return test
     context = HookContext(endpoint)  # context should be passed here instead
     GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, examples)
     endpoint.schema.hooks.dispatch("before_add_examples", context, examples)

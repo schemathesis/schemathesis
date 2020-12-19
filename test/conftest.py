@@ -297,6 +297,7 @@ def schema_with_get_payload():
                                     "type": "object",
                                     "properties": {"key": {"type": "string"}},
                                     "required": ["key"],
+                                    "example": {"key": "foo"},
                                 }
                             }
                         },
