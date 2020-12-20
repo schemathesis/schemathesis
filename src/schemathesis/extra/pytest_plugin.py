@@ -7,15 +7,12 @@ from _pytest.config import hookimpl
 from _pytest.fixtures import FuncFixtureInfo
 from _pytest.nodes import Node
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
-from _pytest.runner import runtestprotocol
-from _pytest.warning_types import PytestWarning
 from hypothesis.errors import InvalidArgument
 from packaging import version
 
 from .. import DataGenerationMethod
 from .._hypothesis import create_test
 from ..models import Endpoint
-from ..stateful import Feedback
 from ..utils import is_schemathesis_test
 
 USE_FROM_PARENT = version.parse(pytest.__version__) >= version.parse("5.4.0")
@@ -35,14 +32,12 @@ class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
         *args: Any,
         test_func: Callable,
         test_name: Optional[str] = None,
-        recursion_level: int = 0,
         data_generation_method: DataGenerationMethod,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.test_function = test_func
         self.test_name = test_name
-        self.recursion_level = recursion_level
         self.data_generation_method = data_generation_method
 
     def _getobj(self) -> partial:
@@ -51,55 +46,6 @@ class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
         This method is called only for this case.
         """
         return partial(self.obj, self.parent.obj)  # type: ignore
-
-    @property
-    def feedback(self) -> Optional[Feedback]:
-        return getattr(self.obj, "_schemathesis_feedback", None)
-
-    def warn_if_stateful_responses_not_stored(self) -> None:
-        feedback = self.feedback
-        if feedback is not None and not feedback.stateful_tests:
-            self.warn(PytestWarning(NOT_USED_STATEFUL_TESTING_MESSAGE))
-
-    def _get_stateful_tests(self) -> List["SchemathesisFunction"]:
-        feedback = self.feedback
-        recursion_level = self.recursion_level
-        if feedback is None or recursion_level >= feedback.endpoint.schema.stateful_recursion_limit:
-            return []
-        previous_test_name = self.test_name or f"{feedback.endpoint.method.upper()}:{feedback.endpoint.full_path}"
-
-        def make_test(
-            endpoint: Endpoint,
-            test: Callable,
-            data_generation_method: DataGenerationMethod,
-            previous_tests: str,
-        ) -> "SchemathesisFunction":
-            test_name = f"{previous_tests} -> {endpoint.method.upper()}:{endpoint.full_path}"
-            return create(
-                self.__class__,
-                name=f"{self.originalname}[{test_name}][{self.data_generation_method.as_short_name()}]",
-                parent=self.parent,
-                callspec=getattr(self, "callspec", None),
-                callobj=test,
-                fixtureinfo=self._fixtureinfo,
-                keywords=self.keywords,
-                originalname=self.originalname,
-                test_func=self.test_function,
-                test_name=test_name,
-                recursion_level=recursion_level + 1,
-                data_generation_method=data_generation_method,
-            )
-
-        return [
-            make_test(endpoint, test, data_generation_method, previous_test_name)
-            for (endpoint, data_generation_method, test) in feedback.get_stateful_tests(self.test_function, None, None)
-        ]
-
-    def add_stateful_tests(self) -> None:
-        idx = self.session.items.index(self) + 1
-        tests = self._get_stateful_tests()
-        self.session.items[idx:idx] = tests
-        self.session.testscollected += len(tests)
 
 
 class SchemathesisCase(PyCollector):
@@ -201,12 +147,6 @@ class SchemathesisCase(PyCollector):
             pytest.fail("Error during collection")
 
 
-NOT_USED_STATEFUL_TESTING_MESSAGE = (
-    "You are using stateful testing, but no responses were stored during the test! "
-    "Please, use `case.call` or `case.store_response` in your test to enable stateful tests."
-)
-
-
 @hookimpl(hookwrapper=True)  # type:ignore # pragma: no mutate
 def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> Generator[None, Any, None]:
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
@@ -228,15 +168,3 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
         outcome.get_result()
     except InvalidArgument as exc:
         pytest.fail(exc.args[0])
-
-
-def pytest_runtest_protocol(item: Function, nextitem: Optional[Function]) -> bool:
-    item.ihook.pytest_runtest_logstart(nodeid=item.nodeid, location=item.location)
-    reports = runtestprotocol(item, nextitem=nextitem)
-    item.ihook.pytest_runtest_logfinish(nodeid=item.nodeid, location=item.location)
-    if isinstance(item, SchemathesisFunction):
-        for report in reports:
-            if report.when == "call" and report.outcome == "passed":
-                item.warn_if_stateful_responses_not_stored()
-        item.add_stateful_tests()
-    return True

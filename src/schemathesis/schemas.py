@@ -6,7 +6,6 @@ Their responsibilities:
 
 They give only static definitions of endpoints.
 """
-import warnings
 from collections.abc import Mapping
 from typing import Any, Callable, Dict, Generator, Iterable, Iterator, List, Optional, Sequence, Tuple, Type, Union
 from urllib.parse import urljoin, urlsplit, urlunsplit
@@ -18,10 +17,10 @@ from hypothesis.utils.conventions import InferType
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import create_test
-from .constants import DEFAULT_DATA_GENERATION_METHODS, DEFAULT_STATEFUL_RECURSION_LIMIT, DataGenerationMethod
+from .constants import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import Case, Endpoint
-from .stateful import APIStateMachine, Feedback, Stateful, StatefulTest
+from .stateful import APIStateMachine, Stateful, StatefulTest
 from .types import Filter, FormData, GenericTest, NotSet
 from .utils import NOT_SET, GenericResponse
 
@@ -40,8 +39,6 @@ class BaseSchema(Mapping):
     test_function: Optional[GenericTest] = attr.ib(default=None)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
     skip_deprecated_endpoints: bool = attr.ib(default=False)  # pragma: no mutate
-    stateful: Optional[Stateful] = attr.ib(default=None)  # pragma: no mutate
-    stateful_recursion_limit: int = attr.ib(default=DEFAULT_STATEFUL_RECURSION_LIMIT)  # pragma: no mutate
     data_generation_methods: Iterable[DataGenerationMethod] = attr.ib(
         default=DEFAULT_DATA_GENERATION_METHODS
     )  # pragma: no mutate
@@ -145,8 +142,6 @@ class BaseSchema(Mapping):
         operation_id: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
         skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
-        stateful: Optional[Union[Stateful, NotSet]] = NOT_SET,
-        stateful_recursion_limit: Union[int, NotSet] = NOT_SET,
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
@@ -161,8 +156,6 @@ class BaseSchema(Mapping):
                 operation_id=operation_id,
                 validate_schema=validate_schema,
                 skip_deprecated_endpoints=skip_deprecated_endpoints,
-                stateful=stateful,
-                stateful_recursion_limit=stateful_recursion_limit,
                 data_generation_methods=data_generation_methods,
             )
             return func
@@ -190,16 +183,8 @@ class BaseSchema(Mapping):
         hooks: Union[HookDispatcher, NotSet] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
         skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
-        stateful: Optional[Union[Stateful, NotSet]] = NOT_SET,
-        stateful_recursion_limit: Union[int, NotSet] = NOT_SET,
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
     ) -> "BaseSchema":
-        if stateful is not NOT_SET or stateful_recursion_limit is not NOT_SET:
-            warnings.warn(
-                "`stateful` and `stateful_recursion_limit` arguments are deprecated. Use `as_state_machine` instead.",
-                DeprecationWarning,
-            )
-
         if method is NOT_SET:
             method = self.method
         if endpoint is NOT_SET:
@@ -214,10 +199,6 @@ class BaseSchema(Mapping):
             skip_deprecated_endpoints = self.skip_deprecated_endpoints
         if hooks is NOT_SET:
             hooks = self.hooks
-        if stateful is NOT_SET:
-            stateful = self.stateful
-        if stateful_recursion_limit is NOT_SET:
-            stateful_recursion_limit = self.stateful_recursion_limit
         if data_generation_methods is NOT_SET:
             data_generation_methods = self.data_generation_methods
 
@@ -234,8 +215,6 @@ class BaseSchema(Mapping):
             test_function=test_function,
             validate_schema=validate_schema,  # type: ignore
             skip_deprecated_endpoints=skip_deprecated_endpoints,  # type: ignore
-            stateful=stateful,  # type: ignore
-            stateful_recursion_limit=stateful_recursion_limit,  # type: ignore
             data_generation_methods=data_generation_methods,  # type: ignore
         )
 
@@ -271,7 +250,6 @@ class BaseSchema(Mapping):
         self,
         endpoint: Endpoint,
         hooks: Optional[HookDispatcher] = None,
-        feedback: Optional[Feedback] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
         raise NotImplementedError

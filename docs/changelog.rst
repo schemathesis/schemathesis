@@ -28,6 +28,7 @@ Changelog
 - ``Case.form_data``. Use ``Case.body`` instead.
 - ``Endpoint.form_data``. Use ``Endpoint.body`` instead.
 - ``before_generate_form_data`` hook. Use ``before_generate_body`` instead.
+- Deprecated stateful testing integration from our ``pytest`` plugin.
 
 `2.8.5`_ - 2020-12-15
 ---------------------

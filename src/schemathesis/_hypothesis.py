@@ -11,7 +11,6 @@ from .constants import DEFAULT_DEADLINE, DataGenerationMethod
 from .exceptions import InvalidSchema
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import Case, Endpoint
-from .stateful import Feedback, Stateful
 
 GivenInput = Union[SearchStrategy, InferType]
 
@@ -28,14 +27,7 @@ def create_test(
 ) -> Callable:
     """Create a Hypothesis test."""
     hook_dispatcher = getattr(test, "_schemathesis_hooks", None)
-    feedback: Optional[Feedback]
-    if endpoint.schema.stateful == Stateful.links:
-        feedback = Feedback(endpoint.schema.stateful, endpoint)
-    else:
-        feedback = None
-    strategy = endpoint.as_strategy(
-        hooks=hook_dispatcher, feedback=feedback, data_generation_method=data_generation_method
-    )
+    strategy = endpoint.as_strategy(hooks=hook_dispatcher, data_generation_method=data_generation_method)
     _given_kwargs = (_given_kwargs or {}).copy()
     _given_kwargs.setdefault("case", strategy)
     wrapped_test = hypothesis.given(*_given_args, **_given_kwargs)(test)
@@ -46,7 +38,6 @@ def create_test(
     setup_default_deadline(wrapped_test)
     if settings is not None:
         wrapped_test = settings(wrapped_test)
-    wrapped_test._schemathesis_feedback = feedback  # type: ignore
     return add_examples(wrapped_test, endpoint, hook_dispatcher=hook_dispatcher)
 
 

@@ -12,7 +12,6 @@ from ...constants import DataGenerationMethod
 from ...exceptions import InvalidSchema
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import Case, Endpoint
-from ...stateful import Feedback
 from ...utils import NOT_SET
 from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPIParameter, parameters_to_json_schema
@@ -76,7 +75,6 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     draw: Callable,
     endpoint: Endpoint,
     hooks: Optional[HookDispatcher] = None,
-    feedback: Optional[Feedback] = None,
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     path_parameters: Any = NOT_SET,
     headers: Any = NOT_SET,
@@ -129,7 +127,6 @@ def get_case_strategy(  # pylint: disable=too-many-locals
         raise InvalidSchema("Body parameters are defined for GET request.")
     return Case(
         endpoint=endpoint,
-        feedback=feedback,
         media_type=media_type,
         path_parameters=path_parameters,
         headers=headers,

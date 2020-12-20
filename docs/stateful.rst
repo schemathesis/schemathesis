@@ -474,66 +474,9 @@ You can specify recursive links if you want. The default recursion depth limit i
 ``--stateful-recursion-limit=<N>`` CLI option.
 
 Schemathesis's CLI currently uses the old approach to stateful testing, not based on state machines.
-We plan to use the new approach in CLI, beginning from Schemathesis 2.8. It may include slight changes to the visual
+We plan to use the new approach in CLI, beginning from Schemathesis 3.1. It may include slight changes to the visual
 appearance and the way to configure it. It also means that using stateful testing in CLI is not yet as customizable
 as in the in-code approach.
-
-Migration from the previous stateful testing approach
------------------------------------------------------
-
-Initially, stateful testing was introduced to the in-code testing in version 2.5 and used a much less effective way
-of generating scenarios. Using it is discouraged, and here is a migration guide to the new approach.
-
-.. warning::
-
-    The previous approach is deprecated since 2.7 and planned for removal in Schemathesis 3.0.
-
-The previous approach assumed test logic in the test function body, and now it could be moved to extension points in the
-state machine class.
-
-Before:
-
-.. code-block:: python
-
-    @schema.parametrize(stateful=Stateful.links)
-    def test_api(case):
-        response = case.call()
-        case.validate_response(response)
-        # A custom conditional check
-        if case.path == "/items":
-            assert "X-Item-Id" in response.headers
-
-After:
-
-.. code-block:: python
-
-    def check_header(response, case):
-        # A custom conditional check
-        if case.path == "/items":
-            assert "X-Item-Id" in response.headers
-
-    class APIWorkflow(schema.as_state_machine()):
-
-        def validate_response(self, response, case):
-            super().validate_response(
-                response,
-                case,
-                # Run it together with default checks
-                additional_checks=(check_header, )
-            )
-
-    TestCase = APIWorkflow.TestCase
-
-From the usage point of view, the main difference is that you need to work with the state machine class instead of creating a test function.
-These two approaches are significantly different in the test quality aspects. Specifically, the new one:
-
-- Can execute an arbitrary sequence of API calls, when the old one always run then in a particular order;
-- Provides the :py:attr:`Case.source` attribute, that allows you to use responses from previous steps;
-- Doesn't mix different components of responses when generating new ones;
-- Has a better distribution of generated calls in a sequence. With the old one, the deeper an endpoint is in the links
-  tree, the fewer examples will be executed, and the less chance to have it executed at all;
-- About 40% faster in data generation;
-- Much more flexible for adding additional ways of connecting endpoints in the future.
 
 Open API links limitations
 --------------------------
