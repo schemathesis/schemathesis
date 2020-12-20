@@ -22,7 +22,7 @@ from ...exceptions import (
 from ...hooks import HookContext, HookDispatcher
 from ...models import Case, Endpoint, EndpointDefinition
 from ...schemas import BaseSchema
-from ...stateful import APIStateMachine, Feedback, Stateful, StatefulTest
+from ...stateful import APIStateMachine, Stateful, StatefulTest
 from ...types import FormData
 from ...utils import GenericResponse, get_response_payload, is_json_media_type
 from . import links, serialization
@@ -208,12 +208,9 @@ class BaseOpenAPISchema(BaseSchema):
         self,
         endpoint: Endpoint,
         hooks: Optional[HookDispatcher] = None,
-        feedback: Optional[Feedback] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
-        return get_case_strategy(
-            endpoint=endpoint, hooks=hooks, feedback=feedback, data_generation_method=data_generation_method
-        )
+        return get_case_strategy(endpoint=endpoint, hooks=hooks, data_generation_method=data_generation_method)
 
     def get_parameter_serializer(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
         definitions = [item for item in endpoint.definition.resolved.get("parameters", []) if item["in"] == location]
