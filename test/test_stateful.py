@@ -302,6 +302,7 @@ def test_add_link_nothing_is_provided(schema_url):
     (
         (lambda s, e: setattr(e, "method", "GET"), "No such endpoint: `GET /users/`. Did you mean `POST /users/`?"),
         (lambda s, e: setattr(e, "path", "/userz/"), "No such endpoint: `POST /userz/`. Did you mean `POST /users/`?"),
+        (lambda s, e: setattr(e, "path", "/what?/"), "No such endpoint: `POST /what?/`."),
         (
             lambda s, e: s.raw_schema["paths"].__setitem__("/users/", {}),
             "No such endpoint: `POST /users/`.",
