@@ -2,7 +2,7 @@ from base64 import b64decode
 
 import jsonschema
 import pytest
-from hypothesis import HealthCheck, find, given, settings
+from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
@@ -322,6 +322,37 @@ def test_valid_form_data(request, raw_schema):
         case.call()
 
     # Then these values should be casted to bytes and handled successfully
+    inner()
+
+
+@pytest.mark.hypothesis_nested
+def test_optional_form_data(openapi3_base_url, empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"]["/form"] = {
+        "post": {
+            "requestBody": {
+                "content": {
+                    "multipart/form-data": {
+                        "schema": {
+                            "type": "string",
+                        },
+                    }
+                }
+            },
+            "responses": {"200": {"description": "OK"}},
+        }
+    }
+    # When the multipart form is optional
+    # Note, this test is similar to the one above, but has a simplified schema & conditions
+    # It is done mostly due to performance reasons
+    schema = schemathesis.from_dict(empty_open_api_3_schema, base_url=openapi3_base_url)
+
+    @given(case=schema["/form"]["POST"].as_strategy())
+    @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much], max_examples=1)
+    def inner(case):
+        assume(case.body is NOT_SET)
+        case.call()
+
+    # Then payload can be absent
     inner()
 
 
