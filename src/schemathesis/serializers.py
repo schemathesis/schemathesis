@@ -100,7 +100,7 @@ def _should_coerce_to_bytes(item: Any) -> bool:
     return not isinstance(item, (bytes, str, int))
 
 
-def prepare_form_data(data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def prepare_form_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """Make the generated data suitable for sending as multipart.
 
     If the schema is loose, Schemathesis can generate data that can't be sent as multipart. In these cases,
@@ -108,13 +108,11 @@ def prepare_form_data(data: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]
 
     NOTE. This behavior might change in the future.
     """
-    # Form data can be optional
-    if data is not None:
-        for name, value in data.items():
-            if isinstance(value, list):
-                data[name] = [to_bytes(item) if _should_coerce_to_bytes(item) else item for item in value]
-            elif _should_coerce_to_bytes(value):
-                data[name] = to_bytes(value)
+    for name, value in data.items():
+        if isinstance(value, list):
+            data[name] = [to_bytes(item) if _should_coerce_to_bytes(item) else item for item in value]
+        elif _should_coerce_to_bytes(value):
+            data[name] = to_bytes(value)
     return data
 
 
@@ -125,7 +123,7 @@ def to_bytes(value: Any) -> bytes:
 
 @register("multipart/form-data")
 class MultipartSerializer:
-    def as_requests(self, context: SerializerContext, value: Optional[Dict[str, Any]]) -> Any:
+    def as_requests(self, context: SerializerContext, value: Dict[str, Any]) -> Any:
         # Form data always is generated as a dictionary
         multipart = prepare_form_data(value)
         files, data = context.case.endpoint.prepare_multipart(multipart)
