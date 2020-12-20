@@ -1588,7 +1588,7 @@ def test_get_request_with_body(testdir, cli, base_url, hypothesis_max_examples, 
 
 @pytest.mark.endpoints("slow")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_max_response_time(cli, server, schema_url, workers):
+def test_max_response_time_invalid(cli, server, schema_url, workers):
     # When maximum response time check is specified in the CLI and the request takes more time
     result = cli.run(schema_url, "--max-response-time=50", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
@@ -1605,7 +1605,7 @@ def test_max_response_time(cli, server, schema_url, workers):
 
 
 @pytest.mark.endpoints("slow")
-def test_max_response_time(cli, server, schema_url):
+def test_max_response_time_valid(cli, server, schema_url):
     # When maximum response time check is specified in the CLI and the request takes less time
     result = cli.run(schema_url, "--max-response-time=200")
     # Then no errors should occur
