@@ -185,6 +185,13 @@ def test_code_to_reproduce():
         eval(code)
 
 
+def test_code_to_reproduce_without_extra_args():
+    case = Case(Endpoint("/api/success", "GET", {}, base_url="http://0.0.0.0", schema=schema))
+    request = requests.Request(method="GET", url="http://0.0.0.0/api/success").prepare()
+    code = case.get_code_to_reproduce(request=request)
+    assert code == "requests.get('http://0.0.0.0/api/success')"
+
+
 def test_validate_response(testdir):
     testdir.make_test(
         fr"""
