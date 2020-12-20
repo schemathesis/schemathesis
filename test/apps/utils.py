@@ -185,6 +185,7 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
                 "parameters": [
                     {"in": "formData", "name": "key", "required": True, "type": "string"},
                     {"in": "formData", "name": "value", "required": True, "type": "integer"},
+                    {"in": "formData", "name": "maybe", "type": "boolean"},
                 ],
                 "consumes": ["multipart/form-data"],
                 "responses": {"200": {"description": "OK"}},
@@ -465,7 +466,11 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                         "multipart/form-data": {
                             "schema": {
                                 "type": "object",
-                                "properties": {"key": {"type": "string"}, "value": {"type": "integer"}},
+                                "properties": {
+                                    "key": {"type": "string"},
+                                    "value": {"type": "integer"},
+                                    "maybe": {"type": "boolean"},
+                                },
                                 "required": ["key", "value"],
                             }
                         }
