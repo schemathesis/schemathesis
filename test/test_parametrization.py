@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import given, settings
+from hypothesis import assume, given, settings
 from packaging import version
 
 import schemathesis
@@ -706,6 +706,25 @@ def test_loose_multipart_definition():
         assert isinstance(case.body, dict)
 
     # And the resulting values should be valid
+    test()
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.endpoints("multipart")
+def test_optional_form_parameters(schema_url):
+    # When form parameters are optional
+    schema = schemathesis.from_uri(schema_url)
+    strategy = schema.endpoints["/multipart"]["POST"].as_strategy()
+
+    @given(case=strategy)
+    @settings(max_examples=3, deadline=None)
+    def test(case):
+        assume("maybe" in case.body)
+        response = case.call()
+        assert response.status_code == 200
+        # Then they still should be possible to generate
+        assert response.json()["maybe"] == str(case.body["maybe"])
+
     test()
 
 

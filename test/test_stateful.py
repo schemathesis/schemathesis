@@ -302,6 +302,7 @@ def test_add_link_nothing_is_provided(schema_url):
     (
         (lambda s, e: setattr(e, "method", "GET"), "No such endpoint: `GET /users/`. Did you mean `POST /users/`?"),
         (lambda s, e: setattr(e, "path", "/userz/"), "No such endpoint: `POST /userz/`. Did you mean `POST /users/`?"),
+        (lambda s, e: setattr(e, "path", "/what?/"), "No such endpoint: `POST /what?/`."),
         (
             lambda s, e: s.raw_schema["paths"].__setitem__("/users/", {}),
             "No such endpoint: `POST /users/`.",
@@ -329,15 +330,20 @@ def test_links_access(schema_url):
     assert links["GetUserByUserId"].name == "GetUserByUserId"
 
 
+@pytest.mark.parametrize(
+    "parameter, message",
+    (
+        ("userId", "No such parameter in `GET /users/{user_id}`: `userId`. Did you mean `user_id`?"),
+        ("what?", "No such parameter in `GET /users/{user_id}`: `what?`."),
+    ),
+)
 @pytest.mark.endpoints("create_user", "get_user", "update_user")
-def test_misspelled_parameter(schema_url):
+def test_misspelled_parameter(schema_url, parameter, message):
     schema = schemathesis.from_uri(schema_url)
     # When the user supplies a parameter definition, that points to location which has no parameters defined in the
     # schema
-    add_link(schema, "#/paths/~1users~1{user_id}/get", parameters={"header.userId": "$response.body#/id"})
+    add_link(schema, "#/paths/~1users~1{user_id}/get", parameters={f"header.{parameter}": "$response.body#/id"})
     case = schema["/users/{user_id}"]["GET"].make_case()
     link = schema["/users/"]["POST"].links["201"]["#/paths/~1users~1{user_id}/get"]
-    with pytest.raises(
-        ValueError, match="No such parameter in `GET /users/{user_id}`: `userId`. Did you mean `user_id`?"
-    ):
+    with pytest.raises(ValueError, match=re.escape(message)):
         link.set_data(case, context=expressions.ExpressionContext(case=case, response=None))

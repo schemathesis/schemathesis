@@ -147,16 +147,15 @@ def _serialize_swagger2(definitions: DefinitionList) -> Generator[Optional[Calla
         if definition["in"] == "header":
             # Headers should be coerced to a string so we can check it for validity later
             yield to_string(name)
-        if definition["in"] != "body":
-            if type_ in ("array", "object"):
-                if collection_format == "csv":
-                    yield delimited(name, delimiter=",")
-                if collection_format == "ssv":
-                    yield delimited(name, delimiter=" ")
-                if collection_format == "tsv":
-                    yield delimited(name, delimiter="\t")
-                if collection_format == "pipes":
-                    yield delimited(name, delimiter="|")
+        if type_ in ("array", "object"):
+            if collection_format == "csv":
+                yield delimited(name, delimiter=",")
+            if collection_format == "ssv":
+                yield delimited(name, delimiter=" ")
+            if collection_format == "tsv":
+                yield delimited(name, delimiter="\t")
+            if collection_format == "pipes":
+                yield delimited(name, delimiter="|")
 
 
 serialize_openapi3_parameters = make_serializer(_serialize_openapi3)

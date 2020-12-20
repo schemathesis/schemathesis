@@ -187,10 +187,14 @@ class Case:  # pylint: disable=too-many-public-methods
             kwargs["headers"] = final_headers
         method = kwargs["method"].lower()
 
+        def should_display(key: str, value: Any) -> bool:
+            if key in ("method", "url"):
+                return False
+            # Parameters are either absent because they are not defined or are optional
+            return value not in (None, {})
+
         printed_kwargs = ", ".join(
-            f"{key}={repr(value)}"
-            for key, value in kwargs.items()
-            if key not in ("method", "url") and value not in (None, NOT_SET)
+            f"{key}={repr(value)}" for key, value in kwargs.items() if should_display(key, value)
         )
         args_repr = f"'{kwargs['url']}'"
         if printed_kwargs:
