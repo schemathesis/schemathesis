@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, cast
+from typing import Any, Dict, Generator, List, Optional, Tuple, cast
 from urllib.parse import urlsplit
 
 import attr
@@ -57,8 +57,7 @@ class GraphQLSchema(BaseSchema):
 
     @property
     def base_path(self) -> str:
-        if self.base_url:
-            return urlsplit(self.base_url).path
+        # There is no public API to use the `base_url` attribute; therefore, this code is limited
         return self._get_base_path()
 
     def _get_base_path(self) -> str:
@@ -81,6 +80,3 @@ class GraphQLSchema(BaseSchema):
 
     def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
         return []
-
-    def get_parameter_serializer(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
-        return None
