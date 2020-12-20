@@ -494,9 +494,7 @@ class Endpoint(Generic[P]):
         """
         return self.schema.get_parameter_serializer(self, location)
 
-    def prepare_multipart(self, form_data: Optional[FormData]) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
-        if not form_data:
-            return None, None
+    def prepare_multipart(self, form_data: FormData) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
         return self.schema.prepare_multipart(form_data, self)
 
     def get_request_payload_content_types(self) -> List[str]:
