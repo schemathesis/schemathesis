@@ -13,7 +13,6 @@ from ...checks import not_a_server_error
 from ...hooks import HookDispatcher
 from ...models import Case, CheckFunction, Endpoint
 from ...schemas import BaseSchema
-from ...stateful import Feedback
 from ...utils import GenericResponse
 
 
@@ -74,7 +73,6 @@ class GraphQLSchema(BaseSchema):
         self,
         endpoint: Endpoint,
         hooks: Optional[HookDispatcher] = None,
-        feedback: Optional[Feedback] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
         constructor = partial(GraphQLCase, endpoint=endpoint)

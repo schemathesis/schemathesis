@@ -44,13 +44,7 @@ from .utils import NOT_SET, GenericResponse, WSGIResponse, get_response_payload
 if TYPE_CHECKING:
     from .hooks import HookDispatcher
     from .schemas import BaseSchema
-    from .stateful import Feedback, Stateful, StatefulTest
-
-
-MISSING_STATEFUL_ARGUMENT_MESSAGE = (
-    "To use `store_response` you need to enable stateful testing by adding "
-    "`stateful=Stateful.links` to your `parametrize` call."
-)
+    from .stateful import Stateful, StatefulTest
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -86,7 +80,6 @@ class Case:  # pylint: disable=too-many-public-methods
     # which is a valid payload.
     body: Union[Body, NotSet] = attr.ib(default=NOT_SET)  # pragma: no mutate
 
-    feedback: Optional["Feedback"] = attr.ib(default=None)  # pragma: no mutate
     source: Optional[CaseSource] = attr.ib(default=None)  # pragma: no mutate
     # The media type for cases with a payload. For example, "application/json"
     media_type: Optional[str] = attr.ib(default=None)  # pragma: no mutate
@@ -285,14 +278,7 @@ class Case:  # pylint: disable=too-many-public-methods
         response = session.request(**data)  # type: ignore
         if close_session:
             session.close()
-        if self.feedback:
-            self.store_response(response)
         return response
-
-    def store_response(self, response: GenericResponse) -> None:
-        if self.feedback is None:
-            raise RuntimeError(MISSING_STATEFUL_ARGUMENT_MESSAGE)
-        self.feedback.add_test_case(self, response)
 
     def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
@@ -328,8 +314,6 @@ class Case:  # pylint: disable=too-many-public-methods
             response = client.open(**data, **kwargs)
         requests_kwargs = self.as_requests_kwargs(base_url=self.get_full_base_url(), headers=headers)
         response.request = requests.Request(**requests_kwargs).prepare()
-        if self.feedback:
-            self.store_response(response)
         return response
 
     def call_asgi(
@@ -491,10 +475,9 @@ class Endpoint(Generic[P]):
     def as_strategy(
         self,
         hooks: Optional["HookDispatcher"] = None,
-        feedback: Optional["Feedback"] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
-        return self.schema.get_case_strategy(self, hooks, feedback, data_generation_method)
+        return self.schema.get_case_strategy(self, hooks, data_generation_method)
 
     def get_strategies_from_examples(self) -> List[SearchStrategy[Case]]:
         """Get examples from the endpoint."""
