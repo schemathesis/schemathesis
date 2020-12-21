@@ -5,7 +5,7 @@ from contextlib import ExitStack, contextmanager
 from copy import deepcopy
 from difflib import get_close_matches
 from json import JSONDecodeError
-from typing import Any, Callable, ClassVar, Dict, Generator, Iterable, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Callable, ClassVar, Dict, Generator, Iterable, List, Optional, Tuple, Type, Union
 from urllib.parse import urlsplit
 
 import jsonschema
@@ -22,7 +22,7 @@ from ...exceptions import (
 from ...hooks import HookContext, HookDispatcher
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import BaseSchema
-from ...stateful import APIStateMachine, Stateful, StatefulTest
+from ...stateful import APIStateMachine
 from ...types import FormData
 from ...utils import Err, GenericResponse, Ok, Result, get_response_payload, is_json_media_type
 from . import links, serialization
@@ -64,13 +64,6 @@ class BaseOpenAPISchema(BaseSchema):
     @property  # pragma: no mutate
     def spec_version(self) -> str:
         raise NotImplementedError
-
-    def get_stateful_tests(
-        self, response: GenericResponse, operation: APIOperation, stateful: Optional[Stateful]
-    ) -> Sequence[StatefulTest]:
-        if stateful == Stateful.links:
-            return links.get_links(response, operation, field=self.links_field)
-        return []
 
     def __repr__(self) -> str:
         info = self.raw_schema["info"]

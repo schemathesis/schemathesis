@@ -8,7 +8,7 @@ They give only static definitions of paths.
 """
 from collections.abc import Mapping
 from difflib import get_close_matches
-from typing import Any, Callable, Dict, Generator, Iterable, Iterator, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Callable, Dict, Generator, Iterable, Iterator, List, Optional, Tuple, Type, Union
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 import attr
@@ -22,7 +22,7 @@ from .constants import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from .exceptions import InvalidSchema
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import APIOperation, Case
-from .stateful import APIStateMachine, Stateful, StatefulTest
+from .stateful import APIStateMachine
 from .types import Filter, FormData, GenericTest, NotSet
 from .utils import NOT_SET, Err, GenericResponse, Ok, Result
 
@@ -135,12 +135,6 @@ class BaseSchema(Mapping):
 
     def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
         """Get examples from the API operation."""
-        raise NotImplementedError
-
-    def get_stateful_tests(
-        self, response: GenericResponse, operation: APIOperation, stateful: Optional[Stateful]
-    ) -> Sequence[StatefulTest]:
-        """Get a list of additional tests, that should be executed after this response from the API operation."""
         raise NotImplementedError
 
     def get_parameter_serializer(self, operation: APIOperation, location: str) -> Optional[Callable]:

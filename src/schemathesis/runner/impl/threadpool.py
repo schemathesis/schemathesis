@@ -62,7 +62,7 @@ def _run_task(
                 # `feedback.get_stateful_tests`
                 _run_tests(lambda *_: (items,))
             else:
-                for event in handle_schema_error(result.err(), results, data_generation_method, 0):
+                for event in handle_schema_error(result.err(), results, data_generation_method):
                     events_queue.put(event)
 
 

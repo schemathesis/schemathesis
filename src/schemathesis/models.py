@@ -44,7 +44,6 @@ from .utils import NOT_SET, GenericResponse, WSGIResponse, deprecated_property, 
 if TYPE_CHECKING:
     from .hooks import HookDispatcher
     from .schemas import BaseSchema
-    from .stateful import Stateful, StatefulTest
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -496,9 +495,6 @@ class APIOperation(Generic[P]):
     def get_strategies_from_examples(self) -> List[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         return self.schema.get_strategies_from_examples(self)
-
-    def get_stateful_tests(self, response: GenericResponse, stateful: Optional["Stateful"]) -> Sequence["StatefulTest"]:
-        return self.schema.get_stateful_tests(response, self, stateful)
 
     def get_parameter_serializer(self, location: str) -> Optional[Callable]:
         """Get a function that serializes parameters for the given location.

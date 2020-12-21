@@ -14,12 +14,7 @@ from hypothesis.errors import InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
-from ...constants import (
-    DEFAULT_DEADLINE,
-    RECURSIVE_REFERENCE_ERROR_MESSAGE,
-    USER_AGENT,
-    DataGenerationMethod,
-)
+from ...constants import DEFAULT_DEADLINE, RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT, DataGenerationMethod
 from ...exceptions import CheckFailed, InvalidRegularExpression, InvalidSchema, NonCheckError, get_grouped_exception
 from ...hooks import HookContext, get_all_by_name
 from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResult, TestResultSet
@@ -29,8 +24,8 @@ from ...stateful import Stateful
 from ...targets import Target, TargetContext
 from ...types import RawAuth
 from ...utils import GenericResponse, Ok, WSGIResponse, capture_hypothesis_output, format_exception
-from ..serialization import SerializedTestResult
 from ..events import Phase
+from ..serialization import SerializedTestResult
 
 
 def get_hypothesis_settings(hypothesis_options: Dict[str, Any]) -> hypothesis.settings:
@@ -115,11 +110,11 @@ class BaseRunner:
                         return
             else:
                 # Schema errors
-                yield from handle_schema_error(result.err(), results, data_generation_method, recursion_level)
+                yield from handle_schema_error(result.err(), results, data_generation_method)
 
 
 def handle_schema_error(
-    error: InvalidSchema, results: TestResultSet, data_generation_method: DataGenerationMethod, recursion_level: int
+    error: InvalidSchema, results: TestResultSet, data_generation_method: DataGenerationMethod
 ) -> Generator[events.ExecutionEvent, None, None]:
     if error.method is not None:
         assert error.path is not None
@@ -132,9 +127,7 @@ def handle_schema_error(
         )
         result.add_error(error)
 
-        yield events.BeforeExecution(
-            method=method, path=error.full_path, relative_path=error.path, recursion_level=recursion_level
-        )
+        yield events.BeforeExecution(method=method, path=error.full_path, relative_path=error.path)
         yield events.AfterExecution(
             method=method,
             path=error.full_path,
@@ -391,8 +384,8 @@ def network_test(
                 store_interactions,
                 headers,
                 request_tls_verify,
-        max_response_time,
-    )
+                max_response_time,
+            )
     add_cases(
         case,
         response,
@@ -404,9 +397,9 @@ def network_test(
         timeout,
         store_interactions,
         headers,
-                request_tls_verify,
-                max_response_time,
-            )
+        request_tls_verify,
+        max_response_time,
+    )
 
 
 def _network_test(
@@ -469,9 +462,17 @@ def wsgi_test(
     with ErrorCollector(errors):
         headers = _prepare_wsgi_headers(headers, auth, auth_type)
         if not dry_run:
-            response = _wsgi_test(
-                case, checks, targets, result, headers, store_interactions, max_response_time
-            )add_cases(case, response, _wsgi_test, checks, targets, result, headers, store_interactions, max_response_time,
+            response = _wsgi_test(case, checks, targets, result, headers, store_interactions, max_response_time)
+            add_cases(
+                case,
+                response,
+                _wsgi_test,
+                checks,
+                targets,
+                result,
+                headers,
+                store_interactions,
+                max_response_time,
             )
 
 
@@ -540,10 +541,18 @@ def asgi_test(
         headers = headers or {}
 
         if not dry_run:
-            response = _asgi_test(
-                case, checks, targets, result, store_interactions, headers, max_response_time)
-    add_cases(case, response, _asgi_test, checks, targets, result, store_interactions, headers, max_response_time,
-            )
+            response = _asgi_test(case, checks, targets, result, store_interactions, headers, max_response_time)
+    add_cases(
+        case,
+        response,
+        _asgi_test,
+        checks,
+        targets,
+        result,
+        store_interactions,
+        headers,
+        max_response_time,
+    )
 
 
 def _asgi_test(
