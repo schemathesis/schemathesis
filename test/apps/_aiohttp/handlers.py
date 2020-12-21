@@ -4,7 +4,13 @@ import csv
 import io
 from typing import Dict
 
+import jsonschema
 from aiohttp import web
+
+try:
+    from ..utils import PAYLOAD_VALIDATOR
+except (ImportError, ValueError):
+    from utils import PAYLOAD_VALIDATOR
 
 
 def get_integer_parameter(request: web.Request, name: str) -> int:
@@ -29,6 +35,11 @@ async def success(request: web.Request) -> web.Response:
 async def payload(request: web.Request) -> web.Response:
     body = await request.read()
     if body:
+        data = await request.json()
+        try:
+            PAYLOAD_VALIDATOR.validate(data)
+        except jsonschema.ValidationError as exc:
+            raise web.HTTPBadRequest(text=str(exc))
         return web.json_response(body=body)
     return web.json_response({"name": "Nothing!"})
 
@@ -166,6 +177,12 @@ async def upload_file(request: web.Request) -> web.Response:
 async def form(request: web.Request) -> web.Response:
     if not request.headers.get("Content-Type", "").startswith("application/x-www-form-urlencoded"):
         raise web.HTTPInternalServerError(text="Not an urlencoded request!")
+    data = await request.post()
+    for field in ("first_name", "last_name"):
+        if field not in data:
+            raise web.HTTPBadRequest(text=f'{{"detail": "Missing `{field}`"}}')
+        if not isinstance(data[field], str):
+            raise web.HTTPBadRequest(text=f'{{"detail": "Invalid `{field}`"}}')
     return web.json_response({"size": request.content_length})
 
 
