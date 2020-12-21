@@ -78,7 +78,12 @@ def create_openapi_app(
 
     @app.route("/api/multiple_failures", methods=["GET"])
     def multiple_failures():
-        id_value = int(request.args["id"])
+        try:
+            id_value = int(request.args["id"])
+        except KeyError:
+            return jsonify({"detail": "Missing `id`"}), 400
+        except ValueError:
+            return jsonify({"detail": "Invalid `id`"}), 400
         if id_value == 0:
             raise InternalServerError
         if id_value > 0:
@@ -167,6 +172,10 @@ def create_openapi_app(
 
     @app.route("/api/custom_format", methods=["GET"])
     def custom_format():
+        if "id" not in request.args:
+            return jsonify({"detail": "Missing `id`"}), 400
+        if not request.args["id"].isdigit():
+            return jsonify({"detail": "Invalid `id`"}), 400
         return jsonify({"value": request.args["id"]})
 
     @app.route("/api/invalid_path_parameter/<id>", methods=["GET"])
@@ -176,6 +185,10 @@ def create_openapi_app(
     @app.route("/api/users/", methods=["POST"])
     def create_user():
         data = request.json
+        if "username" not in data:
+            return jsonify({"detail": "Missing `username`"}), 400
+        if not isinstance(data["username"], str):
+            return jsonify({"detail": "Invalid `username`"}), 400
         user_id = len(app.config["users"]) + 1
         app.config["users"][user_id] = {**data, "id": user_id}
         app.config["requests_history"][user_id].append("POST")
@@ -198,7 +211,12 @@ def create_openapi_app(
             history.append("PATCH")
             if history == ["POST", "GET", "PATCH", "GET", "PATCH"]:
                 raise InternalServerError("We got a problem!")
-            user["username"] = request.json["username"]
+            data = request.json
+            if "username" not in data:
+                return jsonify({"detail": "Missing `username`"}), 400
+            if not isinstance(data["username"], str):
+                return jsonify({"detail": "Invalid `username`"}), 400
+            user["username"] = data["username"]
             return jsonify(user)
         except KeyError:
             return jsonify({"message": "Not found"}), 404

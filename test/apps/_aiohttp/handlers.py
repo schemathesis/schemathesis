@@ -7,6 +7,15 @@ from typing import Dict
 from aiohttp import web
 
 
+def get_integer_parameter(request: web.Request, name: str) -> int:
+    try:
+        return int(request.match_info[name])
+    except KeyError:
+        raise web.HTTPBadRequest(text=f'{{"detail": "Missing `{name}`"}}')
+    except ValueError:
+        raise web.HTTPBadRequest(text=f'{{"detail": "Invalid `{name}`"}}')
+
+
 async def expect_content_type(request: web.Request, value: str):
     if request.headers.get("Content-Type", "") != value:
         raise web.HTTPInternalServerError(text=f"Expected {value} payload")
@@ -29,7 +38,12 @@ async def invalid_response(request: web.Request) -> web.Response:
 
 
 async def custom_format(request: web.Request) -> web.Response:
-    return web.json_response({"value": request.query["id"]})
+    if "id" not in request.query:
+        raise web.HTTPBadRequest(text='{"detail": "Missing `id`"}')
+    if not request.query["id"].isdigit():
+        raise web.HTTPBadRequest(text='{"detail": "Invalid `id`"}')
+    value = request.query["id"]
+    return web.json_response({"value": value})
 
 
 async def teapot(request: web.Request) -> web.Response:
@@ -102,7 +116,12 @@ async def flaky(request: web.Request) -> web.Response:
 
 
 async def multiple_failures(request: web.Request) -> web.Response:
-    id_value = int(request.query["id"])
+    try:
+        id_value = int(request.query["id"])
+    except KeyError:
+        raise web.HTTPBadRequest(text='{"detail": "Missing `id`"}')
+    except ValueError:
+        raise web.HTTPBadRequest(text='{"detail": "Invalid `id`"}')
     if id_value == 0:
         raise web.HTTPInternalServerError
     if id_value > 0:
@@ -123,7 +142,7 @@ def _decode_multipart(content: bytes, content_type: str) -> Dict[str, str]:
 
 async def multipart(request: web.Request) -> web.Response:
     if not request.headers.get("Content-Type", "").startswith("multipart/"):
-        raise web.HTTPInternalServerError(text="Not a multipart request!")
+        raise web.HTTPBadRequest(text="Not a multipart request!")
     # We need to have payload stored in the request, thus can't use `request.multipart` that consumes the reader
     content = await request.read()
     data = _decode_multipart(content, request.headers["Content-Type"])
@@ -132,7 +151,7 @@ async def multipart(request: web.Request) -> web.Response:
 
 async def upload_file(request: web.Request) -> web.Response:
     if not request.headers.get("Content-Type", "").startswith("multipart/"):
-        raise web.HTTPInternalServerError(text="Not a multipart request!")
+        raise web.HTTPBadRequest(text="Not a multipart request!")
     content = await request.read()
     expected_lines = [
         b'Content-Disposition: form-data; name="data"; filename="data"\r\n',
@@ -140,7 +159,7 @@ async def upload_file(request: web.Request) -> web.Response:
         b'Content-Disposition: form-data; name="note"\r\n',
     ]
     if any(line not in content for line in expected_lines):
-        raise web.HTTPInternalServerError(text="Request does not contain expected lines!")
+        raise web.HTTPBadRequest(text="Request does not contain expected lines!")
     return web.json_response({"size": request.content_length})
 
 
@@ -152,6 +171,10 @@ async def form(request: web.Request) -> web.Response:
 
 async def create_user(request: web.Request) -> web.Response:
     data = await request.json()
+    if "username" not in data:
+        raise web.HTTPBadRequest(text='{"detail": "Missing `username`"}')
+    if not isinstance(data["username"], str):
+        raise web.HTTPBadRequest(text='{"detail": "Invalid `username`"}')
     user_id = len(request.app["users"]) + 1
     request.app["users"][user_id] = {**data, "id": user_id}
     request.app["requests_history"][user_id].append("POST")
@@ -159,7 +182,7 @@ async def create_user(request: web.Request) -> web.Response:
 
 
 async def get_user(request: web.Request) -> web.Response:
-    user_id = int(request.match_info["user_id"])
+    user_id = get_integer_parameter(request, "user_id")
     try:
         user = request.app["users"][user_id]
         request.app["requests_history"][user_id].append("GET")
@@ -169,7 +192,7 @@ async def get_user(request: web.Request) -> web.Response:
 
 
 async def update_user(request: web.Request) -> web.Response:
-    user_id = int(request.match_info["user_id"])
+    user_id = get_integer_parameter(request, "user_id")
     try:
         user = request.app["users"][user_id]
         history = request.app["requests_history"][user_id]
@@ -177,6 +200,10 @@ async def update_user(request: web.Request) -> web.Response:
         if history == ["POST", "GET", "PATCH", "GET", "PATCH"]:
             raise web.HTTPInternalServerError(text="We got a problem!")
         data = await request.json()
+        if "username" not in data:
+            raise web.HTTPBadRequest(text='{"detail": "Missing `username`"}')
+        if not isinstance(data["username"], str):
+            raise web.HTTPBadRequest(text='{"detail": "Invalid `username`"}')
         user["username"] = data["username"]
         return web.json_response(user)
     except KeyError:
