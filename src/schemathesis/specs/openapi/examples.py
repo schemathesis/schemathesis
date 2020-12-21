@@ -119,11 +119,8 @@ def merge_examples(
     for idx in range(num_examples(parameter_examples, request_body_examples)):
         static_parameters: Dict[str, Any] = {}
         for parameter in parameter_examples:
-            if parameter["type"] not in static_parameters:
-                static_parameters[parameter["type"]] = {}
-            static_parameters[parameter["type"]][parameter["name"]] = parameter["examples"][
-                min(idx, len(parameter["examples"]) - 1)
-            ]
+            container = static_parameters.setdefault(parameter["type"], {})
+            container[parameter["name"]] = parameter["examples"][min(idx, len(parameter["examples"]) - 1)]
         if "examples" in request_body_examples and request_body_examples["examples"]:
             static_parameters[request_body_examples["type"]] = request_body_examples["examples"][
                 min(idx, len(request_body_examples["examples"]) - 1)

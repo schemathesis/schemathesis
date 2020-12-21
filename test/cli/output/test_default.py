@@ -264,7 +264,9 @@ def test_display_single_error(capsys, swagger_20, endpoint, execution_context, s
         assert "\n".join(lines[1:6]) == strip_style_win32(click.style(expected, fg="red")).rstrip("\n")
 
 
-def test_display_failures(swagger_20, capsys, execution_context, results_set):
+@pytest.mark.parametrize("verbosity", (0, 1))
+def test_display_failures(swagger_20, capsys, execution_context, results_set, verbosity):
+    execution_context.verbosity = verbosity
     # Given two test results - success and failure
     endpoint = models.Endpoint("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)
     failure = models.TestResult(endpoint, DataGenerationMethod.default())
@@ -284,10 +286,8 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set):
     assert f"requests.get('http://127.0.0.1:8080/api/failure', headers={{'User-Agent': '{USER_AGENT}'}})" in out
 
 
-@pytest.mark.parametrize("verbosity", (0, 1))
 @pytest.mark.parametrize("show_errors_tracebacks", (True, False))
-def test_display_errors(swagger_20, capsys, results_set, execution_context, show_errors_tracebacks, verbosity):
-    execution_context.verbosity = verbosity
+def test_display_errors(swagger_20, capsys, results_set, execution_context, show_errors_tracebacks):
     # Given two test results - success and error
     endpoint = models.Endpoint("/api/error", "GET", {}, swagger_20)
     error = models.TestResult(endpoint, DataGenerationMethod.default(), seed=123)

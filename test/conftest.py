@@ -525,3 +525,15 @@ def loadable_aiohttp_app(testdir, endpoints):
         """
     )
     return f"{module.purebasename}:app"
+
+
+@pytest.fixture
+def loadable_fastapi_app(testdir, endpoints):
+    module = testdir.make_importable_pyfile(
+        location=f"""
+        from test.apps._fastapi import create_app
+
+        app = create_app({endpoints})
+        """
+    )
+    return f"{module.purebasename}:app"

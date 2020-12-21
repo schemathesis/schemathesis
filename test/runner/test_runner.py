@@ -180,6 +180,16 @@ def test_interactions(request, args, workers):
         assert success.response.headers["Content-Type"] == ["application/json; charset=utf-8"]
 
 
+@pytest.mark.endpoints("root")
+def test_asgi_interactions(loadable_fastapi_app):
+    init, *ev, finished = prepare(
+        "/openapi.json", app=loadable_fastapi_app, loader=loaders.from_asgi, store_interactions=True
+    )
+    interaction = ev[1].result.interactions[0]
+    assert interaction.status == Status.success
+    assert interaction.request.uri == "http://testserver/users"
+
+
 def test_auth(args):
     app, kwargs = args
     # When auth is specified as a tuple of 2 strings
