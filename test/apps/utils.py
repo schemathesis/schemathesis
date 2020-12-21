@@ -1,6 +1,8 @@
 from enum import Enum
 from typing import Any, Dict, Tuple
 
+import jsonschema
+
 
 class Endpoint(Enum):
     success = ("GET", "/api/success")
@@ -93,6 +95,8 @@ PAYLOAD = {
     "example": {"name": "John"},
     "additionalProperties": False,
 }
+
+PAYLOAD_VALIDATOR = jsonschema.validators.Draft4Validator({"anyOf": [{"type": "null"}, PAYLOAD]})
 
 
 def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:

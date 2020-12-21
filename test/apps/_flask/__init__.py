@@ -4,14 +4,15 @@ from collections import defaultdict
 from time import sleep
 from typing import Tuple
 
+import jsonschema
 import yaml
 from flask import Flask, Response, _request_ctx_stack, jsonify, request
 from werkzeug.exceptions import BadRequest, GatewayTimeout, InternalServerError
 
 try:
-    from ..utils import Endpoint, OpenAPIVersion, make_openapi_schema
+    from ..utils import PAYLOAD_VALIDATOR, Endpoint, OpenAPIVersion, make_openapi_schema
 except (ImportError, ValueError):
-    from utils import Endpoint, OpenAPIVersion, make_openapi_schema
+    from utils import PAYLOAD_VALIDATOR, Endpoint, OpenAPIVersion, make_openapi_schema
 
 
 def expect_content_type(value: str):
@@ -59,6 +60,10 @@ def create_openapi_app(
     def payload():
         try:
             data = request.json
+            try:
+                PAYLOAD_VALIDATOR.validate(data)
+            except jsonschema.ValidationError:
+                return jsonify({"detail": "Validation error"}), 400
         except BadRequest:
             data = {"name": "Nothing!"}
         return jsonify(data)
@@ -136,6 +141,12 @@ def create_openapi_app(
     @app.route("/api/form", methods=["POST"])
     def form():
         expect_content_type("application/x-www-form-urlencoded")
+        data = request.form
+        for field in ("first_name", "last_name"):
+            if field not in data:
+                return jsonify({"detail": f"Missing `{field}`"}), 400
+            if not isinstance(data[field], str):
+                return jsonify({"detail": f"Invalid `{field}`"}), 400
         return jsonify({"size": request.content_length})
 
     @app.route("/api/csv", methods=["POST"])
