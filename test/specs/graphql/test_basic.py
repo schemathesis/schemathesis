@@ -81,3 +81,22 @@ def test_as_werkzeug_kwargs(graphql_strategy):
         "json": {"query": case.body},
         "headers": {"User-Agent": USER_AGENT},
     }
+
+
+@pytest.mark.parametrize(
+    "kwargs, base_path, expected",
+    (
+        ({"base_url": "http://0.0.0.0:1234/something"}, "/something", "http://0.0.0.0:1234/something"),
+        ({"port": 8888}, "/graphql", "http://127.0.0.1:8888/graphql"),
+    ),
+)
+@pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
+def test_custom_base_url(graphql_endpoint, kwargs, base_path, expected):
+    # When a custom Base URL is specified
+    schema = schemathesis.graphql.from_url(graphql_endpoint, **kwargs)
+    # Then the base path is changed, in this case it is the only available endpoint
+    assert schema.base_path == base_path
+    strategy = schema[base_path]["POST"].as_strategy()
+    case = strategy.example()
+    # And all requests should go to the specified URL
+    assert case.as_requests_kwargs()["url"] == expected
