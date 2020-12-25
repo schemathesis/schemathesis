@@ -153,6 +153,11 @@ def get_parameters_strategy(
     parameters = getattr(endpoint, LOCATION_TO_CONTAINER[location])
     if parameters:
         schema = parameters_to_json_schema(parameters)
+        if not endpoint.schema.validate_schema and location == "path":
+            # If schema validation is disabled, we try to generate data even if the parameter definition
+            # contains errors.
+            # In this case, we know that the `required` keyword should always be `True`.
+            schema["required"] = list(schema["properties"])
         strategy = to_strategy(schema)
         serialize = endpoint.get_parameter_serializer(location)
         if serialize is not None:
