@@ -23,7 +23,9 @@ def get_integer_parameter(request: web.Request, name: str) -> int:
 
 
 async def expect_content_type(request: web.Request, value: str):
-    if request.headers.get("Content-Type", "") != value:
+    content_type = request.headers.get("Content-Type", "")
+    content_type, _ = cgi.parse_header(content_type)
+    if content_type != value:
         raise web.HTTPInternalServerError(text=f"Expected {value} payload")
     return await request.read()
 
