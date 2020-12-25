@@ -57,7 +57,8 @@ class GraphQLSchema(BaseSchema):
 
     @property
     def base_path(self) -> str:
-        # There is no public API to use the `base_url` attribute; therefore, this code is limited
+        if self.base_url:
+            return urlsplit(self.base_url).path
         return self._get_base_path()
 
     def _get_base_path(self) -> str:
@@ -65,7 +66,7 @@ class GraphQLSchema(BaseSchema):
 
     def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
         yield Endpoint(
-            base_url=self.location, path=self.base_path, method="POST", schema=self, definition=None  # type: ignore
+            base_url=self.get_base_url(), path=self.base_path, method="POST", schema=self, definition=None  # type: ignore
         )
 
     def get_case_strategy(

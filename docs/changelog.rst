@@ -11,6 +11,7 @@ Changelog
 - Support for user-defined media types serialization. You can define how Schemathesis should handle media types defined
   in your schema or customize existing (like ``application/json``).
 - The `response_schema_conformance` check now runs on media types that are encoded with JSON. For example, ``application/problem+json``. `#920`_
+- Base URL for GraphQL schemas. It allows you to load the schema from one place but send test requests to another one. `#934`_
 
 **Changed**
 
@@ -1610,6 +1611,7 @@ Deprecated
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#941: https://github.com/schemathesis/schemathesis/issues/941
+.. _#934: https://github.com/schemathesis/schemathesis/issues/934
 .. _#925: https://github.com/schemathesis/schemathesis/issues/925
 .. _#920: https://github.com/schemathesis/schemathesis/issues/920
 .. _#919: https://github.com/schemathesis/schemathesis/issues/919
