@@ -6,7 +6,7 @@ Changelog
 
 **Added**
 
-- Support for sending ``text/plain`` payload as test data. `#850`_
+- Support for sending ``text/plain`` payload as test data. Including variants with non-default ``charset``. `#850`_, `#939`_
 - Generating data for all media types defined for an operation. `#690`_
 - Support for user-defined media types serialization. You can define how Schemathesis should handle media types defined
   in your schema or customize existing (like ``application/json``).
@@ -1616,6 +1616,7 @@ Deprecated
 
 .. _#945: https://github.com/schemathesis/schemathesis/issues/945
 .. _#941: https://github.com/schemathesis/schemathesis/issues/941
+.. _#939: https://github.com/schemathesis/schemathesis/issues/939
 .. _#934: https://github.com/schemathesis/schemathesis/issues/934
 .. _#925: https://github.com/schemathesis/schemathesis/issues/925
 .. _#920: https://github.com/schemathesis/schemathesis/issues/920

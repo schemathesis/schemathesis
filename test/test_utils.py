@@ -7,6 +7,7 @@ from schemathesis.utils import (
     dict_true_values,
     import_app,
     is_json_media_type,
+    is_plain_text_media_type,
     is_schemathesis_test,
     parse_content_type,
 )
@@ -52,6 +53,19 @@ def test_parse_content_type(value, expected):
 )
 def test_is_json_media_type(value, expected):
     assert is_json_media_type(value) is expected
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    (
+        ("text/plain", True),
+        ("text/plain;charset=utf-8", True),
+        ("application/json", False),
+        ("application/problem+json", False),
+    ),
+)
+def test_is_plain_text_media_type(value, expected):
+    assert is_plain_text_media_type(value) is expected
 
 
 @pytest.mark.parametrize(

@@ -1,3 +1,4 @@
+import cgi
 import csv
 import json
 from collections import defaultdict
@@ -16,7 +17,9 @@ except (ImportError, ValueError):
 
 
 def expect_content_type(value: str):
-    if request.headers["Content-Type"] != value:
+    content_type = request.headers["Content-Type"]
+    content_type, _ = cgi.parse_header(content_type)
+    if content_type != value:
         raise InternalServerError(f"Expected {value} payload")
 
 
