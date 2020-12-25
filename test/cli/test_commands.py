@@ -547,7 +547,7 @@ def test_hypothesis_failed_event(cli, cli_args, workers):
         assert lines[10].startswith("GET /api/slow E")
     else:
         # It could be in any sequence, because of multiple threads
-        assert lines[10].split("\n")[0] in ("E.", ".E")
+        assert lines[10].split("\n")[0] in ("E.", ".E", "EE")
         # empty line after all tests progress output
         assert lines[11] == ""
     # And the proper error message from Hypothesis should be displayed
