@@ -391,6 +391,54 @@ def complex_schema(testdir):
     return str(root)
 
 
+@pytest.fixture
+def schema_with_recursive_references():
+    return {
+        "openapi": "3.0.0",
+        "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},
+        "components": {
+            "schemas": {
+                "Node": {
+                    "type": "object",
+                    "required": ["children"],
+                    "properties": {"children": {"type": "array", "items": {"$ref": "#/components/schemas/Node"}}},
+                }
+            }
+        },
+        "paths": {
+            "/foo": {
+                "post": {
+                    "summary": "Test",
+                    "description": "",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["nodes"],
+                                    "properties": {
+                                        "nodes": {
+                                            "type": "object",
+                                            "additionalProperties": {"$ref": "#/components/schemas/Node"},
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {},
+                        }
+                    },
+                }
+            }
+        },
+    }
+
+
 @pytest.fixture(name="get_schema_path")
 def _get_schema_path():
     return get_schema_path

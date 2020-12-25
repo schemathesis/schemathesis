@@ -1,4 +1,4 @@
-from schemathesis.constants import DEFAULT_DEADLINE, USER_AGENT
+from schemathesis.constants import DEFAULT_DEADLINE, RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
 
 
 def test_pytest_parametrize_fixture(testdir):
@@ -216,3 +216,18 @@ def test(case):
             rf".+requests.get\('{openapi3_base_url}/failure', headers={{'User-Agent': '{USER_AGENT}'",
         ]
     )
+
+
+def test_skip_operations_with_recursive_references(testdir, schema_with_recursive_references):
+    # When the test schema contains recursive references
+    testdir.make_test(
+        f"""
+@schema.parametrize()
+def test(case):
+    pass""",
+        schema=schema_with_recursive_references,
+    )
+    result = testdir.runpytest("-rs")
+    # Then this test should be skipped with a proper error message
+    result.assert_outcomes(skipped=1)
+    assert RECURSIVE_REFERENCE_ERROR_MESSAGE in result.stdout.str()

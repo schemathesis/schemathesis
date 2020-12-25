@@ -22,12 +22,14 @@ Changelog
   This change allows Schemathesis to generate test cases even for endpoints containing optional path parameters (which is not compliant with the spec). `#941`_
 - Using ``--auth`` together with ``--header`` that sets the ``Authorization`` header causes a validation error.
   Before, the ``--header`` value was ignored in such cases, and the basic auth passed in ``--auth`` was used. `#911`_
+- When ``hypothesis-jsonschema`` fails to resolve recursive references, the test is skipped with an error message that indicates why it happens.
 
 **Fixed**
 
 - Allow generating requests without payload if the schema does not require it. `#916`_
 - Allow sending ``null`` as request payload if the schema expects it. `#919`_
 - CLI failure if the tested operation is `GET` and has payload examples. `#925`_
+- Excessive reference inlining that leads to out-of-memory for large schemas with deep references. `#945`_
 
 **Removed**
 
@@ -1612,6 +1614,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#945: https://github.com/schemathesis/schemathesis/issues/945
 .. _#941: https://github.com/schemathesis/schemathesis/issues/941
 .. _#934: https://github.com/schemathesis/schemathesis/issues/934
 .. _#925: https://github.com/schemathesis/schemathesis/issues/925
