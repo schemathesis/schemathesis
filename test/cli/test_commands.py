@@ -1625,3 +1625,25 @@ def test_auth_and_authorization_header_are_disallowed(cli, schema_url, header, o
         "Invalid value: Passing `--auth` together with `--header` that sets `Authorization` is not allowed."
         in result.stdout
     )
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.endpoints("failure", "success")
+def test_exit_first(cli, schema_url, openapi_version):
+    # When the `--exit-first` CLI option is passed
+    # And a failure occurs
+    result = cli.run(schema_url, "--exitfirst")
+    # Then tests are failed
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    lines = result.stdout.split("\n")
+    # And the execution should stop on the first failure
+    for idx, line in enumerate(lines):
+        if line.startswith("GET /api/failure F"):
+            assert line.endswith("[ 50%]")
+            break
+    else:
+        pytest.fail("Line is not found")
+    # the "FAILURES" sections goes after a new line, rather then continuing to the next operation
+    next_line = lines[idx + 1]
+    assert next_line == ""
+    assert "FAILURES" in lines[idx + 2]
