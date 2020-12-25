@@ -94,7 +94,7 @@ def test_update_pet(testdir):
     testdir.make_petstore_test(
         """
 @schema.parametrize(method="POST", endpoint="/pet/{petId}$")
-@settings(max_examples=5, deadline=None, suppress_health_check=[HealthCheck.filter_too_much])
+@settings(max_examples=5, deadline=None, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow])
 def test_(request, case):
     assume(case.body is not NOT_SET)
     assume("name" in case.body)
@@ -190,7 +190,7 @@ def test_delete_order(testdir):
     testdir.make_petstore_test(
         """
 @schema.parametrize(method="DELETE", endpoint="/store/order/{orderId}$")
-@settings(max_examples=5, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
+@settings(max_examples=5, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow], deadline=None)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_int(case.path_parameters["orderId"])
