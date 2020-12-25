@@ -5,7 +5,7 @@ from contextlib import ExitStack, contextmanager
 from copy import deepcopy
 from difflib import get_close_matches
 from json import JSONDecodeError
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Callable, ClassVar, Dict, Generator, Iterable, List, Optional, Sequence, Tuple, Type, Union
 from urllib.parse import urlsplit
 
 import jsonschema
@@ -44,7 +44,7 @@ from .parameters import (
     OpenAPI30Parameter,
     OpenAPIParameter,
 )
-from .references import ConvertingResolver
+from .references import RECURSION_DEPTH_LIMIT, ConvertingResolver
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
@@ -55,6 +55,7 @@ class BaseOpenAPISchema(BaseSchema):
     operations: Tuple[str, ...]
     security: BaseSecurityProcessor
     parameter_cls: Type[OpenAPIParameter]
+    component_locations: ClassVar[Tuple[str, ...]] = ()
     _endpoints_by_operation_id: Dict[str, Endpoint]
 
     @property  # pragma: no mutate
@@ -82,7 +83,9 @@ class BaseOpenAPISchema(BaseSchema):
                     continue
                 self.dispatch_hook("before_process_path", context, path, methods)
                 scope, raw_methods = self._resolve_methods(methods)
-                methods = self.resolver.resolve_all(methods)
+                # Setting a low recursion limit doesn't solve the problem with recursive references & inlining too much
+                # but decreases the number of cases when Schemathesis stuck on this step.
+                methods = self.resolver.resolve_all(methods, RECURSION_DEPTH_LIMIT - 5)
                 common_parameters = get_common_parameters(methods)
                 for method, resolved_definition in methods.items():
                     # Only method definitions are parsed
@@ -362,6 +365,18 @@ class BaseOpenAPISchema(BaseSchema):
                 ) from exc
         return None  # explicitly return None for mypy
 
+    def prepare_schema(self, schema: Any) -> Any:
+        """Inline Open API definitions.
+
+        Inlining components helps `hypothesis-jsonschema` generate data that involves non-resolved references.
+        """
+        schema = deepcopy(schema)
+        # Different spec versions allow different keywords to store possible reference targets
+        for key in self.component_locations:
+            if key in self.raw_schema:
+                schema[key] = deepcopy(self.raw_schema[key])
+        return schema
+
 
 @contextmanager
 def in_scopes(resolver: jsonschema.RefResolver, scopes: List[str]) -> Generator[None, None, None]:
@@ -388,6 +403,7 @@ class SwaggerV20(BaseOpenAPISchema):
     operations: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
     parameter_cls: Type[OpenAPIParameter] = OpenAPI20Parameter
     security = SwaggerSecurityProcessor()
+    component_locations: ClassVar[Tuple[str, ...]] = ("definitions", "parameters", "responses")
     links_field = "x-links"
 
     @property
@@ -521,6 +537,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     operations = SwaggerV20.operations + ("trace",)
     security = OpenAPISecurityProcessor()
     parameter_cls = OpenAPI30Parameter
+    component_locations = ("components",)
     links_field = "links"
 
     @property

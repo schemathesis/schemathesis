@@ -263,6 +263,9 @@ class BaseSchema(Mapping):
     def validate_response(self, endpoint: Endpoint, response: GenericResponse) -> None:
         raise NotImplementedError
 
+    def prepare_schema(self, schema: Any) -> Any:
+        raise NotImplementedError
+
 
 def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, CaseInsensitiveDict]:
     output: Dict[str, CaseInsensitiveDict] = {}

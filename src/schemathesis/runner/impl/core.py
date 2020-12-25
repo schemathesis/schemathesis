@@ -7,9 +7,16 @@ import attr
 import hypothesis
 import requests
 from _pytest.logging import LogCaptureHandler, catching_logs
+from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
-from ...constants import DEFAULT_DEADLINE, DEFAULT_STATEFUL_RECURSION_LIMIT, USER_AGENT, DataGenerationMethod
+from ...constants import (
+    DEFAULT_DEADLINE,
+    DEFAULT_STATEFUL_RECURSION_LIMIT,
+    RECURSIVE_REFERENCE_ERROR_MESSAGE,
+    USER_AGENT,
+    DataGenerationMethod,
+)
 from ...exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from ...hooks import HookContext, get_all_by_name
 from ...models import Case, Check, CheckFunction, Endpoint, Status, TestResult, TestResultSet
@@ -144,6 +151,9 @@ def run_test(  # pylint: disable=too-many-locals
         error = reraise(exc)
         status = Status.error
         result.add_error(error)
+    except HypothesisRefResolutionError:
+        status = Status.error
+        result.add_error(hypothesis.errors.Unsatisfiable(RECURSIVE_REFERENCE_ERROR_MESSAGE))
     except Exception as error:
         status = Status.error
         result.add_error(error)
