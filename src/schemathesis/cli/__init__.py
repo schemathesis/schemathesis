@@ -337,6 +337,7 @@ def run(
     SCHEMA must be a valid URL or file path pointing to an Open API / Swagger specification.
     """
     # pylint: disable=too-many-locals
+    check_auth(auth, headers)
     selected_targets = tuple(target for target in targets_module.ALL_TARGETS if target.__name__ in targets)
 
     if "all" in checks:
@@ -380,6 +381,11 @@ def run(
         hypothesis_verbosity=hypothesis_verbosity,
     )
     execute(prepared_runner, workers_num, show_errors_tracebacks, store_network_log, junit_xml, verbosity)
+
+
+def check_auth(auth: Optional[Tuple[str, str]], headers: Dict[str, str]) -> None:
+    if auth is not None and "authorization" in {header.lower() for header in headers}:
+        raise click.BadParameter("Passing `--auth` together with `--header` that sets `Authorization` is not allowed.")
 
 
 def get_output_handler(workers_num: int) -> EventHandler:
