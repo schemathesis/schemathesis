@@ -29,6 +29,7 @@ class Endpoint(Enum):
     invalid_response = ("GET", "/api/invalid_response")
     custom_format = ("GET", "/api/custom_format")
     invalid_path_parameter = ("GET", "/api/invalid_path_parameter/{id}")
+    missing_path_parameter = ("GET", "/api/missing_path_parameter/{id}")
     headers = ("GET", "/api/headers")
 
     create_user = ("POST", "/api/users/")

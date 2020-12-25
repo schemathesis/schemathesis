@@ -125,10 +125,11 @@ class Case:  # pylint: disable=too-many-public-methods
         # pylint: disable=not-a-mapping
         try:
             return self.path.format(**self.path_parameters or {})
-        except KeyError as variable:
-            raise InvalidSchema(
-                f"Missing path parameter {variable}. It either not defined or has no `required: true` in its definition"
-            ) from variable
+        except KeyError as exc:
+            # This may happen when a path template has a placeholder for variable "X", but parameter "X" is not defined
+            # in the parameters list.
+            # When `exc` is formatted, it is the missing key name in quotes. E.g. 'id'
+            raise InvalidSchema(f"Path parameter {exc} is not defined") from exc
 
     def get_full_base_url(self) -> Optional[str]:
         """Create a full base url, adding "localhost" for WSGI apps."""

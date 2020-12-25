@@ -131,6 +131,7 @@ There are also few endpoints with deliberately malformed schemas, that are not i
 - ``POST /api/invalid`` - invalid parameter definition. Uses ``int`` instead of ``integer``
 - ``GET /api/invalid_response`` - response doesn't conform to the declared schema
 - ``GET /api/invalid_path_parameter/{id}`` - the parameter declaration is invalid (``required`` keyword is set to ``false``)
+- ``GET /api/missing_path_parameter/{id}`` - the ``id`` parameter is missing
 
 To select only a subset of the endpoints above, you could use the ``--endpoints`` command-line option and provide a
 list of names separated by a comma. Values in this list are either mentioned in parentheses or are the path part after ``/api/``.

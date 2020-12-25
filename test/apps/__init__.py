@@ -22,7 +22,7 @@ except ImportError as exc:
         raise exc
 
 
-INVALID_ENDPOINTS = ("invalid", "invalid_response", "invalid_path_parameter")
+INVALID_ENDPOINTS = ("invalid", "invalid_response", "invalid_path_parameter", "missing_path_parameter")
 AvailableEndpoints = CSVOption(Endpoint)
 AvailableEndpoints.choices += ("__all__",)
 
