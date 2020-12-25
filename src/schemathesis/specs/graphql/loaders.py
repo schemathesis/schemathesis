@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional
 
 import requests
+from yarl import URL
 
 from ...hooks import HookContext, dispatch
 from .schemas import GraphQLSchema
@@ -91,12 +92,16 @@ fragment TypeRef on __Type {
 }"""
 
 
-def from_url(url: str) -> GraphQLSchema:
+def from_url(url: str, base_url: Optional[str] = None, port: Optional[int] = None) -> GraphQLSchema:
+    if not base_url and port:
+        base_url = str(URL(url).with_port(port))
     response = requests.post(url, json={"query": INTROSPECTION_QUERY})
     decoded = response.json()
-    return from_dict(raw_schema=decoded["data"], location=url)
+    return from_dict(raw_schema=decoded["data"], location=url, base_url=base_url)
 
 
-def from_dict(raw_schema: Dict[str, Any], location: Optional[str] = None) -> GraphQLSchema:
+def from_dict(
+    raw_schema: Dict[str, Any], location: Optional[str] = None, base_url: Optional[str] = None
+) -> GraphQLSchema:
     dispatch("before_load_schema", HookContext(), raw_schema)
-    return GraphQLSchema(raw_schema, location=location)  # type: ignore
+    return GraphQLSchema(raw_schema, location=location, base_url=base_url)  # type: ignore
