@@ -20,6 +20,8 @@ Changelog
 - Missing ``required: true`` in path parameters definition is now automatically enforced if schema validation is disabled.
   According to the Open API spec, the ``required`` keyword value should be ``true`` for path parameters.
   This change allows Schemathesis to generate test cases even for endpoints containing optional path parameters (which is not compliant with the spec). `#941`_
+- Using ``--auth`` together with ``--header`` that sets the ``Authorization`` header causes a validation error.
+  Before, the ``--header`` value was ignored in such cases, and the basic auth passed in ``--auth`` was used. `#911`_
 
 **Fixed**
 
@@ -1617,6 +1619,7 @@ Deprecated
 .. _#919: https://github.com/schemathesis/schemathesis/issues/919
 .. _#917: https://github.com/schemathesis/schemathesis/issues/917
 .. _#916: https://github.com/schemathesis/schemathesis/issues/916
+.. _#911: https://github.com/schemathesis/schemathesis/issues/911
 .. _#897: https://github.com/schemathesis/schemathesis/issues/897
 .. _#895: https://github.com/schemathesis/schemathesis/issues/895
 .. _#890: https://github.com/schemathesis/schemathesis/issues/890

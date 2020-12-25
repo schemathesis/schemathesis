@@ -4,6 +4,7 @@ import os
 import pathlib
 import sys
 import time
+from test.apps import OpenAPIVersion
 from test.utils import HERE, SIMPLE_PATH
 from urllib.parse import urljoin
 
@@ -1610,3 +1611,17 @@ def test_max_response_time_valid(cli, server, schema_url):
     result = cli.run(schema_url, "--max-response-time=200")
     # Then no errors should occur
     assert result.exit_code == ExitCode.OK, result.stdout
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.parametrize("header", ("Authorization", "authorization"))
+@pytest.mark.endpoints()
+def test_auth_and_authorization_header_are_disallowed(cli, schema_url, header, openapi_version):
+    # When ``--auth`` is passed together with ``--header`` that sets the ``Authorization`` header
+    result = cli.run(schema_url, "--auth=test:test", f"--header={header}:token123")
+    # Then it causes a validation error
+    assert result.exit_code == ExitCode.INTERRUPTED
+    assert (
+        "Invalid value: Passing `--auth` together with `--header` that sets `Authorization` is not allowed."
+        in result.stdout
+    )
