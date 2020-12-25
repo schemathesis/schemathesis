@@ -30,6 +30,7 @@ Changelog
 - Allow sending ``null`` as request payload if the schema expects it. `#919`_
 - CLI failure if the tested operation is `GET` and has payload examples. `#925`_
 - Excessive reference inlining that leads to out-of-memory for large schemas with deep references. `#945`_
+- ``--exitfirst`` CLI option trims the progress bar output when a failure occurs. `#951`_
 
 **Removed**
 
@@ -1614,6 +1615,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#951: https://github.com/schemathesis/schemathesis/issues/951
 .. _#945: https://github.com/schemathesis/schemathesis/issues/945
 .. _#941: https://github.com/schemathesis/schemathesis/issues/941
 .. _#939: https://github.com/schemathesis/schemathesis/issues/939

@@ -59,13 +59,13 @@ class BaseRunner:
         yield initialized
 
         for event in self._execute(results):
+            yield event
             if (
                 self.exit_first
                 and isinstance(event, events.AfterExecution)
                 and event.status in (Status.error, Status.failure)
             ):
                 break
-            yield event
 
         yield events.Finished.from_results(results=results, running_time=time.monotonic() - initialized.start_time)
 
