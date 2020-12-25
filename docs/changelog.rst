@@ -16,6 +16,9 @@ Changelog
 
 - Open API parameters parsing to unblock supporting multiple media types per operation. Their definitions aren't converted
   to JSON Schema equivalents right away but deferred instead and stored as-is.
+- Missing ``required: true`` in path parameters definition is now automatically enforced if schema validation is disabled.
+  According to the Open API spec, the ``required`` keyword value should be ``true`` for path parameters.
+  This change allows Schemathesis to generate test cases even for endpoints containing optional path parameters (which is not compliant with the spec). `#941`_
 
 **Fixed**
 
@@ -1606,6 +1609,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#941: https://github.com/schemathesis/schemathesis/issues/941
 .. _#925: https://github.com/schemathesis/schemathesis/issues/925
 .. _#920: https://github.com/schemathesis/schemathesis/issues/920
 .. _#919: https://github.com/schemathesis/schemathesis/issues/919

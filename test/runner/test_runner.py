@@ -510,12 +510,25 @@ async def test_plain_text_body(args):
 
 @pytest.mark.endpoints("invalid_path_parameter")
 def test_invalid_path_parameter(args):
+    # When a path parameter is marked as not required
     app, kwargs = args
-    init, *others, finished = prepare(validate_schema=False, **kwargs)
+    # And schema validation is disabled
+    init, *others, finished = prepare(validate_schema=False, hypothesis_max_examples=3, **kwargs)
+    # Then Schemathesis enforces all path parameters to be required
+    # And there should be no errors
+    assert not finished.has_errors
+
+
+@pytest.mark.endpoints("missing_path_parameter")
+def test_missing_path_parameter(args):
+    # When a path parameter is missing
+    app, kwargs = args
+    init, *others, finished = prepare(hypothesis_max_examples=3, **kwargs)
+    # Then it leads to an error
     assert finished.has_errors
     assert (
-        "schemathesis.exceptions.InvalidSchema: Missing path parameter 'id'. "
-        "It either not defined or has no `required: true` in its definition" in others[1].result.errors[0].exception
+        "schemathesis.exceptions.InvalidSchema: Path parameter 'id' is not defined"
+        in others[1].result.errors[0].exception
     )
 
 

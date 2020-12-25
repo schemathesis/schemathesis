@@ -231,3 +231,4 @@ get_payload = payload
 path_variable = success
 invalid = success
 invalid_path_parameter = success
+missing_path_parameter = success
