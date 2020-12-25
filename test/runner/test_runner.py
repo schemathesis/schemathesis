@@ -13,7 +13,7 @@ from requests.auth import HTTPDigestAuth
 import schemathesis
 from schemathesis import loaders
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
-from schemathesis.constants import USER_AGENT
+from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
 from schemathesis.models import Status
 from schemathesis.runner import ThreadPoolRunner, events, get_requests_auth, prepare
 from schemathesis.runner.impl.core import get_wsgi_auth, reraise
@@ -673,3 +673,11 @@ def test_url_joining(request, server, get_schema_path, schema_path):
         f"http://127.0.0.1:{server['port']}/api/v3/pet/findByStatus"
         in after_execution.result.checks[0].example.requests_code
     )
+
+
+def test_skip_operations_with_recursive_references(schema_with_recursive_references):
+    # When the test schema contains recursive references
+    *_, after, finished = prepare(schema_with_recursive_references, loader=loaders.from_dict)
+    # Then it causes an error with a proper error message
+    assert after.status == Status.error
+    assert RECURSIVE_REFERENCE_ERROR_MESSAGE in after.result.errors[0].exception

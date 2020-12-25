@@ -8,10 +8,12 @@ from _pytest.fixtures import FuncFixtureInfo
 from _pytest.nodes import Node
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from hypothesis.errors import InvalidArgument
+from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from packaging import version
 
 from .. import DataGenerationMethod
 from .._hypothesis import create_test
+from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from ..models import Endpoint
 from ..utils import is_schemathesis_test
 
@@ -168,3 +170,5 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
         outcome.get_result()
     except InvalidArgument as exc:
         pytest.fail(exc.args[0])
+    except HypothesisRefResolutionError:
+        pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)

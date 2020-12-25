@@ -12,6 +12,7 @@ from ...constants import DataGenerationMethod
 from ...exceptions import InvalidSchema
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import Case, Endpoint
+from ...schemas import BaseSchema
 from ...utils import NOT_SET
 from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPIParameter, parameters_to_json_schema
@@ -112,7 +113,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     if body is NOT_SET:
         if endpoint.body:
             parameter = draw(st.sampled_from(endpoint.body.items))
-            strategy = _get_body_strategy(parameter, to_strategy)
+            strategy = _get_body_strategy(parameter, to_strategy, endpoint.schema)
             media_type = parameter.media_type
             body = draw(strategy)
     else:
@@ -137,9 +138,10 @@ def get_case_strategy(  # pylint: disable=too-many-locals
 
 
 def _get_body_strategy(
-    parameter: OpenAPIParameter, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy]
+    parameter: OpenAPIParameter, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], parent_schema: BaseSchema
 ) -> st.SearchStrategy:
     schema = parameter.as_json_schema()
+    schema = parent_schema.prepare_schema(schema)
     strategy = to_strategy(schema)
     if not parameter.is_required:
         strategy |= st.just(NOT_SET)
@@ -158,6 +160,7 @@ def get_parameters_strategy(
             # contains errors.
             # In this case, we know that the `required` keyword should always be `True`.
             schema["required"] = list(schema["properties"])
+        schema = endpoint.schema.prepare_schema(schema)
         strategy = to_strategy(schema)
         serialize = endpoint.get_parameter_serializer(location)
         if serialize is not None:

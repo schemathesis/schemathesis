@@ -12,6 +12,11 @@ except metadata.PackageNotFoundError:
 USER_AGENT = f"schemathesis/{__version__}"
 DEFAULT_DEADLINE = 500  # pragma: no mutate
 DEFAULT_STATEFUL_RECURSION_LIMIT = 5  # pragma: no mutate
+RECURSIVE_REFERENCE_ERROR_MESSAGE = (
+    "Currently, Schemathesis can't generate data for this operation due to "
+    "recursive references in the operation definition. See more information in "
+    "this issue - https://github.com/schemathesis/schemathesis/issues/947"
+)
 
 
 class DataGenerationMethod(str, Enum):
