@@ -46,6 +46,7 @@ junit-xml = "^1.9"
 starlette = "^0.13.2"
 yarl = "^1.5"
 curlify = "^2.2.1"
+typing-extensions = "^3.7.4"
 
 [tool.poetry.dev-dependencies]
 coverage = "^5"
