@@ -503,7 +503,7 @@ async def test_plain_text_body(args):
             data = response.content
         assert case.body.encode("utf8") == data
 
-    result = execute(**kwargs, checks=(check_content,))
+    result = execute(**kwargs, checks=(check_content,), hypothesis_max_examples=3)
     assert not result.has_errors
     assert not result.has_failures
 

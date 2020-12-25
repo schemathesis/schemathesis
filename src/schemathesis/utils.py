@@ -141,10 +141,15 @@ def parse_content_type(content_type: str) -> Tuple[str, str]:
 def is_json_media_type(value: str) -> bool:
     """Detect whether the content type is JSON-compatible.
 
-    For example - `application/problem+json` matches.
+    For example - ``application/problem+json`` matches.
     """
     main, sub = parse_content_type(value)
     return main == "application" and (sub == "json" or sub.endswith("+json"))
+
+
+def is_plain_text_media_type(value: str) -> bool:
+    """Detect variations of the ``text/plain`` media type."""
+    return parse_content_type(value) == ("text", "plain")
 
 
 def are_content_types_equal(source: str, target: str) -> bool:

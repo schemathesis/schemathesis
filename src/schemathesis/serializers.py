@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Optional, Typ
 import attr
 from typing_extensions import Protocol, runtime_checkable
 
-from .utils import is_json_media_type
+from .utils import is_json_media_type, is_plain_text_media_type
 
 if TYPE_CHECKING:
     from .models import Case
@@ -164,4 +164,6 @@ def get(media_type: str) -> Optional[Type[Serializer]]:
     """Get an appropriate serializer for the given media type."""
     if is_json_media_type(media_type):
         media_type = "application/json"
+    if is_plain_text_media_type(media_type):
+        media_type = "text/plain"
     return SERIALIZERS.get(media_type)
