@@ -74,7 +74,8 @@ def add_examples(test: Callable, endpoint: Endpoint, hook_dispatcher: Optional[H
         # Unsatisfiable:
         # The underlying schema is not satisfiable and test will raise an error for the same reason.
         # Skipping this exception here allows us to continue the testing process for other operations.
-        return test
+        # Still, we allow to run user-defined hooks
+        examples = []
     context = HookContext(endpoint)  # context should be passed here instead
     GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, examples)
     endpoint.schema.hooks.dispatch("before_add_examples", context, examples)
