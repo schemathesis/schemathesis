@@ -47,6 +47,11 @@ def run_app(port: int, endpoints: List[Endpoint], spec: str, framework: str) -> 
                 if endpoint.name not in INVALID_ENDPOINTS and endpoint.name != "all"
             )
         version = {"openapi2": OpenAPIVersion("2.0"), "openapi3": OpenAPIVersion("3.0")}[spec]
+        click.secho(
+            f"Schemathesis test server is running!\n\n"
+            f"API Schema is available at: http://0.0.0.0:{port}/schema.yaml\n",
+            bold=True,
+        )
         if framework == "aiohttp":
             app = _aiohttp.create_openapi_app(prepared_endpoints, version)
             web.run_app(app, port=port)
