@@ -12,6 +12,7 @@ from requests.auth import HTTPDigestAuth
 
 import schemathesis
 from schemathesis import loaders
+from schemathesis._hypothesis import add_examples
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
 from schemathesis.models import Status
@@ -488,6 +489,31 @@ async def test_payload_explicit_example(args):
         body = await incoming_requests[0].json()
     # And this example should be sent to the app
     assert body == {"name": "John"}
+
+
+@pytest.mark.endpoints("payload")
+async def test_explicit_example_disable(args, mocker):
+    # When endpoint has an example specified
+    # And the `explicit` phase is excluded
+    app, kwargs = args
+    kwargs.setdefault("hypothesis_max_examples", 1)
+    kwargs.setdefault("hypothesis_phases", [Phase.generate])
+    spy = mocker.patch("schemathesis._hypothesis.add_examples", wraps=add_examples)
+    result = execute(**kwargs)
+    # Then run should be successful
+    assert not result.has_errors
+    assert not result.has_failures
+    incoming_requests = get_incoming_requests(app)
+    assert len(incoming_requests) == 1
+
+    if isinstance(app, Flask):
+        body = incoming_requests[0].json
+    else:
+        body = await incoming_requests[0].json()
+    # And this example should NOT be used
+    assert body != {"name": "John"}
+    # And examples are not evaluated at all
+    assert not spy.called
 
 
 @pytest.mark.endpoints("plain_text_body")
