@@ -14,6 +14,7 @@ class ExecutionContext:
     hypothesis_output: List[str] = attr.ib(factory=list)  # pragma: no mutate
     workers_num: int = attr.ib(default=1)  # pragma: no mutate
     show_errors_tracebacks: bool = attr.ib(default=False)  # pragma: no mutate
+    validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
     endpoints_processed: int = attr.ib(default=0)  # pragma: no mutate
     # It is set in runtime, from a `Initialized` event
     endpoints_count: Optional[int] = attr.ib(default=None)  # pragma: no mutate
