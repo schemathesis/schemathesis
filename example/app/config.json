@@ -1,0 +1,3 @@
+{
+  "DB_URL": "postgresql://test:test@db/schemathesis-example"
+}
