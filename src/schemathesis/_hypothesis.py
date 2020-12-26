@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import hypothesis
 from hypothesis import strategies as st
+from hypothesis.errors import Unsatisfiable
 from hypothesis.strategies import SearchStrategy
 from hypothesis.utils.conventions import InferType
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
@@ -65,11 +66,14 @@ def add_examples(test: Callable, endpoint: Endpoint, hook_dispatcher: Optional[H
     """Add examples to the Hypothesis test, if they are specified in the schema."""
     try:
         examples: List[Case] = [get_single_example(strategy) for strategy in endpoint.get_strategies_from_examples()]
-    except (InvalidSchema, HypothesisRefResolutionError):
+    except (InvalidSchema, HypothesisRefResolutionError, Unsatisfiable):
         # Invalid schema:
         # In this case, the user didn't pass `--validate-schema=false` and see an error in the output anyway,
         # and no tests will be executed. For this reason, examples can be skipped
         # Recursive references: This test will be skipped anyway
+        # Unsatisfiable:
+        # The underlying schema is not satisfiable and test will raise an error for the same reason.
+        # Skipping this exception here allows us to continue the testing process for other operations.
         return test
     context = HookContext(endpoint)  # context should be passed here instead
     GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, examples)
