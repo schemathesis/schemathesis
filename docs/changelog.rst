@@ -32,6 +32,7 @@ Changelog
 - Excessive reference inlining that leads to out-of-memory for large schemas with deep references. `#945`_
 - ``--exitfirst`` CLI option trims the progress bar output when a failure occurs. `#951`_
 - Internal error if filling missing explicit examples led to ``Unsatisfiable`` errors. `#904`_
+- Do not suggest to disable schema validation if it is already disabled. `#914`_
 
 **Removed**
 
@@ -1626,6 +1627,7 @@ Deprecated
 .. _#919: https://github.com/schemathesis/schemathesis/issues/919
 .. _#917: https://github.com/schemathesis/schemathesis/issues/917
 .. _#916: https://github.com/schemathesis/schemathesis/issues/916
+.. _#914: https://github.com/schemathesis/schemathesis/issues/914
 .. _#911: https://github.com/schemathesis/schemathesis/issues/911
 .. _#904: https://github.com/schemathesis/schemathesis/issues/904
 .. _#897: https://github.com/schemathesis/schemathesis/issues/897
