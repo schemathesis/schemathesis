@@ -332,8 +332,7 @@ def test_display_summary(capsys, results_set, swagger_20):
     # Given the Finished event
     event = runner.events.Finished.from_results(results=results_set, running_time=1.257)
     # When `display_summary` is called
-    with pytest.raises(click.exceptions.Exit):
-        default.display_summary(event)
+    default.display_summary(event)
     out = capsys.readouterr().out.strip()
     # Then number of total tests & total running time should be displayed
     assert "=== 1 passed in 1.26s ===" in out
