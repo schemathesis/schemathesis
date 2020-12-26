@@ -62,6 +62,8 @@ CLI is simple to use and requires no coding; the in-code approach gives more fle
 
 Both examples above will run hundreds of requests against the API under test and report all found failures and inconsistencies along with instructions to reproduce them.
 
+💡 See a complete working example project in the ``/example`` directory. 💡
+
 Contributing
 ------------
 

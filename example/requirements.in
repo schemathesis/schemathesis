@@ -1,0 +1,6 @@
+asyncpg
+attrs
+connexion[aiohttp,swagger-ui]
+# Test requirements are installed in the same environment
+pytest
+schemathesis

@@ -1,0 +1,22 @@
+version: '3.1'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - PYTHONUNBUFFERED=0
+    depends_on:
+      - db
+    working_dir: /example
+    volumes:
+      - ./app:/app/
+  db:
+    image: postgres
+    environment:
+      POSTGRES_PASSWORD: test
+      POSTGRES_USER: test
+      POSTGRES_DB: schemathesis-example
+    volumes:
+      - ./database:/docker-entrypoint-initdb.d
