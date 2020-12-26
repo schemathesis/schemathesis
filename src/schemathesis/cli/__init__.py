@@ -151,6 +151,7 @@ class GroupedOption(click.Option):
     default=DEFAULT_CHECKS_NAMES,
     cls=GroupedOption,
     group=ParameterGroup.validation,
+    show_default=True,
 )
 @click.option(
     "--data-generation-method",
@@ -159,6 +160,7 @@ class GroupedOption(click.Option):
     help="Defines how Schemathesis generates data for tests.",
     type=CSVOption(DataGenerationMethod),
     default=DataGenerationMethod.default(),
+    show_default=True,
 )
 @click.option(
     "--max-response-time",
@@ -175,9 +177,16 @@ class GroupedOption(click.Option):
     help="Targets for input generation.",
     type=TARGETS_TYPE,
     default=DEFAULT_TARGETS_NAMES,
+    show_default=True,
 )
 @click.option(
-    "-x", "--exitfirst", "exit_first", is_flag=True, default=False, help="Exit instantly on first error or failed test."
+    "-x",
+    "--exitfirst",
+    "exit_first",
+    is_flag=True,
+    default=False,
+    help="Exit instantly on first error or failed test.",
+    show_default=True,
 )
 @click.option(
     "--auth", "-a", help="Server user and password. Example: USER:PASSWORD", type=str, callback=callbacks.validate_auth
@@ -188,6 +197,7 @@ class GroupedOption(click.Option):
     type=click.Choice(["basic", "digest"], case_sensitive=False),
     default="basic",
     help="The authentication mechanism to be used. Defaults to 'basic'.",
+    show_default=True,
 )
 @click.option(
     "--header",
@@ -252,6 +262,7 @@ class GroupedOption(click.Option):
         choices_repr=f"[auto|{MIN_WORKERS}-{MAX_WORKERS}]",
     ),
     default=str(DEFAULT_WORKERS),
+    show_default=True,
     callback=callbacks.convert_workers,
 )
 @click.option(
@@ -273,6 +284,7 @@ class GroupedOption(click.Option):
     "You can also pass the path to a CA_BUNDLE file for private certs.",
     type=str,
     default="true",
+    show_default=True,
     callback=callbacks.convert_request_tls_verify,
 )
 @click.option(
@@ -280,6 +292,7 @@ class GroupedOption(click.Option):
     help="Enable or disable validation of input schema.",
     type=bool,
     default=True,
+    show_default=True,
     cls=GroupedOption,
     group=ParameterGroup.validation,
 )
@@ -289,6 +302,7 @@ class GroupedOption(click.Option):
     is_flag=True,
     is_eager=True,
     default=False,
+    show_default=True,
     cls=GroupedOption,
     group=ParameterGroup.filtering,
 )
@@ -301,6 +315,7 @@ class GroupedOption(click.Option):
     is_flag=True,
     is_eager=True,
     default=False,
+    show_default=True,
 )
 @click.option(
     "--store-network-log", help="Store requests and responses into a file.", type=click.File("w", encoding="utf-8")
@@ -321,6 +336,7 @@ class GroupedOption(click.Option):
     "--stateful-recursion-limit",
     help="Limit recursion depth for stateful testing.",
     default=DEFAULT_STATEFUL_RECURSION_LIMIT,
+    show_default=True,
     type=click.IntRange(1, 100),
     cls=DeprecatedOption,
     removed_in="3.0",
@@ -343,6 +359,7 @@ class GroupedOption(click.Option):
     help="Use Hypothesis's deterministic mode.",
     is_flag=True,
     default=None,
+    show_default=True,
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,
 )
