@@ -380,7 +380,9 @@ def run(
         hypothesis_suppress_health_check=hypothesis_suppress_health_check,
         hypothesis_verbosity=hypothesis_verbosity,
     )
-    execute(prepared_runner, workers_num, show_errors_tracebacks, store_network_log, junit_xml, verbosity)
+    execute(
+        prepared_runner, workers_num, show_errors_tracebacks, validate_schema, store_network_log, junit_xml, verbosity
+    )
 
 
 def check_auth(auth: Optional[Tuple[str, str]], headers: Dict[str, str]) -> None:
@@ -419,6 +421,7 @@ def execute(
     prepared_runner: Generator[events.ExecutionEvent, None, None],
     workers_num: int,
     show_errors_tracebacks: bool,
+    validate_schema: bool,
     store_network_log: Optional[click.utils.LazyFile],
     junit_xml: Optional[click.utils.LazyFile],
     verbosity: int,
@@ -434,6 +437,7 @@ def execute(
     execution_context = ExecutionContext(
         workers_num=workers_num,
         show_errors_tracebacks=show_errors_tracebacks,
+        validate_schema=validate_schema,
         cassette_file_name=store_network_log.name if store_network_log is not None else None,
         junit_xml_file=junit_xml.name if junit_xml is not None else None,
         verbosity=verbosity,

@@ -691,6 +691,17 @@ In this case, Schemathesis cannot guarantee proper behavior during the test run
     assert expected in result.stdout
 
 
+@pytest.mark.endpoints("invalid")
+def test_invalid_endpoint_suggestion_disabled(cli, cli_args):
+    # When the app's schema contains errors
+    # And schema validation is disabled
+    result = cli.run(*cli_args, "--validate-schema=false")
+    # Then the whole Schemathesis run should fail
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # And there should be no suggestion
+    assert "You can disable input schema validation" not in result.stdout
+
+
 @pytest.mark.endpoints("teapot")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_status_code_conformance(cli, cli_args, workers):
