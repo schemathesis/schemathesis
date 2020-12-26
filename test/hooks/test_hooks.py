@@ -5,6 +5,12 @@ import schemathesis
 from schemathesis.hooks import HookDispatcher, HookScope
 
 
+@pytest.fixture(autouse=True)
+def reset_hooks():
+    yield
+    schemathesis.hooks.unregister_all()
+
+
 @pytest.fixture(params=["direct", "named"])
 def global_hook(request):
     if request.param == "direct":
@@ -18,9 +24,6 @@ def global_hook(request):
         @schemathesis.hooks.register("before_generate_query")
         def hook(context, strategy):
             return strategy.filter(lambda x: x["id"].isdigit())
-
-    yield
-    schemathesis.hooks.unregister_all()
 
 
 @pytest.fixture
