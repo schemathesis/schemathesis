@@ -55,7 +55,7 @@ def create_openapi_app(
     app = web.Application()
     app.add_routes(
         [web.get("/schema.yaml", schema), web.get("/api/cookies", set_cookies)]
-        + [web.route(item.value[0], item.value[1], wrapper(item.name)) for item in Endpoint]
+        + [web.route(item.value[0], item.value[1], wrapper(item.name)) for item in Endpoint if item.name != "all"]
     )
     app["users"] = {}
     app["requests_history"] = defaultdict(list)

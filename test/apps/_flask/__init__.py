@@ -11,9 +11,9 @@ from flask import Flask, Response, _request_ctx_stack, jsonify, request
 from werkzeug.exceptions import BadRequest, GatewayTimeout, InternalServerError
 
 try:
-    from ..utils import PAYLOAD_VALIDATOR, Endpoint, OpenAPIVersion, make_openapi_schema
+    from ..utils import PAYLOAD_VALIDATOR, OpenAPIVersion, make_openapi_schema
 except (ImportError, ValueError):
-    from utils import PAYLOAD_VALIDATOR, Endpoint, OpenAPIVersion, make_openapi_schema
+    from utils import PAYLOAD_VALIDATOR, OpenAPIVersion, make_openapi_schema
 
 
 def expect_content_type(value: str):

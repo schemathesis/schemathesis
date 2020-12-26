@@ -35,6 +35,7 @@ class Endpoint(Enum):
     create_user = ("POST", "/api/users/")
     get_user = ("GET", "/api/users/{user_id}")
     update_user = ("PATCH", "/api/users/{user_id}")
+    all = object()
 
 
 class OpenAPIVersion(Enum):
