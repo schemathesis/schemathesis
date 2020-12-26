@@ -447,8 +447,12 @@ def execute(
         for event in prepared_runner:
             for handler in handlers:
                 handler.handle_event(execution_context, event)
-    except click.exceptions.Exit:
-        raise
+            if isinstance(event, events.Finished):
+                if event.has_failures or event.has_errors:
+                    exit_code = 1
+                else:
+                    exit_code = 0
+                sys.exit(exit_code)
     except Exception as exc:
         for handler in handlers:
             handler.shutdown()
