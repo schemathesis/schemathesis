@@ -7,6 +7,7 @@ Their responsibilities:
 They give only static definitions of endpoints.
 """
 from collections.abc import Mapping
+from difflib import get_close_matches
 from typing import Any, Callable, Dict, Generator, Iterable, Iterator, List, Optional, Sequence, Tuple, Type, Union
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
@@ -23,6 +24,16 @@ from .models import Case, Endpoint
 from .stateful import APIStateMachine, Stateful, StatefulTest
 from .types import Filter, FormData, GenericTest, NotSet
 from .utils import NOT_SET, GenericResponse
+
+
+class MethodsDict(CaseInsensitiveDict):
+    def __getitem__(self, item: Any) -> Any:
+        try:
+            return super().__getitem__(item)
+        except KeyError as exc:
+            available_methods = ", ".join(map(str.upper, self))
+            message = f"Method `{item}` not found. Available methods: {available_methods}"
+            raise KeyError(message) from exc
 
 
 @attr.s()  # pragma: no mutate
@@ -46,8 +57,15 @@ class BaseSchema(Mapping):
     def __iter__(self) -> Iterator[str]:
         return iter(self.endpoints)
 
-    def __getitem__(self, item: str) -> CaseInsensitiveDict:
-        return self.endpoints[item]
+    def __getitem__(self, item: str) -> MethodsDict:
+        try:
+            return self.endpoints[item]
+        except KeyError as exc:
+            matches = get_close_matches(item, list(self.endpoints))
+            message = f"`{item}` not found"
+            if matches:
+                message += f". Did you mean `{matches[0]}`?"
+            raise KeyError(message) from exc
 
     def __len__(self) -> int:
         return len(self.endpoints)
@@ -88,7 +106,7 @@ class BaseSchema(Mapping):
         return self._build_base_url()
 
     @property
-    def endpoints(self) -> Dict[str, CaseInsensitiveDict]:
+    def endpoints(self) -> Dict[str, MethodsDict]:
         if not hasattr(self, "_endpoints"):
             # pylint: disable=attribute-defined-outside-init
             endpoints = self.get_all_endpoints()
@@ -267,9 +285,9 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
 
-def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, CaseInsensitiveDict]:
-    output: Dict[str, CaseInsensitiveDict] = {}
+def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, MethodsDict]:
+    output: Dict[str, MethodsDict] = {}
     for endpoint in endpoints:
-        output.setdefault(endpoint.path, CaseInsensitiveDict())
+        output.setdefault(endpoint.path, MethodsDict())
         output[endpoint.path][endpoint.method] = endpoint
     return output
