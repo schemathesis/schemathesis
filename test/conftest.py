@@ -57,7 +57,7 @@ def endpoints(request):
     marker = request.node.get_closest_marker("endpoints")
     if marker:
         if marker.args and marker.args[0] == "__all__":
-            endpoints = tuple(Endpoint.__members__)
+            endpoints = tuple(item for item in Endpoint.__members__ if item != "all")
         else:
             endpoints = marker.args
     else:

@@ -24,7 +24,6 @@ except ImportError as exc:
 
 INVALID_ENDPOINTS = ("invalid", "invalid_response", "invalid_path_parameter", "missing_path_parameter")
 AvailableEndpoints = CSVOption(Endpoint)
-AvailableEndpoints.choices += ("__all__",)
 
 
 @click.command()
@@ -38,12 +37,15 @@ def run_app(port: int, endpoints: List[Endpoint], spec: str, framework: str) -> 
         app.run(port=port)
     else:
         if endpoints is not None:
-            if "__all__" in endpoints:
-                prepared_endpoints = tuple(endpoint.name for endpoint in Endpoint)
-            else:
-                prepared_endpoints = tuple(endpoint.name for endpoint in endpoints)
+            prepared_endpoints = tuple(endpoint.name for endpoint in endpoints)
+            if "all" in prepared_endpoints:
+                prepared_endpoints = tuple(endpoint.name for endpoint in Endpoint if endpoint.name != "all")
         else:
-            prepared_endpoints = tuple(endpoint.name for endpoint in Endpoint if endpoint.name not in INVALID_ENDPOINTS)
+            prepared_endpoints = tuple(
+                endpoint.name
+                for endpoint in Endpoint
+                if endpoint.name not in INVALID_ENDPOINTS and endpoint.name != "all"
+            )
         version = {"openapi2": OpenAPIVersion("2.0"), "openapi3": OpenAPIVersion("3.0")}[spec]
         if framework == "aiohttp":
             app = _aiohttp.create_openapi_app(prepared_endpoints, version)
