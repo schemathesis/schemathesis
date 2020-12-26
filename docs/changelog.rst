@@ -34,6 +34,7 @@ Changelog
 - ``--exitfirst`` CLI option trims the progress bar output when a failure occurs. `#951`_
 - Internal error if filling missing explicit examples led to ``Unsatisfiable`` errors. `#904`_
 - Do not suggest to disable schema validation if it is already disabled. `#914`_
+- Skip explicit examples generation if this phase is disabled via config. `#905`_
 
 **Removed**
 
@@ -1630,6 +1631,7 @@ Deprecated
 .. _#916: https://github.com/schemathesis/schemathesis/issues/916
 .. _#914: https://github.com/schemathesis/schemathesis/issues/914
 .. _#911: https://github.com/schemathesis/schemathesis/issues/911
+.. _#905: https://github.com/schemathesis/schemathesis/issues/905
 .. _#904: https://github.com/schemathesis/schemathesis/issues/904
 .. _#897: https://github.com/schemathesis/schemathesis/issues/897
 .. _#895: https://github.com/schemathesis/schemathesis/issues/895

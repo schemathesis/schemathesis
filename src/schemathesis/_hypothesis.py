@@ -3,6 +3,7 @@ import asyncio
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import hypothesis
+from hypothesis import Phase
 from hypothesis import strategies as st
 from hypothesis.errors import Unsatisfiable
 from hypothesis.strategies import SearchStrategy
@@ -40,7 +41,10 @@ def create_test(
     setup_default_deadline(wrapped_test)
     if settings is not None:
         wrapped_test = settings(wrapped_test)
-    return add_examples(wrapped_test, endpoint, hook_dispatcher=hook_dispatcher)
+    existing_settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
+    if existing_settings and Phase.explicit in existing_settings.phases:
+        wrapped_test = add_examples(wrapped_test, endpoint, hook_dispatcher=hook_dispatcher)
+    return wrapped_test
 
 
 def setup_default_deadline(wrapped_test: Callable) -> None:
