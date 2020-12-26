@@ -681,3 +681,41 @@ def test_skip_operations_with_recursive_references(schema_with_recursive_referen
     # Then it causes an error with a proper error message
     assert after.status == Status.error
     assert RECURSIVE_REFERENCE_ERROR_MESSAGE in after.result.errors[0].exception
+
+
+def test_unsatisfiable_example(empty_open_api_3_schema):
+    # See GH-904
+    # When filling missing properties during examples generation leads to unsatisfiable schemas
+    empty_open_api_3_schema["paths"] = {
+        "/success": {
+            "post": {
+                "parameters": [
+                    # This parameter is not satisfiable
+                    {
+                        "name": "key",
+                        "in": "query",
+                        "required": True,
+                        "schema": {"type": "integer", "minimum": 5, "maximum": 4},
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "foo": {"type": "string", "example": "foo example string"},
+                                },
+                            },
+                        }
+                    }
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    # Then the testing process should not raise an internal error
+    *_, after, finished = prepare(empty_open_api_3_schema, loader=loaders.from_dict, hypothesis_max_examples=1)
+    # And the tests are failing because of the unsatisfiable schema
+    assert finished.has_errors
+    assert "Unable to satisfy schema parameters for this endpoint" in after.result.errors[0].exception

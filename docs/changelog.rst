@@ -31,6 +31,7 @@ Changelog
 - CLI failure if the tested operation is `GET` and has payload examples. `#925`_
 - Excessive reference inlining that leads to out-of-memory for large schemas with deep references. `#945`_
 - ``--exitfirst`` CLI option trims the progress bar output when a failure occurs. `#951`_
+- Internal error if filling missing explicit examples led to ``Unsatisfiable`` errors. `#904`_
 
 **Removed**
 
@@ -1626,6 +1627,7 @@ Deprecated
 .. _#917: https://github.com/schemathesis/schemathesis/issues/917
 .. _#916: https://github.com/schemathesis/schemathesis/issues/916
 .. _#911: https://github.com/schemathesis/schemathesis/issues/911
+.. _#904: https://github.com/schemathesis/schemathesis/issues/904
 .. _#897: https://github.com/schemathesis/schemathesis/issues/897
 .. _#895: https://github.com/schemathesis/schemathesis/issues/895
 .. _#890: https://github.com/schemathesis/schemathesis/issues/890
