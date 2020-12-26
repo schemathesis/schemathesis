@@ -44,7 +44,6 @@ If you wrote a Python application and you want to utilize the features of an exi
 
 If you wrote your application in a language other than Python, you should use the built-in CLI. Please keep in mind that you will need to have a running application where you can run Schemathesis against.
 
-
 Should I always have my application running before starting the test suite?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -85,6 +84,13 @@ Schemathesis is more strict in schema handling by default, but we provide option
     # schemathesis.fixups.install(["fastapi"])
 
 For more information, take a look into the "Compatibility" section.
+
+Why Schemathesis generates uniform data for my API schema?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There might be multiple reasons for that, but usually, this behavior occurs when the API schema is complex or deeply nested.
+Please, refer to the ``Data generation`` section in the documentation for more info. If you think that it is not the case, feel
+free to `open an issue <https://github.com/schemathesis/schemathesis/issues>`_.
 
 Working with API schemas
 ------------------------

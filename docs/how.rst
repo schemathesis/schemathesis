@@ -3,6 +3,15 @@ Data generation
 
 This section describes how Schemathesis generates test examples and their serialization process.
 
+Schemathesis converts Open API schemas to compatible JSON Schemas and passes them to ``hypothesis-jsonschema``, which generates data for those schemas.
+
+.. important::
+
+    If the API schema is complex or deeply nested, data generation may be slow or produce data without much variance.
+    It is a known behavior and caused by the way Hypothesis works internally.
+    There are many tradeoffs in this process, and Hypothesis tries to give reasonable defaults for a typical case
+    and not be too slow for corner cases.
+
 Payload serialization
 ---------------------
 
