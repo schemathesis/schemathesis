@@ -114,6 +114,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
         if endpoint.body:
             parameter = draw(st.sampled_from(endpoint.body.items))
             strategy = _get_body_strategy(parameter, to_strategy, endpoint.schema)
+            strategy = apply_hooks(endpoint, context, hooks, strategy, "body")
             media_type = parameter.media_type
             body = draw(strategy)
     else:
