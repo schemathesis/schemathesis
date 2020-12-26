@@ -1,3 +1,4 @@
+import re
 from test.utils import SIMPLE_PATH
 
 import pytest
@@ -267,3 +268,20 @@ def test_from_case(swagger_20, base_url, expected):
     session = requests.Session()
     request = Request.from_case(case, session)
     assert request.uri == "http://127.0.0.1/api/v3/users/test"
+
+
+@pytest.mark.parametrize(
+    "value, message",
+    (
+        ("/userz", "`/userz` not found. Did you mean `/users`?"),
+        ("/what?", "`/what?` not found"),
+    ),
+)
+def test_endpoint_path_suggestion(swagger_20, value, message):
+    with pytest.raises(KeyError, match=re.escape(message)):
+        swagger_20[value]["POST"]
+
+
+def test_method_suggestion(swagger_20):
+    with pytest.raises(KeyError, match="Method `PUT` not found. Available methods: GET"):
+        swagger_20["/users"]["PUT"]

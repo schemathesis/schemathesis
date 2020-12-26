@@ -12,6 +12,7 @@ Changelog
   in your schema or customize existing (like ``application/json``).
 - The `response_schema_conformance` check now runs on media types that are encoded with JSON. For example, ``application/problem+json``. `#920`_
 - Base URL for GraphQL schemas. It allows you to load the schema from one place but send test requests to another one. `#934`_
+- A helpful error message when an operation is not found during the direct schema access. `#812`_
 
 **Changed**
 
@@ -1654,6 +1655,7 @@ Deprecated
 .. _#824: https://github.com/schemathesis/schemathesis/issues/824
 .. _#816: https://github.com/schemathesis/schemathesis/issues/816
 .. _#814: https://github.com/schemathesis/schemathesis/issues/814
+.. _#812: https://github.com/schemathesis/schemathesis/issues/812
 .. _#795: https://github.com/schemathesis/schemathesis/issues/795
 .. _#793: https://github.com/schemathesis/schemathesis/issues/793
 .. _#788: https://github.com/schemathesis/schemathesis/issues/788
