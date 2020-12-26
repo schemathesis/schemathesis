@@ -1,6 +1,8 @@
+import enum
 import os
 import sys
 import traceback
+from collections import defaultdict
 from enum import Enum
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
 
@@ -101,10 +103,54 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
         load_hook(pre_run)
 
 
-@schemathesis.command(short_help="Perform schemathesis test.")
+class ParameterGroup(enum.Enum):
+    filtering = "Filtering", "These options define what parts of the API will be tested."
+    validation = "Validation", "Options, responsible for how responses & schemas will be checked."
+    hypothesis = "Hypothesis", "Configuration of the underlying Hypothesis engine."
+    generic = "Generic", None
+
+
+class CommandWithCustomHelp(click.Command):
+    def format_options(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        # Group options first
+        groups = defaultdict(list)
+        for param in self.get_params(ctx):
+            rv = param.get_help_record(ctx)
+            if rv is not None:
+                if isinstance(param, GroupedOption):
+                    group = param.group
+                else:
+                    group = ParameterGroup.generic
+                groups[group].append(rv)
+        # Then display groups separately with optional description
+        for group in ParameterGroup:
+            opts = groups[group]
+            group_name, description = group.value
+            with formatter.section(f"{group_name} options"):
+                if description:
+                    formatter.write_paragraph()
+                    formatter.write_text(description)
+                    formatter.write_paragraph()
+                formatter.write_dl(opts)
+
+
+class GroupedOption(click.Option):
+    def __init__(self, *args: Any, group: ParameterGroup, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self.group = group
+
+
+@schemathesis.command(short_help="Perform schemathesis test.", cls=CommandWithCustomHelp)
 @click.argument("schema", type=str, callback=callbacks.validate_schema)
 @click.option(
-    "--checks", "-c", multiple=True, help="List of checks to run.", type=CHECKS_TYPE, default=DEFAULT_CHECKS_NAMES
+    "--checks",
+    "-c",
+    multiple=True,
+    help="List of checks to run.",
+    type=CHECKS_TYPE,
+    default=DEFAULT_CHECKS_NAMES,
+    cls=GroupedOption,
+    group=ParameterGroup.validation,
 )
 @click.option(
     "--data-generation-method",
@@ -118,6 +164,8 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     "--max-response-time",
     help="A custom check that will fail if the response time is greater than the specified one in milliseconds.",
     type=click.IntRange(min=1),
+    cls=GroupedOption,
+    group=ParameterGroup.validation,
 )
 @click.option(
     "--target",
@@ -158,6 +206,8 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     multiple=True,
     help=r"Filter schemathesis test by endpoint pattern. Example: users/\d+",
     callback=callbacks.validate_regex,
+    cls=GroupedOption,
+    group=ParameterGroup.filtering,
 )
 @click.option(
     "--method",
@@ -167,6 +217,8 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     multiple=True,
     help="Filter schemathesis test by HTTP method.",
     callback=callbacks.validate_regex,
+    cls=GroupedOption,
+    group=ParameterGroup.filtering,
 )
 @click.option(
     "--tag",
@@ -176,6 +228,8 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     multiple=True,
     help="Filter schemathesis test by schema tag pattern.",
     callback=callbacks.validate_regex,
+    cls=GroupedOption,
+    group=ParameterGroup.filtering,
 )
 @click.option(
     "--operation-id",
@@ -185,6 +239,8 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     multiple=True,
     help="Filter schemathesis test by operationId pattern.",
     callback=callbacks.validate_regex,
+    cls=GroupedOption,
+    group=ParameterGroup.filtering,
 )
 @click.option(
     "--workers",
@@ -219,13 +275,22 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     default="true",
     callback=callbacks.convert_request_tls_verify,
 )
-@click.option("--validate-schema", help="Enable or disable validation of input schema.", type=bool, default=True)
+@click.option(
+    "--validate-schema",
+    help="Enable or disable validation of input schema.",
+    type=bool,
+    default=True,
+    cls=GroupedOption,
+    group=ParameterGroup.validation,
+)
 @click.option(
     "--skip-deprecated-endpoints",
     help="Skip testing of deprecated endpoints.",
     is_flag=True,
     is_eager=True,
     default=False,
+    cls=GroupedOption,
+    group=ParameterGroup.filtering,
 )
 @click.option(
     "--junit-xml", help="Create junit-xml style report file at given path.", type=click.File("w", encoding="utf-8")
@@ -270,28 +335,59 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
     help="Duration in milliseconds that each individual example with a test is not allowed to exceed.",
     # max value to avoid overflow. It is the maximum amount of days in milliseconds
     type=OptionalInt(1, 999999999 * 24 * 3600 * 1000),
+    cls=GroupedOption,
+    group=ParameterGroup.hypothesis,
 )
-@click.option("--hypothesis-derandomize", help="Use Hypothesis's deterministic mode.", is_flag=True, default=None)
+@click.option(
+    "--hypothesis-derandomize",
+    help="Use Hypothesis's deterministic mode.",
+    is_flag=True,
+    default=None,
+    cls=GroupedOption,
+    group=ParameterGroup.hypothesis,
+)
 @click.option(
     "--hypothesis-max-examples",
     help="Maximum number of generated examples per each method/endpoint combination.",
     type=click.IntRange(1),
+    cls=GroupedOption,
+    group=ParameterGroup.hypothesis,
 )
-@click.option("--hypothesis-phases", help="Control which phases should be run.", type=CSVOption(hypothesis.Phase))
 @click.option(
-    "--hypothesis-report-multiple-bugs", help="Raise only the exception with the smallest minimal example.", type=bool
+    "--hypothesis-phases",
+    help="Control which phases should be run.",
+    type=CSVOption(hypothesis.Phase),
+    cls=GroupedOption,
+    group=ParameterGroup.hypothesis,
 )
-@click.option("--hypothesis-seed", help="Set a seed to use for all Hypothesis tests.", type=int)
+@click.option(
+    "--hypothesis-report-multiple-bugs",
+    help="Raise only the exception with the smallest minimal example.",
+    type=bool,
+    cls=GroupedOption,
+    group=ParameterGroup.hypothesis,
+)
+@click.option(
+    "--hypothesis-seed",
+    help="Set a seed to use for all Hypothesis tests.",
+    type=int,
+    cls=GroupedOption,
+    group=ParameterGroup.hypothesis,
+)
 @click.option(
     "--hypothesis-suppress-health-check",
     help="Comma-separated list of health checks to disable.",
     type=CSVOption(hypothesis.HealthCheck),
+    cls=GroupedOption,
+    group=ParameterGroup.hypothesis,
 )
 @click.option(
     "--hypothesis-verbosity",
     help="Verbosity level of Hypothesis messages.",
     type=click.Choice([item.name for item in hypothesis.Verbosity]),
     callback=callbacks.convert_verbosity,
+    cls=GroupedOption,
+    group=ParameterGroup.hypothesis,
 )
 @click.option("--verbosity", "-v", help="Reduce verbosity of error output.", count=True)
 def run(
