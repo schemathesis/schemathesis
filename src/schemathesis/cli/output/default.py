@@ -66,9 +66,8 @@ def display_percentage(context: ExecutionContext, event: events.AfterExecution) 
 
 
 def display_summary(event: events.Finished) -> None:
-    message, color, status_code = get_summary_output(event)
+    message, color = get_summary_output(event)
     display_section_name(message, fg=color)
-    raise click.exceptions.Exit(status_code)
 
 
 def get_summary_message_parts(event: events.Finished) -> List[str]:
@@ -85,21 +84,18 @@ def get_summary_message_parts(event: events.Finished) -> List[str]:
     return parts
 
 
-def get_summary_output(event: events.Finished) -> Tuple[str, str, int]:
+def get_summary_output(event: events.Finished) -> Tuple[str, str]:
     parts = get_summary_message_parts(event)
     if not parts:
         message = "Empty test suite"
         color = "yellow"
-        status_code = 0
     else:
         message = f'{", ".join(parts)} in {event.running_time:.2f}s'
         if event.has_failures or event.has_errors:
             color = "red"
-            status_code = 1
         else:
             color = "green"
-            status_code = 0
-    return message, color, status_code
+    return message, color
 
 
 def display_hypothesis_output(hypothesis_output: List[str]) -> None:
