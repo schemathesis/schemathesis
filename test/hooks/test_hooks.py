@@ -48,6 +48,23 @@ def test_global_query_hook(schema, schema_url):
 
 
 @pytest.mark.hypothesis_nested
+@pytest.mark.endpoints("payload")
+def test_global_body_hook(schema):
+    @schemathesis.hooks.register
+    def before_generate_body(context, strategy):
+        return strategy.filter(lambda x: len(x["name"]) == 5)
+
+    strategy = schema.endpoints["/payload"]["POST"].as_strategy()
+
+    @given(case=strategy)
+    @settings(max_examples=3)
+    def test(case):
+        assert len(case.body["name"]) == 5
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
 @pytest.mark.endpoints("custom_format")
 def test_schema_query_hook(schema, schema_url):
     @schema.hooks.register
