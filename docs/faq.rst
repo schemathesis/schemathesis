@@ -12,12 +12,27 @@ What kind of data does Schemathesis generate?
 Schemathesis generates random test data that conforms to the given API schema.
 This data consists of all possible data types from the JSON schema specification in various combinations and different nesting levels.
 
+We can't guarantee that the generated data will always be accepted by the application under test since there could be validation rules not covered by the API schema.
+If you found that Schemathesis generated something that doesn't fit the API schema, consider `reporting a bug <https://github.com/schemathesis/schemathesis/issues/new?assignees=Stranger6667&labels=Status%3A+Review+Needed%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D>`_
+
+What kind errors Schemathesis is capable to find?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The main two groups of problems that Schemathesis targets are server-side errors and nonconformity to the behavior described in the API schema.
+
 What parts of the application is Schemathesis targeting during its tests?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 It depends. The test data that Schemathesis generates is random. Input validation is, therefore, more frequently examined than other parts.
 
 Since Schemathesis generates data that fits the application's API schema, it can reach the app's business logic, but it depends on the architecture of each particular application.
+
+What if my application doesn't have an API schema?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+As the first step, you can use schema generators like `flasgger <https://github.com/flasgger/flasgger>`_ for Python,
+`GrapeSwagger <https://github.com/ruby-grape/grape-swagger>`_ for Ruby, or `Swashbuckle <https://github.com/domaindrivendev/Swashbuckle.AspNetCore>`_ for ASP.Net.
+Then, running Schemathesis against the generated API schema will help you to refine its definitions.
 
 How is Schemathesis different from Dredd?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -47,7 +62,15 @@ If you wrote your application in a language other than Python, you should use th
 Should I always have my application running before starting the test suite?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Yes, except for Python apps that are either built with AioHTTP or implement WSGI (like Flask or Django).
+Only in some workflows! In CLI, you can test your AioHTTP / ASGI / WSGI apps with the ``--app`` CLI option.
+For the ``pytest`` integration, there is ``schemathesis.from_pytest_fixture`` loader where you can postpone API schema loading
+and start the test application as a part of your test setup. See more information in the :doc:`../python` section.
+
+How long does it usually take for Schemathesis to test an app?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+It depends on many factors, including the API's complexity under test, the network connection speed, and the Schemathesis configuration.
+Usually, it takes from a few seconds to a few minutes to run all the tests. However, there are exceptions where it might take an hour and more.
 
 Can I exclude particular data from being generated?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -90,7 +113,41 @@ Why Schemathesis generates uniform data for my API schema?
 
 There might be multiple reasons for that, but usually, this behavior occurs when the API schema is complex or deeply nested.
 Please, refer to the ``Data generation`` section in the documentation for more info. If you think that it is not the case, feel
-free to `open an issue <https://github.com/schemathesis/schemathesis/issues>`_.
+free to `open an issue <https://github.com/schemathesis/schemathesis/issues/new?assignees=Stranger6667&labels=Status%3A+Review+Needed%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D>`_.
+
+Does Schemathesis support Open API discriminators? Schemathesis raises an "Unsatisfiable" error.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``discriminator`` field does not affect data generation, and Schemathesis work directly with the underlying schemas.
+Usually, the problem comes from using the ``oneOf`` keyword with very permissive sub-schemas.
+For example:
+
+.. code:: yaml
+
+    discriminator:
+      propertyName: objectType
+    oneOf:
+      - type: object
+        required:
+          - objectType
+        properties:
+          objectType:
+            type: string
+          foo:
+            type: string
+      - type: object
+        required:
+          - objectType
+        properties:
+          objectType:
+            type: string
+          bar:
+            type: string
+
+Here both schemas do not restrict their additional properties, and for this reason, any object that is valid for the first sub-schema is also valid for the second one, which
+contradicts the definition of the ``oneOf`` keyword behavior, where the value should be valid against **exactly one** sub-schema.
+
+To solve this problem, you can use ``anyOf`` or make your sub-schemas less permissive.
 
 Working with API schemas
 ------------------------
