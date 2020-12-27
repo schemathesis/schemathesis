@@ -30,7 +30,7 @@ Changelog
 - Allow generating requests without payload if the schema does not require it. `#916`_
 - Allow sending ``null`` as request payload if the schema expects it. `#919`_
 - CLI failure if the tested operation is `GET` and has payload examples. `#925`_
-- Excessive reference inlining that leads to out-of-memory for large schemas with deep references. `#945`_
+- Excessive reference inlining that leads to out-of-memory for large schemas with deep references. `#945`_, `#671`_
 - ``--exitfirst`` CLI option trims the progress bar output when a failure occurs. `#951`_
 - Internal error if filling missing explicit examples led to ``Unsatisfiable`` errors. `#904`_
 - Do not suggest to disable schema validation if it is already disabled. `#914`_
@@ -1689,6 +1689,7 @@ Deprecated
 .. _#675: https://github.com/schemathesis/schemathesis/issues/675
 .. _#673: https://github.com/schemathesis/schemathesis/issues/673
 .. _#672: https://github.com/schemathesis/schemathesis/issues/672
+.. _#671: https://github.com/schemathesis/schemathesis/issues/671
 .. _#668: https://github.com/schemathesis/schemathesis/issues/668
 .. _#667: https://github.com/schemathesis/schemathesis/issues/667
 .. _#665: https://github.com/schemathesis/schemathesis/issues/665
