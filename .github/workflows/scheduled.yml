@@ -46,7 +46,7 @@ jobs:
             --paths-to-mutate "src/"
             --tests-dir "test/"
             --paths-to-exclude=definitions.py
-            --runner "poetry run pytest -n auto -x --tb=no -q"
+            --runner "poetry run pytest -n auto -x --tb=no -q test"
 
       - name: Display survived mutations
         if: failure()
