@@ -24,6 +24,7 @@ Changelog
 - Using ``--auth`` together with ``--header`` that sets the ``Authorization`` header causes a validation error.
   Before, the ``--header`` value was ignored in such cases, and the basic auth passed in ``--auth`` was used. `#911`_
 - When ``hypothesis-jsonschema`` fails to resolve recursive references, the test is skipped with an error message that indicates why it happens.
+- Shorter error messages when API operations have logical errors in their schema. For example, when the maximum is less than the minimum - ``{"type": "integer", "minimum": 5, "maximum": 4}``.
 
 **Fixed**
 

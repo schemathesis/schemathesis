@@ -14,6 +14,7 @@ from packaging import version
 from .. import DataGenerationMethod
 from .._hypothesis import create_test
 from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
+from ..exceptions import InvalidSchema
 from ..models import Endpoint
 from ..utils import is_schemathesis_test
 
@@ -169,6 +170,6 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     try:
         outcome.get_result()
     except InvalidArgument as exc:
-        pytest.fail(exc.args[0])
+        raise InvalidSchema(exc.args[0]) from None
     except HypothesisRefResolutionError:
         pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)
