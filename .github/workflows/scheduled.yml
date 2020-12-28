@@ -46,7 +46,7 @@ jobs:
             --paths-to-mutate "src/"
             --tests-dir "test/"
             --paths-to-exclude=definitions.py
-            --runner "poetry run pytest -n auto -x --tb=no -q test"
+            --runner "poetry run pytest -n auto -x -q test"
 
       - name: Display survived mutations
         if: failure()
@@ -72,4 +72,4 @@ jobs:
 
       - run: pip install poetry
       - run: poetry install
-      - run: poetry run pytest -m hypothesis -m hypothesis_nested --hypothesis-profile CI
+      - run: poetry run pytest -m hypothesis -m hypothesis_nested --hypothesis-profile CI test
