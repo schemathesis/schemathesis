@@ -1611,7 +1611,7 @@ def test_get_request_with_body(testdir, cli, base_url, hypothesis_max_examples, 
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
-    assert "schemathesis.exceptions.InvalidSchema: Body parameters are defined for GET request." in lines
+    assert "InvalidSchema: Body parameters are defined for GET request." in lines
 
 
 @pytest.mark.endpoints("slow")

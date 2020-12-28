@@ -11,6 +11,8 @@ from .utils import GenericResponse
 class CheckFailed(AssertionError):
     """Custom error type to distinguish from arbitrary AssertionError that may happen in the dependent libraries."""
 
+    __module__ = "builtins"
+
 
 CACHE: Dict[Union[str, int], Type[CheckFailed]] = {}
 
@@ -81,6 +83,8 @@ def get_headers_error(message: str) -> Type[CheckFailed]:
 
 class InvalidSchema(Exception):
     """Schema associated with an endpoint contains an error."""
+
+    __module__ = "builtins"
 
 
 @attr.s  # pragma: no mutate
