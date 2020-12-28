@@ -552,10 +552,7 @@ def test_missing_path_parameter(args):
     init, *others, finished = prepare(hypothesis_max_examples=3, **kwargs)
     # Then it leads to an error
     assert finished.has_errors
-    assert (
-        "schemathesis.exceptions.InvalidSchema: Path parameter 'id' is not defined"
-        in others[1].result.errors[0].exception
-    )
+    assert "InvalidSchema: Path parameter 'id' is not defined" in others[1].result.errors[0].exception
 
 
 def test_get_requests_auth():

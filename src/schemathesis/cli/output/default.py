@@ -129,7 +129,7 @@ def display_single_error(context: ExecutionContext, result: SerializedTestResult
             message = error.exception_with_traceback
         else:
             message = error.exception
-        if error.exception.startswith("schemathesis.exceptions.InvalidSchema") and context.validate_schema:
+        if error.exception.startswith("InvalidSchema") and context.validate_schema:
             message += DISABLE_SCHEMA_VALIDATION_MESSAGE + "\n"
         click.secho(message, fg="red")
         if error.example is not None:
