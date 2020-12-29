@@ -99,14 +99,13 @@ TestStateful = schema.as_state_machine().TestCase
 TestStateful.settings = settings(
     max_examples=200,
     deadline=None,
-    derandomize=True,
     suppress_health_check=HealthCheck.all(),
     stateful_step_count=3  # There is no need for longer sequences to uncover the bug
 )
 """,
         schema=app_schema,
     )
-    result = testdir.runpytest("--hypothesis-seed=42")
+    result = testdir.runpytest()
     # Then it should be able to find a hidden error:
     result.assert_outcomes(failed=1)
     # And there should be Python code to reproduce the error in the GET call
@@ -168,7 +167,6 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
                 max_examples=500,
                 deadline=None,
                 suppress_health_check=HealthCheck.all(),
-                derandomize=True,
                 stateful_step_count=3,
             ),
         )
