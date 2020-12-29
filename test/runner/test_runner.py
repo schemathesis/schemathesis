@@ -746,3 +746,32 @@ def test_unsatisfiable_example(empty_open_api_3_schema):
     # And the tests are failing because of the unsatisfiable schema
     assert finished.has_errors
     assert "Unable to satisfy schema parameters for this endpoint" in after.result.errors[0].exception
+
+
+@pytest.mark.endpoints("success")
+def test_dry_run(args):
+    called = False
+
+    def check(response, case):
+        nonlocal called
+        called = True
+
+    # When the user passes `dry_run=True`
+    app, kwargs = args
+    execute(checks=(check,), dry_run=True, **kwargs)
+    # Then no requests should be sent & no responses checked
+    assert not called
+
+
+@pytest.mark.endpoints("root")
+def test_dry_run_asgi(loadable_fastapi_app):
+    called = False
+
+    def check(response, case):
+        nonlocal called
+        called = True
+
+    # When the user passes `dry_run=True`
+    execute("/openapi.json", app=loadable_fastapi_app, checks=(check,), dry_run=True)
+    # Then no requests should be sent & no responses checked
+    assert not called
