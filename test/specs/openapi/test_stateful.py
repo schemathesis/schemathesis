@@ -48,6 +48,44 @@ def test_default_status_code(response_status, status_codes, matching):
     assert filter_function(StepResult(response, None)) is matching
 
 
+def test_custom_rule(testdir, openapi3_base_url):
+    # When the state machine contains a failing rule that does not expect `Case`
+    testdir.make_test(
+        f"""
+from hypothesis.stateful import initialize, rule
+
+schema.base_url = "{openapi3_base_url}"
+
+class APIWorkflow(schema.as_state_machine()):
+
+    def validate_response(self, response, case):
+        pass
+
+    @rule(data=st.just("foo"))
+    def some(self, data):
+        assert 0
+
+TestStateful = APIWorkflow.TestCase
+""",
+    )
+    result = testdir.runpytest()
+    # Then the reproducing steps should be correctly displayed
+    result.assert_outcomes(failed=1)
+    result.stdout.re_match_lines([r"state.some\(data='foo'\)"])
+
+
+# With the following tests we try to uncover a bug that requires multiple steps with a shared step
+# There are three operations:
+#   1. Create user via first & last name
+#   2. Get user's details - returns id & full name
+#   3. Update user - update first & last name
+# The problem is that (3) allows you to update a user with non string last name, which is not detectable in its output.
+# However, (2) will fail when it will try to create a full name. Reproducing this bug requires 3 steps:
+#   1. Create a user
+#   2. Update the user with an invalid last name
+#   3. Get info about this user
+
+
 @pytest.mark.endpoints("create_user", "get_user", "update_user")
 def test_hidden_failure(testdir, app_schema, openapi3_base_url):
     # When we run test as a state machine
@@ -56,21 +94,20 @@ def test_hidden_failure(testdir, app_schema, openapi3_base_url):
 schema.base_url = "{openapi3_base_url}"
 TestStateful = schema.as_state_machine().TestCase
 TestStateful.settings = settings(
-    max_examples=300,
+    max_examples=200,
     deadline=None,
     derandomize=True,
     suppress_health_check=HealthCheck.all(),
-    stateful_step_count=5  # There is no need for longer sequences to uncover the bug
+    stateful_step_count=3  # There is no need for longer sequences to uncover the bug
 )
 """,
         schema=app_schema,
     )
     result = testdir.runpytest("--hypothesis-seed=42")
-    # Then it should be able to find a hidden error that happens on the following sequence of API calls:
-    # ["POST", "GET", "PATCH", "GET", "PATCH"]
+    # Then it should be able to find a hidden error:
     result.assert_outcomes(failed=1)
-    # And there should be Python code to reproduce the error in the PATCH call
-    result.stdout.re_match_lines([rf"E +requests\.patch\('{openapi3_base_url}/users/\d+.+"])
+    # And there should be Python code to reproduce the error in the GET call
+    result.stdout.re_match_lines([rf"E +requests\.get\('{openapi3_base_url}/users/\w+.+"])
     # And the reproducing example should work
     first = result.outlines.index("Falsifying example:") + 1
     last = result.outlines.index("state.teardown()") + 1
@@ -108,14 +145,13 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
             target=schema["/users/{user_id}"]["PATCH"],
             status_code="201",
             parameters={"user_id": "$response.body#/id"},
-            request_body={"username": "foo"},
         )
         schema.add_link(
             source=schema["/users/{user_id}"]["GET"],
             target="#/paths/~1users~1{user_id}/patch",
             status_code="200",
             parameters={"user_id": "$response.body#/id"},
-            request_body={"username": "foo"},
+            request_body={"first_name": "foo", "last_name": "bar"},
         )
     else:
         schema = schemathesis.from_wsgi("/schema.yaml", app=app)
@@ -126,36 +162,10 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
         run_state_machine_as_test(
             state_machine,
             settings=settings(
-                max_examples=300,
+                max_examples=500,
                 deadline=None,
                 suppress_health_check=HealthCheck.all(),
                 derandomize=True,
-                stateful_step_count=5,
+                stateful_step_count=3,
             ),
         )
-
-
-def test_custom_rule(testdir, openapi3_base_url):
-    # When the state machine contains a failing rule that does not expect `Case`
-    testdir.make_test(
-        f"""
-from hypothesis.stateful import initialize, rule
-
-schema.base_url = "{openapi3_base_url}"
-
-class APIWorkflow(schema.as_state_machine()):
-
-    def validate_response(self, response, case):
-        pass
-
-    @rule(data=st.just("foo"))
-    def some(self, data):
-        assert 0
-
-TestStateful = APIWorkflow.TestCase
-""",
-    )
-    result = testdir.runpytest()
-    # Then the reproducing steps should be correctly displayed
-    result.assert_outcomes(failed=1)
-    result.stdout.re_match_lines([r"state.some\(data='foo'\)"])

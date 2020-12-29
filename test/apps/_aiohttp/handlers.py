@@ -3,6 +3,7 @@ import cgi
 import csv
 import io
 from typing import Dict
+from uuid import uuid4
 
 import jsonschema
 from aiohttp import web
@@ -11,15 +12,6 @@ try:
     from ..utils import PAYLOAD_VALIDATOR
 except (ImportError, ValueError):
     from utils import PAYLOAD_VALIDATOR
-
-
-def get_integer_parameter(request: web.Request, name: str) -> int:
-    try:
-        return int(request.match_info[name])
-    except KeyError:
-        raise web.HTTPBadRequest(text=f'{{"detail": "Missing `{name}`"}}')
-    except ValueError:
-        raise web.HTTPBadRequest(text=f'{{"detail": "Invalid `{name}`"}}')
 
 
 async def expect_content_type(request: web.Request, value: str):
@@ -190,40 +182,44 @@ async def form(request: web.Request) -> web.Response:
 
 async def create_user(request: web.Request) -> web.Response:
     data = await request.json()
-    if "username" not in data:
-        raise web.HTTPBadRequest(text='{"detail": "Missing `username`"}')
-    if not isinstance(data["username"], str):
-        raise web.HTTPBadRequest(text='{"detail": "Invalid `username`"}')
-    user_id = len(request.app["users"]) + 1
+    for field in ("first_name", "last_name"):
+        if field not in data:
+            raise web.HTTPBadRequest(text=f'{{"detail": "Missing `{field}`"}}')
+        if not isinstance(data[field], str):
+            raise web.HTTPBadRequest(text=f'{{"detail": "Invalid `{field}`"}}')
+    user_id = str(uuid4())
     request.app["users"][user_id] = {**data, "id": user_id}
-    request.app["requests_history"][user_id].append("POST")
     return web.json_response({"id": user_id}, status=201)
 
 
+def get_user_id(request: web.Request) -> str:
+    try:
+        return request.match_info["user_id"]
+    except KeyError:
+        raise web.HTTPBadRequest(text='{"detail": "Missing `user_id`"}')
+
+
 async def get_user(request: web.Request) -> web.Response:
-    user_id = get_integer_parameter(request, "user_id")
+    user_id = get_user_id(request)
     try:
         user = request.app["users"][user_id]
-        request.app["requests_history"][user_id].append("GET")
-        return web.json_response(user)
+        # The full name is done specifically via concatenation to trigger a bug when the last name is `None`
+        full_name = user["first_name"] + " " + user["last_name"]
+        return web.json_response({"id": user["id"], "full_name": full_name})
     except KeyError:
         return web.json_response({"message": "Not found"}, status=404)
 
 
 async def update_user(request: web.Request) -> web.Response:
-    user_id = get_integer_parameter(request, "user_id")
+    user_id = get_user_id(request)
     try:
         user = request.app["users"][user_id]
-        history = request.app["requests_history"][user_id]
-        history.append("PATCH")
-        if history == ["POST", "GET", "PATCH", "GET", "PATCH"]:
-            raise web.HTTPInternalServerError(text="We got a problem!")
         data = await request.json()
-        if "username" not in data:
-            raise web.HTTPBadRequest(text='{"detail": "Missing `username`"}')
-        if not isinstance(data["username"], str):
-            raise web.HTTPBadRequest(text='{"detail": "Invalid `username`"}')
-        user["username"] = data["username"]
+        for field in ("first_name", "last_name"):
+            if field not in data:
+                raise web.HTTPBadRequest(text=f'{{"detail": "Missing `{field}`"}}')
+            # Here we don't check the input value type to emulate a bug in another operation
+            user[field] = data[field]
         return web.json_response(user)
     except KeyError:
         return web.json_response({"message": "Not found"}, status=404)
