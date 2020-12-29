@@ -189,6 +189,14 @@ class GroupedOption(click.Option):
     show_default=True,
 )
 @click.option(
+    "--dry-run",
+    "dry_run",
+    is_flag=True,
+    default=False,
+    help="Disable sending data to the application and checking responses. "
+    "Helpful to verify whether data is generated at all.",
+)
+@click.option(
     "--auth", "-a", help="Server user and password. Example: USER:PASSWORD", type=str, callback=callbacks.validate_auth
 )
 @click.option(
@@ -417,6 +425,7 @@ def run(
     max_response_time: Optional[int] = None,
     targets: Iterable[str] = DEFAULT_TARGETS_NAMES,
     exit_first: bool = False,
+    dry_run: bool = False,
     endpoints: Optional[Filter] = None,
     methods: Optional[Filter] = None,
     tags: Optional[Filter] = None,
@@ -473,6 +482,7 @@ def run(
         app=app,
         seed=hypothesis_seed,
         exit_first=exit_first,
+        dry_run=dry_run,
         store_interactions=store_network_log is not None,
         checks=selected_checks,
         data_generation_methods=data_generation_methods,

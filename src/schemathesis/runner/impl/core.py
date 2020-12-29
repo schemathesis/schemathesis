@@ -50,6 +50,7 @@ class BaseRunner:
     store_interactions: bool = attr.ib(default=False)  # pragma: no mutate
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
     exit_first: bool = attr.ib(default=False)  # pragma: no mutate
+    dry_run: bool = attr.ib(default=False)  # pragma: no mutate
     stateful: Optional[Stateful] = attr.ib(default=None)  # pragma: no mutate
     stateful_recursion_limit: int = attr.ib(default=DEFAULT_STATEFUL_RECURSION_LIMIT)  # pragma: no mutate
 
@@ -295,6 +296,7 @@ def network_test(
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
     max_response_time: Optional[int],
+    dry_run: bool,
     errors: List[Exception],
 ) -> None:
     """A single test body will be executed against the target."""
@@ -303,34 +305,35 @@ def network_test(
         if "user-agent" not in {header.lower() for header in headers}:
             headers["User-Agent"] = USER_AGENT
         timeout = prepare_timeout(request_timeout)
-        response = _network_test(
-            case,
-            checks,
-            targets,
-            result,
-            session,
-            timeout,
-            store_interactions,
-            headers,
-            feedback,
-            request_tls_verify,
-            max_response_time,
-        )
-        add_cases(
-            case,
-            response,
-            _network_test,
-            checks,
-            targets,
-            result,
-            session,
-            timeout,
-            store_interactions,
-            headers,
-            feedback,
-            request_tls_verify,
-            max_response_time,
-        )
+        if not dry_run:
+            response = _network_test(
+                case,
+                checks,
+                targets,
+                result,
+                session,
+                timeout,
+                store_interactions,
+                headers,
+                feedback,
+                request_tls_verify,
+                max_response_time,
+            )
+            add_cases(
+                case,
+                response,
+                _network_test,
+                checks,
+                targets,
+                result,
+                session,
+                timeout,
+                store_interactions,
+                headers,
+                feedback,
+                request_tls_verify,
+                max_response_time,
+            )
 
 
 def _network_test(
@@ -390,23 +393,27 @@ def wsgi_test(
     store_interactions: bool,
     feedback: Feedback,
     max_response_time: Optional[int],
+    dry_run: bool,
     errors: List[Exception],
 ) -> None:
     with ErrorCollector(errors):
         headers = _prepare_wsgi_headers(headers, auth, auth_type)
-        response = _wsgi_test(case, checks, targets, result, headers, store_interactions, feedback, max_response_time)
-        add_cases(
-            case,
-            response,
-            _wsgi_test,
-            checks,
-            targets,
-            result,
-            headers,
-            store_interactions,
-            feedback,
-            max_response_time,
-        )
+        if not dry_run:
+            response = _wsgi_test(
+                case, checks, targets, result, headers, store_interactions, feedback, max_response_time
+            )
+            add_cases(
+                case,
+                response,
+                _wsgi_test,
+                checks,
+                targets,
+                result,
+                headers,
+                store_interactions,
+                feedback,
+                max_response_time,
+            )
 
 
 def _wsgi_test(
@@ -469,25 +476,29 @@ def asgi_test(
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
     max_response_time: Optional[int],
+    dry_run: bool,
     errors: List[Exception],
 ) -> None:
     """A single test body will be executed against the target."""
     with ErrorCollector(errors):
         headers = headers or {}
 
-        response = _asgi_test(case, checks, targets, result, store_interactions, headers, feedback, max_response_time)
-        add_cases(
-            case,
-            response,
-            _asgi_test,
-            checks,
-            targets,
-            result,
-            store_interactions,
-            headers,
-            feedback,
-            max_response_time,
-        )
+        if not dry_run:
+            response = _asgi_test(
+                case, checks, targets, result, store_interactions, headers, feedback, max_response_time
+            )
+            add_cases(
+                case,
+                response,
+                _asgi_test,
+                checks,
+                targets,
+                result,
+                store_interactions,
+                headers,
+                feedback,
+                max_response_time,
+            )
 
 
 def _asgi_test(

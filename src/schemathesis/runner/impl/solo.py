@@ -32,6 +32,7 @@ class SingleThreadRunner(BaseRunner):
                 request_timeout=self.request_timeout,
                 request_tls_verify=self.request_tls_verify,
                 store_interactions=self.store_interactions,
+                dry_run=self.dry_run,
             )
 
 
@@ -51,6 +52,7 @@ class SingleThreadWSGIRunner(SingleThreadRunner):
             auth_type=self.auth_type,
             headers=self.headers,
             store_interactions=self.store_interactions,
+            dry_run=self.dry_run,
         )
 
 
@@ -68,4 +70,5 @@ class SingleThreadASGIRunner(SingleThreadRunner):
             results=results,
             headers=self.headers,
             store_interactions=self.store_interactions,
+            dry_run=self.dry_run,
         )
