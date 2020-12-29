@@ -1,9 +1,9 @@
 import cgi
 import csv
 import json
-from collections import defaultdict
 from time import sleep
 from typing import Tuple
+from uuid import uuid4
 
 import jsonschema
 import yaml
@@ -33,7 +33,6 @@ def create_openapi_app(
     app.config["schema_requests"] = []
     app.config["internal_exception"] = False
     app.config["users"] = {}
-    app.config["requests_history"] = defaultdict(list)
 
     @app.before_request
     def store_request():
@@ -199,38 +198,35 @@ def create_openapi_app(
     @app.route("/api/users/", methods=["POST"])
     def create_user():
         data = request.json
-        if "username" not in data:
-            return jsonify({"detail": "Missing `username`"}), 400
-        if not isinstance(data["username"], str):
-            return jsonify({"detail": "Invalid `username`"}), 400
-        user_id = len(app.config["users"]) + 1
+        for field in ("first_name", "last_name"):
+            if field not in data:
+                return jsonify({"detail": f"Missing `{field}`"}), 400
+            if not isinstance(data[field], str):
+                return jsonify({"detail": f"Invalid `{field}`"}), 400
+        user_id = str(uuid4())
         app.config["users"][user_id] = {**data, "id": user_id}
-        app.config["requests_history"][user_id].append("POST")
         return jsonify({"id": user_id}), 201
 
-    @app.route("/api/users/<int:user_id>", methods=["GET"])
+    @app.route("/api/users/<user_id>", methods=["GET"])
     def get_user(user_id):
         try:
             user = app.config["users"][user_id]
-            app.config["requests_history"][user_id].append("GET")
-            return jsonify(user)
+            # The full name is done specifically via concatenation to trigger a bug when the last name is `None`
+            full_name = user["first_name"] + " " + user["last_name"]
+            return jsonify({"id": user["id"], "full_name": full_name})
         except KeyError:
             return jsonify({"message": "Not found"}), 404
 
-    @app.route("/api/users/<int:user_id>", methods=["PATCH"])
+    @app.route("/api/users/<user_id>", methods=["PATCH"])
     def update_user(user_id):
         try:
             user = app.config["users"][user_id]
-            history = app.config["requests_history"][user_id]
-            history.append("PATCH")
-            if history == ["POST", "GET", "PATCH", "GET", "PATCH"]:
-                raise InternalServerError("We got a problem!")
             data = request.json
-            if "username" not in data:
-                return jsonify({"detail": "Missing `username`"}), 400
-            if not isinstance(data["username"], str):
-                return jsonify({"detail": "Invalid `username`"}), 400
-            user["username"] = data["username"]
+            for field in ("first_name", "last_name"):
+                if field not in data:
+                    return jsonify({"detail": f"Missing `{field}`"}), 400
+                # Here we don't check the input value type to emulate a bug in another operation
+                user[field] = data[field]
             return jsonify(user)
         except KeyError:
             return jsonify({"message": "Not found"}), 404

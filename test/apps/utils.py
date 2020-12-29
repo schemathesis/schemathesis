@@ -233,8 +233,11 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
                         "required": True,
                         "schema": {
                             "type": "object",
-                            "properties": {"username": {"type": "string", "minLength": 3}},
-                            "required": ["username"],
+                            "properties": {
+                                "first_name": {"type": "string", "minLength": 3},
+                                "last_name": {"type": "string", "minLength": 3},
+                            },
+                            "required": ["first_name", "last_name"],
                             "additionalProperties": False,
                         },
                     }
@@ -246,7 +249,6 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
                 {
                     "operationId": "updateUser",
                     "parameters": {"user_id": "$response.body#/id"},
-                    "requestBody": {"username": "foo"},
                 },
             )
             template["x-components"]["responses"] = {
@@ -266,12 +268,12 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
             }
         elif endpoint == "get_user":
             parent = template["paths"].setdefault(path, {})
-            parent["parameters"] = [{"in": "path", "name": "user_id", "required": True, "type": "integer"}]
+            parent["parameters"] = [{"in": "path", "name": "user_id", "required": True, "type": "string"}]
             schema = {
                 "operationId": "getUser",
                 "parameters": [
                     {"in": "query", "name": "code", "required": True, "type": "integer"},
-                    {"in": "query", "name": "user_id", "required": True, "type": "integer"},
+                    {"in": "query", "name": "user_id", "required": True, "type": "string"},
                 ],
                 "responses": {
                     "200": {
@@ -280,7 +282,7 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
                             "UpdateUserById": {
                                 "operationRef": "#/paths/~1users~1{user_id}/patch",
                                 "parameters": {"user_id": "$response.body#/id"},
-                                "requestBody": {"username": "foo"},
+                                "requestBody": {"first_name": "foo", "last_name": "bar"},
                             }
                         },
                     },
@@ -290,7 +292,7 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
         elif endpoint == "update_user":
             parent = template["paths"].setdefault(path, {})
             parent["parameters"] = [
-                {"in": "path", "name": "user_id", "required": True, "type": "integer"},
+                {"in": "path", "name": "user_id", "required": True, "type": "string"},
                 {"in": "query", "name": "common", "required": True, "type": "integer"},
             ]
             schema = {
@@ -301,10 +303,14 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
                         "name": "username",
                         "required": True,
                         "schema": {
-                            "additionalProperties": False,
                             "type": "object",
-                            "properties": {"username": {"type": "string"}},
-                            "required": ["username"],
+                            "properties": {
+                                "first_name": {"type": "string", "minLength": 3},
+                                # Note, the `last_name` field should not be nullable, it is a placed bug
+                                "last_name": {"type": "string", "minLength": 3, "x-nullable": True},
+                            },
+                            "required": ["first_name", "last_name"],
+                            "additionalProperties": False,
                         },
                     },
                 ],
@@ -525,8 +531,11 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "properties": {"username": {"type": "string", "minLength": 3}},
-                                "required": ["username"],
+                                "properties": {
+                                    "first_name": {"type": "string", "minLength": 3},
+                                    "last_name": {"type": "string", "minLength": 3},
+                                },
+                                "required": ["first_name", "last_name"],
                                 "additionalProperties": False,
                             }
                         }
@@ -540,7 +549,6 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                 {
                     "operationId": "updateUser",
                     "parameters": {"user_id": "$response.body#/id"},
-                    "requestBody": {"username": "foo"},
                 },
             )
             template["components"]["responses"] = {
@@ -560,12 +568,12 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
             }
         elif endpoint == "get_user":
             parent = template["paths"].setdefault(path, {})
-            parent["parameters"] = [{"in": "path", "name": "user_id", "required": True, "schema": {"type": "integer"}}]
+            parent["parameters"] = [{"in": "path", "name": "user_id", "required": True, "schema": {"type": "string"}}]
             schema = {
                 "operationId": "getUser",
                 "parameters": [
                     {"in": "query", "name": "code", "required": True, "schema": {"type": "integer"}},
-                    {"in": "query", "name": "user_id", "required": True, "schema": {"type": "integer"}},
+                    {"in": "query", "name": "user_id", "required": True, "schema": {"type": "string"}},
                 ],
                 "responses": {
                     "200": {
@@ -574,7 +582,7 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                             "UpdateUserById": {
                                 "operationRef": "#/paths/~1users~1{user_id}/patch",
                                 "parameters": {"user_id": "$response.body#/id"},
-                                "requestBody": {"username": "foo"},
+                                "requestBody": {"first_name": "foo", "last_name": "bar"},
                             }
                         },
                     },
@@ -584,7 +592,7 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
         elif endpoint == "update_user":
             parent = template["paths"].setdefault(path, {})
             parent["parameters"] = [
-                {"in": "path", "name": "user_id", "required": True, "schema": {"type": "integer"}},
+                {"in": "path", "name": "user_id", "required": True, "schema": {"type": "string"}},
                 {"in": "query", "name": "common", "required": True, "schema": {"type": "integer"}},
             ]
             schema = {
@@ -593,10 +601,14 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
                     "content": {
                         "application/json": {
                             "schema": {
-                                "additionalProperties": False,
                                 "type": "object",
-                                "properties": {"username": {"type": "string"}},
-                                "required": ["username"],
+                                "properties": {
+                                    "first_name": {"type": "string", "minLength": 3},
+                                    # Note, the `last_name` field should not be nullable, it is a placed bug
+                                    "last_name": {"type": "string", "minLength": 3, "nullable": True},
+                                },
+                                "required": ["first_name", "last_name"],
+                                "additionalProperties": False,
                             }
                         }
                     },
