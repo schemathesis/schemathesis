@@ -34,6 +34,13 @@ servers:
         yield
 
 
+@pytest.fixture(scope="module")
+def schema_url(server):
+    # In this module we don't care about resetting the app or testing different Open API versions
+    # Only whether Schemathesis crashes on allowed input
+    return f"http://127.0.0.1:{server['port']}/api"
+
+
 @st.composite
 def delimited(draw):
     key = draw(st.text(min_size=1))
