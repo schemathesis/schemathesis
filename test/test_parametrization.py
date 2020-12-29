@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import assume, given, settings
+from hypothesis import HealthCheck, assume, given, settings
 from packaging import version
 
 import schemathesis
@@ -717,7 +717,7 @@ def test_optional_form_parameters(schema_url):
     strategy = schema.endpoints["/multipart"]["POST"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3, deadline=None)
+    @settings(max_examples=3, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
     def test(case):
         assume("maybe" in case.body)
         response = case.call()
