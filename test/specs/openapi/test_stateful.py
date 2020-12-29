@@ -1,4 +1,5 @@
 import pytest
+import requests
 from hypothesis import HealthCheck, settings
 from hypothesis.stateful import run_state_machine_as_test
 from requests import Response
@@ -169,3 +170,44 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
                 stateful_step_count=3,
             ),
         )
+
+
+def test_all_operations_with_links(openapi3_base_url):
+    # See GH-965
+    # When all API operations have inbound links (one recursive in this exact case)
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/payload": {
+                "post": {
+                    "operationId": "payload",
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"type": "integer", "minimum": 0, "maximum": 5}}},
+                        "required": True,
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "links": {"More": {"operationId": "payload", "requestBody": "$response.body#/value"}},
+                        }
+                    },
+                }
+            }
+        },
+    }
+    schema = schemathesis.from_dict(raw_schema, base_url=openapi3_base_url)
+
+    class APIWorkflow(schema.as_state_machine()):
+        def call(self, case, **kwargs):
+            # The actual response doesn't matter much for this test
+            response = requests.Response()
+            response.status_code = 200
+            response._content = b'{"value": 42}'
+            return response
+
+    # Then test should be successful
+    # And there should be no "Unsatisfiable" error
+    run_state_machine_as_test(
+        APIWorkflow, settings=settings(max_examples=1, deadline=None, suppress_health_check=HealthCheck.all())
+    )

@@ -36,6 +36,7 @@ Changelog
 - Internal error if filling missing explicit examples led to ``Unsatisfiable`` errors. `#904`_
 - Do not suggest to disable schema validation if it is already disabled. `#914`_
 - Skip explicit examples generation if this phase is disabled via config. `#905`_
+- ``Unsatisfiable`` error in stateful testing caused by all API operations having inbound links. `#965`_, `#822`_
 
 **Removed**
 
@@ -1620,6 +1621,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#965: https://github.com/schemathesis/schemathesis/issues/965
 .. _#951: https://github.com/schemathesis/schemathesis/issues/951
 .. _#945: https://github.com/schemathesis/schemathesis/issues/945
 .. _#941: https://github.com/schemathesis/schemathesis/issues/941
@@ -1656,6 +1658,7 @@ Deprecated
 .. _#832: https://github.com/schemathesis/schemathesis/issues/832
 .. _#830: https://github.com/schemathesis/schemathesis/issues/830
 .. _#824: https://github.com/schemathesis/schemathesis/issues/824
+.. _#822: https://github.com/schemathesis/schemathesis/issues/822
 .. _#816: https://github.com/schemathesis/schemathesis/issues/816
 .. _#814: https://github.com/schemathesis/schemathesis/issues/814
 .. _#812: https://github.com/schemathesis/schemathesis/issues/812
