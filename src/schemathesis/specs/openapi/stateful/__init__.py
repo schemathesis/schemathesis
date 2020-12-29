@@ -1,7 +1,7 @@
 import functools
 import operator
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Type
+from typing import TYPE_CHECKING, Any, Dict, Generator, List, Tuple, Type
 
 from hypothesis.stateful import Bundle, Rule, rule
 from hypothesis.strategies import SearchStrategy, none
@@ -61,21 +61,22 @@ def make_all_rules(
 ) -> Dict[str, Rule]:
     """Create rules for all endpoints, based on the provided connections."""
     return {
-        f"rule {endpoint.verbose_name}": make_rule(
-            endpoint, bundles[endpoint.path][endpoint.method.upper()], connections
-        )
+        f"rule {endpoint.verbose_name} {idx}": new
         for endpoint in schema.get_all_endpoints()
+        for idx, new in enumerate(make_rules(endpoint, bundles[endpoint.path][endpoint.method.upper()], connections))
     }
 
 
-def make_rule(endpoint: "Endpoint", bundle: Bundle, connections: EndpointConnections) -> Rule:
+def make_rules(endpoint: "Endpoint", bundle: Bundle, connections: EndpointConnections) -> Generator[Rule, None, None]:
     """Create a rule for an endpoint."""
+
+    def _make_rule(previous: SearchStrategy) -> Rule:
+        return rule(target=bundle, previous=previous, case=endpoint.as_strategy())(APIStateMachine.step)  # type: ignore
+
     previous_strategies = connections.get(endpoint.verbose_name)
     if previous_strategies is not None:
-        previous = _combine_strategies(previous_strategies)
-    else:
-        previous = none()
-    return rule(target=bundle, previous=previous, case=endpoint.as_strategy())(APIStateMachine.step)  # type: ignore
+        yield _make_rule(_combine_strategies(previous_strategies))
+    yield _make_rule(none())
 
 
 def _combine_strategies(strategies: List[SearchStrategy]) -> SearchStrategy:
