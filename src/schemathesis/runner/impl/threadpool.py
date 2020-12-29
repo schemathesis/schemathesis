@@ -255,6 +255,7 @@ class ThreadPoolRunner(BaseRunner):
                 "request_tls_verify": self.request_tls_verify,
                 "store_interactions": self.store_interactions,
                 "max_response_time": self.max_response_time,
+                "dry_run": self.dry_run,
             },
         }
 
@@ -280,6 +281,7 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
                 "headers": self.headers,
                 "store_interactions": self.store_interactions,
                 "max_response_time": self.max_response_time,
+                "dry_run": self.dry_run,
             },
         }
 
@@ -303,6 +305,7 @@ class ThreadPoolASGIRunner(ThreadPoolRunner):
             "kwargs": {
                 "store_interactions": self.store_interactions,
                 "max_response_time": self.max_response_time,
+                "dry_run": self.dry_run,
             },
         }
 
