@@ -37,6 +37,7 @@ Changelog
 - Do not suggest to disable schema validation if it is already disabled. `#914`_
 - Skip explicit examples generation if this phase is disabled via config. `#905`_
 - ``Unsatisfiable`` error in stateful testing caused by all API operations having inbound links. `#965`_, `#822`_
+- A possibility to override ``APIStateMachine.step``. `#970`_
 
 **Removed**
 
@@ -1621,6 +1622,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#970: https://github.com/schemathesis/schemathesis/issues/970
 .. _#965: https://github.com/schemathesis/schemathesis/issues/965
 .. _#951: https://github.com/schemathesis/schemathesis/issues/951
 .. _#945: https://github.com/schemathesis/schemathesis/issues/945
