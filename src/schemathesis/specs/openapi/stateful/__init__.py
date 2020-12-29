@@ -71,7 +71,8 @@ def make_rules(endpoint: "Endpoint", bundle: Bundle, connections: EndpointConnec
     """Create a rule for an endpoint."""
 
     def _make_rule(previous: SearchStrategy) -> Rule:
-        return rule(target=bundle, previous=previous, case=endpoint.as_strategy())(APIStateMachine.step)  # type: ignore
+        decorator = rule(target=bundle, previous=previous, case=endpoint.as_strategy())  # type: ignore
+        return decorator(APIStateMachine._step)
 
     previous_strategies = connections.get(endpoint.verbose_name)
     if previous_strategies is not None:

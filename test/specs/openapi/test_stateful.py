@@ -1,3 +1,5 @@
+from test.apps import OpenAPIVersion
+
 import pytest
 import requests
 from hypothesis import HealthCheck, settings
@@ -211,3 +213,34 @@ def test_all_operations_with_links(openapi3_base_url):
     run_state_machine_as_test(
         APIWorkflow, settings=settings(max_examples=1, deadline=None, suppress_health_check=HealthCheck.all())
     )
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.endpoints("create_user", "get_user", "update_user")
+def test_step_override(testdir, app_schema, base_url, openapi_version):
+    # See GH-970
+    # When the user overrides the `step` method
+    testdir.make_test(
+        f"""
+schema.base_url = "{base_url}"
+
+class APIWorkflow(schema.as_state_machine()):
+
+    def step(self, case, previous=None):
+        raise ValueError("ERROR FOUND!")
+
+TestStateful = APIWorkflow.TestCase
+TestStateful.settings = settings(
+    max_examples=1,
+    deadline=None,
+    derandomize=True,
+    suppress_health_check=HealthCheck.all(),
+)
+""",
+        schema=app_schema,
+    )
+    result = testdir.runpytest()
+    # Then it should be overridden
+    result.assert_outcomes(failed=1)
+    # And the placed error should pop up to indicate that the overridden code is called
+    result.stdout.re_match_lines([r".+ValueError: ERROR FOUND!"])
