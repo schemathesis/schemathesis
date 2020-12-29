@@ -74,7 +74,6 @@ def response():
                     name="UpdateUserById",
                     endpoint=ANY,
                     parameters={"user_id": "$response.body#/id"},
-                    request_body={"username": "foo"},
                 ),
             ],
         ),
@@ -84,7 +83,7 @@ def response():
 @pytest.mark.endpoints("create_user", "get_user", "update_user")
 def test_get_links(openapi3_base_url, schema_url, url, expected):
     schema = schemathesis.from_uri(schema_url)
-    response = requests.post(f"{openapi3_base_url}{url}", json={"username": "TEST"})
+    response = requests.post(f"{openapi3_base_url}{url}", json={"first_name": "TEST", "last_name": "TEST"})
     assert schema.endpoints["/users/"]["POST"].get_stateful_tests(response, Stateful.links) == expected
 
 

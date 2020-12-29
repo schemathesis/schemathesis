@@ -58,7 +58,6 @@ def create_openapi_app(
         + [web.route(item.value[0], item.value[1], wrapper(item.name)) for item in Endpoint if item.name != "all"]
     )
     app["users"] = {}
-    app["requests_history"] = defaultdict(list)
     app["incoming_requests"] = incoming_requests
     app["schema_requests"] = schema_requests
     app["config"] = {"should_fail": True, "schema_data": make_openapi_schema(endpoints, version)}
@@ -72,7 +71,6 @@ def reset_app(
 ) -> None:
     """Clean up all internal containers of the application and resets its config."""
     app["users"].clear()
-    app["requests_history"].clear()
     app["incoming_requests"][:] = []
     app["schema_requests"][:] = []
     app["config"].update({"should_fail": True, "schema_data": make_openapi_schema(endpoints, version)})
