@@ -474,6 +474,7 @@ def test_internal_exceptions(args, mocker):
     exceptions = [i.exception.strip() for i in others[1].result.errors]
     for exc_type in exc_types:
         assert str(exc_type.__name__) in exceptions
+    assert len(exceptions) == len(exc_types)
 
 
 @pytest.mark.endpoints("payload")

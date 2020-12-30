@@ -133,7 +133,7 @@ def run_test(  # pylint: disable=too-many-locals
         # It could be an error in user-defined extensions, network errors or internal Schemathesis errors
         status = Status.error
         result.mark_errored()
-        for error in errors:
+        for error in deduplicate_errors(errors):
             result.add_error(error)
     except hypothesis.errors.MultipleFailures:
         # Schemathesis may detect multiple errors that come from different check results
@@ -193,6 +193,17 @@ def reraise(error: AssertionError) -> InvalidSchema:
         raise InvalidSchema(message) from error
     except InvalidSchema as exc:
         return exc
+
+
+def deduplicate_errors(errors: List[Exception]) -> Generator[Exception, None, None]:
+    """Deduplicate errors by their messages + tracebacks."""
+    seen = set()
+    for error in errors:
+        message = format_exception(error, True)
+        if message in seen:
+            continue
+        seen.add(message)
+        yield error
 
 
 def run_checks(
