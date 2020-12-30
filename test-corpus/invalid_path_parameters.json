@@ -1,0 +1,57 @@
+{
+  "amazonaws.com/appsync/2017-07-25/openapi.yaml": [
+    "DELETE /v1/tags/{resourceArn}#tagKeys",
+    "GET /v1/tags/{resourceArn}",
+    "POST /v1/tags/{resourceArn}"
+  ],
+  "amazonaws.com/dlm/2018-01-12/openapi.yaml": [
+    "DELETE /tags/{resourceArn}#tagKeys",
+    "GET /tags/{resourceArn}",
+    "POST /tags/{resourceArn}"
+  ],
+  "amazonaws.com/elastic-inference/2017-07-25/openapi.yaml": [
+    "DELETE /tags/{resourceArn}#tagKeys",
+    "GET /tags/{resourceArn}",
+    "POST /tags/{resourceArn}"
+  ],
+  "amazonaws.com/emr-containers/2020-10-01/openapi.yaml": [
+    "DELETE /tags/{resourceArn}#tagKeys",
+    "GET /tags/{resourceArn}",
+    "POST /tags/{resourceArn}"
+  ],
+  "amazonaws.com/guardduty/2017-11-28/openapi.yaml": [
+    "DELETE /tags/{resourceArn}#tagKeys",
+    "GET /tags/{resourceArn}",
+    "POST /tags/{resourceArn}"
+  ],
+  "amazonaws.com/imagebuilder/2019-12-02/openapi.yaml": [
+    "DELETE /tags/{resourceArn}#tagKeys",
+    "GET /tags/{resourceArn}",
+    "POST /tags/{resourceArn}"
+  ],
+  "amazonaws.com/iot1click-projects/2018-05-14/openapi.yaml": [
+    "DELETE /tags/{resourceArn}#tagKeys",
+    "GET /tags/{resourceArn}",
+    "POST /tags/{resourceArn}"
+  ],
+  "amazonaws.com/ivs/2020-07-14/openapi.yaml": [
+    "DELETE /tags/{resourceArn}#tagKeys",
+    "GET /tags/{resourceArn}",
+    "POST /tags/{resourceArn}"
+  ],
+  "amazonaws.com/mwaa/2020-07-01/openapi.yaml": [
+    "DELETE /tags/{ResourceArn}#tagKeys",
+    "GET /tags/{ResourceArn}",
+    "POST /tags/{ResourceArn}"
+  ],
+  "amazonaws.com/outposts/2019-12-03/openapi.yaml": [
+    "DELETE /tags/{ResourceArn}#tagKeys",
+    "GET /tags/{ResourceArn}",
+    "POST /tags/{ResourceArn}"
+  ],
+  "amazonaws.com/resource-groups/2017-11-27/openapi.yaml": [
+    "GET /resources/{Arn}/tags",
+    "PATCH /resources/{Arn}/tags",
+    "PUT /resources/{Arn}/tags"
+  ]
+}

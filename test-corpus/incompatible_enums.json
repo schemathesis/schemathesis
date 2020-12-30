@@ -1,0 +1,59 @@
+{
+  "bhagavadgita.io/1.0/openapi.yaml": [
+    "GET /api/v1/chapters/{chapter_number}/verses/{verse_number}"
+  ],
+  "bungie.net/2.0.0/swagger.yaml": [
+    "GET /Platform/CommunityContent/Get/{sort}/{mediaFilter}/{page}/",
+    "GET /Platform/CommunityContent/Live/All/{partnershipType}/{sort}/{page}/",
+    "GET /Platform/CommunityContent/Live/Clan/{partnershipType}/{sort}/{page}/",
+    "GET /Platform/CommunityContent/Live/Featured/{partnershipType}/{sort}/{page}/",
+    "GET /Platform/CommunityContent/Live/Friends/{partnershipType}/{sort}/{page}/",
+    "GET /Platform/CommunityContent/Live/Users/{partnershipType}/{membershipType}/{membershipId}/",
+    "GET /Platform/Destiny2/SearchDestinyPlayer/{membershipType}/{displayName}/",
+    "GET /Platform/Destiny2/Stats/Leaderboards/{membershipType}/{destinyMembershipId}/{characterId}/",
+    "GET /Platform/Destiny2/{membershipType}/Account/{destinyMembershipId}/Character/{characterId}/Stats/",
+    "GET /Platform/Destiny2/{membershipType}/Account/{destinyMembershipId}/Character/{characterId}/Stats/Activities/",
+    "GET /Platform/Destiny2/{membershipType}/Account/{destinyMembershipId}/Character/{characterId}/Stats/AggregateActivityStats/",
+    "GET /Platform/Destiny2/{membershipType}/Account/{destinyMembershipId}/Character/{characterId}/Stats/UniqueWeapons/",
+    "GET /Platform/Destiny2/{membershipType}/Account/{destinyMembershipId}/Stats/",
+    "GET /Platform/Destiny2/{membershipType}/Account/{destinyMembershipId}/Stats/Leaderboards/",
+    "GET /Platform/Destiny2/{membershipType}/Profile/{destinyMembershipId}/",
+    "GET /Platform/Destiny2/{membershipType}/Profile/{destinyMembershipId}/Character/{characterId}/",
+    "GET /Platform/Destiny2/{membershipType}/Profile/{destinyMembershipId}/Character/{characterId}/Vendors/",
+    "GET /Platform/Destiny2/{membershipType}/Profile/{destinyMembershipId}/Character/{characterId}/Vendors/{vendorHash}/",
+    "GET /Platform/Destiny2/{membershipType}/Profile/{destinyMembershipId}/Item/{itemInstanceId}/",
+    "GET /Platform/Forum/GetCoreTopicsPaged/{page}/{sort}/{quickDate}/{categoryFilter}/",
+    "GET /Platform/Forum/GetPostsThreadedPaged/{parentPostId}/{page}/{pageSize}/{replySize}/{getParentPost}/{rootThreadMode}/{sortMode}/",
+    "GET /Platform/Forum/GetPostsThreadedPagedFromChild/{childPostId}/{page}/{pageSize}/{replySize}/{rootThreadMode}/{sortMode}/",
+    "GET /Platform/Forum/GetTopicsPaged/{page}/{pageSize}/{group}/{sort}/{quickDate}/{categoryFilter}/",
+    "GET /Platform/GroupV2/GetUserClanInviteSetting/{mType}/",
+    "GET /Platform/GroupV2/Name/{groupName}/{groupType}/",
+    "GET /Platform/GroupV2/User/Potential/{membershipType}/{membershipId}/{filter}/{groupType}/",
+    "GET /Platform/GroupV2/User/{membershipType}/{membershipId}/{filter}/{groupType}/",
+    "GET /Platform/Trending/Details/{trendingEntryType}/{identifier}/",
+    "GET /Platform/User/GetMembershipsById/{membershipId}/{membershipType}/",
+    "POST /Platform/GroupV2/SetUserClanInviteSetting/{mType}/{allowInvites}/",
+    "POST /Platform/GroupV2/{groupId}/Admin/AbdicateFoundership/{membershipType}/{founderIdNew}/",
+    "POST /Platform/GroupV2/{groupId}/Members/Apply/{membershipType}/",
+    "POST /Platform/GroupV2/{groupId}/Members/IndividualInvite/{membershipType}/{membershipId}/",
+    "POST /Platform/GroupV2/{groupId}/Members/IndividualInviteCancel/{membershipType}/{membershipId}/",
+    "POST /Platform/GroupV2/{groupId}/Members/Rescind/{membershipType}/",
+    "POST /Platform/GroupV2/{groupId}/Members/{membershipType}/{membershipId}/Ban/",
+    "POST /Platform/GroupV2/{groupId}/Members/{membershipType}/{membershipId}/Kick/",
+    "POST /Platform/GroupV2/{groupId}/Members/{membershipType}/{membershipId}/SetMembershipType/{memberType}/",
+    "POST /Platform/GroupV2/{groupId}/Members/{membershipType}/{membershipId}/Unban/"
+  ],
+  "dracoon.team/4.23.4/openapi.yaml": [
+    "POST /api/v4/system/config/oauth/clients",
+    "PUT /api/v4/system/config/oauth/clients/{client_id}"
+  ],
+  "visagecloud.com/1.1/swagger.yaml": [
+    "PUT /rest/v1.1/collection/purpose"
+  ],
+  "whatsapp.local/1.0/openapi.yaml": [
+    "POST /v1/account/shards"
+  ],
+  "zoom.us/2.0.0/swagger.yaml": [
+    "POST /v2/webhooks"
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "amazonaws.com/honeycode/2020-03-01/openapi.yaml": [
+    "POST /workbooks/{workbookId}/tables/{tableId}/import"
+  ],
+  "amazonaws.com/iot/2015-05-28/openapi.yaml": [
+    "DELETE /cacertificate/{caCertificateId}",
+    "DELETE /certificates/{certificateId}",
+    "GET /cacertificate/{caCertificateId}",
+    "GET /certificates-by-ca/{caCertificateId}",
+    "GET /certificates/{certificateId}",
+    "PATCH /accept-certificate-transfer/{certificateId}",
+    "PATCH /cancel-certificate-transfer/{certificateId}",
+    "PATCH /reject-certificate-transfer/{certificateId}",
+    "PATCH /transfer-certificate/{certificateId}#targetAwsAccount",
+    "PUT /cacertificate/{caCertificateId}",
+    "PUT /certificates/{certificateId}#newStatus"
+  ],
+  "amazonaws.com/sagemaker/2017-07-24/openapi.yaml": [
+    "POST /#X-Amz-Target=SageMaker.CreateWorkteam",
+    "POST /#X-Amz-Target=SageMaker.DeleteTags"
+  ],
+  "amazonaws.com/budgets/2016-10-20/openapi.yaml": [
+    "POST /#X-Amz-Target=AWSBudgetServiceGateway.CreateBudgetAction"
+  ],
+  "azure.com/applicationinsights-swagger/2018-04-20/swagger.yaml": [
+    "GET /subscriptions/{subscriptionId}/resourcegroups/{resourceGroupName}/providers/Microsoft.Insights/components/{applicationName}/metrics/{metricId}"
+  ],
+  "azure.com/customer-insights/2017-01-01/swagger.yaml": [
+    "PUT /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.CustomerInsights/hubs/{hubName}/authorizationPolicies/{authorizationPolicyName}"
+  ],
+  "azure.com/customer-insights/2017-04-26/swagger.yaml": [
+    "PUT /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.CustomerInsights/hubs/{hubName}/authorizationPolicies/{authorizationPolicyName}"
+  ],
+  "azure.com/logic/2016-06-01/swagger.yaml": [
+    "PUT /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Logic/integrationAccounts/{integrationAccountName}/assemblies/{assemblyArtifactName}",
+    "PUT /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Logic/integrationAccounts/{integrationAccountName}/batchConfigurations/{batchConfigurationName}"
+  ],
+  "azure.com/logic/2018-07-01-preview/swagger.yaml": [
+    "PUT /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Logic/integrationAccounts/{integrationAccountName}/assemblies/{assemblyArtifactName}",
+    "PUT /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Logic/integrationAccounts/{integrationAccountName}/batchConfigurations/{batchConfigurationName}"
+  ],
+  "azure.com/logic/2019-05-01/swagger.yaml": [
+    "PUT /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Logic/integrationAccounts/{integrationAccountName}/assemblies/{assemblyArtifactName}",
+    "PUT /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Logic/integrationAccounts/{integrationAccountName}/batchConfigurations/{batchConfigurationName}"
+  ],
+  "amazonaws.com/sts/2011-06-15/openapi.yaml": [
+    "GET /#Action=AssumeRole"
+  ],
+  "intellifi.nl/2.18.0+0.g0bcb16f.dirty/openapi.yaml": [
+    "POST /api/items"
+  ]
+}
