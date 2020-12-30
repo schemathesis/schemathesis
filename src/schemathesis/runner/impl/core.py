@@ -1,7 +1,9 @@
+# pylint: disable=too-many-statements
 import logging
 import time
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Union
+from types import TracebackType
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Type, Union, cast
 
 import attr
 import hypothesis
@@ -17,7 +19,7 @@ from ...constants import (
     USER_AGENT,
     DataGenerationMethod,
 )
-from ...exceptions import CheckFailed, InvalidSchema, get_grouped_exception
+from ...exceptions import CheckFailed, InvalidSchema, NonCheckError, get_grouped_exception
 from ...hooks import HookContext, get_all_by_name
 from ...models import Case, Check, CheckFunction, Endpoint, Status, TestResult, TestResultSet
 from ...runner import events
@@ -118,27 +120,34 @@ def run_test(  # pylint: disable=too-many-locals
     result = TestResult(endpoint=endpoint, overridden_headers=headers, data_generation_method=data_generation_method)
     yield events.BeforeExecution.from_endpoint(endpoint=endpoint, recursion_level=recursion_level)
     hypothesis_output: List[str] = []
+    errors: List[Exception] = []
     test_start_time = time.monotonic()
     try:
         with capture_hypothesis_output() as hypothesis_output:
-            test(checks, targets, result, headers=headers, **kwargs)
+            test(checks, targets, result, errors=errors, headers=headers, **kwargs)
         status = Status.success
-    except (CheckFailed, hypothesis.errors.MultipleFailures):
+    except CheckFailed:
+        status = Status.failure
+    except NonCheckError:
+        # It could be an error in user-defined extensions, network errors or internal Schemathesis errors
+        status = Status.error
+        result.mark_errored()
+        for error in errors:
+            result.add_error(error)
+    except hypothesis.errors.MultipleFailures:
+        # Schemathesis may detect multiple errors that come from different check results
+        # They raise different "grouped" exceptions, and `MultipleFailures` is risen as the result
         status = Status.failure
     except hypothesis.errors.Flaky:
         status = Status.error
         result.mark_errored()
-        # Sometimes Hypothesis detects inconsistent test results and checks are not available
-        if result.checks:
-            flaky_example = result.checks[-1].example
-        else:
-            flaky_example = None
         result.add_error(
             hypothesis.errors.Flaky(
                 "Tests on this endpoint produce unreliable results: \n"
                 "Falsified on the first call but did not on a subsequent one"
             ),
-            flaky_example,
+            # Checks should not be empty, as such cases should be caught in the `NonCheckError` branch
+            result.checks[-1].example,
         )
     except hypothesis.errors.Unsatisfiable:
         # We need more clear error message here
@@ -239,6 +248,41 @@ def add_cases(case: Case, response: GenericResponse, test: Callable, *args: Any)
             test(_case, *args)
 
 
+@attr.s(slots=True)  # pragma: no mutate
+class ErrorCollector:
+    """Collect exceptions that are not related to failed checks.
+
+    Such exceptions may be considered as multiple failures or flakiness by Hypothesis. In both cases, Hypothesis hides
+    exception information that, in our case, is helpful for the end-user. It either indicates errors in user-defined
+    extensions, network-related errors, or internal Schemathesis errors. In all cases, this information is useful for
+    debugging.
+
+    To mitigate this, we gather all exceptions manually via this context manager to avoid interfering with the test
+    function signatures, which are used by Hypothesis.
+    """
+
+    errors: List[Exception] = attr.ib()  # pragma: no mutate
+
+    def __enter__(self) -> "ErrorCollector":
+        return self
+
+    # Typing: The return type suggested by mypy is `Literal[False]`, but I don't want to introduce dependency on the
+    # `typing_extensions` package for Python 3.6
+    def __exit__(
+        self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]
+    ) -> Any:
+        # Don't do anything special if:
+        #   - Tests are successful
+        #   - Checks failed
+        #   - The testing process is interrupted
+        if not exc_type or issubclass(exc_type, CheckFailed) or not issubclass(exc_type, Exception):
+            return False
+        # Exception value is not `None` and is a subclass of `Exception` at this point
+        exc_val = cast(Exception, exc_val)
+        self.errors.append(exc_val.with_traceback(exc_tb))
+        raise NonCheckError from None
+
+
 def network_test(
     case: Case,
     checks: Iterable[CheckFunction],
@@ -251,40 +295,42 @@ def network_test(
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
     max_response_time: Optional[int],
+    errors: List[Exception],
 ) -> None:
     """A single test body will be executed against the target."""
-    headers = headers or {}
-    if "user-agent" not in {header.lower() for header in headers}:
-        headers["User-Agent"] = USER_AGENT
-    timeout = prepare_timeout(request_timeout)
-    response = _network_test(
-        case,
-        checks,
-        targets,
-        result,
-        session,
-        timeout,
-        store_interactions,
-        headers,
-        feedback,
-        request_tls_verify,
-        max_response_time,
-    )
-    add_cases(
-        case,
-        response,
-        _network_test,
-        checks,
-        targets,
-        result,
-        session,
-        timeout,
-        store_interactions,
-        headers,
-        feedback,
-        request_tls_verify,
-        max_response_time,
-    )
+    with ErrorCollector(errors):
+        headers = headers or {}
+        if "user-agent" not in {header.lower() for header in headers}:
+            headers["User-Agent"] = USER_AGENT
+        timeout = prepare_timeout(request_timeout)
+        response = _network_test(
+            case,
+            checks,
+            targets,
+            result,
+            session,
+            timeout,
+            store_interactions,
+            headers,
+            feedback,
+            request_tls_verify,
+            max_response_time,
+        )
+        add_cases(
+            case,
+            response,
+            _network_test,
+            checks,
+            targets,
+            result,
+            session,
+            timeout,
+            store_interactions,
+            headers,
+            feedback,
+            request_tls_verify,
+            max_response_time,
+        )
 
 
 def _network_test(
@@ -344,12 +390,23 @@ def wsgi_test(
     store_interactions: bool,
     feedback: Feedback,
     max_response_time: Optional[int],
+    errors: List[Exception],
 ) -> None:
-    headers = _prepare_wsgi_headers(headers, auth, auth_type)
-    response = _wsgi_test(case, checks, targets, result, headers, store_interactions, feedback, max_response_time)
-    add_cases(
-        case, response, _wsgi_test, checks, targets, result, headers, store_interactions, feedback, max_response_time
-    )
+    with ErrorCollector(errors):
+        headers = _prepare_wsgi_headers(headers, auth, auth_type)
+        response = _wsgi_test(case, checks, targets, result, headers, store_interactions, feedback, max_response_time)
+        add_cases(
+            case,
+            response,
+            _wsgi_test,
+            checks,
+            targets,
+            result,
+            headers,
+            store_interactions,
+            feedback,
+            max_response_time,
+        )
 
 
 def _wsgi_test(
@@ -412,14 +469,25 @@ def asgi_test(
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
     max_response_time: Optional[int],
+    errors: List[Exception],
 ) -> None:
     """A single test body will be executed against the target."""
-    headers = headers or {}
+    with ErrorCollector(errors):
+        headers = headers or {}
 
-    response = _asgi_test(case, checks, targets, result, store_interactions, headers, feedback, max_response_time)
-    add_cases(
-        case, response, _asgi_test, checks, targets, result, store_interactions, headers, feedback, max_response_time
-    )
+        response = _asgi_test(case, checks, targets, result, store_interactions, headers, feedback, max_response_time)
+        add_cases(
+            case,
+            response,
+            _asgi_test,
+            checks,
+            targets,
+            result,
+            store_interactions,
+            headers,
+            feedback,
+            max_response_time,
+        )
 
 
 def _asgi_test(

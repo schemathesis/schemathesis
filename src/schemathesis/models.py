@@ -785,7 +785,7 @@ class TestResultSet:
     @property
     def has_errors(self) -> bool:
         """If any result has any errors."""
-        return any(result.has_errors for result in self)
+        return self.errored_count > 0
 
     @property
     def has_logs(self) -> bool:

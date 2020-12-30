@@ -87,6 +87,16 @@ class InvalidSchema(Exception):
     __module__ = "builtins"
 
 
+class NonCheckError(Exception):
+    """An error happened in side the runner, but is not related to failed checks.
+
+    Used primarily to not let Hypothesis to consider the test as flaky or detect multiple failures as we handle it
+    on our side.
+    """
+
+    __module__ = "builtins"
+
+
 @attr.s  # pragma: no mutate
 class HTTPError(Exception):
     response: GenericResponse = attr.ib()  # pragma: no mutate

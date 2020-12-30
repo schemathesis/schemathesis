@@ -25,6 +25,7 @@ Changelog
   Before, the ``--header`` value was ignored in such cases, and the basic auth passed in ``--auth`` was used. `#911`_
 - When ``hypothesis-jsonschema`` fails to resolve recursive references, the test is skipped with an error message that indicates why it happens.
 - Shorter error messages when API operations have logical errors in their schema. For example, when the maximum is less than the minimum - ``{"type": "integer", "minimum": 5, "maximum": 4}``.
+- If multiple non-check related failures happens during a test of a single API operation, they are displayed as is, instead of Hypothesis-level error messages about multiple found failures or flaky tests. `#975`_
 
 **Fixed**
 
@@ -1622,6 +1623,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#975: https://github.com/schemathesis/schemathesis/issues/975
 .. _#970: https://github.com/schemathesis/schemathesis/issues/970
 .. _#965: https://github.com/schemathesis/schemathesis/issues/965
 .. _#951: https://github.com/schemathesis/schemathesis/issues/951
