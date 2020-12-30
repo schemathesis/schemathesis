@@ -3,6 +3,7 @@ from typing import Any, Dict
 import pytest
 import yaml
 from _pytest.main import ExitCode
+from hypothesis import find
 
 import schemathesis
 from schemathesis.models import Endpoint
@@ -389,3 +390,40 @@ def test_example_external_value_failure(func, expected):
     schema = schemathesis.from_dict(EXAMPLE_SCHEMA)
     endpoint = schema["/test"]["POST"]
     assert func(endpoint.definition.resolved, "examples") == expected
+
+
+def test_multipart_examples():
+    # Regression after parameters refactoring
+    # When the schema contains examples for multipart forms
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
+        "paths": {
+            "/test": {
+                "post": {
+                    "description": "Test",
+                    "requestBody": {
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "properties": {
+                                        "key": {
+                                            "example": "test",
+                                            "type": "string",
+                                        },
+                                    },
+                                    "type": "object",
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                },
+            },
+        },
+    }
+    schema = schemathesis.from_dict(raw_schema)
+    # Then examples should be correctly generated
+    strategies = schema["/test"]["POST"].get_strategies_from_examples()
+    assert len(strategies) == 1
+    assert find(strategies[0], lambda case: case.body == {"key": "test"})
