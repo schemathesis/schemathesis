@@ -35,7 +35,7 @@ def get_parameter_example_from_properties(endpoint_def: Dict[str, Any]) -> Dict[
         example = get_object_example_from_properties(parameter_schema)
         if example:
             parameter_type = LOCATION_TO_CONTAINER[parameter["in"]]
-            if parameter_type not in ("body", "form_data"):
+            if parameter_type != "body":
                 if parameter_type not in static_parameters:
                     static_parameters[parameter_type] = {}
                 static_parameters[parameter_type][parameter["name"]] = example
@@ -50,11 +50,10 @@ def get_request_body_examples(endpoint_def: Dict[str, Any], examples_field: str)
     request_bodies_items = endpoint_def.get("requestBody", {}).get("content", {}).items()
     if not request_bodies_items:
         return {}
-    # first element in tuple in media type, second element is dict
-    media_type, schema = next(iter(request_bodies_items))
-    parameter_type = "body" if media_type != "multipart/form-data" else "form_data"
+    # first element in tuple is media type, second element is dict
+    _, schema = next(iter(request_bodies_items))
     return {
-        "type": parameter_type,
+        "type": "body",
         "examples": [example["value"] for example in schema.get(examples_field, {}).values() if "value" in example],
     }
 
@@ -63,11 +62,10 @@ def get_request_body_example_from_properties(endpoint_def: Dict[str, Any]) -> Di
     static_parameters: Dict[str, Any] = {}
     request_bodies_items = endpoint_def.get("requestBody", {}).get("content", {}).items()
     if request_bodies_items:
-        media_type, request_body_schema = next(iter(request_bodies_items))
+        _, request_body_schema = next(iter(request_bodies_items))
         example = get_object_example_from_properties(request_body_schema.get("schema", {}))
         if example:
-            request_body_type = "body" if media_type != "multipart/form-data" else "form_data"
-            static_parameters[request_body_type] = example
+            static_parameters["body"] = example
 
     return static_parameters
 
@@ -145,9 +143,9 @@ def _static_parameters_union(base_obj: Dict[str, Any], fill_obj: Dict[str, Any])
     for parameter_type, examples in fill_obj.items():
         if parameter_type not in full_static_parameters:
             full_static_parameters[parameter_type] = examples
-        elif parameter_type not in ("body", "form_data"):
+        elif parameter_type != "body":
             # copy individual parameter names.
-            # body and form_data are unnamed, single examples, so we only do this for named parameters.
+            # body is unnamed, single examples, so we only do this for named parameters.
             for parameter_name, example in examples.items():
                 if parameter_name not in full_static_parameters[parameter_type]:
                     full_static_parameters[parameter_type][parameter_name] = example
