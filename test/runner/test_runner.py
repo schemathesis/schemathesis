@@ -451,25 +451,29 @@ def test_exceptions(schema_url, app, options):
 
 
 @pytest.mark.endpoints("multipart")
-def test_flaky_exceptions(args, mocker):
+def test_internal_exceptions(args, mocker):
     app, kwargs = args
     # GH: #236
     error_idx = 0
+    exc_types = [ValueError, TypeError, ZeroDivisionError, KeyError]
 
-    def flaky(*args, **kwargs):
+    def buggy_call(*args, **kwargs):
         nonlocal error_idx
-        exception_class = [ValueError, TypeError, ZeroDivisionError, KeyError][error_idx % 4]
+        exception_class = exc_types[error_idx % 4]
         error_idx += 1
         raise exception_class
 
     # When there are many exceptions during the test
     # And Hypothesis consider this test as a flaky one
-    mocker.patch("schemathesis.Case.call", side_effect=flaky)
-    mocker.patch("schemathesis.Case.call_wsgi", side_effect=flaky)
-    init, *others, finished = prepare(**kwargs, hypothesis_max_examples=3, hypothesis_derandomize=True)
+    mocker.patch("schemathesis.Case.call", side_effect=buggy_call)
+    mocker.patch("schemathesis.Case.call_wsgi", side_effect=buggy_call)
+    init, *others, finished = prepare(**kwargs, hypothesis_max_examples=3)
     # Then the execution result should indicate errors
     assert finished.has_errors
-    assert "Tests on this endpoint produce unreliable results:" in others[1].result.errors[0].exception
+    # And all errors from the buggy code should be collected
+    exceptions = [i.exception.strip() for i in others[1].result.errors]
+    for exc_type in exc_types:
+        assert str(exc_type.__name__) in exceptions
 
 
 @pytest.mark.endpoints("payload")
