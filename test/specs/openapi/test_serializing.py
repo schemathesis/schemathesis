@@ -2,13 +2,15 @@ import json
 from urllib.parse import quote, unquote
 
 import pytest
-from hypothesis import given
+from hypothesis import assume, given, settings
 
 import schemathesis
 from schemathesis.specs.openapi.serialization import conversion
 
 PRIMITIVE_SCHEMA = {"type": "integer", "enum": [1]}
+NULLABLE_PRIMITIVE_SCHEMA = {"type": "integer", "enum": [1], "nullable": True}
 ARRAY_SCHEMA = {"type": "array", "enum": [["blue", "black", "brown"]]}
+NULLABLE_ARRAY_SCHEMA = {"type": "array", "enum": [["blue", "black", "brown"]], "nullable": True}
 OBJECT_SCHEMA = {
     "additionalProperties": False,
     "type": "object",
@@ -18,6 +20,17 @@ OBJECT_SCHEMA = {
         "b": {"type": "integer", "enum": [150]},
     },
     "required": ["r", "g", "b"],
+}
+NULLABLE_OBJECT_SCHEMA = {
+    "additionalProperties": False,
+    "type": "object",
+    "properties": {
+        "r": {"type": "integer", "enum": [100]},  # "const" is not supported by Open API
+        "g": {"type": "integer", "enum": [200]},
+        "b": {"type": "integer", "enum": [150]},
+    },
+    "required": ["r", "g", "b"],
+    "nullable": True,
 }
 
 
@@ -57,6 +70,8 @@ class Prefixed:
 
 class CommaDelimitedObject(Prefixed):
     def prepare(self, value):
+        if not value:
+            return {}
         items = unquote(value).split(",")
         return dict(chunks(items, 2))
 
@@ -88,7 +103,7 @@ def assert_generates(raw_schema, expected, parameter):
 
     @given(case=schema["/teapot"]["GET"].as_strategy())
     def test(case):
-        assert getattr(case, "path_parameters" if parameter == "path" else parameter) == expected
+        assert getattr(case, "path_parameters" if parameter == "path" else parameter) in expected
 
     test()
 
@@ -113,7 +128,7 @@ def test_query_serialization_styles_openapi3(schema, explode, style, expected):
     raw_schema = make_openapi_schema(
         {"name": "color", "in": "query", "required": True, "schema": schema, "explode": explode, "style": style}
     )
-    assert_generates(raw_schema, expected, "query")
+    assert_generates(raw_schema, (expected,), "query")
 
 
 @pytest.mark.hypothesis_nested
@@ -130,7 +145,7 @@ def test_header_serialization_styles_openapi3(schema, explode, expected):
     raw_schema = make_openapi_schema(
         {"name": "X-Api-Key", "in": "header", "required": True, "schema": schema, "explode": explode}
     )
-    assert_generates(raw_schema, expected, "headers")
+    assert_generates(raw_schema, (expected,), "headers")
 
 
 @pytest.mark.hypothesis_nested
@@ -147,7 +162,7 @@ def test_cookie_serialization_styles_openapi3(schema, explode, expected):
     raw_schema = make_openapi_schema(
         {"name": "SessionID", "in": "cookie", "required": True, "schema": schema, "explode": explode}
     )
-    assert_generates(raw_schema, expected, "cookies")
+    assert_generates(raw_schema, (expected,), "cookies")
 
 
 @pytest.mark.hypothesis_nested
@@ -155,21 +170,47 @@ def test_cookie_serialization_styles_openapi3(schema, explode, expected):
     "schema, style, explode, expected",
     (
         (ARRAY_SCHEMA, "simple", False, {"color": quote("blue,black,brown")}),
+        (NULLABLE_ARRAY_SCHEMA, "simple", False, {"color": quote("blue,black,brown")}),
         (ARRAY_SCHEMA, "simple", True, {"color": quote("blue,black,brown")}),
+        (NULLABLE_ARRAY_SCHEMA, "simple", True, {"color": quote("blue,black,brown")}),
         (OBJECT_SCHEMA, "simple", False, {"color": CommaDelimitedObject("r,100,g,200,b,150")}),
+        (NULLABLE_OBJECT_SCHEMA, "simple", False, {"color": CommaDelimitedObject("r,100,g,200,b,150")}),
         (OBJECT_SCHEMA, "simple", True, {"color": DelimitedObject("r=100,g=200,b=150")}),
+        (NULLABLE_OBJECT_SCHEMA, "simple", True, {"color": DelimitedObject("r=100,g=200,b=150")}),
         (PRIMITIVE_SCHEMA, "label", False, {"color": quote(".1")}),
+        (NULLABLE_PRIMITIVE_SCHEMA, "label", False, {"color": quote(".1")}),
         (PRIMITIVE_SCHEMA, "label", True, {"color": quote(".1")}),
+        (NULLABLE_PRIMITIVE_SCHEMA, "label", True, {"color": quote(".1")}),
         (ARRAY_SCHEMA, "label", False, {"color": quote(".blue,black,brown")}),
+        (NULLABLE_ARRAY_SCHEMA, "label", False, {"color": quote(".blue,black,brown")}),
         (ARRAY_SCHEMA, "label", True, {"color": quote(".blue.black.brown")}),
+        (NULLABLE_ARRAY_SCHEMA, "label", True, {"color": quote(".blue.black.brown")}),
         (OBJECT_SCHEMA, "label", False, {"color": CommaDelimitedObject(".r,100,g,200,b,150", prefix=".")}),
+        (NULLABLE_OBJECT_SCHEMA, "label", False, {"color": CommaDelimitedObject(".r,100,g,200,b,150", prefix=".")}),
         (OBJECT_SCHEMA, "label", True, {"color": DelimitedObject(".r=100.g=200.b=150", prefix=".", delimiter=".")}),
+        (
+            NULLABLE_OBJECT_SCHEMA,
+            "label",
+            True,
+            {"color": DelimitedObject(".r=100.g=200.b=150", prefix=".", delimiter=".")},
+        ),
         (PRIMITIVE_SCHEMA, "matrix", False, {"color": quote(";color=1")}),
+        (NULLABLE_PRIMITIVE_SCHEMA, "matrix", False, {"color": quote(";color=1")}),
         (PRIMITIVE_SCHEMA, "matrix", True, {"color": quote(";color=1")}),
+        (NULLABLE_PRIMITIVE_SCHEMA, "matrix", True, {"color": quote(";color=1")}),
         (ARRAY_SCHEMA, "matrix", False, {"color": quote(";blue,black,brown")}),
+        (NULLABLE_ARRAY_SCHEMA, "matrix", False, {"color": quote(";blue,black,brown")}),
         (ARRAY_SCHEMA, "matrix", True, {"color": quote(";color=blue;color=black;color=brown")}),
+        (NULLABLE_ARRAY_SCHEMA, "matrix", True, {"color": quote(";color=blue;color=black;color=brown")}),
         (OBJECT_SCHEMA, "matrix", False, {"color": CommaDelimitedObject(";r,100,g,200,b,150", prefix=";")}),
+        (NULLABLE_OBJECT_SCHEMA, "matrix", False, {"color": CommaDelimitedObject(";r,100,g,200,b,150", prefix=";")}),
         (OBJECT_SCHEMA, "matrix", True, {"color": DelimitedObject(";r=100;g=200;b=150", prefix=";", delimiter=";")}),
+        (
+            NULLABLE_OBJECT_SCHEMA,
+            "matrix",
+            True,
+            {"color": DelimitedObject(";r=100;g=200;b=150", prefix=";", delimiter=";")},
+        ),
     ),
 )
 def test_path_serialization_styles_openapi3(schema, style, explode, expected):
@@ -224,7 +265,7 @@ def test_query_serialization_styles_openapi_multiple_params():
             "style": "spaceDelimited",
         },
     )
-    assert_generates(raw_schema, {"color1": "blue|black|brown", "color2": "blue black brown"}, "query")
+    assert_generates(raw_schema, ({"color1": "blue|black|brown", "color2": "blue black brown"},), "query")
 
 
 @pytest.mark.hypothesis_nested
@@ -265,7 +306,7 @@ def test_query_serialization_styles_swagger2(collection_format, expected):
             }
         },
     }
-    assert_generates(raw_schema, expected, "query")
+    assert_generates(raw_schema, (expected,), "query")
 
 
 @pytest.mark.parametrize("item, expected", (({}, {}), ({"key": 1}, {"key": "TEST"})))
@@ -292,7 +333,7 @@ def test_content_serialization():
     raw_schema = make_openapi_schema(
         {"in": "query", "name": "filter", "required": True, "content": {"application/json": {"schema": OBJECT_SCHEMA}}}
     )
-    assert_generates(raw_schema, {"filter": JSONString('{"r":100, "g": 200, "b": 150}')}, "query")
+    assert_generates(raw_schema, ({"filter": JSONString('{"r":100, "g": 200, "b": 150}')},), "query")
 
 
 def make_array_schema(location, style):
@@ -311,15 +352,32 @@ def make_array_schema(location, style):
     (
         (
             make_array_schema("query", "form"),
-            {"bbox": "1.1,1.1,1.1,1.1"},
+            ({"bbox": "1.1,1.1,1.1,1.1"},),
         ),
         (
             make_array_schema("path", "label"),
-            {"bbox": ".1.1%2C1.1%2C1.1%2C1.1"},
+            ({"bbox": ".1.1%2C1.1%2C1.1%2C1.1"},),
         ),
         (
             make_array_schema("path", "matrix"),
-            {"bbox": "%3B1.1%2C1.1%2C1.1%2C1.1"},
+            ({"bbox": "%3B1.1%2C1.1%2C1.1%2C1.1"},),
+        ),
+        (
+            {
+                "name": "bbox",
+                "in": "query",
+                "schema": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {"type": "number", "enum": [1]},
+                    "nullable": True,
+                },
+                "style": "form",
+                "explode": False,
+                "required": True,
+            },
+            ({"bbox": "1,1"}, {"bbox": ""}),
         ),
     ),
 )
