@@ -460,6 +460,39 @@ def test_(case):
     testdir.run_and_assert(passed=1)
 
 
+def test_nullable_body_behind_a_reference(empty_open_api_2_schema):
+    # When a body parameter is nullable and is behind a reference
+    empty_open_api_2_schema["parameters"] = {
+        "Foo": {
+            "in": "body",
+            "name": "payload",
+            "required": True,
+            "schema": {"type": "string"},
+            "x-nullable": True,
+        }
+    }
+    empty_open_api_2_schema["paths"] = {
+        "/payload": {
+            "post": {
+                "parameters": [{"$ref": "#/parameters/Foo"}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    jsonschema.validate(empty_open_api_2_schema, SWAGGER_20)
+    # Then it should be properly collected
+    schema = schemathesis.from_dict(empty_open_api_2_schema)
+    endpoint = schema["/payload"]["POST"]
+    # And its definition is not transformed to JSON Schema
+    assert endpoint.body[0].definition == {
+        "in": "body",
+        "name": "payload",
+        "required": True,
+        "schema": {"type": "string"},
+        "x-nullable": True,
+    }
+
+
 @pytest.fixture(params=["aiohttp", "flask"])
 def api_schema(request, openapi_version):
     if openapi_version.is_openapi_2:
