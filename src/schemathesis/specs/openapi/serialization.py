@@ -174,8 +174,8 @@ def conversion(func: Callable[..., None]) -> Callable:
     return _wrapper
 
 
-def make_delimited(data: Dict[str, Any], delimiter: str = ",") -> str:
-    return delimiter.join(f"{key}={value}" for key, value in data.items())
+def make_delimited(data: Optional[Dict[str, Any]], delimiter: str = ",") -> str:
+    return delimiter.join(f"{key}={value}" for key, value in (data or {}).items())
 
 
 @conversion
@@ -186,7 +186,7 @@ def to_json(item: Generated, name: str) -> None:
 
 @conversion
 def delimited(item: Generated, name: str, delimiter: str) -> None:
-    item[name] = delimiter.join(map(str, item[name]))
+    item[name] = delimiter.join(map(str, item[name] or ()))
 
 
 @conversion
@@ -201,7 +201,7 @@ def deep_object(item: Generated, name: str) -> None:
 
 @conversion
 def comma_delimited_object(item: Generated, name: str) -> None:
-    item[name] = ",".join(map(str, sum(item[name].items(), ())))
+    item[name] = ",".join(map(str, sum((item[name] or {}).items(), ())))
 
 
 @conversion
@@ -222,7 +222,11 @@ def label_primitive(item: Generated, name: str) -> None:
 
     5 => ".5"
     """
-    item[name] = f".{item[name]}"
+    new = item[name]
+    if new:
+        item[name] = f".{new}"
+    else:
+        item[name] = ""
 
 
 @conversion
@@ -241,7 +245,11 @@ def label_array(item: Generated, name: str, explode: Optional[bool]) -> None:
         delimiter = "."
     else:
         delimiter = ","
-    item[name] = f".{delimiter.join(map(str, item[name]))}"
+    new = delimiter.join(map(str, item[name] or ()))
+    if new:
+        item[name] = f".{new}"
+    else:
+        item[name] = ""
 
 
 @conversion
@@ -259,9 +267,12 @@ def label_object(item: Generated, name: str, explode: Optional[bool]) -> None:
     if explode:
         new = make_delimited(item[name], ".")
     else:
-        object_items = map(str, sum(item[name].items(), ()))
+        object_items = map(str, sum((item[name] or {}).items(), ()))
         new = ",".join(object_items)
-    item[name] = f".{new}"
+    if new:
+        item[name] = f".{new}"
+    else:
+        item[name] = new
 
 
 @conversion
@@ -270,7 +281,11 @@ def matrix_primitive(item: Generated, name: str) -> None:
 
     5 => ";id=5"
     """
-    item[name] = f";{name}={item[name]}"
+    new = item[name]
+    if new is not None:
+        item[name] = f";{name}={new}"
+    else:
+        item[name] = ""
 
 
 @conversion
@@ -286,10 +301,13 @@ def matrix_array(item: Generated, name: str, explode: Optional[bool]) -> None:
         id=[3, 4, 5] => ";id=3,4,5"
     """
     if explode:
-        new = ";".join(f"{name}={value}" for value in item[name])
+        new = ";".join(f"{name}={value}" for value in item[name] or ())
     else:
-        new = ",".join(map(str, item[name]))
-    item[name] = f";{new}"
+        new = ",".join(map(str, item[name] or ()))
+    if new:
+        item[name] = f";{new}"
+    else:
+        item[name] = new
 
 
 @conversion
@@ -307,9 +325,12 @@ def matrix_object(item: Generated, name: str, explode: Optional[bool]) -> None:
     if explode:
         new = make_delimited(item[name], ";")
     else:
-        object_items = map(str, sum(item[name].items(), ()))
+        object_items = map(str, sum((item[name] or {}).items(), ()))
         new = ",".join(object_items)
-    item[name] = f";{new}"
+    if new:
+        item[name] = f";{new}"
+    else:
+        item[name] = ""
 
 
 @conversion

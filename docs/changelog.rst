@@ -40,6 +40,7 @@ Changelog
 - Skip explicit examples generation if this phase is disabled via config. `#905`_
 - ``Unsatisfiable`` error in stateful testing caused by all API operations having inbound links. `#965`_, `#822`_
 - A possibility to override ``APIStateMachine.step``. `#970`_
+- ``TypeError`` on nullable parameters during Open API specific serialization. `#980`_
 
 **Removed**
 
@@ -1624,6 +1625,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#980: https://github.com/schemathesis/schemathesis/issues/980
 .. _#975: https://github.com/schemathesis/schemathesis/issues/975
 .. _#970: https://github.com/schemathesis/schemathesis/issues/970
 .. _#965: https://github.com/schemathesis/schemathesis/issues/965
