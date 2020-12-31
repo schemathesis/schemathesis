@@ -44,7 +44,7 @@ from .parameters import (
     OpenAPI30Parameter,
     OpenAPIParameter,
 )
-from .references import RECURSION_DEPTH_LIMIT, ConvertingResolver
+from .references import RECURSION_DEPTH_LIMIT, ConvertingResolver, InliningResolver
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
@@ -151,10 +151,10 @@ class BaseOpenAPISchema(BaseSchema):
         return endpoint
 
     @property
-    def resolver(self) -> ConvertingResolver:
+    def resolver(self) -> InliningResolver:
         if not hasattr(self, "_resolver"):
             # pylint: disable=attribute-defined-outside-init
-            self._resolver = ConvertingResolver(self.location or "", self.raw_schema, nullable_name=self.nullable_name)
+            self._resolver = InliningResolver(self.location or "", self.raw_schema)
         return self._resolver
 
     def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
@@ -355,9 +355,10 @@ class BaseOpenAPISchema(BaseSchema):
             raise exc_class(
                 f"The received response is not valid JSON:\n\n    {payload}\n\nException: \n\n    {exc}"
             ) from exc
-        with in_scopes(self.resolver, scopes):
+        resolver = ConvertingResolver(self.location or "", self.raw_schema, nullable_name=self.nullable_name)
+        with in_scopes(resolver, scopes):
             try:
-                jsonschema.validate(data, schema, cls=jsonschema.Draft4Validator, resolver=self.resolver)
+                jsonschema.validate(data, schema, cls=jsonschema.Draft4Validator, resolver=resolver)
             except jsonschema.ValidationError as exc:
                 exc_class = get_schema_validation_error(exc)
                 raise exc_class(
