@@ -1,4 +1,4 @@
-from schemathesis.specs.openapi.references import ConvertingResolver
+from schemathesis.specs.openapi.references import InliningResolver
 from schemathesis.specs.openapi.security import OpenAPISecurityProcessor
 
 
@@ -11,5 +11,5 @@ def test_ref_resolving():
         "paths": {"foo": {"get": {"responses": {"200": {"description": "OK"}}}}},
         "components": {"securitySchemes": {"$ref": "#/components/HTTPSchema"}, "HTTPSchema": http_schema},
     }
-    resolver = ConvertingResolver("", schema, nullable_name="nullable")
+    resolver = InliningResolver("", schema)
     assert OpenAPISecurityProcessor().get_security_definitions(schema, resolver) == http_schema

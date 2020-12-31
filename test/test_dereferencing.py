@@ -568,8 +568,10 @@ def test_complex_dereference(testdir, complex_schema):
                                 "schema": {
                                     "additionalProperties": False,
                                     "properties": {
-                                        "key": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-                                        "referenced": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                                        # Note, these `nullable` keywords are not transformed at this point
+                                        # It is done during the response validation.
+                                        "key": {"type": "string", "nullable": True},
+                                        "referenced": {"type": "string", "nullable": True},
                                     },
                                     "required": ["key", "referenced"],
                                     "type": "object",
