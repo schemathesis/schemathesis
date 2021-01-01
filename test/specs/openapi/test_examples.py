@@ -427,3 +427,21 @@ def test_multipart_examples():
     strategies = schema["/test"]["POST"].get_strategies_from_examples()
     assert len(strategies) == 1
     assert find(strategies[0], lambda case: case.body == {"key": "test"})
+
+
+def test_invalid_x_examples(empty_open_api_2_schema):
+    # See GH-982
+    # When an Open API 2.0 schema contains a non-object type in `x-examples`
+    empty_open_api_2_schema["paths"] = {
+        "/test": {
+            "post": {
+                "parameters": [
+                    {"name": "body", "in": "body", "schema": {"type": "integer"}, "x-examples": {"foo": "value"}}
+                ],
+                "responses": {"default": {"description": "OK"}},
+            }
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_2_schema)
+    # Then such examples should be skipped as invalid (there should be an object)
+    assert schema["/test"]["POST"].get_strategies_from_examples() == []
