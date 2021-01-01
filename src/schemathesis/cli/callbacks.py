@@ -22,7 +22,7 @@ def validate_schema(ctx: click.core.Context, param: click.core.Parameter, raw_va
         if not netloc:
             if "\x00" in raw_value or not utils.file_exists(raw_value):
                 raise click.UsageError("Invalid SCHEMA, must be a valid URL or file path.")
-            if "base_url" not in ctx.params:
+            if "base_url" not in ctx.params and not ctx.params.get("dry_run", False):
                 raise click.UsageError('Missing argument, "--base-url" is required for SCHEMA specified by file.')
         else:
             _validate_url(raw_value)
