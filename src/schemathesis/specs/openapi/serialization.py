@@ -196,7 +196,10 @@ def deep_object(item: Generated, name: str) -> None:
     id={"role": "admin", "firstName": "Alex"} => id[role]=admin&id[firstName]=Alex
     """
     generated = item.pop(name)
-    item.update({f"{name}[{key}]": value for key, value in generated.items()})
+    if generated:
+        item.update({f"{name}[{key}]": value for key, value in generated.items()})
+    else:
+        item[name] = ""
 
 
 @conversion
@@ -213,7 +216,10 @@ def delimited_object(item: Generated, name: str) -> None:
 def extracted_object(item: Generated, name: str) -> None:
     """Merge a child node to the parent one."""
     generated = item.pop(name)
-    item.update(generated)
+    if generated:
+        item.update(generated)
+    else:
+        item[name] = ""
 
 
 @conversion
