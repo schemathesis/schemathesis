@@ -21,7 +21,12 @@ def get_parameter_examples(endpoint_def: Dict[str, Any], examples_field: str) ->
         {
             "type": LOCATION_TO_CONTAINER.get(parameter["in"]),
             "name": parameter["name"],
-            "examples": [example["value"] for example in parameter[examples_field].values() if "value" in example],
+            "examples": [
+                example["value"]
+                for example in parameter[examples_field].values()
+                # IDEA: report when it is not a dictionary
+                if isinstance(example, dict) and "value" in example
+            ],
         }
         for parameter in endpoint_def.get("parameters", [])
         if examples_field in parameter
@@ -47,6 +52,7 @@ def get_parameter_example_from_properties(endpoint_def: Dict[str, Any]) -> Dict[
 
 def get_request_body_examples(endpoint_def: Dict[str, Any], examples_field: str) -> Dict[str, Any]:
     """Gets request body examples from OAS3 `examples` keyword or `x-examples` for Swagger 2."""
+    # NOTE. `requestBody` is OAS3-specific. How should it work with OAS2?
     request_bodies_items = endpoint_def.get("requestBody", {}).get("content", {}).items()
     if not request_bodies_items:
         return {}
