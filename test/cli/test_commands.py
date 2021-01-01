@@ -1679,3 +1679,10 @@ def test_exit_first(cli, schema_url, openapi_version):
     next_line = lines[idx + 1]
     assert next_line == ""
     assert "FAILURES" in lines[idx + 2]
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+def test_base_url_not_required_for_dry_run(testdir, cli, openapi_version, empty_open_api_3_schema):
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(empty_open_api_3_schema))
+    result = cli.run(str(schema_file), "--dry-run")
+    assert result.exit_code == ExitCode.OK, result.stdout
