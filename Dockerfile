@@ -13,5 +13,8 @@ RUN apk add --no-cache --virtual=.build-deps build-base libffi-dev openssl-dev &
     pip install --no-cache-dir ./ && \
     apk del .build-deps
 
+# Needed for the `.hypothesis` directory
+RUN chown -R 1000:1000 /app
+
 USER schemathesis
 ENTRYPOINT ["schemathesis"]
