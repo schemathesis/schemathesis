@@ -2,10 +2,23 @@ import json
 from urllib.parse import quote, unquote
 
 import pytest
-from hypothesis import assume, given, settings
+from hypothesis import given
 
 import schemathesis
-from schemathesis.specs.openapi.serialization import conversion
+from schemathesis.specs.openapi.serialization import (
+    comma_delimited_object,
+    conversion,
+    deep_object,
+    delimited,
+    delimited_object,
+    extracted_object,
+    label_array,
+    label_object,
+    label_primitive,
+    matrix_array,
+    matrix_object,
+    matrix_primitive,
+)
 
 PRIMITIVE_SCHEMA = {"type": "integer", "enum": [1]}
 NULLABLE_PRIMITIVE_SCHEMA = {"type": "integer", "enum": [1], "nullable": True}
@@ -385,3 +398,31 @@ def test_non_string_serialization(parameter, expected):
     # GH: #651
     raw_schema = make_openapi_schema(parameter)
     assert_generates(raw_schema, expected, parameter["in"])
+
+
+@pytest.mark.parametrize(
+    "func, kwargs",
+    (
+        (delimited, {"delimiter": ","}),
+        (deep_object, {}),
+        (comma_delimited_object, {}),
+        (delimited_object, {}),
+        (extracted_object, {}),
+        (label_primitive, {}),
+        (label_array, {"explode": True}),
+        (label_array, {"explode": False}),
+        (label_object, {"explode": True}),
+        (label_object, {"explode": False}),
+        (matrix_primitive, {}),
+        (matrix_array, {"explode": True}),
+        (matrix_array, {"explode": False}),
+        (matrix_object, {"explode": True}),
+        (matrix_object, {"explode": False}),
+    ),
+)
+def test_nullable_parameters(
+    func,
+    kwargs,
+):
+    # Nullable parameters are converted to an empty string
+    assert func("foo", **kwargs)({"foo": None}) == {"foo": ""}
