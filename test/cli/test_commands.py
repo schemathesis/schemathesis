@@ -1686,3 +1686,27 @@ def test_base_url_not_required_for_dry_run(testdir, cli, openapi_version, empty_
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(empty_open_api_3_schema))
     result = cli.run(str(schema_file), "--dry-run")
     assert result.exit_code == ExitCode.OK, result.stdout
+
+
+def test_long_operation_output(testdir, empty_open_api_3_schema):
+    # See GH-990
+    # When there is a narrow screen
+    # And the API schema contains an operation with a long name
+    empty_open_api_3_schema["paths"] = {
+        f"/{'a' * 100}": {
+            "get": {
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+        f"/{'a' * 10}": {
+            "get": {
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+    }
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(empty_open_api_3_schema))
+    result = testdir.run("schemathesis", "run", str(schema_file), "--dry-run")
+    # Then this operation name should be truncated
+    assert result.ret == ExitCode.OK
+    assert "GET /aaaaaaaaaa .                                                         [ 50%]" in result.outlines
+    assert "GET /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[...] . [100%]" in result.outlines
