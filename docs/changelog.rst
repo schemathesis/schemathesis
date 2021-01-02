@@ -46,6 +46,7 @@ Changelog
 **Performance**
 
 - Use compiled versions of Open API spec validators.
+- Decrease CLI memory usage. `#987`_
 
 **Removed**
 
@@ -1630,6 +1631,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#987: https://github.com/schemathesis/schemathesis/issues/987
 .. _#982: https://github.com/schemathesis/schemathesis/issues/982
 .. _#980: https://github.com/schemathesis/schemathesis/issues/980
 .. _#975: https://github.com/schemathesis/schemathesis/issues/975
