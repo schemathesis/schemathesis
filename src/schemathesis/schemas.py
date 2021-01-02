@@ -115,7 +115,11 @@ class BaseSchema(Mapping):
 
     @property
     def endpoints_count(self) -> int:
-        return len(list(self.get_all_endpoints()))
+        total = 0
+        # Avoid creating a list of all endpoints - for large schemas it consumes too much memory
+        for _ in self.get_all_endpoints():
+            total += 1
+        return total
 
     def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
         raise NotImplementedError

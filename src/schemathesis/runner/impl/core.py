@@ -118,7 +118,12 @@ def run_test(  # pylint: disable=too-many-locals
     **kwargs: Any,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """A single test run with all error handling needed."""
-    result = TestResult(endpoint=endpoint, overridden_headers=headers, data_generation_method=data_generation_method)
+    result = TestResult(
+        method=endpoint.method.upper(),
+        path=endpoint.full_path,
+        overridden_headers=headers,
+        data_generation_method=data_generation_method,
+    )
     yield events.BeforeExecution.from_endpoint(endpoint=endpoint, recursion_level=recursion_level)
     hypothesis_output: List[str] = []
     errors: List[Exception] = []

@@ -713,7 +713,8 @@ class Interaction:
 class TestResult:
     """Result of a single test."""
 
-    endpoint: Endpoint = attr.ib()  # pragma: no mutate
+    method: str = attr.ib()  # pragma: no mutate
+    path: str = attr.ib()  # pragma: no mutate
     data_generation_method: DataGenerationMethod = attr.ib()  # pragma: no mutate
     checks: List[Check] = attr.ib(factory=list)  # pragma: no mutate
     errors: List[Tuple[Exception, Optional[Case]]] = attr.ib(factory=list)  # pragma: no mutate
