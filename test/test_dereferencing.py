@@ -1,12 +1,10 @@
 from pathlib import Path
 
-import jsonschema
 import pytest
 
 import schemathesis
 from schemathesis.models import Endpoint, EndpointDefinition
 from schemathesis.parameters import PayloadAlternatives
-from schemathesis.specs.openapi.definitions import OPENAPI_30, SWAGGER_20
 from schemathesis.specs.openapi.parameters import OpenAPI30Body
 
 from .utils import as_param, get_schema, integer
@@ -348,12 +346,10 @@ def test_nullable_parameters(request, testdir, spec_version, extra):
         schema["paths"]["/users"]["get"]["parameters"] = [
             {"in": "query", "name": "id", "type": "string", "x-nullable": True, "required": True, **extra}
         ]
-        jsonschema.validate(schema, SWAGGER_20)
     else:
         schema["paths"]["/users"]["get"]["parameters"] = [
             {"in": "query", "name": "id", "schema": {"type": "string", "nullable": True, **extra}, "required": True}
         ]
-        jsonschema.validate(schema, OPENAPI_30)
     testdir.make_test(
         """
 @schema.parametrize()

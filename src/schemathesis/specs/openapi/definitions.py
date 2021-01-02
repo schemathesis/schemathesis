@@ -1,5 +1,7 @@
 # pylint: disable=too-many-lines
 # These schemas are copied from https://github.com/OAI/OpenAPI-Specification/tree/master/schemas
+import jsonschema
+
 SWAGGER_20 = {
     "title": "A JSON Schema for Swagger 2.0 API.",
     "id": "http://swagger.io/v2/schema.json#",
@@ -663,6 +665,7 @@ SWAGGER_20 = {
         },
     },
 }
+SWAGGER_20_VALIDATOR = jsonschema.validators.validator_for(SWAGGER_20)(SWAGGER_20)
 OPENAPI_30 = {
     "id": "https://spec.openapis.org/oas/3.0/schema/2019-04-02",
     "$schema": "http://json-schema.org/draft-04/schema#",
@@ -1321,3 +1324,4 @@ OPENAPI_30 = {
         },
     },
 }
+OPENAPI_30_VALIDATOR = jsonschema.validators.validator_for(OPENAPI_30)(OPENAPI_30)

@@ -43,6 +43,10 @@ Changelog
 - ``TypeError`` on nullable parameters during Open API specific serialization. `#980`_
 - Invalid types in ``x-examples``. `#982`_
 
+**Performance**
+
+- Use compiled versions of Open API spec validators.
+
 **Removed**
 
 - ``Case.form_data``. Use ``Case.body`` instead.
