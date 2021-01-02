@@ -1,13 +1,11 @@
 import datetime
 from copy import deepcopy
 
-import jsonschema
 import pytest
 import yaml
 from hypothesis import HealthCheck, assume, given, settings
 
 import schemathesis
-from schemathesis.specs.openapi.definitions import OPENAPI_30, SWAGGER_20
 
 from .utils import as_param
 
@@ -479,7 +477,6 @@ def test_nullable_body_behind_a_reference(empty_open_api_2_schema):
             }
         }
     }
-    jsonschema.validate(empty_open_api_2_schema, SWAGGER_20)
     # Then it should be properly collected
     schema = schemathesis.from_dict(empty_open_api_2_schema)
     endpoint = schema["/payload"]["POST"]
@@ -512,7 +509,6 @@ def api_schema(request, openapi_version):
                 }
             }
         }
-        jsonschema.validate(schema, SWAGGER_20)
     else:
         schema = request.getfixturevalue("empty_open_api_3_schema")
         schema["paths"] = {
@@ -526,7 +522,6 @@ def api_schema(request, openapi_version):
                 }
             }
         }
-        jsonschema.validate(schema, OPENAPI_30)
     if request.param == "aiohttp":
         base_url = request.getfixturevalue("base_url")
         return schemathesis.from_dict(schema, base_url=base_url)

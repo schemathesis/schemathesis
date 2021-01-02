@@ -1,7 +1,4 @@
-import jsonschema
 import pytest
-
-from schemathesis.specs.openapi.definitions import OPENAPI_30, SWAGGER_20
 
 from .utils import as_param
 
@@ -70,7 +67,6 @@ def test_without_required(request, testdir, spec_version, param):
     if spec_version == "open_api_2":
         schema["paths"] = {"/users": {"post": {"parameters": [param], "responses": {"200": {"description": "OK"}}}}}
         location = param["in"]
-        jsonschema.validate(schema, SWAGGER_20)
     else:
         path = {"responses": {"200": {"description": "OK"}}}
         if "content" in param:
@@ -80,7 +76,6 @@ def test_without_required(request, testdir, spec_version, param):
             path["parameters"] = [param]
             location = param["in"]
         schema["paths"] = {"/users": {"post": path}}
-        jsonschema.validate(schema, OPENAPI_30)
     testdir.make_test(
         f"""
 @schema.parametrize()
