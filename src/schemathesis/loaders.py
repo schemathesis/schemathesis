@@ -150,7 +150,7 @@ def from_dict(
     dispatch("before_load_schema", HookContext(), raw_schema)
 
     def init_openapi_2() -> SwaggerV20:
-        _maybe_validate_schema(raw_schema, definitions.SWAGGER_20, validate_schema)
+        _maybe_validate_schema(raw_schema, definitions.SWAGGER_20_VALIDATOR, validate_schema)
         return SwaggerV20(
             raw_schema,
             location=location,
@@ -166,7 +166,7 @@ def from_dict(
         )
 
     def init_openapi_3() -> OpenApi30:
-        _maybe_validate_schema(raw_schema, definitions.OPENAPI_30, validate_schema)
+        _maybe_validate_schema(raw_schema, definitions.OPENAPI_30_VALIDATOR, validate_schema)
         return OpenApi30(
             raw_schema,
             location=location,
@@ -192,10 +192,12 @@ def from_dict(
     raise ValueError("Unsupported schema type")
 
 
-def _maybe_validate_schema(instance: Dict[str, Any], schema: Dict[str, Any], validate_schema: bool) -> None:
+def _maybe_validate_schema(
+    instance: Dict[str, Any], validator: jsonschema.validators.Draft4Validator, validate_schema: bool
+) -> None:
     if validate_schema:
         try:
-            jsonschema.validate(instance, schema)
+            validator.validate(instance)
         except TypeError as exc:
             raise ValidationError("Invalid schema") from exc
 

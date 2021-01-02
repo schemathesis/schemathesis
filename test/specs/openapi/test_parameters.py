@@ -1,7 +1,6 @@
-import jsonschema
 import pytest
 
-from schemathesis.specs.openapi.definitions import OPENAPI_30, SWAGGER_20
+from schemathesis.specs.openapi.definitions import OPENAPI_30_VALIDATOR, SWAGGER_20_VALIDATOR
 from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20Parameter, OpenAPI30Parameter, OpenAPIBody
 
 
@@ -63,7 +62,7 @@ def test_examples(request, cls, schema, expected):
     if issubclass(cls, OpenAPI20Parameter):
         template = request.getfixturevalue("empty_open_api_2_schema")
         template["paths"]["/users"] = {"get": {"parameters": [schema], "responses": {"200": {"description": "OK"}}}}
-        jsonschema.validate(template, SWAGGER_20)
+        SWAGGER_20_VALIDATOR.validate(template)
     else:
         template = request.getfixturevalue("empty_open_api_3_schema")
         if issubclass(cls, OpenAPIBody):
@@ -75,7 +74,7 @@ def test_examples(request, cls, schema, expected):
             }
         else:
             template["paths"]["/users"] = {"get": {"parameters": [schema], "responses": {"200": {"description": "OK"}}}}
-        jsonschema.validate(template, OPENAPI_30)
+        OPENAPI_30_VALIDATOR.validate(template)
     kwargs = {"media_type": "text/plain"} if issubclass(cls, OpenAPIBody) else {}
 
     assert cls(schema, **kwargs).example == expected
