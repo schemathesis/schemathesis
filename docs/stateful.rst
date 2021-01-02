@@ -446,6 +446,18 @@ The ``APIWorkflow`` class in the example is your state machine class - change it
 class has a different name, or change it to ``state = schema.as_state_machine()()``. Besides the class naming, this code
 is supposed to run without changes.
 
+Corner cases
+------------
+
+Sometimes the API under test may behave in the way, so errors are not easily reproducible. For example, if there is
+a mistake with caching that occurs only on the first call, and your test app is not entirely restarted on each run, then
+Schemathesis will report that the error is flaky and can't be reliably reproduced.
+
+If your stateful tests report an ``Unsatisfiable`` error, it means that Schemathesis can't do any API calls to satisfy
+rules on your state machine. In most cases, it comes from custom pre-conditions and the underlying API schema, but if
+you got this error, I suggest `reporting it <https://github.com/schemathesis/schemathesis/issues/new?assignees=Stranger6667&labels=Status%3A+Review+Needed%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D>`_
+so we can confirm the root cause.
+
 Command Line Interface
 ----------------------
 
