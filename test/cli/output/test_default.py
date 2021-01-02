@@ -158,8 +158,9 @@ def test_display_percentage(
     # When percentage is displayed
     default.display_percentage(execution_context, after_execution)
     out = capsys.readouterr().out
-    # Then the whole line fits precisely to the terminal width
-    assert len(click.unstyle(out)) + current_line_length == default.get_terminal_width()
+    # Then the whole line fits precisely to the terminal width. Note `-1` is padding, that is calculated in a
+    # different place when the line is printed
+    assert len(click.unstyle(out)) + current_line_length - 1 == default.get_terminal_width()
     # And the percentage displayed as expected in cyan color
     assert out.strip() == strip_style_win32(click.style(percentage, fg="cyan"))
 

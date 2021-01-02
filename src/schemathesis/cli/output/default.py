@@ -55,12 +55,12 @@ def display_execution_result(context: ExecutionContext, event: events.AfterExecu
 
 def display_percentage(context: ExecutionContext, event: events.AfterExecution) -> None:
     """Add the current progress in % to the right side of the current line."""
-    padding = 1
     endpoints_count = cast(int, context.endpoints_count)  # is already initialized via `Initialized` event
     current_percentage = get_percentage(context.endpoints_processed, endpoints_count)
     styled = click.style(current_percentage, fg="cyan")
-    # Total length of the message, so it will fill to the right border of the terminal minus padding
-    length = get_terminal_width() - context.current_line_length + len(styled) - len(current_percentage) - padding
+    # Total length of the message, so it will fill to the right border of the terminal.
+    # Padding is already taken into account in `context.current_line_length`
+    length = get_terminal_width() - context.current_line_length + len(styled) - len(current_percentage)
     template = f"{{:>{length}}}"
     click.echo(template.format(styled))
 
@@ -302,13 +302,20 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
         click.echo()
 
 
+TRUNCATION_PLACEHOLDER = "[...]"
+
+
 def handle_before_execution(context: ExecutionContext, event: events.BeforeExecution) -> None:
     """Display what method / endpoint will be tested next."""
-    message = f"{event.method} {event.path} "
+    # We should display execution result + percentage in the end. For example:
+    max_length = get_terminal_width() - len(" . [XXX%]") - len(TRUNCATION_PLACEHOLDER)
+    message = f"{event.method} {event.path}"
     if event.recursion_level > 0:
         message = f"{'    ' * event.recursion_level}-> {message}"
         # This value is not `None` - the value is set in runtime before this line
         context.endpoints_count += 1  # type: ignore
+
+    message = message[:max_length] + (message[max_length:] and "[...]") + " "
     context.current_line_length = len(message)
     click.echo(message, nl=False)
 
