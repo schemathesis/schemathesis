@@ -42,6 +42,7 @@ Changelog
 - A possibility to override ``APIStateMachine.step``. `#970`_
 - ``TypeError`` on nullable parameters during Open API specific serialization. `#980`_
 - Invalid types in ``x-examples``. `#982`_
+- CLI crash on schemas with operation names longer than the current terminal width. `#990`_
 
 **Performance**
 
@@ -1631,6 +1632,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#990: https://github.com/schemathesis/schemathesis/issues/990
 .. _#987: https://github.com/schemathesis/schemathesis/issues/987
 .. _#982: https://github.com/schemathesis/schemathesis/issues/982
 .. _#980: https://github.com/schemathesis/schemathesis/issues/980
