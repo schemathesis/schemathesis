@@ -65,7 +65,7 @@ class LazySchema:
                     data_generation_methods=data_generation_methods,
                 )
                 fixtures = get_fixtures(func, request)
-                # Changing the node id is required for better reporting - the method and endpoint will appear there
+                # Changing the node id is required for better reporting - the method and path will appear there
                 node_id = subtests.item._nodeid
                 settings = getattr(test, "_hypothesis_internal_use_settings", None)
                 tests = list(schema.get_all_tests(func, settings))

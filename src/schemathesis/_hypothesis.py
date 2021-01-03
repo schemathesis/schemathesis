@@ -1,4 +1,4 @@
-"""Provide strategies for given endpoint(s) definition."""
+"""High-level API for creating Hypothesis tests."""
 import asyncio
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 

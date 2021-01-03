@@ -162,7 +162,7 @@ def detect_invalid_schema(endpoint: APIOperation) -> Generator[None, None, None]
 
 
 def is_yaml_parsing_issue(endpoint: APIOperation) -> bool:
-    """Detect whether the endpoint has problems because of YAML syntax.
+    """Detect whether the API operation has problems because of YAML syntax.
 
     For example, unquoted 'on' is parsed as `True`.
     """
@@ -188,7 +188,7 @@ def _get_body_strategy(
 def get_parameters_strategy(
     endpoint: APIOperation, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], location: str
 ) -> st.SearchStrategy:
-    """Create a new strategy for the case's component from the endpoint parameters."""
+    """Create a new strategy for the case's component from the API operation parameters."""
     parameters = getattr(endpoint, LOCATION_TO_CONTAINER[location])
     if parameters:
         schema = parameters_to_json_schema(parameters)

@@ -236,7 +236,7 @@ def test_execute_filter_endpoint(args):
     kwargs.setdefault("endpoint", ["success"])
     execute(**kwargs)
 
-    # Then the runner will make calls only to the specified endpoint
+    # Then the runner will make calls only to the specified path
     assert_incoming_requests_num(app, 1)
     assert_request(app, 0, "GET", "/api/success")
     assert_not_request(app, "GET", "/api/failure")
@@ -275,7 +275,7 @@ def test_form_data(args):
         assert isinstance(data["key"], str)
         assert data["value"].lstrip("-").isdigit()
 
-    # When endpoint specifies parameters with `in=formData`
+    # When API operation specifies parameters with `in=formData`
     # Then responses should have 200 status, and not 415 (unsupported media type)
     results = execute(**kwargs, checks=(is_ok, check_content), hypothesis_max_examples=3)
     # And there should be no errors or failures
@@ -309,7 +309,7 @@ def test_headers_override(args):
 @pytest.mark.endpoints("teapot")
 def test_unknown_response_code(args):
     app, kwargs = args
-    # When endpoint returns a status code, that is not listed in "responses"
+    # When API operation returns a status code, that is not listed in "responses"
     # And "status_code_conformance" is specified
     init, *others, finished = prepare(**kwargs, checks=(status_code_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
@@ -322,7 +322,7 @@ def test_unknown_response_code(args):
 @pytest.mark.endpoints("failure")
 def test_unknown_response_code_with_default(args):
     app, kwargs = args
-    # When endpoint returns a status code, that is not listed in "responses", but there is a "default" response
+    # When API operation returns a status code, that is not listed in "responses", but there is a "default" response
     # And "status_code_conformance" is specified
     init, *others, finished = prepare(**kwargs, checks=(status_code_conformance,), hypothesis_max_examples=1)
     # Then there should be no failure
@@ -335,7 +335,7 @@ def test_unknown_response_code_with_default(args):
 @pytest.mark.endpoints("text")
 def test_unknown_content_type(args):
     app, kwargs = args
-    # When endpoint returns a response with content type, not specified in "produces"
+    # When API operation returns a response with content type, not specified in "produces"
     # And "content_type_conformance" is specified
     init, *others, finished = prepare(**kwargs, checks=(content_type_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
@@ -348,7 +348,7 @@ def test_unknown_content_type(args):
 @pytest.mark.endpoints("success")
 def test_known_content_type(args):
     app, kwargs = args
-    # When endpoint returns a response with a proper content type
+    # When API operation returns a response with a proper content type
     # And "content_type_conformance" is specified
     *_, finished = prepare(**kwargs, checks=(content_type_conformance,), hypothesis_max_examples=1)
     # Then there should be no a failures
@@ -358,7 +358,7 @@ def test_known_content_type(args):
 @pytest.mark.endpoints("invalid_response")
 def test_response_conformance_invalid(args):
     app, kwargs = args
-    # When endpoint returns a response that doesn't conform to the schema
+    # When API operation returns a response that doesn't conform to the schema
     # And "response_schema_conformance" is specified
     init, *others, finished = prepare(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
@@ -372,7 +372,7 @@ def test_response_conformance_invalid(args):
 @pytest.mark.endpoints("success")
 def test_response_conformance_valid(args):
     app, kwargs = args
-    # When endpoint returns a response that conforms to the schema
+    # When API operation returns a response that conforms to the schema
     # And "response_schema_conformance" is specified
     results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
     # Then there should be no failures or errors
@@ -382,7 +382,7 @@ def test_response_conformance_valid(args):
 
 @pytest.mark.endpoints("recursive")
 def test_response_conformance_recursive_valid(schema_url):
-    # When endpoint contains a response that have recursive references
+    # When API operation contains a response that have recursive references
     # And "response_schema_conformance" is specified
     results = execute(schema_url, checks=(response_schema_conformance,), hypothesis_max_examples=1)
     # Then there should be no failures or errors
@@ -393,7 +393,7 @@ def test_response_conformance_recursive_valid(schema_url):
 @pytest.mark.endpoints("text")
 def test_response_conformance_text(args):
     app, kwargs = args
-    # When endpoint returns a response that is not JSON
+    # When API operation returns a response that is not JSON
     # And "response_schema_conformance" is specified
     results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
     # Then the check should be ignored if the response headers are not application/json
@@ -404,7 +404,7 @@ def test_response_conformance_text(args):
 @pytest.mark.endpoints("malformed_json")
 def test_response_conformance_malformed_json(args):
     app, kwargs = args
-    # When endpoint returns a response that contains a malformed JSON, but has a valid content type header
+    # When API operation returns a response that contains a malformed JSON, but has a valid content type header
     # And "response_schema_conformance" is specified
     init, *others, finished = prepare(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
@@ -435,7 +435,7 @@ def filter_path_parameters():
 @pytest.mark.usefixtures("filter_path_parameters")
 def test_path_parameters_encoding(schema_url):
     # NOTE. WSGI and ASGI applications decodes %2F as / and returns 404
-    # When endpoint has a path parameter
+    # When API operation has a path parameter
     results = execute(schema_url, checks=(status_code_conformance,), hypothesis_derandomize=True)
     # Then there should be no failures
     # since all path parameters are quoted
@@ -479,7 +479,7 @@ def test_internal_exceptions(args, mocker):
 
 @pytest.mark.endpoints("payload")
 async def test_payload_explicit_example(args):
-    # When endpoint has an example specified
+    # When API operation has an example specified
     app, kwargs = args
     kwargs.setdefault("hypothesis_phases", [Phase.explicit])
     result = execute(**kwargs)
@@ -498,7 +498,7 @@ async def test_payload_explicit_example(args):
 
 @pytest.mark.endpoints("payload")
 async def test_explicit_example_disable(args, mocker):
-    # When endpoint has an example specified
+    # When API operation has an example specified
     # And the `explicit` phase is excluded
     app, kwargs = args
     kwargs.setdefault("hypothesis_max_examples", 1)
@@ -746,7 +746,7 @@ def test_unsatisfiable_example(empty_open_api_3_schema):
     *_, after, finished = prepare(empty_open_api_3_schema, loader=loaders.from_dict, hypothesis_max_examples=1)
     # And the tests are failing because of the unsatisfiable schema
     assert finished.has_errors
-    assert "Unable to satisfy schema parameters for this endpoint" in after.result.errors[0].exception
+    assert "Unable to satisfy schema parameters for this API operation" in after.result.errors[0].exception
 
 
 @pytest.mark.endpoints("success")

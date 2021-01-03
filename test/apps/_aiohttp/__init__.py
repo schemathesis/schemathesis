@@ -18,7 +18,7 @@ def create_openapi_app(
 ) -> web.Application:
     """Factory for aioHTTP app.
 
-    Each endpoint except the one for schema saves requests in the list shared in the app instance and could be
+    Each handler except the one for schema saves requests in the list shared in the app instance and could be
     used to verify generated requests.
 
     >>> def test_something(app, server):

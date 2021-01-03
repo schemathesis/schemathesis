@@ -151,7 +151,7 @@ def display_failures(context: ExecutionContext, event: events.Finished) -> None:
 
 
 def display_failures_for_single_test(context: ExecutionContext, result: SerializedTestResult) -> None:
-    """Display a failure for a single method / endpoint."""
+    """Display a failure for a single method / path."""
     display_subsection(result)
     checks = get_unique_failures(result.checks)
     for idx, check in enumerate(checks, 1):
@@ -306,7 +306,7 @@ TRUNCATION_PLACEHOLDER = "[...]"
 
 
 def handle_before_execution(context: ExecutionContext, event: events.BeforeExecution) -> None:
-    """Display what method / endpoint will be tested next."""
+    """Display what method / path will be tested next."""
     # We should display execution result + percentage in the end. For example:
     max_length = get_terminal_width() - len(" . [XXX%]") - len(TRUNCATION_PLACEHOLDER)
     message = f"{event.method} {event.path}"
@@ -321,7 +321,7 @@ def handle_before_execution(context: ExecutionContext, event: events.BeforeExecu
 
 
 def handle_after_execution(context: ExecutionContext, event: events.AfterExecution) -> None:
-    """Display the execution result + current progress at the same line with the method / endpoint names."""
+    """Display the execution result + current progress at the same line with the method / path names."""
     context.endpoints_processed += 1
     context.results.append(event.result)
     display_execution_result(context, event)

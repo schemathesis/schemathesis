@@ -166,7 +166,9 @@ def test_make_endpoint_single():
 
 @pytest.mark.parametrize("parameter", ("wrong.id", "unknown", "header.id"))
 def test_make_endpoint_invalid_location(parameter):
-    with pytest.raises(ValueError, match=f"Parameter `{parameter}` is not defined in endpoint GET /users/{{user_id}}"):
+    with pytest.raises(
+        ValueError, match=f"Parameter `{parameter}` is not defined in API operation GET /users/{{user_id}}"
+    ):
         LINK.make_endpoint([ParsedData({parameter: 4})])
 
 
@@ -187,5 +189,5 @@ def test_get_container_invalid_location():
         ),
     )
     case = endpoint.make_case()
-    with pytest.raises(ValueError, match="Parameter `unknown` is not defined in endpoint `GET /users/{user_id}`"):
+    with pytest.raises(ValueError, match="Parameter `unknown` is not defined in API operation `GET /users/{user_id}`"):
         get_container(case, None, "unknown")

@@ -24,7 +24,7 @@ class BaseSecurityProcessor:
     def _get_active_definitions(
         self, schema: Dict[str, Any], endpoint: APIOperation, resolver: RefResolver
     ) -> Generator[Dict[str, Any], None, None]:
-        """Get only security definitions active for the given endpoint."""
+        """Get only security definitions active for the given API operation."""
         definitions = self.get_security_definitions(schema, resolver)
         requirements = get_security_requirements(schema, endpoint)
         for name, definition in definitions.items():
@@ -116,7 +116,7 @@ class OpenAPISecurityProcessor(BaseSecurityProcessor):
 
 
 def get_security_requirements(schema: Dict[str, Any], endpoint: APIOperation) -> List[str]:
-    """Get applied security requirements for the given endpoint."""
+    """Get applied security requirements for the given API operation."""
     # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#operation-object
     # > This definition overrides any declared top-level security.
     # > To remove a top-level security declaration, an empty array can be used.

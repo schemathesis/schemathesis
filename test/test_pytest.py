@@ -25,7 +25,7 @@ def test_(request, param, case):
             }
         },
     )
-    # And there are multiple method/endpoint combinations
+    # And there are multiple method/path combinations
     result = testdir.runpytest("-v", "-s")
     # Then the total number of tests should be Method/Endpoint combos x parameters in `pytest_generate_tests`
     # I.e. regular pytest parametrization logic should be applied
@@ -67,7 +67,7 @@ class TestAPI:
             }
         },
     )
-    # And there are multiple method/endpoint combinations
+    # And there are multiple method/path combinations
     result = testdir.runpytest("-v", "-s")
     # Then the total number of tests should be Method/Endpoint combos x parameters in `pytest_generate_tests`
     # I.e. regular pytest parametrization logic should be applied

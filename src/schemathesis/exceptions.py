@@ -82,7 +82,7 @@ def get_headers_error(message: str) -> Type[CheckFailed]:
 
 
 class InvalidSchema(Exception):
-    """Schema associated with an endpoint contains an error."""
+    """Schema associated with an API operation contains an error."""
 
     __module__ = "builtins"
 

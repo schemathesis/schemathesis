@@ -199,7 +199,7 @@ def test_commands_run_help(cli):
         "  --hypothesis-derandomize        Use Hypothesis's deterministic mode.",
         "  --hypothesis-max-examples INTEGER RANGE",
         "                                  Maximum number of generated examples per each",
-        "                                  method/endpoint combination.",
+        "                                  method/path combination.",
         "",
         f"  --hypothesis-phases [{PHASES.replace(', ', '|')}]",
         "                                  Control which phases should be run.",
@@ -562,7 +562,7 @@ def test_hypothesis_failed_event(cli, cli_args, workers):
     result = cli.run(*cli_args, "--hypothesis-deadline=20", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And the given endpoint should be displayed as an error
+    # And the given operation should be displayed as an error
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("GET /api/slow E")
@@ -583,7 +583,7 @@ def test_connection_timeout(cli, server, schema_url, workers):
     result = cli.run(schema_url, "--request-timeout=80", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And the given endpoint should be displayed as an error
+    # And the given operation should be displayed as an error
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("GET /api/slow E")
@@ -601,7 +601,7 @@ def test_connection_timeout(cli, server, schema_url, workers):
 @pytest.mark.endpoints("success", "slow")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_default_hypothesis_settings(cli, cli_args, workers):
-    # When there is a slow endpoint and if it is faster than 500ms
+    # When there is a slow operation and if it is faster than 500ms
     result = cli.run(*cli_args, f"--workers={workers}")
     # Then the tests should pass, because of default 500ms deadline
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -635,7 +635,7 @@ def test_unsatisfiable(cli, cli_args, workers):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And standard Hypothesis error should not appear in the output
     assert "You can add @seed" not in result.stdout
-    # And this endpoint should be marked as errored in the progress line
+    # And this operation should be marked as errored in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("POST /api/unsatisfiable E")
@@ -643,20 +643,20 @@ def test_unsatisfiable(cli, cli_args, workers):
         assert lines[10] == "E"
     # And more clear error message is displayed instead of Hypothesis one
     lines = result.stdout.split("\n")
-    assert "hypothesis.errors.Unsatisfiable: Unable to satisfy schema parameters for this endpoint" in lines
+    assert "hypothesis.errors.Unsatisfiable: Unable to satisfy schema parameters for this API operation" in lines
 
 
 @pytest.mark.endpoints("flaky")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_flaky(cli, cli_args, workers):
-    # When the endpoint fails / succeeds randomly
+    # When the operation fails / succeeds randomly
     # Derandomize is needed for reproducible test results
     result = cli.run(*cli_args, "--hypothesis-derandomize", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And standard Hypothesis error should not appear in the output
     assert "Failed to reproduce exception. Expected:" not in result.stdout
-    # And this endpoint should be marked as errored in the progress line
+    # And this operation should be marked as errored in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("GET /api/flaky E")
@@ -669,7 +669,7 @@ def test_flaky(cli, cli_args, workers):
     assert "= FAILURES =" not in result.stdout
     # And more clear error message is displayed instead of Hypothesis one
     lines = result.stdout.split("\n")
-    assert "hypothesis.errors.Flaky: Tests on this endpoint produce unreliable results: " in lines
+    assert "hypothesis.errors.Flaky: Tests on this API operation produce unreliable results: " in lines
     assert "Falsified on the first call but did not on a subsequent one" in lines
     # And example is displayed
     assert "Query           : {'id': 0}" in lines
@@ -686,7 +686,7 @@ def test_invalid_endpoint(cli, cli_args, workers):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And standard Hypothesis error should not appear in the output
     assert "You can add @seed" not in result.stdout
-    # And this endpoint should be marked as errored in the progress line
+    # And this operation should be marked as errored in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("POST /api/invalid E")
@@ -726,12 +726,12 @@ def test_invalid_endpoint_suggestion_disabled(cli, cli_args):
 @pytest.mark.endpoints("teapot")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_status_code_conformance(cli, cli_args, workers):
-    # When endpoint returns a status code, that is not listed in "responses"
+    # When operation returns a status code, that is not listed in "responses"
     # And "status_code_conformance" is specified
     result = cli.run(*cli_args, "-c", "status_code_conformance", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And this endpoint should be marked as failed in the progress line
+    # And this operation should be marked as failed in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("POST /api/teapot F")
@@ -812,7 +812,7 @@ def test_connection_error(cli, schema_url, workers):
     # And all endpoints should be mentioned in this section as subsections
     assert "_ GET: /api/success [P] _" in result.stdout
     assert "_ GET: /api/failure [P] _" in result.stdout
-    # And the proper error messages should be displayed for each endpoint
+    # And the proper error messages should be displayed for each operation
     assert "Max retries exceeded with url: /api/success" in result.stdout
     assert "Max retries exceeded with url: /api/failure" in result.stdout
 
@@ -1050,7 +1050,7 @@ def test_multiple_add_case_hooks(testdir, cli, hypothesis_max_examples, schema_u
     )
 
     assert result.exit_code == ExitCode.OK
-    # Each header should only be duplicated once for each endpoint - /api/failure and /api/success.
+    # Each header should only be duplicated once for each API operation - /api/failure and /api/success.
     assert result.stdout.count("First case added!") == 2
     assert result.stdout.count("Second case added!") == 2
 
@@ -1442,12 +1442,12 @@ def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_b
     last_decoded = decode(-1)
     if last_decoded:
         assert b'Content-Disposition: form-data; name="file"; filename="file"\r\n' in last_decoded
-    # NOTE, that the actual endpoint is not checked in this test
+    # NOTE, that the actual API operation is not checked in this test
 
 
 @pytest.mark.endpoints("form")
 def test_urlencoded_form(cli, cli_args):
-    # When the endpoint accepts application/x-www-form-urlencoded
+    # When the API operation accepts application/x-www-form-urlencoded
     result = cli.run(*cli_args)
     # Then Schemathesis should generate appropriate payload
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -1626,7 +1626,7 @@ def test_max_response_time_invalid(cli, server, schema_url, workers):
     result = cli.run(schema_url, "--max-response-time=50", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And the given endpoint should be displayed as a failure
+    # And the given operation should be displayed as a failure
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("GET /api/slow F")

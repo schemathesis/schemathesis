@@ -34,7 +34,7 @@ EXPECTED_LINK_PARAMETERS = {"parameters": {"userId": "$response.body#/id"}}
 @pytest.mark.endpoints("create_user", "get_user", "update_user")
 def test_add_link_default(schema_url):
     schema = schemathesis.from_uri(schema_url)
-    # When we add a link to the target endpoint
+    # When we add a link to the target API operation
     # And it is an `APIOperation` instance
     # And it has the `operationId` key
     links = add_link(schema, schema["/users/{user_id}"]["GET"], parameters={"userId": "$response.body#/id"})
@@ -49,7 +49,7 @@ def test_add_link_default(schema_url):
 @pytest.mark.endpoints("create_user", "get_user", "update_user")
 def test_add_link_no_endpoints_cache(schema_url, status_code):
     schema = schemathesis.from_uri(schema_url)
-    # When we add a link to the target endpoint
+    # When we add a link to the target API operation
     source = schema["/users/"]["POST"]
     target = schema["/users/{user_id}"]["GET"]
     # And the endpoints are not cached
@@ -110,7 +110,7 @@ def test_add_link_by_reference_twice(schema_url):
 def test_add_link_behind_a_reference(schema_url):
     # See GH-824
     schema = schemathesis.from_uri(schema_url)
-    # When all methods for an endpoint are behind a reference
+    # When all methods for an API operation are behind a reference
     schema.raw_schema["components"]["methods"] = {
         "users": schema.raw_schema["paths"]["/users/"],
         "user-details": schema.raw_schema["paths"]["/users/{user_id}"],
@@ -120,7 +120,7 @@ def test_add_link_behind_a_reference(schema_url):
     assert not hasattr(schema, "_endpoints")
     # And a link is added
     add_link(schema, schema["/users/{user_id}"]["GET"], parameters={"userId": "$response.body#/id"})
-    # Then the source endpoint should have the new link
+    # Then the source API operation should have the new link
     endpoint = schema["/users/"]["POST"]
     links = endpoint.definition.resolved["responses"]["201"]["links"]
     assert len(links) == 3
@@ -143,23 +143,29 @@ def test_add_link_nothing_is_provided(schema_url):
 @pytest.mark.parametrize(
     "change, message",
     (
-        (lambda s, e: setattr(e, "method", "GET"), "No such endpoint: `GET /users/`. Did you mean `POST /users/`?"),
-        (lambda s, e: setattr(e, "path", "/userz/"), "No such endpoint: `POST /userz/`. Did you mean `POST /users/`?"),
-        (lambda s, e: setattr(e, "path", "/what?/"), "No such endpoint: `POST /what?/`."),
+        (
+            lambda s, e: setattr(e, "method", "GET"),
+            "No such API operation: `GET /users/`. Did you mean `POST /users/`?",
+        ),
+        (
+            lambda s, e: setattr(e, "path", "/userz/"),
+            "No such API operation: `POST /userz/`. Did you mean `POST /users/`?",
+        ),
+        (lambda s, e: setattr(e, "path", "/what?/"), "No such API operation: `POST /what?/`."),
         (
             lambda s, e: s.raw_schema["paths"].__setitem__("/users/", {}),
-            "No such endpoint: `POST /users/`.",
+            "No such API operation: `POST /users/`.",
         ),
     ),
 )
 @pytest.mark.endpoints("create_user", "get_user", "update_user")
 def test_add_link_unknown_endpoint(schema_url, change, message):
     schema = schemathesis.from_uri(schema_url)
-    # When the source endpoint is modified and can't be found
+    # When the source API operation is modified and can't be found
     source = schema["/users/"]["POST"]
     change(schema, source)
     with pytest.raises(
-        ValueError, match=re.escape(f"{message} Check if the requested endpoint passes the filters in the schema.")
+        ValueError, match=re.escape(f"{message} Check if the requested API operation passes the filters in the schema.")
     ):
         # Then there should be an error about it.
         schema.add_link(source=source, target="#/paths/~1users~1{user_id}/get", status_code="201", request_body="#/foo")

@@ -185,7 +185,7 @@ def test_runner(schema_path):
         return False
 
     def is_unsatisfiable(text):
-        return "Unable to satisfy schema parameters for this endpoint" in text
+        return "Unable to satisfy schema parameters for this API operation" in text
 
     def check_flaky(ev) -> bool:
         if schema_id in FLAKY_SCHEMAS and ev.current_endpoint in FLAKY_SCHEMAS[schema_id]:
@@ -200,7 +200,7 @@ def test_runner(schema_path):
         if schema_id in UNSATISFIABLE_SCHEMAS and ev.current_endpoint in UNSATISFIABLE_SCHEMAS[schema_id]:
             exception = ev.result.errors[0].exception
             if (
-                "Unable to satisfy schema parameters for this endpoint" not in exception
+                "Unable to satisfy schema parameters for this API operation" not in exception
                 and "Cannot create non-empty lists with elements" not in exception
                 and "Cannot create a collection of " not in exception
             ):

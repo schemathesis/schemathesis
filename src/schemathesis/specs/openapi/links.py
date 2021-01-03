@@ -35,8 +35,8 @@ class Link(StatefulTest):
         else:
             endpoint = source_endpoint.schema.get_endpoint_by_reference(definition["operationRef"])  # type: ignore
         return cls(
-            # Pylint can't detect that endpoint is always defined at this point
-            # E.g. if there is no matching endpoint or no endpoints at all, then a ValueError will be risen
+            # Pylint can't detect that the API operation is always defined at this point
+            # E.g. if there is no matching operation or no endpoints at all, then a ValueError will be risen
             name=name,
             endpoint=endpoint,  # pylint: disable=undefined-loop-variable
             parameters=definition.get("parameters", {}),
@@ -58,7 +58,7 @@ class Link(StatefulTest):
         )
 
     def make_endpoint(self, collected: List[ParsedData]) -> APIOperation:
-        """Create a modified version of the original endpoint with additional data merged in."""
+        """Create a modified version of the original API operation with additional data merged in."""
         # We split the gathered data among all locations & store the original parameter
         containers = {
             location: {
@@ -72,7 +72,7 @@ class Link(StatefulTest):
             for name, value in item.parameters.items():
                 container = self._get_container_by_parameter_name(name, containers)
                 container.append(value)
-        # These are the final `path_parameters`, `query`, and other endpoint components
+        # These are the final `path_parameters`, `query`, and other API operation components
         components: Dict[str, ParameterSet] = {
             container_name: getattr(self.endpoint, container_name).__class__()
             for location, container_name in LOCATION_TO_CONTAINER.items()
@@ -120,7 +120,7 @@ class Link(StatefulTest):
 
     def _unknown_parameter(self, name: str) -> NoReturn:
         raise ValueError(
-            f"Parameter `{name}` is not defined in endpoint {self.endpoint.method.upper()} {self.endpoint.path}"
+            f"Parameter `{name}` is not defined in API operation {self.endpoint.method.upper()} {self.endpoint.path}"
         )
 
 
@@ -198,7 +198,7 @@ def get_container(case: Case, location: Optional[str], name: str) -> Optional[Di
                 container_name = LOCATION_TO_CONTAINER[param.location]
                 break
         else:
-            raise ValueError(f"Parameter `{name}` is not defined in endpoint `{case.endpoint.verbose_name}`")
+            raise ValueError(f"Parameter `{name}` is not defined in API operation `{case.endpoint.verbose_name}`")
     return getattr(case, container_name)
 
 

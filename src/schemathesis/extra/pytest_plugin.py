@@ -65,7 +65,7 @@ class SchemathesisCase(PyCollector):
     def _gen_items(
         self, endpoint: APIOperation, data_generation_method: DataGenerationMethod
     ) -> Generator[SchemathesisFunction, None, None]:
-        """Generate all items for the given endpoint.
+        """Generate all tests for the given API operation.
 
         Could produce more than one test item if
         parametrization is applied via ``pytest.mark.parametrize`` or ``pytest_generate_tests``.

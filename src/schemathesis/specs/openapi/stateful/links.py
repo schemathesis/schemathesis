@@ -38,7 +38,7 @@ def _convert_strategy(
 def make_response_filter(status_code: str, all_status_codes: List[str]) -> FilterFunction:
     """Create a filter for stored responses.
 
-    This filter will decide whether some response is suitable to use as a source for requesting some endpoint.
+    This filter will decide whether some response is suitable to use as a source for requesting some API operation.
     """
     if status_code == "default":
         return default_status_code(all_status_codes)

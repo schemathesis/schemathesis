@@ -96,7 +96,7 @@ def test_not_wsgi(schema):
 
 @pytest.mark.hypothesis_nested
 def test_binary_body(mocker, flask_app):
-    # When an endpoint accepts a binary input
+    # When an API operation accepts a binary input
     schema = schemathesis.from_dict(
         {
             "openapi": "3.0.2",

@@ -218,7 +218,7 @@ def before_add_examples(context: HookContext, examples: List["Case"]) -> None:
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
 def add_case(context: HookContext, case: "Case", response: GenericResponse) -> Optional["Case"]:
-    """Creates an additional test per endpoint. If this hook returns None, no additional test created.
+    """Creates an additional test per API operation. If this hook returns None, no additional test created.
 
     Called with a copy of the original case object and the server's response to the original case.
     """

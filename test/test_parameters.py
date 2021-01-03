@@ -268,7 +268,7 @@ def overridden_security_schema(schema, schema_spec):
 
 
 def test_security_definitions_override(testdir, overridden_security_schema, location):
-    # When "security" is an empty list in the endpoint definition
+    # When "security" is an empty list in the API operation definition
     testdir.make_test(
         """
 @schema.parametrize()
@@ -415,7 +415,7 @@ def test_(case):
 
 
 def test_json_media_type(testdir):
-    # When endpoint expects a JSON-compatible media type
+    # When API operation expects a JSON-compatible media type
     testdir.make_test(
         """
 @settings(max_examples=10, deadline=None)
@@ -532,7 +532,7 @@ def api_schema(request, openapi_version):
 @pytest.mark.hypothesis_nested
 @pytest.mark.endpoints("payload")
 def test_null_body(testdir, api_schema):
-    # When endpoint expects `null` as payload
+    # When API operation expects `null` as payload
 
     @given(case=api_schema["/payload"]["POST"].as_strategy())
     @settings(max_examples=5)

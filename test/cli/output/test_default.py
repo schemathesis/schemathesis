@@ -190,7 +190,7 @@ def test_display_single_failure(capsys, swagger_20, execution_context, endpoint,
     default.display_failures_for_single_test(execution_context, SerializedTestResult.from_test_result(test_statistic))
     out = capsys.readouterr().out
     lines = out.split("\n")
-    # Then the endpoint name is displayed as a subsection
+    # Then the path is displayed as a subsection
     assert " GET: /v1/success " in lines[0]
     # And body should be displayed if it is not NOT_SET
     if body is NOT_SET:
@@ -284,7 +284,7 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set, ve
     out = capsys.readouterr().out.strip()
     # Then section title is displayed
     assert " FAILURES " in out
-    # And endpoint with a failure is displayed as a subsection
+    # And operation with a failure is displayed as a subsection
     assert " GET: /v1/api/failure " in out
     assert "Message" in out
     assert "Run this Python code to reproduce this failure: " in out
@@ -311,7 +311,7 @@ def test_display_errors(swagger_20, capsys, results_set, execution_context, show
     )
     # And help message is displayed only if tracebacks are not shown
     assert help_message_exists is not show_errors_tracebacks
-    # And endpoint with an error is displayed as a subsection
+    # And operation with an error is displayed as a subsection
     assert " GET: /v1/api/error " in out
     # And the error itself is displayed
     assert "ConnectionError: Connection refused!" in out

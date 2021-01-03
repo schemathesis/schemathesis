@@ -356,7 +356,7 @@ def load_schema(
         if file_exists(schema_uri):
             loader = loaders.from_path
         elif app is not None and not urlparse(schema_uri).netloc:
-            # If `schema` is not an existing filesystem path, or a URL then it is considered as an endpoint with
+            # If `schema` is not an existing filesystem path, or a URL then it is considered as a path within
             # the given app
             loader = loaders.get_loader_for_app(app)
             loader_options.update(dict_true_values(headers=headers))

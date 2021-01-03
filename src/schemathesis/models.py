@@ -372,7 +372,7 @@ class Case:  # pylint: disable=too-many-public-methods
         self.validate_response(response, checks)
 
     def get_full_url(self) -> str:
-        """Make a full URL to the current endpoint, including query parameters."""
+        """Make a full URL to the current API operation, including query parameters."""
         base_url = self.base_url or "http://localhost"
         kwargs = self.as_requests_kwargs(base_url)
         request = requests.Request(**kwargs)
@@ -405,9 +405,9 @@ def cookie_handler(client: werkzeug.Client, cookies: Optional[Cookies]) -> Gener
 
 @attr.s(slots=True)  # pragma: no mutate
 class EndpointDefinition:
-    """A wrapper to store not resolved endpoint definitions.
+    """A wrapper to store not resolved API operation definitions.
 
-    To prevent recursion errors we need to store definitions without resolving references. But endpoint definitions
+    To prevent recursion errors we need to store definitions without resolving references. But operation definitions
     itself can be behind a reference (when there is a ``$ref`` in ``paths`` values), therefore we need to store this
     scope change to have a proper reference resolving later.
     """
@@ -453,9 +453,9 @@ class APIOperation(Generic[P]):
         return self.schema.get_links(self)
 
     def add_parameter(self, parameter: P) -> None:
-        """Add a new processed parameter to an endpoint.
+        """Add a new processed parameter to an API operation.
 
-        :param parameter: A parameter that will be used with this endpoint.
+        :param parameter: A parameter that will be used with this operation.
         :rtype: None
         """
         lookup_table = {
@@ -467,8 +467,8 @@ class APIOperation(Generic[P]):
         }
         # If the parameter has a typo, then by default, there will be an error from `jsonschema` earlier.
         # But if the user wants to skip schema validation, we choose to ignore a malformed parameter.
-        # In this case, we still might generate some tests for an endpoint, but without this parameter, which is better
-        # than skip the whole endpoint from testing.
+        # In this case, we still might generate some tests for an API operation, but without this parameter,
+        # which is better than skip the whole operation from testing.
         if parameter.location in lookup_table:
             container = lookup_table[parameter.location]
             container.add(parameter)
@@ -481,7 +481,7 @@ class APIOperation(Generic[P]):
         return self.schema.get_case_strategy(self, hooks, data_generation_method)
 
     def get_strategies_from_examples(self) -> List[SearchStrategy[Case]]:
-        """Get examples from the endpoint."""
+        """Get examples from the API operation."""
         return self.schema.get_strategies_from_examples(self)
 
     def get_stateful_tests(self, response: GenericResponse, stateful: Optional["Stateful"]) -> Sequence["StatefulTest"]:
@@ -517,7 +517,7 @@ class APIOperation(Generic[P]):
         )
 
     def clone(self, **components: Any) -> "APIOperation":
-        """Create a new instance of this endpoint with updated components."""
+        """Create a new instance of this API operation with updated components."""
         return self.__class__(
             path=self.path,
             method=self.method,

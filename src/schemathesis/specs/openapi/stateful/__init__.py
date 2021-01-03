@@ -46,7 +46,7 @@ def create_state_machine(schema: "BaseOpenAPISchema") -> Type[APIStateMachine]:
 def init_bundles(schema: "BaseOpenAPISchema") -> Dict[str, CaseInsensitiveDict]:
     """Create bundles for all endpoints in the given schema.
 
-    Each endpoint has a bundle that stores all responses from that endpoint.
+    Each API operation has a bundle that stores all responses from that operation.
     We need to create bundles first, so they can be referred when building connections between endpoints.
     """
     output: Dict[str, CaseInsensitiveDict] = {}
@@ -70,7 +70,7 @@ def make_all_rules(
 def make_rules(
     endpoint: "APIOperation", bundle: Bundle, connections: EndpointConnections
 ) -> Generator[Rule, None, None]:
-    """Create a rule for an endpoint."""
+    """Create a rule for an API operation."""
 
     def _make_rule(previous: SearchStrategy) -> Rule:
         decorator = rule(target=bundle, previous=previous, case=endpoint.as_strategy())  # type: ignore

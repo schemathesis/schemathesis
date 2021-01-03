@@ -64,4 +64,4 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path):
     assert testcases[2].attrib["name"] == "POST /api/unsatisfiable"
     assert testcases[2][0].tag == "error"
     assert testcases[2][0].attrib["type"] == "error"
-    assert "Unable to satisfy schema parameters for this endpoint" in testcases[2][0].attrib["message"]
+    assert "Unable to satisfy schema parameters for this API operation" in testcases[2][0].attrib["message"]

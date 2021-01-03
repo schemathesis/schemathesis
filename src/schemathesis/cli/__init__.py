@@ -373,7 +373,7 @@ class GroupedOption(click.Option):
 )
 @click.option(
     "--hypothesis-max-examples",
-    help="Maximum number of generated examples per each method/endpoint combination.",
+    help="Maximum number of generated examples per each method/path combination.",
     type=click.IntRange(1),
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,

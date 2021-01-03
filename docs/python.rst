@@ -19,7 +19,7 @@ The following test will load the API schema from ``http://0.0.0.0:8080/swagger.j
     def test_api(case):
         case.call_and_validate()
 
-Each test set includes up to 100 test cases by default, depending on the endpoint definition.
+Each test set includes up to 100 test cases by default, depending on the API operation definition.
 
 We recommend running your tests with the latest `pytest <https://docs.pytest.org/en/stable/>`_ version.
 
@@ -79,7 +79,7 @@ Tests configuration
 -------------------
 
 As Schemathesis tests are regular Hypothesis tests, you can use ``hypothesis.settings`` decorator with them.
-For example, in the following test, Schemathesis will test each endpoint with up to 1000 test cases:
+For example, in the following test, Schemathesis will test each API operation with up to 1000 test cases:
 
 .. code:: python
 
@@ -291,7 +291,7 @@ You can use it for:
 Schemathesis automatically applies ``hypothesis.given`` to the wrapped test, and you can't use it explicitly in your test, since it will raise an error.
 You can provide additional strategies with ``schema.given`` that proxies all arguments to ``hypothesis.given``.
 
-In the following example we test a hypothetical ``/api/auth/password/reset/`` endpoint that expects some token in the payload body:
+In the following example we test a hypothetical ``/api/auth/password/reset/`` operation that expects some token in the payload body:
 
 .. code-block:: python
 
@@ -384,7 +384,7 @@ seamlessly combines your API schema with ``pytest``-style parametrization and pr
 Such test consists of four main parts:
 
 1. Schema preparation; In this case, the schema is loaded via the ``from_uri`` function.
-2. Test parametrization; ``@schema.parametrize()`` generates separate tests for all endpoint/method combinations available in the schema.
+2. Test parametrization; ``@schema.parametrize()`` generates separate tests for all path/method combinations available in the schema.
 3. A network call to the running application; ``case.call_and_validate()`` does it.
 4. Verifying a property you'd like to test; In this example, we run all built-in checks.
 
@@ -393,7 +393,7 @@ Each test function where you use ``schema.parametrize`` should have the ``case``
 Important ``Case`` attributes:
 
 - ``method`` - HTTP method
-- ``formatted_path`` - full endpoint path
+- ``formatted_path`` - full API operation path
 - ``path_parameters`` - parameters that are used in ``formatted_path``
 - ``headers`` - HTTP headers
 - ``query`` - query parameters
@@ -406,8 +406,8 @@ For convenience, you can explore the schemas and strategies manually:
 
     >>> import schemathesis
     >>> schema = schemathesis.from_uri("http://api.com/schema.json")
-    >>> endpoint = schema["/pet"]["POST"]
-    >>> strategy = endpoint.as_strategy()
+    >>> operation = schema["/pet"]["POST"]
+    >>> strategy = operation.as_strategy()
     >>> strategy.example()
     Case(
         path='/pet',

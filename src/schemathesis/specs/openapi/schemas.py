@@ -158,11 +158,11 @@ class BaseOpenAPISchema(BaseSchema):
         return self._resolver
 
     def get_content_types(self, endpoint: APIOperation, response: GenericResponse) -> List[str]:
-        """Content types available for this endpoint."""
+        """Content types available for this API operation."""
         raise NotImplementedError
 
     def get_strategies_from_examples(self, endpoint: APIOperation) -> List[SearchStrategy[Case]]:
-        """Get examples from the endpoint."""
+        """Get examples from the API operation."""
         raise NotImplementedError
 
     def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
@@ -264,9 +264,10 @@ class BaseOpenAPISchema(BaseSchema):
         :param APIOperation source: This operation is the source of data
         :param target: This operation will receive the data from this link.
             Can be an ``APIOperation`` instance or a reference like this - ``#/paths/~1users~1{userId}/get``
-        :param str status_code: The link is triggered when the source endpoint responds with this status code.
+        :param str status_code: The link is triggered when the source API operation responds with this status code.
         :param parameters: A dictionary that describes how parameters should be extracted from the matched response.
-            The key represents the parameter name in the target endpoint, and the value is a runtime expression string.
+            The key represents the parameter name in the target API operation, and the value is a runtime
+            expression string.
         :param request_body: A literal value or runtime expression to use as a request body when
             calling the target operation.
 
@@ -307,12 +308,12 @@ class BaseOpenAPISchema(BaseSchema):
                 self.raw_schema["paths"][endpoint].pop("$ref", None)
                 if found:
                     return
-        message = f"No such endpoint: `{source.verbose_name}`."
+        message = f"No such API operation: `{source.verbose_name}`."
         possibilities = [e.verbose_name for e in self.get_all_endpoints()]
         matches = get_close_matches(source.verbose_name, possibilities)
         if matches:
             message += f" Did you mean `{matches[0]}`?"
-        message += " Check if the requested endpoint passes the filters in the schema."
+        message += " Check if the requested API operation passes the filters in the schema."
         raise ValueError(message)
 
     def get_links(self, endpoint: APIOperation) -> Dict[str, Dict[str, Any]]:
@@ -432,7 +433,7 @@ class SwaggerV20(BaseOpenAPISchema):
         media_types = self._get_consumes_for_endpoint(endpoint_definition)
         # For `in=body` parameters, we imply `application/json` as the default media type because it is the most common.
         body_media_types = media_types or (OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE,)
-        # If an endpoint has parameters with `in=formData`, Schemathesis should know how to serialize it.
+        # If an API operation has parameters with `in=formData`, Schemathesis should know how to serialize it.
         # We can't be 100% sure what media type is expected by the server and chose `multipart/form-data` as
         # the default because it is broader since it allows us to upload files.
         form_data_media_types = media_types or (OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE,)
@@ -457,7 +458,7 @@ class SwaggerV20(BaseOpenAPISchema):
         return collected
 
     def get_strategies_from_examples(self, endpoint: APIOperation) -> List[SearchStrategy[Case]]:
-        """Get examples from the endpoint."""
+        """Get examples from the API operation."""
         return get_strategies_from_examples(endpoint, self.examples_field)
 
     def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
@@ -484,7 +485,7 @@ class SwaggerV20(BaseOpenAPISchema):
         """Prepare form data for sending with `requests`.
 
         :param form_data: Raw generated data as a dictionary.
-        :param endpoint: The tested endpoint for which the data was generated.
+        :param endpoint: The tested API operation for which the data was generated.
         :return: `files` and `data` values for `requests.request`.
         """
         files, data = [], {}
@@ -518,10 +519,10 @@ class SwaggerV20(BaseOpenAPISchema):
         return self._get_consumes_for_endpoint(endpoint.definition.resolved)
 
     def _get_consumes_for_endpoint(self, endpoint_definition: Dict[str, Any]) -> List[str]:
-        """Get the `consumes` value for the given endpoint.
+        """Get the `consumes` value for the given API operation.
 
-        :param endpoint_definition: Raw endpoint definition.
-        :return: A list of media-types for this endpoint.
+        :param endpoint_definition: Raw API operation definition.
+        :return: A list of media-types for this operation.
         :rtype: List[str]
         """
         global_consumes = self.raw_schema.get("consumes", [])
@@ -580,7 +581,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         return scopes, None
 
     def get_strategies_from_examples(self, endpoint: APIOperation) -> List[SearchStrategy[Case]]:
-        """Get examples from the endpoint."""
+        """Get examples from the API operation."""
         return get_strategies_from_examples(endpoint, self.examples_field)
 
     def get_content_types(self, endpoint: APIOperation, response: GenericResponse) -> List[str]:
@@ -601,7 +602,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         """Prepare form data for sending with `requests`.
 
         :param form_data: Raw generated data as a dictionary.
-        :param endpoint: The tested endpoint for which the data was generated.
+        :param endpoint: The tested API operation for which the data was generated.
         :return: `files` and `data` values for `requests.request`.
         """
         files = []

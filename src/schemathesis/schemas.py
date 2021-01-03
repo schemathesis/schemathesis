@@ -125,13 +125,13 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def get_strategies_from_examples(self, endpoint: APIOperation) -> List[SearchStrategy[Case]]:
-        """Get examples from the endpoint."""
+        """Get examples from the API operation."""
         raise NotImplementedError
 
     def get_stateful_tests(
         self, response: GenericResponse, endpoint: APIOperation, stateful: Optional[Stateful]
     ) -> Sequence[StatefulTest]:
-        """Get a list of additional tests, that should be executed after this response from the endpoint."""
+        """Get a list of additional tests, that should be executed after this response from the API operation."""
         raise NotImplementedError
 
     def get_parameter_serializer(self, endpoint: APIOperation, location: str) -> Optional[Callable]:

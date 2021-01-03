@@ -21,10 +21,10 @@ def test_(request, case):
 """
     )
     # And schema doesn't contain any parameters
-    # And schema contains only 1 endpoint
+    # And schema contains only 1 API operation
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1)
-    # Then test name should contain method:endpoint
+    # Then test name should contain method:path
     # And there should be only 1 hypothesis call
     result.stdout.re_match_lines(
         [r"test_parametrization.py::test_\[GET:/v1/users\]\[P\] PASSED", r"Hypothesis calls: 1"]
@@ -49,7 +49,7 @@ def test_(request, param, case):
             }
         },
     )
-    # And there are multiple method/endpoint combinations
+    # And there are multiple method/path combinations
     result = testdir.runpytest("-v", "-s")
     # Then the total number of tests should be Method/Endpoint combos x parameters in `parametrize`
     # I.e. regular pytest parametrization logic should be applied
@@ -445,7 +445,7 @@ def test_b(request, case):
     result = testdir.runpytest("-v", "-s", "-k", "pets")
     # Then only relevant tests should be selected for running
     result.assert_outcomes(passed=2)
-    # "/users" endpoint is excluded in the first test function
+    # "/users" path is excluded in the first test function
     result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST:/v1/pets\]", r"Hypothesis calls: 2"])
 
 
@@ -502,7 +502,7 @@ def test_b(request, case):
     ),
 )
 def test_custom_properties(testdir, schema_name, endpoint):
-    # When custom properties are present in endpoint definitions (e.g. vendor extensions, or some other allowed fields)
+    # When custom properties are present in operation definitions (e.g. vendor extensions, or some other allowed fields)
     testdir.make_test(
         """
 @schema.parametrize()

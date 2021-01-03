@@ -94,7 +94,7 @@ def test_as_werkzeug_kwargs(graphql_strategy):
 def test_custom_base_url(graphql_endpoint, kwargs, base_path, expected):
     # When a custom Base URL is specified
     schema = schemathesis.graphql.from_url(graphql_endpoint, **kwargs)
-    # Then the base path is changed, in this case it is the only available endpoint
+    # Then the base path is changed, in this case it is the only available path
     assert schema.base_path == base_path
     strategy = schema[base_path]["POST"].as_strategy()
     case = strategy.example()

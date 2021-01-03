@@ -14,7 +14,7 @@ To execute tests, use the ``schemathesis run`` command:
     $ schemathesis run http://example.com/swagger.json
 
 With this command, Schemathesis will load the schema from ``http://example.com/swagger.json`` and generate separate
-test sets for each endpoint in this schema. Each test set includes up to 100 test cases by default, depending on the endpoint definition.
+test sets for each operation in this schema. Each test set includes up to 100 test cases by default, depending on the operation definition.
 
 For example, if your API schema has three endpoints, then you will see a similar output:
 
@@ -209,7 +209,7 @@ Then your schema location could be:
 
 - A full URL;
 - An existing filesystem path;
-- In-app endpoint with the schema.
+- In-app path with the schema.
 
 For example:
 
@@ -377,7 +377,7 @@ Base URL configuration
 ----------------------
 
 If your Open API schema defines ``servers`` (or ``basePath`` in Open API 2.0), these values will be used to
-construct a full endpoint URL during testing. In the case of Open API 3.0, the first value from ``servers`` will be used.
+construct a full operation URL during testing. In the case of Open API 3.0, the first value from ``servers`` will be used.
 
 However, you may want to run tests against a different base URL. To do this, you need to pass the ``--base-url`` option in CLI
 or provide ``base_url`` argument to a loader/runner if you use Schemathesis in your code:

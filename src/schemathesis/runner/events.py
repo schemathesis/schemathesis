@@ -50,7 +50,7 @@ class CurrentPathMixin:
 
 @attr.s(slots=True)  # pragma: no mutate
 class BeforeExecution(CurrentPathMixin, ExecutionEvent):
-    """Happens before each examined endpoint.
+    """Happens before each tested API operation.
 
     It happens before a single hypothesis test, that may contain many examples inside.
     """
@@ -72,7 +72,7 @@ class BeforeExecution(CurrentPathMixin, ExecutionEvent):
 
 @attr.s(slots=True)  # pragma: no mutate
 class AfterExecution(CurrentPathMixin, ExecutionEvent):
-    """Happens after each examined endpoint."""
+    """Happens after each tested API operation."""
 
     method: str = attr.ib()  # pragma: no mutate
     path: str = attr.ib()  # pragma: no mutate

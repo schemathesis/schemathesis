@@ -149,7 +149,7 @@ def run_test(  # pylint: disable=too-many-locals
         result.mark_errored()
         result.add_error(
             hypothesis.errors.Flaky(
-                "Tests on this endpoint produce unreliable results: \n"
+                "Tests on this API operation produce unreliable results: \n"
                 "Falsified on the first call but did not on a subsequent one"
             ),
             # Checks should not be empty, as such cases should be caught in the `NonCheckError` branch
@@ -158,7 +158,7 @@ def run_test(  # pylint: disable=too-many-locals
     except hypothesis.errors.Unsatisfiable:
         # We need more clear error message here
         status = Status.error
-        result.add_error(hypothesis.errors.Unsatisfiable("Unable to satisfy schema parameters for this endpoint"))
+        result.add_error(hypothesis.errors.Unsatisfiable("Unable to satisfy schema parameters for this API operation"))
     except KeyboardInterrupt:
         yield events.Interrupted()
         return

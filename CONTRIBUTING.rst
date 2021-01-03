@@ -106,7 +106,7 @@ By default, the server will generate an API schema with the following endpoints:
 - ``GET /api/multiple_failures`` - returns different response statuses, depending on the provided integer ``id`` parameter. For negative values returns 200 with ``{"result": "OK"}`` payload, 500 if ``id`` is 0, and 504 for positive ``id`` values.
 - ``GET /api/slow`` - always returns ``{"slow": true}`` after 100 ms delay
 - ``GET /api/path_variable/{key}`` - receives the ``key`` path parameter and unconditionally returns ``{"success": true}``
-- ``POST /api/unsatisfiable`` - parameters for this endpoint are impossible to generate
+- ``POST /api/unsatisfiable`` - parameters for this operation are impossible to generate
 - ``POST /api/performance`` - depending on the number of "0" in the input value, responds slower and if the input value has more than ten "0", returns 500
 - ``GET /api/flaky`` - returns 1:1 ratio of 200/500 responses
 - ``GET /api/recursive`` - accepts a recursive structure and responds with a recursive one
@@ -118,7 +118,7 @@ By default, the server will generate an API schema with the following endpoints:
 - ``POST /api/text`` - expects payload as ``text/plain``
 - ``POST /api/csv`` - expects payload as ``text/csv`` and returns its equivalent in JSON.
 - ``GET /api/malformed_json`` - returns malformed JSON with ``application/json`` content type header
-- ``GET /api/custom_format`` - accepts a string in the custom "digits" format. This endpoint is used to verify custom string formats
+- ``GET /api/custom_format`` - accepts a string in the custom "digits" format. This operation is used to verify custom string formats
 - ``GET /api/headers`` - returns the passed headers
 - ``POST /api/users/`` (``create_user``) - creates a user and stores it in memory. Provides Open API links to the endpoints below
 - ``GET /api/users/{user_id}`` (``get_user``) - returns a user stored in memory

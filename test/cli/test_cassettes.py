@@ -57,7 +57,7 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples)
 @pytest.mark.endpoints("flaky")
 def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, cassette_path):
     # See GH-695
-    # When an endpoint has responses with SUCCESS and FAILURE statuses
+    # When an API operation has responses with SUCCESS and FAILURE statuses
     result = cli.run(
         openapi3_schema_url,
         f"--store-network-log={cassette_path}",

@@ -69,7 +69,7 @@ They have the same signature that looks like this:
     ) -> hypothesis.strategies.SearchStrategy:
         pass
 
-The ``strategy`` argument is a Hypothesis strategy that will generate a certain request part. For example, your endpoint under test
+The ``strategy`` argument is a Hypothesis strategy that will generate a certain request part. For example, your API operation under test
 expects ``id`` query parameter that is a number, and you'd like to have only values that have at least three occurrences of "1".
 Then your hook might look like this:
 
@@ -99,7 +99,7 @@ Let's say you have the following schema:
               format: int64
               type: integer
 
-Then, with this hook, you can query the database for some existing order and set its ID as a constant in the endpoint definition:
+Then, with this hook, you can query the database for some existing order and set its ID as a constant in the API operation definition:
 
 .. code:: python
 
@@ -185,7 +185,7 @@ With this simple handler, only ``Done!`` will be displayed at the end of the tes
 ``add_case``
 ~~~~~~~~~~~~
 
-For each ``add_case`` hook and each endpoint, we create an additional, duplicate test case. We pass the Case object from the duplicate test to the ``add_case`` hook.
+For each ``add_case`` hook and each API operation, we create an additional, duplicate test case. We pass the Case object from the duplicate test to the ``add_case`` hook.
 The user may change the Case object (and therefore the request's data) before the request is sent to the server. The ``add_case`` allows the user to target specific
 behavior in the API by changing the duplicate request's specific details.
 

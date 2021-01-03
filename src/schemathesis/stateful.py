@@ -24,7 +24,7 @@ class Stateful(enum.Enum):
 class ParsedData:
     """A structure that holds information parsed from a test outcome.
 
-    It is used later to create a new version of an endpoint that will reuse this data.
+    It is used later to create a new version of an API operation that will reuse this data.
     """
 
     parameters: Dict[str, Any] = attr.ib()  # pragma: no mutate
@@ -193,7 +193,7 @@ class APIStateMachine(RuleBasedStateMachine):
     def step(self, case: Case, previous: Optional[Tuple[StepResult, Direction]] = None) -> StepResult:
         """A single state machine step.
 
-        :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
         :param previous: Optional result from the previous step and the direction in which this step should be done.
 
         Schemathesis prepares data, makes a call and validates the received response.
@@ -212,7 +212,7 @@ class APIStateMachine(RuleBasedStateMachine):
     def before_call(self, case: Case) -> None:
         """Hook method for modifying the case data before making a request.
 
-        :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
 
         Use it if you want to inject static data, for example,
         a query parameter that should always be used in API calls:
@@ -240,7 +240,7 @@ class APIStateMachine(RuleBasedStateMachine):
         """Hook method for additional actions with case or response instances.
 
         :param response: Response from the application under test.
-        :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
 
         For example, you can log all response statuses by using this hook:
 
@@ -269,9 +269,9 @@ class APIStateMachine(RuleBasedStateMachine):
         """
 
     def call(self, case: Case, **kwargs: Any) -> GenericResponse:
-        """Make a request to an endpoint.
+        """Make a request to the API.
 
-        :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
         :param kwargs: Keyword arguments that will be passed to the appropriate ``case.call_*`` method.
         :return: Response from the application under test.
 
@@ -289,7 +289,7 @@ class APIStateMachine(RuleBasedStateMachine):
 
         Mostly they are proxied to the :func:`requests.request` call.
 
-        :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
 
         .. code-block:: python
 
@@ -315,7 +315,7 @@ class APIStateMachine(RuleBasedStateMachine):
         """Validate an API response.
 
         :param response: Response from the application under test.
-        :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
         :param additional_checks: A list of checks that will be run together with the default ones.
         :raises CheckFailed: If any of the supplied checks failed.
 
