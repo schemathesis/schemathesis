@@ -6,7 +6,7 @@ from schemathesis.parameters import ParameterSet
 from schemathesis.specs.openapi.parameters import OpenAPI20Parameter, OpenAPI30Parameter
 
 
-@pytest.mark.endpoints("get_user", "update_user")
+@pytest.mark.operations("get_user", "update_user")
 def test_get_endpoint_via_remote_reference(openapi_version, schema_url):
     schema = schemathesis.from_uri(schema_url)
     resolved = schema.get_endpoint_by_reference(f"{schema_url}#/paths/~1users~1{{user_id}}/patch")

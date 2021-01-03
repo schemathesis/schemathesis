@@ -4,7 +4,7 @@ import pytest
 from _pytest.main import ExitCode
 
 
-@pytest.mark.endpoints("success")
+@pytest.mark.operations("success")
 def test_junitxml_option(cli, schema_url, hypothesis_max_examples, tmp_path):
     # When option with a path to junit.xml is provided
     xml_path = tmp_path / "junit.xml"
@@ -22,7 +22,7 @@ def test_junitxml_option(cli, schema_url, hypothesis_max_examples, tmp_path):
     ElementTree.parse(xml_path)
 
 
-@pytest.mark.endpoints("success", "failure", "unsatisfiable")
+@pytest.mark.operations("success", "failure", "unsatisfiable")
 def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path):
     xml_path = tmp_path / "junit.xml"
     cli.run(

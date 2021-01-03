@@ -66,7 +66,7 @@ def test_cookies(flask_app):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("multipart")
+@pytest.mark.operations("multipart")
 def test_form_data(schema):
     strategy = schema.endpoints["/multipart"]["POST"].as_strategy()
 

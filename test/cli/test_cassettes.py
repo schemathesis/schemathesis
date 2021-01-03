@@ -26,7 +26,7 @@ def load_response_body(cassette, idx):
     return base64.b64decode(cassette["http_interactions"][idx]["response"]["body"]["base64_string"])
 
 
-@pytest.mark.endpoints("success", "upload_file")
+@pytest.mark.operations("success", "upload_file")
 def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples):
     hypothesis_max_examples = hypothesis_max_examples or 2
     result = cli.run(
@@ -54,7 +54,7 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples)
     assert len(cassette["http_interactions"][1]["checks"]) == 1
 
 
-@pytest.mark.endpoints("flaky")
+@pytest.mark.operations("flaky")
 def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, cassette_path):
     # See GH-695
     # When an API operation has responses with SUCCESS and FAILURE statuses
@@ -131,7 +131,7 @@ def test_get_command_representation(mocker):
     assert get_command_representation() == "schemathesis run http://example.com/schema.yaml"
 
 
-@pytest.mark.endpoints("success")
+@pytest.mark.operations("success")
 def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_url):
     result = testdir.run(
         "schemathesis",
@@ -151,7 +151,7 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
     assert cassette["command"] == command
 
 
-@pytest.mark.endpoints("invalid")
+@pytest.mark.operations("invalid")
 def test_main_process_error(cli, schema_url, hypothesis_max_examples, cassette_path):
     # When there is an error in the main process before the background writer is finished
     # Here it is happening because the schema is not valid
@@ -168,7 +168,7 @@ def test_main_process_error(cli, schema_url, hypothesis_max_examples, cassette_p
     assert cassette is None
 
 
-@pytest.mark.endpoints("__all__")
+@pytest.mark.operations("__all__")
 async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette_path, hypothesis_max_examples):
     # Record a cassette
     result = cli.run(
@@ -210,7 +210,7 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
             compare_headers(request, serialized["headers"])
 
 
-@pytest.mark.endpoints("headers")
+@pytest.mark.operations("headers")
 async def test_headers_serialization(cli, openapi2_schema_url, hypothesis_max_examples, cassette_path):
     # See GH-783
     # When headers contain control characters that are not directly representable in YAML

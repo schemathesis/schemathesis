@@ -31,7 +31,7 @@ def add_link(schema, target, **kwargs):
 EXPECTED_LINK_PARAMETERS = {"parameters": {"userId": "$response.body#/id"}}
 
 
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_default(schema_url):
     schema = schemathesis.from_uri(schema_url)
     # When we add a link to the target API operation
@@ -46,7 +46,7 @@ def test_add_link_default(schema_url):
 
 
 @pytest.mark.parametrize("status_code", ("201", 201))
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_no_endpoints_cache(schema_url, status_code):
     schema = schemathesis.from_uri(schema_url)
     # When we add a link to the target API operation
@@ -69,7 +69,7 @@ def test_add_link_no_endpoints_cache(schema_url, status_code):
     }
 
 
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_no_operation_id(schema_url):
     schema = schemathesis.from_uri(schema_url)
     target = schema["/users/{user_id}"]["GET"]
@@ -81,7 +81,7 @@ def test_add_link_no_operation_id(schema_url):
     }
 
 
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_by_reference(schema_url):
     schema = schemathesis.from_uri(schema_url)
     links = add_link(schema, "#/paths/~1users~1{user_id}/get", parameters={"userId": "$response.body#/id"})
@@ -91,7 +91,7 @@ def test_add_link_by_reference(schema_url):
     }
 
 
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_by_reference_twice(schema_url):
     schema = schemathesis.from_uri(schema_url)
     add_link(schema, "#/paths/~1users~1{user_id}/get", parameters={"userId": "$response.body#/id"})
@@ -106,7 +106,7 @@ def test_add_link_by_reference_twice(schema_url):
     }
 
 
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_behind_a_reference(schema_url):
     # See GH-824
     schema = schemathesis.from_uri(schema_url)
@@ -127,7 +127,7 @@ def test_add_link_behind_a_reference(schema_url):
     assert links["GET /users/{user_id}"] == {"parameters": {"userId": "$response.body#/id"}, "operationId": "getUser"}
 
 
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_nothing_is_provided(schema_url):
     schema = schemathesis.from_uri(schema_url)
     # When the user doesn't provide parameters or request_body
@@ -158,7 +158,7 @@ def test_add_link_nothing_is_provided(schema_url):
         ),
     ),
 )
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_unknown_endpoint(schema_url, change, message):
     schema = schemathesis.from_uri(schema_url)
     # When the source API operation is modified and can't be found
@@ -171,7 +171,7 @@ def test_add_link_unknown_endpoint(schema_url, change, message):
         schema.add_link(source=source, target="#/paths/~1users~1{user_id}/get", status_code="201", request_body="#/foo")
 
 
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_links_access(schema_url):
     schema = schemathesis.from_uri(schema_url)
     links = schema["/users/"]["POST"].links["201"]
@@ -186,7 +186,7 @@ def test_links_access(schema_url):
         ("what?", "No such parameter in `GET /users/{user_id}`: `what?`."),
     ),
 )
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_misspelled_parameter(schema_url, parameter, message):
     schema = schemathesis.from_uri(schema_url)
     # When the user supplies a parameter definition, that points to location which has no parameters defined in the

@@ -108,7 +108,7 @@ def test_call(override, base_url, swagger_20):
     assert not records
 
 
-@pytest.mark.endpoints("success")
+@pytest.mark.operations("success")
 def test_call_and_validate(openapi3_schema_url):
     api_schema = schemathesis.from_uri(openapi3_schema_url)
 
@@ -254,7 +254,7 @@ def test_(case):
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.endpoints()
+@pytest.mark.operations()
 def test_response_from_requests(base_url):
     response = requests.get(f"{base_url}/cookies")
     serialized = Response.from_requests(response)

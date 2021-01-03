@@ -37,7 +37,7 @@ def dispatcher():
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("custom_format")
+@pytest.mark.operations("custom_format")
 @pytest.mark.usefixtures("global_hook")
 def test_global_query_hook(schema, schema_url):
     strategy = schema.endpoints["/custom_format"]["GET"].as_strategy()
@@ -51,7 +51,7 @@ def test_global_query_hook(schema, schema_url):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("payload")
+@pytest.mark.operations("payload")
 def test_global_body_hook(schema):
     @schemathesis.hooks.register
     def before_generate_body(context, strategy):
@@ -68,7 +68,7 @@ def test_global_body_hook(schema):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("custom_format")
+@pytest.mark.operations("custom_format")
 def test_schema_query_hook(schema, schema_url):
     @schema.hooks.register
     def before_generate_query(context, strategy):
@@ -86,7 +86,7 @@ def test_schema_query_hook(schema, schema_url):
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.usefixtures("global_hook")
-@pytest.mark.endpoints("custom_format")
+@pytest.mark.operations("custom_format")
 def test_hooks_combination(schema, schema_url):
     @schema.hooks.register("before_generate_query")
     def extra(context, st):
@@ -232,7 +232,7 @@ def test_local_dispatcher(schema, apply_first):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("custom_format")
+@pytest.mark.operations("custom_format")
 def test_multiple_hooks_per_spec(schema):
     @schema.hooks.register("before_generate_query")
     def first_hook(context, strategy):
@@ -256,7 +256,7 @@ def test_multiple_hooks_per_spec(schema):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("custom_format")
+@pytest.mark.operations("custom_format")
 def test_before_process_path_hook(schema):
     @schema.hooks.register
     def before_process_path(context, path, methods):

@@ -479,7 +479,7 @@ def test_b(request, case):
         },
     )
     result = testdir.runpytest("-v", "-s")
-    # Then only not deprecated endpoints should be tested
+    # Then only not deprecated API operations should be tested
     result.assert_outcomes(passed=5)
     result.stdout.re_match_lines(
         [
@@ -710,7 +710,7 @@ def test_loose_multipart_definition():
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("multipart")
+@pytest.mark.operations("multipart")
 def test_optional_form_parameters(schema_url):
     # When form parameters are optional
     schema = schemathesis.from_uri(schema_url)
@@ -789,7 +789,7 @@ def test_(request, case):
 
 
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
-@pytest.mark.endpoints("multiple_failures")
+@pytest.mark.operations("multiple_failures")
 def test_exceptions_output(testdir, app_schema, openapi3_base_url, openapi_version):
     # When Schemathesis exceptions are in the pytest's output
     testdir.make_test(

@@ -530,7 +530,7 @@ def api_schema(request, openapi_version):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("payload")
+@pytest.mark.operations("payload")
 def test_null_body(testdir, api_schema):
     # When API operation expects `null` as payload
 

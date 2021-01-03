@@ -89,7 +89,7 @@ TestStateful = APIWorkflow.TestCase
 #   3. Get info about this user
 
 
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_hidden_failure(testdir, app_schema, openapi3_base_url):
     # When we run test as a state machine
     testdir.make_test(
@@ -214,7 +214,7 @@ def test_all_operations_with_links(openapi3_base_url):
 
 
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_step_override(testdir, app_schema, base_url, openapi_version):
     # See GH-970
     # When the user overrides the `step` method

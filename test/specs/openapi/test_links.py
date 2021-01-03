@@ -80,7 +80,7 @@ def response():
         ("/unknown", []),
     ),
 )
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_get_links(openapi3_base_url, schema_url, url, expected):
     schema = schemathesis.from_uri(schema_url)
     response = requests.post(f"{openapi3_base_url}{url}", json={"first_name": "TEST", "last_name": "TEST"})

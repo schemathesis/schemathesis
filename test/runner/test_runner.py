@@ -181,7 +181,7 @@ def test_interactions(request, args, workers):
         assert success.response.headers["Content-Type"] == ["application/json; charset=utf-8"]
 
 
-@pytest.mark.endpoints("root")
+@pytest.mark.operations("root")
 def test_asgi_interactions(loadable_fastapi_app):
     init, *ev, finished = prepare(
         "/openapi.json", app=loadable_fastapi_app, loader=loaders.from_asgi, store_interactions=True
@@ -251,7 +251,7 @@ def test_execute_filter_method(args):
     assert_incoming_requests_num(app, 0)
 
 
-@pytest.mark.endpoints("slow")
+@pytest.mark.operations("slow")
 def test_hypothesis_deadline(args):
     app, kwargs = args
     # When `hypothesis_deadline` is passed in the `execute` call
@@ -260,7 +260,7 @@ def test_hypothesis_deadline(args):
     assert_request(app, 0, "GET", "/api/slow")
 
 
-@pytest.mark.endpoints("multipart")
+@pytest.mark.operations("multipart")
 def test_form_data(args):
     app, kwargs = args
 
@@ -288,7 +288,7 @@ def test_form_data(args):
     assert incoming_requests[0].headers["Content-Type"].startswith("multipart/form-data")
 
 
-@pytest.mark.endpoints("headers")
+@pytest.mark.operations("headers")
 def test_headers_override(args):
     app, kwargs = args
 
@@ -306,7 +306,7 @@ def test_headers_override(args):
     assert not finished.has_errors
 
 
-@pytest.mark.endpoints("teapot")
+@pytest.mark.operations("teapot")
 def test_unknown_response_code(args):
     app, kwargs = args
     # When API operation returns a status code, that is not listed in "responses"
@@ -319,7 +319,7 @@ def test_unknown_response_code(args):
     assert check.value == Status.failure
 
 
-@pytest.mark.endpoints("failure")
+@pytest.mark.operations("failure")
 def test_unknown_response_code_with_default(args):
     app, kwargs = args
     # When API operation returns a status code, that is not listed in "responses", but there is a "default" response
@@ -332,7 +332,7 @@ def test_unknown_response_code_with_default(args):
     assert check.value == Status.success
 
 
-@pytest.mark.endpoints("text")
+@pytest.mark.operations("text")
 def test_unknown_content_type(args):
     app, kwargs = args
     # When API operation returns a response with content type, not specified in "produces"
@@ -345,7 +345,7 @@ def test_unknown_content_type(args):
     assert check.value == Status.failure
 
 
-@pytest.mark.endpoints("success")
+@pytest.mark.operations("success")
 def test_known_content_type(args):
     app, kwargs = args
     # When API operation returns a response with a proper content type
@@ -355,7 +355,7 @@ def test_known_content_type(args):
     assert not finished.has_failures
 
 
-@pytest.mark.endpoints("invalid_response")
+@pytest.mark.operations("invalid_response")
 def test_response_conformance_invalid(args):
     app, kwargs = args
     # When API operation returns a response that doesn't conform to the schema
@@ -369,7 +369,7 @@ def test_response_conformance_invalid(args):
     assert lines[4] == "'success' is a required property"
 
 
-@pytest.mark.endpoints("success")
+@pytest.mark.operations("success")
 def test_response_conformance_valid(args):
     app, kwargs = args
     # When API operation returns a response that conforms to the schema
@@ -380,7 +380,7 @@ def test_response_conformance_valid(args):
     assert not results.has_errors
 
 
-@pytest.mark.endpoints("recursive")
+@pytest.mark.operations("recursive")
 def test_response_conformance_recursive_valid(schema_url):
     # When API operation contains a response that have recursive references
     # And "response_schema_conformance" is specified
@@ -390,7 +390,7 @@ def test_response_conformance_recursive_valid(schema_url):
     assert not results.has_errors
 
 
-@pytest.mark.endpoints("text")
+@pytest.mark.operations("text")
 def test_response_conformance_text(args):
     app, kwargs = args
     # When API operation returns a response that is not JSON
@@ -401,7 +401,7 @@ def test_response_conformance_text(args):
     assert not results.has_errors
 
 
-@pytest.mark.endpoints("malformed_json")
+@pytest.mark.operations("malformed_json")
 def test_response_conformance_malformed_json(args):
     app, kwargs = args
     # When API operation returns a response that contains a malformed JSON, but has a valid content type header
@@ -431,7 +431,7 @@ def filter_path_parameters():
     schemathesis.hooks.unregister_all()
 
 
-@pytest.mark.endpoints("path_variable")
+@pytest.mark.operations("path_variable")
 @pytest.mark.usefixtures("filter_path_parameters")
 def test_path_parameters_encoding(schema_url):
     # NOTE. WSGI and ASGI applications decodes %2F as / and returns 404
@@ -444,13 +444,13 @@ def test_path_parameters_encoding(schema_url):
 
 
 @pytest.mark.parametrize("options", ({"base_url": "http://127.0.0.1:1/"}, {"hypothesis_deadline": 1}))
-@pytest.mark.endpoints("slow")
+@pytest.mark.operations("slow")
 def test_exceptions(schema_url, app, options):
     results = prepare(schema_url, **options)
     assert any([event.status == Status.error for event in results if isinstance(event, events.AfterExecution)])
 
 
-@pytest.mark.endpoints("multipart")
+@pytest.mark.operations("multipart")
 def test_internal_exceptions(args, mocker):
     app, kwargs = args
     # GH: #236
@@ -477,7 +477,7 @@ def test_internal_exceptions(args, mocker):
     assert len(exceptions) == len(exc_types)
 
 
-@pytest.mark.endpoints("payload")
+@pytest.mark.operations("payload")
 async def test_payload_explicit_example(args):
     # When API operation has an example specified
     app, kwargs = args
@@ -496,7 +496,7 @@ async def test_payload_explicit_example(args):
     assert body == {"name": "John"}
 
 
-@pytest.mark.endpoints("payload")
+@pytest.mark.operations("payload")
 async def test_explicit_example_disable(args, mocker):
     # When API operation has an example specified
     # And the `explicit` phase is excluded
@@ -521,7 +521,7 @@ async def test_explicit_example_disable(args, mocker):
     assert not spy.called
 
 
-@pytest.mark.endpoints("plain_text_body")
+@pytest.mark.operations("plain_text_body")
 async def test_plain_text_body(args):
     # When the expected payload is text/plain
     app, kwargs = args
@@ -539,7 +539,7 @@ async def test_plain_text_body(args):
     assert not result.has_failures
 
 
-@pytest.mark.endpoints("invalid_path_parameter")
+@pytest.mark.operations("invalid_path_parameter")
 def test_invalid_path_parameter(args):
     # When a path parameter is marked as not required
     app, kwargs = args
@@ -550,7 +550,7 @@ def test_invalid_path_parameter(args):
     assert not finished.has_errors
 
 
-@pytest.mark.endpoints("missing_path_parameter")
+@pytest.mark.operations("missing_path_parameter")
 def test_missing_path_parameter(args):
     # When a path parameter is missing
     app, kwargs = args
@@ -569,7 +569,7 @@ def test_get_wsgi_auth():
         get_wsgi_auth(("test", "test"), "digest")
 
 
-@pytest.mark.endpoints("failure", "multiple_failures")
+@pytest.mark.operations("failure", "multiple_failures")
 def test_exit_first(args):
     app, kwargs = args
     results = prepare(**kwargs, exit_first=True)
@@ -616,7 +616,7 @@ def relative_schema_url():
         (loaders.from_aiohttp, "relative_schema_url"),
     ),
 )
-@pytest.mark.endpoints("success")
+@pytest.mark.operations("success")
 def test_non_default_loader(openapi_version, request, loader, fixture):
     schema = request.getfixturevalue(fixture)
     kwargs = {}
@@ -656,7 +656,7 @@ def test_custom_loader(swagger_20, openapi2_base_url):
     assert not finished.has_failures
 
 
-@pytest.mark.endpoints("failure")
+@pytest.mark.operations("failure")
 def test_reproduce_code_with_overridden_headers(args, openapi3_base_url):
     app, kwargs = args
     headers = {"User-Agent": USER_AGENT, "X-Token": "test"}
@@ -670,7 +670,7 @@ def test_reproduce_code_with_overridden_headers(args, openapi3_base_url):
     assert after.result.checks[1].example.requests_code == expected
 
 
-@pytest.mark.endpoints("success")
+@pytest.mark.operations("success")
 def test_workers_num_regression(mocker, schema_url):
     # GH: 579
     spy = mocker.patch("schemathesis.runner.ThreadPoolRunner", wraps=ThreadPoolRunner)
@@ -749,7 +749,7 @@ def test_unsatisfiable_example(empty_open_api_3_schema):
     assert "Unable to satisfy schema parameters for this API operation" in after.result.errors[0].exception
 
 
-@pytest.mark.endpoints("success")
+@pytest.mark.operations("success")
 def test_dry_run(args):
     called = False
 
@@ -764,7 +764,7 @@ def test_dry_run(args):
     assert not called
 
 
-@pytest.mark.endpoints("root")
+@pytest.mark.operations("root")
 def test_dry_run_asgi(loadable_fastapi_app):
     called = False
 
@@ -778,7 +778,7 @@ def test_dry_run_asgi(loadable_fastapi_app):
     assert not called
 
 
-@pytest.mark.endpoints("reserved")
+@pytest.mark.operations("reserved")
 def test_reserved_characters_in_operation_name(args):
     # See GH-992
 

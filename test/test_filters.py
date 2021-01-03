@@ -22,7 +22,7 @@ def test_(request, case):
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    # Then only tests for these endpoints should be generated
+    # Then only tests for these API operations should be generated
     result.stdout.re_match_lines([r"test_endpoint_filter.py::test_[GET:/v1/foo][P] PASSED"])
 
 

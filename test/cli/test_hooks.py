@@ -10,7 +10,7 @@ def unregister_hooks():
     schemathesis.hooks.unregister_all()
 
 
-@pytest.mark.endpoints("success")
+@pytest.mark.operations("success")
 def test_custom_cli_handlers(testdir, cli, schema_url, app):
     # When `after_init_cli_run_handlers` redefines handlers
     module = testdir.make_importable_pyfile(
