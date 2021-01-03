@@ -288,8 +288,8 @@ class BaseOpenAPISchema(BaseSchema):
             raise ValueError("You need to provide `parameters` or `request_body`.")
         if hasattr(self, "_endpoints"):
             delattr(self, "_endpoints")
-        for endpoint, methods in self.raw_schema["paths"].items():
-            if endpoint == source.path:
+        for operation, methods in self.raw_schema["paths"].items():
+            if operation == source.path:
                 # Methods should be completely resolved now, otherwise they might miss a resolving scope when
                 # they will be fully resolved later
                 methods = self.resolver.resolve_all(methods)
@@ -302,10 +302,10 @@ class BaseOpenAPISchema(BaseSchema):
                         )
                     # If methods are behind a reference, then on the next resolving they will miss the new link
                     # Therefore we need to modify it this way
-                    self.raw_schema["paths"][endpoint][method] = definition
+                    self.raw_schema["paths"][operation][method] = definition
                 # The reference should be removed completely, otherwise new keys in this dictionary will be ignored
                 # due to the `$ref` keyword behavior
-                self.raw_schema["paths"][endpoint].pop("$ref", None)
+                self.raw_schema["paths"][operation].pop("$ref", None)
                 if found:
                     return
         message = f"No such API operation: `{source.verbose_name}`."

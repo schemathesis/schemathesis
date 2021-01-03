@@ -19,10 +19,10 @@ from schemathesis.schemas import BaseSchema
 
 
 def make_case(schema: BaseSchema, definition: Dict[str, Any]) -> models.Case:
-    endpoint = models.APIOperation(
+    operation = models.APIOperation(
         "/path", "GET", definition=EndpointDefinition(definition, definition, None, []), schema=schema
     )
-    return models.Case(endpoint)
+    return models.Case(operation)
 
 
 def make_response(
@@ -188,8 +188,8 @@ def test_content_type_conformance_another_status_code():
 
 def assert_content_type_conformance(raw_schema, content_type, is_error, match=None):
     schema = schemathesis.from_dict(raw_schema)
-    endpoint = schema.endpoints["/users"]["get"]
-    case = models.Case(endpoint)
+    operation = schema.endpoints["/users"]["get"]
+    case = models.Case(operation)
     response = make_response(content_type=content_type)
     if not is_error:
         assert content_type_conformance(response, case) is None
@@ -252,8 +252,8 @@ def test_invalid_schema_on_content_type_check():
         },
         validate_schema=False,
     )
-    endpoint = schema.endpoints["/users"]["get"]
-    case = models.Case(endpoint)
+    operation = schema.endpoints["/users"]["get"]
+    case = models.Case(operation)
     response = make_response(content_type="application/json")
     # Then an error should be risen
     with pytest.raises(InvalidSchema):

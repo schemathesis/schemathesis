@@ -22,7 +22,7 @@ from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20Compos
 from schemathesis.utils import NOT_SET
 
 
-def make_endpoint(schema, **kwargs) -> APIOperation:
+def make_operation(schema, **kwargs) -> APIOperation:
     return APIOperation("/users", "POST", definition=EndpointDefinition({}, {}, "foo", []), schema=schema, **kwargs)
 
 
@@ -40,7 +40,7 @@ def test_get_examples(name, swagger_20):
         expected = {"name": example}
         media_type = None  # there is no payload
         cls = ParameterSet
-    endpoint = make_endpoint(
+    operation = make_operation(
         swagger_20,
         **{
             name: cls(
@@ -58,14 +58,14 @@ def test_get_examples(name, swagger_20):
             )
         },
     )
-    strategies = endpoint.get_strategies_from_examples()
+    strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
-    assert strategies[0].example() == Case(endpoint, media_type=media_type, **{name: expected})
+    assert strategies[0].example() == Case(operation, media_type=media_type, **{name: expected})
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_no_body_in_get(swagger_20):
-    endpoint = APIOperation(
+    operation = APIOperation(
         path="/api/success",
         method="GET",
         definition=EndpointDefinition({}, {}, "foo", []),
@@ -84,14 +84,14 @@ def test_no_body_in_get(swagger_20):
             ]
         ),
     )
-    strategies = endpoint.get_strategies_from_examples()
+    strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
     assert strategies[0].example().body is NOT_SET
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_invalid_body_in_get(swagger_20):
-    endpoint = APIOperation(
+    operation = APIOperation(
         path="/foo",
         method="GET",
         definition=EndpointDefinition({}, {}, "foo", []),
@@ -111,13 +111,13 @@ def test_invalid_body_in_get(swagger_20):
         ),
     )
     with pytest.raises(InvalidSchema, match=r"^Body parameters are defined for GET request.$"):
-        get_case_strategy(endpoint).example()
+        get_case_strategy(operation).example()
 
 
 @pytest.mark.hypothesis_nested
 def test_invalid_body_in_get_disable_validation(simple_schema):
     schema = schemathesis.from_dict(simple_schema, validate_schema=False)
-    endpoint = APIOperation(
+    operation = APIOperation(
         path="/foo",
         method="GET",
         definition=EndpointDefinition({}, {}, "foo", []),
@@ -136,7 +136,7 @@ def test_invalid_body_in_get_disable_validation(simple_schema):
             ]
         ),
     )
-    strategy = get_case_strategy(endpoint)
+    strategy = get_case_strategy(operation)
 
     @given(strategy)
     @settings(max_examples=1)
@@ -149,7 +149,7 @@ def test_invalid_body_in_get_disable_validation(simple_schema):
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_custom_strategies(swagger_20):
     register_string_format("even_4_digits", st.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
-    endpoint = make_endpoint(
+    operation = make_operation(
         swagger_20,
         query=ParameterSet(
             [
@@ -159,7 +159,7 @@ def test_custom_strategies(swagger_20):
             ]
         ),
     )
-    result = get_case_strategy(endpoint).example()
+    result = get_case_strategy(operation).example()
     assert len(result.query["id"]) == 4
     assert int(result.query["id"]) % 2 == 0
 
@@ -171,7 +171,7 @@ def test_register_default_strategies():
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_default_strategies_binary(swagger_20):
-    endpoint = make_endpoint(
+    operation = make_operation(
         swagger_20,
         body=PayloadAlternatives(
             [
@@ -187,13 +187,13 @@ def test_default_strategies_binary(swagger_20):
             ]
         ),
     )
-    result = get_case_strategy(endpoint).example()
+    result = get_case_strategy(operation).example()
     assert isinstance(result.body["upfile"], bytes)
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_default_strategies_bytes(swagger_20):
-    endpoint = make_endpoint(
+    operation = make_operation(
         swagger_20,
         body=PayloadAlternatives(
             [
@@ -204,7 +204,7 @@ def test_default_strategies_bytes(swagger_20):
             ]
         ),
     )
-    result = get_case_strategy(endpoint).example()
+    result = get_case_strategy(operation).example()
     assert isinstance(result.body, str)
     b64decode(result.body)
 
@@ -227,7 +227,7 @@ def test_invalid_custom_strategy(values, error):
     "definition", ({"name": "api_key", "in": "header", "type": "string"}, {"name": "api_key", "in": "header"})
 )
 def test_valid_headers(openapi2_base_url, swagger_20, definition):
-    endpoint = APIOperation(
+    operation = APIOperation(
         "/api/success",
         "GET",
         definition=EndpointDefinition({}, {}, "foo", []),
@@ -236,7 +236,7 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
         headers=ParameterSet([OpenAPI20Parameter(definition)]),
     )
 
-    @given(case=get_case_strategy(endpoint))
+    @given(case=get_case_strategy(operation))
     @settings(suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow], deadline=None, max_examples=10)
     def inner(case):
         case.call()

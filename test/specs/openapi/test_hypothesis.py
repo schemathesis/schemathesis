@@ -6,7 +6,7 @@ from schemathesis.specs.openapi._hypothesis import get_case_strategy
 
 
 @pytest.fixture
-def endpoint(make_openapi_3_schema):
+def operation(make_openapi_3_schema):
     schema = make_openapi_3_schema(
         body={
             "required": True,
@@ -32,9 +32,9 @@ def endpoint(make_openapi_3_schema):
         {"query": {"q1": "TEST"}},
     ),
 )
-def test_explicit_attributes(endpoint, values):
+def test_explicit_attributes(operation, values):
     # When some Case's attribute is passed explicitly to the case strategy
-    strategy = get_case_strategy(endpoint=endpoint, **values)
+    strategy = get_case_strategy(endpoint=operation, **values)
 
     @given(strategy)
     @settings(max_examples=1)

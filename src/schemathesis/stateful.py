@@ -96,10 +96,10 @@ class Feedback:
         from ._hypothesis import create_test  # pylint: disable=import-outside-toplevel
 
         for data in self.stateful_tests.values():
-            endpoint = data.make_endpoint()
-            for data_generation_method in endpoint.schema.data_generation_methods:
-                yield endpoint, data_generation_method, create_test(
-                    endpoint=endpoint,
+            operation = data.make_endpoint()
+            for data_generation_method in operation.schema.data_generation_methods:
+                yield operation, data_generation_method, create_test(
+                    endpoint=operation,
                     test=test,
                     settings=settings,
                     seed=seed,
@@ -123,13 +123,13 @@ class Direction:
 
 
 def _print_case(case: Case) -> str:
-    endpoint = f"state.schema['{case.endpoint.path}']['{case.endpoint.method.upper()}']"
+    operation = f"state.schema['{case.endpoint.path}']['{case.endpoint.method.upper()}']"
     data = [
         f"{name}={getattr(case, name)}"
         for name in ("path_parameters", "headers", "cookies", "query", "body")
         if getattr(case, name) not in (None, NOT_SET)
     ]
-    return f"{endpoint}.make_case({', '.join(data)})"
+    return f"{operation}.make_case({', '.join(data)})"
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate

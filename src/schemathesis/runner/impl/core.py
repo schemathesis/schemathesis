@@ -87,10 +87,10 @@ class BaseRunner:
         """Run tests and recursively run additional tests."""
         if recursion_level > self.stateful_recursion_limit:
             return
-        for endpoint, data_generation_method, test in maker(template, settings, seed):
-            feedback = Feedback(self.stateful, endpoint)
+        for operation, data_generation_method, test in maker(template, settings, seed):
+            feedback = Feedback(self.stateful, operation)
             for event in run_test(
-                endpoint,
+                operation,
                 test,
                 feedback=feedback,
                 recursion_level=recursion_level,

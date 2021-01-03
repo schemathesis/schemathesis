@@ -119,7 +119,7 @@ def schema_with_property_examples(dict_with_property_examples) -> BaseOpenAPISch
 
 
 @pytest.fixture()
-def endpoint(schema_with_examples) -> APIOperation:
+def operation(schema_with_examples) -> APIOperation:
     """Returns first (and only) API operation from schema_with_examples."""
     return next(schema_with_examples.get_all_endpoints())
 
@@ -130,8 +130,8 @@ def endpoint_with_property_examples(schema_with_property_examples) -> APIOperati
     return next(schema_with_property_examples.get_all_endpoints())
 
 
-def test_get_parameter_examples(endpoint):
-    param_examples = examples.get_parameter_examples(endpoint.definition.raw, "examples")
+def test_get_parameter_examples(operation):
+    param_examples = examples.get_parameter_examples(operation.definition.raw, "examples")
 
     # length equals the number of parameters with examples
     assert len(param_examples) == 2
@@ -145,15 +145,15 @@ def test_get_parameter_examples(endpoint):
     assert len(param_examples[1]["examples"]) == 1
 
 
-def test_get_request_body_examples(endpoint):
-    request_body_examples = examples.get_request_body_examples(endpoint.definition.raw, "examples")
+def test_get_request_body_examples(operation):
+    request_body_examples = examples.get_request_body_examples(operation.definition.raw, "examples")
 
     assert request_body_examples["type"] == "body"
     assert len(request_body_examples["examples"]) == 3
 
 
-def test_get_static_parameters_from_examples(endpoint):
-    static_parameters_list = examples.get_static_parameters_from_examples(endpoint, "examples")
+def test_get_static_parameters_from_examples(operation):
+    static_parameters_list = examples.get_static_parameters_from_examples(operation, "examples")
 
     assert len(static_parameters_list) == 3
 
@@ -176,8 +176,8 @@ def test_get_static_parameters_from_examples(endpoint):
     assert any("query1" in static_parameters["query"]["id"] for static_parameters in static_parameters_list)
 
 
-def test_get_strategies_from_examples(endpoint):
-    strategies = examples.get_strategies_from_examples(endpoint, "examples")
+def test_get_strategies_from_examples(operation):
+    strategies = examples.get_strategies_from_examples(operation, "examples")
 
     assert len(strategies) == 3
     assert all(strategy is not None for strategy in strategies)
@@ -388,8 +388,8 @@ EXAMPLE_SCHEMA = {
 def test_example_external_value_failure(func, expected):
     # See GH-882
     schema = schemathesis.from_dict(EXAMPLE_SCHEMA)
-    endpoint = schema["/test"]["POST"]
-    assert func(endpoint.definition.resolved, "examples") == expected
+    operation = schema["/test"]["POST"]
+    assert func(operation.definition.resolved, "examples") == expected
 
 
 def test_multipart_examples():

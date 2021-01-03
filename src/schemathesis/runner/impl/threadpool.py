@@ -214,8 +214,8 @@ class ThreadPoolRunner(BaseRunner):
         tasks_queue: Queue = Queue()
         tasks_queue.queue.extend(
             [
-                (endpoint, data_generation_method)
-                for endpoint in self.schema.get_all_endpoints()
+                (operation, data_generation_method)
+                for operation in self.schema.get_all_endpoints()
                 for data_generation_method in self.schema.data_generation_methods
             ]
         )

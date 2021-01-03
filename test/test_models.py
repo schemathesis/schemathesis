@@ -11,8 +11,8 @@ from schemathesis.models import APIOperation, Case, Request, Response
 
 
 def test_path(swagger_20):
-    endpoint = APIOperation("/users/{name}", "GET", {}, swagger_20)
-    case = endpoint.make_case(path_parameters={"name": "test"})
+    operation = APIOperation("/users/{name}", "GET", {}, swagger_20)
+    case = operation.make_case(path_parameters={"name": "test"})
     assert case.formatted_path == "/users/test"
 
 
@@ -27,8 +27,8 @@ def test_path(swagger_20):
     ),
 )
 def test_case_repr(swagger_20, kwargs, expected):
-    endpoint = APIOperation("/users/{name}", "GET", {}, swagger_20)
-    case = endpoint.make_case(**kwargs)
+    operation = APIOperation("/users/{name}", "GET", {}, swagger_20)
+    case = operation.make_case(**kwargs)
     assert repr(case) == expected
 
 
@@ -36,12 +36,12 @@ def test_case_repr(swagger_20, kwargs, expected):
 @pytest.mark.parametrize("converter", (lambda x: x, lambda x: x + "/"))
 def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
     base_url = converter(base_url)
-    endpoint = APIOperation("/success", "GET", {}, swagger_20)
-    case = endpoint.make_case(cookies={"TOKEN": "secret"})
+    operation = APIOperation("/success", "GET", {}, swagger_20)
+    case = operation.make_case(cookies={"TOKEN": "secret"})
     if override:
         data = case.as_requests_kwargs(base_url)
     else:
-        endpoint.base_url = base_url
+        operation.base_url = base_url
         data = case.as_requests_kwargs()
     assert data == {
         "headers": {"User-Agent": USER_AGENT},
@@ -58,8 +58,8 @@ def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
 def test_reserved_characters_in_operation_name(swagger_20):
     # See GH-992
     # When an API operation name contains `:`
-    endpoint = APIOperation("/foo:bar", "GET", {}, swagger_20)
-    case = endpoint.make_case()
+    operation = APIOperation("/foo:bar", "GET", {}, swagger_20)
+    case = operation.make_case()
     # Then it should not be truncated during API call
     assert case.as_requests_kwargs("/")["url"] == "/foo:bar"
 
@@ -74,9 +74,9 @@ def test_reserved_characters_in_operation_name(swagger_20):
     ),
 )
 def test_as_requests_kwargs_override_user_agent(server, openapi2_base_url, swagger_20, headers, expected):
-    endpoint = APIOperation("/success", "GET", {}, swagger_20, base_url=openapi2_base_url)
+    operation = APIOperation("/success", "GET", {}, swagger_20, base_url=openapi2_base_url)
     original_headers = headers.copy() if headers is not None else headers
-    case = endpoint.make_case(headers=headers)
+    case = operation.make_case(headers=headers)
     data = case.as_requests_kwargs(headers={"X-Key": "foo"})
     assert data == {
         "headers": expected,
@@ -94,12 +94,12 @@ def test_as_requests_kwargs_override_user_agent(server, openapi2_base_url, swagg
 @pytest.mark.parametrize("override", (False, True))
 @pytest.mark.filterwarnings("always")
 def test_call(override, base_url, swagger_20):
-    endpoint = APIOperation("/success", "GET", {}, swagger_20)
-    case = endpoint.make_case()
+    operation = APIOperation("/success", "GET", {}, swagger_20)
+    case = operation.make_case()
     if override:
         response = case.call(base_url)
     else:
-        endpoint.base_url = base_url
+        operation.base_url = base_url
         response = case.call()
     assert response.status_code == 200
     assert response.json() == {"success": True}
@@ -121,9 +121,9 @@ def test_call_and_validate(openapi3_schema_url):
 
 
 def test_case_partial_deepcopy(swagger_20):
-    endpoint = APIOperation("/example/path", "GET", {}, swagger_20)
+    operation = APIOperation("/example/path", "GET", {}, swagger_20)
     original_case = Case(
-        endpoint=endpoint,
+        endpoint=operation,
         path_parameters={"test": "test"},
         headers={"Content-Type": "application/json"},
         cookies={"TOKEN": "secret"},
@@ -148,11 +148,11 @@ def test_case_partial_deepcopy(swagger_20):
 
 
 schema = schemathesis.from_path(SIMPLE_PATH)
-ENDPOINT = APIOperation("/api/success", "POST", {}, base_url="http://example.com", schema=schema)
 
 
 def make_case(**kwargs):
-    return Case(ENDPOINT, media_type="application/json", **kwargs)
+    operation = APIOperation("/api/success", "POST", {}, base_url="http://example.com", schema=schema)
+    return Case(operation, media_type="application/json", **kwargs)
 
 
 def expected(payload=""):
@@ -272,8 +272,8 @@ def test_response_from_requests(base_url):
     ),
 )
 def test_from_case(swagger_20, base_url, expected):
-    endpoint = APIOperation("/users/{name}", "GET", {}, swagger_20, base_url="http://127.0.0.1/api/v3")
-    case = Case(endpoint, path_parameters={"name": "test"})
+    operation = APIOperation("/users/{name}", "GET", {}, swagger_20, base_url="http://127.0.0.1/api/v3")
+    case = Case(operation, path_parameters={"name": "test"})
     session = requests.Session()
     request = Request.from_case(case, session)
     assert request.uri == "http://127.0.0.1/api/v3/users/test"

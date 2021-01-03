@@ -143,8 +143,8 @@ class SchemathesisCase(PyCollector):
             return [
                 item
                 for data_generation_method in self.schemathesis_case.data_generation_methods
-                for endpoint in self.schemathesis_case.get_all_endpoints()
-                for item in self._gen_items(endpoint, data_generation_method)
+                for operation in self.schemathesis_case.get_all_endpoints()
+                for item in self._gen_items(operation, data_generation_method)
             ]
         except Exception:
             pytest.fail("Error during collection")

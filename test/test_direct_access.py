@@ -42,10 +42,10 @@ def test_endpoint_access(swagger_20, method):
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_as_strategy(swagger_20):
-    endpoint = swagger_20["/users"]["GET"]
-    strategy = endpoint.as_strategy()
+    operation = swagger_20["/users"]["GET"]
+    strategy = operation.as_strategy()
     assert isinstance(strategy, st.SearchStrategy)
-    assert strategy.example() == Case(endpoint)
+    assert strategy.example() == Case(operation)
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")

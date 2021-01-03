@@ -11,7 +11,7 @@ from schemathesis.specs.openapi.links import Link, get_container
 from schemathesis.specs.openapi.parameters import OpenAPI30Parameter
 from schemathesis.stateful import ParsedData, Stateful
 
-ENDPOINT = APIOperation(
+API_OPERATION = APIOperation(
     path="/users/{user_id}",
     method="get",
     definition=ANY,
@@ -32,14 +32,14 @@ ENDPOINT = APIOperation(
 )
 LINK = Link(
     name="GetUserByUserId",
-    endpoint=ENDPOINT,
+    endpoint=API_OPERATION,
     parameters={"path.user_id": "$response.body#/id", "query.user_id": "$response.body#/id"},
 )
 
 
 @pytest.fixture(scope="module")
 def case():
-    return Case(ENDPOINT)
+    return Case(API_OPERATION)
 
 
 @pytest.fixture(scope="module")
@@ -125,13 +125,13 @@ EXPECTED_PATH_PARAMETERS = [
     ),
 )
 def test_make_endpoint(value, path_user_id, query_user_id, code):
-    endpoint = LINK.make_endpoint(list(map(ParsedData, value)))
+    operation = LINK.make_endpoint(list(map(ParsedData, value)))
     # There is only one path parameter
-    assert len(endpoint.path_parameters) == 1
-    assert sorted(endpoint.path_parameters[0].definition["schema"]["enum"], key=json.dumps) == path_user_id
-    assert len(endpoint.query) == 3
+    assert len(operation.path_parameters) == 1
+    assert sorted(operation.path_parameters[0].definition["schema"]["enum"], key=json.dumps) == path_user_id
+    assert len(operation.query) == 3
 
-    for item in endpoint.query:
+    for item in operation.query:
         schema = item.definition["schema"]
         if item.name == "code":
             assert_schema(schema, code)
@@ -150,11 +150,11 @@ def assert_schema(target, expected):
 
 
 def test_make_endpoint_single():
-    endpoint = LINK.make_endpoint([ParsedData({"path.user_id": 1, "query.user_id": 2, "code": 7})])
-    assert endpoint.path_parameters == ParameterSet(
+    operation = LINK.make_endpoint([ParsedData({"path.user_id": 1, "query.user_id": 2, "code": 7})])
+    assert operation.path_parameters == ParameterSet(
         [OpenAPI30Parameter({"in": "path", "name": "user_id", "schema": {"enum": [1]}})]
     )
-    for item in endpoint.query:
+    for item in operation.query:
         schema = item.definition["schema"]
         if item.name == "code":
             assert schema == {"enum": [7]}
@@ -173,7 +173,7 @@ def test_make_endpoint_invalid_location(parameter):
 
 
 def test_get_container_invalid_location():
-    endpoint = APIOperation(
+    operation = APIOperation(
         path="/users/{user_id}",
         method="get",
         schema=None,
@@ -188,6 +188,6 @@ def test_get_container_invalid_location():
             ],
         ),
     )
-    case = endpoint.make_case()
+    case = operation.make_case()
     with pytest.raises(ValueError, match="Parameter `unknown` is not defined in API operation `GET /users/{user_id}`"):
         get_container(case, None, "unknown")

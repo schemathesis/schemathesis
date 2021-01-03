@@ -34,8 +34,8 @@ def create_state_machine(schema: "BaseOpenAPISchema") -> Type[APIStateMachine]:
     """
     bundles = init_bundles(schema)
     connections: EndpointConnections = defaultdict(list)
-    for endpoint in schema.get_all_endpoints():
-        links.apply(endpoint, bundles, connections)
+    for operation in schema.get_all_endpoints():
+        links.apply(operation, bundles, connections)
 
     rules = make_all_rules(schema, bundles, connections)
 
@@ -50,9 +50,9 @@ def init_bundles(schema: "BaseOpenAPISchema") -> Dict[str, CaseInsensitiveDict]:
     We need to create bundles first, so they can be referred when building connections between endpoints.
     """
     output: Dict[str, CaseInsensitiveDict] = {}
-    for endpoint in schema.get_all_endpoints():
-        output.setdefault(endpoint.path, CaseInsensitiveDict())
-        output[endpoint.path][endpoint.method.upper()] = Bundle(endpoint.verbose_name)  # type: ignore
+    for operation in schema.get_all_endpoints():
+        output.setdefault(operation.path, CaseInsensitiveDict())
+        output[operation.path][operation.method.upper()] = Bundle(operation.verbose_name)  # type: ignore
     return output
 
 
@@ -61,9 +61,9 @@ def make_all_rules(
 ) -> Dict[str, Rule]:
     """Create rules for all endpoints, based on the provided connections."""
     return {
-        f"rule {endpoint.verbose_name} {idx}": new
-        for endpoint in schema.get_all_endpoints()
-        for idx, new in enumerate(make_rules(endpoint, bundles[endpoint.path][endpoint.method.upper()], connections))
+        f"rule {operation.verbose_name} {idx}": new
+        for operation in schema.get_all_endpoints()
+        for idx, new in enumerate(make_rules(operation, bundles[operation.path][operation.method.upper()], connections))
     }
 
 

@@ -145,16 +145,16 @@ class BaseSchema(Mapping):
         seed: Optional[int] = None,
     ) -> Generator[Tuple[APIOperation, DataGenerationMethod, Callable], None, None]:
         """Generate all endpoints and Hypothesis tests for them."""
-        for endpoint in self.get_all_endpoints():
+        for operation in self.get_all_endpoints():
             for data_generation_method in self.data_generation_methods:
                 test = create_test(
-                    endpoint=endpoint,
+                    endpoint=operation,
                     test=func,
                     settings=settings,
                     seed=seed,
                     data_generation_method=data_generation_method,
                 )
-                yield endpoint, data_generation_method, test
+                yield operation, data_generation_method, test
 
     def parametrize(
         self,
@@ -291,7 +291,7 @@ class BaseSchema(Mapping):
 
 def endpoints_to_dict(endpoints: Generator[APIOperation, None, None]) -> Dict[str, MethodsDict]:
     output: Dict[str, MethodsDict] = {}
-    for endpoint in endpoints:
-        output.setdefault(endpoint.path, MethodsDict())
-        output[endpoint.path][endpoint.method] = endpoint
+    for operation in endpoints:
+        output.setdefault(operation.path, MethodsDict())
+        output[operation.path][operation.method] = operation
     return output

@@ -31,14 +31,14 @@ class Link(StatefulTest):
         )
         if "operationId" in definition:
             # source_endpoint.schema is `BaseOpenAPISchema` and has this method
-            endpoint = source_endpoint.schema.get_endpoint_by_operation_id(definition["operationId"])  # type: ignore
+            operation = source_endpoint.schema.get_endpoint_by_operation_id(definition["operationId"])  # type: ignore
         else:
-            endpoint = source_endpoint.schema.get_endpoint_by_reference(definition["operationRef"])  # type: ignore
+            operation = source_endpoint.schema.get_endpoint_by_reference(definition["operationRef"])  # type: ignore
         return cls(
             # Pylint can't detect that the API operation is always defined at this point
             # E.g. if there is no matching operation or no endpoints at all, then a ValueError will be risen
             name=name,
-            endpoint=endpoint,  # pylint: disable=undefined-loop-variable
+            endpoint=operation,  # pylint: disable=undefined-loop-variable
             parameters=definition.get("parameters", {}),
             request_body=definition.get("requestBody", NOT_SET),  # `None` might be a valid value - `null`
         )

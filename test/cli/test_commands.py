@@ -1172,12 +1172,12 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
 @pytest.mark.parametrize("workers", (1, 2))
 def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_20, workers):
     # When a Schemathesis run in interrupted by keyboard or via SIGINT
-    endpoint = APIOperation("/success", "GET", {}, swagger_20, base_url=base_url)
+    operation = APIOperation("/success", "GET", {}, swagger_20, base_url=base_url)
     if len(cli_args) == 2:
-        endpoint.app = flask_app
-        original = Case(endpoint).call_wsgi
+        operation.app = flask_app
+        original = Case(operation).call_wsgi
     else:
-        original = Case(endpoint).call
+        original = Case(operation).call
     counter = 0
 
     def mocked(*args, **kwargs):

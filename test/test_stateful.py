@@ -121,8 +121,8 @@ def test_add_link_behind_a_reference(schema_url):
     # And a link is added
     add_link(schema, schema["/users/{user_id}"]["GET"], parameters={"userId": "$response.body#/id"})
     # Then the source API operation should have the new link
-    endpoint = schema["/users/"]["POST"]
-    links = endpoint.definition.resolved["responses"]["201"]["links"]
+    operation = schema["/users/"]["POST"]
+    links = operation.definition.resolved["responses"]["201"]["links"]
     assert len(links) == 3
     assert links["GET /users/{user_id}"] == {"parameters": {"userId": "$response.body#/id"}, "operationId": "getUser"}
 

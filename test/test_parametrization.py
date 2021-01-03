@@ -495,13 +495,13 @@ def test_b(request, case):
 
 
 @pytest.mark.parametrize(
-    "schema_name, endpoint",
+    "schema_name, paths",
     (
         ("simple_swagger.yaml", {"/users": {"x-handler": "foo"}}),
         ("simple_openapi.yaml", {"/users": {"x-handler": "foo", "description": "Text"}}),
     ),
 )
-def test_custom_properties(testdir, schema_name, endpoint):
+def test_custom_properties(testdir, schema_name, paths):
     # When custom properties are present in operation definitions (e.g. vendor extensions, or some other allowed fields)
     testdir.make_test(
         """
@@ -511,7 +511,7 @@ def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     """,
         schema_name=schema_name,
-        paths=endpoint,
+        paths=paths,
     )
     result = testdir.runpytest("-s")
     # Then it should be correctly processed
@@ -675,8 +675,8 @@ def test_empty_content():
     }
     schema = schemathesis.from_dict(raw_schema)
     # Then the body processing should be no-op
-    endpoint = schema.endpoints["/body"]["POST"]
-    assert endpoint.body == PayloadAlternatives([])
+    operation = schema.endpoints["/body"]["POST"]
+    assert operation.body == PayloadAlternatives([])
 
 
 @pytest.mark.hypothesis_nested

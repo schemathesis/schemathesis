@@ -31,26 +31,26 @@ def execution_context():
 
 
 @pytest.fixture
-def endpoint(swagger_20):
+def operation(swagger_20):
     return models.APIOperation("/success", "GET", definition={}, base_url="http://127.0.0.1:8080", schema=swagger_20)
 
 
 @pytest.fixture()
-def results_set(endpoint):
+def results_set(operation):
     statistic = models.TestResult(
-        endpoint.method, endpoint.full_path, data_generation_method=DataGenerationMethod.default()
+        operation.method, operation.full_path, data_generation_method=DataGenerationMethod.default()
     )
     return models.TestResultSet([statistic])
 
 
 @pytest.fixture()
-def after_execution(results_set, endpoint, swagger_20):
+def after_execution(results_set, operation, swagger_20):
     return runner.events.AfterExecution.from_result(
         result=results_set.results[0],
         status=models.Status.success,
         hypothesis_output=[],
         elapsed_time=1.0,
-        endpoint=endpoint,
+        endpoint=operation,
     )
 
 
@@ -92,13 +92,13 @@ def test_handle_initialized(capsys, execution_context, results_set, swagger_20):
     assert out.endswith("\n\n")
 
 
-def test_display_statistic(capsys, swagger_20, execution_context, endpoint):
+def test_display_statistic(capsys, swagger_20, execution_context, operation):
     # Given multiple successful & failed checks in a single test
     success = models.Check("not_a_server_error", models.Status.success)
     failure = models.Check("not_a_server_error", models.Status.failure)
     single_test_statistic = models.TestResult(
-        endpoint.method,
-        endpoint.full_path,
+        operation.method,
+        operation.full_path,
         DataGenerationMethod.default(),
         [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
     )
@@ -176,13 +176,13 @@ def test_display_hypothesis_output(capsys):
 
 
 @pytest.mark.parametrize("body", ({}, {"foo": "bar"}, None))
-def test_display_single_failure(capsys, swagger_20, execution_context, endpoint, body):
+def test_display_single_failure(capsys, swagger_20, execution_context, operation, body):
     # Given a single test result with multiple successful & failed checks
     success = models.Check("not_a_server_error", models.Status.success)
-    failure = models.Check("not_a_server_error", models.Status.failure, models.Case(endpoint, body=body))
+    failure = models.Check("not_a_server_error", models.Status.failure, models.Case(operation, body=body))
     test_statistic = models.TestResult(
-        endpoint.method,
-        endpoint.full_path,
+        operation.method,
+        operation.full_path,
         DataGenerationMethod.default(),
         [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
     )
@@ -239,7 +239,7 @@ def test_after_execution_attributes(execution_context, after_execution):
 
 
 @pytest.mark.parametrize("show_errors_tracebacks", (True, False))
-def test_display_single_error(capsys, swagger_20, endpoint, execution_context, show_errors_tracebacks):
+def test_display_single_error(capsys, swagger_20, operation, execution_context, show_errors_tracebacks):
     # Given exception is multiline
     exception = None
     try:
@@ -247,7 +247,7 @@ def test_display_single_error(capsys, swagger_20, endpoint, execution_context, s
     except SyntaxError as exc:
         exception = exc
 
-    result = models.TestResult(endpoint.method, endpoint.path, DataGenerationMethod.default())
+    result = models.TestResult(operation.method, operation.path, DataGenerationMethod.default())
     result.add_error(exception)
     # When the related test result is displayed
     execution_context.show_errors_tracebacks = show_errors_tracebacks
@@ -273,9 +273,9 @@ def test_display_single_error(capsys, swagger_20, endpoint, execution_context, s
 def test_display_failures(swagger_20, capsys, execution_context, results_set, verbosity):
     execution_context.verbosity = verbosity
     # Given two test results - success and failure
-    endpoint = models.APIOperation("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)
-    failure = models.TestResult(endpoint.method, endpoint.full_path, DataGenerationMethod.default())
-    failure.add_failure("test", models.Case(endpoint), "Message")
+    operation = models.APIOperation("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)
+    failure = models.TestResult(operation.method, operation.full_path, DataGenerationMethod.default())
+    failure.add_failure("test", models.Case(operation), "Message")
     execution_context.results.append(SerializedTestResult.from_test_result(failure))
     results_set.append(failure)
     event = Finished.from_results(results_set, 1.0)
@@ -294,9 +294,9 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set, ve
 @pytest.mark.parametrize("show_errors_tracebacks", (True, False))
 def test_display_errors(swagger_20, capsys, results_set, execution_context, show_errors_tracebacks):
     # Given two test results - success and error
-    endpoint = models.APIOperation("/api/error", "GET", {}, swagger_20)
-    error = models.TestResult(endpoint.method, endpoint.full_path, DataGenerationMethod.default(), seed=123)
-    error.add_error(ConnectionError("Connection refused!"), models.Case(endpoint, query={"a": 1}))
+    operation = models.APIOperation("/api/error", "GET", {}, swagger_20)
+    error = models.TestResult(operation.method, operation.full_path, DataGenerationMethod.default(), seed=123)
+    error.add_error(ConnectionError("Connection refused!"), models.Case(operation, query={"a": 1}))
     results_set.append(error)
     execution_context.results.append(SerializedTestResult.from_test_result(error))
     event = Finished.from_results(results_set, 1.0)
