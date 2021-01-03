@@ -204,7 +204,7 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
             url = urlunparse(
                 (parsed.scheme, parsed.netloc, encoded_path, parsed.params, encoded_query, parsed.fragment)
             )
-            assert url == serialized["uri"], request.url
+            assert unquote_plus(url) == unquote_plus(serialized["uri"]), request.url
             content = await request.read()
             assert content == base64.b64decode(serialized["body"]["base64_string"])
             compare_headers(request, serialized["headers"])

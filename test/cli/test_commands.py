@@ -1710,3 +1710,20 @@ def test_long_operation_output(testdir, empty_open_api_3_schema):
     assert result.ret == ExitCode.OK
     assert "GET /aaaaaaaaaa .                                                         [ 50%]" in result.outlines
     assert "GET /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[...] . [100%]" in result.outlines
+
+
+def test_reserved_characters_in_operation_name(testdir, empty_open_api_3_schema):
+    # See GH-992
+    # When an API operation name contains `:`
+    empty_open_api_3_schema["paths"] = {
+        f"/foo:bar": {
+            "get": {
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+    }
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(empty_open_api_3_schema))
+    result = testdir.run("schemathesis", "run", str(schema_file), "--dry-run")
+    # Then this operation name should be displayed with the leading `/`
+    assert result.ret == ExitCode.OK
+    assert "GET /foo:bar .                                                            [100%]" in result.outlines

@@ -123,6 +123,7 @@ By default, the server will generate an API schema with the following endpoints:
 - ``POST /api/users/`` (``create_user``) - creates a user and stores it in memory. Provides Open API links to the endpoints below
 - ``GET /api/users/{user_id}`` (``get_user``) - returns a user stored in memory
 - ``PATCH /api/users/{user_id}`` (``update_user``) - updates a user stored in memory
+- ``GET /api/foo:bar`` (``reserved``) - contains ``:`` in its path
 
 You can find the complete schema at ``http://127.0.0.1:8081/schema.yaml`` (replace 8081 with the port you chose in the start server command).
 
