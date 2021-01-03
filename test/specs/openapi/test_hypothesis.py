@@ -34,7 +34,7 @@ def operation(make_openapi_3_schema):
 )
 def test_explicit_attributes(operation, values):
     # When some Case's attribute is passed explicitly to the case strategy
-    strategy = get_case_strategy(endpoint=operation, **values)
+    strategy = get_case_strategy(operation=operation, **values)
 
     @given(strategy)
     @settings(max_examples=1)

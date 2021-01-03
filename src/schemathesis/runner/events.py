@@ -61,11 +61,11 @@ class BeforeExecution(CurrentPathMixin, ExecutionEvent):
     recursion_level: int = attr.ib()  # pragma: no mutate
 
     @classmethod
-    def from_endpoint(cls, endpoint: APIOperation, recursion_level: int) -> "BeforeExecution":
+    def from_endpoint(cls, operation: APIOperation, recursion_level: int) -> "BeforeExecution":
         return cls(
-            method=endpoint.method.upper(),
-            path=endpoint.full_path,
-            relative_path=endpoint.path,
+            method=operation.method.upper(),
+            path=operation.full_path,
+            relative_path=operation.path,
             recursion_level=recursion_level,
         )
 
@@ -93,12 +93,12 @@ class AfterExecution(CurrentPathMixin, ExecutionEvent):
         status: Status,
         elapsed_time: float,
         hypothesis_output: List[str],
-        endpoint: APIOperation,
+        operation: APIOperation,
     ) -> "AfterExecution":
         return cls(
-            method=endpoint.method.upper(),
-            path=endpoint.full_path,
-            relative_path=endpoint.path,
+            method=operation.method.upper(),
+            path=operation.full_path,
+            relative_path=operation.path,
             result=SerializedTestResult.from_test_result(result),
             status=status,
             elapsed_time=elapsed_time,

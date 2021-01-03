@@ -129,7 +129,7 @@ APIWorkflow = schema.as_state_machine()
 @pytest.mark.parametrize("factory_name", ("wsgi_app_factory", "asgi_app_factory"))
 def test_hidden_failure_app(request, factory_name, open_api_3):
     factory = request.getfixturevalue(factory_name)
-    app = factory(endpoints=("create_user", "get_user", "update_user"), version=open_api_3)
+    app = factory(operations=("create_user", "get_user", "update_user"), version=open_api_3)
 
     if factory_name == "asgi_app_factory":
         schema = schemathesis.from_asgi("/openapi.json", app=app)

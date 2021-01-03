@@ -107,7 +107,7 @@ class BaseRunner:
 
 
 def run_test(  # pylint: disable=too-many-locals
-    endpoint: APIOperation,
+    operation: APIOperation,
     test: Callable,
     checks: Iterable[CheckFunction],
     data_generation_method: DataGenerationMethod,
@@ -119,12 +119,12 @@ def run_test(  # pylint: disable=too-many-locals
 ) -> Generator[events.ExecutionEvent, None, None]:
     """A single test run with all error handling needed."""
     result = TestResult(
-        method=endpoint.method.upper(),
-        path=endpoint.full_path,
+        method=operation.method.upper(),
+        path=operation.full_path,
         overridden_headers=headers,
         data_generation_method=data_generation_method,
     )
-    yield events.BeforeExecution.from_endpoint(endpoint=endpoint, recursion_level=recursion_level)
+    yield events.BeforeExecution.from_endpoint(operation=operation, recursion_level=recursion_level)
     hypothesis_output: List[str] = []
     errors: List[Exception] = []
     test_start_time = time.monotonic()
@@ -184,7 +184,7 @@ def run_test(  # pylint: disable=too-many-locals
         status=status,
         elapsed_time=test_elapsed_time,
         hypothesis_output=hypothesis_output,
-        endpoint=endpoint,
+        operation=operation,
     )
 
 

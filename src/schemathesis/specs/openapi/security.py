@@ -14,19 +14,19 @@ class BaseSecurityProcessor:
     http_security_name = "basic"
     parameter_cls: ClassVar[Type[OpenAPIParameter]] = OpenAPI20Parameter
 
-    def process_definitions(self, schema: Dict[str, Any], endpoint: APIOperation, resolver: RefResolver) -> None:
+    def process_definitions(self, schema: Dict[str, Any], operation: APIOperation, resolver: RefResolver) -> None:
         """Add relevant security parameters to data generation."""
-        for definition in self._get_active_definitions(schema, endpoint, resolver):
+        for definition in self._get_active_definitions(schema, operation, resolver):
             if definition["type"] == "apiKey":
-                self.process_api_key_security_definition(definition, endpoint)
-            self.process_http_security_definition(definition, endpoint)
+                self.process_api_key_security_definition(definition, operation)
+            self.process_http_security_definition(definition, operation)
 
     def _get_active_definitions(
-        self, schema: Dict[str, Any], endpoint: APIOperation, resolver: RefResolver
+        self, schema: Dict[str, Any], operation: APIOperation, resolver: RefResolver
     ) -> Generator[Dict[str, Any], None, None]:
         """Get only security definitions active for the given API operation."""
         definitions = self.get_security_definitions(schema, resolver)
-        requirements = get_security_requirements(schema, endpoint)
+        requirements = get_security_requirements(schema, operation)
         for name, definition in definitions.items():
             if name in requirements:
                 yield definition
@@ -35,7 +35,7 @@ class BaseSecurityProcessor:
         return schema.get("securityDefinitions", {})
 
     def get_security_definitions_as_parameters(
-        self, schema: Dict[str, Any], endpoint: APIOperation, resolver: RefResolver, location: str
+        self, schema: Dict[str, Any], operation: APIOperation, resolver: RefResolver, location: str
     ) -> List[Dict[str, Any]]:
         """Security definitions converted to OAS parameters.
 
@@ -44,18 +44,18 @@ class BaseSecurityProcessor:
         """
         return [
             self._to_parameter(definition)
-            for definition in self._get_active_definitions(schema, endpoint, resolver)
+            for definition in self._get_active_definitions(schema, operation, resolver)
             if self._is_match(definition, location)
         ]
 
-    def process_api_key_security_definition(self, definition: Dict[str, Any], endpoint: APIOperation) -> None:
+    def process_api_key_security_definition(self, definition: Dict[str, Any], operation: APIOperation) -> None:
         parameter = self.parameter_cls(self._make_api_key_parameter(definition))
-        endpoint.add_parameter(parameter)
+        operation.add_parameter(parameter)
 
-    def process_http_security_definition(self, definition: Dict[str, Any], endpoint: APIOperation) -> None:
+    def process_http_security_definition(self, definition: Dict[str, Any], operation: APIOperation) -> None:
         if definition["type"] == self.http_security_name:
             parameter = self.parameter_cls(self._make_http_auth_parameter(definition))
-            endpoint.add_parameter(parameter)
+            operation.add_parameter(parameter)
 
     def _is_match(self, definition: Dict[str, Any], location: str) -> bool:
         return (definition["type"] == "apiKey" and location in self.api_key_locations) or (
@@ -115,13 +115,13 @@ class OpenAPISecurityProcessor(BaseSecurityProcessor):
         return make_api_key_schema(definition, schema={"type": "string"})
 
 
-def get_security_requirements(schema: Dict[str, Any], endpoint: APIOperation) -> List[str]:
+def get_security_requirements(schema: Dict[str, Any], operation: APIOperation) -> List[str]:
     """Get applied security requirements for the given API operation."""
     # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#operation-object
     # > This definition overrides any declared top-level security.
     # > To remove a top-level security declaration, an empty array can be used.
     global_requirements = schema.get("security", [])
-    local_requirements = endpoint.definition.raw.get("security", None)
+    local_requirements = operation.definition.raw.get("security", None)
     if local_requirements is not None:
         requirements = local_requirements
     else:

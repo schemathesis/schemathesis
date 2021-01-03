@@ -457,7 +457,7 @@ def openapi_30():
 
 @pytest.fixture()
 def app_schema(openapi_version, endpoints):
-    return _aiohttp.make_openapi_schema(endpoints=endpoints, version=openapi_version)
+    return _aiohttp.make_openapi_schema(operations=endpoints, version=openapi_version)
 
 
 @pytest.fixture()

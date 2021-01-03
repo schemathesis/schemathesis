@@ -19,7 +19,7 @@ from .constants import LOCATION_TO_CONTAINER
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
 class Link(StatefulTest):
-    endpoint: APIOperation = attr.ib()  # pragma: no mutate
+    operation: APIOperation = attr.ib()  # pragma: no mutate
     parameters: Dict[str, Any] = attr.ib()  # pragma: no mutate
     request_body: Any = attr.ib(default=NOT_SET)  # pragma: no mutate
 
@@ -38,7 +38,7 @@ class Link(StatefulTest):
             # Pylint can't detect that the API operation is always defined at this point
             # E.g. if there is no matching operation or no endpoints at all, then a ValueError will be risen
             name=name,
-            endpoint=operation,  # pylint: disable=undefined-loop-variable
+            operation=operation,  # pylint: disable=undefined-loop-variable
             parameters=definition.get("parameters", {}),
             request_body=definition.get("requestBody", NOT_SET),  # `None` might be a valid value - `null`
         )
@@ -63,7 +63,7 @@ class Link(StatefulTest):
         containers = {
             location: {
                 parameter.name: {"options": [], "parameter": parameter}
-                for parameter in getattr(self.endpoint, container_name)
+                for parameter in getattr(self.operation, container_name)
             }
             for location, container_name in LOCATION_TO_CONTAINER.items()
         }
@@ -74,7 +74,7 @@ class Link(StatefulTest):
                 container.append(value)
         # These are the final `path_parameters`, `query`, and other API operation components
         components: Dict[str, ParameterSet] = {
-            container_name: getattr(self.endpoint, container_name).__class__()
+            container_name: getattr(self.operation, container_name).__class__()
             for location, container_name in LOCATION_TO_CONTAINER.items()
         }
         # Here are all components that are filled with parameters
@@ -93,7 +93,7 @@ class Link(StatefulTest):
                 else:
                     # No options were gathered for this parameter - use the original one
                     components[LOCATION_TO_CONTAINER[location]].add(parameter_data["parameter"])
-        return self.endpoint.clone(**components)
+        return self.operation.clone(**components)
 
     def _get_container_by_parameter_name(self, full_name: str, templates: Dict[str, Dict[str, Dict[str, Any]]]) -> List:
         """Detect in what request part the parameters is defined."""
@@ -120,19 +120,19 @@ class Link(StatefulTest):
 
     def _unknown_parameter(self, name: str) -> NoReturn:
         raise ValueError(
-            f"Parameter `{name}` is not defined in API operation {self.endpoint.method.upper()} {self.endpoint.path}"
+            f"Parameter `{name}` is not defined in API operation {self.operation.method.upper()} {self.operation.path}"
         )
 
 
-def get_links(response: GenericResponse, endpoint: APIOperation, field: str) -> Sequence[Link]:
+def get_links(response: GenericResponse, operation: APIOperation, field: str) -> Sequence[Link]:
     """Get `x-links` / `links` definitions from the schema."""
-    responses = endpoint.definition.resolved["responses"]
+    responses = operation.definition.resolved["responses"]
     if str(response.status_code) in responses:
         response_definition = responses[str(response.status_code)]
     else:
         response_definition = responses.get("default", {})
     links = response_definition.get(field, {})
-    return [Link.from_definition(name, definition, endpoint) for name, definition in links.items()]
+    return [Link.from_definition(name, definition, operation) for name, definition in links.items()]
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
@@ -145,7 +145,7 @@ class OpenAPILink(Direction):
     name: str = attr.ib()  # pragma: no mutate
     status_code: str = attr.ib()  # pragma: no mutate
     definition: Dict[str, Any] = attr.ib()  # pragma: no mutate
-    endpoint: APIOperation = attr.ib()  # pragma: no mutate
+    operation: APIOperation = attr.ib()  # pragma: no mutate
     parameters: List[Tuple[Optional[str], str, str]] = attr.ib(init=False)  # pragma: no mutate
     body: Union[Dict[str, Any], NotSet] = attr.ib(init=False)  # pragma: no mutate
 
@@ -184,8 +184,8 @@ class OpenAPILink(Direction):
 
     def get_target_endpoint(self) -> APIOperation:
         if "operationId" in self.definition:
-            return self.endpoint.schema.get_endpoint_by_operation_id(self.definition["operationId"])  # type: ignore
-        return self.endpoint.schema.get_endpoint_by_reference(self.definition["operationRef"])  # type: ignore
+            return self.operation.schema.get_endpoint_by_operation_id(self.definition["operationId"])  # type: ignore
+        return self.operation.schema.get_endpoint_by_reference(self.definition["operationRef"])  # type: ignore
 
 
 def get_container(case: Case, location: Optional[str], name: str) -> Optional[Dict[str, Any]]:
@@ -217,10 +217,10 @@ def normalize_parameter(parameter: str, expression: str) -> Tuple[Optional[str],
         return None, parameter, expression
 
 
-def get_all_links(endpoint: APIOperation) -> Generator[Tuple[str, OpenAPILink], None, None]:
-    for status_code, definition in endpoint.definition.resolved["responses"].items():
-        for name, link_definition in definition.get(endpoint.schema.links_field, {}).items():  # type: ignore
-            yield status_code, OpenAPILink(name, status_code, link_definition, endpoint)
+def get_all_links(operation: APIOperation) -> Generator[Tuple[str, OpenAPILink], None, None]:
+    for status_code, definition in operation.definition.resolved["responses"].items():
+        for name, link_definition in definition.get(operation.schema.links_field, {}).items():  # type: ignore
+            yield status_code, OpenAPILink(name, status_code, link_definition, operation)
 
 
 def add_link(

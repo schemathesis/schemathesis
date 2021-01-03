@@ -109,8 +109,8 @@ class BaseSchema(Mapping):
     def endpoints(self) -> Dict[str, MethodsDict]:
         if not hasattr(self, "_endpoints"):
             # pylint: disable=attribute-defined-outside-init
-            endpoints = self.get_all_endpoints()
-            self._endpoints = endpoints_to_dict(endpoints)
+            operations = self.get_all_endpoints()
+            self._endpoints = operations_to_dict(operations)
         return self._endpoints
 
     @property
@@ -148,7 +148,7 @@ class BaseSchema(Mapping):
         for operation in self.get_all_endpoints():
             for data_generation_method in self.data_generation_methods:
                 test = create_test(
-                    endpoint=operation,
+                    operation=operation,
                     test=func,
                     settings=settings,
                     seed=seed,
@@ -289,9 +289,9 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
 
-def endpoints_to_dict(endpoints: Generator[APIOperation, None, None]) -> Dict[str, MethodsDict]:
+def operations_to_dict(operations: Generator[APIOperation, None, None]) -> Dict[str, MethodsDict]:
     output: Dict[str, MethodsDict] = {}
-    for operation in endpoints:
+    for operation in operations:
         output.setdefault(operation.path, MethodsDict())
         output[operation.path][operation.method] = operation
     return output

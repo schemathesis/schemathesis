@@ -76,26 +76,26 @@ def get_request_body_example_from_properties(endpoint_def: Dict[str, Any]) -> Di
     return static_parameters
 
 
-def get_static_parameters_from_example(endpoint: APIOperation) -> Dict[str, Any]:
+def get_static_parameters_from_example(operation: APIOperation) -> Dict[str, Any]:
     static_parameters = {}
     for name in PARAMETERS:
-        parameters = getattr(endpoint, name)
+        parameters = getattr(operation, name)
         example = parameters.example
         if example:
             static_parameters[name] = example
     return static_parameters
 
 
-def get_static_parameters_from_examples(endpoint: APIOperation, examples_field: str) -> List[Dict[str, Any]]:
+def get_static_parameters_from_examples(operation: APIOperation, examples_field: str) -> List[Dict[str, Any]]:
     """Get static parameters from OpenAPI examples keyword."""
-    endpoint_def = endpoint.definition.resolved
+    endpoint_def = operation.definition.resolved
     return merge_examples(
         get_parameter_examples(endpoint_def, examples_field), get_request_body_examples(endpoint_def, examples_field)
     )
 
 
-def get_static_parameters_from_properties(endpoint: APIOperation) -> Dict[str, Any]:
-    endpoint_def = endpoint.definition.resolved
+def get_static_parameters_from_properties(operation: APIOperation) -> Dict[str, Any]:
+    endpoint_def = operation.definition.resolved
     return {
         **get_parameter_example_from_properties(endpoint_def),
         **get_request_body_example_from_properties(endpoint_def),
@@ -103,17 +103,17 @@ def get_static_parameters_from_properties(endpoint: APIOperation) -> Dict[str, A
 
 
 def get_strategies_from_examples(
-    endpoint: APIOperation, examples_field: str = "examples"
+    operation: APIOperation, examples_field: str = "examples"
 ) -> List[SearchStrategy[Case]]:
     strategies = [
-        get_case_strategy(endpoint=endpoint, **static_parameters)
-        for static_parameters in get_static_parameters_from_examples(endpoint, examples_field)
+        get_case_strategy(operation=operation, **static_parameters)
+        for static_parameters in get_static_parameters_from_examples(operation, examples_field)
         if static_parameters
     ]
     for static_parameters in static_parameters_union(
-        get_static_parameters_from_example(endpoint), get_static_parameters_from_properties(endpoint)
+        get_static_parameters_from_example(operation), get_static_parameters_from_properties(operation)
     ):
-        strategies.append(get_case_strategy(endpoint=endpoint, **static_parameters))
+        strategies.append(get_case_strategy(operation=operation, **static_parameters))
     return strategies
 
 

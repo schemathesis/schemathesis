@@ -30,19 +30,19 @@ class Message(BaseModel):
         extra = "forbid"
 
 
-def create_app(endpoints=("root",), version=OpenAPIVersion("3.0")):
+def create_app(operations=("root",), version=OpenAPIVersion("3.0")):
     if version != OpenAPIVersion("3.0"):
         raise ValueError("FastAPI supports only Open API 3.0")
     app = FastAPI()
     users = {}
 
-    if "root" in endpoints:
+    if "root" in operations:
 
         @app.get("/users")
         async def root():
             return {"success": True}
 
-    if "create_user" in endpoints:
+    if "create_user" in operations:
 
         @app.post("/users/", status_code=201)
         def create_user(user: User):
@@ -50,7 +50,7 @@ def create_app(endpoints=("root",), version=OpenAPIVersion("3.0")):
             users[user_id] = {**user.dict(), "id": user_id}
             return {"id": user_id}
 
-    if "get_user" in endpoints:
+    if "get_user" in operations:
 
         @app.get("/users/{user_id}", responses={404: {"model": Message}})
         def get_user(user_id: str, uid: str = Query(...), code: int = Query(...)):
@@ -67,7 +67,7 @@ def create_app(endpoints=("root",), version=OpenAPIVersion("3.0")):
             except KeyError:
                 raise HTTPException(status_code=404, detail="Not found")
 
-    if "update_user" in endpoints:
+    if "update_user" in operations:
 
         @app.patch("/users/{user_id}", responses={404: {"model": Message}})
         def update_user(user_id: str, update: BuggyUser, common: int = Query(...)):

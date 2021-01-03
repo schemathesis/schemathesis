@@ -14,15 +14,15 @@ FilterFunction = Callable[[StepResult], bool]
 
 
 def apply(
-    endpoint: "APIOperation",
+    operation: "APIOperation",
     bundles: Dict[str, CaseInsensitiveDict],
     connections: Dict[str, List[st.SearchStrategy[Tuple[StepResult, OpenAPILink]]]],
 ) -> None:
     """Gather all connections based on Open API links definitions."""
-    all_status_codes = list(endpoint.definition.resolved["responses"])
-    for status_code, link in get_all_links(endpoint):
+    all_status_codes = list(operation.definition.resolved["responses"])
+    for status_code, link in get_all_links(operation):
         target_endpoint = link.get_target_endpoint()
-        strategy = bundles[endpoint.path][endpoint.method.upper()].filter(
+        strategy = bundles[operation.path][operation.method.upper()].filter(
             make_response_filter(status_code, all_status_codes)
         )
         connections[target_endpoint.verbose_name].append(_convert_strategy(strategy, link))

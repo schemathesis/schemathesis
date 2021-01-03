@@ -99,7 +99,7 @@ class Feedback:
             operation = data.make_endpoint()
             for data_generation_method in operation.schema.data_generation_methods:
                 yield operation, data_generation_method, create_test(
-                    endpoint=operation,
+                    operation=operation,
                     test=test,
                     settings=settings,
                     seed=seed,
@@ -116,7 +116,7 @@ class StepResult:
 class Direction:
     name: str
     status_code: str
-    endpoint: APIOperation
+    operation: APIOperation
 
     def set_data(self, case: Case, **kwargs: Any) -> None:
         raise NotImplementedError
@@ -139,8 +139,8 @@ class _DirectionWrapper:
     direction: Direction = attr.ib()  # pragma: no mutate
 
     def __repr__(self) -> str:
-        path = self.direction.endpoint.path
-        method = self.direction.endpoint.method.upper()
+        path = self.direction.operation.path
+        method = self.direction.operation.method.upper()
         return f"state.schema['{path}']['{method}'].links['{self.direction.status_code}']['{self.direction.name}']"
 
 

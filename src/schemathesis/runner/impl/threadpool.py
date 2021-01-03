@@ -33,10 +33,10 @@ def _run_task(
     def _run_tests(maker: Callable, recursion_level: int = 0) -> None:
         if recursion_level > stateful_recursion_limit:
             return
-        for _endpoint, data_generation_method, test in maker(test_template, settings, seed):
-            feedback = Feedback(stateful, _endpoint)
+        for _operation, data_generation_method, test in maker(test_template, settings, seed):
+            feedback = Feedback(stateful, _operation)
             for event in run_test(
-                _endpoint,
+                _operation,
                 test,
                 checks,
                 data_generation_method,
@@ -51,12 +51,12 @@ def _run_task(
 
     with capture_hypothesis_output():
         while not tasks_queue.empty():
-            endpoint, data_generation_method = tasks_queue.get()
+            operation, data_generation_method = tasks_queue.get()
             items = (
-                endpoint,
+                operation,
                 data_generation_method,
                 create_test(
-                    endpoint=endpoint,
+                    operation=operation,
                     test=test_template,
                     settings=settings,
                     seed=seed,

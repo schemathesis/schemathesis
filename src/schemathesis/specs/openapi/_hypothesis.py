@@ -76,7 +76,7 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
 @st.composite  # type: ignore
 def get_case_strategy(  # pylint: disable=too-many-locals
     draw: Callable,
-    endpoint: APIOperation,
+    operation: APIOperation,
     hooks: Optional[HookDispatcher] = None,
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     path_parameters: Any = NOT_SET,
@@ -92,47 +92,47 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     """
     to_strategy = {DataGenerationMethod.positive: make_positive_strategy}[data_generation_method]
 
-    context = HookContext(endpoint)
+    context = HookContext(operation)
 
-    with detect_invalid_schema(endpoint):
+    with detect_invalid_schema(operation):
         if path_parameters is NOT_SET:
-            strategy = get_parameters_strategy(endpoint, to_strategy, "path")
-            strategy = apply_hooks(endpoint, context, hooks, strategy, "path")
+            strategy = get_parameters_strategy(operation, to_strategy, "path")
+            strategy = apply_hooks(operation, context, hooks, strategy, "path")
             path_parameters = draw(strategy)
         if headers is NOT_SET:
-            strategy = get_parameters_strategy(endpoint, to_strategy, "header")
-            strategy = apply_hooks(endpoint, context, hooks, strategy, "header")
+            strategy = get_parameters_strategy(operation, to_strategy, "header")
+            strategy = apply_hooks(operation, context, hooks, strategy, "header")
             headers = draw(strategy)
         if cookies is NOT_SET:
-            strategy = get_parameters_strategy(endpoint, to_strategy, "cookie")
-            strategy = apply_hooks(endpoint, context, hooks, strategy, "cookie")
+            strategy = get_parameters_strategy(operation, to_strategy, "cookie")
+            strategy = apply_hooks(operation, context, hooks, strategy, "cookie")
             cookies = draw(strategy)
         if query is NOT_SET:
-            strategy = get_parameters_strategy(endpoint, to_strategy, "query")
-            strategy = apply_hooks(endpoint, context, hooks, strategy, "query")
+            strategy = get_parameters_strategy(operation, to_strategy, "query")
+            strategy = apply_hooks(operation, context, hooks, strategy, "query")
             query = draw(strategy)
 
         media_type = None
         if body is NOT_SET:
-            if endpoint.body:
-                parameter = draw(st.sampled_from(endpoint.body.items))
-                strategy = _get_body_strategy(parameter, to_strategy, endpoint.schema)
-                strategy = apply_hooks(endpoint, context, hooks, strategy, "body")
+            if operation.body:
+                parameter = draw(st.sampled_from(operation.body.items))
+                strategy = _get_body_strategy(parameter, to_strategy, operation.schema)
+                strategy = apply_hooks(operation, context, hooks, strategy, "body")
                 media_type = parameter.media_type
                 body = draw(strategy)
         else:
-            media_types = endpoint.get_request_payload_content_types() or ["application/json"]
+            media_types = operation.get_request_payload_content_types() or ["application/json"]
             # Take the first available media type.
             # POSSIBLE IMPROVEMENT:
             #   - Test examples for each available media type on Open API 2.0;
-            #   - On Open API 3.0, media types are explicit, and each example has it. We can pass `OpenAPIBody.media_type`
-            #     here from the examples handling code.
+            #   - On Open API 3.0, media types are explicit, and each example has it.
+            #     We can pass `OpenAPIBody.media_type` here from the examples handling code.
             media_type = media_types[0]
 
-    if endpoint.schema.validate_schema and endpoint.method.upper() == "GET" and endpoint.body:
+    if operation.schema.validate_schema and operation.method.upper() == "GET" and operation.body:
         raise InvalidSchema("Body parameters are defined for GET request.")
     return Case(
-        endpoint=endpoint,
+        endpoint=operation,
         media_type=media_type,
         path_parameters=path_parameters,
         headers=headers,
@@ -151,24 +151,24 @@ YAML_PARSING_ISSUE_MESSAGE = (
 
 
 @contextmanager
-def detect_invalid_schema(endpoint: APIOperation) -> Generator[None, None, None]:
+def detect_invalid_schema(operation: APIOperation) -> Generator[None, None, None]:
     """Detect common issues with schemas."""
     try:
         yield
     except TypeError as exc:
-        if is_yaml_parsing_issue(endpoint):
+        if is_yaml_parsing_issue(operation):
             raise InvalidSchema(YAML_PARSING_ISSUE_MESSAGE) from exc
         raise
 
 
-def is_yaml_parsing_issue(endpoint: APIOperation) -> bool:
+def is_yaml_parsing_issue(operation: APIOperation) -> bool:
     """Detect whether the API operation has problems because of YAML syntax.
 
     For example, unquoted 'on' is parsed as `True`.
     """
     try:
         # Sorting keys involves their comparison, when there is a non-string value, it leads to a TypeError
-        json.dumps(endpoint.schema.raw_schema, sort_keys=True)
+        json.dumps(operation.schema.raw_schema, sort_keys=True)
     except TypeError:
         return True
     return False
@@ -186,20 +186,20 @@ def _get_body_strategy(
 
 
 def get_parameters_strategy(
-    endpoint: APIOperation, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], location: str
+    operation: APIOperation, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], location: str
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
-    parameters = getattr(endpoint, LOCATION_TO_CONTAINER[location])
+    parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
     if parameters:
         schema = parameters_to_json_schema(parameters)
-        if not endpoint.schema.validate_schema and location == "path":
+        if not operation.schema.validate_schema and location == "path":
             # If schema validation is disabled, we try to generate data even if the parameter definition
             # contains errors.
             # In this case, we know that the `required` keyword should always be `True`.
             schema["required"] = list(schema["properties"])
-        schema = endpoint.schema.prepare_schema(schema)
+        schema = operation.schema.prepare_schema(schema)
         strategy = to_strategy(schema)
-        serialize = endpoint.get_parameter_serializer(location)
+        serialize = operation.get_parameter_serializer(location)
         if serialize is not None:
             strategy = strategy.map(serialize)
         filter_func = {
@@ -246,7 +246,7 @@ def quote_all(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def apply_hooks(
-    endpoint: APIOperation,
+    operation: APIOperation,
     context: HookContext,
     hooks: Optional[HookDispatcher],
     strategy: st.SearchStrategy[Case],
@@ -254,7 +254,7 @@ def apply_hooks(
 ) -> st.SearchStrategy[Case]:
     """Apply all `before_generate_` hooks related to the given location."""
     strategy = _apply_hooks(context, GLOBAL_HOOK_DISPATCHER, strategy, location)
-    strategy = _apply_hooks(context, endpoint.schema.hooks, strategy, location)
+    strategy = _apply_hooks(context, operation.schema.hooks, strategy, location)
     if hooks is not None:
         strategy = _apply_hooks(context, hooks, strategy, location)
     return strategy

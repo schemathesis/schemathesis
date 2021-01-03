@@ -14,7 +14,7 @@ except (ImportError, ValueError):
 
 
 def create_openapi_app(
-    endpoints: Tuple[str, ...] = ("success", "failure"), version: OpenAPIVersion = OpenAPIVersion("2.0")
+    operations: Tuple[str, ...] = ("success", "failure"), version: OpenAPIVersion = OpenAPIVersion("2.0")
 ) -> web.Application:
     """Factory for aioHTTP app.
 
@@ -60,17 +60,17 @@ def create_openapi_app(
     app["users"] = {}
     app["incoming_requests"] = incoming_requests
     app["schema_requests"] = schema_requests
-    app["config"] = {"should_fail": True, "schema_data": make_openapi_schema(endpoints, version)}
+    app["config"] = {"should_fail": True, "schema_data": make_openapi_schema(operations, version)}
     return app
 
 
 def reset_app(
     app: web.Application,
-    endpoints: Tuple[str, ...] = ("success", "failure"),
+    operations: Tuple[str, ...] = ("success", "failure"),
     version: OpenAPIVersion = OpenAPIVersion("2.0"),
 ) -> None:
     """Clean up all internal containers of the application and resets its config."""
     app["users"].clear()
     app["incoming_requests"][:] = []
     app["schema_requests"][:] = []
-    app["config"].update({"should_fail": True, "schema_data": make_openapi_schema(endpoints, version)})
+    app["config"].update({"should_fail": True, "schema_data": make_openapi_schema(operations, version)})

@@ -50,7 +50,7 @@ def after_execution(results_set, operation, swagger_20):
         status=models.Status.success,
         hypothesis_output=[],
         elapsed_time=1.0,
-        endpoint=operation,
+        operation=operation,
     )
 
 

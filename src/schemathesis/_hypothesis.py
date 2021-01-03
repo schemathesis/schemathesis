@@ -20,7 +20,7 @@ GivenInput = Union[SearchStrategy, InferType]
 
 def create_test(
     *,
-    endpoint: APIOperation,
+    operation: APIOperation,
     test: Callable,
     settings: Optional[hypothesis.settings] = None,
     seed: Optional[int] = None,
@@ -30,7 +30,7 @@ def create_test(
 ) -> Callable:
     """Create a Hypothesis test."""
     hook_dispatcher = getattr(test, "_schemathesis_hooks", None)
-    strategy = endpoint.as_strategy(hooks=hook_dispatcher, data_generation_method=data_generation_method)
+    strategy = operation.as_strategy(hooks=hook_dispatcher, data_generation_method=data_generation_method)
     _given_kwargs = (_given_kwargs or {}).copy()
     _given_kwargs.setdefault("case", strategy)
     wrapped_test = hypothesis.given(*_given_args, **_given_kwargs)(test)
@@ -43,7 +43,7 @@ def create_test(
         wrapped_test = settings(wrapped_test)
     existing_settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
     if existing_settings and Phase.explicit in existing_settings.phases:
-        wrapped_test = add_examples(wrapped_test, endpoint, hook_dispatcher=hook_dispatcher)
+        wrapped_test = add_examples(wrapped_test, operation, hook_dispatcher=hook_dispatcher)
     return wrapped_test
 
 
@@ -66,10 +66,10 @@ def make_async_test(test: Callable) -> Callable:
     return async_run
 
 
-def add_examples(test: Callable, endpoint: APIOperation, hook_dispatcher: Optional[HookDispatcher] = None) -> Callable:
+def add_examples(test: Callable, operation: APIOperation, hook_dispatcher: Optional[HookDispatcher] = None) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
     try:
-        examples: List[Case] = [get_single_example(strategy) for strategy in endpoint.get_strategies_from_examples()]
+        examples: List[Case] = [get_single_example(strategy) for strategy in operation.get_strategies_from_examples()]
     except (InvalidSchema, HypothesisRefResolutionError, Unsatisfiable):
         # Invalid schema:
         # In this case, the user didn't pass `--validate-schema=false` and see an error in the output anyway,
@@ -80,9 +80,9 @@ def add_examples(test: Callable, endpoint: APIOperation, hook_dispatcher: Option
         # Skipping this exception here allows us to continue the testing process for other operations.
         # Still, we allow to run user-defined hooks
         examples = []
-    context = HookContext(endpoint)  # context should be passed here instead
+    context = HookContext(operation)  # context should be passed here instead
     GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, examples)
-    endpoint.schema.hooks.dispatch("before_add_examples", context, examples)
+    operation.schema.hooks.dispatch("before_add_examples", context, examples)
     if hook_dispatcher:
         hook_dispatcher.dispatch("before_add_examples", context, examples)
     for example in examples:

@@ -32,7 +32,7 @@ API_OPERATION = APIOperation(
 )
 LINK = Link(
     name="GetUserByUserId",
-    endpoint=API_OPERATION,
+    operation=API_OPERATION,
     parameters={"path.user_id": "$response.body#/id", "query.user_id": "$response.body#/id"},
 )
 
@@ -59,7 +59,7 @@ def response():
             [
                 Link(
                     name="GetUserByUserId",
-                    endpoint=APIOperation(
+                    operation=APIOperation(
                         path="/users/{user_id}",
                         method="get",
                         definition=ANY,
@@ -72,7 +72,7 @@ def response():
                 ),
                 Link(
                     name="UpdateUserById",
-                    endpoint=ANY,
+                    operation=ANY,
                     parameters={"user_id": "$response.body#/id"},
                 ),
             ],

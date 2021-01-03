@@ -83,14 +83,14 @@ class LazySchema:
         return wrapper
 
 
-def _get_node_name(node_id: str, endpoint: APIOperation, data_generation_method: DataGenerationMethod) -> str:
+def _get_node_name(node_id: str, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:
     """Make a test node name. For example: test_api[GET:/users]."""
-    return f"{node_id}[{endpoint.method.upper()}:{endpoint.full_path}][{data_generation_method.as_short_name()}]"
+    return f"{node_id}[{operation.method.upper()}:{operation.full_path}][{data_generation_method.as_short_name()}]"
 
 
-def run_subtest(endpoint: APIOperation, fixtures: Dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:
+def run_subtest(operation: APIOperation, fixtures: Dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:
     """Run the given subtest with pytest fixtures."""
-    with subtests.test(method=endpoint.method.upper(), path=endpoint.path):
+    with subtests.test(method=operation.method.upper(), path=operation.path):
         sub_test(**fixtures)
 
 

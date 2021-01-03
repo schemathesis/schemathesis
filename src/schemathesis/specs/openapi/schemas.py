@@ -137,7 +137,7 @@ class BaseOpenAPISchema(BaseSchema):
     ) -> APIOperation:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         base_url = self.get_base_url()
-        endpoint: APIOperation[OpenAPIParameter] = APIOperation(
+        operation: APIOperation[OpenAPIParameter] = APIOperation(
             path=path,
             method=method,
             definition=raw_definition,
@@ -146,9 +146,9 @@ class BaseOpenAPISchema(BaseSchema):
             schema=self,
         )
         for parameter in parameters:
-            endpoint.add_parameter(parameter)
-        self.security.process_definitions(self.raw_schema, endpoint, self.resolver)
-        return endpoint
+            operation.add_parameter(parameter)
+        self.security.process_definitions(self.raw_schema, operation, self.resolver)
+        return operation
 
     @property
     def resolver(self) -> InliningResolver:
@@ -213,7 +213,7 @@ class BaseOpenAPISchema(BaseSchema):
         hooks: Optional[HookDispatcher] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
-        return get_case_strategy(endpoint=endpoint, hooks=hooks, data_generation_method=data_generation_method)
+        return get_case_strategy(operation=endpoint, hooks=hooks, data_generation_method=data_generation_method)
 
     def get_parameter_serializer(self, endpoint: APIOperation, location: str) -> Optional[Callable]:
         definitions = [item for item in endpoint.definition.resolved.get("parameters", []) if item["in"] == location]
@@ -229,9 +229,9 @@ class BaseOpenAPISchema(BaseSchema):
     def _get_parameter_serializer(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         raise NotImplementedError
 
-    def _get_response_definitions(self, endpoint: APIOperation, response: GenericResponse) -> Optional[Dict[str, Any]]:
+    def _get_response_definitions(self, operation: APIOperation, response: GenericResponse) -> Optional[Dict[str, Any]]:
         try:
-            responses = endpoint.definition.resolved["responses"]
+            responses = operation.definition.resolved["responses"]
         except KeyError as exc:
             # Possible to get if `validate_schema=False` is passed during schema creation
             raise InvalidSchema("Schema parsing failed. Please check your schema.") from exc

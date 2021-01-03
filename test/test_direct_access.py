@@ -4,7 +4,7 @@ from requests.structures import CaseInsensitiveDict
 
 import schemathesis
 from schemathesis.models import APIOperation, Case
-from schemathesis.schemas import endpoints_to_dict
+from schemathesis.schemas import operations_to_dict
 
 
 def test_contains(swagger_20):
@@ -13,7 +13,7 @@ def test_contains(swagger_20):
 
 def test_getitem(simple_schema, mocker):
     swagger = schemathesis.from_dict(simple_schema)
-    mocked = mocker.patch("schemathesis.schemas.endpoints_to_dict", wraps=endpoints_to_dict)
+    mocked = mocker.patch("schemathesis.schemas.operations_to_dict", wraps=operations_to_dict)
     assert "_endpoints" not in swagger.__dict__
     assert isinstance(swagger["/users"], CaseInsensitiveDict)
     assert mocked.call_count == 1

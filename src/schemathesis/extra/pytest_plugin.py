@@ -59,11 +59,13 @@ class SchemathesisCase(PyCollector):
         self.given_kwargs = getattr(test_function, "_schemathesis_given_kwargs", {})
         super().__init__(*args, **kwargs)
 
-    def _get_test_name(self, endpoint: APIOperation, data_generation_method: DataGenerationMethod) -> str:
-        return f"{self.name}[{endpoint.method.upper()}:{endpoint.full_path}][{data_generation_method.as_short_name()}]"
+    def _get_test_name(self, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:
+        return (
+            f"{self.name}[{operation.method.upper()}:{operation.full_path}][{data_generation_method.as_short_name()}]"
+        )
 
     def _gen_items(
-        self, endpoint: APIOperation, data_generation_method: DataGenerationMethod
+        self, operation: APIOperation, data_generation_method: DataGenerationMethod
     ) -> Generator[SchemathesisFunction, None, None]:
         """Generate all tests for the given API operation.
 
@@ -73,9 +75,9 @@ class SchemathesisCase(PyCollector):
         This implementation is based on the original one in pytest, but with slight adjustments
         to produce tests out of hypothesis ones.
         """
-        name = self._get_test_name(endpoint, data_generation_method)
+        name = self._get_test_name(operation, data_generation_method)
         funcobj = create_test(
-            endpoint=endpoint,
+            operation=operation,
             test=self.test_function,
             _given_args=self.given_args,
             _given_kwargs=self.given_kwargs,

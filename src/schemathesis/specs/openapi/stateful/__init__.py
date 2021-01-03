@@ -68,15 +68,15 @@ def make_all_rules(
 
 
 def make_rules(
-    endpoint: "APIOperation", bundle: Bundle, connections: EndpointConnections
+    operation: "APIOperation", bundle: Bundle, connections: EndpointConnections
 ) -> Generator[Rule, None, None]:
     """Create a rule for an API operation."""
 
     def _make_rule(previous: SearchStrategy) -> Rule:
-        decorator = rule(target=bundle, previous=previous, case=endpoint.as_strategy())  # type: ignore
+        decorator = rule(target=bundle, previous=previous, case=operation.as_strategy())  # type: ignore
         return decorator(APIStateMachine._step)
 
-    previous_strategies = connections.get(endpoint.verbose_name)
+    previous_strategies = connections.get(operation.verbose_name)
     if previous_strategies is not None:
         yield _make_rule(_combine_strategies(previous_strategies))
     yield _make_rule(none())

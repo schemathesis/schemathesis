@@ -52,7 +52,7 @@ class OpenAPIVersion(Enum):
         return self.value == "3.0"
 
 
-def make_openapi_schema(endpoints: Tuple[str, ...], version: OpenAPIVersion = OpenAPIVersion("2.0")) -> Dict:
+def make_openapi_schema(operations: Tuple[str, ...], version: OpenAPIVersion = OpenAPIVersion("2.0")) -> Dict:
     """Generate an OAS 2/3 schemas with the given endpoints.
 
     Example:
@@ -61,7 +61,7 @@ def make_openapi_schema(endpoints: Tuple[str, ...], version: OpenAPIVersion = Op
 
     """
     return {OpenAPIVersion("2.0"): _make_openapi_2_schema, OpenAPIVersion("3.0"): _make_openapi_3_schema}[version](
-        endpoints
+        operations
     )
 
 
@@ -102,7 +102,7 @@ PAYLOAD = {
 PAYLOAD_VALIDATOR = jsonschema.validators.Draft4Validator({"anyOf": [{"type": "null"}, PAYLOAD]})
 
 
-def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
+def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
     template: Dict[str, Any] = {
         "swagger": "2.0",
         "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},
@@ -119,7 +119,7 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
         links = components.setdefault("x-links", {})
         links.setdefault(name, definition)
 
-    for endpoint in endpoints:
+    for endpoint in operations:
         method, path = Endpoint[endpoint].value
         path = path.replace(template["basePath"], "")
         reference = {"$ref": "#/definitions/Node"}
@@ -360,7 +360,7 @@ def _make_openapi_2_schema(endpoints: Tuple[str, ...]) -> Dict:
     return template
 
 
-def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
+def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
     _base_path = "api"
     template: Dict[str, Any] = {
         "openapi": "3.0.2",
@@ -375,7 +375,7 @@ def _make_openapi_3_schema(endpoints: Tuple[str, ...]) -> Dict:
         links = components.setdefault("links", {})
         links.setdefault(name, definition)
 
-    for endpoint in endpoints:
+    for endpoint in operations:
         method, path = Endpoint[endpoint].value
         path = path.replace(base_path, "")
         reference = {"$ref": "#/x-definitions/Node"}
