@@ -13,14 +13,14 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from .constants import DEFAULT_DEADLINE, DataGenerationMethod
 from .exceptions import InvalidSchema
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
-from .models import Case, Endpoint
+from .models import APIOperation, Case
 
 GivenInput = Union[SearchStrategy, InferType]
 
 
 def create_test(
     *,
-    endpoint: Endpoint,
+    endpoint: APIOperation,
     test: Callable,
     settings: Optional[hypothesis.settings] = None,
     seed: Optional[int] = None,
@@ -66,7 +66,7 @@ def make_async_test(test: Callable) -> Callable:
     return async_run
 
 
-def add_examples(test: Callable, endpoint: Endpoint, hook_dispatcher: Optional[HookDispatcher] = None) -> Callable:
+def add_examples(test: Callable, endpoint: APIOperation, hook_dispatcher: Optional[HookDispatcher] = None) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
     try:
         examples: List[Case] = [get_single_example(strategy) for strategy in endpoint.get_strategies_from_examples()]

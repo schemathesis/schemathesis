@@ -10,7 +10,7 @@ from .types import GenericTest
 from .utils import GenericResponse
 
 if TYPE_CHECKING:
-    from .models import Case, Endpoint
+    from .models import APIOperation, Case
 
 
 class HookLocation(Enum):
@@ -38,7 +38,7 @@ class RegisteredHook:
 class HookContext:
     """A context that is passed to some hook functions."""
 
-    endpoint: Optional["Endpoint"] = attr.ib(default=None)  # pragma: no mutate
+    endpoint: Optional["APIOperation"] = attr.ib(default=None)  # pragma: no mutate
 
 
 @attr.s(slots=True)  # pragma: no mutate

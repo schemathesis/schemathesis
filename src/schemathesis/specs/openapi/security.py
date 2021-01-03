@@ -4,7 +4,7 @@ from typing import Any, ClassVar, Dict, Generator, List, Tuple, Type
 import attr
 from jsonschema import RefResolver
 
-from ...models import Endpoint
+from ...models import APIOperation
 from .parameters import OpenAPI20Parameter, OpenAPI30Parameter, OpenAPIParameter
 
 
@@ -14,7 +14,7 @@ class BaseSecurityProcessor:
     http_security_name = "basic"
     parameter_cls: ClassVar[Type[OpenAPIParameter]] = OpenAPI20Parameter
 
-    def process_definitions(self, schema: Dict[str, Any], endpoint: Endpoint, resolver: RefResolver) -> None:
+    def process_definitions(self, schema: Dict[str, Any], endpoint: APIOperation, resolver: RefResolver) -> None:
         """Add relevant security parameters to data generation."""
         for definition in self._get_active_definitions(schema, endpoint, resolver):
             if definition["type"] == "apiKey":
@@ -22,7 +22,7 @@ class BaseSecurityProcessor:
             self.process_http_security_definition(definition, endpoint)
 
     def _get_active_definitions(
-        self, schema: Dict[str, Any], endpoint: Endpoint, resolver: RefResolver
+        self, schema: Dict[str, Any], endpoint: APIOperation, resolver: RefResolver
     ) -> Generator[Dict[str, Any], None, None]:
         """Get only security definitions active for the given endpoint."""
         definitions = self.get_security_definitions(schema, resolver)
@@ -35,7 +35,7 @@ class BaseSecurityProcessor:
         return schema.get("securityDefinitions", {})
 
     def get_security_definitions_as_parameters(
-        self, schema: Dict[str, Any], endpoint: Endpoint, resolver: RefResolver, location: str
+        self, schema: Dict[str, Any], endpoint: APIOperation, resolver: RefResolver, location: str
     ) -> List[Dict[str, Any]]:
         """Security definitions converted to OAS parameters.
 
@@ -48,11 +48,11 @@ class BaseSecurityProcessor:
             if self._is_match(definition, location)
         ]
 
-    def process_api_key_security_definition(self, definition: Dict[str, Any], endpoint: Endpoint) -> None:
+    def process_api_key_security_definition(self, definition: Dict[str, Any], endpoint: APIOperation) -> None:
         parameter = self.parameter_cls(self._make_api_key_parameter(definition))
         endpoint.add_parameter(parameter)
 
-    def process_http_security_definition(self, definition: Dict[str, Any], endpoint: Endpoint) -> None:
+    def process_http_security_definition(self, definition: Dict[str, Any], endpoint: APIOperation) -> None:
         if definition["type"] == self.http_security_name:
             parameter = self.parameter_cls(self._make_http_auth_parameter(definition))
             endpoint.add_parameter(parameter)
@@ -115,7 +115,7 @@ class OpenAPISecurityProcessor(BaseSecurityProcessor):
         return make_api_key_schema(definition, schema={"type": "string"})
 
 
-def get_security_requirements(schema: Dict[str, Any], endpoint: Endpoint) -> List[str]:
+def get_security_requirements(schema: Dict[str, Any], endpoint: APIOperation) -> List[str]:
     """Get applied security requirements for the given endpoint."""
     # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#operation-object
     # > This definition overrides any declared top-level security.

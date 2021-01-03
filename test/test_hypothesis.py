@@ -7,7 +7,7 @@ from hypothesis import strategies as st
 import schemathesis
 from schemathesis import Case, register_string_format
 from schemathesis.exceptions import InvalidSchema
-from schemathesis.models import Endpoint, EndpointDefinition
+from schemathesis.models import APIOperation, EndpointDefinition
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
 from schemathesis.specs.openapi._hypothesis import (
     PARAMETERS,
@@ -22,8 +22,8 @@ from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20Compos
 from schemathesis.utils import NOT_SET
 
 
-def make_endpoint(schema, **kwargs) -> Endpoint:
-    return Endpoint("/users", "POST", definition=EndpointDefinition({}, {}, "foo", []), schema=schema, **kwargs)
+def make_endpoint(schema, **kwargs) -> APIOperation:
+    return APIOperation("/users", "POST", definition=EndpointDefinition({}, {}, "foo", []), schema=schema, **kwargs)
 
 
 @pytest.mark.parametrize("name", sorted(PARAMETERS))
@@ -65,7 +65,7 @@ def test_get_examples(name, swagger_20):
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_no_body_in_get(swagger_20):
-    endpoint = Endpoint(
+    endpoint = APIOperation(
         path="/api/success",
         method="GET",
         definition=EndpointDefinition({}, {}, "foo", []),
@@ -91,7 +91,7 @@ def test_no_body_in_get(swagger_20):
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_invalid_body_in_get(swagger_20):
-    endpoint = Endpoint(
+    endpoint = APIOperation(
         path="/foo",
         method="GET",
         definition=EndpointDefinition({}, {}, "foo", []),
@@ -117,7 +117,7 @@ def test_invalid_body_in_get(swagger_20):
 @pytest.mark.hypothesis_nested
 def test_invalid_body_in_get_disable_validation(simple_schema):
     schema = schemathesis.from_dict(simple_schema, validate_schema=False)
-    endpoint = Endpoint(
+    endpoint = APIOperation(
         path="/foo",
         method="GET",
         definition=EndpointDefinition({}, {}, "foo", []),
@@ -227,7 +227,7 @@ def test_invalid_custom_strategy(values, error):
     "definition", ({"name": "api_key", "in": "header", "type": "string"}, {"name": "api_key", "in": "header"})
 )
 def test_valid_headers(openapi2_base_url, swagger_20, definition):
-    endpoint = Endpoint(
+    endpoint = APIOperation(
         "/api/success",
         "GET",
         definition=EndpointDefinition({}, {}, "foo", []),

@@ -2,7 +2,7 @@ from typing import Any, Dict, List
 
 from hypothesis.strategies import SearchStrategy
 
-from ...models import Case, Endpoint
+from ...models import APIOperation, Case
 from ._hypothesis import PARAMETERS, get_case_strategy
 from .constants import LOCATION_TO_CONTAINER
 
@@ -76,7 +76,7 @@ def get_request_body_example_from_properties(endpoint_def: Dict[str, Any]) -> Di
     return static_parameters
 
 
-def get_static_parameters_from_example(endpoint: Endpoint) -> Dict[str, Any]:
+def get_static_parameters_from_example(endpoint: APIOperation) -> Dict[str, Any]:
     static_parameters = {}
     for name in PARAMETERS:
         parameters = getattr(endpoint, name)
@@ -86,7 +86,7 @@ def get_static_parameters_from_example(endpoint: Endpoint) -> Dict[str, Any]:
     return static_parameters
 
 
-def get_static_parameters_from_examples(endpoint: Endpoint, examples_field: str) -> List[Dict[str, Any]]:
+def get_static_parameters_from_examples(endpoint: APIOperation, examples_field: str) -> List[Dict[str, Any]]:
     """Get static parameters from OpenAPI examples keyword."""
     endpoint_def = endpoint.definition.resolved
     return merge_examples(
@@ -94,7 +94,7 @@ def get_static_parameters_from_examples(endpoint: Endpoint, examples_field: str)
     )
 
 
-def get_static_parameters_from_properties(endpoint: Endpoint) -> Dict[str, Any]:
+def get_static_parameters_from_properties(endpoint: APIOperation) -> Dict[str, Any]:
     endpoint_def = endpoint.definition.resolved
     return {
         **get_parameter_example_from_properties(endpoint_def),
@@ -102,7 +102,9 @@ def get_static_parameters_from_properties(endpoint: Endpoint) -> Dict[str, Any]:
     }
 
 
-def get_strategies_from_examples(endpoint: Endpoint, examples_field: str = "examples") -> List[SearchStrategy[Case]]:
+def get_strategies_from_examples(
+    endpoint: APIOperation, examples_field: str = "examples"
+) -> List[SearchStrategy[Case]]:
     strategies = [
         get_case_strategy(endpoint=endpoint, **static_parameters)
         for static_parameters in get_static_parameters_from_examples(endpoint, examples_field)

@@ -5,7 +5,7 @@ import attr
 from requests import exceptions
 
 from ..exceptions import HTTPError
-from ..models import Endpoint, Status, TestResult, TestResultSet
+from ..models import APIOperation, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
 from ..utils import format_exception
 from .serialization import SerializedTestResult
@@ -61,7 +61,7 @@ class BeforeExecution(CurrentPathMixin, ExecutionEvent):
     recursion_level: int = attr.ib()  # pragma: no mutate
 
     @classmethod
-    def from_endpoint(cls, endpoint: Endpoint, recursion_level: int) -> "BeforeExecution":
+    def from_endpoint(cls, endpoint: APIOperation, recursion_level: int) -> "BeforeExecution":
         return cls(
             method=endpoint.method.upper(),
             path=endpoint.full_path,
@@ -78,7 +78,7 @@ class AfterExecution(CurrentPathMixin, ExecutionEvent):
     path: str = attr.ib()  # pragma: no mutate
     relative_path: str = attr.ib()  # pragma: no mutate
 
-    # Endpoint test status - success / failure / error
+    # APIOperation test status - success / failure / error
     status: Status = attr.ib()  # pragma: no mutate
     result: SerializedTestResult = attr.ib()  # pragma: no mutate
     # Test running time
@@ -88,7 +88,12 @@ class AfterExecution(CurrentPathMixin, ExecutionEvent):
 
     @classmethod
     def from_result(
-        cls, result: TestResult, status: Status, elapsed_time: float, hypothesis_output: List[str], endpoint: Endpoint
+        cls,
+        result: TestResult,
+        status: Status,
+        elapsed_time: float,
+        hypothesis_output: List[str],
+        endpoint: APIOperation,
     ) -> "AfterExecution":
         return cls(
             method=endpoint.method.upper(),

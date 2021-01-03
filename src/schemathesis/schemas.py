@@ -20,7 +20,7 @@ from requests.structures import CaseInsensitiveDict
 from ._hypothesis import create_test
 from .constants import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
-from .models import Case, Endpoint
+from .models import APIOperation, Case
 from .stateful import APIStateMachine, Stateful, StatefulTest
 from .types import Filter, FormData, GenericTest, NotSet
 from .utils import NOT_SET, GenericResponse
@@ -121,20 +121,20 @@ class BaseSchema(Mapping):
             total += 1
         return total
 
-    def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
+    def get_all_endpoints(self) -> Generator[APIOperation, None, None]:
         raise NotImplementedError
 
-    def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, endpoint: APIOperation) -> List[SearchStrategy[Case]]:
         """Get examples from the endpoint."""
         raise NotImplementedError
 
     def get_stateful_tests(
-        self, response: GenericResponse, endpoint: Endpoint, stateful: Optional[Stateful]
+        self, response: GenericResponse, endpoint: APIOperation, stateful: Optional[Stateful]
     ) -> Sequence[StatefulTest]:
         """Get a list of additional tests, that should be executed after this response from the endpoint."""
         raise NotImplementedError
 
-    def get_parameter_serializer(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
+    def get_parameter_serializer(self, endpoint: APIOperation, location: str) -> Optional[Callable]:
         """Get a function that serializes parameters for the given location."""
         raise NotImplementedError
 
@@ -143,7 +143,7 @@ class BaseSchema(Mapping):
         func: Callable,
         settings: Optional[hypothesis.settings] = None,
         seed: Optional[int] = None,
-    ) -> Generator[Tuple[Endpoint, DataGenerationMethod, Callable], None, None]:
+    ) -> Generator[Tuple[APIOperation, DataGenerationMethod, Callable], None, None]:
         """Generate all endpoints and Hypothesis tests for them."""
         for endpoint in self.get_all_endpoints():
             for data_generation_method in self.data_generation_methods:
@@ -242,7 +242,7 @@ class BaseSchema(Mapping):
 
     def get_local_hook_dispatcher(self) -> Optional[HookDispatcher]:
         """Get a HookDispatcher instance bound to the test if present."""
-        # It might be not present when it is used without pytest via `Endpoint.as_strategy()`
+        # It might be not present when it is used without pytest via `APIOperation.as_strategy()`
         if self.test_function is not None:
             # Might be missing it in case of `LazySchema` usage
             return getattr(self.test_function, "_schemathesis_hooks", None)  # type: ignore
@@ -257,7 +257,7 @@ class BaseSchema(Mapping):
             local_dispatcher.dispatch(name, context, *args, **kwargs)
 
     def prepare_multipart(
-        self, form_data: FormData, endpoint: Endpoint
+        self, form_data: FormData, endpoint: APIOperation
     ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
         """Split content of `form_data` into files & data.
 
@@ -265,12 +265,12 @@ class BaseSchema(Mapping):
         """
         raise NotImplementedError
 
-    def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
+    def get_request_payload_content_types(self, endpoint: APIOperation) -> List[str]:
         raise NotImplementedError
 
     def get_case_strategy(
         self,
-        endpoint: Endpoint,
+        endpoint: APIOperation,
         hooks: Optional[HookDispatcher] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
@@ -279,17 +279,17 @@ class BaseSchema(Mapping):
     def as_state_machine(self) -> Type[APIStateMachine]:
         raise NotImplementedError
 
-    def get_links(self, endpoint: Endpoint) -> Dict[str, Dict[str, Any]]:
+    def get_links(self, endpoint: APIOperation) -> Dict[str, Dict[str, Any]]:
         raise NotImplementedError
 
-    def validate_response(self, endpoint: Endpoint, response: GenericResponse) -> None:
+    def validate_response(self, endpoint: APIOperation, response: GenericResponse) -> None:
         raise NotImplementedError
 
     def prepare_schema(self, schema: Any) -> Any:
         raise NotImplementedError
 
 
-def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, MethodsDict]:
+def endpoints_to_dict(endpoints: Generator[APIOperation, None, None]) -> Dict[str, MethodsDict]:
     output: Dict[str, MethodsDict] = {}
     for endpoint in endpoints:
         output.setdefault(endpoint.path, MethodsDict())

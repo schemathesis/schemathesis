@@ -5,13 +5,13 @@ import pytest
 import requests
 
 import schemathesis
-from schemathesis.models import Case, Endpoint, EndpointDefinition
+from schemathesis.models import APIOperation, Case, EndpointDefinition
 from schemathesis.parameters import ParameterSet
 from schemathesis.specs.openapi.links import Link, get_container
 from schemathesis.specs.openapi.parameters import OpenAPI30Parameter
 from schemathesis.stateful import ParsedData, Stateful
 
-ENDPOINT = Endpoint(
+ENDPOINT = APIOperation(
     path="/users/{user_id}",
     method="get",
     definition=ANY,
@@ -59,7 +59,7 @@ def response():
             [
                 Link(
                     name="GetUserByUserId",
-                    endpoint=Endpoint(
+                    endpoint=APIOperation(
                         path="/users/{user_id}",
                         method="get",
                         definition=ANY,
@@ -171,7 +171,7 @@ def test_make_endpoint_invalid_location(parameter):
 
 
 def test_get_container_invalid_location():
-    endpoint = Endpoint(
+    endpoint = APIOperation(
         path="/users/{user_id}",
         method="get",
         schema=None,

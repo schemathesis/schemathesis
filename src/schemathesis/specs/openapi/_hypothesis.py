@@ -13,7 +13,7 @@ from ... import utils
 from ...constants import DataGenerationMethod
 from ...exceptions import InvalidSchema
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
-from ...models import Case, Endpoint
+from ...models import APIOperation, Case
 from ...schemas import BaseSchema
 from ...utils import NOT_SET
 from .constants import LOCATION_TO_CONTAINER
@@ -76,7 +76,7 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
 @st.composite  # type: ignore
 def get_case_strategy(  # pylint: disable=too-many-locals
     draw: Callable,
-    endpoint: Endpoint,
+    endpoint: APIOperation,
     hooks: Optional[HookDispatcher] = None,
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     path_parameters: Any = NOT_SET,
@@ -151,7 +151,7 @@ YAML_PARSING_ISSUE_MESSAGE = (
 
 
 @contextmanager
-def detect_invalid_schema(endpoint: Endpoint) -> Generator[None, None, None]:
+def detect_invalid_schema(endpoint: APIOperation) -> Generator[None, None, None]:
     """Detect common issues with schemas."""
     try:
         yield
@@ -161,7 +161,7 @@ def detect_invalid_schema(endpoint: Endpoint) -> Generator[None, None, None]:
         raise
 
 
-def is_yaml_parsing_issue(endpoint: Endpoint) -> bool:
+def is_yaml_parsing_issue(endpoint: APIOperation) -> bool:
     """Detect whether the endpoint has problems because of YAML syntax.
 
     For example, unquoted 'on' is parsed as `True`.
@@ -186,7 +186,7 @@ def _get_body_strategy(
 
 
 def get_parameters_strategy(
-    endpoint: Endpoint, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], location: str
+    endpoint: APIOperation, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], location: str
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the endpoint parameters."""
     parameters = getattr(endpoint, LOCATION_TO_CONTAINER[location])
@@ -246,7 +246,7 @@ def quote_all(parameters: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def apply_hooks(
-    endpoint: Endpoint,
+    endpoint: APIOperation,
     context: HookContext,
     hooks: Optional[HookDispatcher],
     strategy: st.SearchStrategy[Case],

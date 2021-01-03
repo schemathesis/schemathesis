@@ -71,7 +71,7 @@ def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
 class Case:  # pylint: disable=too-many-public-methods
     """A single test case parameters."""
 
-    endpoint: "Endpoint" = attr.ib()  # pragma: no mutate
+    endpoint: "APIOperation" = attr.ib()  # pragma: no mutate
     path_parameters: Optional[PathParameters] = attr.ib(default=None)  # pragma: no mutate
     headers: Optional[Headers] = attr.ib(default=None)  # pragma: no mutate
     cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
@@ -422,8 +422,8 @@ P = TypeVar("P", bound=Parameter)
 
 
 @attr.s  # pragma: no mutate
-class Endpoint(Generic[P]):
-    """A container that could be used for test cases generation."""
+class APIOperation(Generic[P]):
+    """A single operation defined in an API."""
 
     # `path` does not contain `basePath`
     # Example <scheme>://<host>/<basePath>/users - "/users" is path
@@ -501,7 +501,7 @@ class Endpoint(Generic[P]):
     def get_request_payload_content_types(self) -> List[str]:
         return self.schema.get_request_payload_content_types(self)
 
-    def partial_deepcopy(self) -> "Endpoint":
+    def partial_deepcopy(self) -> "APIOperation":
         return self.__class__(
             path=self.path,  # string, immutable
             method=self.method,  # string, immutable
@@ -516,7 +516,7 @@ class Endpoint(Generic[P]):
             body=deepcopy(self.body),
         )
 
-    def clone(self, **components: Any) -> "Endpoint":
+    def clone(self, **components: Any) -> "APIOperation":
         """Create a new instance of this endpoint with updated components."""
         return self.__class__(
             path=self.path,
@@ -564,6 +564,10 @@ class Endpoint(Generic[P]):
             return True
         except CheckFailed:
             return False
+
+
+# backward-compatibility
+Endpoint = APIOperation
 
 
 class Status(IntEnum):

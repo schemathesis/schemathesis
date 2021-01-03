@@ -6,7 +6,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from schemathesis import Case
-from schemathesis.models import Endpoint
+from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.lexer import Token
@@ -17,7 +17,7 @@ DOCUMENT = {"foo": ["bar", "baz"], "": 0, "a/b": 1, "c%d": 2, "e^f": 3, "g|h": 4
 
 @pytest.fixture(scope="module")
 def endpoint():
-    return Endpoint("/users/{user_id}", "GET", None, None, base_url="http://127.0.0.1:8080/api")
+    return APIOperation("/users/{user_id}", "GET", None, None, base_url="http://127.0.0.1:8080/api")
 
 
 @pytest.fixture(scope="module")

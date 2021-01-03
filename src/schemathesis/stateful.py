@@ -9,7 +9,7 @@ from requests.structures import CaseInsensitiveDict
 from starlette.applications import Starlette
 
 from .constants import DataGenerationMethod
-from .models import Case, CheckFunction, Endpoint
+from .models import APIOperation, Case, CheckFunction
 from .utils import NOT_SET, GenericResponse
 
 if TYPE_CHECKING:
@@ -52,7 +52,7 @@ class StatefulTest:
     def parse(self, case: Case, response: GenericResponse) -> ParsedData:
         raise NotImplementedError
 
-    def make_endpoint(self, collected: List[ParsedData]) -> Endpoint:
+    def make_endpoint(self, collected: List[ParsedData]) -> APIOperation:
         raise NotImplementedError
 
 
@@ -63,7 +63,7 @@ class StatefulData:
     stateful_test: StatefulTest = attr.ib()  # pragma: no mutate
     container: List[ParsedData] = attr.ib(factory=list)  # pragma: no mutate
 
-    def make_endpoint(self) -> Endpoint:
+    def make_endpoint(self) -> APIOperation:
         return self.stateful_test.make_endpoint(self.container)
 
     def store(self, case: Case, response: GenericResponse) -> None:
@@ -80,7 +80,7 @@ class Feedback:
     """
 
     stateful: Optional[Stateful] = attr.ib()  # pragma: no mutate
-    endpoint: Endpoint = attr.ib(repr=False)  # pragma: no mutate
+    endpoint: APIOperation = attr.ib(repr=False)  # pragma: no mutate
     stateful_tests: Dict[str, StatefulData] = attr.ib(factory=dict, repr=False)  # pragma: no mutate
 
     def add_test_case(self, case: Case, response: GenericResponse) -> None:
@@ -91,7 +91,7 @@ class Feedback:
 
     def get_stateful_tests(
         self, test: Callable, settings: Optional[hypothesis.settings], seed: Optional[int]
-    ) -> Generator[Tuple[Endpoint, DataGenerationMethod, Callable], None, None]:
+    ) -> Generator[Tuple[APIOperation, DataGenerationMethod, Callable], None, None]:
         """Generate additional tests that use data from the previous ones."""
         from ._hypothesis import create_test  # pylint: disable=import-outside-toplevel
 
@@ -116,7 +116,7 @@ class StepResult:
 class Direction:
     name: str
     status_code: str
-    endpoint: Endpoint
+    endpoint: APIOperation
 
     def set_data(self, case: Case, **kwargs: Any) -> None:
         raise NotImplementedError

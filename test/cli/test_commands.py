@@ -20,7 +20,7 @@ from schemathesis.checks import ALL_CHECKS
 from schemathesis.cli import reset_checks
 from schemathesis.hooks import unregister_all
 from schemathesis.loaders import from_uri
-from schemathesis.models import Endpoint
+from schemathesis.models import APIOperation
 from schemathesis.runner import DEFAULT_CHECKS
 from schemathesis.targets import DEFAULT_TARGETS
 
@@ -1172,7 +1172,7 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
 @pytest.mark.parametrize("workers", (1, 2))
 def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_20, workers):
     # When a Schemathesis run in interrupted by keyboard or via SIGINT
-    endpoint = Endpoint("/success", "GET", {}, swagger_20, base_url=base_url)
+    endpoint = APIOperation("/success", "GET", {}, swagger_20, base_url=base_url)
     if len(cli_args) == 2:
         endpoint.app = flask_app
         original = Case(endpoint).call_wsgi

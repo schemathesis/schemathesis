@@ -3,7 +3,7 @@ from hypothesis import strategies as st
 from requests.structures import CaseInsensitiveDict
 
 import schemathesis
-from schemathesis.models import Case, Endpoint
+from schemathesis.models import APIOperation, Case
 from schemathesis.schemas import endpoints_to_dict
 
 
@@ -37,7 +37,7 @@ def test_repr(swagger_20):
 
 @pytest.mark.parametrize("method", ("GET", "get"))
 def test_endpoint_access(swagger_20, method):
-    assert isinstance(swagger_20["/users"][method], Endpoint)
+    assert isinstance(swagger_20["/users"][method], APIOperation)
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")

@@ -15,7 +15,7 @@ from .. import DataGenerationMethod
 from .._hypothesis import create_test
 from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from ..exceptions import InvalidSchema
-from ..models import Endpoint
+from ..models import APIOperation
 from ..utils import is_schemathesis_test
 
 USE_FROM_PARENT = version.parse(pytest.__version__) >= version.parse("5.4.0")
@@ -59,11 +59,11 @@ class SchemathesisCase(PyCollector):
         self.given_kwargs = getattr(test_function, "_schemathesis_given_kwargs", {})
         super().__init__(*args, **kwargs)
 
-    def _get_test_name(self, endpoint: Endpoint, data_generation_method: DataGenerationMethod) -> str:
+    def _get_test_name(self, endpoint: APIOperation, data_generation_method: DataGenerationMethod) -> str:
         return f"{self.name}[{endpoint.method.upper()}:{endpoint.full_path}][{data_generation_method.as_short_name()}]"
 
     def _gen_items(
-        self, endpoint: Endpoint, data_generation_method: DataGenerationMethod
+        self, endpoint: APIOperation, data_generation_method: DataGenerationMethod
     ) -> Generator[SchemathesisFunction, None, None]:
         """Generate all items for the given endpoint.
 

@@ -8,7 +8,7 @@ from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tup
 
 import attr
 
-from ...models import Case, Endpoint
+from ...models import APIOperation, Case
 from ...parameters import ParameterSet
 from ...stateful import Direction, ParsedData, StatefulTest
 from ...types import NotSet
@@ -19,12 +19,12 @@ from .constants import LOCATION_TO_CONTAINER
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
 class Link(StatefulTest):
-    endpoint: Endpoint = attr.ib()  # pragma: no mutate
+    endpoint: APIOperation = attr.ib()  # pragma: no mutate
     parameters: Dict[str, Any] = attr.ib()  # pragma: no mutate
     request_body: Any = attr.ib(default=NOT_SET)  # pragma: no mutate
 
     @classmethod
-    def from_definition(cls, name: str, definition: Dict[str, Dict[str, Any]], source_endpoint: Endpoint) -> "Link":
+    def from_definition(cls, name: str, definition: Dict[str, Dict[str, Any]], source_endpoint: APIOperation) -> "Link":
         # Links can be behind a reference
         _, definition = source_endpoint.schema.resolver.resolve_in_scope(  # type: ignore
             definition, source_endpoint.definition.scope
@@ -57,7 +57,7 @@ class Link(StatefulTest):
             body=expressions.evaluate(self.request_body, context),
         )
 
-    def make_endpoint(self, collected: List[ParsedData]) -> Endpoint:
+    def make_endpoint(self, collected: List[ParsedData]) -> APIOperation:
         """Create a modified version of the original endpoint with additional data merged in."""
         # We split the gathered data among all locations & store the original parameter
         containers = {
@@ -124,7 +124,7 @@ class Link(StatefulTest):
         )
 
 
-def get_links(response: GenericResponse, endpoint: Endpoint, field: str) -> Sequence[Link]:
+def get_links(response: GenericResponse, endpoint: APIOperation, field: str) -> Sequence[Link]:
     """Get `x-links` / `links` definitions from the schema."""
     responses = endpoint.definition.resolved["responses"]
     if str(response.status_code) in responses:
@@ -145,7 +145,7 @@ class OpenAPILink(Direction):
     name: str = attr.ib()  # pragma: no mutate
     status_code: str = attr.ib()  # pragma: no mutate
     definition: Dict[str, Any] = attr.ib()  # pragma: no mutate
-    endpoint: Endpoint = attr.ib()  # pragma: no mutate
+    endpoint: APIOperation = attr.ib()  # pragma: no mutate
     parameters: List[Tuple[Optional[str], str, str]] = attr.ib(init=False)  # pragma: no mutate
     body: Union[Dict[str, Any], NotSet] = attr.ib(init=False)  # pragma: no mutate
 
@@ -182,7 +182,7 @@ class OpenAPILink(Direction):
         if self.body is not NOT_SET:
             case.body = expressions.evaluate(self.body, context)
 
-    def get_target_endpoint(self) -> Endpoint:
+    def get_target_endpoint(self) -> APIOperation:
         if "operationId" in self.definition:
             return self.endpoint.schema.get_endpoint_by_operation_id(self.definition["operationId"])  # type: ignore
         return self.endpoint.schema.get_endpoint_by_reference(self.definition["operationRef"])  # type: ignore
@@ -217,7 +217,7 @@ def normalize_parameter(parameter: str, expression: str) -> Tuple[Optional[str],
         return None, parameter, expression
 
 
-def get_all_links(endpoint: Endpoint) -> Generator[Tuple[str, OpenAPILink], None, None]:
+def get_all_links(endpoint: APIOperation) -> Generator[Tuple[str, OpenAPILink], None, None]:
     for status_code, definition in endpoint.definition.resolved["responses"].items():
         for name, link_definition in definition.get(endpoint.schema.links_field, {}).items():  # type: ignore
             yield status_code, OpenAPILink(name, status_code, link_definition, endpoint)
@@ -229,7 +229,7 @@ def add_link(
     parameters: Optional[Dict[str, str]],
     request_body: Any,
     status_code: Union[str, int],
-    target: Union[str, Endpoint],
+    target: Union[str, APIOperation],
 ) -> None:
     response = responses.setdefault(str(status_code), {})
     links_definition = response.setdefault(links_field, {})

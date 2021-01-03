@@ -295,7 +295,7 @@ a special bundle, where it will be used for dependent API calls. The state machi
     If you need to run initialization code always at the beginning of each test scenario, use the :meth:`setup` hook instead.
 
 If you need more control and you'd like to provide the whole payload to your endpoint, then you can do it either by modifying
-the generated case manually or by creating a new one via the :func:`Endpoint.make_case` function:
+the generated case manually or by creating a new one via the :func:`APIOperation.make_case` function:
 
 .. code-block:: python
 

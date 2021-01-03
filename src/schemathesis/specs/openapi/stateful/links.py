@@ -8,13 +8,13 @@ from ..links import OpenAPILink, get_all_links
 from ..utils import expand_status_code
 
 if TYPE_CHECKING:
-    from ....models import Endpoint
+    from ....models import APIOperation
 
 FilterFunction = Callable[[StepResult], bool]
 
 
 def apply(
-    endpoint: "Endpoint",
+    endpoint: "APIOperation",
     bundles: Dict[str, CaseInsensitiveDict],
     connections: Dict[str, List[st.SearchStrategy[Tuple[StepResult, OpenAPILink]]]],
 ) -> None:

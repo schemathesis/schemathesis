@@ -32,7 +32,7 @@ def execution_context():
 
 @pytest.fixture
 def endpoint(swagger_20):
-    return models.Endpoint("/success", "GET", definition={}, base_url="http://127.0.0.1:8080", schema=swagger_20)
+    return models.APIOperation("/success", "GET", definition={}, base_url="http://127.0.0.1:8080", schema=swagger_20)
 
 
 @pytest.fixture()
@@ -273,7 +273,7 @@ def test_display_single_error(capsys, swagger_20, endpoint, execution_context, s
 def test_display_failures(swagger_20, capsys, execution_context, results_set, verbosity):
     execution_context.verbosity = verbosity
     # Given two test results - success and failure
-    endpoint = models.Endpoint("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)
+    endpoint = models.APIOperation("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)
     failure = models.TestResult(endpoint.method, endpoint.full_path, DataGenerationMethod.default())
     failure.add_failure("test", models.Case(endpoint), "Message")
     execution_context.results.append(SerializedTestResult.from_test_result(failure))
@@ -294,7 +294,7 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set, ve
 @pytest.mark.parametrize("show_errors_tracebacks", (True, False))
 def test_display_errors(swagger_20, capsys, results_set, execution_context, show_errors_tracebacks):
     # Given two test results - success and error
-    endpoint = models.Endpoint("/api/error", "GET", {}, swagger_20)
+    endpoint = models.APIOperation("/api/error", "GET", {}, swagger_20)
     error = models.TestResult(endpoint.method, endpoint.full_path, DataGenerationMethod.default(), seed=123)
     error.add_error(ConnectionError("Connection refused!"), models.Case(endpoint, query={"a": 1}))
     results_set.append(error)

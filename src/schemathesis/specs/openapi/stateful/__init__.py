@@ -13,7 +13,7 @@ from ..links import OpenAPILink
 from . import links
 
 if TYPE_CHECKING:
-    from ....models import Case, Endpoint
+    from ....models import APIOperation, Case
     from ..schemas import BaseOpenAPISchema
 
 
@@ -67,7 +67,9 @@ def make_all_rules(
     }
 
 
-def make_rules(endpoint: "Endpoint", bundle: Bundle, connections: EndpointConnections) -> Generator[Rule, None, None]:
+def make_rules(
+    endpoint: "APIOperation", bundle: Bundle, connections: EndpointConnections
+) -> Generator[Rule, None, None]:
     """Create a rule for an endpoint."""
 
     def _make_rule(previous: SearchStrategy) -> Rule:

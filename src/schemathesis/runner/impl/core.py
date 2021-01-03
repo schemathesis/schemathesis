@@ -21,7 +21,7 @@ from ...constants import (
 )
 from ...exceptions import CheckFailed, InvalidSchema, NonCheckError, get_grouped_exception
 from ...hooks import HookContext, get_all_by_name
-from ...models import Case, Check, CheckFunction, Endpoint, Status, TestResult, TestResultSet
+from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResult, TestResultSet
 from ...runner import events
 from ...schemas import BaseSchema
 from ...stateful import Feedback, Stateful
@@ -107,7 +107,7 @@ class BaseRunner:
 
 
 def run_test(  # pylint: disable=too-many-locals
-    endpoint: Endpoint,
+    endpoint: APIOperation,
     test: Callable,
     checks: Iterable[CheckFunction],
     data_generation_method: DataGenerationMethod,

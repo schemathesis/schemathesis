@@ -7,7 +7,7 @@ from pytest_subtests import SubTests
 
 from .constants import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from .hooks import HookDispatcher, HookScope
-from .models import Endpoint
+from .models import APIOperation
 from .schemas import BaseSchema
 from .types import Filter, GenericTest, NotSet
 from .utils import NOT_SET
@@ -83,12 +83,12 @@ class LazySchema:
         return wrapper
 
 
-def _get_node_name(node_id: str, endpoint: Endpoint, data_generation_method: DataGenerationMethod) -> str:
+def _get_node_name(node_id: str, endpoint: APIOperation, data_generation_method: DataGenerationMethod) -> str:
     """Make a test node name. For example: test_api[GET:/users]."""
     return f"{node_id}[{endpoint.method.upper()}:{endpoint.full_path}][{data_generation_method.as_short_name()}]"
 
 
-def run_subtest(endpoint: Endpoint, fixtures: Dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:
+def run_subtest(endpoint: APIOperation, fixtures: Dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:
     """Run the given subtest with pytest fixtures."""
     with subtests.test(method=endpoint.method.upper(), path=endpoint.path):
         sub_test(**fixtures)

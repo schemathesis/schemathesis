@@ -6,7 +6,7 @@ from _pytest.main import ExitCode
 from hypothesis import find
 
 import schemathesis
-from schemathesis.models import Endpoint
+from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import examples
 from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
@@ -119,13 +119,13 @@ def schema_with_property_examples(dict_with_property_examples) -> BaseOpenAPISch
 
 
 @pytest.fixture()
-def endpoint(schema_with_examples) -> Endpoint:
+def endpoint(schema_with_examples) -> APIOperation:
     """Returns first (and only) endpoint from schema_with_examples."""
     return next(schema_with_examples.get_all_endpoints())
 
 
 @pytest.fixture()
-def endpoint_with_property_examples(schema_with_property_examples) -> Endpoint:
+def endpoint_with_property_examples(schema_with_property_examples) -> APIOperation:
     """Returns first (and only) endpoint from schema_with_examples."""
     return next(schema_with_property_examples.get_all_endpoints())
 

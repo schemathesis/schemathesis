@@ -35,7 +35,7 @@ EXPECTED_LINK_PARAMETERS = {"parameters": {"userId": "$response.body#/id"}}
 def test_add_link_default(schema_url):
     schema = schemathesis.from_uri(schema_url)
     # When we add a link to the target endpoint
-    # And it is an `Endpoint` instance
+    # And it is an `APIOperation` instance
     # And it has the `operationId` key
     links = add_link(schema, schema["/users/{user_id}"]["GET"], parameters={"userId": "$response.body#/id"})
     # Then it should be added without errors
