@@ -55,6 +55,15 @@ def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
     assert response.json() == {"success": True}
 
 
+def test_reserved_characters_in_operation_name(swagger_20):
+    # See GH-992
+    # When an API operation name contains `:`
+    endpoint = Endpoint("/foo:bar", "GET", {}, swagger_20)
+    case = endpoint.make_case()
+    # Then it should not be truncated during API call
+    assert case.as_requests_kwargs("/")["url"] == "/foo:bar"
+
+
 @pytest.mark.parametrize(
     "headers, expected",
     (

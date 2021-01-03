@@ -776,3 +776,18 @@ def test_dry_run_asgi(loadable_fastapi_app):
     execute("/openapi.json", app=loadable_fastapi_app, checks=(check,), dry_run=True)
     # Then no requests should be sent & no responses checked
     assert not called
+
+
+@pytest.mark.endpoints("reserved")
+def test_reserved_characters_in_operation_name(args):
+    # See GH-992
+
+    def check(response, case):
+        assert response.status_code == 200
+
+    # When there is `:` in the API operation path
+    app, kwargs = args
+    result = execute(checks=(check,), **kwargs)
+    # Then it should be reachable
+    assert not result.has_errors
+    assert not result.has_failures

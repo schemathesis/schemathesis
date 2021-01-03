@@ -31,6 +31,7 @@ class Endpoint(Enum):
     invalid_path_parameter = ("GET", "/api/invalid_path_parameter/{id}")
     missing_path_parameter = ("GET", "/api/missing_path_parameter/{id}")
     headers = ("GET", "/api/headers")
+    reserved = ("GET", "/api/foo:bar")
 
     create_user = ("POST", "/api/users/")
     get_user = ("GET", "/api/users/{user_id}")

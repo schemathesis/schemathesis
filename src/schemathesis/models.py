@@ -23,7 +23,7 @@ from typing import (
     Union,
     cast,
 )
-from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 import attr
 import curlify
@@ -244,7 +244,7 @@ class Case:  # pylint: disable=too-many-public-methods
             final_headers["Content-Type"] = self.media_type
         base_url = self._get_base_url(base_url)
         formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
-        url = urljoin(base_url + "/", formatted_path)
+        url = unquote(urljoin(base_url + "/", quote(formatted_path)))
         extra: Dict[str, Any]
         serializer = self._get_serializer()
         if serializer is not None and self.body is not NOT_SET:
