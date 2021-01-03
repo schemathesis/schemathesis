@@ -27,6 +27,7 @@ Changelog
 - When ``hypothesis-jsonschema`` fails to resolve recursive references, the test is skipped with an error message that indicates why it happens.
 - Shorter error messages when API operations have logical errors in their schema. For example, when the maximum is less than the minimum - ``{"type": "integer", "minimum": 5, "maximum": 4}``.
 - If multiple non-check related failures happens during a test of a single API operation, they are displayed as is, instead of Hypothesis-level error messages about multiple found failures or flaky tests. `#975`_
+- Catch schema parsing errors, that are caused by YAML parsing.
 
 **Fixed**
 
@@ -44,6 +45,7 @@ Changelog
 - Invalid types in ``x-examples``. `#982`_
 - CLI crash on schemas with operation names longer than the current terminal width. `#990`_
 - Handling of API operations that contain reserved characters in their paths. `#992`_
+- CLI execution stops on errors during example generation. `#994`_
 
 **Performance**
 
@@ -1633,6 +1635,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#994: https://github.com/schemathesis/schemathesis/issues/994
 .. _#992: https://github.com/schemathesis/schemathesis/issues/992
 .. _#990: https://github.com/schemathesis/schemathesis/issues/990
 .. _#987: https://github.com/schemathesis/schemathesis/issues/987

@@ -1716,7 +1716,7 @@ def test_reserved_characters_in_operation_name(testdir, empty_open_api_3_schema)
     # See GH-992
     # When an API operation name contains `:`
     empty_open_api_3_schema["paths"] = {
-        f"/foo:bar": {
+        "/foo:bar": {
             "get": {
                 "responses": {"200": {"description": "OK"}},
             }
@@ -1727,3 +1727,57 @@ def test_reserved_characters_in_operation_name(testdir, empty_open_api_3_schema)
     # Then this operation name should be displayed with the leading `/`
     assert result.ret == ExitCode.OK
     assert "GET /foo:bar .                                                            [100%]" in result.outlines
+
+
+def test_error_during_example_generation(testdir, cli):
+    # See GH-994
+    # When the API schema is in YAML
+    # And contains an unquoted value, that is casted to boolean
+    # And it is behind references
+    # And there are examples of another parameter
+    content = """
+swagger: "2.0"
+basePath: /
+info:
+  description: Test
+  title: Test
+  version: 1.0
+parameters:
+  Bar:
+    in: body
+    name: payload
+    required: true
+    schema:
+      properties:
+        name:
+          example: test
+          type: string
+      type: object
+paths:
+  /test:
+    post:
+      parameters:
+        - $ref: "#/parameters/Bar"
+        - in: query
+          name: test
+          type: string
+      responses:
+        "201":
+          description: Ok
+definitions:
+  Foo:
+    properties:
+      bar:
+        example: foo
+        type: string
+      # Should be quoted
+      on:
+        example: true
+        type: boolean
+    type: object
+"""
+    schema_file = testdir.makefile(".yaml", schema=content)
+    result = cli.run(str(schema_file), "--dry-run", "--validate-schema=false")
+    # Then the run should not be interrupted, but the run fails
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    assert " The API schema contains non-string keys" in result.stdout
