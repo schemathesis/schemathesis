@@ -54,6 +54,10 @@ def create_openapi_app(
             1 / 0
         return jsonify({"success": True})
 
+    @app.route("/api/foo:bar", methods=["GET"])
+    def reserved():
+        return jsonify({"success": True})
+
     @app.route("/api/recursive", methods=["GET"])
     def recursive():
         return jsonify({"children": [{"children": [{"children": []}]}]})

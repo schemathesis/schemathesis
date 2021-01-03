@@ -43,6 +43,7 @@ Changelog
 - ``TypeError`` on nullable parameters during Open API specific serialization. `#980`_
 - Invalid types in ``x-examples``. `#982`_
 - CLI crash on schemas with operation names longer than the current terminal width. `#990`_
+- Handling of API operations that contain reserved characters in their paths. `#992`_
 
 **Performance**
 
@@ -1632,6 +1633,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#992: https://github.com/schemathesis/schemathesis/issues/992
 .. _#990: https://github.com/schemathesis/schemathesis/issues/990
 .. _#987: https://github.com/schemathesis/schemathesis/issues/987
 .. _#982: https://github.com/schemathesis/schemathesis/issues/982

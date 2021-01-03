@@ -9,7 +9,7 @@ They give only static definitions of endpoints.
 from collections.abc import Mapping
 from difflib import get_close_matches
 from typing import Any, Callable, Dict, Generator, Iterable, Iterator, List, Optional, Sequence, Tuple, Type, Union
-from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 import attr
 import hypothesis
@@ -76,7 +76,7 @@ class BaseSchema(Mapping):
 
     def get_full_path(self, path: str) -> str:
         """Compute full path for the given path."""
-        return urljoin(self.base_path, path.lstrip("/"))  # pragma: no mutate
+        return unquote(urljoin(self.base_path, quote(path.lstrip("/"))))  # pragma: no mutate
 
     @property
     def base_path(self) -> str:
