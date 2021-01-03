@@ -1,6 +1,8 @@
+import json
 import re
 from base64 import b64encode
-from typing import Any, Callable, Dict, Optional, Tuple
+from contextlib import contextmanager
+from typing import Any, Callable, Dict, Generator, Optional, Tuple
 from urllib.parse import quote_plus
 
 from hypothesis import strategies as st
@@ -92,39 +94,41 @@ def get_case_strategy(  # pylint: disable=too-many-locals
 
     context = HookContext(endpoint)
 
-    if path_parameters is NOT_SET:
-        strategy = get_parameters_strategy(endpoint, to_strategy, "path")
-        strategy = apply_hooks(endpoint, context, hooks, strategy, "path")
-        path_parameters = draw(strategy)
-    if headers is NOT_SET:
-        strategy = get_parameters_strategy(endpoint, to_strategy, "header")
-        strategy = apply_hooks(endpoint, context, hooks, strategy, "header")
-        headers = draw(strategy)
-    if cookies is NOT_SET:
-        strategy = get_parameters_strategy(endpoint, to_strategy, "cookie")
-        strategy = apply_hooks(endpoint, context, hooks, strategy, "cookie")
-        cookies = draw(strategy)
-    if query is NOT_SET:
-        strategy = get_parameters_strategy(endpoint, to_strategy, "query")
-        strategy = apply_hooks(endpoint, context, hooks, strategy, "query")
-        query = draw(strategy)
+    with detect_invalid_schema(endpoint):
+        if path_parameters is NOT_SET:
+            strategy = get_parameters_strategy(endpoint, to_strategy, "path")
+            strategy = apply_hooks(endpoint, context, hooks, strategy, "path")
+            path_parameters = draw(strategy)
+        if headers is NOT_SET:
+            strategy = get_parameters_strategy(endpoint, to_strategy, "header")
+            strategy = apply_hooks(endpoint, context, hooks, strategy, "header")
+            headers = draw(strategy)
+        if cookies is NOT_SET:
+            strategy = get_parameters_strategy(endpoint, to_strategy, "cookie")
+            strategy = apply_hooks(endpoint, context, hooks, strategy, "cookie")
+            cookies = draw(strategy)
+        if query is NOT_SET:
+            strategy = get_parameters_strategy(endpoint, to_strategy, "query")
+            strategy = apply_hooks(endpoint, context, hooks, strategy, "query")
+            query = draw(strategy)
 
-    media_type = None
-    if body is NOT_SET:
-        if endpoint.body:
-            parameter = draw(st.sampled_from(endpoint.body.items))
-            strategy = _get_body_strategy(parameter, to_strategy, endpoint.schema)
-            strategy = apply_hooks(endpoint, context, hooks, strategy, "body")
-            media_type = parameter.media_type
-            body = draw(strategy)
-    else:
-        media_types = endpoint.get_request_payload_content_types() or ["application/json"]
-        # Take the first available media type.
-        # POSSIBLE IMPROVEMENT:
-        #   - Test examples for each available media type on Open API 2.0;
-        #   - On Open API 3.0, media types are explicit, and each example has it. We can pass `OpenAPIBody.media_type`
-        #     here from the examples handling code.
-        media_type = media_types[0]
+        media_type = None
+        if body is NOT_SET:
+            if endpoint.body:
+                parameter = draw(st.sampled_from(endpoint.body.items))
+                strategy = _get_body_strategy(parameter, to_strategy, endpoint.schema)
+                strategy = apply_hooks(endpoint, context, hooks, strategy, "body")
+                media_type = parameter.media_type
+                body = draw(strategy)
+        else:
+            media_types = endpoint.get_request_payload_content_types() or ["application/json"]
+            # Take the first available media type.
+            # POSSIBLE IMPROVEMENT:
+            #   - Test examples for each available media type on Open API 2.0;
+            #   - On Open API 3.0, media types are explicit, and each example has it. We can pass `OpenAPIBody.media_type`
+            #     here from the examples handling code.
+            media_type = media_types[0]
+
     if endpoint.schema.validate_schema and endpoint.method.upper() == "GET" and endpoint.body:
         raise InvalidSchema("Body parameters are defined for GET request.")
     return Case(
@@ -136,6 +140,38 @@ def get_case_strategy(  # pylint: disable=too-many-locals
         query=query,
         body=body,
     )
+
+
+YAML_PARSING_ISSUE_MESSAGE = (
+    "The API schema contains non-string keys. "
+    "If you store your schema in YAML, it is likely caused by unquoted keys parsed as "
+    "non-strings. For example, `on` is parsed as boolean `true`, "
+    "but `'on'` (with quotes) is a string `'on'`. See more information at https://noyaml.com/."
+)
+
+
+@contextmanager
+def detect_invalid_schema(endpoint: Endpoint) -> Generator[None, None, None]:
+    """Detect common issues with schemas."""
+    try:
+        yield
+    except TypeError as exc:
+        if is_yaml_parsing_issue(endpoint):
+            raise InvalidSchema(YAML_PARSING_ISSUE_MESSAGE) from exc
+        raise
+
+
+def is_yaml_parsing_issue(endpoint: Endpoint) -> bool:
+    """Detect whether the endpoint has problems because of YAML syntax.
+
+    For example, unquoted 'on' is parsed as `True`.
+    """
+    try:
+        # Sorting keys involves their comparison, when there is a non-string value, it leads to a TypeError
+        json.dumps(endpoint.schema.raw_schema, sort_keys=True)
+    except TypeError:
+        return True
+    return False
 
 
 def _get_body_strategy(
