@@ -28,6 +28,7 @@ Changelog
 - Shorter error messages when API operations have logical errors in their schema. For example, when the maximum is less than the minimum - ``{"type": "integer", "minimum": 5, "maximum": 4}``.
 - If multiple non-check related failures happens during a test of a single API operation, they are displayed as is, instead of Hypothesis-level error messages about multiple found failures or flaky tests. `#975`_
 - Catch schema parsing errors, that are caused by YAML parsing.
+- The built-in test server now accepts ``--operations`` instead of ``--endpoints``.
 
 **Fixed**
 
