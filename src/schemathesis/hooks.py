@@ -7,7 +7,7 @@ import attr
 from hypothesis import strategies as st
 
 from .types import GenericTest
-from .utils import GenericResponse
+from .utils import GenericResponse, deprecated_property
 
 if TYPE_CHECKING:
     from .models import APIOperation, Case
@@ -38,7 +38,11 @@ class RegisteredHook:
 class HookContext:
     """A context that is passed to some hook functions."""
 
-    endpoint: Optional["APIOperation"] = attr.ib(default=None)  # pragma: no mutate
+    operation: Optional["APIOperation"] = attr.ib(default=None)  # pragma: no mutate
+
+    @deprecated_property(removed_in="4.0", replacement="operation")
+    def endpoint(self) -> Optional["APIOperation"]:
+        return self.operation
 
 
 @attr.s(slots=True)  # pragma: no mutate

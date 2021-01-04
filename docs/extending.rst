@@ -139,7 +139,7 @@ With this hook, you can add additional test cases that will be executed in Hypot
         examples: List[Case],
     ) -> None:
         examples.append(
-            Case(endpoint=context.endpoint, query={"foo": "bar"})
+            Case(endpoint=context.operation, query={"foo": "bar"})
         )
 
 To load CLI hooks, you need to put them into a separate module and pass an importable path in the ``--pre-run`` CLI option.

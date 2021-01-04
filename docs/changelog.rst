@@ -48,6 +48,10 @@ Changelog
 - Handling of API operations that contain reserved characters in their paths. `#992`_
 - CLI execution stops on errors during example generation. `#994`_
 
+**Deprecated**
+
+- ``HookContext.endpoint``. Use ``HookContext.operation`` instead.
+
 **Performance**
 
 - Use compiled versions of Open API spec validators.

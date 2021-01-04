@@ -2,7 +2,7 @@ import pytest
 from hypothesis import given, settings
 
 import schemathesis
-from schemathesis.hooks import HookDispatcher, HookScope
+from schemathesis.hooks import HookContext, HookDispatcher, HookScope
 
 
 @pytest.fixture(autouse=True)
@@ -90,7 +90,7 @@ def test_schema_query_hook(schema, schema_url):
 def test_hooks_combination(schema, schema_url):
     @schema.hooks.register("before_generate_query")
     def extra(context, st):
-        assert context.endpoint == schema.endpoints["/custom_format"]["GET"]
+        assert context.operation == schema.endpoints["/custom_format"]["GET"]
         return st.filter(lambda x: int(x["id"]) % 2 == 0)
 
     strategy = schema.endpoints["/custom_format"]["GET"].as_strategy()
@@ -292,7 +292,7 @@ def test_before_add_examples(testdir, simple_openapi):
 @schema.hooks.register
 def before_add_examples(context, examples):
     new = schemathesis.models.Case(
-        endpoint=context.endpoint,
+        endpoint=context.operation,
         query={"foo": "bar"}
     )
     examples.append(new)
@@ -305,7 +305,7 @@ def test_a(case):
 
 def another_hook(context, examples):
     new = schemathesis.models.Case(
-        endpoint=context.endpoint,
+        endpoint=context.operation,
         query={"spam": "baz"}
     )
     examples.append(new)
@@ -327,3 +327,12 @@ def test_b(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=2)
+
+
+def test_deprecated_attribute():
+    context = HookContext(1)
+    with pytest.warns(None) as records:
+        assert context.endpoint == context.operation == 1
+    assert str(records[0].message) == (
+        "Property `endpoint` is deprecated and will be removed in Schemathesis 4.0. Use `operation` instead."
+    )
