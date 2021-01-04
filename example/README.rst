@@ -58,7 +58,7 @@ Here are examples of how you can run Schemathesis CLI:
     export SCHEMA_URL="http://0.0.0.0:5000/api/openapi.json"
     export PYTHONPATH=$(pwd)
 
-    # Default config. Runs unit tests for all endpoints with `not_a_server_error` check
+    # Default config. Runs unit tests for all API operations with `not_a_server_error` check
     schemathesis run $SCHEMA_URL
 
     # Select what to test. Only `POST` operations that have `booking` in their path

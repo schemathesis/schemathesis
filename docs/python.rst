@@ -6,7 +6,7 @@ Schemathesis is written in Python and provides a Python interface that allows yo
 Basic usage
 -----------
 
-The following test will load the API schema from ``http://0.0.0.0:8080/swagger.json`` and execute tests for all endpoints:
+The following test will load the API schema from ``http://0.0.0.0:8080/swagger.json`` and execute tests for all operations:
 
 
 .. code:: python
@@ -44,12 +44,12 @@ Running these tests requires your app running at ``http://0.0.0.0:8080/`` and a 
 
 By default, Schemathesis refuses to work with schemas that do not conform to the Open API spec, but you can disable this behavior by passing the ``validate_schema=False`` argument to the ``from_uri`` function.
 
-Testing specific endpoints
---------------------------
+Testing specific operations
+---------------------------
 
-By default, Schemathesis runs tests for all endpoints, but you can select specific endpoints by passing the following arguments to the ``parametrize`` function:
+By default, Schemathesis runs tests for all operations, but you can select specific operations by passing the following arguments to the ``parametrize`` function:
 
-- ``endpoint``. Endpoint path;
+- ``endpoint``. Operation path;
 - ``method``. HTTP method;
 - ``tag``. Open API tag;
 - ``operation_id``. ``operationId`` field value;
@@ -57,7 +57,7 @@ By default, Schemathesis runs tests for all endpoints, but you can select specif
 Each argument expects a case-insensitive regex string or a list of such strings.
 Each regex will be matched with its corresponding value via Python's ``re.search`` function.
 
-For example, the following test selects all endpoints which paths start with ``/api/users``:
+For example, the following test selects all operations which paths start with ``/api/users``:
 
 .. code:: python
 
@@ -65,7 +65,7 @@ For example, the following test selects all endpoints which paths start with ``/
     def test_api(case):
         case.call_and_validate()
 
-If your API contains deprecated endpoints (that have ``deprecated: true`` in their definition),
+If your API contains deprecated operations (that have ``deprecated: true`` in their definition),
 then you can skip them by passing ``skip_deprecated_endpoints=True`` to loaders or to the `schema.parametrize` call:
 
 .. code:: python
@@ -183,7 +183,7 @@ If you maintain your API schema in Python code or your web framework (for exampl
     raw_schema = {
         "swagger": "2.0",
         "paths": {
-            # Open API endpoints here
+            # Open API operations here
         },
     }
     schema = schemathesis.from_dict(raw_schema)

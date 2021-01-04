@@ -30,7 +30,7 @@ class OpenAPIStateMachine(APIStateMachine):
 def create_state_machine(schema: "BaseOpenAPISchema") -> Type[APIStateMachine]:
     """Create a state machine class.
 
-    This state machine will contain transitions that connect some endpoints' outputs with other endpoints' inputs.
+    This state machine will contain transitions that connect some operations' outputs with other operations' inputs.
     """
     bundles = init_bundles(schema)
     connections: EndpointConnections = defaultdict(list)
@@ -44,10 +44,10 @@ def create_state_machine(schema: "BaseOpenAPISchema") -> Type[APIStateMachine]:
 
 
 def init_bundles(schema: "BaseOpenAPISchema") -> Dict[str, CaseInsensitiveDict]:
-    """Create bundles for all endpoints in the given schema.
+    """Create bundles for all operations in the given schema.
 
     Each API operation has a bundle that stores all responses from that operation.
-    We need to create bundles first, so they can be referred when building connections between endpoints.
+    We need to create bundles first, so they can be referred when building connections between operations.
     """
     output: Dict[str, CaseInsensitiveDict] = {}
     for operation in schema.get_all_endpoints():
@@ -59,7 +59,7 @@ def init_bundles(schema: "BaseOpenAPISchema") -> Dict[str, CaseInsensitiveDict]:
 def make_all_rules(
     schema: "BaseOpenAPISchema", bundles: Dict[str, CaseInsensitiveDict], connections: EndpointConnections
 ) -> Dict[str, Rule]:
-    """Create rules for all endpoints, based on the provided connections."""
+    """Create rules for all API operations, based on the provided connections."""
     return {
         f"rule {operation.verbose_name} {idx}": new
         for operation in schema.get_all_endpoints()

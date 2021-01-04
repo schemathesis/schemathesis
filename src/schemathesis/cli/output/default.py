@@ -55,8 +55,8 @@ def display_execution_result(context: ExecutionContext, event: events.AfterExecu
 
 def display_percentage(context: ExecutionContext, event: events.AfterExecution) -> None:
     """Add the current progress in % to the right side of the current line."""
-    endpoints_count = cast(int, context.endpoints_count)  # is already initialized via `Initialized` event
-    current_percentage = get_percentage(context.endpoints_processed, endpoints_count)
+    operations_count = cast(int, context.operations_count)  # is already initialized via `Initialized` event
+    current_percentage = get_percentage(context.operations_processed, operations_count)
     styled = click.style(current_percentage, fg="cyan")
     # Total length of the message, so it will fill to the right border of the terminal.
     # Padding is already taken into account in `context.current_line_length`
@@ -276,7 +276,7 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
 
 def handle_initialized(context: ExecutionContext, event: events.Initialized) -> None:
     """Display information about the test session."""
-    context.endpoints_count = event.endpoints_count
+    context.operations_count = event.operations_count
     display_section_name("Schemathesis test session starts")
     versions = (
         f"platform {platform.system()} -- "
@@ -297,8 +297,8 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     click.echo(f"Base URL: {event.base_url}")
     click.echo(f"Specification version: {event.specification_name}")
     click.echo(f"Workers: {context.workers_num}")
-    click.secho(f"collected endpoints: {event.endpoints_count}", bold=True)
-    if event.endpoints_count >= 1:
+    click.secho(f"collected endpoints: {event.operations_count}", bold=True)
+    if event.operations_count >= 1:
         click.echo()
 
 
@@ -313,7 +313,7 @@ def handle_before_execution(context: ExecutionContext, event: events.BeforeExecu
     if event.recursion_level > 0:
         message = f"{'    ' * event.recursion_level}-> {message}"
         # This value is not `None` - the value is set in runtime before this line
-        context.endpoints_count += 1  # type: ignore
+        context.operations_count += 1  # type: ignore
 
     message = message[:max_length] + (message[max_length:] and "[...]") + " "
     context.current_line_length = len(message)
@@ -322,7 +322,7 @@ def handle_before_execution(context: ExecutionContext, event: events.BeforeExecu
 
 def handle_after_execution(context: ExecutionContext, event: events.AfterExecution) -> None:
     """Display the execution result + current progress at the same line with the method / path names."""
-    context.endpoints_processed += 1
+    context.operations_processed += 1
     context.results.append(event.result)
     display_execution_result(context, event)
     display_percentage(context, event)

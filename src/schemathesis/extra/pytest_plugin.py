@@ -140,7 +140,7 @@ class SchemathesisCase(PyCollector):
         return metafunc
 
     def collect(self) -> List[Function]:  # type: ignore
-        """Generate different test items for all endpoints available in the given schema."""
+        """Generate different test items for all API operations available in the given schema."""
         try:
             return [
                 item

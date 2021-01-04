@@ -27,7 +27,7 @@ def click_context():
 
 @pytest.fixture()
 def execution_context():
-    return schemathesis.cli.context.ExecutionContext([], endpoints_count=1)
+    return schemathesis.cli.context.ExecutionContext([], operations_count=1)
 
 
 @pytest.fixture
@@ -86,7 +86,7 @@ def test_handle_initialized(capsys, execution_context, results_set, swagger_20):
     assert lines[1].startswith("platform")
     # And current directory
     assert f"rootdir: {os.getcwd()}" in lines
-    # And number of collected endpoints
+    # And number of collected operations
     assert strip_style_win32(click.style("collected endpoints: 1", bold=True)) in lines
     # And the output has an empty line in the end
     assert out.endswith("\n\n")
@@ -149,12 +149,12 @@ def test_get_percentage(position, length, expected):
 
 
 @pytest.mark.parametrize("current_line_length", (0, 20))
-@pytest.mark.parametrize("endpoints_processed, percentage", ((0, "[  0%]"), (1, "[100%]")))
+@pytest.mark.parametrize("operations_processed, percentage", ((0, "[  0%]"), (1, "[100%]")))
 def test_display_percentage(
-    capsys, execution_context, after_execution, swagger_20, current_line_length, endpoints_processed, percentage
+    capsys, execution_context, after_execution, swagger_20, current_line_length, operations_processed, percentage
 ):
     execution_context.current_line_length = current_line_length
-    execution_context.endpoints_processed = endpoints_processed
+    execution_context.operations_processed = operations_processed
     # When percentage is displayed
     default.display_percentage(execution_context, after_execution)
     out = capsys.readouterr().out
@@ -228,13 +228,13 @@ def test_handle_after_execution(capsys, execution_context, after_execution, stat
 def test_after_execution_attributes(execution_context, after_execution):
     # When `handle_after_execution` is executed
     default.handle_after_execution(execution_context, after_execution)
-    # Then number of endpoints processed grows by 1
-    assert execution_context.endpoints_processed == 1
+    # Then number of operations processed grows by 1
+    assert execution_context.operations_processed == 1
     # And the line length grows by 1 symbol
     assert execution_context.current_line_length == 1
 
     default.handle_after_execution(execution_context, after_execution)
-    assert execution_context.endpoints_processed == 2
+    assert execution_context.operations_processed == 2
     assert execution_context.current_line_length == 2
 
 

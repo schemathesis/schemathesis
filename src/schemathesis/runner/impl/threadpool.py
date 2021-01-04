@@ -210,7 +210,7 @@ class ThreadPoolRunner(BaseRunner):
             yield events.Interrupted()
 
     def _get_tasks_queue(self) -> Queue:
-        """All endpoints are distributed among all workers via a queue."""
+        """All API operations are distributed among all workers via a queue."""
         tasks_queue: Queue = Queue()
         tasks_queue.queue.extend(
             [

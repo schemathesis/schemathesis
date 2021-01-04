@@ -52,7 +52,7 @@ def test_add_link_no_endpoints_cache(schema_url, status_code):
     # When we add a link to the target API operation
     source = schema["/users/"]["POST"]
     target = schema["/users/{user_id}"]["GET"]
-    # And the endpoints are not cached
+    # And the operations are not cached
     delattr(schema, "_operations")
     schema.add_link(
         source=source,

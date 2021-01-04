@@ -15,9 +15,9 @@ class ExecutionContext:
     workers_num: int = attr.ib(default=1)  # pragma: no mutate
     show_errors_tracebacks: bool = attr.ib(default=False)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
-    endpoints_processed: int = attr.ib(default=0)  # pragma: no mutate
+    operations_processed: int = attr.ib(default=0)  # pragma: no mutate
     # It is set in runtime, from a `Initialized` event
-    endpoints_count: Optional[int] = attr.ib(default=None)  # pragma: no mutate
+    operations_count: Optional[int] = attr.ib(default=None)  # pragma: no mutate
     current_line_length: int = attr.ib(default=0)  # pragma: no mutate
     terminal_size: os.terminal_size = attr.ib(factory=shutil.get_terminal_size)  # pragma: no mutate
     results: List[SerializedTestResult] = attr.ib(factory=list)  # pragma: no mutate

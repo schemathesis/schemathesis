@@ -2,9 +2,9 @@
 
 Their responsibilities:
   - Provide a unified way to work with different types of schemas
-  - Give all endpoints / methods combinations that are available directly from the schema;
+  - Give all paths / methods combinations that are available directly from the schema;
 
-They give only static definitions of endpoints.
+They give only static definitions of paths.
 """
 from collections.abc import Mapping
 from difflib import get_close_matches
@@ -23,7 +23,7 @@ from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import APIOperation, Case
 from .stateful import APIStateMachine, Stateful, StatefulTest
 from .types import Filter, FormData, GenericTest, NotSet
-from .utils import NOT_SET, GenericResponse, deprecated_property
+from .utils import NOT_SET, GenericResponse
 
 
 class MethodsDict(CaseInsensitiveDict):
@@ -113,14 +113,10 @@ class BaseSchema(Mapping):
             self._operations = operations_to_dict(operations)
         return self._operations
 
-    @deprecated_property(removed_in="4.0", replacement="operations")
-    def endpoints(self) -> Dict[str, MethodsDict]:
-        return self.operations
-
     @property
-    def endpoints_count(self) -> int:
+    def operations_count(self) -> int:
         total = 0
-        # Avoid creating a list of all endpoints - for large schemas it consumes too much memory
+        # Avoid creating a list of all operation - for large schemas it consumes too much memory
         for _ in self.get_all_endpoints():
             total += 1
         return total
@@ -148,7 +144,7 @@ class BaseSchema(Mapping):
         settings: Optional[hypothesis.settings] = None,
         seed: Optional[int] = None,
     ) -> Generator[Tuple[APIOperation, DataGenerationMethod, Callable], None, None]:
-        """Generate all endpoints and Hypothesis tests for them."""
+        """Generate all operations and Hypothesis tests for them."""
         for operation in self.get_all_endpoints():
             for data_generation_method in self.data_generation_methods:
                 test = create_test(

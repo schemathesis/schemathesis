@@ -427,7 +427,7 @@ class SwaggerV20(BaseOpenAPISchema):
         collected: List[OpenAPIParameter] = []
         # NOTE. The Open API 2.0 spec doesn't strictly imply having media types in the "consumes" keyword.
         # It is not enforced by the meta schema and has no "MUST" verb in the spec text.
-        # Also, not every API has operations with payload (they might have only GET endpoints without payloads).
+        # Also, not every API has operations with payload (they might have only GET operations without payloads).
         # For these reasons, it might be (and often is) absent, and we need to provide the proper media type in case
         # we have operations with a payload.
         media_types = self._get_consumes_for_endpoint(endpoint_definition)

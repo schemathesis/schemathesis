@@ -36,7 +36,7 @@ class Link(StatefulTest):
             operation = source_endpoint.schema.get_endpoint_by_reference(definition["operationRef"])  # type: ignore
         return cls(
             # Pylint can't detect that the API operation is always defined at this point
-            # E.g. if there is no matching operation or no endpoints at all, then a ValueError will be risen
+            # E.g. if there is no matching operation or no operations at all, then a ValueError will be risen
             name=name,
             operation=operation,  # pylint: disable=undefined-loop-variable
             parameters=definition.get("parameters", {}),

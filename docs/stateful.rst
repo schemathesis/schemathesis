@@ -2,8 +2,8 @@
 Stateful testing
 ****************
 
-By default, Schemathesis takes all endpoints from your API and tests them separately by passing random input data and validating responses.
-It works great when you need to quickly verify that your endpoints properly validate input and respond in conformance with the API schema.
+By default, Schemathesis takes all operations from your API and tests them separately by passing random input data and validating responses.
+It works great when you need to quickly verify that your operations properly validate input and respond in conformance with the API schema.
 
 With stateful testing, Schemathesis combines multiple API calls into a single test scenario and tries to find call sequences that fail.
 
@@ -12,7 +12,7 @@ Why is it useful?
 
 This approach allows your tests to reach deeper into your application logic and cover scenarios that are impossible to cover with independent tests.
 You may compare Schemathesis's stateful and non-stateful testing the same way you would compare integration and unit tests.
-Stateful testing checks how multiple API endpoints work in combination.
+Stateful testing checks how multiple API operations work in combination.
 
 It solves the problem when your application produces a high number of "404 Not Found" responses during testing due to randomness in the input data.
 
@@ -22,7 +22,7 @@ The more connections you have, the deeper tests can reach.
 How to specify connections?
 ---------------------------
 
-To specify how different endpoints depend on each other, we use a special syntax from the Open API specification - `Open API links <https://swagger.io/docs/specification/links/>`_.
+To specify how different operations depend on each other, we use a special syntax from the Open API specification - `Open API links <https://swagger.io/docs/specification/links/>`_.
 It describes how the output from one operation can be used as input for other operations.
 To define such connections, you need to extend your API schema with the ``links`` keyword:
 
@@ -66,7 +66,7 @@ In this schema, you define that the ``id`` value returned by the ``POST /users``
 Schemathesis will use this connection during ``GET /users/{userId}`` parameters generation - everything that is not defined by links will be generated randomly.
 
 If you don't want to modify your schema source, :func:`add_link <schemathesis.specs.openapi.schemas.BaseOpenAPISchema.add_link>`
-allows you to define links between a pair of endpoints programmatically.
+allows you to define links between a pair of operations programmatically.
 
 .. automethod:: schemathesis.specs.openapi.schemas.BaseOpenAPISchema.add_link(source, target, status_code, parameters=None, request_body=None) -> None
 
@@ -131,7 +131,7 @@ How it works behind the scenes?
 The whole concept consists of two important stages.
 
 - State machine creation:
-    - Each API operation has a separate bundle where Schemathesis put all responses received from that endpoint;
+    - Each API operation has a separate bundle where Schemathesis put all responses received from that operation;
     - All links represent transitions of the state machine. Each one has a pre-condition - there should already be a response
       with the proper status code;
     - If an operation has no links, then Schemathesis creates a transition without a pre-condition and generates random
