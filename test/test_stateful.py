@@ -53,7 +53,7 @@ def test_add_link_no_endpoints_cache(schema_url, status_code):
     source = schema["/users/"]["POST"]
     target = schema["/users/{user_id}"]["GET"]
     # And the endpoints are not cached
-    delattr(schema, "_endpoints")
+    delattr(schema, "_operations")
     schema.add_link(
         source=source,
         target=target,
@@ -117,7 +117,7 @@ def test_add_link_behind_a_reference(schema_url):
     }
     schema.raw_schema["paths"]["/users/"] = {"$ref": "#/components/methods/users"}
     schema.raw_schema["paths"]["/users/{user_id}"] = {"$ref": "#/components/methods/user-details"}
-    assert not hasattr(schema, "_endpoints")
+    assert not hasattr(schema, "_operations")
     # And a link is added
     add_link(schema, schema["/users/{user_id}"]["GET"], parameters={"userId": "$response.body#/id"})
     # Then the source API operation should have the new link

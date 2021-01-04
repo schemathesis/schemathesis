@@ -16,7 +16,7 @@ def schema():
 
 @pytest.mark.hypothesis_nested
 def test_call(schema, simple_schema):
-    strategy = schema.endpoints["/users"]["GET"].as_strategy()
+    strategy = schema["/users"]["GET"].as_strategy()
 
     @given(case=strategy)
     def test(case):
@@ -56,7 +56,7 @@ def test_cookies(fastapi_app):
         app=fastapi_app,
     )
 
-    strategy = schema.endpoints["/cookies"]["GET"].as_strategy()
+    strategy = schema["/cookies"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
@@ -69,7 +69,7 @@ def test_cookies(fastapi_app):
 
 
 def test_not_app_with_asgi(schema):
-    case = Case(schema.endpoints["/users"]["GET"])
+    case = Case(schema["/users"]["GET"])
     case.operation.app = None
     with pytest.raises(
         RuntimeError,

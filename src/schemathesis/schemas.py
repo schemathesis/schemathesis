@@ -23,7 +23,7 @@ from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import APIOperation, Case
 from .stateful import APIStateMachine, Stateful, StatefulTest
 from .types import Filter, FormData, GenericTest, NotSet
-from .utils import NOT_SET, GenericResponse
+from .utils import NOT_SET, GenericResponse, deprecated_property
 
 
 class MethodsDict(CaseInsensitiveDict):
@@ -55,20 +55,20 @@ class BaseSchema(Mapping):
     )  # pragma: no mutate
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self.endpoints)
+        return iter(self.operations)
 
     def __getitem__(self, item: str) -> MethodsDict:
         try:
-            return self.endpoints[item]
+            return self.operations[item]
         except KeyError as exc:
-            matches = get_close_matches(item, list(self.endpoints))
+            matches = get_close_matches(item, list(self.operations))
             message = f"`{item}` not found"
             if matches:
                 message += f". Did you mean `{matches[0]}`?"
             raise KeyError(message) from exc
 
     def __len__(self) -> int:
-        return len(self.endpoints)
+        return len(self.operations)
 
     @property  # pragma: no mutate
     def verbose_name(self) -> str:
@@ -106,12 +106,16 @@ class BaseSchema(Mapping):
         return self._build_base_url()
 
     @property
-    def endpoints(self) -> Dict[str, MethodsDict]:
-        if not hasattr(self, "_endpoints"):
+    def operations(self) -> Dict[str, MethodsDict]:
+        if not hasattr(self, "_operations"):
             # pylint: disable=attribute-defined-outside-init
             operations = self.get_all_endpoints()
-            self._endpoints = operations_to_dict(operations)
-        return self._endpoints
+            self._operations = operations_to_dict(operations)
+        return self._operations
+
+    @deprecated_property(removed_in="4.0", replacement="operations")
+    def endpoints(self) -> Dict[str, MethodsDict]:
+        return self.operations
 
     @property
     def endpoints_count(self) -> int:

@@ -188,7 +188,7 @@ def test_content_type_conformance_another_status_code():
 
 def assert_content_type_conformance(raw_schema, content_type, is_error, match=None):
     schema = schemathesis.from_dict(raw_schema)
-    operation = schema.endpoints["/users"]["get"]
+    operation = schema["/users"]["get"]
     case = models.Case(operation)
     response = make_response(content_type=content_type)
     if not is_error:
@@ -252,7 +252,7 @@ def test_invalid_schema_on_content_type_check():
         },
         validate_schema=False,
     )
-    operation = schema.endpoints["/users"]["get"]
+    operation = schema["/users"]["get"]
     case = models.Case(operation)
     response = make_response(content_type="application/json")
     # Then an error should be risen
@@ -457,7 +457,7 @@ def test_response_schema_conformance_invalid_openapi(openapi_30, media_type, con
 def test_response_schema_conformance_references_invalid(complex_schema):
     schema = schemathesis.from_path(complex_schema)
 
-    @given(case=schema.endpoints["/teapot"]["POST"].as_strategy())
+    @given(case=schema["/teapot"]["POST"].as_strategy())
     @settings(max_examples=3)
     def test(case):
         response = make_response(json.dumps({"foo": 1}).encode())
@@ -473,7 +473,7 @@ def test_response_schema_conformance_references_invalid(complex_schema):
 def test_response_schema_conformance_references_valid(complex_schema, value):
     schema = schemathesis.from_path(complex_schema)
 
-    @given(case=schema.endpoints["/teapot"]["POST"].as_strategy())
+    @given(case=schema["/teapot"]["POST"].as_strategy())
     @settings(max_examples=3)
     def test(case):
         response = make_response(json.dumps({"key": value, "referenced": value}).encode())

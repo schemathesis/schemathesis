@@ -40,7 +40,7 @@ def dispatcher():
 @pytest.mark.operations("custom_format")
 @pytest.mark.usefixtures("global_hook")
 def test_global_query_hook(schema, schema_url):
-    strategy = schema.endpoints["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -57,7 +57,7 @@ def test_global_body_hook(schema):
     def before_generate_body(context, strategy):
         return strategy.filter(lambda x: len(x["name"]) == 5)
 
-    strategy = schema.endpoints["/payload"]["POST"].as_strategy()
+    strategy = schema["/payload"]["POST"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -74,7 +74,7 @@ def test_schema_query_hook(schema, schema_url):
     def before_generate_query(context, strategy):
         return strategy.filter(lambda x: x["id"].isdigit())
 
-    strategy = schema.endpoints["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -90,10 +90,10 @@ def test_schema_query_hook(schema, schema_url):
 def test_hooks_combination(schema, schema_url):
     @schema.hooks.register("before_generate_query")
     def extra(context, st):
-        assert context.operation == schema.endpoints["/custom_format"]["GET"]
+        assert context.operation == schema["/custom_format"]["GET"]
         return st.filter(lambda x: int(x["id"]) % 2 == 0)
 
-    strategy = schema.endpoints["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -244,7 +244,7 @@ def test_multiple_hooks_per_spec(schema):
 
     assert schema.hooks.get_all_by_name("before_generate_query") == [first_hook, second_hook]
 
-    strategy = schema.endpoints["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -263,7 +263,7 @@ def test_before_process_path_hook(schema):
         methods["get"]["parameters"][0]["name"] = "foo"
         methods["get"]["parameters"][0]["enum"] = ["bar"]
 
-    strategy = schema.endpoints["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)

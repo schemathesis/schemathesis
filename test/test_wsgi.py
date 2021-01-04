@@ -13,7 +13,7 @@ def schema(flask_app):
 
 @pytest.mark.hypothesis_nested
 def test_call(schema, simple_schema):
-    strategy = schema.endpoints["/success"]["GET"].as_strategy()
+    strategy = schema["/success"]["GET"].as_strategy()
 
     @given(case=strategy)
     def test(case):
@@ -53,7 +53,7 @@ def test_cookies(flask_app):
         app=flask_app,
     )
 
-    strategy = schema.endpoints["/cookies"]["GET"].as_strategy()
+    strategy = schema["/cookies"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
@@ -68,7 +68,7 @@ def test_cookies(flask_app):
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("multipart")
 def test_form_data(schema):
-    strategy = schema.endpoints["/multipart"]["POST"].as_strategy()
+    strategy = schema["/multipart"]["POST"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
@@ -83,7 +83,7 @@ def test_form_data(schema):
 
 def test_not_wsgi(schema):
     # When a schema is created without a WSGI app (e.g. from a URL)
-    case = Case(schema.endpoints["/success"]["GET"])
+    case = Case(schema["/success"]["GET"])
     case.operation.app = None
     # Then an error should be raised if the user tries to use `call_wsgi`
     with pytest.raises(
@@ -114,7 +114,7 @@ def test_binary_body(mocker, flask_app):
         },
         app=flask_app,
     )
-    strategy = schema.endpoints["/api/upload_file"]["POST"].as_strategy()
+    strategy = schema["/api/upload_file"]["POST"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)

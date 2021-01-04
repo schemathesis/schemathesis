@@ -515,7 +515,7 @@ def test_complex_dereference(testdir, complex_schema):
         required=True,
         media_type="application/json",
     )
-    assert schema.endpoints["/teapot"]["POST"] == APIOperation(
+    assert schema["/teapot"]["POST"] == APIOperation(
         base_url="file:///",
         path="/teapot",
         method="post",

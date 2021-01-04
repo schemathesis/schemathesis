@@ -52,7 +52,7 @@ from .stateful import create_state_machine
 class BaseOpenAPISchema(BaseSchema):
     nullable_name: str
     links_field: str
-    operations: Tuple[str, ...]
+    allowed_http_methods: Tuple[str, ...]
     security: BaseSecurityProcessor
     parameter_cls: Type[OpenAPIParameter]
     component_locations: ClassVar[Tuple[str, ...]] = ()
@@ -90,7 +90,7 @@ class BaseOpenAPISchema(BaseSchema):
                 for method, resolved_definition in methods.items():
                     # Only method definitions are parsed
                     if (
-                        method not in self.operations
+                        method not in self.allowed_http_methods
                         or should_skip_method(method, self.method)
                         or should_skip_deprecated(
                             resolved_definition.get("deprecated", False), self.skip_deprecated_endpoints
@@ -181,7 +181,7 @@ class BaseOpenAPISchema(BaseSchema):
             methods = self.resolver.resolve_all(methods)
             common_parameters = methods.get("parameters", [])
             for method, resolved_definition in methods.items():
-                if method not in self.operations or "operationId" not in resolved_definition:
+                if method not in self.allowed_http_methods or "operationId" not in resolved_definition:
                     continue
                 parameters = self.collect_parameters(
                     itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
@@ -286,8 +286,8 @@ class BaseOpenAPISchema(BaseSchema):
         """
         if parameters is None and request_body is None:
             raise ValueError("You need to provide `parameters` or `request_body`.")
-        if hasattr(self, "_endpoints"):
-            delattr(self, "_endpoints")
+        if hasattr(self, "_operations"):
+            delattr(self, "_operations")
         for operation, methods in self.raw_schema["paths"].items():
             if operation == source.path:
                 # Methods should be completely resolved now, otherwise they might miss a resolving scope when
@@ -402,7 +402,7 @@ class SwaggerV20(BaseOpenAPISchema):
     nullable_name = "x-nullable"
     example_field = "x-example"
     examples_field = "x-examples"
-    operations: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
+    allowed_http_methods: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
     parameter_cls: Type[OpenAPIParameter] = OpenAPI20Parameter
     security = SwaggerSecurityProcessor()
     component_locations: ClassVar[Tuple[str, ...]] = ("definitions", "parameters", "responses")
@@ -536,7 +536,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     nullable_name = "nullable"
     example_field = "example"
     examples_field = "examples"
-    operations = SwaggerV20.operations + ("trace",)
+    allowed_http_methods = SwaggerV20.allowed_http_methods + ("trace",)
     security = OpenAPISecurityProcessor()
     parameter_cls = OpenAPI30Parameter
     component_locations = ("components",)

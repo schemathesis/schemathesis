@@ -84,7 +84,7 @@ def response():
 def test_get_links(openapi3_base_url, schema_url, url, expected):
     schema = schemathesis.from_uri(schema_url)
     response = requests.post(f"{openapi3_base_url}{url}", json={"first_name": "TEST", "last_name": "TEST"})
-    assert schema.endpoints["/users/"]["POST"].get_stateful_tests(response, Stateful.links) == expected
+    assert schema["/users/"]["POST"].get_stateful_tests(response, Stateful.links) == expected
 
 
 def test_parse(case, response):

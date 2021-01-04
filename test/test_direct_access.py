@@ -14,11 +14,11 @@ def test_contains(swagger_20):
 def test_getitem(simple_schema, mocker):
     swagger = schemathesis.from_dict(simple_schema)
     mocked = mocker.patch("schemathesis.schemas.operations_to_dict", wraps=operations_to_dict)
-    assert "_endpoints" not in swagger.__dict__
+    assert "_operations" not in swagger.__dict__
     assert isinstance(swagger["/users"], CaseInsensitiveDict)
     assert mocked.call_count == 1
     # Check cached access
-    assert "_endpoints" in swagger.__dict__
+    assert "_operations" in swagger.__dict__
     assert isinstance(swagger["/users"], CaseInsensitiveDict)
     assert mocked.call_count == 1
 

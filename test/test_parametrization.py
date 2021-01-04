@@ -675,7 +675,7 @@ def test_empty_content():
     }
     schema = schemathesis.from_dict(raw_schema)
     # Then the body processing should be no-op
-    operation = schema.endpoints["/body"]["POST"]
+    operation = schema["/body"]["POST"]
     assert operation.body == PayloadAlternatives([])
 
 
@@ -700,7 +700,7 @@ def test_loose_multipart_definition():
     schema = schemathesis.from_dict(raw_schema)
     # Then non-object data should be excluded during generation
 
-    @given(case=schema.endpoints["/body"]["POST"].as_strategy())
+    @given(case=schema["/body"]["POST"].as_strategy())
     @settings(max_examples=5)
     def test(case):
         assert isinstance(case.body, dict)
@@ -714,7 +714,7 @@ def test_loose_multipart_definition():
 def test_optional_form_parameters(schema_url):
     # When form parameters are optional
     schema = schemathesis.from_uri(schema_url)
-    strategy = schema.endpoints["/multipart"]["POST"].as_strategy()
+    strategy = schema["/multipart"]["POST"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
@@ -755,7 +755,7 @@ def test_ref_field():
     }
     schema = schemathesis.from_dict(raw_schema)
 
-    @given(case=schema.endpoints["/body"]["POST"].as_strategy())
+    @given(case=schema["/body"]["POST"].as_strategy())
     @settings(max_examples=5)
     def test(case):
         assert isinstance(case.body["$ref"], str)
