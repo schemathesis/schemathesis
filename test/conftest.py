@@ -9,7 +9,7 @@ import schemathesis.cli
 from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
 
-from .apps import Endpoint, _aiohttp, _fastapi, _flask, _graphql
+from .apps import Operation, _aiohttp, _fastapi, _flask, _graphql
 from .apps.utils import OpenAPIVersion
 from .utils import get_schema_path, make_schema
 
@@ -57,7 +57,7 @@ def operations(request):
     marker = request.node.get_closest_marker("operations")
     if marker:
         if marker.args and marker.args[0] == "__all__":
-            operations = tuple(item for item in Endpoint.__members__ if item != "all")
+            operations = tuple(item for item in Operation.__members__ if item != "all")
         else:
             operations = marker.args
     else:

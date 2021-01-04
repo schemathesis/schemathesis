@@ -4,7 +4,7 @@ from typing import Any, Dict, Tuple
 import jsonschema
 
 
-class Endpoint(Enum):
+class Operation(Enum):
     success = ("GET", "/api/success")
     failure = ("GET", "/api/failure")
     payload = ("POST", "/api/payload")
@@ -119,20 +119,20 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
         links = components.setdefault("x-links", {})
         links.setdefault(name, definition)
 
-    for endpoint in operations:
-        method, path = Endpoint[endpoint].value
+    for name in operations:
+        method, path = Operation[name].value
         path = path.replace(template["basePath"], "")
         reference = {"$ref": "#/definitions/Node"}
-        if endpoint == "recursive":
+        if name == "recursive":
             schema = {"responses": {"200": {"description": "OK", "schema": reference}}}
             definitions = template.setdefault("definitions", {})
             definitions["Node"] = make_node_definition(reference)
-        elif endpoint in ("payload", "get_payload"):
+        elif name in ("payload", "get_payload"):
             schema = {
                 "parameters": [{"name": "body", "in": "body", "required": True, "schema": PAYLOAD}],
                 "responses": {"200": {"description": "OK", "schema": PAYLOAD}},
             }
-        elif endpoint == "unsatisfiable":
+        elif name == "unsatisfiable":
             schema = {
                 "parameters": [
                     {
@@ -145,27 +145,27 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
                 ],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "performance":
+        elif name == "performance":
             schema = {
                 "parameters": [{"name": "data", "in": "body", "required": True, "schema": {"type": "integer"}}],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint in ("flaky", "multiple_failures"):
+        elif name in ("flaky", "multiple_failures"):
             schema = {
                 "parameters": [{"name": "id", "in": "query", "required": True, "type": "integer"}],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "path_variable":
+        elif name == "path_variable":
             schema = {
                 "parameters": [{"name": "key", "in": "path", "required": True, "type": "string", "minLength": 1}],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "invalid":
+        elif name == "invalid":
             schema = {
                 "parameters": [{"name": "id", "in": "query", "required": True, "type": "int"}],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "upload_file":
+        elif name == "upload_file":
             schema = {
                 "parameters": [
                     {"name": "note", "in": "formData", "required": True, "type": "string"},
@@ -173,7 +173,7 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
                 ],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "form":
+        elif name == "form":
             schema = {
                 "parameters": [
                     {"name": "first_name", "in": "formData", "required": True, "type": "string"},
@@ -182,12 +182,12 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
                 "consumes": ["application/x-www-form-urlencoded"],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "custom_format":
+        elif name == "custom_format":
             schema = {
                 "parameters": [{"name": "id", "in": "query", "required": True, "type": "string", "format": "digits"}],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "multipart":
+        elif name == "multipart":
             schema = {
                 "parameters": [
                     {"in": "formData", "name": "key", "required": True, "type": "string"},
@@ -197,9 +197,9 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
                 "consumes": ["multipart/form-data"],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "teapot":
+        elif name == "teapot":
             schema = {"produces": ["application/json"], "responses": {"200": {"description": "OK"}}}
-        elif endpoint == "plain_text_body":
+        elif name == "plain_text_body":
             schema = {
                 "parameters": [
                     {"in": "body", "name": "value", "required": True, "schema": {"type": "string"}},
@@ -208,12 +208,12 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
                 "produces": ["text/plain"],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "invalid_path_parameter":
+        elif name == "invalid_path_parameter":
             schema = {
                 "parameters": [{"name": "id", "in": "path", "required": False, "type": "integer"}],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "headers":
+        elif name == "headers":
             schema = {
                 "security": [{"api_key": []}],
                 "responses": {
@@ -225,7 +225,7 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
                     "default": {"description": "Default response"},
                 },
             }
-        elif endpoint == "create_user":
+        elif name == "create_user":
             schema = {
                 "parameters": [
                     {
@@ -267,7 +267,7 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
                     },
                 }
             }
-        elif endpoint == "get_user":
+        elif name == "get_user":
             parent = template["paths"].setdefault(path, {})
             parent["parameters"] = [{"in": "path", "name": "user_id", "required": True, "type": "string"}]
             schema = {
@@ -290,7 +290,7 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
                     "404": {"description": "Not found"},
                 },
             }
-        elif endpoint == "update_user":
+        elif name == "update_user":
             parent = template["paths"].setdefault(path, {})
             parent["parameters"] = [
                 {"in": "path", "name": "user_id", "required": True, "type": "string"},
@@ -317,7 +317,7 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
                 ],
                 "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
             }
-        elif endpoint == "csv_payload":
+        elif name == "csv_payload":
             schema = {
                 "parameters": [
                     {
@@ -375,22 +375,22 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
         links = components.setdefault("links", {})
         links.setdefault(name, definition)
 
-    for endpoint in operations:
-        method, path = Endpoint[endpoint].value
+    for name in operations:
+        method, path = Operation[name].value
         path = path.replace(base_path, "")
         reference = {"$ref": "#/x-definitions/Node"}
-        if endpoint == "recursive":
+        if name == "recursive":
             schema = {
                 "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": reference}}}}
             }
             definitions = template.setdefault("x-definitions", {})
             definitions["Node"] = make_node_definition(reference)
-        elif endpoint in ("payload", "get_payload"):
+        elif name in ("payload", "get_payload"):
             schema = {
                 "requestBody": {"content": {"application/json": {"schema": PAYLOAD}}},
                 "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": PAYLOAD}}}},
             }
-        elif endpoint == "unsatisfiable":
+        elif name == "unsatisfiable":
             schema = {
                 "requestBody": {
                     "content": {"application/json": {"schema": {"allOf": [{"type": "integer"}, {"type": "string"}]}}},
@@ -398,34 +398,34 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                 },
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "performance":
+        elif name == "performance":
             schema = {
                 "requestBody": {"content": {"application/json": {"schema": {"type": "integer"}}}, "required": True},
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "plain_text_body":
+        elif name == "plain_text_body":
             schema = {
                 "requestBody": {"content": {"text/plain": {"schema": {"type": "string"}}}, "required": True},
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint in ("flaky", "multiple_failures"):
+        elif name in ("flaky", "multiple_failures"):
             schema = {
                 "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "integer"}}],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "path_variable":
+        elif name == "path_variable":
             schema = {
                 "parameters": [
                     {"name": "key", "in": "path", "required": True, "schema": {"type": "string", "minLength": 1}}
                 ],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "invalid":
+        elif name == "invalid":
             schema = {
                 "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "int"}}],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "upload_file":
+        elif name == "upload_file":
             schema = {
                 "requestBody": {
                     "required": True,
@@ -444,7 +444,7 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                 },
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "form":
+        elif name == "form":
             schema = {
                 "requestBody": {
                     "required": True,
@@ -464,14 +464,14 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                 },
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "custom_format":
+        elif name == "custom_format":
             schema = {
                 "parameters": [
                     {"name": "id", "in": "query", "required": True, "schema": {"type": "string", "format": "digits"}}
                 ],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "multipart":
+        elif name == "multipart":
             schema = {
                 "requestBody": {
                     "required": True,
@@ -491,7 +491,7 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                 },
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "teapot":
+        elif name == "teapot":
             schema = {
                 "responses": {
                     "200": {
@@ -508,12 +508,12 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                     }
                 }
             }
-        elif endpoint == "invalid_path_parameter":
+        elif name == "invalid_path_parameter":
             schema = {
                 "parameters": [{"name": "id", "in": "path", "required": False, "schema": {"type": "integer"}}],
                 "responses": {"200": {"description": "OK"}},
             }
-        elif endpoint == "headers":
+        elif name == "headers":
             schema = {
                 "security": [{"api_key": []}],
                 "responses": {
@@ -525,7 +525,7 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                     "default": {"description": "Default response"},
                 },
             }
-        elif endpoint == "create_user":
+        elif name == "create_user":
             schema = {
                 "requestBody": {
                     "content": {
@@ -567,7 +567,7 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                     },
                 }
             }
-        elif endpoint == "get_user":
+        elif name == "get_user":
             parent = template["paths"].setdefault(path, {})
             parent["parameters"] = [{"in": "path", "name": "user_id", "required": True, "schema": {"type": "string"}}]
             schema = {
@@ -590,7 +590,7 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                     "404": {"description": "Not found"},
                 },
             }
-        elif endpoint == "update_user":
+        elif name == "update_user":
             parent = template["paths"].setdefault(path, {})
             parent["parameters"] = [
                 {"in": "path", "name": "user_id", "required": True, "schema": {"type": "string"}},
@@ -617,7 +617,7 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                 },
                 "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
             }
-        elif endpoint == "csv_payload":
+        elif name == "csv_payload":
             schema = {
                 "requestBody": {
                     "required": True,

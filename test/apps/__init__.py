@@ -8,7 +8,7 @@ from schemathesis.cli import CSVOption
 
 try:
     from . import _aiohttp, _flask, _graphql
-    from .utils import Endpoint, OpenAPIVersion
+    from .utils import OpenAPIVersion, Operation
 except ImportError as exc:
     # try/except for cases when there is a different ImportError in the block before, that
     # doesn't imply another running environment (test_server.sh vs usual pytest run)
@@ -17,34 +17,34 @@ except ImportError as exc:
         import _aiohttp
         import _flask
         import _graphql
-        from utils import Endpoint, OpenAPIVersion
+        from utils import OpenAPIVersion, Operation
     except ImportError:
         raise exc
 
 
-INVALID_ENDPOINTS = ("invalid", "invalid_response", "invalid_path_parameter", "missing_path_parameter")
-AvailableEndpoints = CSVOption(Endpoint)
+INVALID_OPERATIONS = ("invalid", "invalid_response", "invalid_path_parameter", "missing_path_parameter")
+AvailableOperations = CSVOption(Operation)
 
 
 @click.command()
 @click.argument("port", type=int)
-@click.option("--operations", type=AvailableEndpoints)
+@click.option("--operations", type=AvailableOperations)
 @click.option("--spec", type=click.Choice(["openapi2", "openapi3", "graphql"]), default="openapi2")
 @click.option("--framework", type=click.Choice(["aiohttp", "flask"]), default="aiohttp")
-def run_app(port: int, operations: List[Endpoint], spec: str, framework: str) -> None:
+def run_app(port: int, operations: List[Operation], spec: str, framework: str) -> None:
     if spec == "graphql":
         app = _graphql.create_app()
         app.run(port=port)
     else:
         if operations is not None:
-            prepared_operations = tuple(endpoint.name for endpoint in operations)
+            prepared_operations = tuple(operation.name for operation in operations)
             if "all" in prepared_operations:
-                prepared_operations = tuple(endpoint.name for endpoint in Endpoint if endpoint.name != "all")
+                prepared_operations = tuple(operation.name for operation in Operation if operation.name != "all")
         else:
             prepared_operations = tuple(
-                endpoint.name
-                for endpoint in Endpoint
-                if endpoint.name not in INVALID_ENDPOINTS and endpoint.name != "all"
+                operation.name
+                for operation in Operation
+                if operation.name not in INVALID_OPERATIONS and operation.name != "all"
             )
         version = {"openapi2": OpenAPIVersion("2.0"), "openapi3": OpenAPIVersion("3.0")}[spec]
         click.secho(

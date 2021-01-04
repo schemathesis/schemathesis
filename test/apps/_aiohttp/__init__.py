@@ -8,9 +8,9 @@ from aiohttp import web
 from . import handlers
 
 try:
-    from ..utils import Endpoint, OpenAPIVersion, make_openapi_schema
+    from ..utils import OpenAPIVersion, Operation, make_openapi_schema
 except (ImportError, ValueError):
-    from utils import Endpoint, OpenAPIVersion, make_openapi_schema
+    from utils import OpenAPIVersion, Operation, make_openapi_schema
 
 
 def create_openapi_app(
@@ -55,7 +55,7 @@ def create_openapi_app(
     app = web.Application()
     app.add_routes(
         [web.get("/schema.yaml", schema), web.get("/api/cookies", set_cookies)]
-        + [web.route(item.value[0], item.value[1], wrapper(item.name)) for item in Endpoint if item.name != "all"]
+        + [web.route(item.value[0], item.value[1], wrapper(item.name)) for item in Operation if item.name != "all"]
     )
     app["users"] = {}
     app["incoming_requests"] = incoming_requests

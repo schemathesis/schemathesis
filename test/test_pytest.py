@@ -27,7 +27,7 @@ def test_(request, param, case):
     )
     # And there are multiple method/path combinations
     result = testdir.runpytest("-v", "-s")
-    # Then the total number of tests should be Method/Endpoint combos x parameters in `pytest_generate_tests`
+    # Then the total number of tests should be method/path combos x parameters in `pytest_generate_tests`
     # I.e. regular pytest parametrization logic should be applied
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
@@ -69,7 +69,7 @@ class TestAPI:
     )
     # And there are multiple method/path combinations
     result = testdir.runpytest("-v", "-s")
-    # Then the total number of tests should be Method/Endpoint combos x parameters in `pytest_generate_tests`
+    # Then the total number of tests should be method/path combos x parameters in `pytest_generate_tests`
     # I.e. regular pytest parametrization logic should be applied
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
