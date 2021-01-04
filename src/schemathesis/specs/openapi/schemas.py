@@ -86,7 +86,7 @@ class BaseOpenAPISchema(BaseSchema):
                 # Setting a low recursion limit doesn't solve the problem with recursive references & inlining too much
                 # but decreases the number of cases when Schemathesis stuck on this step.
                 methods = self.resolver.resolve_all(methods, RECURSION_DEPTH_LIMIT - 5)
-                common_parameters = get_common_parameters(methods)
+                common_parameters = methods.get("parameters", [])
                 for method, resolved_definition in methods.items():
                     # Only method definitions are parsed
                     if (
@@ -179,7 +179,7 @@ class BaseOpenAPISchema(BaseSchema):
         for path, methods in self.raw_schema["paths"].items():
             scope, raw_methods = self._resolve_methods(methods)
             methods = self.resolver.resolve_all(methods)
-            common_parameters = get_common_parameters(methods)
+            common_parameters = methods.get("parameters", [])
             for method, resolved_definition in methods.items():
                 if method not in self.operations or "operationId" not in resolved_definition:
                     continue
@@ -200,7 +200,7 @@ class BaseOpenAPISchema(BaseSchema):
         resolved_definition = self.resolver.resolve_all(data)
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
         _, methods = self.resolver.resolve(parent_ref)
-        common_parameters = get_common_parameters(methods)
+        common_parameters = methods.get("parameters", [])
         parameters = self.collect_parameters(
             itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
         )
@@ -619,14 +619,3 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
                     files.append((name, (None, form_data[name])))
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, None
-
-
-def get_common_parameters(methods: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Common parameters are deep copied from the methods definitions.
-
-    Copying is needed because of further modifications.
-    """
-    common_parameters = methods.get("parameters")
-    if common_parameters is not None:
-        return deepcopy(common_parameters)
-    return []

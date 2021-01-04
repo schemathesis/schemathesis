@@ -251,6 +251,5 @@ def traverse_schema(schema: Schema, callback: Callable[..., Dict[str, Any]], *ar
         for key, sub_item in schema.items():
             schema[key] = traverse_schema(sub_item, callback, *args, **kwargs)
     elif isinstance(schema, list):
-        for idx, sub_item in enumerate(schema):
-            schema[idx] = traverse_schema(sub_item, callback, *args, **kwargs)
+        schema = [traverse_schema(sub_item, callback, *args, **kwargs) for sub_item in schema]
     return schema
