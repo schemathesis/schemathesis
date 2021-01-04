@@ -51,6 +51,8 @@ Changelog
 
 - Use compiled versions of Open API spec validators.
 - Decrease CLI memory usage. `#987`_
+- Various improvements relevant to processing of API operation definitions.
+  It gives ~20% improvement on large schemas with many references.
 
 **Removed**
 

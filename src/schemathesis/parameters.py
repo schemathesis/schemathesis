@@ -2,7 +2,6 @@
 
 These are basic entities that describe what data could be sent to the API.
 """
-from copy import deepcopy
 from typing import Any, Dict, Generator, Generic, List, TypeVar
 
 import attr
@@ -18,10 +17,6 @@ class Parameter:
 
     # The parameter definition in the language acceptable by the API
     definition: Any = attr.ib()  # pragma: no mutate
-
-    def __attrs_post_init__(self) -> None:
-        # Do not use `converter=deepcopy` on the field due to mypy not detecting type annotations
-        self.definition = deepcopy(self.definition)
 
     @property
     def location(self) -> str:
