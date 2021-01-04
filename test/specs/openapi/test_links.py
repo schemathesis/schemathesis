@@ -125,7 +125,7 @@ EXPECTED_PATH_PARAMETERS = [
     ),
 )
 def test_make_endpoint(value, path_user_id, query_user_id, code):
-    operation = LINK.make_endpoint(list(map(ParsedData, value)))
+    operation = LINK.make_operation(list(map(ParsedData, value)))
     # There is only one path parameter
     assert len(operation.path_parameters) == 1
     assert sorted(operation.path_parameters[0].definition["schema"]["enum"], key=json.dumps) == path_user_id
@@ -150,7 +150,7 @@ def assert_schema(target, expected):
 
 
 def test_make_endpoint_single():
-    operation = LINK.make_endpoint([ParsedData({"path.user_id": 1, "query.user_id": 2, "code": 7})])
+    operation = LINK.make_operation([ParsedData({"path.user_id": 1, "query.user_id": 2, "code": 7})])
     assert operation.path_parameters == ParameterSet(
         [OpenAPI30Parameter({"in": "path", "name": "user_id", "schema": {"enum": [1]}})]
     )
@@ -169,7 +169,7 @@ def test_make_endpoint_invalid_location(parameter):
     with pytest.raises(
         ValueError, match=f"Parameter `{parameter}` is not defined in API operation GET /users/{{user_id}}"
     ):
-        LINK.make_endpoint([ParsedData({parameter: 4})])
+        LINK.make_operation([ParsedData({parameter: 4})])
 
 
 def test_get_container_invalid_location():

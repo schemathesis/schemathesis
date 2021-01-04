@@ -52,7 +52,7 @@ class StatefulTest:
     def parse(self, case: Case, response: GenericResponse) -> ParsedData:
         raise NotImplementedError
 
-    def make_endpoint(self, collected: List[ParsedData]) -> APIOperation:
+    def make_operation(self, collected: List[ParsedData]) -> APIOperation:
         raise NotImplementedError
 
 
@@ -63,8 +63,8 @@ class StatefulData:
     stateful_test: StatefulTest = attr.ib()  # pragma: no mutate
     container: List[ParsedData] = attr.ib(factory=list)  # pragma: no mutate
 
-    def make_endpoint(self) -> APIOperation:
-        return self.stateful_test.make_endpoint(self.container)
+    def make_operation(self) -> APIOperation:
+        return self.stateful_test.make_operation(self.container)
 
     def store(self, case: Case, response: GenericResponse) -> None:
         """Parse and store data for a stateful test."""
@@ -80,7 +80,7 @@ class Feedback:
     """
 
     stateful: Optional[Stateful] = attr.ib()  # pragma: no mutate
-    endpoint: APIOperation = attr.ib(repr=False)  # pragma: no mutate
+    operation: APIOperation = attr.ib(repr=False)  # pragma: no mutate
     stateful_tests: Dict[str, StatefulData] = attr.ib(factory=dict, repr=False)  # pragma: no mutate
 
     def add_test_case(self, case: Case, response: GenericResponse) -> None:
@@ -96,7 +96,7 @@ class Feedback:
         from ._hypothesis import create_test  # pylint: disable=import-outside-toplevel
 
         for data in self.stateful_tests.values():
-            operation = data.make_endpoint()
+            operation = data.make_operation()
             for data_generation_method in operation.schema.data_generation_methods:
                 yield operation, data_generation_method, create_test(
                     operation=operation,

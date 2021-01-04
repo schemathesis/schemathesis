@@ -57,7 +57,7 @@ class Link(StatefulTest):
             body=expressions.evaluate(self.request_body, context),
         )
 
-    def make_endpoint(self, collected: List[ParsedData]) -> APIOperation:
+    def make_operation(self, collected: List[ParsedData]) -> APIOperation:
         """Create a modified version of the original API operation with additional data merged in."""
         # We split the gathered data among all locations & store the original parameter
         containers = {
