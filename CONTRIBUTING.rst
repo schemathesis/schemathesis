@@ -157,7 +157,7 @@ Then you could use CLI against this server:
     Base URL: http://127.0.0.1:8081/api
     Specification version: Swagger 2.0
     Workers: 1
-    collected endpoints: 3
+    Collected API operations: 3
 
     GET /api/path_variable/{key} .                                              [ 33%]
     GET /api/success .                                                          [ 66%]

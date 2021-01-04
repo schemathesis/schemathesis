@@ -1495,11 +1495,11 @@ def test_chained_internal_exception(testdir, cli, hypothesis_max_examples, opena
     (
         (
             ("--skip-deprecated-endpoints",),
-            "collected endpoints: 1",
+            "Collected API operations: 1",
         ),
         (
             (),
-            "collected endpoints: 2",
+            "Collected API operations: 2",
         ),
     ),
 )

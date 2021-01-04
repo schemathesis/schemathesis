@@ -29,6 +29,7 @@ Changelog
 - If multiple non-check related failures happens during a test of a single API operation, they are displayed as is, instead of Hypothesis-level error messages about multiple found failures or flaky tests. `#975`_
 - Catch schema parsing errors, that are caused by YAML parsing.
 - The built-in test server now accepts ``--operations`` instead of ``--endpoints``.
+- Display ``Collected API operations`` instead of ``collected endpoints`` in the CLI. `#869`_
 
 **Fixed**
 
@@ -1678,6 +1679,7 @@ Deprecated
 .. _#874: https://github.com/schemathesis/schemathesis/issues/874
 .. _#872: https://github.com/schemathesis/schemathesis/issues/872
 .. _#870: https://github.com/schemathesis/schemathesis/issues/870
+.. _#869: https://github.com/schemathesis/schemathesis/issues/869
 .. _#858: https://github.com/schemathesis/schemathesis/issues/858
 .. _#855: https://github.com/schemathesis/schemathesis/issues/855
 .. _#851: https://github.com/schemathesis/schemathesis/issues/851

@@ -297,7 +297,7 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     click.echo(f"Base URL: {event.base_url}")
     click.echo(f"Specification version: {event.specification_name}")
     click.echo(f"Workers: {context.workers_num}")
-    click.secho(f"collected endpoints: {event.operations_count}", bold=True)
+    click.secho(f"Collected API operations: {event.operations_count}", bold=True)
     if event.operations_count >= 1:
         click.echo()
 

@@ -28,7 +28,7 @@ For example, if your API schema has three operations, then you will see a simila
     Base URL: http://127.0.0.1:8081/api
     Specification version: Swagger 2.0
     Workers: 1
-    collected endpoints: 3
+    Collected API operations: 3
 
     GET /api/path_variable/{key} .                             [ 33%]
     GET /api/success .                                         [ 66%]
@@ -111,7 +111,7 @@ To make Schemathesis perform all built-in checks use ``--checks all`` CLI option
     Base URL: http://api.com/
     Specification version: Swagger 2.0
     Workers: 1
-    collected endpoints: 3
+    Collected API operations: 3
 
     GET /api/path_variable/{key} .                             [ 33%]
     GET /api/success .                                         [ 66%]
@@ -141,7 +141,7 @@ If any response will take longer than the provided value (in milliseconds) than 
     Base URL: http://api.com/
     Specification version: Swagger 2.0
     Workers: 1
-    collected endpoints: 1
+    Collected API operations: 1
 
     GET /api/slow F                                            [100%]
 
