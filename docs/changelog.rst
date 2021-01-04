@@ -30,6 +30,7 @@ Changelog
 - Catch schema parsing errors, that are caused by YAML parsing.
 - The built-in test server now accepts ``--operations`` instead of ``--endpoints``.
 - Display ``Collected API operations`` instead of ``collected endpoints`` in the CLI. `#869`_
+- ``--skip-deprecated-endpoints`` is renamed to ``--skip-deprecated-operations``. `#869`_
 
 **Fixed**
 
@@ -255,7 +256,7 @@ Changelog
 - New ``port`` parameter added to ``from_uri()`` method. `#706`_
 - A code snippet to reproduce a failed check when running Python tests. `#793`_
 - Python 3.9 support. `#731`_
-- Ability to skip deprecated endpoints with ``--skip-deprecated-endpoints`` CLI option and ``skip_deprecated_endpoints=True`` argument to schema loaders. `#715`_
+- Ability to skip deprecated endpoints with ``--skip-deprecated-endpoints`` CLI option and ``skip_deprecated_operations=True`` argument to schema loaders. `#715`_
 
 **Fixed**
 

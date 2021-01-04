@@ -64,11 +64,11 @@ For example, the following command will select all operations which paths start 
     $ schemathesis run -E ^/api/users http://api.com/swagger.json
 
 If your API contains deprecated operations (that have ``deprecated: true`` in their definition),
-then you can skip them by passing ``--skip-deprecated-endpoints``:
+then you can skip them by passing ``--skip-deprecated-operations``:
 
 .. code:: bash
 
-    $ schemathesis run --skip-deprecated-endpoints ...
+    $ schemathesis run --skip-deprecated-operations ...
 
 Tests configuration
 -------------------

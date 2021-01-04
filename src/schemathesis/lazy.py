@@ -22,7 +22,7 @@ class LazySchema:
     operation_id: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
     hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
-    skip_deprecated_endpoints: bool = attr.ib(default=False)  # pragma: no mutate
+    skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
     data_generation_methods: Iterable[DataGenerationMethod] = attr.ib(default=DEFAULT_DATA_GENERATION_METHODS)
 
     def parametrize(
@@ -32,7 +32,7 @@ class LazySchema:
         tag: Optional[Filter] = NOT_SET,
         operation_id: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
-        skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
+        skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
     ) -> Callable:
         if method is NOT_SET:
@@ -61,7 +61,7 @@ class LazySchema:
                     hooks=self.hooks,
                     test_function=func,
                     validate_schema=validate_schema,
-                    skip_deprecated_endpoints=skip_deprecated_endpoints,
+                    skip_deprecated_operations=skip_deprecated_operations,
                     data_generation_methods=data_generation_methods,
                 )
                 fixtures = get_fixtures(func, request)
@@ -105,7 +105,7 @@ def get_schema(
     test_function: GenericTest,
     hooks: HookDispatcher,
     validate_schema: Union[bool, NotSet] = NOT_SET,
-    skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
+    skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
     data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
 ) -> BaseSchema:
     """Loads a schema from the fixture."""
@@ -120,7 +120,7 @@ def get_schema(
         test_function=test_function,
         hooks=hooks,
         validate_schema=validate_schema,
-        skip_deprecated_endpoints=skip_deprecated_endpoints,
+        skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
     )
 

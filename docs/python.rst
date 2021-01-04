@@ -66,13 +66,13 @@ For example, the following test selects all operations which paths start with ``
         case.call_and_validate()
 
 If your API contains deprecated operations (that have ``deprecated: true`` in their definition),
-then you can skip them by passing ``skip_deprecated_endpoints=True`` to loaders or to the `schema.parametrize` call:
+then you can skip them by passing ``skip_deprecated_operations=True`` to loaders or to the `schema.parametrize` call:
 
 .. code:: python
 
     schema = schemathesis.from_uri(
         "http://example.com/swagger.json",
-        skip_deprecated_endpoints=True
+        skip_deprecated_operations=True
     )
 
 Tests configuration

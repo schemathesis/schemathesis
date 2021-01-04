@@ -93,7 +93,7 @@ class BaseOpenAPISchema(BaseSchema):
                         method not in self.allowed_http_methods
                         or should_skip_method(method, self.method)
                         or should_skip_deprecated(
-                            resolved_definition.get("deprecated", False), self.skip_deprecated_endpoints
+                            resolved_definition.get("deprecated", False), self.skip_deprecated_operations
                         )
                         or should_skip_by_tag(resolved_definition.get("tags"), self.tag)
                         or should_skip_by_operation_id(resolved_definition.get("operationId"), self.operation_id)

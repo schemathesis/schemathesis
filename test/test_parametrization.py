@@ -450,17 +450,17 @@ def test_b(request, case):
 
 
 def test_skip_deprecated_endpoints(testdir):
-    # When the schema is loaded with `skip_deprecated_endpoints=True`
+    # When the schema is loaded with `skip_deprecated_operations=True`
     testdir.make_test(
         """
-schema = schemathesis.from_dict(raw_schema, skip_deprecated_endpoints=True)
+schema = schemathesis.from_dict(raw_schema, skip_deprecated_operations=True)
 
 @schema.parametrize()
 @settings(max_examples=1)
 def test_a(request, case):
     request.config.HYPOTHESIS_CASES += 1
 
-@schema.parametrize(skip_deprecated_endpoints=False)
+@schema.parametrize(skip_deprecated_operations=False)
 @settings(max_examples=1)
 def test_b(request, case):
     request.config.HYPOTHESIS_CASES += 1
@@ -485,7 +485,7 @@ def test_b(request, case):
         [
             r".*test_a\[PATCH:/v1/users\]\[P\]",
             r".*test_a\[GET:/v1/users\]\[P\]",
-            # Here POST is not skipped due to using skip_deprecated_endpoints=False in the `parametrize` call
+            # Here POST is not skipped due to using skip_deprecated_operations=False in the `parametrize` call
             r".*test_b\[POST:/v1/users\]\[P\]",
             r".*test_b\[PATCH:/v1/users\]\[P\]",
             r".*test_b\[GET:/v1/users\]\[P\]",

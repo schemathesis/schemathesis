@@ -305,8 +305,8 @@ class GroupedOption(click.Option):
     group=ParameterGroup.validation,
 )
 @click.option(
-    "--skip-deprecated-endpoints",
-    help="Skip testing of deprecated endpoints.",
+    "--skip-deprecated-operations",
+    help="Skip testing of deprecated API operations.",
     is_flag=True,
     is_eager=True,
     default=False,
@@ -436,7 +436,7 @@ def run(
     request_timeout: Optional[int] = None,
     request_tls_verify: bool = True,
     validate_schema: bool = True,
-    skip_deprecated_endpoints: bool = False,
+    skip_deprecated_operations: bool = False,
     junit_xml: Optional[click.utils.LazyFile] = None,
     show_errors_tracebacks: bool = False,
     store_network_log: Optional[click.utils.LazyFile] = None,
@@ -490,7 +490,7 @@ def run(
         targets=selected_targets,
         workers_num=workers_num,
         validate_schema=validate_schema,
-        skip_deprecated_endpoints=skip_deprecated_endpoints,
+        skip_deprecated_operations=skip_deprecated_operations,
         fixups=fixups,
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,

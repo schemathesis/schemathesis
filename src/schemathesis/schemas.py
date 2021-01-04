@@ -49,7 +49,7 @@ class BaseSchema(Mapping):
     hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
     test_function: Optional[GenericTest] = attr.ib(default=None)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
-    skip_deprecated_endpoints: bool = attr.ib(default=False)  # pragma: no mutate
+    skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
     data_generation_methods: Iterable[DataGenerationMethod] = attr.ib(
         default=DEFAULT_DATA_GENERATION_METHODS
     )  # pragma: no mutate
@@ -163,7 +163,7 @@ class BaseSchema(Mapping):
         tag: Optional[Filter] = NOT_SET,
         operation_id: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
-        skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
+        skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
@@ -177,7 +177,7 @@ class BaseSchema(Mapping):
                 tag=tag,
                 operation_id=operation_id,
                 validate_schema=validate_schema,
-                skip_deprecated_endpoints=skip_deprecated_endpoints,
+                skip_deprecated_operations=skip_deprecated_operations,
                 data_generation_methods=data_generation_methods,
             )
             return func
@@ -204,7 +204,7 @@ class BaseSchema(Mapping):
         operation_id: Optional[Filter] = NOT_SET,
         hooks: Union[HookDispatcher, NotSet] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
-        skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
+        skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
     ) -> "BaseSchema":
         if method is NOT_SET:
@@ -217,8 +217,8 @@ class BaseSchema(Mapping):
             operation_id = self.operation_id
         if validate_schema is NOT_SET:
             validate_schema = self.validate_schema
-        if skip_deprecated_endpoints is NOT_SET:
-            skip_deprecated_endpoints = self.skip_deprecated_endpoints
+        if skip_deprecated_operations is NOT_SET:
+            skip_deprecated_operations = self.skip_deprecated_operations
         if hooks is NOT_SET:
             hooks = self.hooks
         if data_generation_methods is NOT_SET:
@@ -236,7 +236,7 @@ class BaseSchema(Mapping):
             hooks=hooks,  # type: ignore
             test_function=test_function,
             validate_schema=validate_schema,  # type: ignore
-            skip_deprecated_endpoints=skip_deprecated_endpoints,  # type: ignore
+            skip_deprecated_operations=skip_deprecated_operations,  # type: ignore
             data_generation_methods=data_generation_methods,  # type: ignore
         )
 
