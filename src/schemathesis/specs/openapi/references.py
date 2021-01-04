@@ -7,8 +7,8 @@ import jsonschema
 import requests
 import yaml
 
-from ...utils import StringDatesYAMLLoader, traverse_schema
-from .converter import to_json_schema
+from ...utils import StringDatesYAMLLoader
+from .converter import to_json_schema_recursive
 
 # Reference resolving will stop after this depth
 RECURSION_DEPTH_LIMIT = 100
@@ -62,16 +62,16 @@ class InliningResolver(jsonschema.RefResolver):
         """Recursively resolve all references in the given object."""
         if recursion_level > RECURSION_DEPTH_LIMIT:
             return item
-        item = deepcopy(item)
         if isinstance(item, dict):
-            if "$ref" in item and isinstance(item["$ref"], str):
-                with self.resolving(item["$ref"]) as resolved:
+            ref = item.get("$ref")
+            if ref is not None and isinstance(ref, str):
+                with self.resolving(ref) as resolved:
                     return self.resolve_all(resolved, recursion_level + 1)
+            item = deepcopy(item)
             for key, sub_item in item.items():
                 item[key] = self.resolve_all(sub_item, recursion_level)
         elif isinstance(item, list):
-            for idx, sub_item in enumerate(item):
-                item[idx] = self.resolve_all(sub_item, recursion_level)
+            item = [self.resolve_all(sub_item, recursion_level) for sub_item in deepcopy(item)]
         return item
 
     def resolve_in_scope(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Dict[str, Any]]:
@@ -98,5 +98,5 @@ class ConvertingResolver(InliningResolver):
 
     def resolve(self, ref: str) -> Tuple[str, Any]:
         url, document = super().resolve(ref)
-        document = traverse_schema(document, to_json_schema, nullable_name=self.nullable_name)
+        document = to_json_schema_recursive(document, nullable_name=self.nullable_name)
         return url, document
