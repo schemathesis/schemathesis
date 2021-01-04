@@ -5,7 +5,7 @@ import attr
 from requests import exceptions
 
 from ..exceptions import HTTPError
-from ..models import Endpoint, Status, TestResult, TestResultSet
+from ..models import APIOperation, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
 from ..utils import format_exception
 from .serialization import SerializedTestResult
@@ -20,8 +20,8 @@ class ExecutionEvent:
 class Initialized(ExecutionEvent):
     """Runner is initialized, settings are prepared, requests session is ready."""
 
-    # Total number of endpoints in the schema
-    endpoints_count: int = attr.ib()  # pragma: no mutate
+    # Total number of operations in the schema
+    operations_count: int = attr.ib()  # pragma: no mutate
     location: Optional[str] = attr.ib()  # pragma: no mutate
     base_url: str = attr.ib()  # pragma: no mutate
     specification_name: str = attr.ib()  # pragma: no mutate
@@ -32,25 +32,25 @@ class Initialized(ExecutionEvent):
     def from_schema(cls, *, schema: BaseSchema) -> "Initialized":
         """Computes all needed data from a schema instance."""
         return cls(
-            endpoints_count=schema.endpoints_count,
+            operations_count=schema.operations_count,
             location=schema.location,
             base_url=schema.get_base_url(),
             specification_name=schema.verbose_name,
         )
 
 
-class CurrentPathMixin:
+class CurrentOperationMixin:
     method: str
     path: str
 
     @property
-    def current_endpoint(self) -> str:
+    def current_operation(self) -> str:
         return f"{self.method} {self.path}"
 
 
 @attr.s(slots=True)  # pragma: no mutate
-class BeforeExecution(CurrentPathMixin, ExecutionEvent):
-    """Happens before each examined endpoint.
+class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
+    """Happens before each tested API operation.
 
     It happens before a single hypothesis test, that may contain many examples inside.
     """
@@ -61,24 +61,24 @@ class BeforeExecution(CurrentPathMixin, ExecutionEvent):
     recursion_level: int = attr.ib()  # pragma: no mutate
 
     @classmethod
-    def from_endpoint(cls, endpoint: Endpoint, recursion_level: int) -> "BeforeExecution":
+    def from_operation(cls, operation: APIOperation, recursion_level: int) -> "BeforeExecution":
         return cls(
-            method=endpoint.method.upper(),
-            path=endpoint.full_path,
-            relative_path=endpoint.path,
+            method=operation.method.upper(),
+            path=operation.full_path,
+            relative_path=operation.path,
             recursion_level=recursion_level,
         )
 
 
 @attr.s(slots=True)  # pragma: no mutate
-class AfterExecution(CurrentPathMixin, ExecutionEvent):
-    """Happens after each examined endpoint."""
+class AfterExecution(CurrentOperationMixin, ExecutionEvent):
+    """Happens after each tested API operation."""
 
     method: str = attr.ib()  # pragma: no mutate
     path: str = attr.ib()  # pragma: no mutate
     relative_path: str = attr.ib()  # pragma: no mutate
 
-    # Endpoint test status - success / failure / error
+    # APIOperation test status - success / failure / error
     status: Status = attr.ib()  # pragma: no mutate
     result: SerializedTestResult = attr.ib()  # pragma: no mutate
     # Test running time
@@ -88,12 +88,17 @@ class AfterExecution(CurrentPathMixin, ExecutionEvent):
 
     @classmethod
     def from_result(
-        cls, result: TestResult, status: Status, elapsed_time: float, hypothesis_output: List[str], endpoint: Endpoint
+        cls,
+        result: TestResult,
+        status: Status,
+        elapsed_time: float,
+        hypothesis_output: List[str],
+        operation: APIOperation,
     ) -> "AfterExecution":
         return cls(
-            method=endpoint.method.upper(),
-            path=endpoint.full_path,
-            relative_path=endpoint.path,
+            method=operation.method.upper(),
+            path=operation.full_path,
+            relative_path=operation.path,
             result=SerializedTestResult.from_test_result(result),
             status=status,
             elapsed_time=elapsed_time,

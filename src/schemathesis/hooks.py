@@ -7,10 +7,10 @@ import attr
 from hypothesis import strategies as st
 
 from .types import GenericTest
-from .utils import GenericResponse
+from .utils import GenericResponse, deprecated_property
 
 if TYPE_CHECKING:
-    from .models import Case, Endpoint
+    from .models import APIOperation, Case
 
 
 class HookLocation(Enum):
@@ -38,7 +38,11 @@ class RegisteredHook:
 class HookContext:
     """A context that is passed to some hook functions."""
 
-    endpoint: Optional["Endpoint"] = attr.ib(default=None)  # pragma: no mutate
+    operation: Optional["APIOperation"] = attr.ib(default=None)  # pragma: no mutate
+
+    @deprecated_property(removed_in="4.0", replacement="operation")
+    def endpoint(self) -> Optional["APIOperation"]:
+        return self.operation
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -218,7 +222,7 @@ def before_add_examples(context: HookContext, examples: List["Case"]) -> None:
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
 def add_case(context: HookContext, case: "Case", response: GenericResponse) -> Optional["Case"]:
-    """Creates an additional test per endpoint. If this hook returns None, no additional test created.
+    """Creates an additional test per API operation. If this hook returns None, no additional test created.
 
     Called with a copy of the original case object and the server's response to the original case.
     """

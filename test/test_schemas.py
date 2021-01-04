@@ -123,7 +123,7 @@ def test_schema_parsing_error(simple_schema, error_type, validate_schema, expect
         raw_schema["paths"]["/users"]["get"]["parameters"] = [as_param({"$ref": "#/definitions/SimpleIntRef"})]
     with pytest.raises(expected_exception):
         schema = schemathesis.from_dict(raw_schema, validate_schema=validate_schema)
-        list(schema.get_all_endpoints())
+        list(schema.get_all_operations())
 
 
 RESPONSES = {"responses": {"200": {"description": "OK"}}}
@@ -144,8 +144,8 @@ SCHEMA = {
         ("postBar", "/bar", "POST"),
     ),
 )
-def test_get_endpoint_by_operation_id(operation_id, path, method):
+def test_get_operation_by_id(operation_id, path, method):
     schema = schemathesis.from_dict(SCHEMA)
-    endpoint = schema.get_endpoint_by_operation_id(operation_id)
-    assert endpoint.path == path
-    assert endpoint.method.upper() == method
+    operation = schema.get_operation_by_id(operation_id)
+    assert operation.path == path
+    assert operation.method.upper() == method

@@ -20,7 +20,7 @@ from ...exceptions import (
     get_schema_validation_error,
 )
 from ...hooks import HookContext, HookDispatcher
-from ...models import Case, Endpoint, EndpointDefinition
+from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import BaseSchema
 from ...stateful import APIStateMachine, Stateful, StatefulTest
 from ...types import FormData
@@ -52,28 +52,28 @@ from .stateful import create_state_machine
 class BaseOpenAPISchema(BaseSchema):
     nullable_name: str
     links_field: str
-    operations: Tuple[str, ...]
+    allowed_http_methods: Tuple[str, ...]
     security: BaseSecurityProcessor
     parameter_cls: Type[OpenAPIParameter]
     component_locations: ClassVar[Tuple[str, ...]] = ()
-    _endpoints_by_operation_id: Dict[str, Endpoint]
+    _operations_by_id: Dict[str, APIOperation]
 
     @property  # pragma: no mutate
     def spec_version(self) -> str:
         raise NotImplementedError
 
     def get_stateful_tests(
-        self, response: GenericResponse, endpoint: Endpoint, stateful: Optional[Stateful]
+        self, response: GenericResponse, operation: APIOperation, stateful: Optional[Stateful]
     ) -> Sequence[StatefulTest]:
         if stateful == Stateful.links:
-            return links.get_links(response, endpoint, field=self.links_field)
+            return links.get_links(response, operation, field=self.links_field)
         return []
 
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
         return f"{self.__class__.__name__} for {info['title']} ({info['version']})"
 
-    def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
+    def get_all_operations(self) -> Generator[APIOperation, None, None]:
         try:
             paths = self.raw_schema["paths"]  # pylint: disable=unsubscriptable-object
             context = HookContext()
@@ -90,10 +90,10 @@ class BaseOpenAPISchema(BaseSchema):
                 for method, resolved_definition in methods.items():
                     # Only method definitions are parsed
                     if (
-                        method not in self.operations
+                        method not in self.allowed_http_methods
                         or should_skip_method(method, self.method)
                         or should_skip_deprecated(
-                            resolved_definition.get("deprecated", False), self.skip_deprecated_endpoints
+                            resolved_definition.get("deprecated", False), self.skip_deprecated_operations
                         )
                         or should_skip_by_tag(resolved_definition.get("tags"), self.tag)
                         or should_skip_by_operation_id(resolved_definition.get("operationId"), self.operation_id)
@@ -105,13 +105,13 @@ class BaseOpenAPISchema(BaseSchema):
                     )
                     # To prevent recursion errors we need to pass not resolved schema as well
                     # It could be used for response validation
-                    raw_definition = EndpointDefinition(raw_methods[method], resolved_definition, scope, parameters)
-                    yield self.make_endpoint(path, method, parameters, raw_definition)
+                    raw_definition = OperationDefinition(raw_methods[method], resolved_definition, scope, parameters)
+                    yield self.make_operation(path, method, parameters, raw_definition)
         except (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError) as exc:
             raise InvalidSchema("Schema parsing failed. Please check your schema.") from exc
 
     def collect_parameters(
-        self, parameters: Iterable[Dict[str, Any]], endpoint_definition: Dict[str, Any]
+        self, parameters: Iterable[Dict[str, Any]], definition: Dict[str, Any]
     ) -> List[OpenAPIParameter]:
         """Collect Open API parameters.
 
@@ -128,16 +128,16 @@ class BaseOpenAPISchema(BaseSchema):
             return deepcopy(self.resolver.resolve(methods["$ref"]))
         return self.resolver.resolution_scope, deepcopy(methods)
 
-    def make_endpoint(
+    def make_operation(
         self,
         path: str,
         method: str,
         parameters: List[OpenAPIParameter],
-        raw_definition: EndpointDefinition,
-    ) -> Endpoint:
+        raw_definition: OperationDefinition,
+    ) -> APIOperation:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         base_url = self.get_base_url()
-        endpoint: Endpoint[OpenAPIParameter] = Endpoint(
+        operation: APIOperation[OpenAPIParameter] = APIOperation(
             path=path,
             method=method,
             definition=raw_definition,
@@ -146,9 +146,9 @@ class BaseOpenAPISchema(BaseSchema):
             schema=self,
         )
         for parameter in parameters:
-            endpoint.add_parameter(parameter)
-        self.security.process_definitions(self.raw_schema, endpoint, self.resolver)
-        return endpoint
+            operation.add_parameter(parameter)
+        self.security.process_definitions(self.raw_schema, operation, self.resolver)
+        return operation
 
     @property
     def resolver(self) -> InliningResolver:
@@ -157,40 +157,40 @@ class BaseOpenAPISchema(BaseSchema):
             self._resolver = InliningResolver(self.location or "", self.raw_schema)
         return self._resolver
 
-    def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
-        """Content types available for this endpoint."""
+    def get_content_types(self, operation: APIOperation, response: GenericResponse) -> List[str]:
+        """Content types available for this API operation."""
         raise NotImplementedError
 
-    def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
-        """Get examples from the endpoint."""
+    def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
+        """Get examples from the API operation."""
         raise NotImplementedError
 
     def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
         """Extract response schema from `responses`."""
         raise NotImplementedError
 
-    def get_endpoint_by_operation_id(self, operation_id: str) -> Endpoint:
-        """Get an `Endpoint` instance by its `operationId`."""
-        if not hasattr(self, "_endpoints_by_operation_id"):
-            self._endpoints_by_operation_id = dict(self._group_endpoints_by_operation_id())
-        return self._endpoints_by_operation_id[operation_id]
+    def get_operation_by_id(self, operation_id: str) -> APIOperation:
+        """Get an `APIOperation` instance by its `operationId`."""
+        if not hasattr(self, "_operations_by_id"):
+            self._operations_by_id = dict(self._group_operations_by_id())
+        return self._operations_by_id[operation_id]
 
-    def _group_endpoints_by_operation_id(self) -> Generator[Tuple[str, Endpoint], None, None]:
+    def _group_operations_by_id(self) -> Generator[Tuple[str, APIOperation], None, None]:
         for path, methods in self.raw_schema["paths"].items():
             scope, raw_methods = self._resolve_methods(methods)
             methods = self.resolver.resolve_all(methods)
             common_parameters = methods.get("parameters", [])
             for method, resolved_definition in methods.items():
-                if method not in self.operations or "operationId" not in resolved_definition:
+                if method not in self.allowed_http_methods or "operationId" not in resolved_definition:
                     continue
                 parameters = self.collect_parameters(
                     itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
                 )
-                raw_definition = EndpointDefinition(raw_methods[method], resolved_definition, scope, parameters)
-                yield resolved_definition["operationId"], self.make_endpoint(path, method, parameters, raw_definition)
+                raw_definition = OperationDefinition(raw_methods[method], resolved_definition, scope, parameters)
+                yield resolved_definition["operationId"], self.make_operation(path, method, parameters, raw_definition)
 
-    def get_endpoint_by_reference(self, reference: str) -> Endpoint:
-        """Get local or external `Endpoint` instance by reference.
+    def get_operation_by_reference(self, reference: str) -> APIOperation:
+        """Get local or external `APIOperation` instance by reference.
 
         Reference example: #/paths/~1users~1{user_id}/patch
         """
@@ -204,21 +204,21 @@ class BaseOpenAPISchema(BaseSchema):
         parameters = self.collect_parameters(
             itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
         )
-        raw_definition = EndpointDefinition(data, resolved_definition, scope, parameters)
-        return self.make_endpoint(path, method, parameters, raw_definition)
+        raw_definition = OperationDefinition(data, resolved_definition, scope, parameters)
+        return self.make_operation(path, method, parameters, raw_definition)
 
     def get_case_strategy(
         self,
-        endpoint: Endpoint,
+        operation: APIOperation,
         hooks: Optional[HookDispatcher] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
-        return get_case_strategy(endpoint=endpoint, hooks=hooks, data_generation_method=data_generation_method)
+        return get_case_strategy(operation=operation, hooks=hooks, data_generation_method=data_generation_method)
 
-    def get_parameter_serializer(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
-        definitions = [item for item in endpoint.definition.resolved.get("parameters", []) if item["in"] == location]
+    def get_parameter_serializer(self, operation: APIOperation, location: str) -> Optional[Callable]:
+        definitions = [item for item in operation.definition.resolved.get("parameters", []) if item["in"] == location]
         security_parameters = self.security.get_security_definitions_as_parameters(
-            self.raw_schema, endpoint, self.resolver, location
+            self.raw_schema, operation, self.resolver, location
         )
         if security_parameters:
             definitions.extend(security_parameters)
@@ -229,9 +229,9 @@ class BaseOpenAPISchema(BaseSchema):
     def _get_parameter_serializer(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         raise NotImplementedError
 
-    def _get_response_definitions(self, endpoint: Endpoint, response: GenericResponse) -> Optional[Dict[str, Any]]:
+    def _get_response_definitions(self, operation: APIOperation, response: GenericResponse) -> Optional[Dict[str, Any]]:
         try:
-            responses = endpoint.definition.resolved["responses"]
+            responses = operation.definition.resolved["responses"]
         except KeyError as exc:
             # Possible to get if `validate_schema=False` is passed during schema creation
             raise InvalidSchema("Schema parsing failed. Please check your schema.") from exc
@@ -242,8 +242,8 @@ class BaseOpenAPISchema(BaseSchema):
             return responses["default"]
         return None
 
-    def get_headers(self, endpoint: Endpoint, response: GenericResponse) -> Optional[Dict[str, Dict[str, Any]]]:
-        definitions = self._get_response_definitions(endpoint, response)
+    def get_headers(self, operation: APIOperation, response: GenericResponse) -> Optional[Dict[str, Dict[str, Any]]]:
+        definitions = self._get_response_definitions(operation, response)
         if not definitions:
             return None
         return definitions.get("headers")
@@ -253,20 +253,21 @@ class BaseOpenAPISchema(BaseSchema):
 
     def add_link(
         self,
-        source: Endpoint,
-        target: Union[str, Endpoint],
+        source: APIOperation,
+        target: Union[str, APIOperation],
         status_code: Union[str, int],
         parameters: Optional[Dict[str, str]] = None,
         request_body: Any = None,
     ) -> None:
         """Add a new Open API link to the schema definition.
 
-        :param Endpoint source: This operation is the source of data
+        :param APIOperation source: This operation is the source of data
         :param target: This operation will receive the data from this link.
-            Can be an ``Endpoint`` instance or a reference like this - ``#/paths/~1users~1{userId}/get``
-        :param str status_code: The link is triggered when the source endpoint responds with this status code.
+            Can be an ``APIOperation`` instance or a reference like this - ``#/paths/~1users~1{userId}/get``
+        :param str status_code: The link is triggered when the source API operation responds with this status code.
         :param parameters: A dictionary that describes how parameters should be extracted from the matched response.
-            The key represents the parameter name in the target endpoint, and the value is a runtime expression string.
+            The key represents the parameter name in the target API operation, and the value is a runtime
+            expression string.
         :param request_body: A literal value or runtime expression to use as a request body when
             calling the target operation.
 
@@ -285,10 +286,10 @@ class BaseOpenAPISchema(BaseSchema):
         """
         if parameters is None and request_body is None:
             raise ValueError("You need to provide `parameters` or `request_body`.")
-        if hasattr(self, "_endpoints"):
-            delattr(self, "_endpoints")
-        for endpoint, methods in self.raw_schema["paths"].items():
-            if endpoint == source.path:
+        if hasattr(self, "_operations"):
+            delattr(self, "_operations")
+        for operation, methods in self.raw_schema["paths"].items():
+            if operation == source.path:
                 # Methods should be completely resolved now, otherwise they might miss a resolving scope when
                 # they will be fully resolved later
                 methods = self.resolver.resolve_all(methods)
@@ -301,28 +302,28 @@ class BaseOpenAPISchema(BaseSchema):
                         )
                     # If methods are behind a reference, then on the next resolving they will miss the new link
                     # Therefore we need to modify it this way
-                    self.raw_schema["paths"][endpoint][method] = definition
+                    self.raw_schema["paths"][operation][method] = definition
                 # The reference should be removed completely, otherwise new keys in this dictionary will be ignored
                 # due to the `$ref` keyword behavior
-                self.raw_schema["paths"][endpoint].pop("$ref", None)
+                self.raw_schema["paths"][operation].pop("$ref", None)
                 if found:
                     return
-        message = f"No such endpoint: `{source.verbose_name}`."
-        possibilities = [e.verbose_name for e in self.get_all_endpoints()]
+        message = f"No such API operation: `{source.verbose_name}`."
+        possibilities = [e.verbose_name for e in self.get_all_operations()]
         matches = get_close_matches(source.verbose_name, possibilities)
         if matches:
             message += f" Did you mean `{matches[0]}`?"
-        message += " Check if the requested endpoint passes the filters in the schema."
+        message += " Check if the requested API operation passes the filters in the schema."
         raise ValueError(message)
 
-    def get_links(self, endpoint: Endpoint) -> Dict[str, Dict[str, Any]]:
+    def get_links(self, operation: APIOperation) -> Dict[str, Dict[str, Any]]:
         result: Dict[str, Dict[str, Any]] = defaultdict(dict)
-        for status_code, link in links.get_all_links(endpoint):
+        for status_code, link in links.get_all_links(operation):
             result[status_code][link.name] = link
         return result
 
-    def validate_response(self, endpoint: Endpoint, response: GenericResponse) -> None:
-        responses = {str(key): value for key, value in endpoint.definition.raw.get("responses", {}).items()}
+    def validate_response(self, operation: APIOperation, response: GenericResponse) -> None:
+        responses = {str(key): value for key, value in operation.definition.raw.get("responses", {}).items()}
         status_code = str(response.status_code)
         if status_code in responses:
             definition = responses[status_code]
@@ -331,13 +332,13 @@ class BaseOpenAPISchema(BaseSchema):
         else:
             # No response defined for the received response status code
             return
-        scopes, schema = self.get_response_schema(definition, endpoint.definition.scope)
+        scopes, schema = self.get_response_schema(definition, operation.definition.scope)
         if not schema:
             # No schema to check against
             return
         content_type = response.headers.get("Content-Type")
         if content_type is None:
-            media_types = "\n    ".join(self.get_content_types(endpoint, response))
+            media_types = "\n    ".join(self.get_content_types(operation, response))
             raise get_missing_content_type_error()(
                 "The response is missing the `Content-Type` header. The schema defines the following media types:\n\n"
                 f"    {media_types}"
@@ -401,7 +402,7 @@ class SwaggerV20(BaseOpenAPISchema):
     nullable_name = "x-nullable"
     example_field = "x-example"
     examples_field = "x-examples"
-    operations: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
+    allowed_http_methods: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
     parameter_cls: Type[OpenAPIParameter] = OpenAPI20Parameter
     security = SwaggerSecurityProcessor()
     component_locations: ClassVar[Tuple[str, ...]] = ("definitions", "parameters", "responses")
@@ -419,20 +420,20 @@ class SwaggerV20(BaseOpenAPISchema):
         return self.raw_schema.get("basePath", "/")
 
     def collect_parameters(
-        self, parameters: Iterable[Dict[str, Any]], endpoint_definition: Dict[str, Any]
+        self, parameters: Iterable[Dict[str, Any]], definition: Dict[str, Any]
     ) -> List[OpenAPIParameter]:
         # The main difference with Open API 3.0 is that it has `body` and `form` parameters that we need to handle
         # differently.
         collected: List[OpenAPIParameter] = []
         # NOTE. The Open API 2.0 spec doesn't strictly imply having media types in the "consumes" keyword.
         # It is not enforced by the meta schema and has no "MUST" verb in the spec text.
-        # Also, not every API has operations with payload (they might have only GET endpoints without payloads).
+        # Also, not every API has operations with payload (they might have only GET operations without payloads).
         # For these reasons, it might be (and often is) absent, and we need to provide the proper media type in case
         # we have operations with a payload.
-        media_types = self._get_consumes_for_endpoint(endpoint_definition)
+        media_types = self._get_consumes_for_operation(definition)
         # For `in=body` parameters, we imply `application/json` as the default media type because it is the most common.
         body_media_types = media_types or (OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE,)
-        # If an endpoint has parameters with `in=formData`, Schemathesis should know how to serialize it.
+        # If an API operation has parameters with `in=formData`, Schemathesis should know how to serialize it.
         # We can't be 100% sure what media type is expected by the server and chose `multipart/form-data` as
         # the default because it is broader since it allows us to upload files.
         form_data_media_types = media_types or (OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE,)
@@ -456,9 +457,9 @@ class SwaggerV20(BaseOpenAPISchema):
                 )
         return collected
 
-    def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
-        """Get examples from the endpoint."""
-        return get_strategies_from_examples(endpoint, self.examples_field)
+    def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
+        """Get examples from the API operation."""
+        return get_strategies_from_examples(operation, self.examples_field)
 
     def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
         scopes, definition = self.resolver.resolve_in_scope(deepcopy(definition), scope)
@@ -469,8 +470,8 @@ class SwaggerV20(BaseOpenAPISchema):
         # because it is not converted
         return scopes, to_json_schema_recursive(schema, self.nullable_name)
 
-    def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
-        produces = endpoint.definition.raw.get("produces", None)
+    def get_content_types(self, operation: APIOperation, response: GenericResponse) -> List[str]:
+        produces = operation.definition.raw.get("produces", None)
         if produces:
             return produces
         return self.raw_schema.get("produces", [])
@@ -479,18 +480,18 @@ class SwaggerV20(BaseOpenAPISchema):
         return serialization.serialize_swagger2_parameters(definitions)
 
     def prepare_multipart(
-        self, form_data: FormData, endpoint: Endpoint
+        self, form_data: FormData, operation: APIOperation
     ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
         """Prepare form data for sending with `requests`.
 
         :param form_data: Raw generated data as a dictionary.
-        :param endpoint: The tested endpoint for which the data was generated.
+        :param operation: The tested API operation for which the data was generated.
         :return: `files` and `data` values for `requests.request`.
         """
         files, data = [], {}
         # If there is no content types specified for the request or "application/x-www-form-urlencoded" is specified
         # explicitly, then use it., but if "multipart/form-data" is specified, then use it
-        content_types = self.get_request_payload_content_types(endpoint)
+        content_types = self.get_request_payload_content_types(operation)
         is_multipart = "multipart/form-data" in content_types
 
         def add_file(file_value: Any) -> None:
@@ -500,7 +501,7 @@ class SwaggerV20(BaseOpenAPISchema):
             else:
                 files.append((name, file_value))
 
-        for parameter in endpoint.definition.parameters:
+        for parameter in operation.definition.parameters:
             if isinstance(parameter, OpenAPI20CompositeBody):
                 for form_parameter in parameter.definition:
                     name = form_parameter.name
@@ -514,18 +515,18 @@ class SwaggerV20(BaseOpenAPISchema):
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, data or None
 
-    def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
-        return self._get_consumes_for_endpoint(endpoint.definition.resolved)
+    def get_request_payload_content_types(self, operation: APIOperation) -> List[str]:
+        return self._get_consumes_for_operation(operation.definition.resolved)
 
-    def _get_consumes_for_endpoint(self, endpoint_definition: Dict[str, Any]) -> List[str]:
-        """Get the `consumes` value for the given endpoint.
+    def _get_consumes_for_operation(self, definition: Dict[str, Any]) -> List[str]:
+        """Get the `consumes` value for the given API operation.
 
-        :param endpoint_definition: Raw endpoint definition.
-        :return: A list of media-types for this endpoint.
+        :param definition: Raw API operation definition.
+        :return: A list of media-types for this operation.
         :rtype: List[str]
         """
         global_consumes = self.raw_schema.get("consumes", [])
-        consumes = endpoint_definition.get("consumes", [])
+        consumes = definition.get("consumes", [])
         if not consumes:
             consumes = global_consumes
         return consumes
@@ -535,7 +536,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     nullable_name = "nullable"
     example_field = "example"
     examples_field = "examples"
-    operations = SwaggerV20.operations + ("trace",)
+    allowed_http_methods = SwaggerV20.allowed_http_methods + ("trace",)
     security = OpenAPISecurityProcessor()
     parameter_cls = OpenAPI30Parameter
     component_locations = ("components",)
@@ -559,14 +560,14 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         return "/"
 
     def collect_parameters(
-        self, parameters: Iterable[Dict[str, Any]], endpoint_definition: Dict[str, Any]
+        self, parameters: Iterable[Dict[str, Any]], definition: Dict[str, Any]
     ) -> List[OpenAPIParameter]:
         # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
         collected: List[OpenAPIParameter] = [OpenAPI30Parameter(definition=parameter) for parameter in parameters]
-        if "requestBody" in endpoint_definition:
-            required = endpoint_definition["requestBody"].get("required", False)
-            for media_type, definition in endpoint_definition["requestBody"]["content"].items():
-                collected.append(OpenAPI30Body(definition, media_type=media_type, required=required))
+        if "requestBody" in definition:
+            required = definition["requestBody"].get("required", False)
+            for media_type, content in definition["requestBody"]["content"].items():
+                collected.append(OpenAPI30Body(content, media_type=media_type, required=required))
         return collected
 
     def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
@@ -579,12 +580,12 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
             return scopes, to_json_schema_recursive(option["schema"], self.nullable_name)
         return scopes, None
 
-    def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
-        """Get examples from the endpoint."""
-        return get_strategies_from_examples(endpoint, self.examples_field)
+    def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
+        """Get examples from the API operation."""
+        return get_strategies_from_examples(operation, self.examples_field)
 
-    def get_content_types(self, endpoint: Endpoint, response: GenericResponse) -> List[str]:
-        definitions = self._get_response_definitions(endpoint, response)
+    def get_content_types(self, operation: APIOperation, response: GenericResponse) -> List[str]:
+        definitions = self._get_response_definitions(operation, response)
         if not definitions:
             return []
         return list(definitions.get("content", {}).keys())
@@ -592,20 +593,20 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     def _get_parameter_serializer(self, definitions: List[Dict[str, Any]]) -> Optional[Callable]:
         return serialization.serialize_openapi3_parameters(definitions)
 
-    def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
-        return list(endpoint.definition.resolved["requestBody"]["content"].keys())
+    def get_request_payload_content_types(self, operation: APIOperation) -> List[str]:
+        return list(operation.definition.resolved["requestBody"]["content"].keys())
 
     def prepare_multipart(
-        self, form_data: FormData, endpoint: Endpoint
+        self, form_data: FormData, operation: APIOperation
     ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
         """Prepare form data for sending with `requests`.
 
         :param form_data: Raw generated data as a dictionary.
-        :param endpoint: The tested endpoint for which the data was generated.
+        :param operation: The tested API operation for which the data was generated.
         :return: `files` and `data` values for `requests.request`.
         """
         files = []
-        content = endpoint.definition.resolved["requestBody"]["content"]
+        content = operation.definition.resolved["requestBody"]["content"]
         # Open API 3.0 requires media types to be present. We can get here only if the schema defines
         # the "multipart/form-data" media type
         schema = content["multipart/form-data"]["schema"]

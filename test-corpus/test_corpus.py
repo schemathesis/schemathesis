@@ -176,19 +176,19 @@ def test_runner(schema_path):
     schema_id = get_id(schema_path)
 
     def check_xfailed(ev) -> bool:
-        if schema_id in XFAILING and ev.current_endpoint in XFAILING[schema_id]:
+        if schema_id in XFAILING and ev.current_operation in XFAILING[schema_id]:
             if ev.result.errors:
-                message = XFAILING[schema_id][ev.current_endpoint]
+                message = XFAILING[schema_id][ev.current_operation]
                 # If is is failed for some other reason, then an assertion will be risen
                 return any(message in err.exception_with_traceback for err in ev.result.errors)
             pytest.fail("Expected a failure")
         return False
 
     def is_unsatisfiable(text):
-        return "Unable to satisfy schema parameters for this endpoint" in text
+        return "Unable to satisfy schema parameters for this API operation" in text
 
     def check_flaky(ev) -> bool:
-        if schema_id in FLAKY_SCHEMAS and ev.current_endpoint in FLAKY_SCHEMAS[schema_id]:
+        if schema_id in FLAKY_SCHEMAS and ev.current_operation in FLAKY_SCHEMAS[schema_id]:
             if ev.result.errors:
                 # NOTE. There could be other errors if the "Unsatisfiable" case wasn't triggered.
                 # Could be added to expected errors later
@@ -197,10 +197,10 @@ def test_runner(schema_path):
 
     def check_unsatisfiable(ev):
         # In some cases Schemathesis can't generate data - either due to a contradiction within the schema
-        if schema_id in UNSATISFIABLE_SCHEMAS and ev.current_endpoint in UNSATISFIABLE_SCHEMAS[schema_id]:
+        if schema_id in UNSATISFIABLE_SCHEMAS and ev.current_operation in UNSATISFIABLE_SCHEMAS[schema_id]:
             exception = ev.result.errors[0].exception
             if (
-                "Unable to satisfy schema parameters for this endpoint" not in exception
+                "Unable to satisfy schema parameters for this API operation" not in exception
                 and "Cannot create non-empty lists with elements" not in exception
                 and "Cannot create a collection of " not in exception
             ):
@@ -209,7 +209,7 @@ def test_runner(schema_path):
         return False
 
     def check_recursive_references(ev):
-        if schema_id in RECURSIVE_REFERENCES and ev.current_endpoint in RECURSIVE_REFERENCES[schema_id]:
+        if schema_id in RECURSIVE_REFERENCES and ev.current_operation in RECURSIVE_REFERENCES[schema_id]:
             for err in ev.result.errors:
                 if RECURSIVE_REFERENCE_ERROR_MESSAGE in err.exception_with_traceback:
                     # It is OK
@@ -242,8 +242,8 @@ def test_runner(schema_path):
                 continue
             if check_invalid(event):
                 continue
-            assert not event.result.has_errors, event.current_endpoint
-            assert not event.result.has_failures, event.current_endpoint
+            assert not event.result.has_errors, event.current_operation
+            assert not event.result.has_failures, event.current_operation
         if isinstance(event, events.InternalError):
             if check_not_parsable(event):
                 continue

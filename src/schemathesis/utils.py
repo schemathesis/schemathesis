@@ -3,6 +3,7 @@ import pathlib
 import re
 import sys
 import traceback
+import warnings
 from contextlib import contextmanager
 from json import JSONDecodeError
 from typing import Any, Callable, Dict, Generator, List, NoReturn, Optional, Set, Tuple, Type, Union, overload
@@ -253,3 +254,19 @@ def traverse_schema(schema: Schema, callback: Callable[..., Dict[str, Any]], *ar
     elif isinstance(schema, list):
         schema = [traverse_schema(sub_item, callback, *args, **kwargs) for sub_item in schema]
     return schema
+
+
+def deprecated_property(*, removed_in: str, replacement: str) -> Callable:
+    def wrapper(prop: Callable) -> Callable:
+        @property  # type: ignore
+        def inner(self: Any) -> Any:
+            warnings.warn(
+                f"Property `{prop.__name__}` is deprecated and will be removed in Schemathesis {removed_in}. "
+                f"Use `{replacement}` instead.",
+                DeprecationWarning,
+            )
+            return prop(self)
+
+        return inner
+
+    return wrapper

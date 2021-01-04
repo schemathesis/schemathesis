@@ -2,7 +2,7 @@ from .utils import integer
 
 
 def test_common_parameters(testdir):
-    # When common parameter is shared on an endpoint level
+    # When common parameter is shared on an API operation level
     testdir.make_test(
         """
 @schema.parametrize()
@@ -35,7 +35,7 @@ def test_(request, case):
 
 
 def test_common_parameters_with_references(testdir):
-    # When common parameter that is shared on an endpoint level contains a reference
+    # When common parameter that is shared on an API operation level contains a reference
     # And this parameter is in `body`
     # And the schema is used for multiple test functions
     testdir.make_test(
@@ -82,7 +82,7 @@ def test_b(request, case):
 
 
 def test_common_parameters_multiple_tests(testdir):
-    # When common parameters are specified on an endpoint level
+    # When common parameters are specified on an API operation level
     # And the same schema is used in multiple tests
     testdir.make_test(
         """

@@ -7,7 +7,7 @@ from pytest_subtests import SubTests
 
 from .constants import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from .hooks import HookDispatcher, HookScope
-from .models import Endpoint
+from .models import APIOperation
 from .schemas import BaseSchema
 from .types import Filter, GenericTest, NotSet
 from .utils import NOT_SET
@@ -22,7 +22,7 @@ class LazySchema:
     operation_id: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
     hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
-    skip_deprecated_endpoints: bool = attr.ib(default=False)  # pragma: no mutate
+    skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
     data_generation_methods: Iterable[DataGenerationMethod] = attr.ib(default=DEFAULT_DATA_GENERATION_METHODS)
 
     def parametrize(
@@ -32,7 +32,7 @@ class LazySchema:
         tag: Optional[Filter] = NOT_SET,
         operation_id: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
-        skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
+        skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
     ) -> Callable:
         if method is NOT_SET:
@@ -61,18 +61,18 @@ class LazySchema:
                     hooks=self.hooks,
                     test_function=func,
                     validate_schema=validate_schema,
-                    skip_deprecated_endpoints=skip_deprecated_endpoints,
+                    skip_deprecated_operations=skip_deprecated_operations,
                     data_generation_methods=data_generation_methods,
                 )
                 fixtures = get_fixtures(func, request)
-                # Changing the node id is required for better reporting - the method and endpoint will appear there
+                # Changing the node id is required for better reporting - the method and path will appear there
                 node_id = subtests.item._nodeid
                 settings = getattr(test, "_hypothesis_internal_use_settings", None)
                 tests = list(schema.get_all_tests(func, settings))
                 request.session.testscollected += len(tests)
-                for _endpoint, data_generation_method, sub_test in tests:
-                    subtests.item._nodeid = _get_node_name(node_id, _endpoint, data_generation_method)
-                    run_subtest(_endpoint, fixtures, sub_test, subtests)
+                for operation, data_generation_method, sub_test in tests:
+                    subtests.item._nodeid = _get_node_name(node_id, operation, data_generation_method)
+                    run_subtest(operation, fixtures, sub_test, subtests)
                 subtests.item._nodeid = node_id
 
             # Needed to prevent a failure when settings are applied to the test function
@@ -83,14 +83,14 @@ class LazySchema:
         return wrapper
 
 
-def _get_node_name(node_id: str, endpoint: Endpoint, data_generation_method: DataGenerationMethod) -> str:
+def _get_node_name(node_id: str, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:
     """Make a test node name. For example: test_api[GET:/users]."""
-    return f"{node_id}[{endpoint.method.upper()}:{endpoint.full_path}][{data_generation_method.as_short_name()}]"
+    return f"{node_id}[{operation.method.upper()}:{operation.full_path}][{data_generation_method.as_short_name()}]"
 
 
-def run_subtest(endpoint: Endpoint, fixtures: Dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:
+def run_subtest(operation: APIOperation, fixtures: Dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:
     """Run the given subtest with pytest fixtures."""
-    with subtests.test(method=endpoint.method.upper(), path=endpoint.path):
+    with subtests.test(method=operation.method.upper(), path=operation.path):
         sub_test(**fixtures)
 
 
@@ -105,7 +105,7 @@ def get_schema(
     test_function: GenericTest,
     hooks: HookDispatcher,
     validate_schema: Union[bool, NotSet] = NOT_SET,
-    skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
+    skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
     data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
 ) -> BaseSchema:
     """Loads a schema from the fixture."""
@@ -120,7 +120,7 @@ def get_schema(
         test_function=test_function,
         hooks=hooks,
         validate_schema=validate_schema,
-        skip_deprecated_endpoints=skip_deprecated_endpoints,
+        skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
     )
 

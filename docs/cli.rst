@@ -14,9 +14,9 @@ To execute tests, use the ``schemathesis run`` command:
     $ schemathesis run http://example.com/swagger.json
 
 With this command, Schemathesis will load the schema from ``http://example.com/swagger.json`` and generate separate
-test sets for each endpoint in this schema. Each test set includes up to 100 test cases by default, depending on the endpoint definition.
+test sets for each operation in this schema. Each test set includes up to 100 test cases by default, depending on the operation definition.
 
-For example, if your API schema has three endpoints, then you will see a similar output:
+For example, if your API schema has three operations, then you will see a similar output:
 
 .. code:: text
 
@@ -28,7 +28,7 @@ For example, if your API schema has three endpoints, then you will see a similar
     Base URL: http://127.0.0.1:8081/api
     Specification version: Swagger 2.0
     Workers: 1
-    collected endpoints: 3
+    Collected API operations: 3
 
     GET /api/path_variable/{key} .                             [ 33%]
     GET /api/success .                                         [ 66%]
@@ -42,33 +42,33 @@ For example, if your API schema has three endpoints, then you will see a similar
     ======================= 3 passed in 1.77s =======================
 
 The output style is inspired by `pytest <https://docs.pytest.org/en/stable/>`_ and provides necessary information about the
-loaded API schema, processed endpoints, found errors, and used checks.
+loaded API schema, processed operations, found errors, and used checks.
 
 By default, Schemathesis refuses to work with schemas that do not conform to the Open API spec, but you can disable this behavior with ``--validate-schema=false``.
 
-Testing specific endpoints
---------------------------
+Testing specific operations
+---------------------------
 
-By default, Schemathesis runs tests for all endpoints, but you can select specific endpoints with the following CLI options:
+By default, Schemathesis runs tests for all operations, but you can select specific operations with the following CLI options:
 
-- ``--endpoint / -E``. Endpoint path;
+- ``--endpoint / -E``. Operation path;
 - ``--method / -M``. HTTP method;
 - ``--tag / -T``. Open API tag;
 - ``--operation-id / -O``. ``operationId`` field value;
 
 Each option accepts a case-insensitive regex string and could be used multiple times in a single command.
-For example, the following command will select all endpoints which paths start with ``/api/users``:
+For example, the following command will select all operations which paths start with ``/api/users``:
 
 .. code:: text
 
     $ schemathesis run -E ^/api/users http://api.com/swagger.json
 
-If your API contains deprecated endpoints (that have ``deprecated: true`` in their definition),
-then you can skip them by passing ``--skip-deprecated-endpoints``:
+If your API contains deprecated operations (that have ``deprecated: true`` in their definition),
+then you can skip them by passing ``--skip-deprecated-operations``:
 
 .. code:: bash
 
-    $ schemathesis run --skip-deprecated-endpoints ...
+    $ schemathesis run --skip-deprecated-operations ...
 
 Tests configuration
 -------------------
@@ -78,7 +78,7 @@ Schemathesis is built on top of the `Hypothesis <http://hypothesis.works/>`_ lib
 We support all configuration options accepted by the ``hypothesis.settings`` decorator.
 All of them are prefixed with ``--hypothesis-`` and underscores are replaced with dashes, for example:
 
-- ``--hypothesis-max-examples=1000``. Generate up to 1000 test cases per endpoint;
+- ``--hypothesis-max-examples=1000``. Generate up to 1000 test cases per API operation;
 - ``--hypothesis-phases=explicit``. Run only examples, specified explicitly in the API schema;
 - ``--hypothesis-suppress-health-check=too_slow``. Disables the ``too_slow`` health check and makes Schemathesis continue testing even if it is considered too slow.
 
@@ -111,7 +111,7 @@ To make Schemathesis perform all built-in checks use ``--checks all`` CLI option
     Base URL: http://api.com/
     Specification version: Swagger 2.0
     Workers: 1
-    collected endpoints: 3
+    Collected API operations: 3
 
     GET /api/path_variable/{key} .                             [ 33%]
     GET /api/success .                                         [ 66%]
@@ -141,7 +141,7 @@ If any response will take longer than the provided value (in milliseconds) than 
     Base URL: http://api.com/
     Specification version: Swagger 2.0
     Workers: 1
-    collected endpoints: 1
+    Collected API operations: 1
 
     GET /api/slow F                                            [100%]
 
@@ -209,7 +209,7 @@ Then your schema location could be:
 
 - A full URL;
 - An existing filesystem path;
-- In-app endpoint with the schema.
+- In-app path with the schema.
 
 For example:
 
@@ -377,7 +377,7 @@ Base URL configuration
 ----------------------
 
 If your Open API schema defines ``servers`` (or ``basePath`` in Open API 2.0), these values will be used to
-construct a full endpoint URL during testing. In the case of Open API 3.0, the first value from ``servers`` will be used.
+construct a full operation URL during testing. In the case of Open API 3.0, the first value from ``servers`` will be used.
 
 However, you may want to run tests against a different base URL. To do this, you need to pass the ``--base-url`` option in CLI
 or provide ``base_url`` argument to a loader/runner if you use Schemathesis in your code:

@@ -6,7 +6,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from schemathesis import Case
-from schemathesis.models import Endpoint
+from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.lexer import Token
@@ -16,14 +16,14 @@ DOCUMENT = {"foo": ["bar", "baz"], "": 0, "a/b": 1, "c%d": 2, "e^f": 3, "g|h": 4
 
 
 @pytest.fixture(scope="module")
-def endpoint():
-    return Endpoint("/users/{user_id}", "GET", None, None, base_url="http://127.0.0.1:8080/api")
+def operation():
+    return APIOperation("/users/{user_id}", "GET", None, None, base_url="http://127.0.0.1:8080/api")
 
 
 @pytest.fixture(scope="module")
-def case(endpoint):
+def case(operation):
     return Case(
-        endpoint,
+        operation,
         path_parameters={"user_id": 5},
         query={"username": "foo"},
         headers={"X-Token": "secret"},
@@ -107,8 +107,8 @@ def test_random_expression(expr):
         pass
 
 
-def test_non_json_serializable_body(endpoint, response):
-    case = Case(endpoint, body={"a": b"content"})
+def test_non_json_serializable_body(operation, response):
+    case = Case(operation, body={"a": b"content"})
     context = expressions.ExpressionContext(response=response, case=case)
     with pytest.raises(RuntimeExpressionError, match="^The request body is not JSON-serializable$"):
         expressions.evaluate("$request.body", context=context)

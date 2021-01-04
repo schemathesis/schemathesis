@@ -2,9 +2,9 @@
 
 Their responsibilities:
   - Provide a unified way to work with different types of schemas
-  - Give all endpoints / methods combinations that are available directly from the schema;
+  - Give all paths / methods combinations that are available directly from the schema;
 
-They give only static definitions of endpoints.
+They give only static definitions of paths.
 """
 from collections.abc import Mapping
 from difflib import get_close_matches
@@ -20,7 +20,7 @@ from requests.structures import CaseInsensitiveDict
 from ._hypothesis import create_test
 from .constants import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
-from .models import Case, Endpoint
+from .models import APIOperation, Case
 from .stateful import APIStateMachine, Stateful, StatefulTest
 from .types import Filter, FormData, GenericTest, NotSet
 from .utils import NOT_SET, GenericResponse
@@ -49,26 +49,26 @@ class BaseSchema(Mapping):
     hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
     test_function: Optional[GenericTest] = attr.ib(default=None)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
-    skip_deprecated_endpoints: bool = attr.ib(default=False)  # pragma: no mutate
+    skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
     data_generation_methods: Iterable[DataGenerationMethod] = attr.ib(
         default=DEFAULT_DATA_GENERATION_METHODS
     )  # pragma: no mutate
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self.endpoints)
+        return iter(self.operations)
 
     def __getitem__(self, item: str) -> MethodsDict:
         try:
-            return self.endpoints[item]
+            return self.operations[item]
         except KeyError as exc:
-            matches = get_close_matches(item, list(self.endpoints))
+            matches = get_close_matches(item, list(self.operations))
             message = f"`{item}` not found"
             if matches:
                 message += f". Did you mean `{matches[0]}`?"
             raise KeyError(message) from exc
 
     def __len__(self) -> int:
-        return len(self.endpoints)
+        return len(self.operations)
 
     @property  # pragma: no mutate
     def verbose_name(self) -> str:
@@ -106,35 +106,35 @@ class BaseSchema(Mapping):
         return self._build_base_url()
 
     @property
-    def endpoints(self) -> Dict[str, MethodsDict]:
-        if not hasattr(self, "_endpoints"):
+    def operations(self) -> Dict[str, MethodsDict]:
+        if not hasattr(self, "_operations"):
             # pylint: disable=attribute-defined-outside-init
-            endpoints = self.get_all_endpoints()
-            self._endpoints = endpoints_to_dict(endpoints)
-        return self._endpoints
+            operations = self.get_all_operations()
+            self._operations = operations_to_dict(operations)
+        return self._operations
 
     @property
-    def endpoints_count(self) -> int:
+    def operations_count(self) -> int:
         total = 0
-        # Avoid creating a list of all endpoints - for large schemas it consumes too much memory
-        for _ in self.get_all_endpoints():
+        # Avoid creating a list of all operation - for large schemas it consumes too much memory
+        for _ in self.get_all_operations():
             total += 1
         return total
 
-    def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
+    def get_all_operations(self) -> Generator[APIOperation, None, None]:
         raise NotImplementedError
 
-    def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
-        """Get examples from the endpoint."""
+    def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
+        """Get examples from the API operation."""
         raise NotImplementedError
 
     def get_stateful_tests(
-        self, response: GenericResponse, endpoint: Endpoint, stateful: Optional[Stateful]
+        self, response: GenericResponse, operation: APIOperation, stateful: Optional[Stateful]
     ) -> Sequence[StatefulTest]:
-        """Get a list of additional tests, that should be executed after this response from the endpoint."""
+        """Get a list of additional tests, that should be executed after this response from the API operation."""
         raise NotImplementedError
 
-    def get_parameter_serializer(self, endpoint: Endpoint, location: str) -> Optional[Callable]:
+    def get_parameter_serializer(self, operation: APIOperation, location: str) -> Optional[Callable]:
         """Get a function that serializes parameters for the given location."""
         raise NotImplementedError
 
@@ -143,18 +143,18 @@ class BaseSchema(Mapping):
         func: Callable,
         settings: Optional[hypothesis.settings] = None,
         seed: Optional[int] = None,
-    ) -> Generator[Tuple[Endpoint, DataGenerationMethod, Callable], None, None]:
-        """Generate all endpoints and Hypothesis tests for them."""
-        for endpoint in self.get_all_endpoints():
+    ) -> Generator[Tuple[APIOperation, DataGenerationMethod, Callable], None, None]:
+        """Generate all operations and Hypothesis tests for them."""
+        for operation in self.get_all_operations():
             for data_generation_method in self.data_generation_methods:
                 test = create_test(
-                    endpoint=endpoint,
+                    operation=operation,
                     test=func,
                     settings=settings,
                     seed=seed,
                     data_generation_method=data_generation_method,
                 )
-                yield endpoint, data_generation_method, test
+                yield operation, data_generation_method, test
 
     def parametrize(
         self,
@@ -163,7 +163,7 @@ class BaseSchema(Mapping):
         tag: Optional[Filter] = NOT_SET,
         operation_id: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
-        skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
+        skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
@@ -177,7 +177,7 @@ class BaseSchema(Mapping):
                 tag=tag,
                 operation_id=operation_id,
                 validate_schema=validate_schema,
-                skip_deprecated_endpoints=skip_deprecated_endpoints,
+                skip_deprecated_operations=skip_deprecated_operations,
                 data_generation_methods=data_generation_methods,
             )
             return func
@@ -204,7 +204,7 @@ class BaseSchema(Mapping):
         operation_id: Optional[Filter] = NOT_SET,
         hooks: Union[HookDispatcher, NotSet] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
-        skip_deprecated_endpoints: Union[bool, NotSet] = NOT_SET,
+        skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
     ) -> "BaseSchema":
         if method is NOT_SET:
@@ -217,8 +217,8 @@ class BaseSchema(Mapping):
             operation_id = self.operation_id
         if validate_schema is NOT_SET:
             validate_schema = self.validate_schema
-        if skip_deprecated_endpoints is NOT_SET:
-            skip_deprecated_endpoints = self.skip_deprecated_endpoints
+        if skip_deprecated_operations is NOT_SET:
+            skip_deprecated_operations = self.skip_deprecated_operations
         if hooks is NOT_SET:
             hooks = self.hooks
         if data_generation_methods is NOT_SET:
@@ -236,13 +236,13 @@ class BaseSchema(Mapping):
             hooks=hooks,  # type: ignore
             test_function=test_function,
             validate_schema=validate_schema,  # type: ignore
-            skip_deprecated_endpoints=skip_deprecated_endpoints,  # type: ignore
+            skip_deprecated_operations=skip_deprecated_operations,  # type: ignore
             data_generation_methods=data_generation_methods,  # type: ignore
         )
 
     def get_local_hook_dispatcher(self) -> Optional[HookDispatcher]:
         """Get a HookDispatcher instance bound to the test if present."""
-        # It might be not present when it is used without pytest via `Endpoint.as_strategy()`
+        # It might be not present when it is used without pytest via `APIOperation.as_strategy()`
         if self.test_function is not None:
             # Might be missing it in case of `LazySchema` usage
             return getattr(self.test_function, "_schemathesis_hooks", None)  # type: ignore
@@ -257,7 +257,7 @@ class BaseSchema(Mapping):
             local_dispatcher.dispatch(name, context, *args, **kwargs)
 
     def prepare_multipart(
-        self, form_data: FormData, endpoint: Endpoint
+        self, form_data: FormData, operation: APIOperation
     ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
         """Split content of `form_data` into files & data.
 
@@ -265,12 +265,12 @@ class BaseSchema(Mapping):
         """
         raise NotImplementedError
 
-    def get_request_payload_content_types(self, endpoint: Endpoint) -> List[str]:
+    def get_request_payload_content_types(self, operation: APIOperation) -> List[str]:
         raise NotImplementedError
 
     def get_case_strategy(
         self,
-        endpoint: Endpoint,
+        operation: APIOperation,
         hooks: Optional[HookDispatcher] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
@@ -279,19 +279,19 @@ class BaseSchema(Mapping):
     def as_state_machine(self) -> Type[APIStateMachine]:
         raise NotImplementedError
 
-    def get_links(self, endpoint: Endpoint) -> Dict[str, Dict[str, Any]]:
+    def get_links(self, operation: APIOperation) -> Dict[str, Dict[str, Any]]:
         raise NotImplementedError
 
-    def validate_response(self, endpoint: Endpoint, response: GenericResponse) -> None:
+    def validate_response(self, operation: APIOperation, response: GenericResponse) -> None:
         raise NotImplementedError
 
     def prepare_schema(self, schema: Any) -> Any:
         raise NotImplementedError
 
 
-def endpoints_to_dict(endpoints: Generator[Endpoint, None, None]) -> Dict[str, MethodsDict]:
+def operations_to_dict(operations: Generator[APIOperation, None, None]) -> Dict[str, MethodsDict]:
     output: Dict[str, MethodsDict] = {}
-    for endpoint in endpoints:
-        output.setdefault(endpoint.path, MethodsDict())
-        output[endpoint.path][endpoint.method] = endpoint
+    for operation in operations:
+        output.setdefault(operation.path, MethodsDict())
+        output[operation.path][operation.method] = operation
     return output

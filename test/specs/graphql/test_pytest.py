@@ -1,7 +1,7 @@
-def test_basic_pytest_graphql(testdir, graphql_endpoint):
+def test_basic_pytest_graphql(testdir, graphql_url):
     testdir.make_test(
         f"""
-schema = schemathesis.graphql.from_url('{graphql_endpoint}')
+schema = schemathesis.graphql.from_url('{graphql_url}')
 
 @schema.parametrize()
 @settings(max_examples=10)

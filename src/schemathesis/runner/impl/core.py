@@ -21,7 +21,7 @@ from ...constants import (
 )
 from ...exceptions import CheckFailed, InvalidSchema, NonCheckError, get_grouped_exception
 from ...hooks import HookContext, get_all_by_name
-from ...models import Case, Check, CheckFunction, Endpoint, Status, TestResult, TestResultSet
+from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResult, TestResultSet
 from ...runner import events
 from ...schemas import BaseSchema
 from ...stateful import Feedback, Stateful
@@ -87,10 +87,10 @@ class BaseRunner:
         """Run tests and recursively run additional tests."""
         if recursion_level > self.stateful_recursion_limit:
             return
-        for endpoint, data_generation_method, test in maker(template, settings, seed):
-            feedback = Feedback(self.stateful, endpoint)
+        for operation, data_generation_method, test in maker(template, settings, seed):
+            feedback = Feedback(self.stateful, operation)
             for event in run_test(
-                endpoint,
+                operation,
                 test,
                 feedback=feedback,
                 recursion_level=recursion_level,
@@ -107,7 +107,7 @@ class BaseRunner:
 
 
 def run_test(  # pylint: disable=too-many-locals
-    endpoint: Endpoint,
+    operation: APIOperation,
     test: Callable,
     checks: Iterable[CheckFunction],
     data_generation_method: DataGenerationMethod,
@@ -119,12 +119,12 @@ def run_test(  # pylint: disable=too-many-locals
 ) -> Generator[events.ExecutionEvent, None, None]:
     """A single test run with all error handling needed."""
     result = TestResult(
-        method=endpoint.method.upper(),
-        path=endpoint.full_path,
+        method=operation.method.upper(),
+        path=operation.full_path,
         overridden_headers=headers,
         data_generation_method=data_generation_method,
     )
-    yield events.BeforeExecution.from_endpoint(endpoint=endpoint, recursion_level=recursion_level)
+    yield events.BeforeExecution.from_operation(operation=operation, recursion_level=recursion_level)
     hypothesis_output: List[str] = []
     errors: List[Exception] = []
     test_start_time = time.monotonic()
@@ -149,7 +149,7 @@ def run_test(  # pylint: disable=too-many-locals
         result.mark_errored()
         result.add_error(
             hypothesis.errors.Flaky(
-                "Tests on this endpoint produce unreliable results: \n"
+                "Tests on this API operation produce unreliable results: \n"
                 "Falsified on the first call but did not on a subsequent one"
             ),
             # Checks should not be empty, as such cases should be caught in the `NonCheckError` branch
@@ -158,7 +158,7 @@ def run_test(  # pylint: disable=too-many-locals
     except hypothesis.errors.Unsatisfiable:
         # We need more clear error message here
         status = Status.error
-        result.add_error(hypothesis.errors.Unsatisfiable("Unable to satisfy schema parameters for this endpoint"))
+        result.add_error(hypothesis.errors.Unsatisfiable("Unable to satisfy schema parameters for this API operation"))
     except KeyboardInterrupt:
         yield events.Interrupted()
         return
@@ -184,7 +184,7 @@ def run_test(  # pylint: disable=too-many-locals
         status=status,
         elapsed_time=test_elapsed_time,
         hypothesis_output=hypothesis_output,
-        endpoint=endpoint,
+        operation=operation,
     )
 
 
@@ -247,7 +247,7 @@ def run_checks(
             result.add_success("max_response_time", case)
 
     if errors:
-        raise get_grouped_exception(case.endpoint.verbose_name, *errors)
+        raise get_grouped_exception(case.operation.verbose_name, *errors)
 
 
 def run_targets(targets: Iterable[Callable], context: TargetContext) -> None:
@@ -257,7 +257,7 @@ def run_targets(targets: Iterable[Callable], context: TargetContext) -> None:
 
 
 def add_cases(case: Case, response: GenericResponse, test: Callable, *args: Any) -> None:
-    context = HookContext(case.endpoint)
+    context = HookContext(case.operation)
     for case_hook in get_all_by_name("add_case"):
         _case = case_hook(context, case.partial_deepcopy(), response)
         # run additional test if _case is not an empty value

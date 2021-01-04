@@ -14,15 +14,15 @@ from schemathesis.checks import (
     status_code_conformance,
 )
 from schemathesis.exceptions import CheckFailed, InvalidSchema
-from schemathesis.models import EndpointDefinition
+from schemathesis.models import OperationDefinition
 from schemathesis.schemas import BaseSchema
 
 
 def make_case(schema: BaseSchema, definition: Dict[str, Any]) -> models.Case:
-    endpoint = models.Endpoint(
-        "/path", "GET", definition=EndpointDefinition(definition, definition, None, []), schema=schema
+    operation = models.APIOperation(
+        "/path", "GET", definition=OperationDefinition(definition, definition, None, []), schema=schema
     )
-    return models.Case(endpoint)
+    return models.Case(operation)
 
 
 def make_response(
@@ -188,8 +188,8 @@ def test_content_type_conformance_another_status_code():
 
 def assert_content_type_conformance(raw_schema, content_type, is_error, match=None):
     schema = schemathesis.from_dict(raw_schema)
-    endpoint = schema.endpoints["/users"]["get"]
-    case = models.Case(endpoint)
+    operation = schema["/users"]["get"]
+    case = models.Case(operation)
     response = make_response(content_type=content_type)
     if not is_error:
         assert content_type_conformance(response, case) is None
@@ -252,8 +252,8 @@ def test_invalid_schema_on_content_type_check():
         },
         validate_schema=False,
     )
-    endpoint = schema.endpoints["/users"]["get"]
-    case = models.Case(endpoint)
+    operation = schema["/users"]["get"]
+    case = models.Case(operation)
     response = make_response(content_type="application/json")
     # Then an error should be risen
     with pytest.raises(InvalidSchema):
@@ -285,7 +285,7 @@ def test_response_schema_conformance_swagger(swagger_20, content, definition):
     response = make_response(content)
     case = make_case(swagger_20, definition)
     assert response_schema_conformance(response, case) is None
-    assert case.endpoint.is_response_valid(response)
+    assert case.operation.is_response_valid(response)
 
 
 @pytest.mark.parametrize(
@@ -335,7 +335,7 @@ def test_response_schema_conformance_openapi(openapi_30, content, definition):
     response = make_response(content)
     case = make_case(openapi_30, definition)
     assert response_schema_conformance(response, case) is None
-    assert case.endpoint.is_response_valid(response)
+    assert case.operation.is_response_valid(response)
 
 
 @pytest.mark.parametrize(
@@ -406,7 +406,7 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
     case = make_case(swagger_20, definition)
     with pytest.raises(AssertionError) as exc_info:
         response_schema_conformance(response, case)
-    assert not case.endpoint.is_response_valid(response)
+    assert not case.operation.is_response_valid(response)
     assert exc_info.type.__name__ == "CheckFailed"
 
 
@@ -450,20 +450,20 @@ def test_response_schema_conformance_invalid_openapi(openapi_30, media_type, con
     case = make_case(openapi_30, definition)
     with pytest.raises(AssertionError):
         response_schema_conformance(response, case)
-    assert not case.endpoint.is_response_valid(response)
+    assert not case.operation.is_response_valid(response)
 
 
 @pytest.mark.hypothesis_nested
 def test_response_schema_conformance_references_invalid(complex_schema):
     schema = schemathesis.from_path(complex_schema)
 
-    @given(case=schema.endpoints["/teapot"]["POST"].as_strategy())
+    @given(case=schema["/teapot"]["POST"].as_strategy())
     @settings(max_examples=3)
     def test(case):
         response = make_response(json.dumps({"foo": 1}).encode())
         with pytest.raises(AssertionError):
             case.validate_response(response)
-        assert not case.endpoint.is_response_valid(response)
+        assert not case.operation.is_response_valid(response)
 
     test()
 
@@ -473,7 +473,7 @@ def test_response_schema_conformance_references_invalid(complex_schema):
 def test_response_schema_conformance_references_valid(complex_schema, value):
     schema = schemathesis.from_path(complex_schema)
 
-    @given(case=schema.endpoints["/teapot"]["POST"].as_strategy())
+    @given(case=schema["/teapot"]["POST"].as_strategy())
     @settings(max_examples=3)
     def test(case):
         response = make_response(json.dumps({"key": value, "referenced": value}).encode())

@@ -28,6 +28,10 @@ Changelog
 - Shorter error messages when API operations have logical errors in their schema. For example, when the maximum is less than the minimum - ``{"type": "integer", "minimum": 5, "maximum": 4}``.
 - If multiple non-check related failures happens during a test of a single API operation, they are displayed as is, instead of Hypothesis-level error messages about multiple found failures or flaky tests. `#975`_
 - Catch schema parsing errors, that are caused by YAML parsing.
+- The built-in test server now accepts ``--operations`` instead of ``--endpoints``.
+- Display ``Collected API operations`` instead of ``collected endpoints`` in the CLI. `#869`_
+- ``--skip-deprecated-endpoints`` is renamed to ``--skip-deprecated-operations``. `#869`_
+- Rename various internal API methods that contained ``endpoint`` in their names. `#869`_
 
 **Fixed**
 
@@ -47,6 +51,11 @@ Changelog
 - Handling of API operations that contain reserved characters in their paths. `#992`_
 - CLI execution stops on errors during example generation. `#994`_
 
+**Deprecated**
+
+- ``HookContext.endpoint``. Use ``HookContext.operation`` instead.
+- ``Case.endpoint``. Use ``Case.operation`` instead.
+
 **Performance**
 
 - Use compiled versions of Open API spec validators.
@@ -60,6 +69,15 @@ Changelog
 - ``Endpoint.form_data``. Use ``Endpoint.body`` instead.
 - ``before_generate_form_data`` hook. Use ``before_generate_body`` instead.
 - Deprecated stateful testing integration from our ``pytest`` plugin.
+
+.. note::
+
+    This release features multiple backward-incompatible changes. The first one is removing ``form_data`` and hooks related to it -
+    all payload related actions can be done via ``body`` and its hooks. The second one involves renaming the so-called "endpoint" to "operation".
+    The main reason for this is to generalize terminology and make it applicable to GraphQL schemas, as all Schemathesis internals
+    are more suited to work with semantically different API operations rather than with endpoints that are often connected with URLs and HTTP methods.
+    It brings the possibility to reuse the same concepts for Open API and GraphQL - in the future, unit tests will cover individual API operations
+    in GraphQL, rather than everything available under the same "endpoint".
 
 `2.8.5`_ - 2020-12-15
 ---------------------
@@ -248,7 +266,7 @@ Changelog
 - New ``port`` parameter added to ``from_uri()`` method. `#706`_
 - A code snippet to reproduce a failed check when running Python tests. `#793`_
 - Python 3.9 support. `#731`_
-- Ability to skip deprecated endpoints with ``--skip-deprecated-endpoints`` CLI option and ``skip_deprecated_endpoints=True`` argument to schema loaders. `#715`_
+- Ability to skip deprecated endpoints with ``--skip-deprecated-endpoints`` CLI option and ``skip_deprecated_operations=True`` argument to schema loaders. `#715`_
 
 **Fixed**
 
@@ -1672,6 +1690,7 @@ Deprecated
 .. _#874: https://github.com/schemathesis/schemathesis/issues/874
 .. _#872: https://github.com/schemathesis/schemathesis/issues/872
 .. _#870: https://github.com/schemathesis/schemathesis/issues/870
+.. _#869: https://github.com/schemathesis/schemathesis/issues/869
 .. _#858: https://github.com/schemathesis/schemathesis/issues/858
 .. _#855: https://github.com/schemathesis/schemathesis/issues/855
 .. _#851: https://github.com/schemathesis/schemathesis/issues/851

@@ -56,7 +56,7 @@ def prepare(
     operation_id: Optional[Filter] = None,
     app: Optional[str] = None,
     validate_schema: bool = True,
-    skip_deprecated_endpoints: bool = False,
+    skip_deprecated_operations: bool = False,
     force_schema_version: Optional[str] = None,
     # Hypothesis-specific configuration
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
@@ -94,7 +94,7 @@ def prepare(
         operation_id=operation_id,
         app=app,
         validate_schema=validate_schema,
-        skip_deprecated_endpoints=skip_deprecated_endpoints,
+        skip_deprecated_operations=skip_deprecated_operations,
         force_schema_version=force_schema_version,
         checks=checks,
         data_generation_methods=data_generation_methods,
@@ -147,7 +147,7 @@ def execute_from_schema(
     operation_id: Optional[Filter] = None,
     app: Optional[str] = None,
     validate_schema: bool = True,
-    skip_deprecated_endpoints: bool = False,
+    skip_deprecated_operations: bool = False,
     force_schema_version: Optional[str] = None,
     checks: Iterable[CheckFunction],
     data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
@@ -188,7 +188,7 @@ def execute_from_schema(
             loader=loader,
             app=app,
             validate_schema=validate_schema,
-            skip_deprecated_endpoints=skip_deprecated_endpoints,
+            skip_deprecated_operations=skip_deprecated_operations,
             auth=auth,
             auth_type=auth_type,
             headers=headers,
@@ -327,7 +327,7 @@ def load_schema(
     loader: Callable = loaders.from_uri,
     app: Any = None,
     validate_schema: bool = True,
-    skip_deprecated_endpoints: bool = False,
+    skip_deprecated_operations: bool = False,
     data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
     request_tls_verify: Union[bool, str] = True,
@@ -356,7 +356,7 @@ def load_schema(
         if file_exists(schema_uri):
             loader = loaders.from_path
         elif app is not None and not urlparse(schema_uri).netloc:
-            # If `schema` is not an existing filesystem path, or a URL then it is considered as an endpoint with
+            # If `schema` is not an existing filesystem path, or a URL then it is considered as a path within
             # the given app
             loader = loaders.get_loader_for_app(app)
             loader_options.update(dict_true_values(headers=headers))
@@ -371,7 +371,7 @@ def load_schema(
     return loader(
         schema_uri,
         validate_schema=validate_schema,
-        skip_deprecated_endpoints=skip_deprecated_endpoints,
+        skip_deprecated_operations=skip_deprecated_operations,
         force_schema_version=force_schema_version,
         **loader_options,
     )

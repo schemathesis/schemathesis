@@ -21,7 +21,7 @@ class NotSet:
     pass
 
 
-# A filter for endpoint / method
+# A filter for path / method
 Filter = Union[str, List[str], Tuple[str], Set[str], NotSet]  # pragma: no mutate
 
 Hook = Union[

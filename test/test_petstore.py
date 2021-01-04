@@ -132,7 +132,7 @@ def test_upload_image(testdir):
 def test_(request, case):
     assume(case.body is not NOT_SET)
     assert_int(case.path_parameters["petId"])
-    if case.endpoint.schema.spec_version == "2.0":
+    if case.operation.schema.spec_version == "2.0":
         assume("additionalMetadata" in case.body)
         assert_str(case.body["additionalMetadata"])
     assert_requests_call(case)

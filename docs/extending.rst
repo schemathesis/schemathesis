@@ -69,7 +69,7 @@ They have the same signature that looks like this:
     ) -> hypothesis.strategies.SearchStrategy:
         pass
 
-The ``strategy`` argument is a Hypothesis strategy that will generate a certain request part. For example, your endpoint under test
+The ``strategy`` argument is a Hypothesis strategy that will generate a certain request part. For example, your API operation under test
 expects ``id`` query parameter that is a number, and you'd like to have only values that have at least three occurrences of "1".
 Then your hook might look like this:
 
@@ -99,7 +99,7 @@ Let's say you have the following schema:
               format: int64
               type: integer
 
-Then, with this hook, you can query the database for some existing order and set its ID as a constant in the endpoint definition:
+Then, with this hook, you can query the database for some existing order and set its ID as a constant in the API operation definition:
 
 .. code:: python
 
@@ -139,7 +139,7 @@ With this hook, you can add additional test cases that will be executed in Hypot
         examples: List[Case],
     ) -> None:
         examples.append(
-            Case(endpoint=context.endpoint, query={"foo": "bar"})
+            Case(operation=context.operation, query={"foo": "bar"})
         )
 
 To load CLI hooks, you need to put them into a separate module and pass an importable path in the ``--pre-run`` CLI option.
@@ -185,7 +185,7 @@ With this simple handler, only ``Done!`` will be displayed at the end of the tes
 ``add_case``
 ~~~~~~~~~~~~
 
-For each ``add_case`` hook and each endpoint, we create an additional, duplicate test case. We pass the Case object from the duplicate test to the ``add_case`` hook.
+For each ``add_case`` hook and each API operation, we create an additional, duplicate test case. We pass the Case object from the duplicate test to the ``add_case`` hook.
 The user may change the Case object (and therefore the request's data) before the request is sent to the server. The ``add_case`` allows the user to target specific
 behavior in the API by changing the duplicate request's specific details.
 
@@ -209,8 +209,8 @@ an additional test case if the original case received a successful response from
             # original case produced non-2xx response, do not create additional test case
             return None
 
-Note: A partial deep copy of the ``Case`` object is passed to each ``add_case`` hook. ``Case.endpoint.app`` is a reference to the original ``app``, 
-and ``Case.endpoint.schema`` is a shallow copy, so changes to these fields will be reflected in other tests.
+Note: A partial deep copy of the ``Case`` object is passed to each ``add_case`` hook. ``Case.operation.app`` is a reference to the original ``app``,
+and ``Case.operation.schema`` is a shallow copy, so changes to these fields will be reflected in other tests.
 
 Custom string strategies
 ------------------------

@@ -8,24 +8,24 @@ from ..links import OpenAPILink, get_all_links
 from ..utils import expand_status_code
 
 if TYPE_CHECKING:
-    from ....models import Endpoint
+    from ....models import APIOperation
 
 FilterFunction = Callable[[StepResult], bool]
 
 
 def apply(
-    endpoint: "Endpoint",
+    operation: "APIOperation",
     bundles: Dict[str, CaseInsensitiveDict],
     connections: Dict[str, List[st.SearchStrategy[Tuple[StepResult, OpenAPILink]]]],
 ) -> None:
     """Gather all connections based on Open API links definitions."""
-    all_status_codes = list(endpoint.definition.resolved["responses"])
-    for status_code, link in get_all_links(endpoint):
-        target_endpoint = link.get_target_endpoint()
-        strategy = bundles[endpoint.path][endpoint.method.upper()].filter(
+    all_status_codes = list(operation.definition.resolved["responses"])
+    for status_code, link in get_all_links(operation):
+        target_operation = link.get_target_operation()
+        strategy = bundles[operation.path][operation.method.upper()].filter(
             make_response_filter(status_code, all_status_codes)
         )
-        connections[target_endpoint.verbose_name].append(_convert_strategy(strategy, link))
+        connections[target_operation.verbose_name].append(_convert_strategy(strategy, link))
 
 
 def _convert_strategy(
@@ -38,7 +38,7 @@ def _convert_strategy(
 def make_response_filter(status_code: str, all_status_codes: List[str]) -> FilterFunction:
     """Create a filter for stored responses.
 
-    This filter will decide whether some response is suitable to use as a source for requesting some endpoint.
+    This filter will decide whether some response is suitable to use as a source for requesting some API operation.
     """
     if status_code == "default":
         return default_status_code(all_status_codes)

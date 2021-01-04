@@ -33,10 +33,10 @@ def _run_task(
     def _run_tests(maker: Callable, recursion_level: int = 0) -> None:
         if recursion_level > stateful_recursion_limit:
             return
-        for _endpoint, data_generation_method, test in maker(test_template, settings, seed):
-            feedback = Feedback(stateful, _endpoint)
+        for _operation, data_generation_method, test in maker(test_template, settings, seed):
+            feedback = Feedback(stateful, _operation)
             for event in run_test(
-                _endpoint,
+                _operation,
                 test,
                 checks,
                 data_generation_method,
@@ -51,12 +51,12 @@ def _run_task(
 
     with capture_hypothesis_output():
         while not tasks_queue.empty():
-            endpoint, data_generation_method = tasks_queue.get()
+            operation, data_generation_method = tasks_queue.get()
             items = (
-                endpoint,
+                operation,
                 data_generation_method,
                 create_test(
-                    endpoint=endpoint,
+                    operation=operation,
                     test=test_template,
                     settings=settings,
                     seed=seed,
@@ -210,12 +210,12 @@ class ThreadPoolRunner(BaseRunner):
             yield events.Interrupted()
 
     def _get_tasks_queue(self) -> Queue:
-        """All endpoints are distributed among all workers via a queue."""
+        """All API operations are distributed among all workers via a queue."""
         tasks_queue: Queue = Queue()
         tasks_queue.queue.extend(
             [
-                (endpoint, data_generation_method)
-                for endpoint in self.schema.get_all_endpoints()
+                (operation, data_generation_method)
+                for operation in self.schema.get_all_operations()
                 for data_generation_method in self.schema.data_generation_methods
             ]
         )

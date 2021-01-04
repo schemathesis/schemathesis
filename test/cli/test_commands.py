@@ -20,7 +20,7 @@ from schemathesis.checks import ALL_CHECKS
 from schemathesis.cli import reset_checks
 from schemathesis.hooks import unregister_all
 from schemathesis.loaders import from_uri
-from schemathesis.models import Endpoint
+from schemathesis.models import APIOperation
 from schemathesis.runner import DEFAULT_CHECKS
 from schemathesis.targets import DEFAULT_TARGETS
 
@@ -160,14 +160,16 @@ def test_commands_run_help(cli):
         "",
         "  These options define what parts of the API will be tested.",
         "",
-        "  -E, --endpoint TEXT          Filter schemathesis test by endpoint pattern.",
-        "                               Example: users/\\d+",
+        "  -E, --endpoint TEXT           Filter schemathesis tests by API operation path",
+        "                                pattern. Example: users/\\d+",
         "",
-        "  -M, --method TEXT            Filter schemathesis test by HTTP method.",
-        "  -T, --tag TEXT               Filter schemathesis test by schema tag pattern.",
-        "  -O, --operation-id TEXT      Filter schemathesis test by operationId pattern.",
-        "  --skip-deprecated-endpoints  Skip testing of deprecated endpoints.  [default:",
-        "                               False]",
+        "  -M, --method TEXT             Filter schemathesis tests by HTTP method.",
+        "  -T, --tag TEXT                Filter schemathesis tests by schema tag pattern.",
+        "  -O, --operation-id TEXT       Filter schemathesis tests by operationId",
+        "                                pattern.",
+        "",
+        "  --skip-deprecated-operations  Skip testing of deprecated API operations.",
+        "                                [default: False]",
         "",
         "",
         "Validation options:",
@@ -199,7 +201,7 @@ def test_commands_run_help(cli):
         "  --hypothesis-derandomize        Use Hypothesis's deterministic mode.",
         "  --hypothesis-max-examples INTEGER RANGE",
         "                                  Maximum number of generated examples per each",
-        "                                  method/endpoint combination.",
+        "                                  method/path combination.",
         "",
         f"  --hypothesis-phases [{PHASES.replace(', ', '|')}]",
         "                                  Control which phases should be run.",
@@ -331,7 +333,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "schema_uri": SCHEMA_URI,
         "validate_schema": True,
         "data_generation_methods": [DataGenerationMethod.default()],
-        "skip_deprecated_endpoints": False,
+        "skip_deprecated_operations": False,
         "force_schema_version": None,
         "loader": from_uri,
         "hypothesis_options": {},
@@ -390,7 +392,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
         "tag": (),
         "operation_id": (),
         "validate_schema": True,
-        "skip_deprecated_endpoints": False,
+        "skip_deprecated_operations": False,
         "force_schema_version": None,
         "request_tls_verify": True,
         **expected,
@@ -422,7 +424,7 @@ def test_all_checks(cli, mocker):
     assert execute.call_args[1]["checks"] == ALL_CHECKS
 
 
-@pytest.mark.endpoints()
+@pytest.mark.operations()
 def test_hypothesis_parameters(cli, schema_url):
     # When Hypothesis options are passed via command line
     result = cli.run(
@@ -460,7 +462,7 @@ def cli_args(openapi_version, request):
     return args
 
 
-@pytest.mark.endpoints("success")
+@pytest.mark.operations("success")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_cli_run_output_success(cli, cli_args, workers):
     result = cli.run(*cli_args, f"--workers={workers}")
@@ -496,7 +498,7 @@ def test_cli_run_output_with_errors(cli, cli_args, workers):
     assert f"== 1 passed, 1 failed in " in lines[-1]
 
 
-@pytest.mark.endpoints("failure")
+@pytest.mark.operations("failure")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_cli_run_only_failure(cli, cli_args, workers):
     result = cli.run(*cli_args, f"--workers={workers}")
@@ -509,14 +511,14 @@ def test_cli_run_only_failure(cli, cli_args, workers):
     assert "== 1 failed in " in lines[-1]
 
 
-@pytest.mark.endpoints("upload_file")
+@pytest.mark.operations("upload_file")
 def test_cli_binary_body(cli, schema_url):
     result = cli.run(schema_url, "--hypothesis-suppress-health-check=filter_too_much")
     assert result.exit_code == ExitCode.OK, result.stdout
     assert " HYPOTHESIS OUTPUT " not in result.stdout
 
 
-@pytest.mark.endpoints()
+@pytest.mark.operations()
 @pytest.mark.parametrize("workers", (1, 2))
 def test_cli_run_output_empty(cli, cli_args, workers):
     result = cli.run(*cli_args, f"--workers={workers}")
@@ -529,7 +531,7 @@ def test_cli_run_output_empty(cli, cli_args, workers):
     assert "= Empty test suite =" in lines[-1]
 
 
-@pytest.mark.endpoints()
+@pytest.mark.operations()
 @pytest.mark.parametrize("workers", (1, 2))
 def test_cli_run_changed_base_url(cli, server, cli_args, workers):
     # When the CLI receives custom base URL
@@ -547,7 +549,7 @@ def test_cli_run_changed_base_url(cli, server, cli_args, workers):
         ("/failure", f"Failed to load schema, code 500 was returned from http://127.0.0.1"),
     ),
 )
-@pytest.mark.endpoints("failure")
+@pytest.mark.operations("failure")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_execute_missing_schema(cli, openapi3_base_url, url, message, workers):
     result = cli.run(f"{openapi3_base_url}{url}", f"--workers={workers}")
@@ -555,14 +557,14 @@ def test_execute_missing_schema(cli, openapi3_base_url, url, message, workers):
     assert message in result.stdout
 
 
-@pytest.mark.endpoints("success", "slow")
+@pytest.mark.operations("success", "slow")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_hypothesis_failed_event(cli, cli_args, workers):
     # When the Hypothesis deadline option is set manually, and it is smaller than the response time
     result = cli.run(*cli_args, "--hypothesis-deadline=20", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And the given endpoint should be displayed as an error
+    # And the given operation should be displayed as an error
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("GET /api/slow E")
@@ -576,14 +578,14 @@ def test_hypothesis_failed_event(cli, cli_args, workers):
     assert "which exceeds the deadline of 20.00ms" in result.stdout
 
 
-@pytest.mark.endpoints("success", "slow")
+@pytest.mark.operations("success", "slow")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_connection_timeout(cli, server, schema_url, workers):
     # When connection timeout is specified in the CLI and the request fails because of it
     result = cli.run(schema_url, "--request-timeout=80", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And the given endpoint should be displayed as an error
+    # And the given operation should be displayed as an error
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("GET /api/slow E")
@@ -598,10 +600,10 @@ def test_connection_timeout(cli, server, schema_url, workers):
     )
 
 
-@pytest.mark.endpoints("success", "slow")
+@pytest.mark.operations("success", "slow")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_default_hypothesis_settings(cli, cli_args, workers):
-    # When there is a slow endpoint and if it is faster than 500ms
+    # When there is a slow operation and if it is faster than 500ms
     result = cli.run(*cli_args, f"--workers={workers}")
     # Then the tests should pass, because of default 500ms deadline
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -614,7 +616,7 @@ def test_default_hypothesis_settings(cli, cli_args, workers):
         assert lines[10] == ".."
 
 
-@pytest.mark.endpoints("failure")
+@pytest.mark.operations("failure")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_seed(cli, cli_args, workers):
     # When there is a failure
@@ -624,7 +626,7 @@ def test_seed(cli, cli_args, workers):
     assert "Or add this option to your command line parameters: --hypothesis-seed=456" in result.stdout.split("\n")
 
 
-@pytest.mark.endpoints("unsatisfiable")
+@pytest.mark.operations("unsatisfiable")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_unsatisfiable(cli, cli_args, workers):
     # When the app's schema contains parameters that can't be generated
@@ -635,7 +637,7 @@ def test_unsatisfiable(cli, cli_args, workers):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And standard Hypothesis error should not appear in the output
     assert "You can add @seed" not in result.stdout
-    # And this endpoint should be marked as errored in the progress line
+    # And this operation should be marked as errored in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("POST /api/unsatisfiable E")
@@ -643,20 +645,20 @@ def test_unsatisfiable(cli, cli_args, workers):
         assert lines[10] == "E"
     # And more clear error message is displayed instead of Hypothesis one
     lines = result.stdout.split("\n")
-    assert "hypothesis.errors.Unsatisfiable: Unable to satisfy schema parameters for this endpoint" in lines
+    assert "hypothesis.errors.Unsatisfiable: Unable to satisfy schema parameters for this API operation" in lines
 
 
-@pytest.mark.endpoints("flaky")
+@pytest.mark.operations("flaky")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_flaky(cli, cli_args, workers):
-    # When the endpoint fails / succeeds randomly
+    # When the operation fails / succeeds randomly
     # Derandomize is needed for reproducible test results
     result = cli.run(*cli_args, "--hypothesis-derandomize", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And standard Hypothesis error should not appear in the output
     assert "Failed to reproduce exception. Expected:" not in result.stdout
-    # And this endpoint should be marked as errored in the progress line
+    # And this operation should be marked as errored in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("GET /api/flaky E")
@@ -669,15 +671,15 @@ def test_flaky(cli, cli_args, workers):
     assert "= FAILURES =" not in result.stdout
     # And more clear error message is displayed instead of Hypothesis one
     lines = result.stdout.split("\n")
-    assert "hypothesis.errors.Flaky: Tests on this endpoint produce unreliable results: " in lines
+    assert "hypothesis.errors.Flaky: Tests on this API operation produce unreliable results: " in lines
     assert "Falsified on the first call but did not on a subsequent one" in lines
     # And example is displayed
     assert "Query           : {'id': 0}" in lines
 
 
-@pytest.mark.endpoints("invalid")
+@pytest.mark.operations("invalid")
 @pytest.mark.parametrize("workers", (1,))
-def test_invalid_endpoint(cli, cli_args, workers):
+def test_invalid_operation(cli, cli_args, workers):
     # When the app's schema contains errors
     # For example if its type is "int" but should be "integer"
     # And schema validation is disabled
@@ -686,7 +688,7 @@ def test_invalid_endpoint(cli, cli_args, workers):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And standard Hypothesis error should not appear in the output
     assert "You can add @seed" not in result.stdout
-    # And this endpoint should be marked as errored in the progress line
+    # And this operation should be marked as errored in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("POST /api/invalid E")
@@ -699,8 +701,8 @@ def test_invalid_endpoint(cli, cli_args, workers):
     assert not lines[14].startswith("=")
 
 
-@pytest.mark.endpoints("invalid")
-def test_invalid_endpoint_suggestion(cli, cli_args):
+@pytest.mark.operations("invalid")
+def test_invalid_operation_suggestion(cli, cli_args):
     # When the app's schema contains errors
     result = cli.run(*cli_args)
     # Then the whole Schemathesis run should fail
@@ -712,8 +714,8 @@ In this case, Schemathesis cannot guarantee proper behavior during the test run
     assert expected in result.stdout
 
 
-@pytest.mark.endpoints("invalid")
-def test_invalid_endpoint_suggestion_disabled(cli, cli_args):
+@pytest.mark.operations("invalid")
+def test_invalid_operation_suggestion_disabled(cli, cli_args):
     # When the app's schema contains errors
     # And schema validation is disabled
     result = cli.run(*cli_args, "--validate-schema=false")
@@ -723,15 +725,15 @@ def test_invalid_endpoint_suggestion_disabled(cli, cli_args):
     assert "You can disable input schema validation" not in result.stdout
 
 
-@pytest.mark.endpoints("teapot")
+@pytest.mark.operations("teapot")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_status_code_conformance(cli, cli_args, workers):
-    # When endpoint returns a status code, that is not listed in "responses"
+    # When operation returns a status code, that is not listed in "responses"
     # And "status_code_conformance" is specified
     result = cli.run(*cli_args, "-c", "status_code_conformance", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And this endpoint should be marked as failed in the progress line
+    # And this operation should be marked as failed in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("POST /api/teapot F")
@@ -743,7 +745,7 @@ def test_status_code_conformance(cli, cli_args, workers):
     assert lines[16].strip() == "Declared status codes: 200"
 
 
-@pytest.mark.endpoints("headers")
+@pytest.mark.operations("headers")
 def test_headers_conformance_invalid(cli, cli_args):
     result = cli.run(*cli_args, "-c", "response_headers_conformance")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
@@ -751,7 +753,7 @@ def test_headers_conformance_invalid(cli, cli_args):
     assert "1. Received a response with missing headers: X-Custom-Header" in lines
 
 
-@pytest.mark.endpoints("headers")
+@pytest.mark.operations("headers")
 def test_headers_conformance_valid(cli, cli_args):
     result = cli.run(*cli_args, "-c", "response_headers_conformance", "-H", "X-Custom-Header: bla")
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -759,7 +761,7 @@ def test_headers_conformance_valid(cli, cli_args):
     assert "1. Received a response with missing headers: X-Custom-Header" not in lines
 
 
-@pytest.mark.endpoints("multiple_failures")
+@pytest.mark.operations("multiple_failures")
 def test_multiple_failures_single_check(cli, schema_url):
     result = cli.run(schema_url, "--hypothesis-seed=1", "--hypothesis-derandomize")
 
@@ -772,7 +774,7 @@ def test_multiple_failures_single_check(cli, schema_url):
     assert "1 failed in " in lines[-1]
 
 
-@pytest.mark.endpoints("multiple_failures")
+@pytest.mark.operations("multiple_failures")
 def test_multiple_failures_different_check(cli, schema_url):
     result = cli.run(
         schema_url,
@@ -800,7 +802,7 @@ def test_connection_error(cli, schema_url, workers):
     result = cli.run(schema_url, "--base-url=http://127.0.0.1:1/api", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And all collected endpoints should be marked as errored
+    # And all collected API operations should be marked as errored
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("GET /api/failure E")
@@ -809,10 +811,10 @@ def test_connection_error(cli, schema_url, workers):
         assert lines[10] == "EE"
     # And errors section title should be displayed
     assert "= ERRORS =" in result.stdout
-    # And all endpoints should be mentioned in this section as subsections
+    # And all API operations should be mentioned in this section as subsections
     assert "_ GET: /api/success [P] _" in result.stdout
     assert "_ GET: /api/failure [P] _" in result.stdout
-    # And the proper error messages should be displayed for each endpoint
+    # And the proper error messages should be displayed for each operation
     assert "Max retries exceeded with url: /api/success" in result.stdout
     assert "Max retries exceeded with url: /api/failure" in result.stdout
 
@@ -842,7 +844,7 @@ def test_schema_not_available_wsgi(cli, loadable_flask_app):
     assert lines[0] == "Schema was not found at unknown.yaml"
 
 
-@pytest.mark.endpoints("custom_format")
+@pytest.mark.operations("custom_format")
 def test_pre_run_hook_valid(testdir, cli, schema_url, app):
     # When `--pre-run` hook is passed to the CLI call
     module = testdir.make_importable_pyfile(
@@ -930,7 +932,7 @@ def test_conditional_checks(testdir, cli, hypothesis_max_examples, schema_url):
     )
 
     assert result.exit_code == ExitCode.OK
-    # One additional case created for two endpoints - /api/failure and /api/success.
+    # One additional case created for two API operations - /api/failure and /api/success.
     assert "No checks were performed." in result.stdout
 
 
@@ -967,7 +969,7 @@ def test_add_case(testdir, cli, hypothesis_max_examples, schema_url):
     )
 
     assert result.exit_code == ExitCode.OK
-    # One additional case created for two endpoints - /api/failure and /api/success.
+    # One additional case created for two API operations - /api/failure and /api/success.
     assert result.stdout.count("The case was added!") == 2
 
 
@@ -1000,7 +1002,7 @@ def test_add_case_returns_none(testdir, cli, hypothesis_max_examples, schema_url
     )
 
     assert result.exit_code == ExitCode.OK
-    # with --hypothesis-max-examples=1 and 2 endpoints, only two cases should be created and validated.
+    # with --hypothesis-max-examples=1 and 2 API operations, only two cases should be created and validated.
     # If the count is greater than 2, additional test cases should not have been created but were created.
     assert result.stdout.count("Validating case.") == 2
 
@@ -1050,7 +1052,7 @@ def test_multiple_add_case_hooks(testdir, cli, hypothesis_max_examples, schema_u
     )
 
     assert result.exit_code == ExitCode.OK
-    # Each header should only be duplicated once for each endpoint - /api/failure and /api/success.
+    # Each header should only be duplicated once for each API operation - /api/failure and /api/success.
     assert result.stdout.count("First case added!") == 2
     assert result.stdout.count("Second case added!") == 2
 
@@ -1141,7 +1143,7 @@ def new_check(request, testdir, cli):
     )
 
 
-@pytest.mark.endpoints("success")
+@pytest.mark.operations("success")
 def test_register_check(new_check, cli, schema_url):
     new_check, message = new_check
     # When `--pre-run` hook is passed to the CLI call
@@ -1172,12 +1174,12 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
 @pytest.mark.parametrize("workers", (1, 2))
 def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_20, workers):
     # When a Schemathesis run in interrupted by keyboard or via SIGINT
-    endpoint = Endpoint("/success", "GET", {}, swagger_20, base_url=base_url)
+    operation = APIOperation("/success", "GET", {}, swagger_20, base_url=base_url)
     if len(cli_args) == 2:
-        endpoint.app = flask_app
-        original = Case(endpoint).call_wsgi
+        operation.app = flask_app
+        original = Case(operation).call_wsgi
     else:
-        original = Case(endpoint).call
+        original = Case(operation).call
     counter = 0
 
     def mocked(*args, **kwargs):
@@ -1230,7 +1232,7 @@ def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
     assert_threaded_executor_interruption(lines, ("F", ".", "F.", ".F", ""), True)
 
 
-@pytest.mark.endpoints("failure")
+@pytest.mark.operations("failure")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_hypothesis_output_capture(mocker, cli, cli_args, workers):
     mocker.patch("schemathesis.utils.IGNORED_PATTERNS", ())
@@ -1442,19 +1444,19 @@ def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_b
     last_decoded = decode(-1)
     if last_decoded:
         assert b'Content-Disposition: form-data; name="file"; filename="file"\r\n' in last_decoded
-    # NOTE, that the actual endpoint is not checked in this test
+    # NOTE, that the actual API operation is not checked in this test
 
 
-@pytest.mark.endpoints("form")
+@pytest.mark.operations("form")
 def test_urlencoded_form(cli, cli_args):
-    # When the endpoint accepts application/x-www-form-urlencoded
+    # When the API operation accepts application/x-www-form-urlencoded
     result = cli.run(*cli_args)
     # Then Schemathesis should generate appropriate payload
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
 @pytest.mark.parametrize("workers", (1, 2))
-@pytest.mark.endpoints("success")
+@pytest.mark.operations("success")
 def test_targeted(mocker, cli, cli_args, workers):
     target = mocker.spy(hypothesis, "target")
     result = cli.run(*cli_args, f"--workers={workers}", "--target=response_time")
@@ -1494,17 +1496,17 @@ def test_chained_internal_exception(testdir, cli, hypothesis_max_examples, opena
     "options, expected",
     (
         (
-            ("--skip-deprecated-endpoints",),
-            "collected endpoints: 1",
+            ("--skip-deprecated-operations",),
+            "Collected API operations: 1",
         ),
         (
             (),
-            "collected endpoints: 2",
+            "Collected API operations: 2",
         ),
     ),
 )
-def test_skip_deprecated_endpoints(testdir, cli, openapi3_base_url, options, expected):
-    # When there are some deprecated endpoints
+def test_skip_deprecated_operations(testdir, cli, openapi3_base_url, options, expected):
+    # When there are some deprecated API operations
     definition = {
         "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}}
     }
@@ -1524,7 +1526,7 @@ def test_skip_deprecated_endpoints(testdir, cli, openapi3_base_url, options, exp
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(raw_schema))
     result = cli.run(str(schema_file), f"--base-url={openapi3_base_url}", f"--hypothesis-max-examples=1", *options)
     assert result.exit_code == ExitCode.OK, result.stdout
-    # Then only not deprecated endpoints should be selected
+    # Then only not deprecated API operations should be selected
     assert expected in result.stdout.splitlines()
 
 
@@ -1547,7 +1549,7 @@ def test_fast_api_fixup(testdir, cli, base_url, fast_api_schema, hypothesis_max_
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
-@pytest.mark.endpoints("success")
+@pytest.mark.operations("success")
 def test_colon_in_headers(cli, schema_url, app):
     header = "X-FOO"
     value = "bar:spam"
@@ -1556,10 +1558,10 @@ def test_colon_in_headers(cli, schema_url, app):
     assert app["incoming_requests"][0].headers[header] == value
 
 
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_openapi_links(cli, cli_args, schema_url, hypothesis_max_examples):
     # When the schema contains Open API links or Swagger 2 extension for links
-    # And these links are nested - endpoints in these links contain links to another endpoints
+    # And these links are nested - API operations in these links contain links to another operations
     result = cli.run(
         *cli_args,
         f"--hypothesis-max-examples={hypothesis_max_examples or 2}",
@@ -1586,10 +1588,10 @@ def test_openapi_links(cli, cli_args, schema_url, hypothesis_max_examples):
 
 
 @pytest.mark.parametrize("recursion_limit, expected", ((1, "....."), (5, "......")))
-@pytest.mark.endpoints("create_user", "get_user", "update_user")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_limit, hypothesis_max_examples, expected):
     # When the schema contains Open API links or Swagger 2 extension for links
-    # And these links are nested - endpoints in these links contain links to another endpoints
+    # And these links are nested - API operations in these links contain links to another operations
     result = cli.run(
         *cli_args,
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
@@ -1619,14 +1621,14 @@ def test_get_request_with_body(testdir, cli, base_url, hypothesis_max_examples, 
     assert "InvalidSchema: Body parameters are defined for GET request." in lines
 
 
-@pytest.mark.endpoints("slow")
+@pytest.mark.operations("slow")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_max_response_time_invalid(cli, server, schema_url, workers):
     # When maximum response time check is specified in the CLI and the request takes more time
     result = cli.run(schema_url, "--max-response-time=50", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And the given endpoint should be displayed as a failure
+    # And the given operation should be displayed as a failure
     lines = result.stdout.split("\n")
     if workers == 1:
         assert lines[10].startswith("GET /api/slow F")
@@ -1637,7 +1639,7 @@ def test_max_response_time_invalid(cli, server, schema_url, workers):
     assert "Response time exceeded the limit of 50 ms" in result.stdout
 
 
-@pytest.mark.endpoints("slow")
+@pytest.mark.operations("slow")
 def test_max_response_time_valid(cli, server, schema_url):
     # When maximum response time check is specified in the CLI and the request takes less time
     result = cli.run(schema_url, "--max-response-time=200")
@@ -1647,7 +1649,7 @@ def test_max_response_time_valid(cli, server, schema_url):
 
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 @pytest.mark.parametrize("header", ("Authorization", "authorization"))
-@pytest.mark.endpoints()
+@pytest.mark.operations()
 def test_auth_and_authorization_header_are_disallowed(cli, schema_url, header, openapi_version):
     # When ``--auth`` is passed together with ``--header`` that sets the ``Authorization`` header
     result = cli.run(schema_url, "--auth=test:test", f"--header={header}:token123")
@@ -1660,7 +1662,7 @@ def test_auth_and_authorization_header_are_disallowed(cli, schema_url, header, o
 
 
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
-@pytest.mark.endpoints("failure", "success")
+@pytest.mark.operations("failure", "success")
 def test_exit_first(cli, schema_url, openapi_version):
     # When the `--exit-first` CLI option is passed
     # And a failure occurs

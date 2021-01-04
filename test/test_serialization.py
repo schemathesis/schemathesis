@@ -46,7 +46,7 @@ def api_schema(request, openapi_version):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("csv_payload")
+@pytest.mark.operations("csv_payload")
 @pytest.mark.usefixtures("csv_serializer")
 def test_text_csv(api_schema):
     # When API expects `text/csv`

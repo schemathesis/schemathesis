@@ -126,7 +126,7 @@ class MultipartSerializer:
     def as_requests(self, context: SerializerContext, value: Dict[str, Any]) -> Any:
         # Form data always is generated as a dictionary
         multipart = prepare_form_data(value)
-        files, data = context.case.endpoint.prepare_multipart(multipart)
+        files, data = context.case.operation.prepare_multipart(multipart)
         return {"files": files, "data": data}
 
     def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:

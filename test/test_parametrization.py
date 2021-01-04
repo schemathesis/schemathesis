@@ -21,10 +21,10 @@ def test_(request, case):
 """
     )
     # And schema doesn't contain any parameters
-    # And schema contains only 1 endpoint
+    # And schema contains only 1 API operation
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1)
-    # Then test name should contain method:endpoint
+    # Then test name should contain method:path
     # And there should be only 1 hypothesis call
     result.stdout.re_match_lines(
         [r"test_parametrization.py::test_\[GET:/v1/users\]\[P\] PASSED", r"Hypothesis calls: 1"]
@@ -49,9 +49,9 @@ def test_(request, param, case):
             }
         },
     )
-    # And there are multiple method/endpoint combinations
+    # And there are multiple method/path combinations
     result = testdir.runpytest("-v", "-s")
-    # Then the total number of tests should be Method/Endpoint combos x parameters in `parametrize`
+    # Then the total number of tests should be method/path combos x parameters in `parametrize`
     # I.e. regular pytest parametrization logic should be applied
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
@@ -445,22 +445,22 @@ def test_b(request, case):
     result = testdir.runpytest("-v", "-s", "-k", "pets")
     # Then only relevant tests should be selected for running
     result.assert_outcomes(passed=2)
-    # "/users" endpoint is excluded in the first test function
+    # "/users" path is excluded in the first test function
     result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST:/v1/pets\]", r"Hypothesis calls: 2"])
 
 
-def test_skip_deprecated_endpoints(testdir):
-    # When the schema is loaded with `skip_deprecated_endpoints=True`
+def test_skip_deprecated_operations(testdir):
+    # When the schema is loaded with `skip_deprecated_operations=True`
     testdir.make_test(
         """
-schema = schemathesis.from_dict(raw_schema, skip_deprecated_endpoints=True)
+schema = schemathesis.from_dict(raw_schema, skip_deprecated_operations=True)
 
 @schema.parametrize()
 @settings(max_examples=1)
 def test_a(request, case):
     request.config.HYPOTHESIS_CASES += 1
 
-@schema.parametrize(skip_deprecated_endpoints=False)
+@schema.parametrize(skip_deprecated_operations=False)
 @settings(max_examples=1)
 def test_b(request, case):
     request.config.HYPOTHESIS_CASES += 1
@@ -479,13 +479,13 @@ def test_b(request, case):
         },
     )
     result = testdir.runpytest("-v", "-s")
-    # Then only not deprecated endpoints should be tested
+    # Then only not deprecated API operations should be tested
     result.assert_outcomes(passed=5)
     result.stdout.re_match_lines(
         [
             r".*test_a\[PATCH:/v1/users\]\[P\]",
             r".*test_a\[GET:/v1/users\]\[P\]",
-            # Here POST is not skipped due to using skip_deprecated_endpoints=False in the `parametrize` call
+            # Here POST is not skipped due to using skip_deprecated_operations=False in the `parametrize` call
             r".*test_b\[POST:/v1/users\]\[P\]",
             r".*test_b\[PATCH:/v1/users\]\[P\]",
             r".*test_b\[GET:/v1/users\]\[P\]",
@@ -495,14 +495,14 @@ def test_b(request, case):
 
 
 @pytest.mark.parametrize(
-    "schema_name, endpoint",
+    "schema_name, paths",
     (
         ("simple_swagger.yaml", {"/users": {"x-handler": "foo"}}),
         ("simple_openapi.yaml", {"/users": {"x-handler": "foo", "description": "Text"}}),
     ),
 )
-def test_custom_properties(testdir, schema_name, endpoint):
-    # When custom properties are present in endpoint definitions (e.g. vendor extensions, or some other allowed fields)
+def test_custom_properties(testdir, schema_name, paths):
+    # When custom properties are present in operation definitions (e.g. vendor extensions, or some other allowed fields)
     testdir.make_test(
         """
 @schema.parametrize()
@@ -511,7 +511,7 @@ def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     """,
         schema_name=schema_name,
-        paths=endpoint,
+        paths=paths,
     )
     result = testdir.runpytest("-s")
     # Then it should be correctly processed
@@ -608,7 +608,7 @@ def test_(request, case):
     result.stdout.re_match_lines([r".*InvalidSchema: Cannot have max_size=6 < min_size=10"])
 
 
-def test_invalid_endpoint(testdir):
+def test_invalid_operation(testdir):
     # When the given schema is invalid
     # And schema validation is disabled
     testdir.make_test(
@@ -626,7 +626,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-rf")
     # Then the tests should fail with the relevant error message
     result.assert_outcomes(failed=1, passed=2)
-    result.stdout.re_match_lines([r".*test_invalid_endpoint.py::test_\[GET:/v1/invalid\]\[P\] FAILED"])
+    result.stdout.re_match_lines([r".*test_invalid_operation.py::test_\[GET:/v1/invalid\]\[P\] FAILED"])
 
 
 def test_no_base_path(testdir):
@@ -675,8 +675,8 @@ def test_empty_content():
     }
     schema = schemathesis.from_dict(raw_schema)
     # Then the body processing should be no-op
-    endpoint = schema.endpoints["/body"]["POST"]
-    assert endpoint.body == PayloadAlternatives([])
+    operation = schema["/body"]["POST"]
+    assert operation.body == PayloadAlternatives([])
 
 
 @pytest.mark.hypothesis_nested
@@ -700,7 +700,7 @@ def test_loose_multipart_definition():
     schema = schemathesis.from_dict(raw_schema)
     # Then non-object data should be excluded during generation
 
-    @given(case=schema.endpoints["/body"]["POST"].as_strategy())
+    @given(case=schema["/body"]["POST"].as_strategy())
     @settings(max_examples=5)
     def test(case):
         assert isinstance(case.body, dict)
@@ -710,11 +710,11 @@ def test_loose_multipart_definition():
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("multipart")
+@pytest.mark.operations("multipart")
 def test_optional_form_parameters(schema_url):
     # When form parameters are optional
     schema = schemathesis.from_uri(schema_url)
-    strategy = schema.endpoints["/multipart"]["POST"].as_strategy()
+    strategy = schema["/multipart"]["POST"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
@@ -755,7 +755,7 @@ def test_ref_field():
     }
     schema = schemathesis.from_dict(raw_schema)
 
-    @given(case=schema.endpoints["/body"]["POST"].as_strategy())
+    @given(case=schema["/body"]["POST"].as_strategy())
     @settings(max_examples=5)
     def test(case):
         assert isinstance(case.body["$ref"], str)
@@ -789,7 +789,7 @@ def test_(request, case):
 
 
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
-@pytest.mark.endpoints("multiple_failures")
+@pytest.mark.operations("multiple_failures")
 def test_exceptions_output(testdir, app_schema, openapi3_base_url, openapi_version):
     # When Schemathesis exceptions are in the pytest's output
     testdir.make_test(

@@ -24,11 +24,11 @@ def expect_content_type(value: str):
 
 
 def create_openapi_app(
-    endpoints: Tuple[str, ...] = ("success", "failure"), version: OpenAPIVersion = OpenAPIVersion("2.0")
+    operations: Tuple[str, ...] = ("success", "failure"), version: OpenAPIVersion = OpenAPIVersion("2.0")
 ) -> Flask:
     app = Flask("test_app")
     app.config["should_fail"] = True
-    app.config["schema_data"] = make_openapi_schema(endpoints, version)
+    app.config["schema_data"] = make_openapi_schema(operations, version)
     app.config["incoming_requests"] = []
     app.config["schema_requests"] = []
     app.config["internal_exception"] = False
