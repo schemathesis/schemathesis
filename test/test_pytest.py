@@ -25,9 +25,9 @@ def test_(request, param, case):
             }
         },
     )
-    # And there are multiple method/endpoint combinations
+    # And there are multiple method/path combinations
     result = testdir.runpytest("-v", "-s")
-    # Then the total number of tests should be Method/Endpoint combos x parameters in `pytest_generate_tests`
+    # Then the total number of tests should be method/path combos x parameters in `pytest_generate_tests`
     # I.e. regular pytest parametrization logic should be applied
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
@@ -67,9 +67,9 @@ class TestAPI:
             }
         },
     )
-    # And there are multiple method/endpoint combinations
+    # And there are multiple method/path combinations
     result = testdir.runpytest("-v", "-s")
-    # Then the total number of tests should be Method/Endpoint combos x parameters in `pytest_generate_tests`
+    # Then the total number of tests should be method/path combos x parameters in `pytest_generate_tests`
     # I.e. regular pytest parametrization logic should be applied
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
@@ -151,17 +151,17 @@ def test_schema_given(testdir):
         """
 from hypothesis.strategies._internal.core import DataObject
 
-ENDPOINTS = []
+OPERATIONS = []
 
 @schema.parametrize()
 @schema.given(data=st.data())
 def test(data, case):
     assert isinstance(data, DataObject)
-    ENDPOINTS.append(f"{case.method} {case.path}")
+    OPERATIONS.append(f"{case.method} {case.path}")
 
 
-def test_endpoints():
-    assert ENDPOINTS == ['GET /users', 'POST /users']
+def test_operations():
+    assert OPERATIONS == ['GET /users', 'POST /users']
     """,
         paths={
             "/users": {

@@ -2,7 +2,7 @@ from typing import Any, Dict, List
 
 from hypothesis.strategies import SearchStrategy
 
-from ...models import Case, Endpoint
+from ...models import APIOperation, Case
 from ._hypothesis import PARAMETERS, get_case_strategy
 from .constants import LOCATION_TO_CONTAINER
 
@@ -15,7 +15,7 @@ def get_object_example_from_properties(object_schema: Dict[str, Any]) -> Dict[st
     }
 
 
-def get_parameter_examples(endpoint_def: Dict[str, Any], examples_field: str) -> List[Dict[str, Any]]:
+def get_parameter_examples(operation_definition: Dict[str, Any], examples_field: str) -> List[Dict[str, Any]]:
     """Gets parameter examples from OAS3 `examples` keyword or `x-examples` for Swagger 2."""
     return [
         {
@@ -28,14 +28,14 @@ def get_parameter_examples(endpoint_def: Dict[str, Any], examples_field: str) ->
                 if isinstance(example, dict) and "value" in example
             ],
         }
-        for parameter in endpoint_def.get("parameters", [])
+        for parameter in operation_definition.get("parameters", [])
         if examples_field in parameter
     ]
 
 
-def get_parameter_example_from_properties(endpoint_def: Dict[str, Any]) -> Dict[str, Any]:
+def get_parameter_example_from_properties(operation_definition: Dict[str, Any]) -> Dict[str, Any]:
     static_parameters: Dict[str, Any] = {}
-    for parameter in endpoint_def.get("parameters", []):
+    for parameter in operation_definition.get("parameters", []):
         parameter_schema = parameter["schema"] if "schema" in parameter else parameter
         example = get_object_example_from_properties(parameter_schema)
         if example:
@@ -50,10 +50,10 @@ def get_parameter_example_from_properties(endpoint_def: Dict[str, Any]) -> Dict[
     return static_parameters
 
 
-def get_request_body_examples(endpoint_def: Dict[str, Any], examples_field: str) -> Dict[str, Any]:
+def get_request_body_examples(operation_definition: Dict[str, Any], examples_field: str) -> Dict[str, Any]:
     """Gets request body examples from OAS3 `examples` keyword or `x-examples` for Swagger 2."""
     # NOTE. `requestBody` is OAS3-specific. How should it work with OAS2?
-    request_bodies_items = endpoint_def.get("requestBody", {}).get("content", {}).items()
+    request_bodies_items = operation_definition.get("requestBody", {}).get("content", {}).items()
     if not request_bodies_items:
         return {}
     # first element in tuple is media type, second element is dict
@@ -64,9 +64,9 @@ def get_request_body_examples(endpoint_def: Dict[str, Any], examples_field: str)
     }
 
 
-def get_request_body_example_from_properties(endpoint_def: Dict[str, Any]) -> Dict[str, Any]:
+def get_request_body_example_from_properties(operation_definition: Dict[str, Any]) -> Dict[str, Any]:
     static_parameters: Dict[str, Any] = {}
-    request_bodies_items = endpoint_def.get("requestBody", {}).get("content", {}).items()
+    request_bodies_items = operation_definition.get("requestBody", {}).get("content", {}).items()
     if request_bodies_items:
         _, request_body_schema = next(iter(request_bodies_items))
         example = get_object_example_from_properties(request_body_schema.get("schema", {}))
@@ -76,42 +76,45 @@ def get_request_body_example_from_properties(endpoint_def: Dict[str, Any]) -> Di
     return static_parameters
 
 
-def get_static_parameters_from_example(endpoint: Endpoint) -> Dict[str, Any]:
+def get_static_parameters_from_example(operation: APIOperation) -> Dict[str, Any]:
     static_parameters = {}
     for name in PARAMETERS:
-        parameters = getattr(endpoint, name)
+        parameters = getattr(operation, name)
         example = parameters.example
         if example:
             static_parameters[name] = example
     return static_parameters
 
 
-def get_static_parameters_from_examples(endpoint: Endpoint, examples_field: str) -> List[Dict[str, Any]]:
+def get_static_parameters_from_examples(operation: APIOperation, examples_field: str) -> List[Dict[str, Any]]:
     """Get static parameters from OpenAPI examples keyword."""
-    endpoint_def = endpoint.definition.resolved
+    operation_definition = operation.definition.resolved
     return merge_examples(
-        get_parameter_examples(endpoint_def, examples_field), get_request_body_examples(endpoint_def, examples_field)
+        get_parameter_examples(operation_definition, examples_field),
+        get_request_body_examples(operation_definition, examples_field),
     )
 
 
-def get_static_parameters_from_properties(endpoint: Endpoint) -> Dict[str, Any]:
-    endpoint_def = endpoint.definition.resolved
+def get_static_parameters_from_properties(operation: APIOperation) -> Dict[str, Any]:
+    operation_definition = operation.definition.resolved
     return {
-        **get_parameter_example_from_properties(endpoint_def),
-        **get_request_body_example_from_properties(endpoint_def),
+        **get_parameter_example_from_properties(operation_definition),
+        **get_request_body_example_from_properties(operation_definition),
     }
 
 
-def get_strategies_from_examples(endpoint: Endpoint, examples_field: str = "examples") -> List[SearchStrategy[Case]]:
+def get_strategies_from_examples(
+    operation: APIOperation, examples_field: str = "examples"
+) -> List[SearchStrategy[Case]]:
     strategies = [
-        get_case_strategy(endpoint=endpoint, **static_parameters)
-        for static_parameters in get_static_parameters_from_examples(endpoint, examples_field)
+        get_case_strategy(operation=operation, **static_parameters)
+        for static_parameters in get_static_parameters_from_examples(operation, examples_field)
         if static_parameters
     ]
     for static_parameters in static_parameters_union(
-        get_static_parameters_from_example(endpoint), get_static_parameters_from_properties(endpoint)
+        get_static_parameters_from_example(operation), get_static_parameters_from_properties(operation)
     ):
-        strategies.append(get_case_strategy(endpoint=endpoint, **static_parameters))
+        strategies.append(get_case_strategy(operation=operation, **static_parameters))
     return strategies
 
 

@@ -3,8 +3,8 @@ from hypothesis import strategies as st
 from requests.structures import CaseInsensitiveDict
 
 import schemathesis
-from schemathesis.models import Case, Endpoint
-from schemathesis.schemas import endpoints_to_dict
+from schemathesis.models import APIOperation, Case
+from schemathesis.schemas import operations_to_dict
 
 
 def test_contains(swagger_20):
@@ -13,12 +13,12 @@ def test_contains(swagger_20):
 
 def test_getitem(simple_schema, mocker):
     swagger = schemathesis.from_dict(simple_schema)
-    mocked = mocker.patch("schemathesis.schemas.endpoints_to_dict", wraps=endpoints_to_dict)
-    assert "_endpoints" not in swagger.__dict__
+    mocked = mocker.patch("schemathesis.schemas.operations_to_dict", wraps=operations_to_dict)
+    assert "_operations" not in swagger.__dict__
     assert isinstance(swagger["/users"], CaseInsensitiveDict)
     assert mocked.call_count == 1
     # Check cached access
-    assert "_endpoints" in swagger.__dict__
+    assert "_operations" in swagger.__dict__
     assert isinstance(swagger["/users"], CaseInsensitiveDict)
     assert mocked.call_count == 1
 
@@ -36,16 +36,16 @@ def test_repr(swagger_20):
 
 
 @pytest.mark.parametrize("method", ("GET", "get"))
-def test_endpoint_access(swagger_20, method):
-    assert isinstance(swagger_20["/users"][method], Endpoint)
+def test_operation_access(swagger_20, method):
+    assert isinstance(swagger_20["/users"][method], APIOperation)
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_as_strategy(swagger_20):
-    endpoint = swagger_20["/users"]["GET"]
-    strategy = endpoint.as_strategy()
+    operation = swagger_20["/users"]["GET"]
+    strategy = operation.as_strategy()
     assert isinstance(strategy, st.SearchStrategy)
-    assert strategy.example() == Case(endpoint)
+    assert strategy.example() == Case(operation)
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")

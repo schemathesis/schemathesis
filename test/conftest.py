@@ -9,7 +9,7 @@ import schemathesis.cli
 from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
 
-from .apps import Endpoint, _aiohttp, _fastapi, _flask, _graphql
+from .apps import Operation, _aiohttp, _fastapi, _flask, _graphql
 from .apps.utils import OpenAPIVersion
 from .utils import get_schema_path, make_schema
 
@@ -42,33 +42,33 @@ def pytest_collection_modifyitems(session, config, items):
 
 
 def pytest_configure(config):
-    config.addinivalue_line("markers", "endpoints(*names): add only specified endpoints to the test application.")
+    config.addinivalue_line("markers", "operations(*names): add only specified API operations to the test application.")
     config.addinivalue_line("markers", "hypothesis_nested: mark tests with nested Hypothesis tests.")
 
 
 @pytest.fixture(scope="session")
 def _app():
-    """A global AioHTTP application with configurable endpoints."""
+    """A global AioHTTP application with configurable API operations."""
     return _aiohttp.create_openapi_app(("success", "failure"))
 
 
 @pytest.fixture
-def endpoints(request):
-    marker = request.node.get_closest_marker("endpoints")
+def operations(request):
+    marker = request.node.get_closest_marker("operations")
     if marker:
         if marker.args and marker.args[0] == "__all__":
-            endpoints = tuple(item for item in Endpoint.__members__ if item != "all")
+            operations = tuple(item for item in Operation.__members__ if item != "all")
         else:
-            endpoints = marker.args
+            operations = marker.args
     else:
-        endpoints = ("success", "failure")
-    return endpoints
+        operations = ("success", "failure")
+    return operations
 
 
 @pytest.fixture
-def reset_app(_app, endpoints):
+def reset_app(_app, operations):
     def inner(version):
-        _aiohttp.reset_app(_app, endpoints, version)
+        _aiohttp.reset_app(_app, operations, version)
 
     return inner
 
@@ -168,7 +168,7 @@ def graphql_server(graphql_app):
 
 
 @pytest.fixture()
-def graphql_endpoint(graphql_server, graphql_path):
+def graphql_url(graphql_server, graphql_path):
     return f"http://127.0.0.1:{graphql_server['port']}{graphql_path}"
 
 
@@ -456,8 +456,8 @@ def openapi_30():
 
 
 @pytest.fixture()
-def app_schema(openapi_version, endpoints):
-    return _aiohttp.make_openapi_schema(endpoints=endpoints, version=openapi_version)
+def app_schema(openapi_version, operations):
+    return _aiohttp.make_openapi_schema(operations=operations, version=openapi_version)
 
 
 @pytest.fixture()
@@ -531,8 +531,8 @@ def wsgi_app_factory():
 
 
 @pytest.fixture()
-def flask_app(wsgi_app_factory, endpoints):
-    return wsgi_app_factory(endpoints)
+def flask_app(wsgi_app_factory, operations):
+    return wsgi_app_factory(operations)
 
 
 @pytest.fixture
@@ -552,36 +552,36 @@ def make_importable(module):
 
 
 @pytest.fixture
-def loadable_flask_app(testdir, endpoints):
+def loadable_flask_app(testdir, operations):
     module = testdir.make_importable_pyfile(
         location=f"""
         from test.apps._flask import create_openapi_app
 
-        app = create_openapi_app({endpoints})
+        app = create_openapi_app({operations})
         """
     )
     return f"{module.purebasename}:app"
 
 
 @pytest.fixture
-def loadable_aiohttp_app(testdir, endpoints):
+def loadable_aiohttp_app(testdir, operations):
     module = testdir.make_importable_pyfile(
         location=f"""
         from test.apps._aiohttp import create_openapi_app
 
-        app = create_openapi_app({endpoints})
+        app = create_openapi_app({operations})
         """
     )
     return f"{module.purebasename}:app"
 
 
 @pytest.fixture
-def loadable_fastapi_app(testdir, endpoints):
+def loadable_fastapi_app(testdir, operations):
     module = testdir.make_importable_pyfile(
         location=f"""
         from test.apps._fastapi import create_app
 
-        app = create_app({endpoints})
+        app = create_app({operations})
         """
     )
     return f"{module.purebasename}:app"

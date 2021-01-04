@@ -2,7 +2,7 @@ import pytest
 from hypothesis import given, settings
 
 import schemathesis
-from schemathesis.hooks import HookDispatcher, HookScope
+from schemathesis.hooks import HookContext, HookDispatcher, HookScope
 
 
 @pytest.fixture(autouse=True)
@@ -37,10 +37,10 @@ def dispatcher():
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("custom_format")
+@pytest.mark.operations("custom_format")
 @pytest.mark.usefixtures("global_hook")
 def test_global_query_hook(schema, schema_url):
-    strategy = schema.endpoints["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -51,13 +51,13 @@ def test_global_query_hook(schema, schema_url):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("payload")
+@pytest.mark.operations("payload")
 def test_global_body_hook(schema):
     @schemathesis.hooks.register
     def before_generate_body(context, strategy):
         return strategy.filter(lambda x: len(x["name"]) == 5)
 
-    strategy = schema.endpoints["/payload"]["POST"].as_strategy()
+    strategy = schema["/payload"]["POST"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -68,13 +68,13 @@ def test_global_body_hook(schema):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("custom_format")
+@pytest.mark.operations("custom_format")
 def test_schema_query_hook(schema, schema_url):
     @schema.hooks.register
     def before_generate_query(context, strategy):
         return strategy.filter(lambda x: x["id"].isdigit())
 
-    strategy = schema.endpoints["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -86,14 +86,14 @@ def test_schema_query_hook(schema, schema_url):
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.usefixtures("global_hook")
-@pytest.mark.endpoints("custom_format")
+@pytest.mark.operations("custom_format")
 def test_hooks_combination(schema, schema_url):
     @schema.hooks.register("before_generate_query")
     def extra(context, st):
-        assert context.endpoint == schema.endpoints["/custom_format"]["GET"]
+        assert context.operation == schema["/custom_format"]["GET"]
         return st.filter(lambda x: int(x["id"]) % 2 == 0)
 
-    strategy = schema.endpoints["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -160,7 +160,7 @@ def extra(context, st):
 @schema.parametrize()
 @settings(max_examples=1)
 def test(case):
-    assert case.endpoint.schema.hooks.get_all_by_name("before_generate_query")[0] is extra
+    assert case.operation.schema.hooks.get_all_by_name("before_generate_query")[0] is extra
     assert int(case.query["id"]) % 2 == 0
     """,
         schema=simple_openapi,
@@ -232,7 +232,7 @@ def test_local_dispatcher(schema, apply_first):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("custom_format")
+@pytest.mark.operations("custom_format")
 def test_multiple_hooks_per_spec(schema):
     @schema.hooks.register("before_generate_query")
     def first_hook(context, strategy):
@@ -244,7 +244,7 @@ def test_multiple_hooks_per_spec(schema):
 
     assert schema.hooks.get_all_by_name("before_generate_query") == [first_hook, second_hook]
 
-    strategy = schema.endpoints["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -256,14 +256,14 @@ def test_multiple_hooks_per_spec(schema):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("custom_format")
+@pytest.mark.operations("custom_format")
 def test_before_process_path_hook(schema):
     @schema.hooks.register
     def before_process_path(context, path, methods):
         methods["get"]["parameters"][0]["name"] = "foo"
         methods["get"]["parameters"][0]["enum"] = ["bar"]
 
-    strategy = schema.endpoints["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -292,7 +292,7 @@ def test_before_add_examples(testdir, simple_openapi):
 @schema.hooks.register
 def before_add_examples(context, examples):
     new = schemathesis.models.Case(
-        endpoint=context.endpoint,
+        operation=context.operation,
         query={"foo": "bar"}
     )
     examples.append(new)
@@ -305,7 +305,7 @@ def test_a(case):
 
 def another_hook(context, examples):
     new = schemathesis.models.Case(
-        endpoint=context.endpoint,
+        operation=context.operation,
         query={"spam": "baz"}
     )
     examples.append(new)
@@ -327,3 +327,12 @@ def test_b(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=2)
+
+
+def test_deprecated_attribute():
+    context = HookContext(1)
+    with pytest.warns(None) as records:
+        assert context.endpoint == context.operation == 1
+    assert str(records[0].message) == (
+        "Property `endpoint` is deprecated and will be removed in Schemathesis 4.0. Use `operation` instead."
+    )

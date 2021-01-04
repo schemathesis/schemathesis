@@ -6,7 +6,7 @@ an API to guide data generation towards certain pre-defined goals:
 
 - ``response_time``. Hypothesis will try to generate input that will more likely to have higher response time;
 
-To illustrate this feature, consider the following AioHTTP endpoint, that contains a hidden performance problem -
+To illustrate this feature, consider the following AioHTTP request handler, that contains a hidden performance problem -
 the more zeroes are in the input number, the slower it works, and if there are more than 10 zeroes, it will cause an internal
 server error:
 

@@ -27,30 +27,30 @@ def click_context():
 
 @pytest.fixture()
 def execution_context():
-    return schemathesis.cli.context.ExecutionContext([], endpoints_count=1)
+    return schemathesis.cli.context.ExecutionContext([], operations_count=1)
 
 
 @pytest.fixture
-def endpoint(swagger_20):
-    return models.Endpoint("/success", "GET", definition={}, base_url="http://127.0.0.1:8080", schema=swagger_20)
+def operation(swagger_20):
+    return models.APIOperation("/success", "GET", definition={}, base_url="http://127.0.0.1:8080", schema=swagger_20)
 
 
 @pytest.fixture()
-def results_set(endpoint):
+def results_set(operation):
     statistic = models.TestResult(
-        endpoint.method, endpoint.full_path, data_generation_method=DataGenerationMethod.default()
+        operation.method, operation.full_path, data_generation_method=DataGenerationMethod.default()
     )
     return models.TestResultSet([statistic])
 
 
 @pytest.fixture()
-def after_execution(results_set, endpoint, swagger_20):
+def after_execution(results_set, operation, swagger_20):
     return runner.events.AfterExecution.from_result(
         result=results_set.results[0],
         status=models.Status.success,
         hypothesis_output=[],
         elapsed_time=1.0,
-        endpoint=endpoint,
+        operation=operation,
     )
 
 
@@ -86,19 +86,19 @@ def test_handle_initialized(capsys, execution_context, results_set, swagger_20):
     assert lines[1].startswith("platform")
     # And current directory
     assert f"rootdir: {os.getcwd()}" in lines
-    # And number of collected endpoints
-    assert strip_style_win32(click.style("collected endpoints: 1", bold=True)) in lines
+    # And number of collected operations
+    assert strip_style_win32(click.style("Collected API operations: 1", bold=True)) in lines
     # And the output has an empty line in the end
     assert out.endswith("\n\n")
 
 
-def test_display_statistic(capsys, swagger_20, execution_context, endpoint):
+def test_display_statistic(capsys, swagger_20, execution_context, operation):
     # Given multiple successful & failed checks in a single test
     success = models.Check("not_a_server_error", models.Status.success)
     failure = models.Check("not_a_server_error", models.Status.failure)
     single_test_statistic = models.TestResult(
-        endpoint.method,
-        endpoint.full_path,
+        operation.method,
+        operation.full_path,
         DataGenerationMethod.default(),
         [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
     )
@@ -149,12 +149,12 @@ def test_get_percentage(position, length, expected):
 
 
 @pytest.mark.parametrize("current_line_length", (0, 20))
-@pytest.mark.parametrize("endpoints_processed, percentage", ((0, "[  0%]"), (1, "[100%]")))
+@pytest.mark.parametrize("operations_processed, percentage", ((0, "[  0%]"), (1, "[100%]")))
 def test_display_percentage(
-    capsys, execution_context, after_execution, swagger_20, current_line_length, endpoints_processed, percentage
+    capsys, execution_context, after_execution, swagger_20, current_line_length, operations_processed, percentage
 ):
     execution_context.current_line_length = current_line_length
-    execution_context.endpoints_processed = endpoints_processed
+    execution_context.operations_processed = operations_processed
     # When percentage is displayed
     default.display_percentage(execution_context, after_execution)
     out = capsys.readouterr().out
@@ -176,13 +176,13 @@ def test_display_hypothesis_output(capsys):
 
 
 @pytest.mark.parametrize("body", ({}, {"foo": "bar"}, None))
-def test_display_single_failure(capsys, swagger_20, execution_context, endpoint, body):
+def test_display_single_failure(capsys, swagger_20, execution_context, operation, body):
     # Given a single test result with multiple successful & failed checks
     success = models.Check("not_a_server_error", models.Status.success)
-    failure = models.Check("not_a_server_error", models.Status.failure, models.Case(endpoint, body=body))
+    failure = models.Check("not_a_server_error", models.Status.failure, models.Case(operation, body=body))
     test_statistic = models.TestResult(
-        endpoint.method,
-        endpoint.full_path,
+        operation.method,
+        operation.full_path,
         DataGenerationMethod.default(),
         [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
     )
@@ -190,7 +190,7 @@ def test_display_single_failure(capsys, swagger_20, execution_context, endpoint,
     default.display_failures_for_single_test(execution_context, SerializedTestResult.from_test_result(test_statistic))
     out = capsys.readouterr().out
     lines = out.split("\n")
-    # Then the endpoint name is displayed as a subsection
+    # Then the path is displayed as a subsection
     assert " GET: /v1/success " in lines[0]
     # And body should be displayed if it is not NOT_SET
     if body is NOT_SET:
@@ -215,7 +215,7 @@ def test_handle_after_execution(capsys, execution_context, after_execution, stat
     # When this event is handled
     default.handle_after_execution(execution_context, after_execution)
 
-    assert after_execution.current_endpoint == "GET /v1/success"
+    assert after_execution.current_operation == "GET /v1/success"
 
     lines = capsys.readouterr().out.strip().split("\n")
     symbol, percentage = lines[0].split()
@@ -228,18 +228,18 @@ def test_handle_after_execution(capsys, execution_context, after_execution, stat
 def test_after_execution_attributes(execution_context, after_execution):
     # When `handle_after_execution` is executed
     default.handle_after_execution(execution_context, after_execution)
-    # Then number of endpoints processed grows by 1
-    assert execution_context.endpoints_processed == 1
+    # Then number of operations processed grows by 1
+    assert execution_context.operations_processed == 1
     # And the line length grows by 1 symbol
     assert execution_context.current_line_length == 1
 
     default.handle_after_execution(execution_context, after_execution)
-    assert execution_context.endpoints_processed == 2
+    assert execution_context.operations_processed == 2
     assert execution_context.current_line_length == 2
 
 
 @pytest.mark.parametrize("show_errors_tracebacks", (True, False))
-def test_display_single_error(capsys, swagger_20, endpoint, execution_context, show_errors_tracebacks):
+def test_display_single_error(capsys, swagger_20, operation, execution_context, show_errors_tracebacks):
     # Given exception is multiline
     exception = None
     try:
@@ -247,7 +247,7 @@ def test_display_single_error(capsys, swagger_20, endpoint, execution_context, s
     except SyntaxError as exc:
         exception = exc
 
-    result = models.TestResult(endpoint.method, endpoint.path, DataGenerationMethod.default())
+    result = models.TestResult(operation.method, operation.path, DataGenerationMethod.default())
     result.add_error(exception)
     # When the related test result is displayed
     execution_context.show_errors_tracebacks = show_errors_tracebacks
@@ -273,9 +273,9 @@ def test_display_single_error(capsys, swagger_20, endpoint, execution_context, s
 def test_display_failures(swagger_20, capsys, execution_context, results_set, verbosity):
     execution_context.verbosity = verbosity
     # Given two test results - success and failure
-    endpoint = models.Endpoint("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)
-    failure = models.TestResult(endpoint.method, endpoint.full_path, DataGenerationMethod.default())
-    failure.add_failure("test", models.Case(endpoint), "Message")
+    operation = models.APIOperation("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)
+    failure = models.TestResult(operation.method, operation.full_path, DataGenerationMethod.default())
+    failure.add_failure("test", models.Case(operation), "Message")
     execution_context.results.append(SerializedTestResult.from_test_result(failure))
     results_set.append(failure)
     event = Finished.from_results(results_set, 1.0)
@@ -284,7 +284,7 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set, ve
     out = capsys.readouterr().out.strip()
     # Then section title is displayed
     assert " FAILURES " in out
-    # And endpoint with a failure is displayed as a subsection
+    # And operation with a failure is displayed as a subsection
     assert " GET: /v1/api/failure " in out
     assert "Message" in out
     assert "Run this Python code to reproduce this failure: " in out
@@ -294,9 +294,9 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set, ve
 @pytest.mark.parametrize("show_errors_tracebacks", (True, False))
 def test_display_errors(swagger_20, capsys, results_set, execution_context, show_errors_tracebacks):
     # Given two test results - success and error
-    endpoint = models.Endpoint("/api/error", "GET", {}, swagger_20)
-    error = models.TestResult(endpoint.method, endpoint.full_path, DataGenerationMethod.default(), seed=123)
-    error.add_error(ConnectionError("Connection refused!"), models.Case(endpoint, query={"a": 1}))
+    operation = models.APIOperation("/api/error", "GET", {}, swagger_20)
+    error = models.TestResult(operation.method, operation.full_path, DataGenerationMethod.default(), seed=123)
+    error.add_error(ConnectionError("Connection refused!"), models.Case(operation, query={"a": 1}))
     results_set.append(error)
     execution_context.results.append(SerializedTestResult.from_test_result(error))
     event = Finished.from_results(results_set, 1.0)
@@ -311,7 +311,7 @@ def test_display_errors(swagger_20, capsys, results_set, execution_context, show
     )
     # And help message is displayed only if tracebacks are not shown
     assert help_message_exists is not show_errors_tracebacks
-    # And endpoint with an error is displayed as a subsection
+    # And operation with an error is displayed as a subsection
     assert " GET: /v1/api/error " in out
     # And the error itself is displayed
     assert "ConnectionError: Connection refused!" in out

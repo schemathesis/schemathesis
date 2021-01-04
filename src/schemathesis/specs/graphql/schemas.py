@@ -11,7 +11,7 @@ from hypothesis_graphql import strategies as gql_st
 from ... import DataGenerationMethod
 from ...checks import not_a_server_error
 from ...hooks import HookDispatcher
-from ...models import Case, CheckFunction, Endpoint
+from ...models import APIOperation, Case, CheckFunction
 from ...schemas import BaseSchema
 from ...utils import GenericResponse
 
@@ -29,7 +29,7 @@ class GraphQLCase(Case):
         final_headers = self._get_headers(headers)
         return {
             "method": self.method,
-            "path": self.endpoint.schema.get_full_path(self.formatted_path),
+            "path": self.operation.schema.get_full_path(self.formatted_path),
             "headers": final_headers,
             "query_string": self.query,
             "json": {"query": self.body},
@@ -64,20 +64,20 @@ class GraphQLSchema(BaseSchema):
     def _get_base_path(self) -> str:
         return cast(str, urlsplit(self.location).path)
 
-    def get_all_endpoints(self) -> Generator[Endpoint, None, None]:
-        yield Endpoint(
+    def get_all_operations(self) -> Generator[APIOperation, None, None]:
+        yield APIOperation(
             base_url=self.get_base_url(), path=self.base_path, method="POST", schema=self, definition=None  # type: ignore
         )
 
     def get_case_strategy(
         self,
-        endpoint: Endpoint,
+        operation: APIOperation,
         hooks: Optional[HookDispatcher] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
-        constructor = partial(GraphQLCase, endpoint=endpoint)
+        constructor = partial(GraphQLCase, operation=operation)
         schema = graphql.build_client_schema(self.raw_schema)
         return st.builds(constructor, body=gql_st.query(schema))
 
-    def get_strategies_from_examples(self, endpoint: Endpoint) -> List[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
         return []

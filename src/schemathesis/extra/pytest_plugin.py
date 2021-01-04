@@ -15,7 +15,7 @@ from .. import DataGenerationMethod
 from .._hypothesis import create_test
 from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from ..exceptions import InvalidSchema
-from ..models import Endpoint
+from ..models import APIOperation
 from ..utils import is_schemathesis_test
 
 USE_FROM_PARENT = version.parse(pytest.__version__) >= version.parse("5.4.0")
@@ -59,13 +59,15 @@ class SchemathesisCase(PyCollector):
         self.given_kwargs = getattr(test_function, "_schemathesis_given_kwargs", {})
         super().__init__(*args, **kwargs)
 
-    def _get_test_name(self, endpoint: Endpoint, data_generation_method: DataGenerationMethod) -> str:
-        return f"{self.name}[{endpoint.method.upper()}:{endpoint.full_path}][{data_generation_method.as_short_name()}]"
+    def _get_test_name(self, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:
+        return (
+            f"{self.name}[{operation.method.upper()}:{operation.full_path}][{data_generation_method.as_short_name()}]"
+        )
 
     def _gen_items(
-        self, endpoint: Endpoint, data_generation_method: DataGenerationMethod
+        self, operation: APIOperation, data_generation_method: DataGenerationMethod
     ) -> Generator[SchemathesisFunction, None, None]:
-        """Generate all items for the given endpoint.
+        """Generate all tests for the given API operation.
 
         Could produce more than one test item if
         parametrization is applied via ``pytest.mark.parametrize`` or ``pytest_generate_tests``.
@@ -73,9 +75,9 @@ class SchemathesisCase(PyCollector):
         This implementation is based on the original one in pytest, but with slight adjustments
         to produce tests out of hypothesis ones.
         """
-        name = self._get_test_name(endpoint, data_generation_method)
+        name = self._get_test_name(operation, data_generation_method)
         funcobj = create_test(
-            endpoint=endpoint,
+            operation=operation,
             test=self.test_function,
             _given_args=self.given_args,
             _given_kwargs=self.given_kwargs,
@@ -138,13 +140,13 @@ class SchemathesisCase(PyCollector):
         return metafunc
 
     def collect(self) -> List[Function]:  # type: ignore
-        """Generate different test items for all endpoints available in the given schema."""
+        """Generate different test items for all API operations available in the given schema."""
         try:
             return [
                 item
                 for data_generation_method in self.schemathesis_case.data_generation_methods
-                for endpoint in self.schemathesis_case.get_all_endpoints()
-                for item in self._gen_items(endpoint, data_generation_method)
+                for operation in self.schemathesis_case.get_all_operations()
+                for item in self._gen_items(operation, data_generation_method)
             ]
         except Exception:
             pytest.fail("Error during collection")

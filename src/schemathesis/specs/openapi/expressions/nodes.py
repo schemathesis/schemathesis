@@ -58,7 +58,7 @@ class Method(Node):
     """A node for `$method` expression."""
 
     def evaluate(self, context: ExpressionContext) -> str:
-        return context.case.endpoint.method.upper()
+        return context.case.operation.method.upper()
 
 
 @attr.s(slots=True)  # pragma: no mutate

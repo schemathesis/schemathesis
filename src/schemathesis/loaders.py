@@ -31,7 +31,7 @@ def from_path(
     *,
     app: Any = None,
     validate_schema: bool = True,
-    skip_deprecated_endpoints: bool = False,
+    skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
 ) -> BaseOpenAPISchema:
@@ -47,7 +47,7 @@ def from_path(
             operation_id=operation_id,
             app=app,
             validate_schema=validate_schema,
-            skip_deprecated_endpoints=skip_deprecated_endpoints,
+            skip_deprecated_operations=skip_deprecated_operations,
             data_generation_methods=data_generation_methods,
             force_schema_version=force_schema_version,
         )
@@ -64,7 +64,7 @@ def from_uri(
     *,
     app: Any = None,
     validate_schema: bool = True,
-    skip_deprecated_endpoints: bool = False,
+    skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
     **kwargs: Any,
@@ -88,7 +88,7 @@ def from_uri(
         operation_id=operation_id,
         app=app,
         validate_schema=validate_schema,
-        skip_deprecated_endpoints=skip_deprecated_endpoints,
+        skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
     )
@@ -105,7 +105,7 @@ def from_file(
     *,
     app: Any = None,
     validate_schema: bool = True,
-    skip_deprecated_endpoints: bool = False,
+    skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
     **kwargs: Any,  # needed in the runner to have compatible API across all loaders
@@ -125,7 +125,7 @@ def from_file(
         operation_id=operation_id,
         app=app,
         validate_schema=validate_schema,
-        skip_deprecated_endpoints=skip_deprecated_endpoints,
+        skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
     )
@@ -142,7 +142,7 @@ def from_dict(
     *,
     app: Any = None,
     validate_schema: bool = True,
-    skip_deprecated_endpoints: bool = False,
+    skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
 ) -> BaseOpenAPISchema:
@@ -161,7 +161,7 @@ def from_dict(
             operation_id=operation_id,
             app=app,
             validate_schema=validate_schema,
-            skip_deprecated_endpoints=skip_deprecated_endpoints,
+            skip_deprecated_operations=skip_deprecated_operations,
             data_generation_methods=data_generation_methods,
         )
 
@@ -177,7 +177,7 @@ def from_dict(
             operation_id=operation_id,
             app=app,
             validate_schema=validate_schema,
-            skip_deprecated_endpoints=skip_deprecated_endpoints,
+            skip_deprecated_operations=skip_deprecated_operations,
             data_generation_methods=data_generation_methods,
         )
 
@@ -209,7 +209,7 @@ def from_pytest_fixture(
     tag: Optional[Filter] = NOT_SET,
     operation_id: Optional[Filter] = NOT_SET,
     validate_schema: bool = True,
-    skip_deprecated_endpoints: bool = False,
+    skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
 ) -> LazySchema:
     """Needed for a consistent library API."""
@@ -220,7 +220,7 @@ def from_pytest_fixture(
         tag=tag,
         operation_id=operation_id,
         validate_schema=validate_schema,
-        skip_deprecated_endpoints=skip_deprecated_endpoints,
+        skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
     )
 
@@ -234,7 +234,7 @@ def from_wsgi(
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
     validate_schema: bool = True,
-    skip_deprecated_endpoints: bool = False,
+    skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
     **kwargs: Any,
@@ -253,7 +253,7 @@ def from_wsgi(
         operation_id=operation_id,
         app=app,
         validate_schema=validate_schema,
-        skip_deprecated_endpoints=skip_deprecated_endpoints,
+        skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
     )
@@ -277,7 +277,7 @@ def from_aiohttp(
     operation_id: Optional[Filter] = None,
     *,
     validate_schema: bool = True,
-    skip_deprecated_endpoints: bool = False,
+    skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
     **kwargs: Any,
@@ -295,7 +295,7 @@ def from_aiohttp(
         tag=tag,
         operation_id=operation_id,
         validate_schema=validate_schema,
-        skip_deprecated_endpoints=skip_deprecated_endpoints,
+        skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
         **kwargs,
@@ -310,7 +310,7 @@ def from_asgi(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     validate_schema: bool = True,
-    skip_deprecated_endpoints: bool = False,
+    skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
     **kwargs: Any,
@@ -328,7 +328,7 @@ def from_asgi(
         tag=tag,
         app=app,
         validate_schema=validate_schema,
-        skip_deprecated_endpoints=skip_deprecated_endpoints,
+        skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
     )

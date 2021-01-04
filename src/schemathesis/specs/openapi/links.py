@@ -8,7 +8,7 @@ from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tup
 
 import attr
 
-from ...models import Case, Endpoint
+from ...models import APIOperation, Case
 from ...parameters import ParameterSet
 from ...stateful import Direction, ParsedData, StatefulTest
 from ...types import NotSet
@@ -19,26 +19,28 @@ from .constants import LOCATION_TO_CONTAINER
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
 class Link(StatefulTest):
-    endpoint: Endpoint = attr.ib()  # pragma: no mutate
+    operation: APIOperation = attr.ib()  # pragma: no mutate
     parameters: Dict[str, Any] = attr.ib()  # pragma: no mutate
     request_body: Any = attr.ib(default=NOT_SET)  # pragma: no mutate
 
     @classmethod
-    def from_definition(cls, name: str, definition: Dict[str, Dict[str, Any]], source_endpoint: Endpoint) -> "Link":
+    def from_definition(
+        cls, name: str, definition: Dict[str, Dict[str, Any]], source_operation: APIOperation
+    ) -> "Link":
         # Links can be behind a reference
-        _, definition = source_endpoint.schema.resolver.resolve_in_scope(  # type: ignore
-            definition, source_endpoint.definition.scope
+        _, definition = source_operation.schema.resolver.resolve_in_scope(  # type: ignore
+            definition, source_operation.definition.scope
         )
         if "operationId" in definition:
-            # source_endpoint.schema is `BaseOpenAPISchema` and has this method
-            endpoint = source_endpoint.schema.get_endpoint_by_operation_id(definition["operationId"])  # type: ignore
+            # source_operation.schema is `BaseOpenAPISchema` and has this method
+            operation = source_operation.schema.get_operation_by_id(definition["operationId"])  # type: ignore
         else:
-            endpoint = source_endpoint.schema.get_endpoint_by_reference(definition["operationRef"])  # type: ignore
+            operation = source_operation.schema.get_operation_by_reference(definition["operationRef"])  # type: ignore
         return cls(
-            # Pylint can't detect that endpoint is always defined at this point
-            # E.g. if there is no matching endpoint or no endpoints at all, then a ValueError will be risen
+            # Pylint can't detect that the API operation is always defined at this point
+            # E.g. if there is no matching operation or no operations at all, then a ValueError will be risen
             name=name,
-            endpoint=endpoint,  # pylint: disable=undefined-loop-variable
+            operation=operation,  # pylint: disable=undefined-loop-variable
             parameters=definition.get("parameters", {}),
             request_body=definition.get("requestBody", NOT_SET),  # `None` might be a valid value - `null`
         )
@@ -57,13 +59,13 @@ class Link(StatefulTest):
             body=expressions.evaluate(self.request_body, context),
         )
 
-    def make_endpoint(self, collected: List[ParsedData]) -> Endpoint:
-        """Create a modified version of the original endpoint with additional data merged in."""
+    def make_operation(self, collected: List[ParsedData]) -> APIOperation:
+        """Create a modified version of the original API operation with additional data merged in."""
         # We split the gathered data among all locations & store the original parameter
         containers = {
             location: {
                 parameter.name: {"options": [], "parameter": parameter}
-                for parameter in getattr(self.endpoint, container_name)
+                for parameter in getattr(self.operation, container_name)
             }
             for location, container_name in LOCATION_TO_CONTAINER.items()
         }
@@ -72,9 +74,9 @@ class Link(StatefulTest):
             for name, value in item.parameters.items():
                 container = self._get_container_by_parameter_name(name, containers)
                 container.append(value)
-        # These are the final `path_parameters`, `query`, and other endpoint components
+        # These are the final `path_parameters`, `query`, and other API operation components
         components: Dict[str, ParameterSet] = {
-            container_name: getattr(self.endpoint, container_name).__class__()
+            container_name: getattr(self.operation, container_name).__class__()
             for location, container_name in LOCATION_TO_CONTAINER.items()
         }
         # Here are all components that are filled with parameters
@@ -93,7 +95,7 @@ class Link(StatefulTest):
                 else:
                     # No options were gathered for this parameter - use the original one
                     components[LOCATION_TO_CONTAINER[location]].add(parameter_data["parameter"])
-        return self.endpoint.clone(**components)
+        return self.operation.clone(**components)
 
     def _get_container_by_parameter_name(self, full_name: str, templates: Dict[str, Dict[str, Dict[str, Any]]]) -> List:
         """Detect in what request part the parameters is defined."""
@@ -120,19 +122,19 @@ class Link(StatefulTest):
 
     def _unknown_parameter(self, name: str) -> NoReturn:
         raise ValueError(
-            f"Parameter `{name}` is not defined in endpoint {self.endpoint.method.upper()} {self.endpoint.path}"
+            f"Parameter `{name}` is not defined in API operation {self.operation.method.upper()} {self.operation.path}"
         )
 
 
-def get_links(response: GenericResponse, endpoint: Endpoint, field: str) -> Sequence[Link]:
+def get_links(response: GenericResponse, operation: APIOperation, field: str) -> Sequence[Link]:
     """Get `x-links` / `links` definitions from the schema."""
-    responses = endpoint.definition.resolved["responses"]
+    responses = operation.definition.resolved["responses"]
     if str(response.status_code) in responses:
         response_definition = responses[str(response.status_code)]
     else:
         response_definition = responses.get("default", {})
     links = response_definition.get(field, {})
-    return [Link.from_definition(name, definition, endpoint) for name, definition in links.items()]
+    return [Link.from_definition(name, definition, operation) for name, definition in links.items()]
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
@@ -145,7 +147,7 @@ class OpenAPILink(Direction):
     name: str = attr.ib()  # pragma: no mutate
     status_code: str = attr.ib()  # pragma: no mutate
     definition: Dict[str, Any] = attr.ib()  # pragma: no mutate
-    endpoint: Endpoint = attr.ib()  # pragma: no mutate
+    operation: APIOperation = attr.ib()  # pragma: no mutate
     parameters: List[Tuple[Optional[str], str, str]] = attr.ib(init=False)  # pragma: no mutate
     body: Union[Dict[str, Any], NotSet] = attr.ib(init=False)  # pragma: no mutate
 
@@ -170,8 +172,8 @@ class OpenAPILink(Direction):
             # but the schema has no parameters of such type at all.
             # Therefore the container is empty, otherwise it will be at least an empty object
             if container is None:
-                message = f"No such parameter in `{case.endpoint.verbose_name}`: `{name}`."
-                possibilities = [param.name for param in case.endpoint.definition.parameters]
+                message = f"No such parameter in `{case.operation.verbose_name}`: `{name}`."
+                possibilities = [param.name for param in case.operation.definition.parameters]
                 matches = get_close_matches(name, possibilities)
                 if matches:
                     message += f" Did you mean `{matches[0]}`?"
@@ -182,10 +184,10 @@ class OpenAPILink(Direction):
         if self.body is not NOT_SET:
             case.body = expressions.evaluate(self.body, context)
 
-    def get_target_endpoint(self) -> Endpoint:
+    def get_target_operation(self) -> APIOperation:
         if "operationId" in self.definition:
-            return self.endpoint.schema.get_endpoint_by_operation_id(self.definition["operationId"])  # type: ignore
-        return self.endpoint.schema.get_endpoint_by_reference(self.definition["operationRef"])  # type: ignore
+            return self.operation.schema.get_operation_by_id(self.definition["operationId"])  # type: ignore
+        return self.operation.schema.get_operation_by_reference(self.definition["operationRef"])  # type: ignore
 
 
 def get_container(case: Case, location: Optional[str], name: str) -> Optional[Dict[str, Any]]:
@@ -193,12 +195,12 @@ def get_container(case: Case, location: Optional[str], name: str) -> Optional[Di
     if location:
         container_name = LOCATION_TO_CONTAINER[location]
     else:
-        for param in case.endpoint.definition.parameters:
+        for param in case.operation.definition.parameters:
             if param.name == name:
                 container_name = LOCATION_TO_CONTAINER[param.location]
                 break
         else:
-            raise ValueError(f"Parameter `{name}` is not defined in endpoint `{case.endpoint.verbose_name}`")
+            raise ValueError(f"Parameter `{name}` is not defined in API operation `{case.operation.verbose_name}`")
     return getattr(case, container_name)
 
 
@@ -217,10 +219,10 @@ def normalize_parameter(parameter: str, expression: str) -> Tuple[Optional[str],
         return None, parameter, expression
 
 
-def get_all_links(endpoint: Endpoint) -> Generator[Tuple[str, OpenAPILink], None, None]:
-    for status_code, definition in endpoint.definition.resolved["responses"].items():
-        for name, link_definition in definition.get(endpoint.schema.links_field, {}).items():  # type: ignore
-            yield status_code, OpenAPILink(name, status_code, link_definition, endpoint)
+def get_all_links(operation: APIOperation) -> Generator[Tuple[str, OpenAPILink], None, None]:
+    for status_code, definition in operation.definition.resolved["responses"].items():
+        for name, link_definition in definition.get(operation.schema.links_field, {}).items():  # type: ignore
+            yield status_code, OpenAPILink(name, status_code, link_definition, operation)
 
 
 def add_link(
@@ -229,7 +231,7 @@ def add_link(
     parameters: Optional[Dict[str, str]],
     request_body: Any,
     status_code: Union[str, int],
-    target: Union[str, Endpoint],
+    target: Union[str, APIOperation],
 ) -> None:
     response = responses.setdefault(str(status_code), {})
     links_definition = response.setdefault(links_field, {})

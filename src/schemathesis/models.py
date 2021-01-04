@@ -39,7 +39,7 @@ from .exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .serializers import Serializer, SerializerContext
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
-from .utils import NOT_SET, GenericResponse, WSGIResponse, get_response_payload
+from .utils import NOT_SET, GenericResponse, WSGIResponse, deprecated_property, get_response_payload
 
 if TYPE_CHECKING:
     from .hooks import HookDispatcher
@@ -71,7 +71,7 @@ def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
 class Case:  # pylint: disable=too-many-public-methods
     """A single test case parameters."""
 
-    endpoint: "Endpoint" = attr.ib()  # pragma: no mutate
+    operation: "APIOperation" = attr.ib()  # pragma: no mutate
     path_parameters: Optional[PathParameters] = attr.ib(default=None)  # pragma: no mutate
     headers: Optional[Headers] = attr.ib(default=None)  # pragma: no mutate
     cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
@@ -97,25 +97,29 @@ class Case:  # pylint: disable=too-many-public-methods
                 parts.extend((name, "=", repr(value)))
         return "".join(parts) + ")"
 
+    @deprecated_property(removed_in="4.0", replacement="operation")
+    def endpoint(self) -> "APIOperation":
+        return self.operation
+
     @property
     def path(self) -> str:
-        return self.endpoint.path
+        return self.operation.path
 
     @property
     def full_path(self) -> str:
-        return self.endpoint.full_path
+        return self.operation.full_path
 
     @property
     def method(self) -> str:
-        return self.endpoint.method.upper()
+        return self.operation.method.upper()
 
     @property
     def base_url(self) -> Optional[str]:
-        return self.endpoint.base_url
+        return self.operation.base_url
 
     @property
     def app(self) -> Any:
-        return self.endpoint.app
+        return self.operation.app
 
     def set_source(self, response: GenericResponse, case: "Case") -> None:
         self.source = CaseSource(case=case, response=response)
@@ -296,7 +300,7 @@ class Case:  # pylint: disable=too-many-public-methods
             extra = {}
         return {
             "method": self.method,
-            "path": self.endpoint.schema.get_full_path(self.formatted_path),
+            "path": self.operation.schema.get_full_path(self.formatted_path),
             "headers": final_headers,
             "query_string": self.query,
             **extra,
@@ -351,7 +355,7 @@ class Case:  # pylint: disable=too-many-public-methods
             except CheckFailed as exc:
                 errors.append(exc)
         if errors:
-            exception_cls = get_grouped_exception(self.endpoint.verbose_name, *errors)
+            exception_cls = get_grouped_exception(self.operation.verbose_name, *errors)
             formatted_errors = "\n\n".join(f"{idx}. {error.args[0]}" for idx, error in enumerate(errors, 1))
             code = self.get_code_to_reproduce(request=response.request)
             payload = get_response_payload(response)
@@ -372,7 +376,7 @@ class Case:  # pylint: disable=too-many-public-methods
         self.validate_response(response, checks)
 
     def get_full_url(self) -> str:
-        """Make a full URL to the current endpoint, including query parameters."""
+        """Make a full URL to the current API operation, including query parameters."""
         base_url = self.base_url or "http://localhost"
         kwargs = self.as_requests_kwargs(base_url)
         request = requests.Request(**kwargs)
@@ -381,7 +385,7 @@ class Case:  # pylint: disable=too-many-public-methods
 
     def partial_deepcopy(self) -> "Case":
         return self.__class__(
-            endpoint=self.endpoint.partial_deepcopy(),
+            operation=self.operation.partial_deepcopy(),
             path_parameters=deepcopy(self.path_parameters),
             headers=deepcopy(self.headers),
             cookies=deepcopy(self.cookies),
@@ -404,10 +408,10 @@ def cookie_handler(client: werkzeug.Client, cookies: Optional[Cookies]) -> Gener
 
 
 @attr.s(slots=True)  # pragma: no mutate
-class EndpointDefinition:
-    """A wrapper to store not resolved endpoint definitions.
+class OperationDefinition:
+    """A wrapper to store not resolved API operation definitions.
 
-    To prevent recursion errors we need to store definitions without resolving references. But endpoint definitions
+    To prevent recursion errors we need to store definitions without resolving references. But operation definitions
     itself can be behind a reference (when there is a ``$ref`` in ``paths`` values), therefore we need to store this
     scope change to have a proper reference resolving later.
     """
@@ -422,15 +426,15 @@ P = TypeVar("P", bound=Parameter)
 
 
 @attr.s  # pragma: no mutate
-class Endpoint(Generic[P]):
-    """A container that could be used for test cases generation."""
+class APIOperation(Generic[P]):
+    """A single operation defined in an API."""
 
     # `path` does not contain `basePath`
     # Example <scheme>://<host>/<basePath>/users - "/users" is path
     # https://swagger.io/docs/specification/2-0/api-host-and-base-path/
     path: str = attr.ib()  # pragma: no mutate
     method: str = attr.ib()  # pragma: no mutate
-    definition: EndpointDefinition = attr.ib(repr=False)  # pragma: no mutate
+    definition: OperationDefinition = attr.ib(repr=False)  # pragma: no mutate
     schema: "BaseSchema" = attr.ib()  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
@@ -453,9 +457,9 @@ class Endpoint(Generic[P]):
         return self.schema.get_links(self)
 
     def add_parameter(self, parameter: P) -> None:
-        """Add a new processed parameter to an endpoint.
+        """Add a new processed parameter to an API operation.
 
-        :param parameter: A parameter that will be used with this endpoint.
+        :param parameter: A parameter that will be used with this operation.
         :rtype: None
         """
         lookup_table = {
@@ -467,8 +471,8 @@ class Endpoint(Generic[P]):
         }
         # If the parameter has a typo, then by default, there will be an error from `jsonschema` earlier.
         # But if the user wants to skip schema validation, we choose to ignore a malformed parameter.
-        # In this case, we still might generate some tests for an endpoint, but without this parameter, which is better
-        # than skip the whole endpoint from testing.
+        # In this case, we still might generate some tests for an API operation, but without this parameter,
+        # which is better than skip the whole operation from testing.
         if parameter.location in lookup_table:
             container = lookup_table[parameter.location]
             container.add(parameter)
@@ -481,7 +485,7 @@ class Endpoint(Generic[P]):
         return self.schema.get_case_strategy(self, hooks, data_generation_method)
 
     def get_strategies_from_examples(self) -> List[SearchStrategy[Case]]:
-        """Get examples from the endpoint."""
+        """Get examples from the API operation."""
         return self.schema.get_strategies_from_examples(self)
 
     def get_stateful_tests(self, response: GenericResponse, stateful: Optional["Stateful"]) -> Sequence["StatefulTest"]:
@@ -501,7 +505,7 @@ class Endpoint(Generic[P]):
     def get_request_payload_content_types(self) -> List[str]:
         return self.schema.get_request_payload_content_types(self)
 
-    def partial_deepcopy(self) -> "Endpoint":
+    def partial_deepcopy(self) -> "APIOperation":
         return self.__class__(
             path=self.path,  # string, immutable
             method=self.method,  # string, immutable
@@ -516,8 +520,8 @@ class Endpoint(Generic[P]):
             body=deepcopy(self.body),
         )
 
-    def clone(self, **components: Any) -> "Endpoint":
-        """Create a new instance of this endpoint with updated components."""
+    def clone(self, **components: Any) -> "APIOperation":
+        """Create a new instance of this API operation with updated components."""
         return self.__class__(
             path=self.path,
             method=self.method,
@@ -542,7 +546,7 @@ class Endpoint(Generic[P]):
         body: Union[Body, NotSet] = NOT_SET,
     ) -> Case:
         return Case(
-            endpoint=self,
+            operation=self,
             path_parameters=path_parameters,
             headers=headers,
             cookies=cookies,
@@ -564,6 +568,10 @@ class Endpoint(Generic[P]):
             return True
         except CheckFailed:
             return False
+
+
+# backward-compatibility
+Endpoint = APIOperation
 
 
 class Status(IntEnum):

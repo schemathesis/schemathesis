@@ -226,21 +226,21 @@ def _assert_parameter(schema, schema_spec, location, expected=None):
     # When security definition is defined as "apiKey"
     schema = schemathesis.from_dict(schema)
     if schema_spec == "swagger":
-        endpoint = schema["/users"]["get"]
+        operation = schema["/users"]["get"]
         expected = (
             expected
             if expected is not None
             else [{"in": location, "name": "api_key", "type": "string", "required": True}]
         )
     else:
-        endpoint = schema["/query"]["get"]
+        operation = schema["/query"]["get"]
         expected = (
             expected
             if expected is not None
             else [{"in": location, "name": "api_key", "schema": {"type": "string"}, "required": True}]
         )
     parameters = schema.security.get_security_definitions_as_parameters(
-        schema.raw_schema, endpoint, schema.resolver, location
+        schema.raw_schema, operation, schema.resolver, location
     )
     # Then it should be presented as a "string" parameter
     assert parameters == expected
@@ -268,7 +268,7 @@ def overridden_security_schema(schema, schema_spec):
 
 
 def test_security_definitions_override(testdir, overridden_security_schema, location):
-    # When "security" is an empty list in the endpoint definition
+    # When "security" is an empty list in the API operation definition
     testdir.make_test(
         """
 @schema.parametrize()
@@ -415,7 +415,7 @@ def test_(case):
 
 
 def test_json_media_type(testdir):
-    # When endpoint expects a JSON-compatible media type
+    # When API operation expects a JSON-compatible media type
     testdir.make_test(
         """
 @settings(max_examples=10, deadline=None)
@@ -479,9 +479,9 @@ def test_nullable_body_behind_a_reference(empty_open_api_2_schema):
     }
     # Then it should be properly collected
     schema = schemathesis.from_dict(empty_open_api_2_schema)
-    endpoint = schema["/payload"]["POST"]
+    operation = schema["/payload"]["POST"]
     # And its definition is not transformed to JSON Schema
-    assert endpoint.body[0].definition == {
+    assert operation.body[0].definition == {
         "in": "body",
         "name": "payload",
         "required": True,
@@ -530,9 +530,9 @@ def api_schema(request, openapi_version):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.endpoints("payload")
+@pytest.mark.operations("payload")
 def test_null_body(testdir, api_schema):
-    # When endpoint expects `null` as payload
+    # When API operation expects `null` as payload
 
     @given(case=api_schema["/payload"]["POST"].as_strategy())
     @settings(max_examples=5)

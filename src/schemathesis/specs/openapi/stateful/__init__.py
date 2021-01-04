@@ -13,11 +13,11 @@ from ..links import OpenAPILink
 from . import links
 
 if TYPE_CHECKING:
-    from ....models import Case, Endpoint
+    from ....models import APIOperation, Case
     from ..schemas import BaseOpenAPISchema
 
 
-EndpointConnections = Dict[str, List[SearchStrategy[Tuple[StepResult, OpenAPILink]]]]
+APIOperationConnections = Dict[str, List[SearchStrategy[Tuple[StepResult, OpenAPILink]]]]
 
 
 class OpenAPIStateMachine(APIStateMachine):
@@ -30,12 +30,12 @@ class OpenAPIStateMachine(APIStateMachine):
 def create_state_machine(schema: "BaseOpenAPISchema") -> Type[APIStateMachine]:
     """Create a state machine class.
 
-    This state machine will contain transitions that connect some endpoints' outputs with other endpoints' inputs.
+    This state machine will contain transitions that connect some operations' outputs with other operations' inputs.
     """
     bundles = init_bundles(schema)
-    connections: EndpointConnections = defaultdict(list)
-    for endpoint in schema.get_all_endpoints():
-        links.apply(endpoint, bundles, connections)
+    connections: APIOperationConnections = defaultdict(list)
+    for operation in schema.get_all_operations():
+        links.apply(operation, bundles, connections)
 
     rules = make_all_rules(schema, bundles, connections)
 
@@ -44,37 +44,39 @@ def create_state_machine(schema: "BaseOpenAPISchema") -> Type[APIStateMachine]:
 
 
 def init_bundles(schema: "BaseOpenAPISchema") -> Dict[str, CaseInsensitiveDict]:
-    """Create bundles for all endpoints in the given schema.
+    """Create bundles for all operations in the given schema.
 
-    Each endpoint has a bundle that stores all responses from that endpoint.
-    We need to create bundles first, so they can be referred when building connections between endpoints.
+    Each API operation has a bundle that stores all responses from that operation.
+    We need to create bundles first, so they can be referred when building connections between operations.
     """
     output: Dict[str, CaseInsensitiveDict] = {}
-    for endpoint in schema.get_all_endpoints():
-        output.setdefault(endpoint.path, CaseInsensitiveDict())
-        output[endpoint.path][endpoint.method.upper()] = Bundle(endpoint.verbose_name)  # type: ignore
+    for operation in schema.get_all_operations():
+        output.setdefault(operation.path, CaseInsensitiveDict())
+        output[operation.path][operation.method.upper()] = Bundle(operation.verbose_name)  # type: ignore
     return output
 
 
 def make_all_rules(
-    schema: "BaseOpenAPISchema", bundles: Dict[str, CaseInsensitiveDict], connections: EndpointConnections
+    schema: "BaseOpenAPISchema", bundles: Dict[str, CaseInsensitiveDict], connections: APIOperationConnections
 ) -> Dict[str, Rule]:
-    """Create rules for all endpoints, based on the provided connections."""
+    """Create rules for all API operations, based on the provided connections."""
     return {
-        f"rule {endpoint.verbose_name} {idx}": new
-        for endpoint in schema.get_all_endpoints()
-        for idx, new in enumerate(make_rules(endpoint, bundles[endpoint.path][endpoint.method.upper()], connections))
+        f"rule {operation.verbose_name} {idx}": new
+        for operation in schema.get_all_operations()
+        for idx, new in enumerate(make_rules(operation, bundles[operation.path][operation.method.upper()], connections))
     }
 
 
-def make_rules(endpoint: "Endpoint", bundle: Bundle, connections: EndpointConnections) -> Generator[Rule, None, None]:
-    """Create a rule for an endpoint."""
+def make_rules(
+    operation: "APIOperation", bundle: Bundle, connections: APIOperationConnections
+) -> Generator[Rule, None, None]:
+    """Create a rule for an API operation."""
 
     def _make_rule(previous: SearchStrategy) -> Rule:
-        decorator = rule(target=bundle, previous=previous, case=endpoint.as_strategy())  # type: ignore
+        decorator = rule(target=bundle, previous=previous, case=operation.as_strategy())  # type: ignore
         return decorator(APIStateMachine._step)
 
-    previous_strategies = connections.get(endpoint.verbose_name)
+    previous_strategies = connections.get(operation.verbose_name)
     if previous_strategies is not None:
         yield _make_rule(_combine_strategies(previous_strategies))
     yield _make_rule(none())

@@ -2,8 +2,8 @@
 Stateful testing
 ****************
 
-By default, Schemathesis takes all endpoints from your API and tests them separately by passing random input data and validating responses.
-It works great when you need to quickly verify that your endpoints properly validate input and respond in conformance with the API schema.
+By default, Schemathesis takes all operations from your API and tests them separately by passing random input data and validating responses.
+It works great when you need to quickly verify that your operations properly validate input and respond in conformance with the API schema.
 
 With stateful testing, Schemathesis combines multiple API calls into a single test scenario and tries to find call sequences that fail.
 
@@ -12,7 +12,7 @@ Why is it useful?
 
 This approach allows your tests to reach deeper into your application logic and cover scenarios that are impossible to cover with independent tests.
 You may compare Schemathesis's stateful and non-stateful testing the same way you would compare integration and unit tests.
-Stateful testing checks how multiple API endpoints work in combination.
+Stateful testing checks how multiple API operations work in combination.
 
 It solves the problem when your application produces a high number of "404 Not Found" responses during testing due to randomness in the input data.
 
@@ -22,7 +22,7 @@ The more connections you have, the deeper tests can reach.
 How to specify connections?
 ---------------------------
 
-To specify how different endpoints depend on each other, we use a special syntax from the Open API specification - `Open API links <https://swagger.io/docs/specification/links/>`_.
+To specify how different operations depend on each other, we use a special syntax from the Open API specification - `Open API links <https://swagger.io/docs/specification/links/>`_.
 It describes how the output from one operation can be used as input for other operations.
 To define such connections, you need to extend your API schema with the ``links`` keyword:
 
@@ -66,7 +66,7 @@ In this schema, you define that the ``id`` value returned by the ``POST /users``
 Schemathesis will use this connection during ``GET /users/{userId}`` parameters generation - everything that is not defined by links will be generated randomly.
 
 If you don't want to modify your schema source, :func:`add_link <schemathesis.specs.openapi.schemas.BaseOpenAPISchema.add_link>`
-allows you to define links between a pair of endpoints programmatically.
+allows you to define links between a pair of operations programmatically.
 
 .. automethod:: schemathesis.specs.openapi.schemas.BaseOpenAPISchema.add_link(source, target, status_code, parameters=None, request_body=None) -> None
 
@@ -131,16 +131,16 @@ How it works behind the scenes?
 The whole concept consists of two important stages.
 
 - State machine creation:
-    - Each endpoint has a separate bundle where Schemathesis put all responses received from that endpoint;
+    - Each API operation has a separate bundle where Schemathesis put all responses received from that operation;
     - All links represent transitions of the state machine. Each one has a pre-condition - there should already be a response
       with the proper status code;
-    - If an endpoint has no links, then Schemathesis creates a transition without a pre-condition and generates random
+    - If an operation has no links, then Schemathesis creates a transition without a pre-condition and generates random
       data as input.
 - Running scenarios:
-    - Each scenario step accepts a freshly generated random test case and randomly chosen data from the dependent endpoint.
-      This data might be missing if there are no links to the current endpoint;
+    - Each scenario step accepts a freshly generated random test case and randomly chosen data from the dependent operation.
+      This data might be missing if there are no links to the current operation;
     - If there is data, then the generated case is updated according to the defined link rules;
-    - The resulting test case is sent to the current endpoint then its response is validated and stored for future use.
+    - The resulting test case is sent to the current operation then its response is validated and stored for future use.
 
 As a result, Schemathesis can run arbitrary API call sequences and combine data generation with reusing responses.
 
@@ -286,7 +286,7 @@ The best way to do so is by using the Hypothesis's ``initialize`` decorator:
         def init_user(self, case):
             return self.step(case)
 
-This rule will use the ``POST /users/`` endpoint strategy and generate random data as input and store the result in
+This rule will use the ``POST /users/`` operation strategy and generate random data as input and store the result in
 a special bundle, where it will be used for dependent API calls. The state machine will run this rule at the beginning of any test scenario.
 
 .. important::
@@ -294,8 +294,8 @@ a special bundle, where it will be used for dependent API calls. The state machi
     If you have multiple rules, they will run in arbitrary order, which may not be desired.
     If you need to run initialization code always at the beginning of each test scenario, use the :meth:`setup` hook instead.
 
-If you need more control and you'd like to provide the whole payload to your endpoint, then you can do it either by modifying
-the generated case manually or by creating a new one via the :func:`Endpoint.make_case` function:
+If you need more control and you'd like to provide the whole payload to your API operation, then you can do it either by modifying
+the generated case manually or by creating a new one via the :func:`APIOperation.make_case` function:
 
 .. code-block:: python
 

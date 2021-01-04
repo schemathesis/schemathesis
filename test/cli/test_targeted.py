@@ -27,7 +27,7 @@ def new_target(testdir, cli):
 
 
 @pytest.mark.usefixtures("new_target")
-@pytest.mark.endpoints("success")
+@pytest.mark.operations("success")
 def test_custom_target(testdir, cli, new_target, openapi3_schema_url):
     # When `--pre-run` hook is passed to the CLI call
     # And it contains registering a new target

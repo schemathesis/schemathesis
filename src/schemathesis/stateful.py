@@ -9,7 +9,7 @@ from requests.structures import CaseInsensitiveDict
 from starlette.applications import Starlette
 
 from .constants import DataGenerationMethod
-from .models import Case, CheckFunction, Endpoint
+from .models import APIOperation, Case, CheckFunction
 from .utils import NOT_SET, GenericResponse
 
 if TYPE_CHECKING:
@@ -24,7 +24,7 @@ class Stateful(enum.Enum):
 class ParsedData:
     """A structure that holds information parsed from a test outcome.
 
-    It is used later to create a new version of an endpoint that will reuse this data.
+    It is used later to create a new version of an API operation that will reuse this data.
     """
 
     parameters: Dict[str, Any] = attr.ib()  # pragma: no mutate
@@ -52,7 +52,7 @@ class StatefulTest:
     def parse(self, case: Case, response: GenericResponse) -> ParsedData:
         raise NotImplementedError
 
-    def make_endpoint(self, collected: List[ParsedData]) -> Endpoint:
+    def make_operation(self, collected: List[ParsedData]) -> APIOperation:
         raise NotImplementedError
 
 
@@ -63,8 +63,8 @@ class StatefulData:
     stateful_test: StatefulTest = attr.ib()  # pragma: no mutate
     container: List[ParsedData] = attr.ib(factory=list)  # pragma: no mutate
 
-    def make_endpoint(self) -> Endpoint:
-        return self.stateful_test.make_endpoint(self.container)
+    def make_operation(self) -> APIOperation:
+        return self.stateful_test.make_operation(self.container)
 
     def store(self, case: Case, response: GenericResponse) -> None:
         """Parse and store data for a stateful test."""
@@ -80,26 +80,26 @@ class Feedback:
     """
 
     stateful: Optional[Stateful] = attr.ib()  # pragma: no mutate
-    endpoint: Endpoint = attr.ib(repr=False)  # pragma: no mutate
+    operation: APIOperation = attr.ib(repr=False)  # pragma: no mutate
     stateful_tests: Dict[str, StatefulData] = attr.ib(factory=dict, repr=False)  # pragma: no mutate
 
     def add_test_case(self, case: Case, response: GenericResponse) -> None:
         """Store test data to reuse it in the future additional tests."""
-        for stateful_test in case.endpoint.get_stateful_tests(response, self.stateful):
+        for stateful_test in case.operation.get_stateful_tests(response, self.stateful):
             data = self.stateful_tests.setdefault(stateful_test.name, StatefulData(stateful_test))
             data.store(case, response)
 
     def get_stateful_tests(
         self, test: Callable, settings: Optional[hypothesis.settings], seed: Optional[int]
-    ) -> Generator[Tuple[Endpoint, DataGenerationMethod, Callable], None, None]:
+    ) -> Generator[Tuple[APIOperation, DataGenerationMethod, Callable], None, None]:
         """Generate additional tests that use data from the previous ones."""
         from ._hypothesis import create_test  # pylint: disable=import-outside-toplevel
 
         for data in self.stateful_tests.values():
-            endpoint = data.make_endpoint()
-            for data_generation_method in endpoint.schema.data_generation_methods:
-                yield endpoint, data_generation_method, create_test(
-                    endpoint=endpoint,
+            operation = data.make_operation()
+            for data_generation_method in operation.schema.data_generation_methods:
+                yield operation, data_generation_method, create_test(
+                    operation=operation,
                     test=test,
                     settings=settings,
                     seed=seed,
@@ -116,20 +116,20 @@ class StepResult:
 class Direction:
     name: str
     status_code: str
-    endpoint: Endpoint
+    operation: APIOperation
 
     def set_data(self, case: Case, **kwargs: Any) -> None:
         raise NotImplementedError
 
 
 def _print_case(case: Case) -> str:
-    endpoint = f"state.schema['{case.endpoint.path}']['{case.endpoint.method.upper()}']"
+    operation = f"state.schema['{case.operation.path}']['{case.operation.method.upper()}']"
     data = [
         f"{name}={getattr(case, name)}"
         for name in ("path_parameters", "headers", "cookies", "query", "body")
         if getattr(case, name) not in (None, NOT_SET)
     ]
-    return f"{endpoint}.make_case({', '.join(data)})"
+    return f"{operation}.make_case({', '.join(data)})"
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
@@ -139,8 +139,8 @@ class _DirectionWrapper:
     direction: Direction = attr.ib()  # pragma: no mutate
 
     def __repr__(self) -> str:
-        path = self.direction.endpoint.path
-        method = self.direction.endpoint.method.upper()
+        path = self.direction.operation.path
+        method = self.direction.operation.method.upper()
         return f"state.schema['{path}']['{method}'].links['{self.direction.status_code}']['{self.direction.name}']"
 
 
@@ -193,7 +193,7 @@ class APIStateMachine(RuleBasedStateMachine):
     def step(self, case: Case, previous: Optional[Tuple[StepResult, Direction]] = None) -> StepResult:
         """A single state machine step.
 
-        :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
         :param previous: Optional result from the previous step and the direction in which this step should be done.
 
         Schemathesis prepares data, makes a call and validates the received response.
@@ -212,7 +212,7 @@ class APIStateMachine(RuleBasedStateMachine):
     def before_call(self, case: Case) -> None:
         """Hook method for modifying the case data before making a request.
 
-        :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
 
         Use it if you want to inject static data, for example,
         a query parameter that should always be used in API calls:
@@ -240,7 +240,7 @@ class APIStateMachine(RuleBasedStateMachine):
         """Hook method for additional actions with case or response instances.
 
         :param response: Response from the application under test.
-        :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
 
         For example, you can log all response statuses by using this hook:
 
@@ -269,9 +269,9 @@ class APIStateMachine(RuleBasedStateMachine):
         """
 
     def call(self, case: Case, **kwargs: Any) -> GenericResponse:
-        """Make a request to an endpoint.
+        """Make a request to the API.
 
-        :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
         :param kwargs: Keyword arguments that will be passed to the appropriate ``case.call_*`` method.
         :return: Response from the application under test.
 
@@ -289,7 +289,7 @@ class APIStateMachine(RuleBasedStateMachine):
 
         Mostly they are proxied to the :func:`requests.request` call.
 
-        :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
 
         .. code-block:: python
 
@@ -315,7 +315,7 @@ class APIStateMachine(RuleBasedStateMachine):
         """Validate an API response.
 
         :param response: Response from the application under test.
-        :param Case case: Generated test case data that should be sent in an API call to the tested endpoint.
+        :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
         :param additional_checks: A list of checks that will be run together with the default ones.
         :raises CheckFailed: If any of the supplied checks failed.
 

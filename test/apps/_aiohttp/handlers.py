@@ -98,7 +98,7 @@ async def slow(request: web.Request) -> web.Response:
 
 async def performance(request: web.Request) -> web.Response:
     # Emulate bad performance on certain input type
-    # This endpoint is for Schemathesis targeted testing, the failure should be discovered
+    # This API operation is for Schemathesis targeted testing, the failure should be discovered
     decoded = await request.json()
     number = str(decoded).count("0")
     if number > 0:
