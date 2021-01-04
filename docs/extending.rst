@@ -139,7 +139,7 @@ With this hook, you can add additional test cases that will be executed in Hypot
         examples: List[Case],
     ) -> None:
         examples.append(
-            Case(endpoint=context.operation, query={"foo": "bar"})
+            Case(operation=context.operation, query={"foo": "bar"})
         )
 
 To load CLI hooks, you need to put them into a separate module and pass an importable path in the ``--pre-run`` CLI option.
@@ -209,8 +209,8 @@ an additional test case if the original case received a successful response from
             # original case produced non-2xx response, do not create additional test case
             return None
 
-Note: A partial deep copy of the ``Case`` object is passed to each ``add_case`` hook. ``Case.endpoint.app`` is a reference to the original ``app``, 
-and ``Case.endpoint.schema`` is a shallow copy, so changes to these fields will be reflected in other tests.
+Note: A partial deep copy of the ``Case`` object is passed to each ``add_case`` hook. ``Case.operation.app`` is a reference to the original ``app``,
+and ``Case.operation.schema`` is a shallow copy, so changes to these fields will be reflected in other tests.
 
 Custom string strategies
 ------------------------

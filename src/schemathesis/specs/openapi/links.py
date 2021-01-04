@@ -170,8 +170,8 @@ class OpenAPILink(Direction):
             # but the schema has no parameters of such type at all.
             # Therefore the container is empty, otherwise it will be at least an empty object
             if container is None:
-                message = f"No such parameter in `{case.endpoint.verbose_name}`: `{name}`."
-                possibilities = [param.name for param in case.endpoint.definition.parameters]
+                message = f"No such parameter in `{case.operation.verbose_name}`: `{name}`."
+                possibilities = [param.name for param in case.operation.definition.parameters]
                 matches = get_close_matches(name, possibilities)
                 if matches:
                     message += f" Did you mean `{matches[0]}`?"
@@ -193,12 +193,12 @@ def get_container(case: Case, location: Optional[str], name: str) -> Optional[Di
     if location:
         container_name = LOCATION_TO_CONTAINER[location]
     else:
-        for param in case.endpoint.definition.parameters:
+        for param in case.operation.definition.parameters:
             if param.name == name:
                 container_name = LOCATION_TO_CONTAINER[param.location]
                 break
         else:
-            raise ValueError(f"Parameter `{name}` is not defined in API operation `{case.endpoint.verbose_name}`")
+            raise ValueError(f"Parameter `{name}` is not defined in API operation `{case.operation.verbose_name}`")
     return getattr(case, container_name)
 
 

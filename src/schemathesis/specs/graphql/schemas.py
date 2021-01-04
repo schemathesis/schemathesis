@@ -29,7 +29,7 @@ class GraphQLCase(Case):
         final_headers = self._get_headers(headers)
         return {
             "method": self.method,
-            "path": self.endpoint.schema.get_full_path(self.formatted_path),
+            "path": self.operation.schema.get_full_path(self.formatted_path),
             "headers": final_headers,
             "query_string": self.query,
             "json": {"query": self.body},
@@ -75,7 +75,7 @@ class GraphQLSchema(BaseSchema):
         hooks: Optional[HookDispatcher] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
-        constructor = partial(GraphQLCase, endpoint=endpoint)
+        constructor = partial(GraphQLCase, operation=endpoint)
         schema = graphql.build_client_schema(self.raw_schema)
         return st.builds(constructor, body=gql_st.query(schema))
 

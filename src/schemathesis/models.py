@@ -39,7 +39,7 @@ from .exceptions import CheckFailed, InvalidSchema, get_grouped_exception
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .serializers import Serializer, SerializerContext
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
-from .utils import NOT_SET, GenericResponse, WSGIResponse, get_response_payload
+from .utils import NOT_SET, GenericResponse, WSGIResponse, deprecated_property, get_response_payload
 
 if TYPE_CHECKING:
     from .hooks import HookDispatcher
@@ -71,7 +71,7 @@ def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
 class Case:  # pylint: disable=too-many-public-methods
     """A single test case parameters."""
 
-    endpoint: "APIOperation" = attr.ib()  # pragma: no mutate
+    operation: "APIOperation" = attr.ib()  # pragma: no mutate
     path_parameters: Optional[PathParameters] = attr.ib(default=None)  # pragma: no mutate
     headers: Optional[Headers] = attr.ib(default=None)  # pragma: no mutate
     cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
@@ -97,25 +97,29 @@ class Case:  # pylint: disable=too-many-public-methods
                 parts.extend((name, "=", repr(value)))
         return "".join(parts) + ")"
 
+    @deprecated_property(removed_in="4.0", replacement="operation")
+    def endpoint(self) -> "APIOperation":
+        return self.operation
+
     @property
     def path(self) -> str:
-        return self.endpoint.path
+        return self.operation.path
 
     @property
     def full_path(self) -> str:
-        return self.endpoint.full_path
+        return self.operation.full_path
 
     @property
     def method(self) -> str:
-        return self.endpoint.method.upper()
+        return self.operation.method.upper()
 
     @property
     def base_url(self) -> Optional[str]:
-        return self.endpoint.base_url
+        return self.operation.base_url
 
     @property
     def app(self) -> Any:
-        return self.endpoint.app
+        return self.operation.app
 
     def set_source(self, response: GenericResponse, case: "Case") -> None:
         self.source = CaseSource(case=case, response=response)
@@ -296,7 +300,7 @@ class Case:  # pylint: disable=too-many-public-methods
             extra = {}
         return {
             "method": self.method,
-            "path": self.endpoint.schema.get_full_path(self.formatted_path),
+            "path": self.operation.schema.get_full_path(self.formatted_path),
             "headers": final_headers,
             "query_string": self.query,
             **extra,
@@ -351,7 +355,7 @@ class Case:  # pylint: disable=too-many-public-methods
             except CheckFailed as exc:
                 errors.append(exc)
         if errors:
-            exception_cls = get_grouped_exception(self.endpoint.verbose_name, *errors)
+            exception_cls = get_grouped_exception(self.operation.verbose_name, *errors)
             formatted_errors = "\n\n".join(f"{idx}. {error.args[0]}" for idx, error in enumerate(errors, 1))
             code = self.get_code_to_reproduce(request=response.request)
             payload = get_response_payload(response)
@@ -381,7 +385,7 @@ class Case:  # pylint: disable=too-many-public-methods
 
     def partial_deepcopy(self) -> "Case":
         return self.__class__(
-            endpoint=self.endpoint.partial_deepcopy(),
+            operation=self.operation.partial_deepcopy(),
             path_parameters=deepcopy(self.path_parameters),
             headers=deepcopy(self.headers),
             cookies=deepcopy(self.cookies),
@@ -542,7 +546,7 @@ class APIOperation(Generic[P]):
         body: Union[Body, NotSet] = NOT_SET,
     ) -> Case:
         return Case(
-            endpoint=self,
+            operation=self,
             path_parameters=path_parameters,
             headers=headers,
             cookies=cookies,

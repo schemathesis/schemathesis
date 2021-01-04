@@ -123,7 +123,7 @@ def test_call_and_validate(openapi3_schema_url):
 def test_case_partial_deepcopy(swagger_20):
     operation = APIOperation("/example/path", "GET", {}, swagger_20)
     original_case = Case(
-        endpoint=operation,
+        operation=operation,
         path_parameters={"test": "test"},
         headers={"Content-Type": "application/json"},
         cookies={"TOKEN": "secret"},
@@ -132,14 +132,14 @@ def test_case_partial_deepcopy(swagger_20):
     )
 
     copied_case = original_case.partial_deepcopy()
-    copied_case.endpoint.path = "/overwritten/path"
+    copied_case.operation.path = "/overwritten/path"
     copied_case.path_parameters["test"] = "overwritten"
     copied_case.headers["Content-Type"] = "overwritten"
     copied_case.cookies["TOKEN"] = "overwritten"
     copied_case.query["a"] = "overwritten"
     copied_case.body["b"] = "overwritten"
 
-    assert original_case.endpoint.path == "/example/path"
+    assert original_case.operation.path == "/example/path"
     assert original_case.path_parameters["test"] == "test"
     assert original_case.headers["Content-Type"] == "application/json"
     assert original_case.cookies["TOKEN"] == "secret"

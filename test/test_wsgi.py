@@ -84,7 +84,7 @@ def test_form_data(schema):
 def test_not_wsgi(schema):
     # When a schema is created without a WSGI app (e.g. from a URL)
     case = Case(schema.endpoints["/success"]["GET"])
-    case.endpoint.app = None
+    case.operation.app = None
     # Then an error should be raised if the user tries to use `call_wsgi`
     with pytest.raises(
         RuntimeError,
@@ -144,7 +144,7 @@ def test_app_with_parametrize(testdir):
     def test(case):
         global called
         called = True
-        assert case.endpoint.schema.app is app
+        assert case.operation.schema.app is app
 
     def test_two():
         assert called

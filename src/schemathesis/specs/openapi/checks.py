@@ -16,9 +16,9 @@ if TYPE_CHECKING:
 
 
 def status_code_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
-    if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
-    responses = case.endpoint.definition.raw.get("responses", {})
+    responses = case.operation.definition.raw.get("responses", {})
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
     if "default" in responses:
         return None
@@ -40,9 +40,9 @@ def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, N
 
 
 def content_type_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
-    if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
-    content_types = case.endpoint.schema.get_content_types(case.endpoint, response)
+    content_types = case.operation.schema.get_content_types(case.operation, response)
     if not content_types:
         return None
     content_type = response.headers.get("Content-Type")
@@ -65,9 +65,9 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> Optiona
 
 
 def response_headers_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
-    if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
-    defined_headers = case.endpoint.schema.get_headers(case.endpoint, response)
+    defined_headers = case.operation.schema.get_headers(case.operation, response)
     if not defined_headers:
         return None
 
@@ -80,6 +80,6 @@ def response_headers_conformance(response: GenericResponse, case: "Case") -> Opt
 
 
 def response_schema_conformance(response: GenericResponse, case: "Case") -> None:
-    if not isinstance(case.endpoint.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
-    return case.endpoint.validate_response(response)
+    return case.operation.validate_response(response)

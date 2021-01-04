@@ -285,7 +285,7 @@ def test_response_schema_conformance_swagger(swagger_20, content, definition):
     response = make_response(content)
     case = make_case(swagger_20, definition)
     assert response_schema_conformance(response, case) is None
-    assert case.endpoint.is_response_valid(response)
+    assert case.operation.is_response_valid(response)
 
 
 @pytest.mark.parametrize(
@@ -335,7 +335,7 @@ def test_response_schema_conformance_openapi(openapi_30, content, definition):
     response = make_response(content)
     case = make_case(openapi_30, definition)
     assert response_schema_conformance(response, case) is None
-    assert case.endpoint.is_response_valid(response)
+    assert case.operation.is_response_valid(response)
 
 
 @pytest.mark.parametrize(
@@ -406,7 +406,7 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
     case = make_case(swagger_20, definition)
     with pytest.raises(AssertionError) as exc_info:
         response_schema_conformance(response, case)
-    assert not case.endpoint.is_response_valid(response)
+    assert not case.operation.is_response_valid(response)
     assert exc_info.type.__name__ == "CheckFailed"
 
 
@@ -450,7 +450,7 @@ def test_response_schema_conformance_invalid_openapi(openapi_30, media_type, con
     case = make_case(openapi_30, definition)
     with pytest.raises(AssertionError):
         response_schema_conformance(response, case)
-    assert not case.endpoint.is_response_valid(response)
+    assert not case.operation.is_response_valid(response)
 
 
 @pytest.mark.hypothesis_nested
@@ -463,7 +463,7 @@ def test_response_schema_conformance_references_invalid(complex_schema):
         response = make_response(json.dumps({"foo": 1}).encode())
         with pytest.raises(AssertionError):
             case.validate_response(response)
-        assert not case.endpoint.is_response_valid(response)
+        assert not case.operation.is_response_valid(response)
 
     test()
 

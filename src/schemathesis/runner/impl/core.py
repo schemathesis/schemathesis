@@ -247,7 +247,7 @@ def run_checks(
             result.add_success("max_response_time", case)
 
     if errors:
-        raise get_grouped_exception(case.endpoint.verbose_name, *errors)
+        raise get_grouped_exception(case.operation.verbose_name, *errors)
 
 
 def run_targets(targets: Iterable[Callable], context: TargetContext) -> None:
@@ -257,7 +257,7 @@ def run_targets(targets: Iterable[Callable], context: TargetContext) -> None:
 
 
 def add_cases(case: Case, response: GenericResponse, test: Callable, *args: Any) -> None:
-    context = HookContext(case.endpoint)
+    context = HookContext(case.operation)
     for case_hook in get_all_by_name("add_case"):
         _case = case_hook(context, case.partial_deepcopy(), response)
         # run additional test if _case is not an empty value

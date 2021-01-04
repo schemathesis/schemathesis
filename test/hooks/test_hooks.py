@@ -160,7 +160,7 @@ def extra(context, st):
 @schema.parametrize()
 @settings(max_examples=1)
 def test(case):
-    assert case.endpoint.schema.hooks.get_all_by_name("before_generate_query")[0] is extra
+    assert case.operation.schema.hooks.get_all_by_name("before_generate_query")[0] is extra
     assert int(case.query["id"]) % 2 == 0
     """,
         schema=simple_openapi,
@@ -292,7 +292,7 @@ def test_before_add_examples(testdir, simple_openapi):
 @schema.hooks.register
 def before_add_examples(context, examples):
     new = schemathesis.models.Case(
-        endpoint=context.operation,
+        operation=context.operation,
         query={"foo": "bar"}
     )
     examples.append(new)
@@ -305,7 +305,7 @@ def test_a(case):
 
 def another_hook(context, examples):
     new = schemathesis.models.Case(
-        endpoint=context.operation,
+        operation=context.operation,
         query={"spam": "baz"}
     )
     examples.append(new)

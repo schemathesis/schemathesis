@@ -51,6 +51,7 @@ Changelog
 **Deprecated**
 
 - ``HookContext.endpoint``. Use ``HookContext.operation`` instead.
+- ``Case.endpoint``. Use ``Case.operation`` instead.
 
 **Performance**
 

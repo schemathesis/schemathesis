@@ -85,7 +85,7 @@ class Feedback:
 
     def add_test_case(self, case: Case, response: GenericResponse) -> None:
         """Store test data to reuse it in the future additional tests."""
-        for stateful_test in case.endpoint.get_stateful_tests(response, self.stateful):
+        for stateful_test in case.operation.get_stateful_tests(response, self.stateful):
             data = self.stateful_tests.setdefault(stateful_test.name, StatefulData(stateful_test))
             data.store(case, response)
 
@@ -123,7 +123,7 @@ class Direction:
 
 
 def _print_case(case: Case) -> str:
-    operation = f"state.schema['{case.endpoint.path}']['{case.endpoint.method.upper()}']"
+    operation = f"state.schema['{case.operation.path}']['{case.operation.method.upper()}']"
     data = [
         f"{name}={getattr(case, name)}"
         for name in ("path_parameters", "headers", "cookies", "query", "body")

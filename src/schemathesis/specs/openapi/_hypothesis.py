@@ -132,7 +132,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     if operation.schema.validate_schema and operation.method.upper() == "GET" and operation.body:
         raise InvalidSchema("Body parameters are defined for GET request.")
     return Case(
-        endpoint=operation,
+        operation=operation,
         media_type=media_type,
         path_parameters=path_parameters,
         headers=headers,

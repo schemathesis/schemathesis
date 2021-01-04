@@ -70,7 +70,7 @@ def test_cookies(fastapi_app):
 
 def test_not_app_with_asgi(schema):
     case = Case(schema.endpoints["/users"]["GET"])
-    case.endpoint.app = None
+    case.operation.app = None
     with pytest.raises(
         RuntimeError,
         match="ASGI application instance is required. "
