@@ -160,12 +160,14 @@ def test_commands_run_help(cli):
         "",
         "  These options define what parts of the API will be tested.",
         "",
-        "  -E, --endpoint TEXT           Filter schemathesis test by endpoint pattern.",
-        "                                Example: users/\\d+",
+        "  -E, --endpoint TEXT           Filter schemathesis tests by API operation path",
+        "                                pattern. Example: users/\\d+",
         "",
-        "  -M, --method TEXT             Filter schemathesis test by HTTP method.",
-        "  -T, --tag TEXT                Filter schemathesis test by schema tag pattern.",
-        "  -O, --operation-id TEXT       Filter schemathesis test by operationId pattern.",
+        "  -M, --method TEXT             Filter schemathesis tests by HTTP method.",
+        "  -T, --tag TEXT                Filter schemathesis tests by schema tag pattern.",
+        "  -O, --operation-id TEXT       Filter schemathesis tests by operationId",
+        "                                pattern.",
+        "",
         "  --skip-deprecated-operations  Skip testing of deprecated API operations.",
         "                                [default: False]",
         "",
@@ -677,7 +679,7 @@ def test_flaky(cli, cli_args, workers):
 
 @pytest.mark.operations("invalid")
 @pytest.mark.parametrize("workers", (1,))
-def test_invalid_endpoint(cli, cli_args, workers):
+def test_invalid_operation(cli, cli_args, workers):
     # When the app's schema contains errors
     # For example if its type is "int" but should be "integer"
     # And schema validation is disabled
@@ -700,7 +702,7 @@ def test_invalid_endpoint(cli, cli_args, workers):
 
 
 @pytest.mark.operations("invalid")
-def test_invalid_endpoint_suggestion(cli, cli_args):
+def test_invalid_operation_suggestion(cli, cli_args):
     # When the app's schema contains errors
     result = cli.run(*cli_args)
     # Then the whole Schemathesis run should fail
@@ -713,7 +715,7 @@ In this case, Schemathesis cannot guarantee proper behavior during the test run
 
 
 @pytest.mark.operations("invalid")
-def test_invalid_endpoint_suggestion_disabled(cli, cli_args):
+def test_invalid_operation_suggestion_disabled(cli, cli_args):
     # When the app's schema contains errors
     # And schema validation is disabled
     result = cli.run(*cli_args, "--validate-schema=false")
@@ -1503,7 +1505,7 @@ def test_chained_internal_exception(testdir, cli, hypothesis_max_examples, opena
         ),
     ),
 )
-def test_skip_deprecated_endpoints(testdir, cli, openapi3_base_url, options, expected):
+def test_skip_deprecated_operations(testdir, cli, openapi3_base_url, options, expected):
     # When there are some deprecated API operations
     definition = {
         "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}}

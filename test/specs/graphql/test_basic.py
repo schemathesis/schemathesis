@@ -6,8 +6,8 @@ from schemathesis.constants import USER_AGENT
 
 
 @pytest.fixture()
-def graphql_schema(graphql_endpoint):
-    return schemathesis.graphql.from_url(graphql_endpoint)
+def graphql_schema(graphql_url):
+    return schemathesis.graphql.from_url(graphql_url)
 
 
 @pytest.fixture
@@ -62,10 +62,10 @@ def test_query_strategy(graphql_strategy):
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_get_code_to_reproduce(graphql_endpoint, graphql_strategy):
+def test_get_code_to_reproduce(graphql_url, graphql_strategy):
     case = graphql_strategy.example()
     assert (
-        case.get_code_to_reproduce() == f"requests.post('{graphql_endpoint}', "
+        case.get_code_to_reproduce() == f"requests.post('{graphql_url}', "
         f"json={{'query': {repr(case.body)}}}, "
         f"headers={{'User-Agent': '{USER_AGENT}'}})"
     )
@@ -91,9 +91,9 @@ def test_as_werkzeug_kwargs(graphql_strategy):
     ),
 )
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_custom_base_url(graphql_endpoint, kwargs, base_path, expected):
+def test_custom_base_url(graphql_url, kwargs, base_path, expected):
     # When a custom Base URL is specified
-    schema = schemathesis.graphql.from_url(graphql_endpoint, **kwargs)
+    schema = schemathesis.graphql.from_url(graphql_url, **kwargs)
     # Then the base path is changed, in this case it is the only available path
     assert schema.base_path == base_path
     strategy = schema[base_path]["POST"].as_strategy()

@@ -31,6 +31,7 @@ Changelog
 - The built-in test server now accepts ``--operations`` instead of ``--endpoints``.
 - Display ``Collected API operations`` instead of ``collected endpoints`` in the CLI. `#869`_
 - ``--skip-deprecated-endpoints`` is renamed to ``--skip-deprecated-operations``. `#869`_
+- Rename various internal API methods that contained ``endpoint`` in their names. `#869`_
 
 **Fixed**
 
@@ -68,6 +69,15 @@ Changelog
 - ``Endpoint.form_data``. Use ``Endpoint.body`` instead.
 - ``before_generate_form_data`` hook. Use ``before_generate_body`` instead.
 - Deprecated stateful testing integration from our ``pytest`` plugin.
+
+.. note::
+
+    This release features multiple backward-incompatible changes. The first one is removing ``form_data`` and hooks related to it -
+    all payload related actions can be done via ``body`` and its hooks. The second one involves renaming the so-called "endpoint" to "operation".
+    The main reason for this is to generalize terminology and make it applicable to GraphQL schemas, as all Schemathesis internals
+    are more suited to work with semantically different API operations rather than with endpoints that are often connected with URLs and HTTP methods.
+    It brings the possibility to reuse the same concepts for Open API and GraphQL - in the future, unit tests will cover individual API operations
+    in GraphQL, rather than everything available under the same "endpoint".
 
 `2.8.5`_ - 2020-12-15
 ---------------------

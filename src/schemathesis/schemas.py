@@ -109,7 +109,7 @@ class BaseSchema(Mapping):
     def operations(self) -> Dict[str, MethodsDict]:
         if not hasattr(self, "_operations"):
             # pylint: disable=attribute-defined-outside-init
-            operations = self.get_all_endpoints()
+            operations = self.get_all_operations()
             self._operations = operations_to_dict(operations)
         return self._operations
 
@@ -117,24 +117,24 @@ class BaseSchema(Mapping):
     def operations_count(self) -> int:
         total = 0
         # Avoid creating a list of all operation - for large schemas it consumes too much memory
-        for _ in self.get_all_endpoints():
+        for _ in self.get_all_operations():
             total += 1
         return total
 
-    def get_all_endpoints(self) -> Generator[APIOperation, None, None]:
+    def get_all_operations(self) -> Generator[APIOperation, None, None]:
         raise NotImplementedError
 
-    def get_strategies_from_examples(self, endpoint: APIOperation) -> List[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         raise NotImplementedError
 
     def get_stateful_tests(
-        self, response: GenericResponse, endpoint: APIOperation, stateful: Optional[Stateful]
+        self, response: GenericResponse, operation: APIOperation, stateful: Optional[Stateful]
     ) -> Sequence[StatefulTest]:
         """Get a list of additional tests, that should be executed after this response from the API operation."""
         raise NotImplementedError
 
-    def get_parameter_serializer(self, endpoint: APIOperation, location: str) -> Optional[Callable]:
+    def get_parameter_serializer(self, operation: APIOperation, location: str) -> Optional[Callable]:
         """Get a function that serializes parameters for the given location."""
         raise NotImplementedError
 
@@ -145,7 +145,7 @@ class BaseSchema(Mapping):
         seed: Optional[int] = None,
     ) -> Generator[Tuple[APIOperation, DataGenerationMethod, Callable], None, None]:
         """Generate all operations and Hypothesis tests for them."""
-        for operation in self.get_all_endpoints():
+        for operation in self.get_all_operations():
             for data_generation_method in self.data_generation_methods:
                 test = create_test(
                     operation=operation,
@@ -257,7 +257,7 @@ class BaseSchema(Mapping):
             local_dispatcher.dispatch(name, context, *args, **kwargs)
 
     def prepare_multipart(
-        self, form_data: FormData, endpoint: APIOperation
+        self, form_data: FormData, operation: APIOperation
     ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
         """Split content of `form_data` into files & data.
 
@@ -265,12 +265,12 @@ class BaseSchema(Mapping):
         """
         raise NotImplementedError
 
-    def get_request_payload_content_types(self, endpoint: APIOperation) -> List[str]:
+    def get_request_payload_content_types(self, operation: APIOperation) -> List[str]:
         raise NotImplementedError
 
     def get_case_strategy(
         self,
-        endpoint: APIOperation,
+        operation: APIOperation,
         hooks: Optional[HookDispatcher] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
@@ -279,10 +279,10 @@ class BaseSchema(Mapping):
     def as_state_machine(self) -> Type[APIStateMachine]:
         raise NotImplementedError
 
-    def get_links(self, endpoint: APIOperation) -> Dict[str, Dict[str, Any]]:
+    def get_links(self, operation: APIOperation) -> Dict[str, Dict[str, Any]]:
         raise NotImplementedError
 
-    def validate_response(self, endpoint: APIOperation, response: GenericResponse) -> None:
+    def validate_response(self, operation: APIOperation, response: GenericResponse) -> None:
         raise NotImplementedError
 
     def prepare_schema(self, schema: Any) -> Any:

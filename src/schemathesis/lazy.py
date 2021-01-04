@@ -70,9 +70,9 @@ class LazySchema:
                 settings = getattr(test, "_hypothesis_internal_use_settings", None)
                 tests = list(schema.get_all_tests(func, settings))
                 request.session.testscollected += len(tests)
-                for _endpoint, data_generation_method, sub_test in tests:
-                    subtests.item._nodeid = _get_node_name(node_id, _endpoint, data_generation_method)
-                    run_subtest(_endpoint, fixtures, sub_test, subtests)
+                for operation, data_generation_method, sub_test in tests:
+                    subtests.item._nodeid = _get_node_name(node_id, operation, data_generation_method)
+                    run_subtest(operation, fixtures, sub_test, subtests)
                 subtests.item._nodeid = node_id
 
             # Needed to prevent a failure when settings are applied to the test function

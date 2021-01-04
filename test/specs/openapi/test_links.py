@@ -5,7 +5,7 @@ import pytest
 import requests
 
 import schemathesis
-from schemathesis.models import APIOperation, Case, EndpointDefinition
+from schemathesis.models import APIOperation, Case, OperationDefinition
 from schemathesis.parameters import ParameterSet
 from schemathesis.specs.openapi.links import Link, get_container
 from schemathesis.specs.openapi.parameters import OpenAPI30Parameter
@@ -124,7 +124,7 @@ EXPECTED_PATH_PARAMETERS = [
         ),
     ),
 )
-def test_make_endpoint(value, path_user_id, query_user_id, code):
+def test_make_operation(value, path_user_id, query_user_id, code):
     operation = LINK.make_operation(list(map(ParsedData, value)))
     # There is only one path parameter
     assert len(operation.path_parameters) == 1
@@ -149,7 +149,7 @@ def assert_schema(target, expected):
         assert target == expected
 
 
-def test_make_endpoint_single():
+def test_make_operation_single():
     operation = LINK.make_operation([ParsedData({"path.user_id": 1, "query.user_id": 2, "code": 7})])
     assert operation.path_parameters == ParameterSet(
         [OpenAPI30Parameter({"in": "path", "name": "user_id", "schema": {"enum": [1]}})]
@@ -165,7 +165,7 @@ def test_make_endpoint_single():
 
 
 @pytest.mark.parametrize("parameter", ("wrong.id", "unknown", "header.id"))
-def test_make_endpoint_invalid_location(parameter):
+def test_make_operation_invalid_location(parameter):
     with pytest.raises(
         ValueError, match=f"Parameter `{parameter}` is not defined in API operation GET /users/{{user_id}}"
     ):
@@ -177,7 +177,7 @@ def test_get_container_invalid_location():
         path="/users/{user_id}",
         method="get",
         schema=None,
-        definition=EndpointDefinition(
+        definition=OperationDefinition(
             raw={},
             resolved={},
             scope="",

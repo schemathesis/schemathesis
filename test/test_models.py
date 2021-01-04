@@ -286,7 +286,7 @@ def test_from_case(swagger_20, base_url, expected):
         ("/what?", "`/what?` not found"),
     ),
 )
-def test_endpoint_path_suggestion(swagger_20, value, message):
+def test_operation_path_suggestion(swagger_20, value, message):
     with pytest.raises(KeyError, match=re.escape(message)):
         swagger_20[value]["POST"]
 
@@ -294,3 +294,13 @@ def test_endpoint_path_suggestion(swagger_20, value, message):
 def test_method_suggestion(swagger_20):
     with pytest.raises(KeyError, match="Method `PUT` not found. Available methods: GET"):
         swagger_20["/users"]["PUT"]
+
+
+def test_deprecated_attribute(swagger_20):
+    operation = APIOperation("/users/{name}", "GET", {}, swagger_20, base_url="http://127.0.0.1/api/v3")
+    case = Case(operation)
+    with pytest.warns(None) as records:
+        assert case.endpoint == case.operation == operation
+    assert str(records[0].message) == (
+        "Property `endpoint` is deprecated and will be removed in Schemathesis 4.0. Use `operation` instead."
+    )

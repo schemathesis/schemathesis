@@ -449,7 +449,7 @@ def test_b(request, case):
     result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST:/v1/pets\]", r"Hypothesis calls: 2"])
 
 
-def test_skip_deprecated_endpoints(testdir):
+def test_skip_deprecated_operations(testdir):
     # When the schema is loaded with `skip_deprecated_operations=True`
     testdir.make_test(
         """
@@ -608,7 +608,7 @@ def test_(request, case):
     result.stdout.re_match_lines([r".*InvalidSchema: Cannot have max_size=6 < min_size=10"])
 
 
-def test_invalid_endpoint(testdir):
+def test_invalid_operation(testdir):
     # When the given schema is invalid
     # And schema validation is disabled
     testdir.make_test(
@@ -626,7 +626,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-rf")
     # Then the tests should fail with the relevant error message
     result.assert_outcomes(failed=1, passed=2)
-    result.stdout.re_match_lines([r".*test_invalid_endpoint.py::test_\[GET:/v1/invalid\]\[P\] FAILED"])
+    result.stdout.re_match_lines([r".*test_invalid_operation.py::test_\[GET:/v1/invalid\]\[P\] FAILED"])
 
 
 def test_no_base_path(testdir):

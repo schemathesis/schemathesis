@@ -124,7 +124,7 @@ def run_test(  # pylint: disable=too-many-locals
         overridden_headers=headers,
         data_generation_method=data_generation_method,
     )
-    yield events.BeforeExecution.from_endpoint(operation=operation, recursion_level=recursion_level)
+    yield events.BeforeExecution.from_operation(operation=operation, recursion_level=recursion_level)
     hypothesis_output: List[str] = []
     errors: List[Exception] = []
     test_start_time = time.monotonic()

@@ -47,7 +47,7 @@ def test_add_link_default(schema_url):
 
 @pytest.mark.parametrize("status_code", ("201", 201))
 @pytest.mark.operations("create_user", "get_user", "update_user")
-def test_add_link_no_endpoints_cache(schema_url, status_code):
+def test_add_link_no_operations_cache(schema_url, status_code):
     schema = schemathesis.from_uri(schema_url)
     # When we add a link to the target API operation
     source = schema["/users/"]["POST"]
@@ -159,7 +159,7 @@ def test_add_link_nothing_is_provided(schema_url):
     ),
 )
 @pytest.mark.operations("create_user", "get_user", "update_user")
-def test_add_link_unknown_endpoint(schema_url, change, message):
+def test_add_link_unknown_operation(schema_url, change, message):
     schema = schemathesis.from_uri(schema_url)
     # When the source API operation is modified and can't be found
     source = schema["/users/"]["POST"]

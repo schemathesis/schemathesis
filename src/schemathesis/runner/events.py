@@ -39,17 +39,17 @@ class Initialized(ExecutionEvent):
         )
 
 
-class CurrentPathMixin:
+class CurrentOperationMixin:
     method: str
     path: str
 
     @property
-    def current_endpoint(self) -> str:
+    def current_operation(self) -> str:
         return f"{self.method} {self.path}"
 
 
 @attr.s(slots=True)  # pragma: no mutate
-class BeforeExecution(CurrentPathMixin, ExecutionEvent):
+class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
     """Happens before each tested API operation.
 
     It happens before a single hypothesis test, that may contain many examples inside.
@@ -61,7 +61,7 @@ class BeforeExecution(CurrentPathMixin, ExecutionEvent):
     recursion_level: int = attr.ib()  # pragma: no mutate
 
     @classmethod
-    def from_endpoint(cls, operation: APIOperation, recursion_level: int) -> "BeforeExecution":
+    def from_operation(cls, operation: APIOperation, recursion_level: int) -> "BeforeExecution":
         return cls(
             method=operation.method.upper(),
             path=operation.full_path,
@@ -71,7 +71,7 @@ class BeforeExecution(CurrentPathMixin, ExecutionEvent):
 
 
 @attr.s(slots=True)  # pragma: no mutate
-class AfterExecution(CurrentPathMixin, ExecutionEvent):
+class AfterExecution(CurrentOperationMixin, ExecutionEvent):
     """Happens after each tested API operation."""
 
     method: str = attr.ib()  # pragma: no mutate

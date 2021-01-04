@@ -121,13 +121,13 @@ def schema_with_property_examples(dict_with_property_examples) -> BaseOpenAPISch
 @pytest.fixture()
 def operation(schema_with_examples) -> APIOperation:
     """Returns first (and only) API operation from schema_with_examples."""
-    return next(schema_with_examples.get_all_endpoints())
+    return next(schema_with_examples.get_all_operations())
 
 
 @pytest.fixture()
-def endpoint_with_property_examples(schema_with_property_examples) -> APIOperation:
+def operation_with_property_examples(schema_with_property_examples) -> APIOperation:
     """Returns first (and only) API operation from schema_with_examples."""
-    return next(schema_with_property_examples.get_all_endpoints())
+    return next(schema_with_property_examples.get_all_operations())
 
 
 def test_get_parameter_examples(operation):
@@ -265,7 +265,7 @@ def test_get_object_example_from_properties():
 
 
 def test_get_parameter_example_from_properties():
-    mock_endpoint_schema: Dict[str, Any] = {
+    schema: Dict[str, Any] = {
         "parameters": [
             {
                 "name": "param1",
@@ -281,13 +281,13 @@ def test_get_parameter_example_from_properties():
             }
         ]
     }
-    example = examples.get_parameter_example_from_properties(mock_endpoint_schema)
+    example = examples.get_parameter_example_from_properties(schema)
     assert "query" in example
     assert example["query"] == {"param1": {"prop1": "prop1 example string", "prop2": "prop2 example string"}}
 
 
 def test_get_request_body_example_from_properties():
-    mock_endpoint_schema: Dict[str, Any] = {
+    schema: Dict[str, Any] = {
         "requestBody": {
             "content": {
                 "application/json": {
@@ -299,13 +299,13 @@ def test_get_request_body_example_from_properties():
             }
         }
     }
-    example = examples.get_request_body_example_from_properties(mock_endpoint_schema)
+    example = examples.get_request_body_example_from_properties(schema)
     assert "body" in example
     assert example["body"] == {"foo": "foo example string"}
 
 
-def test_get_static_parameters_from_properties(endpoint_with_property_examples):
-    example = examples.get_static_parameters_from_properties(endpoint_with_property_examples)
+def test_get_static_parameters_from_properties(operation_with_property_examples):
+    example = examples.get_static_parameters_from_properties(operation_with_property_examples)
     assert "query" in example
     assert "param1" in example["query"]
     assert "param2" in example["query"]

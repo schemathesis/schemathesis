@@ -145,7 +145,7 @@ class SchemathesisCase(PyCollector):
             return [
                 item
                 for data_generation_method in self.schemathesis_case.data_generation_methods
-                for operation in self.schemathesis_case.get_all_endpoints()
+                for operation in self.schemathesis_case.get_all_operations()
                 for item in self._gen_items(operation, data_generation_method)
             ]
         except Exception:

@@ -21,11 +21,11 @@ def apply(
     """Gather all connections based on Open API links definitions."""
     all_status_codes = list(operation.definition.resolved["responses"])
     for status_code, link in get_all_links(operation):
-        target_endpoint = link.get_target_endpoint()
+        target_operation = link.get_target_operation()
         strategy = bundles[operation.path][operation.method.upper()].filter(
             make_response_filter(status_code, all_status_codes)
         )
-        connections[target_endpoint.verbose_name].append(_convert_strategy(strategy, link))
+        connections[target_operation.verbose_name].append(_convert_strategy(strategy, link))
 
 
 def _convert_strategy(

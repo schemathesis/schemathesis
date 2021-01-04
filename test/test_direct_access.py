@@ -36,7 +36,7 @@ def test_repr(swagger_20):
 
 
 @pytest.mark.parametrize("method", ("GET", "get"))
-def test_endpoint_access(swagger_20, method):
+def test_operation_access(swagger_20, method):
     assert isinstance(swagger_20["/users"][method], APIOperation)
 
 

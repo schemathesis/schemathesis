@@ -64,20 +64,20 @@ class GraphQLSchema(BaseSchema):
     def _get_base_path(self) -> str:
         return cast(str, urlsplit(self.location).path)
 
-    def get_all_endpoints(self) -> Generator[APIOperation, None, None]:
+    def get_all_operations(self) -> Generator[APIOperation, None, None]:
         yield APIOperation(
             base_url=self.get_base_url(), path=self.base_path, method="POST", schema=self, definition=None  # type: ignore
         )
 
     def get_case_strategy(
         self,
-        endpoint: APIOperation,
+        operation: APIOperation,
         hooks: Optional[HookDispatcher] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
-        constructor = partial(GraphQLCase, operation=endpoint)
+        constructor = partial(GraphQLCase, operation=operation)
         schema = graphql.build_client_schema(self.raw_schema)
         return st.builds(constructor, body=gql_st.query(schema))
 
-    def get_strategies_from_examples(self, endpoint: APIOperation) -> List[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
         return []

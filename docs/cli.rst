@@ -51,7 +51,7 @@ Testing specific operations
 
 By default, Schemathesis runs tests for all operations, but you can select specific operations with the following CLI options:
 
-- ``--endpoint / -E``. Endpoint path;
+- ``--endpoint / -E``. Operation path;
 - ``--method / -M``. HTTP method;
 - ``--tag / -T``. Open API tag;
 - ``--operation-id / -O``. ``operationId`` field value;

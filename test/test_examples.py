@@ -29,7 +29,7 @@ def schema():
 
 @pytest.mark.hypothesis_nested
 def test_examples_validity(schema, openapi3_base_url):
-    operation = next(schema.get_all_endpoints())
+    operation = next(schema.get_all_operations())
     strategy = get_strategies_from_examples(operation, "examples")[0]
 
     @given(case=strategy)

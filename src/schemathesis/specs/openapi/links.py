@@ -24,16 +24,18 @@ class Link(StatefulTest):
     request_body: Any = attr.ib(default=NOT_SET)  # pragma: no mutate
 
     @classmethod
-    def from_definition(cls, name: str, definition: Dict[str, Dict[str, Any]], source_endpoint: APIOperation) -> "Link":
+    def from_definition(
+        cls, name: str, definition: Dict[str, Dict[str, Any]], source_operation: APIOperation
+    ) -> "Link":
         # Links can be behind a reference
-        _, definition = source_endpoint.schema.resolver.resolve_in_scope(  # type: ignore
-            definition, source_endpoint.definition.scope
+        _, definition = source_operation.schema.resolver.resolve_in_scope(  # type: ignore
+            definition, source_operation.definition.scope
         )
         if "operationId" in definition:
-            # source_endpoint.schema is `BaseOpenAPISchema` and has this method
-            operation = source_endpoint.schema.get_endpoint_by_operation_id(definition["operationId"])  # type: ignore
+            # source_operation.schema is `BaseOpenAPISchema` and has this method
+            operation = source_operation.schema.get_operation_by_id(definition["operationId"])  # type: ignore
         else:
-            operation = source_endpoint.schema.get_endpoint_by_reference(definition["operationRef"])  # type: ignore
+            operation = source_operation.schema.get_operation_by_reference(definition["operationRef"])  # type: ignore
         return cls(
             # Pylint can't detect that the API operation is always defined at this point
             # E.g. if there is no matching operation or no operations at all, then a ValueError will be risen
@@ -182,10 +184,10 @@ class OpenAPILink(Direction):
         if self.body is not NOT_SET:
             case.body = expressions.evaluate(self.body, context)
 
-    def get_target_endpoint(self) -> APIOperation:
+    def get_target_operation(self) -> APIOperation:
         if "operationId" in self.definition:
-            return self.operation.schema.get_endpoint_by_operation_id(self.definition["operationId"])  # type: ignore
-        return self.operation.schema.get_endpoint_by_reference(self.definition["operationRef"])  # type: ignore
+            return self.operation.schema.get_operation_by_id(self.definition["operationId"])  # type: ignore
+        return self.operation.schema.get_operation_by_reference(self.definition["operationRef"])  # type: ignore
 
 
 def get_container(case: Case, location: Optional[str], name: str) -> Optional[Dict[str, Any]]:

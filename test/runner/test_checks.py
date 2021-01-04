@@ -14,13 +14,13 @@ from schemathesis.checks import (
     status_code_conformance,
 )
 from schemathesis.exceptions import CheckFailed, InvalidSchema
-from schemathesis.models import EndpointDefinition
+from schemathesis.models import OperationDefinition
 from schemathesis.schemas import BaseSchema
 
 
 def make_case(schema: BaseSchema, definition: Dict[str, Any]) -> models.Case:
     operation = models.APIOperation(
-        "/path", "GET", definition=EndpointDefinition(definition, definition, None, []), schema=schema
+        "/path", "GET", definition=OperationDefinition(definition, definition, None, []), schema=schema
     )
     return models.Case(operation)
 

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from ..schemas import BaseOpenAPISchema
 
 
-EndpointConnections = Dict[str, List[SearchStrategy[Tuple[StepResult, OpenAPILink]]]]
+APIOperationConnections = Dict[str, List[SearchStrategy[Tuple[StepResult, OpenAPILink]]]]
 
 
 class OpenAPIStateMachine(APIStateMachine):
@@ -33,8 +33,8 @@ def create_state_machine(schema: "BaseOpenAPISchema") -> Type[APIStateMachine]:
     This state machine will contain transitions that connect some operations' outputs with other operations' inputs.
     """
     bundles = init_bundles(schema)
-    connections: EndpointConnections = defaultdict(list)
-    for operation in schema.get_all_endpoints():
+    connections: APIOperationConnections = defaultdict(list)
+    for operation in schema.get_all_operations():
         links.apply(operation, bundles, connections)
 
     rules = make_all_rules(schema, bundles, connections)
@@ -50,25 +50,25 @@ def init_bundles(schema: "BaseOpenAPISchema") -> Dict[str, CaseInsensitiveDict]:
     We need to create bundles first, so they can be referred when building connections between operations.
     """
     output: Dict[str, CaseInsensitiveDict] = {}
-    for operation in schema.get_all_endpoints():
+    for operation in schema.get_all_operations():
         output.setdefault(operation.path, CaseInsensitiveDict())
         output[operation.path][operation.method.upper()] = Bundle(operation.verbose_name)  # type: ignore
     return output
 
 
 def make_all_rules(
-    schema: "BaseOpenAPISchema", bundles: Dict[str, CaseInsensitiveDict], connections: EndpointConnections
+    schema: "BaseOpenAPISchema", bundles: Dict[str, CaseInsensitiveDict], connections: APIOperationConnections
 ) -> Dict[str, Rule]:
     """Create rules for all API operations, based on the provided connections."""
     return {
         f"rule {operation.verbose_name} {idx}": new
-        for operation in schema.get_all_endpoints()
+        for operation in schema.get_all_operations()
         for idx, new in enumerate(make_rules(operation, bundles[operation.path][operation.method.upper()], connections))
     }
 
 
 def make_rules(
-    operation: "APIOperation", bundle: Bundle, connections: EndpointConnections
+    operation: "APIOperation", bundle: Bundle, connections: APIOperationConnections
 ) -> Generator[Rule, None, None]:
     """Create a rule for an API operation."""
 

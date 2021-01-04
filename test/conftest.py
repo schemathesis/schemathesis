@@ -168,7 +168,7 @@ def graphql_server(graphql_app):
 
 
 @pytest.fixture()
-def graphql_endpoint(graphql_server, graphql_path):
+def graphql_url(graphql_server, graphql_path):
     return f"http://127.0.0.1:{graphql_server['port']}{graphql_path}"
 
 

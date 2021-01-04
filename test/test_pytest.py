@@ -151,17 +151,17 @@ def test_schema_given(testdir):
         """
 from hypothesis.strategies._internal.core import DataObject
 
-ENDPOINTS = []
+OPERATIONS = []
 
 @schema.parametrize()
 @schema.given(data=st.data())
 def test(data, case):
     assert isinstance(data, DataObject)
-    ENDPOINTS.append(f"{case.method} {case.path}")
+    OPERATIONS.append(f"{case.method} {case.path}")
 
 
-def test_endpoints():
-    assert ENDPOINTS == ['GET /users', 'POST /users']
+def test_operations():
+    assert OPERATIONS == ['GET /users', 'POST /users']
     """,
         paths={
             "/users": {
