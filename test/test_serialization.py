@@ -5,6 +5,7 @@ import pytest
 from hypothesis import given, settings
 
 import schemathesis
+from schemathesis.exceptions import SerializationNotPossible
 
 
 def to_csv(data):
@@ -80,3 +81,25 @@ def test_register_incomplete_serializer():
         class CSVSerializer:
             def as_requests(self, context, value):
                 return {}
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.operations("csv_payload")
+def test_no_serialization_possible(api_schema):
+    # When API expects `text/csv`
+    # And there is no registered serializer for this media type
+
+    @given(case=api_schema["/csv"]["POST"].as_strategy())
+    @settings(max_examples=5)
+    def test(case):
+        # Then there should be an error indicating this
+        with pytest.raises(
+            SerializationNotPossible,
+            match="Schemathesis can't serialize data to any of the defined media types: text/csv",
+        ):
+            if case.app is not None:
+                case.call_wsgi()
+            else:
+                case.call()
+
+    test()
