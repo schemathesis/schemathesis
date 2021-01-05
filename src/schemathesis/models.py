@@ -59,7 +59,7 @@ def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
     """Reject the current example if we don't know how to send this data to the application."""
     event_text = f"Can't serialize data to `{media_type}`."
     note(
-        f"{event_text}. "
+        f"{event_text} "
         f"You can register your own serializer with `schemathesis.serializers.register` and Schemathesis will be able "
         f"to make API calls with this media type."
     )
