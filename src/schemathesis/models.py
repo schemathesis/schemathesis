@@ -34,8 +34,8 @@ from hypothesis.strategies import SearchStrategy
 from starlette.testclient import TestClient as ASGIClient
 
 from . import serializers
-from .constants import USER_AGENT, DataGenerationMethod
-from .exceptions import CheckFailed, InvalidSchema, get_grouped_exception
+from .constants import SERIALIZERS_SUGGESTION_MESSAGE, USER_AGENT, DataGenerationMethod
+from .exceptions import CheckFailed, InvalidSchema, SerializationNotPossible, get_grouped_exception
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .serializers import Serializer, SerializerContext
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
@@ -58,11 +58,7 @@ class CaseSource:
 def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
     """Reject the current example if we don't know how to send this data to the application."""
     event_text = f"Can't serialize data to `{media_type}`."
-    note(
-        f"{event_text} "
-        f"You can register your own serializer with `schemathesis.serializers.register` and Schemathesis will be able "
-        f"to make API calls with this media type."
-    )
+    note(f"{event_text} {SERIALIZERS_SUGGESTION_MESSAGE}")
     event(event_text)
     reject()  # type: ignore
 
@@ -234,6 +230,9 @@ class Case:  # pylint: disable=too-many-public-methods
         if self.media_type is not None:
             cls = serializers.get(self.media_type)
             if cls is None:
+                all_media_types = self.operation.get_request_payload_content_types()
+                if all(serializers.get(media_type) is None for media_type in all_media_types):
+                    raise SerializationNotPossible.from_media_types(*all_media_types)
                 cant_serialize(self.media_type)
             return cls()
         return None
