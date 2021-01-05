@@ -5,6 +5,7 @@ from typing import Dict, Type, Union
 import attr
 from jsonschema import ValidationError
 
+from .constants import SERIALIZERS_SUGGESTION_MESSAGE
 from .utils import GenericResponse
 
 
@@ -95,6 +96,25 @@ class NonCheckError(Exception):
     """
 
     __module__ = "builtins"
+
+
+SERIALIZATION_NOT_POSSIBLE_MESSAGE = (
+    f"Schemathesis can't serialize data to any of the defined media types: {{}} \n{SERIALIZERS_SUGGESTION_MESSAGE}"
+)
+
+
+class SerializationNotPossible(Exception):
+    """Not possible to serialize to any of the media types defined for some API operation.
+
+    Usually, there is still `application/json` along with less common ones, but this error happens when there is no
+    media type that Schemathesis knows how to serialize data to.
+    """
+
+    __module__ = "builtins"
+
+    @classmethod
+    def from_media_types(cls, *media_types: str) -> "SerializationNotPossible":
+        return cls(SERIALIZATION_NOT_POSSIBLE_MESSAGE.format(", ".join(media_types)))
 
 
 @attr.s  # pragma: no mutate
