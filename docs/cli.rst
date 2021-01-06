@@ -435,6 +435,7 @@ To use your custom checks with Schemathesis CLI, you need to register them via t
 
     import schemathesis
 
+
     @schemathesis.register_check
     def new_check(response, case):
         # some awesome assertions!
@@ -457,10 +458,11 @@ response code is ``200``.
 
     import schemathesis
 
+
     @schemathesis.register_check
     def conditional_check(response, case):
         if response.status_code == 200:
-            # some awesome assertions!
+            ...  # some awesome assertions!
         else:
             # check not relevant to this response, skip test
             return True

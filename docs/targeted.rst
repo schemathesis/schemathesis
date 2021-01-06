@@ -82,6 +82,7 @@ You can register your own targets with the ``schemathesis.register_target`` deco
 
     import schemathesis
 
+
     @schemathesis.register_target
     def new_target(context) -> float:
         return float(len(context.response.content))
