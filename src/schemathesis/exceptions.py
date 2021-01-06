@@ -117,6 +117,10 @@ class SerializationNotPossible(Exception):
         return cls(SERIALIZATION_NOT_POSSIBLE_MESSAGE.format(", ".join(media_types)))
 
 
+class InvalidRegularExpression(Exception):
+    __module__ = "builtins"
+
+
 @attr.s  # pragma: no mutate
 class HTTPError(Exception):
     response: GenericResponse = attr.ib()  # pragma: no mutate

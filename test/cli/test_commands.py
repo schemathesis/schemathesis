@@ -1785,3 +1785,47 @@ definitions:
     # Then the run should not be interrupted, but the run fails
     assert result.exit_code == ExitCode.TESTS_FAILED
     assert " The API schema contains non-string keys" in result.stdout
+
+
+def test_unsupported_regex(testdir, cli, empty_open_api_3_schema):
+    def make_definition(min_items):
+        return {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                                # Java-style regular expression
+                                "items": {"type": "string", "pattern": r"\p{Alpha}"},
+                                "maxItems": 3,
+                                "minItems": min_items,
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+
+    # When an operation uses an unsupported regex syntax
+    empty_open_api_3_schema["paths"] = {
+        # Can't generate anything
+        "/foo": make_definition(min_items=1),
+        # Can generate an empty array
+        "/bar": make_definition(min_items=0),
+    }
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(empty_open_api_3_schema))
+    result = cli.run(str(schema_file), "--dry-run", "--hypothesis-max-examples=1")
+    # Then if it is possible it should generate at least something
+    assert "POST /bar ." in result.stdout
+    # And if it is not then there should be an error with a descriptive error message
+    assert "POST /foo E" in result.stdout
+    lines = result.stdout.splitlines()
+    for idx, line in enumerate(lines):
+        if "__ POST: /foo [P] __" in line:
+            break
+    else:
+        pytest.fail("Line not found")
+    assert r"Got pattern='\\p{Alpha}', but this is not valid syntax for a Python regular expression" in lines[idx + 1]

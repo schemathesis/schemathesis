@@ -14,6 +14,7 @@ Changelog
 - Base URL for GraphQL schemas. It allows you to load the schema from one place but send test requests to another one. `#934`_
 - A helpful error message when an operation is not found during the direct schema access. `#812`_
 - ``--dry-run`` CLI option. When applied, Schemathesis won't send any data to the server and won't perform any response checks. `#963`_
+- A better error message when the API schema contains an invalid regular expression syntax. `#1003`_
 
 **Changed**
 
@@ -32,6 +33,7 @@ Changelog
 - Display ``Collected API operations`` instead of ``collected endpoints`` in the CLI. `#869`_
 - ``--skip-deprecated-endpoints`` is renamed to ``--skip-deprecated-operations``. `#869`_
 - Rename various internal API methods that contained ``endpoint`` in their names. `#869`_
+- Bump ``hypothesis-jsonschema`` version to ``0.19.0``. This version improves the handling of unsupported regular expression syntax and can generate data for a subset of schemas containing such regular expressions.
 
 **Fixed**
 
@@ -1655,6 +1657,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1003: https://github.com/schemathesis/schemathesis/issues/1003
 .. _#994: https://github.com/schemathesis/schemathesis/issues/994
 .. _#992: https://github.com/schemathesis/schemathesis/issues/992
 .. _#990: https://github.com/schemathesis/schemathesis/issues/990
