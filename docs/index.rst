@@ -23,6 +23,7 @@ Or in your Python tests:
 
     schema = schemathesis.from_uri("http://example.com/swagger.json")
 
+
     @schema.parametrize()
     def test_api(case):
         case.call_and_validate()

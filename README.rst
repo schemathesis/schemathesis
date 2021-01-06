@@ -54,6 +54,7 @@ Or in your Python tests:
 
     schema = schemathesis.from_uri("http://0.0.0.0:8081/schema.yaml")
 
+
     @schema.parametrize()
     def test_api(case):
         case.call_and_validate()

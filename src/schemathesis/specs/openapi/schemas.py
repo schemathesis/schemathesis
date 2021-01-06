@@ -279,9 +279,7 @@ class BaseOpenAPISchema(BaseSchema):
                 source=schema["/users/"]["POST"],
                 target=schema["/users/{userId}"]["GET"],
                 status_code="201",
-                parameters={
-                    "userId": "$response.body#/id"
-                }
+                parameters={"userId": "$response.body#/id"},
             )
         """
         if parameters is None and request_body is None:

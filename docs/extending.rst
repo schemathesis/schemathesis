@@ -19,18 +19,23 @@ To register a new hook function, you need to use special decorators - ``register
 
     import schemathesis
 
+
     @schemathesis.hooks.register
     def before_generate_query(context, strategy):
         return strategy.filter(lambda x: x["id"].isdigit())
 
+
     schema = schemathesis.from_uri("http://0.0.0.0:8080/swagger.json")
+
 
     @schema.hooks.register("before_generate_query")
     def schema_hook(context, strategy):
         return strategy.filter(lambda x: int(x["id"]) % 2 == 0)
 
+
     def before_generate_headers(context, strategy):
         return strategy.filter(lambda x: len(x["id"]) > 5)
+
 
     @schema.hooks.apply(before_generate_headers)
     @schema.parametrize()
@@ -104,9 +109,7 @@ Then, with this hook, you can query the database for some existing order and set
 .. code:: python
 
     def before_process_path(
-        context: schemathesis.hooks.HookContext,
-        path: str,
-        methods: Dict[str, Any]
+        context: schemathesis.hooks.HookContext, path: str, methods: Dict[str, Any]
     ) -> None:
         if path == "/orders/{order_id}":
             order_id = database.get_orders().first().id
@@ -138,9 +141,7 @@ With this hook, you can add additional test cases that will be executed in Hypot
         context: schemathesis.hooks.HookContext,
         examples: List[Case],
     ) -> None:
-        examples.append(
-            Case(operation=context.operation, query={"foo": "bar"})
-        )
+        examples.append(Case(operation=context.operation, query={"foo": "bar"}))
 
 To load CLI hooks, you need to put them into a separate module and pass an importable path in the ``--pre-run`` CLI option.
 For example, you have your hooks definition in ``myproject/hooks.py``, and ``myproject`` is importable:
@@ -161,17 +162,18 @@ This hook allows you to extend or redefine a list of CLI handlers that will be u
     from schemathesis.cli.handlers import EventHandler
     from schemathesis.runner import events
 
-    class SimpleHandler(EventHandler):
 
+    class SimpleHandler(EventHandler):
         def handle_event(self, context, event):
             if isinstance(event, events.Finished):
                 click.echo("Done!")
+
 
     @schemathesis.hooks.register
     def after_init_cli_run_handlers(
         context: HookContext,
         handlers: List[EventHandler],
-        execution_context: ExecutionContext
+        execution_context: ExecutionContext,
     ) -> None:
         handlers[:] = [SimpleHandler()]
 
@@ -191,7 +193,9 @@ behavior in the API by changing the duplicate request's specific details.
 
 .. code:: python
 
-    def add_case(context: HookContext, case: Case, response: GenericResponse) -> Optional[Case]:
+    def add_case(
+        context: HookContext, case: Case, response: GenericResponse
+    ) -> Optional[Case]:
         case.headers["Content-Type"] = "application/json"
         return case
 
@@ -200,7 +204,9 @@ an additional test case if the original case received a successful response from
 
 .. code:: python
 
-    def add_case(context: HookContext, case: Case, response: GenericResponse) -> Optional[Case]:
+    def add_case(
+        context: HookContext, case: Case, response: GenericResponse
+    ) -> Optional[Case]:
         if 200 <= response.status_code < 300:
             # if the original case was successful, see if an invalid content type header produces a failure
             case.headers["Content-Type"] = "invalid/content/type"
@@ -225,9 +231,7 @@ You can teach Schemathesis to generate values that fit this format by registerin
 
 .. code-block:: python
 
-    strategy = strategies.from_regex(
-        r"\A4[0-9]{15}\Z"
-    ).filter(luhn_validator)
+    strategy = strategies.from_regex(r"\A4[0-9]{15}\Z").filter(luhn_validator)
     schemathesis.register_string_format("visa_cards", strategy)
 
 Schemathesis test runner
@@ -242,7 +246,7 @@ It can run tests against the given schema URI and will do some simple checks for
 
     events = runner.prepare("http://127.0.0.1:8080/swagger.json")
     for event in events:
-        # do something with event
+        ...  # do something with event
 
 ``runner.prepare`` creates a generator that yields events of different kinds - ``BeforeExecution``, ``AfterExecution``, etc.
 They provide a lot of useful information about what happens during tests, but your responsibility is handling these events.
@@ -256,9 +260,11 @@ You can provide your custom checks to the execute function; the check is a calla
     from datetime import timedelta
     from schemathesis import runner, models
 
+
     def not_too_long(response, case: models.Case):
         assert response.elapsed < timedelta(milliseconds=300)
 
+
     events = runner.prepare("http://127.0.0.1:8080/swagger.json", checks=[not_too_long])
     for event in events:
-        # do something with event
+        ...  # do something with event

@@ -15,6 +15,7 @@ The following test will load the API schema from ``http://0.0.0.0:8080/swagger.j
 
     schema = schemathesis.from_uri("http://example.com/swagger.json")
 
+
     @schema.parametrize()
     def test_api(case):
         case.call_and_validate()
@@ -71,8 +72,7 @@ then you can skip them by passing ``skip_deprecated_operations=True`` to loaders
 .. code:: python
 
     schema = schemathesis.from_uri(
-        "http://example.com/swagger.json",
-        skip_deprecated_operations=True
+        "http://example.com/swagger.json", skip_deprecated_operations=True
     )
 
 Tests configuration
@@ -86,9 +86,12 @@ For example, in the following test, Schemathesis will test each API operation wi
     from hypothesis import settings, Phase
 
     ...
+
+
     @schema.parametrize()
     @settings(max_examples=1000)
     def test_api(case):
+        ...
 
 See the whole list of available options in the `Hypothesis documentation <https://hypothesis.readthedocs.io/en/latest/settings.html#available-settings>`_.
 
@@ -114,10 +117,7 @@ then you can use the ``port`` argument:
 
 .. code:: python
 
-    schema = schemathesis.from_uri(
-        "http://app.com/api/openapi.json",
-        port=8081
-    )
+    schema = schemathesis.from_uri("http://app.com/api/openapi.json", port=8081)
 
 This code will run tests against ``http://app.com:8081/api/openapi.json``.
 
@@ -146,8 +146,7 @@ But want to send requests to a local test server which is running at ``http://12
 .. code:: python
 
     schema = schemathesis.from_path(
-        "/tmp/openapi.json",
-        base_url="http://127.0.0.1:8000/v2"
+        "/tmp/openapi.json", base_url="http://127.0.0.1:8000/v2"
     )
 
 Note that you need to provide the full base URL, which includes the ``basePath`` part.
@@ -221,6 +220,7 @@ This approach requires an initialized application instance to generate the API s
 
     import schemathesis
 
+
     @pytest.fixture
     def web_app(db):
         # some dynamically built application
@@ -237,7 +237,9 @@ This approach requires an initialized application instance to generate the API s
 
         return schemathesis.from_dict(app.openapi())
 
+
     schema = schemathesis.from_pytest_fixture("web_app")
+
 
     @schema.parametrize()
     def test_api(case):
@@ -268,6 +270,7 @@ If you don't use Schemathesis for data generation, you can still utilize respons
 .. code-block:: python
 
     schema = schemathesis.from_uri("http://0.0.0.0/openapi.json")
+
 
     def test_api():
         response = requests.get("http://0.0.0.0/api/users")
@@ -300,10 +303,7 @@ In the following example we test a hypothetical ``/api/auth/password/reset/`` op
     def test_password_reset(data, case, user):
         if data.draw(st.booleans()):
             case.body["token"] = data.draw(
-                (
-                    st.emails() |
-                    st.just(user.email)
-                ).map(create_reset_password_token)
+                (st.emails() | st.just(user.email)).map(create_reset_password_token)
             )
         response = case.call_asgi(app=app)
         case.validate_response(response)
@@ -329,15 +329,19 @@ in this case, the test execution will go much faster.
 
     app = Flask("test_app")
 
+
     @app.route("/schema.json")
     def schema():
         return {...}  # Your API schema
+
 
     @app.route("/v1/users", methods=["GET"])
     def users():
         return jsonify([{"name": "Robin"}])
 
+
     schema = schemathesis.from_wsgi("/schema.json", app)
+
 
     @schema.parametrize()
     def test_api(case):
@@ -359,8 +363,8 @@ You only need to specify strategies for ``hypothesis.given``:
     schema = schemathesis.from_uri("http://0.0.0.0:8080/schema.json")
     new_pet_strategy = schema["/v2/pet"]["POST"].as_strategy()
 
-    class TestAPI(TestCase):
 
+    class TestAPI(TestCase):
         @given(case=new_pet_strategy)
         def test_pets(self, case):
             case.call_and_validate()
@@ -376,6 +380,7 @@ seamlessly combines your API schema with ``pytest``-style parametrization and pr
     import schemathesis
 
     schema = schemathesis.from_uri("http://example.com/swagger.json")
+
 
     @schema.parametrize()
     def test_api(case):
@@ -404,24 +409,26 @@ For convenience, you can explore the schemas and strategies manually:
 
 .. code:: python
 
-    >>> import schemathesis
-    >>> schema = schemathesis.from_uri("http://api.com/schema.json")
-    >>> operation = schema["/pet"]["POST"]
-    >>> strategy = operation.as_strategy()
-    >>> strategy.example()
-    Case(
-        path='/pet',
-        method='POST',
-        path_parameters={},
-        headers={},
-        cookies={},
-        query={},
-        body={
-            'name': '\x15.\x13\U0008f42a',
-            'photoUrls': ['\x08\U0009f29a', '']
-        },
-        form_data={}
-    )
+    import schemathesis
+
+    schema = schemathesis.from_uri("http://api.com/schema.json")
+
+    operation = schema["/pet"]["POST"]
+    strategy = operation.as_strategy()
+    print(strategy.example())
+    # Case(
+    #     path='/pet',
+    #     method='POST',
+    #     path_parameters={},
+    #     headers={},
+    #     cookies={},
+    #     query={},
+    #     body={
+    #         'name': '\x15.\x13\U0008f42a',
+    #         'photoUrls': ['\x08\U0009f29a', '']
+    #     },
+    #     form_data={}
+    # )
 
 Schema instances implement the ``Mapping`` protocol.
 
@@ -430,5 +437,5 @@ Schema instances implement the ``Mapping`` protocol.
 .. code:: python
 
     # your ``basePath`` is ``/api/v1``
-    >>> schema["/pet"]["POST"]  # VALID
-    >>> schema["/api/v1/pet"]["POST"]  # INVALID
+    schema["/pet"]["POST"]  # VALID
+    schema["/api/v1/pet"]["POST"]  # INVALID

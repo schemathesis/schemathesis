@@ -101,6 +101,7 @@ First, let's define a function that will transform lists of dictionaries to CSV 
     import csv
     from io import StringIO
 
+
     def to_csv(data):
         if not data:
             # Empty CSV file
@@ -124,6 +125,7 @@ Second, register a serializer class via the ``schemathesis.serializers.register`
 
     import schemathesis
 
+
     @schemathesis.serializers.register("text/csv")
     class CSVSerializer:
         ...
@@ -135,8 +137,9 @@ Third, the serializer should have two methods - ``as_requests`` and ``as_werkzeu
 .. code-block:: python
 
     ...
-    class CSVSerializer:
 
+
+    class CSVSerializer:
         def as_requests(self, context, value):
             return {"data": to_csv(value)}
 
