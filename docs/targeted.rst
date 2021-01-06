@@ -12,6 +12,10 @@ server error:
 
 .. code:: python
 
+    import asyncio
+    from aiohttp import web
+
+
     async def performance(request: web.Request) -> web.Response:
         decoded = await request.json()
         number = str(decoded).count("0")

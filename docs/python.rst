@@ -62,6 +62,9 @@ For example, the following test selects all operations which paths start with ``
 
 .. code:: python
 
+    schema = ...  # Load the API schema here
+
+
     @schema.parametrize(endpoint="^/api/users")
     def test_api(case):
         case.call_and_validate()
@@ -85,7 +88,7 @@ For example, in the following test, Schemathesis will test each API operation wi
 
     from hypothesis import settings, Phase
 
-    ...
+    schema = ...  # Load the API schema here
 
 
     @schema.parametrize()
@@ -218,6 +221,8 @@ This approach requires an initialized application instance to generate the API s
 
 .. code:: python
 
+    from fastapi import FastAPI
+    import pytest
     import schemathesis
 
 
@@ -269,6 +274,8 @@ If you don't use Schemathesis for data generation, you can still utilize respons
 
 .. code-block:: python
 
+    import requests
+
     schema = schemathesis.from_uri("http://0.0.0.0/openapi.json")
 
 
@@ -298,6 +305,11 @@ In the following example we test a hypothetical ``/api/auth/password/reset/`` op
 
 .. code-block:: python
 
+    from hypothesis import strategies as st
+
+    schema = ...  # Load the API schema here
+
+
     @schema.parametrize(endpoint="/api/auth/password/reset/")
     @schema.given(data=st.data())
     def test_password_reset(data, case, user):
@@ -326,6 +338,9 @@ Schemathesis supports making calls to ASGI and WSGI-compliant applications inste
 in this case, the test execution will go much faster.
 
 .. code:: python
+
+    from flask import Flask
+    import schemathesis
 
     app = Flask("test_app")
 

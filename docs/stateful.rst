@@ -110,6 +110,8 @@ To do so, you need to create the state machine inside a ``pytest`` fixture and r
 .. code-block:: python
 
     from hypothesis.stateful import run_state_machine_as_test
+    import pytest
+    import schemathesis
 
 
     @pytest.fixture
@@ -174,6 +176,9 @@ If you load your schema lazily, you can extend the state machine inside the ``py
 
 .. code-block:: python
 
+    import pytest
+
+
     @pytest.fixture
     def state_machine():
         schema = schemathesis.from_uri("http://0.0.0.0:8081/schema.yaml")
@@ -190,6 +195,8 @@ Using pytest fixtures
 In case if you need to customize the whole test run, then you can extend the test class:
 
 .. code-block:: python
+
+    schema = ...  # Load the API schema here
 
     APIWorkflow = schema.as_state_machine()
 
@@ -233,6 +240,8 @@ Hypothesis settings can be changed via the settings object on the ``TestCase`` c
 
     from hypothesis import settings
 
+    schema = ...  # Load the API schema here
+
     TestCase = schema.as_state_machine().TestCase
     TestCase.settings = settings(max_examples=200, stateful_step_count=5)
 
@@ -242,6 +251,7 @@ If you load your schema lazily:
 
     from hypothesis.stateful import run_state_machine_as_test
     from hypothesis import settings
+    import pytest
 
 
     @pytest.fixture
@@ -273,6 +283,8 @@ The best way to do so is by using the Hypothesis's ``initialize`` decorator:
 
     from hypothesis.stateful import initialize
 
+    schema = ...  # Load the API schema here
+
     BaseAPIWorkflow = schema.as_state_machine()
 
 
@@ -299,6 +311,8 @@ the generated case manually or by creating a new one via the :func:`APIOperation
 
     from hypothesis.stateful import initialize
 
+    schema = ...  # Load the API schema here
+
     BaseAPIWorkflow = schema.as_state_machine()
 
 
@@ -315,6 +329,8 @@ Loading multiple entries of the same type is more verbose but still possible:
 .. code-block:: python
 
     from hypothesis.stateful import initialize, multiple
+
+    schema = ...  # Load the API schema here
 
     BaseAPIWorkflow = schema.as_state_machine()
     # These users will be created at the beginning of each scenario
