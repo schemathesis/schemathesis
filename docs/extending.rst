@@ -68,6 +68,10 @@ They have the same signature that looks like this:
 
 .. code:: python
 
+    import hypothesis
+    import schemathesis
+
+
     def before_generate_query(
         context: schemathesis.hooks.HookContext,
         strategy: hypothesis.strategies.SearchStrategy,
@@ -108,6 +112,12 @@ Then, with this hook, you can query the database for some existing order and set
 
 .. code:: python
 
+    import schemathesis
+    from typing import Any, Dict
+
+    database = ...  # Init the DB
+
+
     def before_process_path(
         context: schemathesis.hooks.HookContext, path: str, methods: Dict[str, Any]
     ) -> None:
@@ -121,6 +131,10 @@ Then, with this hook, you can query the database for some existing order and set
 Called just before schema instance is created. Takes a raw schema representation as a dictionary:
 
 .. code:: python
+
+    import schemathesis
+    from typing import Any, Dict
+
 
     def before_load_schema(
         context: schemathesis.hooks.HookContext,
@@ -136,6 +150,11 @@ This hook allows you to modify schema before loading.
 With this hook, you can add additional test cases that will be executed in Hypothesis ``explicit`` phase:
 
 .. code:: python
+
+    import schemathesis
+    from schemathesis import Case
+    from typing import List
+
 
     def before_add_examples(
         context: schemathesis.hooks.HookContext,
@@ -160,7 +179,9 @@ This hook allows you to extend or redefine a list of CLI handlers that will be u
     import click
     import schemathesis
     from schemathesis.cli.handlers import EventHandler
+    from schemathesis.cli.context import ExecutionContext
     from schemathesis.runner import events
+    from typing import List
 
 
     class SimpleHandler(EventHandler):
@@ -193,8 +214,12 @@ behavior in the API by changing the duplicate request's specific details.
 
 .. code:: python
 
+    from schemathesis import Case, GenericResponse, hooks
+    from typing import Optional
+
+
     def add_case(
-        context: HookContext, case: Case, response: GenericResponse
+        context: hooks.HookContext, case: Case, response: GenericResponse
     ) -> Optional[Case]:
         case.headers["Content-Type"] = "application/json"
         return case
@@ -204,8 +229,12 @@ an additional test case if the original case received a successful response from
 
 .. code:: python
 
+    from schemathesis import Case, GenericResponse, hooks
+    from typing import Optional
+
+
     def add_case(
-        context: HookContext, case: Case, response: GenericResponse
+        context: hooks.HookContext, case: Case, response: GenericResponse
     ) -> Optional[Case]:
         if 200 <= response.status_code < 300:
             # if the original case was successful, see if an invalid content type header produces a failure
@@ -231,7 +260,10 @@ You can teach Schemathesis to generate values that fit this format by registerin
 
 .. code-block:: python
 
-    strategy = strategies.from_regex(r"\A4[0-9]{15}\Z").filter(luhn_validator)
+    from hypothesis import strategies as st
+    import schemathesis
+
+    strategy = st.from_regex(r"\A4[0-9]{15}\Z").filter(luhn_validator)
     schemathesis.register_string_format("visa_cards", strategy)
 
 Schemathesis test runner

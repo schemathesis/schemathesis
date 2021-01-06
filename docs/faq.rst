@@ -86,6 +86,9 @@ The ``case`` object that is injected in each test can be modified, assuming your
 
 .. code:: python
 
+    schema = ...  # Load the API schema here
+
+
     @schema.parametrize()
     def test_api(case):
         case.path_parameters["user_id"] = 42

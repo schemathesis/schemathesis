@@ -10,6 +10,7 @@ Usage
 .. code:: python
 
     import schemathesis
+    from hypothesis import settings
 
     schema = schemathesis.graphql.from_url("https://bahnql.herokuapp.com/graphql")
 
