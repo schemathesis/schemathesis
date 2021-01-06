@@ -97,7 +97,7 @@ def test_hidden_failure(testdir, app_schema, openapi3_base_url):
 schema.base_url = "{openapi3_base_url}"
 TestStateful = schema.as_state_machine().TestCase
 TestStateful.settings = settings(
-    max_examples=200,
+    max_examples=500,
     deadline=None,
     suppress_health_check=HealthCheck.all(),
     stateful_step_count=3  # There is no need for longer sequences to uncover the bug
