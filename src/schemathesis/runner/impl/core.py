@@ -1,14 +1,16 @@
-# pylint: disable=too-many-statements
+# pylint: disable=too-many-statements,too-many-branches
 import logging
 import time
 from contextlib import contextmanager
 from types import TracebackType
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Type, Union, cast
+from warnings import WarningMessage, catch_warnings
 
 import attr
 import hypothesis
 import requests
 from _pytest.logging import LogCaptureHandler, catching_logs
+from hypothesis.errors import InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
@@ -19,7 +21,7 @@ from ...constants import (
     USER_AGENT,
     DataGenerationMethod,
 )
-from ...exceptions import CheckFailed, InvalidSchema, NonCheckError, get_grouped_exception
+from ...exceptions import CheckFailed, InvalidRegularExpression, InvalidSchema, NonCheckError, get_grouped_exception
 from ...hooks import HookContext, get_all_by_name
 from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResult, TestResultSet
 from ...runner import events
@@ -129,7 +131,7 @@ def run_test(  # pylint: disable=too-many-locals
     errors: List[Exception] = []
     test_start_time = time.monotonic()
     try:
-        with capture_hypothesis_output() as hypothesis_output:
+        with catch_warnings(record=True) as warnings, capture_hypothesis_output() as hypothesis_output:
             test(checks, targets, result, errors=errors, headers=headers, **kwargs)
         status = Status.success
     except CheckFailed:
@@ -169,6 +171,14 @@ def run_test(  # pylint: disable=too-many-locals
     except HypothesisRefResolutionError:
         status = Status.error
         result.add_error(hypothesis.errors.Unsatisfiable(RECURSIVE_REFERENCE_ERROR_MESSAGE))
+    except InvalidArgument as error:
+        status = Status.error
+        message = get_invalid_regular_expression_message(warnings)
+        if message:
+            # `hypothesis-jsonschema` emits a warning on invalid regular expression syntax
+            result.add_error(InvalidRegularExpression(message))
+        else:
+            result.add_error(error)
     except Exception as error:
         status = Status.error
         result.add_error(error)
@@ -186,6 +196,14 @@ def run_test(  # pylint: disable=too-many-locals
         hypothesis_output=hypothesis_output,
         operation=operation,
     )
+
+
+def get_invalid_regular_expression_message(warnings: List[WarningMessage]) -> Optional[str]:
+    for warning in warnings:
+        message = str(warning.message)
+        if "is not valid syntax for a Python regular expression" in message:
+            return message
+    return None
 
 
 def reraise(error: AssertionError) -> InvalidSchema:
