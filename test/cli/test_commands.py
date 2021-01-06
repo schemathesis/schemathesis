@@ -1172,6 +1172,7 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
 
 
 @pytest.mark.parametrize("workers", (1, 2))
+@pytest.mark.filterwarnings("ignore:Exception in thread")
 def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_20, workers):
     # When a Schemathesis run in interrupted by keyboard or via SIGINT
     operation = APIOperation("/success", "GET", {}, swagger_20, base_url=base_url)
@@ -1209,6 +1210,7 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
         assert_threaded_executor_interruption(lines, ("", "."))
 
 
+@pytest.mark.filterwarnings("ignore:Exception in thread")
 def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
     # When a Schemathesis run is interrupted by the keyboard or via SIGINT
     original = time.sleep
