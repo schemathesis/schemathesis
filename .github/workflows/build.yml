@@ -66,6 +66,17 @@ jobs:
       - run: pip install pre-commit
       - run: pre-commit run mypy --all-files
 
+  docs:
+    name: Documentation check
+    runs-on: ubuntu-latest
+    steps:
+     - uses: actions/checkout@v2
+       with:
+         fetch-depth: 1
+     - uses: ammaraskar/sphinx-action@master
+       with:
+         docs-folder: "docs/"
+
   tests:
     strategy:
       matrix:
