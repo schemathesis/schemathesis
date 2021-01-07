@@ -18,7 +18,7 @@ pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
 
 # Register Hypothesis profile. Could be used as
 # `pytest test -m hypothesis --hypothesis-profile <profile-name>`
-settings.register_profile("CI", max_examples=10000)
+settings.register_profile("CI", max_examples=1000)
 
 
 @pytest.fixture(scope="session")
