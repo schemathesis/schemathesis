@@ -91,6 +91,7 @@ IGNORED_PATTERNS = (
     "Failed to reproduce exception. Expected:",
     "Flaky example!",
     "Traceback (most recent call last):",
+    "You can reproduce this example by temporarily",
 )
 
 
