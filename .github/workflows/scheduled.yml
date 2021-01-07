@@ -127,5 +127,41 @@ jobs:
 
       - run: pip install poetry
       - run: poetry install
-      # It matches everything except that large MS API and all Azure.com APIs
-      - run: poetry run pytest test-corpus -k 'not (microsoft.com and graph) and not azure.com'
+      # It matches all Amazon APIs
+      - run: poetry run pytest test-corpus -k 'amazonaws.com'
+
+  test-corpus-part-4:
+    name: Corpus tests. Part 4
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          submodules: true
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - run: pip install poetry
+      - run: poetry install
+      # It matches all Google APIs
+      - run: poetry run pytest test-corpus -k 'googleapis.com'
+
+  test-corpus-part-5:
+    name: Corpus tests. Part 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          submodules: true
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - run: pip install poetry
+      - run: poetry install
+      # It matches everything except that large MS API and all Azure.com | Amazon | Google APIs
+      - run: poetry run pytest test-corpus -k 'not (microsoft.com and graph) and not azure.com and not amazonaws.com and not googleapis.com'
