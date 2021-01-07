@@ -512,8 +512,12 @@ def test_cli_run_only_failure(cli, cli_args, workers):
 
 
 @pytest.mark.operations("upload_file")
-def test_cli_binary_body(cli, schema_url):
-    result = cli.run(schema_url, "--hypothesis-suppress-health-check=filter_too_much")
+def test_cli_binary_body(cli, schema_url, hypothesis_max_examples):
+    result = cli.run(
+        schema_url,
+        "--hypothesis-suppress-health-check=filter_too_much",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+    )
     assert result.exit_code == ExitCode.OK, result.stdout
     assert " HYPOTHESIS OUTPUT " not in result.stdout
 
