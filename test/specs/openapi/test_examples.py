@@ -1,13 +1,16 @@
 from typing import Any, Dict
 
+import jsonschema
 import pytest
 import yaml
 from _pytest.main import ExitCode
 from hypothesis import find
 
 import schemathesis
+from schemathesis._hypothesis import get_single_example
 from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import examples
+from schemathesis.specs.openapi.parameters import parameters_to_json_schema
 from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
 
@@ -445,3 +448,31 @@ def test_invalid_x_examples(empty_open_api_2_schema):
     schema = schemathesis.from_dict(empty_open_api_2_schema)
     # Then such examples should be skipped as invalid (there should be an object)
     assert schema["/test"]["POST"].get_strategies_from_examples() == []
+
+
+def test_partial_examples(empty_open_api_3_schema):
+    # When the API schema contains multiple parameters in the same location
+    # And some of them don't have explicit examples and others do
+    empty_open_api_3_schema["paths"] = {
+        "/test/{foo}/{bar}/": {
+            "post": {
+                "parameters": [
+                    {"name": "foo", "in": "path", "required": True, "schema": {"type": "string", "enum": ["A"]}},
+                    {
+                        "name": "bar",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string", "example": "bar-example"},
+                    },
+                ],
+                "responses": {"default": {"description": "OK"}},
+            }
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    operation = schema["/test/{foo}/{bar}/"]["POST"]
+    strategy = operation.get_strategies_from_examples()[0]
+    # Then all generated examples should have those missing parts generated according to the API schema
+    example = get_single_example(strategy)
+    parameters_schema = parameters_to_json_schema(operation.path_parameters)
+    jsonschema.validate(example.path_parameters, parameters_schema)
