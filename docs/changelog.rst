@@ -52,6 +52,7 @@ Changelog
 - CLI crash on schemas with operation names longer than the current terminal width. `#990`_
 - Handling of API operations that contain reserved characters in their paths. `#992`_
 - CLI execution stops on errors during example generation. `#994`_
+- Fill missing properties in incomplete explicit examples for non-body parameters. `#1007`_
 
 **Deprecated**
 
@@ -1657,6 +1658,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1007: https://github.com/schemathesis/schemathesis/issues/1007
 .. _#1003: https://github.com/schemathesis/schemathesis/issues/1003
 .. _#994: https://github.com/schemathesis/schemathesis/issues/994
 .. _#992: https://github.com/schemathesis/schemathesis/issues/992

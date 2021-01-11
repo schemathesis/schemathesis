@@ -1,8 +1,8 @@
 import json
 import re
 from base64 import b64encode
-from contextlib import contextmanager
-from typing import Any, Callable, Dict, Generator, Optional, Tuple
+from contextlib import contextmanager, suppress
+from typing import Any, Callable, Dict, Generator, Iterable, Optional, Tuple, Union
 from urllib.parse import quote_plus
 
 from hypothesis import strategies as st
@@ -15,6 +15,7 @@ from ...exceptions import InvalidSchema
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import APIOperation, Case
 from ...schemas import BaseSchema
+from ...types import NotSet
 from ...utils import NOT_SET
 from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPIParameter, parameters_to_json_schema
@@ -79,38 +80,33 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     operation: APIOperation,
     hooks: Optional[HookDispatcher] = None,
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
-    path_parameters: Any = NOT_SET,
-    headers: Any = NOT_SET,
-    cookies: Any = NOT_SET,
-    query: Any = NOT_SET,
+    path_parameters: Union[NotSet, Dict[str, Any]] = NOT_SET,
+    headers: Union[NotSet, Dict[str, Any]] = NOT_SET,
+    cookies: Union[NotSet, Dict[str, Any]] = NOT_SET,
+    query: Union[NotSet, Dict[str, Any]] = NOT_SET,
     body: Any = NOT_SET,
 ) -> Any:
     """A strategy that creates `Case` instances.
 
     Explicit `path_parameters`, `headers`, `cookies`, `query`, `body` arguments will be used in the resulting `Case`
     object.
+
+    If such explicit parameters are composite (not `body`) and don't provide the whole set of parameters for that
+    location, then we generate what is missing and merge these two parts. Note that if parameters are optional, then
+    they may remain absent.
+
+    The primary purpose of this behavior is to prevent sending incomplete explicit examples by generating missing parts
+    as it works with `body`.
     """
     to_strategy = {DataGenerationMethod.positive: make_positive_strategy}[data_generation_method]
 
     context = HookContext(operation)
 
     with detect_invalid_schema(operation):
-        if path_parameters is NOT_SET:
-            strategy = get_parameters_strategy(operation, to_strategy, "path")
-            strategy = apply_hooks(operation, context, hooks, strategy, "path")
-            path_parameters = draw(strategy)
-        if headers is NOT_SET:
-            strategy = get_parameters_strategy(operation, to_strategy, "header")
-            strategy = apply_hooks(operation, context, hooks, strategy, "header")
-            headers = draw(strategy)
-        if cookies is NOT_SET:
-            strategy = get_parameters_strategy(operation, to_strategy, "cookie")
-            strategy = apply_hooks(operation, context, hooks, strategy, "cookie")
-            cookies = draw(strategy)
-        if query is NOT_SET:
-            strategy = get_parameters_strategy(operation, to_strategy, "query")
-            strategy = apply_hooks(operation, context, hooks, strategy, "query")
-            query = draw(strategy)
+        path_parameters = get_parameters_value(path_parameters, "path", draw, operation, context, hooks, to_strategy)
+        headers = get_parameters_value(headers, "header", draw, operation, context, hooks, to_strategy)
+        cookies = get_parameters_value(cookies, "cookie", draw, operation, context, hooks, to_strategy)
+        query = get_parameters_value(query, "query", draw, operation, context, hooks, to_strategy)
 
         media_type = None
         if body is NOT_SET:
@@ -185,8 +181,35 @@ def _get_body_strategy(
     return strategy
 
 
+def get_parameters_value(
+    value: Union[NotSet, Dict[str, Any]],
+    location: str,
+    draw: Callable,
+    operation: APIOperation,
+    context: HookContext,
+    hooks: Optional[HookDispatcher],
+    to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy],
+) -> Dict[str, Any]:
+    """Get the final value for the specified location.
+
+    If the value is not set, then generate it from the relevant strategy. Otherwise, check what is missing in it and
+    generate those parts.
+    """
+    if isinstance(value, NotSet):
+        strategy = get_parameters_strategy(operation, to_strategy, location)
+        strategy = apply_hooks(operation, context, hooks, strategy, location)
+        return draw(strategy)
+    strategy = get_parameters_strategy(operation, to_strategy, location, exclude=value.keys())
+    strategy = apply_hooks(operation, context, hooks, strategy, location)
+    value.update(draw(strategy))
+    return value
+
+
 def get_parameters_strategy(
-    operation: APIOperation, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], location: str
+    operation: APIOperation,
+    to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy],
+    location: str,
+    exclude: Iterable[str] = (),
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
     parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
@@ -198,6 +221,12 @@ def get_parameters_strategy(
             # In this case, we know that the `required` keyword should always be `True`.
             schema["required"] = list(schema["properties"])
         schema = operation.schema.prepare_schema(schema)
+        for name in exclude:
+            # Values from `exclude` are not necessarily valid for the schema - they come from user-defined examples
+            # that may be invalid
+            schema["properties"].pop(name, None)
+            with suppress(ValueError):
+                schema["required"].remove(name)
         strategy = to_strategy(schema)
         serialize = operation.get_parameter_serializer(location)
         if serialize is not None:
