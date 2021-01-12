@@ -46,15 +46,17 @@ class SerializedError:
     exception: str = attr.ib()  # pragma: no mutate
     exception_with_traceback: str = attr.ib()  # pragma: no mutate
     example: Optional[SerializedCase] = attr.ib()  # pragma: no mutate
+    title: Optional[str] = attr.ib()  # pragma: no mutate
 
     @classmethod
     def from_error(
-        cls, exception: Exception, case: Optional[Case], headers: Optional[Dict[str, Any]]
+        cls, exception: Exception, case: Optional[Case], headers: Optional[Dict[str, Any]], title: Optional[str] = None
     ) -> "SerializedError":
         return cls(
             exception=format_exception(exception),
             exception_with_traceback=format_exception(exception, True),
             example=SerializedCase.from_case(case, headers) if case else None,
+            title=title,
         )
 
 

@@ -792,6 +792,7 @@ class TestResultSet:
     """Set of multiple test results."""
 
     results: List[TestResult] = attr.ib(factory=list)  # pragma: no mutate
+    generic_errors: List[InvalidSchema] = attr.ib(factory=list)  # pragma: no mutate
 
     def __iter__(self) -> Iterator[TestResult]:
         return iter(self.results)
@@ -799,7 +800,7 @@ class TestResultSet:
     @property
     def is_empty(self) -> bool:
         """If the result set contains no results."""
-        return len(self.results) == 0
+        return len(self.results) == 0 and len(self.generic_errors) == 0
 
     @property
     def has_failures(self) -> bool:
@@ -829,7 +830,7 @@ class TestResultSet:
 
     @property
     def errored_count(self) -> int:
-        return self._count(lambda result: result.has_errors or result.is_errored)
+        return self._count(lambda result: result.has_errors or result.is_errored) + len(self.generic_errors)
 
     @property
     def total(self) -> Dict[str, Dict[Union[str, Status], int]]:

@@ -124,13 +124,13 @@ def schema_with_property_examples(dict_with_property_examples) -> BaseOpenAPISch
 @pytest.fixture()
 def operation(schema_with_examples) -> APIOperation:
     """Returns first (and only) API operation from schema_with_examples."""
-    return next(schema_with_examples.get_all_operations())
+    return next(schema_with_examples.get_all_operations()).ok()
 
 
 @pytest.fixture()
 def operation_with_property_examples(schema_with_property_examples) -> APIOperation:
     """Returns first (and only) API operation from schema_with_examples."""
-    return next(schema_with_property_examples.get_all_operations())
+    return next(schema_with_property_examples.get_all_operations()).ok()
 
 
 def test_get_parameter_examples(operation):

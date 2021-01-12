@@ -8,6 +8,7 @@ from hypothesis.strategies import SearchStrategy, none
 from requests.structures import CaseInsensitiveDict
 
 from ....stateful import APIStateMachine, Direction, StepResult
+from ....utils import Ok
 from .. import expressions
 from ..links import OpenAPILink
 from . import links
@@ -34,8 +35,9 @@ def create_state_machine(schema: "BaseOpenAPISchema") -> Type[APIStateMachine]:
     """
     bundles = init_bundles(schema)
     connections: APIOperationConnections = defaultdict(list)
-    for operation in schema.get_all_operations():
-        links.apply(operation, bundles, connections)
+    for result in schema.get_all_operations():
+        if isinstance(result, Ok):
+            links.apply(result.ok(), bundles, connections)
 
     rules = make_all_rules(schema, bundles, connections)
 
@@ -50,9 +52,11 @@ def init_bundles(schema: "BaseOpenAPISchema") -> Dict[str, CaseInsensitiveDict]:
     We need to create bundles first, so they can be referred when building connections between operations.
     """
     output: Dict[str, CaseInsensitiveDict] = {}
-    for operation in schema.get_all_operations():
-        output.setdefault(operation.path, CaseInsensitiveDict())
-        output[operation.path][operation.method.upper()] = Bundle(operation.verbose_name)  # type: ignore
+    for result in schema.get_all_operations():
+        if isinstance(result, Ok):
+            operation = result.ok()
+            output.setdefault(operation.path, CaseInsensitiveDict())
+            output[operation.path][operation.method.upper()] = Bundle(operation.verbose_name)  # type: ignore
     return output
 
 
@@ -62,7 +66,7 @@ def make_all_rules(
     """Create rules for all API operations, based on the provided connections."""
     return {
         f"rule {operation.verbose_name} {idx}": new
-        for operation in schema.get_all_operations()
+        for operation in (result.ok() for result in schema.get_all_operations() if isinstance(result, Ok))
         for idx, new in enumerate(make_rules(operation, bundles[operation.path][operation.method.upper()], connections))
     }
 

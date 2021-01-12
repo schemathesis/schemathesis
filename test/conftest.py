@@ -196,7 +196,7 @@ def cli():
     return Runner()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def simple_schema():
     return {
         "swagger": "2.0",
@@ -236,6 +236,23 @@ def empty_open_api_3_schema():
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
         "paths": {},
     }
+
+
+@pytest.fixture
+def open_api_3_schema_with_recoverable_errors(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/foo": {"$ref": "#/components/UnknownMethods"},
+        "/bar": {
+            "get": {
+                "responses": {"200": {"description": "OK"}},
+            },
+            "post": {
+                "parameters": [{"$ref": "#/components/UnknownParameter"}],
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    return empty_open_api_3_schema
 
 
 @pytest.fixture(scope="session")

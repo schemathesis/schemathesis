@@ -16,7 +16,7 @@ from .._hypothesis import create_test
 from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from ..exceptions import InvalidSchema
 from ..models import APIOperation
-from ..utils import is_schemathesis_test
+from ..utils import Ok, Result, is_schemathesis_test
 
 USE_FROM_PARENT = version.parse(pytest.__version__) >= version.parse("5.4.0")
 
@@ -65,7 +65,7 @@ class SchemathesisCase(PyCollector):
         )
 
     def _gen_items(
-        self, operation: APIOperation, data_generation_method: DataGenerationMethod
+        self, result: Result[APIOperation, InvalidSchema], data_generation_method: DataGenerationMethod
     ) -> Generator[SchemathesisFunction, None, None]:
         """Generate all tests for the given API operation.
 
@@ -75,14 +75,26 @@ class SchemathesisCase(PyCollector):
         This implementation is based on the original one in pytest, but with slight adjustments
         to produce tests out of hypothesis ones.
         """
-        name = self._get_test_name(operation, data_generation_method)
-        funcobj = create_test(
-            operation=operation,
-            test=self.test_function,
-            _given_args=self.given_args,
-            _given_kwargs=self.given_kwargs,
-            data_generation_method=data_generation_method,
-        )
+        if isinstance(result, Ok):
+            operation = result.ok()
+            funcobj = create_test(
+                operation=operation,
+                test=self.test_function,
+                _given_args=self.given_args,
+                _given_kwargs=self.given_kwargs,
+                data_generation_method=data_generation_method,
+            )
+            name = self._get_test_name(operation, data_generation_method)
+        else:
+            error = result.err()
+            funcobj = error.as_failing_test_function()
+            name = self.name
+            # `full_path` is always available in this case
+            if error.method:
+                name += f"[{error.method.upper()}:{error.full_path}]"
+            else:
+                name += f"[{error.full_path}]"
+            name += f"[{data_generation_method.as_short_name()}]"
 
         cls = self._get_class_parent()
         definition: FunctionDefinition = create(FunctionDefinition, name=self.name, parent=self.parent, callobj=funcobj)

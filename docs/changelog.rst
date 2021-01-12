@@ -34,6 +34,8 @@ Changelog
 - ``--skip-deprecated-endpoints`` is renamed to ``--skip-deprecated-operations``. `#869`_
 - Rename various internal API methods that contained ``endpoint`` in their names. `#869`_
 - Bump ``hypothesis-jsonschema`` version to ``0.19.0``. This version improves the handling of unsupported regular expression syntax and can generate data for a subset of schemas containing such regular expressions.
+- Schemathesis doesn't stop testing on errors during schema parsing. These errors are handled the same way as other errors
+  during the testing process. It allows Schemathesis to test API operations with valid definitions and report problematic operations instead of failing the whole run. `#999`_
 
 **Fixed**
 
@@ -1660,6 +1662,7 @@ Deprecated
 
 .. _#1007: https://github.com/schemathesis/schemathesis/issues/1007
 .. _#1003: https://github.com/schemathesis/schemathesis/issues/1003
+.. _#999: https://github.com/schemathesis/schemathesis/issues/999
 .. _#994: https://github.com/schemathesis/schemathesis/issues/994
 .. _#992: https://github.com/schemathesis/schemathesis/issues/992
 .. _#990: https://github.com/schemathesis/schemathesis/issues/990

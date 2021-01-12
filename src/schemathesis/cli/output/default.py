@@ -10,7 +10,7 @@ from ..._compat import metadata
 from ...constants import __version__
 from ...models import Status
 from ...runner import events
-from ...runner.serialization import SerializedCase, SerializedTestResult
+from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult
 from ..context import ExecutionContext
 from ..handlers import EventHandler, get_unique_failures
 
@@ -116,6 +116,8 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
         if not result.has_errors:
             continue
         display_single_error(context, result)
+    if event.generic_errors:
+        display_generic_errors(context, event.generic_errors)
     if not context.show_errors_tracebacks:
         click.secho(
             "Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks", fg="red"
@@ -125,15 +127,25 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
 def display_single_error(context: ExecutionContext, result: SerializedTestResult) -> None:
     display_subsection(result)
     for error in result.errors:
-        if context.show_errors_tracebacks:
-            message = error.exception_with_traceback
-        else:
-            message = error.exception
-        if error.exception.startswith("InvalidSchema") and context.validate_schema:
-            message += DISABLE_SCHEMA_VALIDATION_MESSAGE + "\n"
-        click.secho(message, fg="red")
-        if error.example is not None:
-            display_example(context, error.example, seed=result.seed)
+        _display_error(context, error, result.seed)
+
+
+def display_generic_errors(context: ExecutionContext, errors: List[SerializedError]) -> None:
+    for error in errors:
+        display_section_name(error.title or "Generic error", "_", fg="red")
+        _display_error(context, error)
+
+
+def _display_error(context: ExecutionContext, error: SerializedError, seed: Optional[int] = None) -> None:
+    if context.show_errors_tracebacks:
+        message = error.exception_with_traceback
+    else:
+        message = error.exception
+    if error.exception.startswith("InvalidSchema") and context.validate_schema:
+        message += DISABLE_SCHEMA_VALIDATION_MESSAGE + "\n"
+    click.secho(message, fg="red")
+    if error.example is not None:
+        display_example(context, error.example, seed=seed)
 
 
 def display_failures(context: ExecutionContext, event: events.Finished) -> None:
