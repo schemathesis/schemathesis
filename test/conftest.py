@@ -478,7 +478,7 @@ def testdir(testdir):
             """
         import pytest
         import schemathesis
-        from schemathesis import Stateful
+        from schemathesis.stateful import Stateful
         from schemathesis.utils import NOT_SET
         from test.utils import *
         from hypothesis import given, settings, HealthCheck, Phase, assume, strategies as st
