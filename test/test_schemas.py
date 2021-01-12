@@ -1,6 +1,3 @@
-from copy import deepcopy
-from test.utils import as_param
-
 import pytest
 from jsonschema import ValidationError
 
@@ -9,6 +6,7 @@ from schemathesis.exceptions import InvalidSchema
 from schemathesis.parameters import PayloadAlternatives
 from schemathesis.specs.openapi.parameters import OpenAPI20Body
 from schemathesis.specs.openapi.schemas import InliningResolver
+from schemathesis.utils import Err, Ok
 
 
 @pytest.mark.parametrize("base_path", ("/v1", "/v1/"))
@@ -111,19 +109,56 @@ def test_resolving_multiple_files():
     )
 
 
+def test_schema_parsing_error(simple_schema):
+    # When API operation contains unresolvable reference on its parameter level
+    simple_schema["paths"]["/users"]["get"]["parameters"] = [{"$ref": "#/definitions/SimpleIntRef"}]
+    simple_schema["paths"]["/foo"] = {"post": RESPONSES}
+    # Then it is not detectable during the schema validation
+    schema = schemathesis.from_dict(simple_schema)
+    # And is represented as an `Err` instance during operations parsing
+    operations = list(schema.get_all_operations())
+    assert len(operations) == 2
+    errors = [op.err() for op in operations if isinstance(op, Err)]
+    assert len(errors) == 1
+    # And `path` and `method` are known for this error
+    assert errors[0].path == "/users"
+    assert errors[0].method == "get"
+    # And all valid operations should be parsed as `Ok`
+    oks = [op.ok() for op in operations if isinstance(op, Ok)]
+    assert len(oks) == 1
+    assert oks[0].path == "/foo"
+    assert oks[0].method == "post"
+
+
 @pytest.mark.parametrize("validate_schema, expected_exception", ((False, InvalidSchema), (True, ValidationError)))
-@pytest.mark.parametrize("error_type", ("KeyError", "AttributeError", "RefResolutionError"))
-def test_schema_parsing_error(simple_schema, error_type, validate_schema, expected_exception):
-    raw_schema = deepcopy(simple_schema)
-    if error_type == "KeyError":
-        raw_schema.pop("paths")
-    elif error_type == "AttributeError":
-        raw_schema["paths"] = {None: ""}
-    elif error_type == "RefResolutionError":
-        raw_schema["paths"]["/users"]["get"]["parameters"] = [as_param({"$ref": "#/definitions/SimpleIntRef"})]
+def test_not_recoverable_schema_error(simple_schema, validate_schema, expected_exception):
+    # When there is an error in the API schema that leads to inability to generate any tests
+    del simple_schema["paths"]
+    # Then it is an explicit exception either during schema loading or processing API operations
     with pytest.raises(expected_exception):
-        schema = schemathesis.from_dict(raw_schema, validate_schema=validate_schema)
+        schema = schemathesis.from_dict(simple_schema, validate_schema=validate_schema)
         list(schema.get_all_operations())
+
+
+def test_schema_error_on_path(simple_schema):
+    # When there is an error that affects only a subset of paths
+    simple_schema["paths"] = {None: "", "/foo": {"post": RESPONSES}}
+    # Then it should be rejected during loading if schema validation is enabled
+    with pytest.raises(ValidationError):
+        schemathesis.from_dict(simple_schema)
+    # And should produce an `Err` instance on operation parsing
+    schema = schemathesis.from_dict(simple_schema, validate_schema=False)
+    operations = list(schema.get_all_operations())
+    assert len(operations) == 2
+    errors = [op for op in operations if isinstance(op, Err)]
+    assert len(errors) == 1
+    assert errors[0].err().path is None
+    assert errors[0].err().method is None
+    # And all valid operations should be parsed as `Ok`
+    oks = [op for op in operations if isinstance(op, Ok)]
+    assert len(oks) == 1
+    assert oks[0].ok().path == "/foo"
+    assert oks[0].ok().method == "post"
 
 
 RESPONSES = {"responses": {"200": {"description": "OK"}}}

@@ -10,10 +10,11 @@ from hypothesis_graphql import strategies as gql_st
 
 from ... import DataGenerationMethod
 from ...checks import not_a_server_error
+from ...exceptions import InvalidSchema
 from ...hooks import HookDispatcher
 from ...models import APIOperation, Case, CheckFunction
 from ...schemas import BaseSchema
-from ...utils import GenericResponse
+from ...utils import GenericResponse, Ok, Result
 
 
 @attr.s()  # pragma: no mutate
@@ -64,9 +65,11 @@ class GraphQLSchema(BaseSchema):
     def _get_base_path(self) -> str:
         return cast(str, urlsplit(self.location).path)
 
-    def get_all_operations(self) -> Generator[APIOperation, None, None]:
-        yield APIOperation(
-            base_url=self.get_base_url(), path=self.base_path, method="POST", schema=self, definition=None  # type: ignore
+    def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+        yield Ok(
+            APIOperation(
+                base_url=self.get_base_url(), path=self.base_path, method="POST", schema=self, definition=None  # type: ignore
+            )
         )
 
     def get_case_strategy(

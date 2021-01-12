@@ -29,7 +29,8 @@ from ...schemas import BaseSchema
 from ...stateful import Feedback, Stateful
 from ...targets import Target, TargetContext
 from ...types import RawAuth
-from ...utils import GenericResponse, WSGIResponse, capture_hypothesis_output, format_exception
+from ...utils import GenericResponse, Ok, WSGIResponse, capture_hypothesis_output, format_exception
+from ..serialization import SerializedTestResult
 
 
 def get_hypothesis_settings(hypothesis_options: Dict[str, Any]) -> hypothesis.settings:
@@ -83,29 +84,75 @@ class BaseRunner:
         template: Callable,
         settings: hypothesis.settings,
         seed: Optional[int],
+        results: TestResultSet,
         recursion_level: int = 0,
         **kwargs: Any,
     ) -> Generator[events.ExecutionEvent, None, None]:
         """Run tests and recursively run additional tests."""
         if recursion_level > self.stateful_recursion_limit:
             return
-        for operation, data_generation_method, test in maker(template, settings, seed):
-            feedback = Feedback(self.stateful, operation)
-            for event in run_test(
-                operation,
-                test,
-                feedback=feedback,
-                recursion_level=recursion_level,
-                data_generation_method=data_generation_method,
-                **kwargs,
-            ):
-                yield event
-                if isinstance(event, events.Interrupted):
-                    return
-            # Additional tests, generated via the `feedback` instance
-            yield from self._run_tests(
-                feedback.get_stateful_tests, template, settings, seed, recursion_level=recursion_level + 1, **kwargs
-            )
+        for result, data_generation_method in maker(template, settings, seed):
+            if isinstance(result, Ok):
+                operation, test = result.ok()
+                feedback = Feedback(self.stateful, operation)
+                for event in run_test(
+                    operation,
+                    test,
+                    results=results,
+                    feedback=feedback,
+                    recursion_level=recursion_level,
+                    data_generation_method=data_generation_method,
+                    **kwargs,
+                ):
+                    yield event
+                    if isinstance(event, events.Interrupted):
+                        return
+                # Additional tests, generated via the `feedback` instance
+                yield from self._run_tests(
+                    feedback.get_stateful_tests,
+                    template,
+                    settings,
+                    seed,
+                    recursion_level=recursion_level + 1,
+                    results=results,
+                    **kwargs,
+                )
+            else:
+                # Schema errors
+                yield from handle_schema_error(result.err(), results, data_generation_method, recursion_level)
+
+
+def handle_schema_error(
+    error: InvalidSchema, results: TestResultSet, data_generation_method: DataGenerationMethod, recursion_level: int
+) -> Generator[events.ExecutionEvent, None, None]:
+    if error.method is not None:
+        assert error.path is not None
+        assert error.full_path is not None
+        method = error.method.upper()
+        result = TestResult(
+            method=method,
+            path=error.full_path,
+            data_generation_method=data_generation_method,
+        )
+        result.add_error(error)
+
+        yield events.BeforeExecution(
+            method=method, path=error.full_path, relative_path=error.path, recursion_level=recursion_level
+        )
+        yield events.AfterExecution(
+            method=method,
+            path=error.full_path,
+            relative_path=error.path,
+            status=Status.error,
+            result=SerializedTestResult.from_test_result(result),
+            elapsed_time=0.0,
+            hypothesis_output=[],
+        )
+        results.append(result)
+    else:
+        # When there is no `method`, then the schema error may cover multiple operations and we can't display it in
+        # the progress bar
+        results.generic_errors.append(error)
 
 
 def run_test(  # pylint: disable=too-many-locals

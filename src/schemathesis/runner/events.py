@@ -8,7 +8,7 @@ from ..exceptions import HTTPError
 from ..models import APIOperation, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
 from ..utils import format_exception
-from .serialization import SerializedTestResult
+from .serialization import SerializedError, SerializedTestResult
 
 
 @attr.s()  # pragma: no mutate
@@ -158,6 +158,7 @@ class Finished(ExecutionEvent):
     has_errors: bool = attr.ib()  # pragma: no mutate
     has_logs: bool = attr.ib()  # pragma: no mutate
     is_empty: bool = attr.ib()  # pragma: no mutate
+    generic_errors: List[SerializedError] = attr.ib()  # pragma: no mutate
 
     total: Dict[str, Dict[Union[str, Status], int]] = attr.ib()  # pragma: no mutate
 
@@ -175,5 +176,8 @@ class Finished(ExecutionEvent):
             has_logs=results.has_logs,
             is_empty=results.is_empty,
             total=results.total,
+            generic_errors=[
+                SerializedError.from_error(error, None, None, error.full_path) for error in results.generic_errors
+            ],
             running_time=running_time,
         )
