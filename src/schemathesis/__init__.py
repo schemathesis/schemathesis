@@ -9,3 +9,6 @@ from .stateful import Stateful
 from .utils import GenericResponse
 
 init_default_strategies()
+
+# Is not a part of the public API
+del init_default_strategies
