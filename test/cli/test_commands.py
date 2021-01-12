@@ -1604,6 +1604,7 @@ def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_lim
         "--hypothesis-seed=1",
         "--hypothesis-derandomize",
         "--hypothesis-deadline=None",
+        "--hypothesis-suppress-health-check=too_slow,filter_too_much",
         "--show-errors-tracebacks",
         "--stateful=links",
         f"--stateful-recursion-limit={recursion_limit}",
