@@ -19,11 +19,12 @@ from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import create_test
 from .constants import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
+from .exceptions import InvalidSchema
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import APIOperation, Case
 from .stateful import APIStateMachine, Stateful, StatefulTest
 from .types import Filter, FormData, GenericTest, NotSet
-from .utils import NOT_SET, GenericResponse
+from .utils import NOT_SET, Err, GenericResponse, Ok, Result
 
 
 class MethodsDict(CaseInsensitiveDict):
@@ -117,11 +118,14 @@ class BaseSchema(Mapping):
     def operations_count(self) -> int:
         total = 0
         # Avoid creating a list of all operation - for large schemas it consumes too much memory
-        for _ in self.get_all_operations():
-            total += 1
+        for result in self.get_all_operations():
+            if isinstance(result, Ok) or (isinstance(result, Err) and result.err().method is not None):
+                total += 1
+            # In the `Err` case without `method` we don't know how many operations are there.
+            # it happens when all operations are behind an unresolvable reference
         return total
 
-    def get_all_operations(self) -> Generator[APIOperation, None, None]:
+    def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         raise NotImplementedError
 
     def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
@@ -143,18 +147,21 @@ class BaseSchema(Mapping):
         func: Callable,
         settings: Optional[hypothesis.settings] = None,
         seed: Optional[int] = None,
-    ) -> Generator[Tuple[APIOperation, DataGenerationMethod, Callable], None, None]:
+    ) -> Generator[Tuple[Result[Tuple[APIOperation, Callable], InvalidSchema], DataGenerationMethod], None, None]:
         """Generate all operations and Hypothesis tests for them."""
-        for operation in self.get_all_operations():
+        for result in self.get_all_operations():
             for data_generation_method in self.data_generation_methods:
-                test = create_test(
-                    operation=operation,
-                    test=func,
-                    settings=settings,
-                    seed=seed,
-                    data_generation_method=data_generation_method,
-                )
-                yield operation, data_generation_method, test
+                if isinstance(result, Ok):
+                    test = create_test(
+                        operation=result.ok(),
+                        test=func,
+                        settings=settings,
+                        seed=seed,
+                        data_generation_method=data_generation_method,
+                    )
+                    yield Ok((result.ok(), test)), data_generation_method
+                else:
+                    yield result, data_generation_method
 
     def parametrize(
         self,
@@ -293,9 +300,13 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
 
-def operations_to_dict(operations: Generator[APIOperation, None, None]) -> Dict[str, MethodsDict]:
+def operations_to_dict(
+    operations: Generator[Result[APIOperation, InvalidSchema], None, None]
+) -> Dict[str, MethodsDict]:
     output: Dict[str, MethodsDict] = {}
-    for operation in operations:
-        output.setdefault(operation.path, MethodsDict())
-        output[operation.path][operation.method] = operation
+    for result in operations:
+        if isinstance(result, Ok):
+            operation = result.ok()
+            output.setdefault(operation.path, MethodsDict())
+            output[operation.path][operation.method] = operation
     return output

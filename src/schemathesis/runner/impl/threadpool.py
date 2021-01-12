@@ -12,9 +12,9 @@ from ...models import CheckFunction, TestResultSet
 from ...stateful import Feedback, Stateful
 from ...targets import Target
 from ...types import RawAuth
-from ...utils import capture_hypothesis_output, get_requests_auth
+from ...utils import Ok, capture_hypothesis_output, get_requests_auth
 from .. import events
-from .core import BaseRunner, asgi_test, get_session, network_test, run_test, wsgi_test
+from .core import BaseRunner, asgi_test, get_session, handle_schema_error, network_test, run_test, wsgi_test
 
 
 def _run_task(
@@ -33,9 +33,11 @@ def _run_task(
     def _run_tests(maker: Callable, recursion_level: int = 0) -> None:
         if recursion_level > stateful_recursion_limit:
             return
-        for _operation, data_generation_method, test in maker(test_template, settings, seed):
+        for _result, _data_generation_method in maker(test_template, settings, seed):
+            # `result` is always `Ok` here
+            _operation, test = _result.ok()
             feedback = Feedback(stateful, _operation)
-            for event in run_test(
+            for _event in run_test(
                 _operation,
                 test,
                 checks,
@@ -46,25 +48,31 @@ def _run_task(
                 feedback=feedback,
                 **kwargs,
             ):
-                events_queue.put(event)
+                events_queue.put(_event)
             _run_tests(feedback.get_stateful_tests, recursion_level + 1)
 
     with capture_hypothesis_output():
         while not tasks_queue.empty():
-            operation, data_generation_method = tasks_queue.get()
-            items = (
-                operation,
-                data_generation_method,
-                create_test(
+            result, data_generation_method = tasks_queue.get()
+            if isinstance(result, Ok):
+                operation = result.ok()
+                test_function = create_test(
                     operation=operation,
                     test=test_template,
                     settings=settings,
                     seed=seed,
                     data_generation_method=data_generation_method,
-                ),
-            )
-            # This lambda ignores the input arguments to support the same interface for `feedback.get_stateful_tests`
-            _run_tests(lambda *_: (items,))
+                )
+                items = (
+                    Ok((operation, test_function)),
+                    data_generation_method,
+                )
+                # This lambda ignores the input arguments to support the same interface for
+                # `feedback.get_stateful_tests`
+                _run_tests(lambda *_: (items,))
+            else:
+                for event in handle_schema_error(result.err(), results, data_generation_method, 0):
+                    events_queue.put(event)
 
 
 def thread_task(

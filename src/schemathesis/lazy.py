@@ -10,7 +10,7 @@ from .hooks import HookDispatcher, HookScope
 from .models import APIOperation
 from .schemas import BaseSchema
 from .types import Filter, GenericTest, NotSet
-from .utils import NOT_SET
+from .utils import NOT_SET, Ok
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -49,6 +49,7 @@ class LazySchema:
         def wrapper(func: Callable) -> Callable:
             def test(request: FixtureRequest, subtests: SubTests) -> None:
                 """The actual test, which is executed by pytest."""
+                __tracebackhide__ = True  # pylint: disable=unused-variable
                 if hasattr(test, "_schemathesis_hooks"):
                     func._schemathesis_hooks = test._schemathesis_hooks  # type: ignore
                 schema = get_schema(
@@ -70,9 +71,22 @@ class LazySchema:
                 settings = getattr(test, "_hypothesis_internal_use_settings", None)
                 tests = list(schema.get_all_tests(func, settings))
                 request.session.testscollected += len(tests)
-                for operation, data_generation_method, sub_test in tests:
-                    subtests.item._nodeid = _get_node_name(node_id, operation, data_generation_method)
-                    run_subtest(operation, fixtures, sub_test, subtests)
+                for result, data_generation_method in tests:
+                    if isinstance(result, Ok):
+                        operation, sub_test = result.ok()
+                        subtests.item._nodeid = _get_node_name(node_id, operation, data_generation_method)
+                        run_subtest(operation, fixtures, sub_test, subtests)
+                    else:
+                        # Schema errors
+                        error = result.err()
+                        sub_test = error.as_failing_test_function()
+                        # `full_path` is always available in this case
+                        kwargs = {"path": error.full_path}
+                        if error.method:
+                            kwargs["method"] = error.method.upper()
+                        subtests.item._nodeid = _get_partial_node_name(node_id, data_generation_method, **kwargs)
+                        with subtests.test(**kwargs):
+                            sub_test()
                 subtests.item._nodeid = node_id
 
             # Needed to prevent a failure when settings are applied to the test function
@@ -86,6 +100,17 @@ class LazySchema:
 def _get_node_name(node_id: str, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:
     """Make a test node name. For example: test_api[GET:/users]."""
     return f"{node_id}[{operation.method.upper()}:{operation.full_path}][{data_generation_method.as_short_name()}]"
+
+
+def _get_partial_node_name(node_id: str, data_generation_method: DataGenerationMethod, **kwargs: Any) -> str:
+    """Make a test node name for failing tests caused by schema errors."""
+    name = node_id
+    if "method" in kwargs:
+        name += f"[{kwargs['method']}:{kwargs['path']}]"
+    else:
+        name += f"[{kwargs['path']}]"
+    name += f"[{data_generation_method.as_short_name()}]"
+    return name
 
 
 def run_subtest(operation: APIOperation, fixtures: Dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:

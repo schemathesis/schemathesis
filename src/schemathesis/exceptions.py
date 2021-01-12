@@ -1,6 +1,6 @@
 from hashlib import sha1
 from json import JSONDecodeError
-from typing import Dict, Type, Union
+from typing import Any, Callable, Dict, NoReturn, Optional, Type, Union
 
 import attr
 from jsonschema import ValidationError
@@ -82,10 +82,27 @@ def get_headers_error(message: str) -> Type[CheckFailed]:
     return _get_hashed_exception("MissingHeadersError", message)
 
 
+@attr.s(slots=True)
 class InvalidSchema(Exception):
     """Schema associated with an API operation contains an error."""
 
     __module__ = "builtins"
+    message: Optional[str] = attr.ib(default=None)
+    path: Optional[str] = attr.ib(default=None)
+    method: Optional[str] = attr.ib(default=None)
+    full_path: Optional[str] = attr.ib(default=None)
+
+    def as_failing_test_function(self) -> Callable:
+        """Create a test function that will fail.
+
+        This approach allows us to use default pytest reporting style for operation-level schema errors.
+        """
+
+        def actual_test(*args: Any, **kwargs: Any) -> NoReturn:
+            __tracebackhide__ = True  # pylint: disable=unused-variable
+            raise self
+
+        return actual_test
 
 
 class NonCheckError(Exception):

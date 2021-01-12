@@ -24,7 +24,7 @@ from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import BaseSchema
 from ...stateful import APIStateMachine, Stateful, StatefulTest
 from ...types import FormData
-from ...utils import GenericResponse, get_response_payload, is_json_media_type
+from ...utils import Err, GenericResponse, Ok, Result, get_response_payload, is_json_media_type
 from . import links, serialization
 from ._hypothesis import get_case_strategy
 from .converter import to_json_schema_recursive
@@ -47,6 +47,9 @@ from .parameters import (
 from .references import RECURSION_DEPTH_LIMIT, ConvertingResolver, InliningResolver
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
+
+SCHEMA_ERROR_MESSAGE = "Schema parsing failed. Please check your schema."
+SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError)
 
 
 class BaseOpenAPISchema(BaseSchema):
@@ -73,42 +76,76 @@ class BaseOpenAPISchema(BaseSchema):
         info = self.raw_schema["info"]
         return f"{self.__class__.__name__} for {info['title']} ({info['version']})"
 
-    def get_all_operations(self) -> Generator[APIOperation, None, None]:
+    def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+        """Iterate over all operations defined in the API.
+
+        Each yielded item is either `Ok` or `Err`, depending on the presence of errors during schema processing.
+
+        There are two cases for the `Err` variant:
+
+          1. The error happened while resolving a group of API operations. In Open API, you can put all operations for
+             a specific path behind a reference, and if it is not resolvable, then all operations won't be available
+             for testing. For example - a file with those definitions was removed. Here we know the path but don't
+             know what operations are there.
+          2. Errors while processing a known API operation.
+
+        In both cases, Schemathesis lets the callee decide what to do with these variants. It allows it to test valid
+        operations and show errors for invalid ones.
+        """
         try:
             paths = self.raw_schema["paths"]  # pylint: disable=unsubscriptable-object
-            context = HookContext()
-            for path, methods in paths.items():
-                full_path = self.get_full_path(path)
+        except KeyError as exc:
+            # Missing `paths` is not recoverable
+            raise InvalidSchema(SCHEMA_ERROR_MESSAGE) from exc
+
+        context = HookContext()
+        for path, methods in paths.items():
+            method = None
+            try:
+                full_path = self.get_full_path(path)  # Should be available for later use
                 if should_skip_endpoint(full_path, self.endpoint):
                     continue
                 self.dispatch_hook("before_process_path", context, path, methods)
                 scope, raw_methods = self._resolve_methods(methods)
-                # Setting a low recursion limit doesn't solve the problem with recursive references & inlining too much
-                # but decreases the number of cases when Schemathesis stuck on this step.
-                methods = self.resolver.resolve_all(methods, RECURSION_DEPTH_LIMIT - 5)
                 common_parameters = methods.get("parameters", [])
-                for method, resolved_definition in methods.items():
-                    # Only method definitions are parsed
-                    if (
-                        method not in self.allowed_http_methods
-                        or should_skip_method(method, self.method)
-                        or should_skip_deprecated(
-                            resolved_definition.get("deprecated", False), self.skip_deprecated_operations
+                for method, definition in raw_methods.items():
+                    try:
+                        # Setting a low recursion limit doesn't solve the problem with recursive references & inlining
+                        # too much but decreases the number of cases when Schemathesis stuck on this step.
+                        with self.resolver.in_scope(scope):
+                            resolved_definition = self.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 5)
+                        # Only method definitions are parsed
+                        if (
+                            method not in self.allowed_http_methods
+                            or should_skip_method(method, self.method)
+                            or should_skip_deprecated(
+                                resolved_definition.get("deprecated", False), self.skip_deprecated_operations
+                            )
+                            or should_skip_by_tag(resolved_definition.get("tags"), self.tag)
+                            or should_skip_by_operation_id(resolved_definition.get("operationId"), self.operation_id)
+                        ):
+                            continue
+                        parameters = self.collect_parameters(
+                            itertools.chain(resolved_definition.get("parameters", ()), common_parameters),
+                            resolved_definition,
                         )
-                        or should_skip_by_tag(resolved_definition.get("tags"), self.tag)
-                        or should_skip_by_operation_id(resolved_definition.get("operationId"), self.operation_id)
-                    ):
-                        continue
-                    parameters = self.collect_parameters(
-                        itertools.chain(resolved_definition.get("parameters", ()), common_parameters),
-                        resolved_definition,
-                    )
-                    # To prevent recursion errors we need to pass not resolved schema as well
-                    # It could be used for response validation
-                    raw_definition = OperationDefinition(raw_methods[method], resolved_definition, scope, parameters)
-                    yield self.make_operation(path, method, parameters, raw_definition)
-        except (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError) as exc:
-            raise InvalidSchema("Schema parsing failed. Please check your schema.") from exc
+                        # To prevent recursion errors we need to pass not resolved schema as well
+                        # It could be used for response validation
+                        raw_definition = OperationDefinition(
+                            raw_methods[method], resolved_definition, scope, parameters
+                        )
+                        yield Ok(self.make_operation(path, method, parameters, raw_definition))
+                    except SCHEMA_PARSING_ERRORS as exc:
+                        yield self._into_err(exc, path, method)
+            except SCHEMA_PARSING_ERRORS as exc:
+                yield self._into_err(exc, path, method)
+
+    def _into_err(self, error: Exception, path: Optional[str], method: Optional[str]) -> Err[InvalidSchema]:
+        try:
+            full_path = self.get_full_path(path) if isinstance(path, str) else None
+            raise InvalidSchema(SCHEMA_ERROR_MESSAGE, path=path, method=method, full_path=full_path) from error
+        except InvalidSchema as exc:
+            return Err(exc)
 
     def collect_parameters(
         self, parameters: Iterable[Dict[str, Any]], definition: Dict[str, Any]
@@ -307,7 +344,7 @@ class BaseOpenAPISchema(BaseSchema):
                 if found:
                     return
         message = f"No such API operation: `{source.verbose_name}`."
-        possibilities = [e.verbose_name for e in self.get_all_operations()]
+        possibilities = [op.ok().verbose_name for op in self.get_all_operations() if isinstance(op, Ok)]
         matches = get_close_matches(source.verbose_name, possibilities)
         if matches:
             message += f" Did you mean `{matches[0]}`?"
