@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis.hooks import HookContext, HookDispatcher, HookScope
@@ -60,7 +60,7 @@ def test_global_body_hook(schema):
     strategy = schema["/payload"]["POST"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3)
+    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much])
     def test(case):
         assert len(case.body["name"]) == 5
 
