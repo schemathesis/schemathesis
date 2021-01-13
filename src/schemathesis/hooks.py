@@ -36,7 +36,11 @@ class RegisteredHook:
 
 @attr.s(slots=True)  # pragma: no mutate
 class HookContext:
-    """A context that is passed to some hook functions."""
+    """A context that is passed to some hook functions.
+
+    :ivar Optional[APIOperation] operation: API operation that is currently being processed.
+                                            Might be absent in some cases.
+    """
 
     operation: Optional["APIOperation"] = attr.ib(default=None)  # pragma: no mutate
 
@@ -59,16 +63,22 @@ class HookDispatcher:
     def register(self, hook: Union[str, Callable]) -> Callable:
         """Register a new hook.
 
+        :param hook: Either a hook function or a string.
+
         Can be used as a decorator in two forms.
         Without arguments for registering hooks and autodetecting their names:
 
-            @schema.hooks.register
+        .. code-block:: python
+
+            @schemathesis.hooks.register
             def before_generate_query(strategy, context):
                 ...
 
         With a hook name as the first argument:
 
-            @schema.hooks.register("before_generate_query")
+        .. code-block:: python
+
+            @schemathesis.hooks.register("before_generate_query")
             def hook(strategy, context):
                 ...
         """
@@ -84,9 +94,14 @@ class HookDispatcher:
     def apply(self, hook: Callable, *, name: Optional[str] = None) -> Callable[[Callable], Callable]:
         """Register hook to run only on one test function.
 
-        Example:
+        :param hook: A hook function.
+        :param Optional[str] name: A hook name.
+
+        .. code-block:: python
+
             def before_generate_query(strategy, context):
                 ...
+
 
             @schema.hooks.apply(before_generate_query)
             @schema.parametrize()
@@ -161,7 +176,10 @@ class HookDispatcher:
             hook(context, *args, **kwargs)
 
     def unregister(self, hook: Callable) -> None:
-        """Unregister a specific hook."""
+        """Unregister a specific hook.
+
+        :param hook: A hook function to unregister.
+        """
         # It removes this function from all places
         for hooks in self._hooks.values():
             hooks[:] = [item for item in hooks if item is not hook]

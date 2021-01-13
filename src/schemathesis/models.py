@@ -426,7 +426,16 @@ P = TypeVar("P", bound=Parameter)
 
 @attr.s  # pragma: no mutate
 class APIOperation(Generic[P]):
-    """A single operation defined in an API."""
+    """A single operation defined in an API.
+
+    You can get one via a ``schema`` instance.
+
+    .. code-block:: python
+
+        # Get the POST /items operation
+        operation = schema["/items"]["POST"]
+
+    """
 
     # `path` does not contain `basePath`
     # Example <scheme>://<host>/<basePath>/users - "/users" is path
@@ -481,6 +490,7 @@ class APIOperation(Generic[P]):
         hooks: Optional["HookDispatcher"] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
+        """Turn this API operation into a Hypothesis strategy."""
         return self.schema.get_case_strategy(self, hooks, data_generation_method)
 
     def get_strategies_from_examples(self) -> List[SearchStrategy[Case]]:
@@ -544,6 +554,7 @@ class APIOperation(Generic[P]):
         query: Optional[Query] = None,
         body: Union[Body, NotSet] = NOT_SET,
     ) -> Case:
+        """Create a new example for this API operation."""
         return Case(
             operation=self,
             path_parameters=path_parameters,
@@ -559,9 +570,14 @@ class APIOperation(Generic[P]):
         return f"#/paths/{path}/{self.method}"
 
     def validate_response(self, response: GenericResponse) -> None:
+        """Validate API response for conformance.
+
+        :raises CheckFailed: If the response does not conform to the API schema.
+        """
         return self.schema.validate_response(self, response)
 
     def is_response_valid(self, response: GenericResponse) -> bool:
+        """Validate API response for conformance."""
         try:
             self.validate_response(response)
             return True

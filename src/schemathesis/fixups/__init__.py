@@ -9,6 +9,8 @@ def install(fixups: Optional[Iterable[str]] = None) -> None:
     """Install fixups.
 
     Without the first argument installs all available fixups.
+
+    :param fixups: Names of fixups to install.
     """
     fixups = fixups or list(ALL_FIXUPS.keys())
     for name in fixups:
@@ -19,6 +21,8 @@ def uninstall(fixups: Optional[Iterable[str]] = None) -> None:
     """Uninstall fixups.
 
     Without the first argument uninstalls all available fixups.
+
+    :param fixups: Names of fixups to install.
     """
     fixups = fixups or list(ALL_FIXUPS.keys())
     for name in fixups:

@@ -26,7 +26,11 @@ STRING_FORMATS = {}
 
 
 def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
-    """Register a new strategy for generating data for specific string "format"."""
+    """Register a new strategy for generating data for specific string "format".
+
+    :param str name: Format name. It should correspond the one used in the API schema as the "format" keyword value.
+    :param strategy: Hypothesis strategy you'd like to use to generate values for this format.
+    """
     if not isinstance(name, str):
         raise TypeError(f"name must be of type {str}, not {type(name)}")
     if not isinstance(strategy, st.SearchStrategy):

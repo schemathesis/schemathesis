@@ -51,7 +51,10 @@ TARGETS_TYPE = click.Choice((*ALL_TARGETS_NAMES, "all"))
 
 
 def register_target(function: Target) -> Target:
-    """Register a new testing target for schemathesis CLI."""
+    """Register a new testing target for schemathesis CLI.
+
+    :param function: A function that will be called to calculate a metric passed to ``hypothesis.target``.
+    """
     targets_module.ALL_TARGETS += (function,)
     TARGETS_TYPE.choices += (function.__name__,)  # type: ignore
     return function
