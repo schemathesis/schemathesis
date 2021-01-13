@@ -1,6 +1,11 @@
 Public API reference
 ====================
 
+Checks
+~~~~~~
+
+.. autofunction:: schemathesis.register_check
+
 Fixups
 ~~~~~~
 
@@ -101,3 +106,4 @@ Open API-specific API
   :noindex:
 
   .. automethod:: add_link
+    :noindex:
