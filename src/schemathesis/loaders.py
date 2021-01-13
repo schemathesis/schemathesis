@@ -35,7 +35,10 @@ def from_path(
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
 ) -> BaseOpenAPISchema:
-    """Load a file from OS path and parse to schema instance."""
+    """Load Open API schema via a file from an OS path.
+
+    :param path: A path to the schema file.
+    """
     with open(path) as fd:
         return from_file(
             fd,
@@ -69,7 +72,10 @@ def from_uri(
     force_schema_version: Optional[str] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
-    """Load a remote resource and parse to schema instance."""
+    """Load Open API schema from the network.
+
+    :param str uri: Schema URL.
+    """
     _setup_headers(kwargs)
     if not base_url and port:
         base_url = str(URL(uri).with_port(port))
@@ -110,9 +116,9 @@ def from_file(
     force_schema_version: Optional[str] = None,
     **kwargs: Any,  # needed in the runner to have compatible API across all loaders
 ) -> BaseOpenAPISchema:
-    """Load a file content and parse to schema instance.
+    """Load Open API schema from a file descriptor, string or bytes.
 
-    `file` could be a file descriptor, string or bytes.
+    :param file: Could be a file descriptor, string or bytes.
     """
     raw = yaml.load(file, StringDatesYAMLLoader)
     return from_dict(
@@ -146,7 +152,10 @@ def from_dict(
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
 ) -> BaseOpenAPISchema:
-    """Get a proper abstraction for the given raw schema."""
+    """Load Open API schema from a Python dictionary.
+
+    :param dict raw_schema: A schema to load.
+    """
     dispatch("before_load_schema", HookContext(), raw_schema)
 
     def init_openapi_2() -> SwaggerV20:
@@ -212,7 +221,15 @@ def from_pytest_fixture(
     skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
 ) -> LazySchema:
-    """Needed for a consistent library API."""
+    """Load schema from a ``pytest`` fixture.
+
+    It is useful if you don't want to make network requests during module loading. With this loader you can defer it
+    to a fixture.
+
+    Note, the fixture should return a ``BaseSchema`` instance loaded with another loader.
+
+    :param str fixture_name: The name of a fixture to load.
+    """
     return LazySchema(
         fixture_name,
         method=method,
@@ -239,6 +256,11 @@ def from_wsgi(
     force_schema_version: Optional[str] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
+    """Load Open API schema from a WSGI app.
+
+    :param str schema_path: An in-app relative URL to the schema.
+    :param app: A WSGI app instance.
+    """
     _setup_headers(kwargs)
     client = Client(app, WSGIResponse)
     response = client.get(schema_path, **kwargs)
@@ -282,6 +304,11 @@ def from_aiohttp(
     force_schema_version: Optional[str] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
+    """Load Open API schema from an AioHTTP app.
+
+    :param str schema_path: An in-app relative URL to the schema.
+    :param app: An AioHTTP app instance.
+    """
     from .extra._aiohttp import run_server  # pylint: disable=import-outside-toplevel
 
     port = run_server(app)
@@ -315,6 +342,11 @@ def from_asgi(
     force_schema_version: Optional[str] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
+    """Load Open API schema from an ASGI app.
+
+    :param str schema_path: An in-app relative URL to the schema.
+    :param app: An ASGI app instance.
+    """
     _setup_headers(kwargs)
     client = ASGIClient(app)
     response = client.get(schema_path, **kwargs)

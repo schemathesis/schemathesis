@@ -277,6 +277,10 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def as_state_machine(self) -> Type[APIStateMachine]:
+        """Create a state machine class.
+
+        Use it for stateful testing.
+        """
         raise NotImplementedError
 
     def get_links(self, operation: APIOperation) -> Dict[str, Dict[str, Any]]:

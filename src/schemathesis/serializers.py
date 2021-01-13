@@ -14,7 +14,10 @@ SERIALIZERS = {}
 
 @attr.s(slots=True)  # pragma: no mutate
 class SerializerContext:
-    """The context for serialization process."""
+    """The context for serialization process.
+
+    :ivar Case case: Generated example that is being processed.
+    """
 
     case: "Case" = attr.ib()  # pragma: no mutate
 
@@ -41,10 +44,10 @@ def register(media_type: str, *, aliases: Collection[str] = ()) -> Callable[[Typ
     should have two methods, ``as_requests`` and ``as_werkzeug``, providing keyword arguments that Schemathesis will
     pass to ``requests.request`` and ``werkzeug.Client.open`` respectively.
 
-    Example:
+    .. code-block:: python
+
         @register("text/csv")
         class CSVSerializer:
-
             def as_requests(self, context, value):
                 return {"data": to_csv(value)}
 

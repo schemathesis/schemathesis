@@ -10,6 +10,13 @@ if TYPE_CHECKING:
 
 @attr.s(slots=True)  # pragma: no mutate
 class TargetContext:
+    """Context for targeted testing.
+
+    :ivar Case case: Generated example that is being processed.
+    :ivar GenericResponse response: API response.
+    :ivar float response_time: API response time.
+    """
+
     case: "Case" = attr.ib()  # pragma: no mutate
     response: GenericResponse = attr.ib()  # pragma: no mutate
     response_time: float = attr.ib()  # pragma: no mutate

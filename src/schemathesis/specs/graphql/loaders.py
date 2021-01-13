@@ -93,6 +93,14 @@ fragment TypeRef on __Type {
 
 
 def from_url(url: str, base_url: Optional[str] = None, port: Optional[int] = None) -> GraphQLSchema:
+    """Load GraphQL schema from the network.
+
+    :param url: Schema URL.
+    :param Optional[str] base_url: Base URL to send requests to.
+    :param Optional[int] port: An optional port if you don't want to pass the ``base_url`` parameter, but only to change
+                               port in ``url``.
+    :return: GraphQLSchema
+    """
     if not base_url and port:
         base_url = str(URL(url).with_port(port))
     response = requests.post(url, json={"query": INTROSPECTION_QUERY})
@@ -103,5 +111,12 @@ def from_url(url: str, base_url: Optional[str] = None, port: Optional[int] = Non
 def from_dict(
     raw_schema: Dict[str, Any], location: Optional[str] = None, base_url: Optional[str] = None
 ) -> GraphQLSchema:
+    """Load GraphQL schema from a Python dictionary.
+
+    :param dict raw_schema: A schema to load.
+    :param Optional[str] location: Optional schema location. Either a full URL or a filesystem path.
+    :param Optional[str] base_url: Base URL to send requests to.
+    :return: GraphQLSchema
+    """
     dispatch("before_load_schema", HookContext(), raw_schema)
     return GraphQLSchema(raw_schema, location=location, base_url=base_url)  # type: ignore

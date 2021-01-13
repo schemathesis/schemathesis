@@ -79,5 +79,6 @@ Additional notes
 .. toctree::
    :maxdepth: 2
 
+   api
    faq
    changelog
