@@ -47,7 +47,7 @@ repos:
         additional_dependencies: [ black==20.8b1 ]
 
   - repo: https://github.com/pre-commit/mirrors-isort
-    rev: v5.6.4
+    rev: v5.7.0
     hooks:
       - id: isort
         exclude: ^example/.*$
