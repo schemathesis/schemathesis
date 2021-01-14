@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.0.0`_ - 2021-01-14
+---------------------
+
 **Added**
 
 - Support for sending ``text/plain`` payload as test data. Including variants with non-default ``charset``. `#850`_, `#939`_
@@ -1545,7 +1548,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.8.5...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.0...HEAD
+.. _3.0.0: https://github.com/schemathesis/schemathesis/compare/v2.8.5...v3.0.0
 .. _2.8.5: https://github.com/schemathesis/schemathesis/compare/v2.8.4...v2.8.5
 .. _2.8.4: https://github.com/schemathesis/schemathesis/compare/v2.8.3...v2.8.4
 .. _2.8.3: https://github.com/schemathesis/schemathesis/compare/v2.8.2...v2.8.3
