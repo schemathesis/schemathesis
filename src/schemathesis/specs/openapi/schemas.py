@@ -107,7 +107,7 @@ class BaseOpenAPISchema(BaseSchema):
                     continue
                 self.dispatch_hook("before_process_path", context, path, methods)
                 scope, raw_methods = self._resolve_methods(methods)
-                common_parameters = methods.get("parameters", [])
+                common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 5)
                 for method, definition in raw_methods.items():
                     try:
                         # Setting a low recursion limit doesn't solve the problem with recursive references & inlining

@@ -47,6 +47,7 @@ def impl(request, case):
     if case.method == "POST":
         assert_int(case.body)
     assert_int(case.query["not_common_id"])
+    assert_int(case.query["key"])
 
 @schema.parametrize(endpoint="/foo")
 @settings(max_examples=1)
@@ -61,7 +62,8 @@ def test_b(request, case):
         paths={
             "/foo": {
                 "parameters": [
-                    {"schema": {"$ref": "#/definitions/SimpleIntRef"}, "in": "body", "name": "id", "required": True}
+                    {"$ref": "#/parameters/Param"},
+                    {"schema": {"$ref": "#/definitions/SimpleIntRef"}, "in": "body", "name": "id", "required": True},
                 ],
                 "put": {
                     "parameters": [integer(name="not_common_id", required=True)],
@@ -74,6 +76,7 @@ def test_b(request, case):
             }
         },
         definitions={"SimpleIntRef": {"type": "integer"}},
+        parameters={"Param": {"in": "query", "name": "key", "required": True, "type": "integer"}},
     )
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used in all generated tests
