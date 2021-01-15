@@ -164,7 +164,7 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
         run_state_machine_as_test(
             state_machine,
             settings=settings(
-                max_examples=500,
+                max_examples=1000,
                 deadline=None,
                 suppress_health_check=HealthCheck.all(),
                 stateful_step_count=3,

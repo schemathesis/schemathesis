@@ -202,8 +202,7 @@ def run_test(  # pylint: disable=too-many-locals
                 "Tests on this API operation produce unreliable results: \n"
                 "Falsified on the first call but did not on a subsequent one"
             ),
-            # Checks should not be empty, as such cases should be caught in the `NonCheckError` branch
-            result.checks[-1].example,
+            result.checks[-1].example if result.checks else None,
         )
     except hypothesis.errors.Unsatisfiable:
         # We need more clear error message here

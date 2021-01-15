@@ -452,29 +452,19 @@ def test_exceptions(schema_url, app, options):
 
 @pytest.mark.operations("multipart")
 def test_internal_exceptions(args, mocker):
-    app, kwargs = args
     # GH: #236
-    error_idx = 0
-    exc_types = [ValueError, TypeError, ZeroDivisionError, KeyError]
-
-    def buggy_call(*args, **kwargs):
-        nonlocal error_idx
-        exception_class = exc_types[error_idx % 4]
-        error_idx += 1
-        raise exception_class
-
-    # When there are many exceptions during the test
+    app, kwargs = args
+    # When there is an exception during the test
     # And Hypothesis consider this test as a flaky one
-    mocker.patch("schemathesis.Case.call", side_effect=buggy_call)
-    mocker.patch("schemathesis.Case.call_wsgi", side_effect=buggy_call)
+    mocker.patch("schemathesis.Case.call", side_effect=ValueError)
+    mocker.patch("schemathesis.Case.call_wsgi", side_effect=ValueError)
     init, *others, finished = prepare(**kwargs, hypothesis_max_examples=3)
     # Then the execution result should indicate errors
     assert finished.has_errors
-    # And all errors from the buggy code should be collected
+    # And an error from the buggy code should be collected
     exceptions = [i.exception.strip() for i in others[1].result.errors]
-    for exc_type in exc_types:
-        assert str(exc_type.__name__) in exceptions
-    assert len(exceptions) == len(exc_types)
+    assert "ValueError" in exceptions
+    assert len(exceptions) == 1
 
 
 @pytest.mark.operations("payload")
