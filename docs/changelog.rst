@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.0.1`_ - 2021-01-15
+---------------------
+
 **Added**
 
 - YAML serialization for ``text/yaml``, ``text/x-yaml``, ``application/x-yaml`` and ``text/vnd.yaml`` media types. `#1010`_.
@@ -1552,7 +1555,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.1...HEAD
+.. _3.0.1: https://github.com/schemathesis/schemathesis/compare/v3.0.0...v3.0.1
 .. _3.0.0: https://github.com/schemathesis/schemathesis/compare/v2.8.5...v3.0.0
 .. _2.8.5: https://github.com/schemathesis/schemathesis/compare/v2.8.4...v2.8.5
 .. _2.8.4: https://github.com/schemathesis/schemathesis/compare/v2.8.3...v2.8.4
