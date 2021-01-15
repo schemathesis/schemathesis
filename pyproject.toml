@@ -31,7 +31,7 @@ include = ["src/schemathesis/py.typed"]
 [tool.poetry.dependencies]
 python = "^3.6"
 attrs = ">=19.2"
-hypothesis = ">=5.15,<6.0"
+hypothesis = ">=5.15,<7.0"
 hypothesis_jsonschema = ">=0.19.0,<1.0"
 hypothesis_graphql = ">=0.3"
 jsonschema = "^3.0.0"
