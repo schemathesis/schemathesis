@@ -1,12 +1,20 @@
 from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Optional, Type
 
 import attr
+import yaml
 from typing_extensions import Protocol, runtime_checkable
 
 from .utils import is_json_media_type, is_plain_text_media_type
 
 if TYPE_CHECKING:
     from .models import Case
+
+
+try:
+    from yaml import CSafeDumper as SafeDumper
+except ImportError:
+    # pylint: disable=unused-import
+    from yaml import SafeDumper  # type: ignore
 
 
 SERIALIZERS = {}
@@ -95,6 +103,15 @@ class JSONSerializer:
 
     def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
         return _to_json(value)
+
+
+@register("text/yaml", aliases=("text/x-yaml", "application/x-yaml", "text/vnd.yaml"))
+class YAMLSerializer:
+    def as_requests(self, context: SerializerContext, value: Any) -> Any:
+        return {"data": yaml.dump(value, Dumper=SafeDumper)}
+
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
+        return {"data": yaml.dump(value, Dumper=SafeDumper)}
 
 
 def _should_coerce_to_bytes(item: Any) -> bool:

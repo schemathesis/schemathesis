@@ -255,6 +255,26 @@ def open_api_3_schema_with_recoverable_errors(empty_open_api_3_schema):
     return empty_open_api_3_schema
 
 
+@pytest.fixture
+def open_api_3_schema_with_yaml_payload(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/yaml": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "text/yaml": {
+                            "schema": {"type": "array", "items": {"enum": [42]}, "minItems": 1, "maxItems": 1}
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    return empty_open_api_3_schema
+
+
 @pytest.fixture(scope="session")
 def simple_openapi():
     return {

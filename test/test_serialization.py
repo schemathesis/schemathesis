@@ -103,3 +103,20 @@ def test_no_serialization_possible(api_schema):
                 case.call()
 
     test()
+
+
+@pytest.mark.parametrize("method", ("as_requests_kwargs", "as_werkzeug_kwargs"))
+def test_serialize_yaml(open_api_3_schema_with_yaml_payload, method):
+    # See GH-1010
+    # When API expects `text/yaml`
+    schema = schemathesis.from_dict(open_api_3_schema_with_yaml_payload)
+
+    @given(case=schema["/yaml"]["POST"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        # Then Schemathesis should generate valid YAML, not JSON with `application/json` media type
+        kwargs = getattr(case, method)()
+        assert kwargs["headers"]["Content-Type"] == "text/yaml"
+        assert kwargs["data"] == "- 42\n"
+
+    test()
