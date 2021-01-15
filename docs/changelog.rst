@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.0.2`_ - 2021-01-15
+---------------------
+
 **Fixed**
 
 - Processing parameters common for multiple API operations if they are behind a reference. `#1015`_
@@ -1559,7 +1562,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.2...HEAD
+.. _3.0.2: https://github.com/schemathesis/schemathesis/compare/v3.0.1...v3.0.2
 .. _3.0.1: https://github.com/schemathesis/schemathesis/compare/v3.0.0...v3.0.1
 .. _3.0.0: https://github.com/schemathesis/schemathesis/compare/v2.8.5...v3.0.0
 .. _2.8.5: https://github.com/schemathesis/schemathesis/compare/v2.8.4...v2.8.5
