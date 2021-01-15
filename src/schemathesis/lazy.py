@@ -3,7 +3,7 @@ from typing import Any, Callable, Dict, Iterable, Optional, Union
 
 import attr
 from _pytest.fixtures import FixtureRequest
-from pytest_subtests import SubTests
+from pytest_subtests import SubTests, nullcontext
 
 from .constants import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from .hooks import HookDispatcher, HookScope
@@ -47,7 +47,7 @@ class LazySchema:
             data_generation_methods = self.data_generation_methods
 
         def wrapper(func: Callable) -> Callable:
-            def test(request: FixtureRequest, subtests: SubTests) -> None:
+            def test(request: FixtureRequest) -> None:
                 """The actual test, which is executed by pytest."""
                 __tracebackhide__ = True  # pylint: disable=unused-variable
                 if hasattr(test, "_schemathesis_hooks"):
@@ -67,10 +67,16 @@ class LazySchema:
                 )
                 fixtures = get_fixtures(func, request)
                 # Changing the node id is required for better reporting - the method and path will appear there
-                node_id = subtests.item._nodeid
+                node_id = request.node._nodeid
                 settings = getattr(test, "_hypothesis_internal_use_settings", None)
                 tests = list(schema.get_all_tests(func, settings))
                 request.session.testscollected += len(tests)
+                capmam = request.node.config.pluginmanager.get_plugin("capturemanager")
+                if capmam is not None:
+                    suspend_capture_ctx = capmam.global_and_fixture_disabled
+                else:
+                    suspend_capture_ctx = nullcontext
+                subtests = SubTests(request.node.ihook, suspend_capture_ctx, request)
                 for result, data_generation_method in tests:
                     if isinstance(result, Ok):
                         operation, sub_test = result.ok()
