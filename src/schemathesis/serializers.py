@@ -38,10 +38,10 @@ class Serializer(Protocol):
     `requests` and `werkzeug` transports.
     """
 
-    def as_requests(self, context: SerializerContext, payload: Any) -> Any:
+    def as_requests(self, context: SerializerContext, payload: Any) -> Dict[str, Any]:
         raise NotImplementedError
 
-    def as_werkzeug(self, context: SerializerContext, payload: Any) -> Any:
+    def as_werkzeug(self, context: SerializerContext, payload: Any) -> Dict[str, Any]:
         raise NotImplementedError
 
 
@@ -98,20 +98,24 @@ def _to_json(value: Any) -> Dict[str, Any]:
 
 @register("application/json")
 class JSONSerializer:
-    def as_requests(self, context: SerializerContext, value: Any) -> Any:
+    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
         return _to_json(value)
 
-    def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
         return _to_json(value)
+
+
+def _to_yaml(value: Any) -> Dict[str, Any]:
+    return {"data": yaml.dump(value, Dumper=SafeDumper)}
 
 
 @register("text/yaml", aliases=("text/x-yaml", "application/x-yaml", "text/vnd.yaml"))
 class YAMLSerializer:
-    def as_requests(self, context: SerializerContext, value: Any) -> Any:
-        return {"data": yaml.dump(value, Dumper=SafeDumper)}
+    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+        return _to_yaml(value)
 
-    def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
-        return {"data": yaml.dump(value, Dumper=SafeDumper)}
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+        return _to_yaml(value)
 
 
 def _should_coerce_to_bytes(item: Any) -> bool:
@@ -120,7 +124,7 @@ def _should_coerce_to_bytes(item: Any) -> bool:
     return not isinstance(item, (bytes, str, int))
 
 
-def prepare_form_data(data: Dict[str, Any]) -> Dict[str, Any]:
+def _prepare_form_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """Make the generated data suitable for sending as multipart.
 
     If the schema is loose, Schemathesis can generate data that can't be sent as multipart. In these cases,
@@ -130,53 +134,53 @@ def prepare_form_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     for name, value in data.items():
         if isinstance(value, list):
-            data[name] = [to_bytes(item) if _should_coerce_to_bytes(item) else item for item in value]
+            data[name] = [_to_bytes(item) if _should_coerce_to_bytes(item) else item for item in value]
         elif _should_coerce_to_bytes(value):
-            data[name] = to_bytes(value)
+            data[name] = _to_bytes(value)
     return data
 
 
-def to_bytes(value: Any) -> bytes:
+def _to_bytes(value: Any) -> bytes:
     """Convert the input value to bytes and ignore any conversion errors."""
     return str(value).encode(errors="ignore")
 
 
 @register("multipart/form-data")
 class MultipartSerializer:
-    def as_requests(self, context: SerializerContext, value: Dict[str, Any]) -> Any:
+    def as_requests(self, context: SerializerContext, value: Dict[str, Any]) -> Dict[str, Any]:
         # Form data always is generated as a dictionary
-        multipart = prepare_form_data(value)
+        multipart = _prepare_form_data(value)
         files, data = context.case.operation.prepare_multipart(multipart)
         return {"files": files, "data": data}
 
-    def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
         return {"data": value}
 
 
 @register("application/x-www-form-urlencoded")
 class URLEncodedFormSerializer:
-    def as_requests(self, context: SerializerContext, value: Any) -> Any:
+    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
         return {"data": value}
 
-    def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
         return {"data": value}
 
 
 @register("text/plain")
 class TextSerializer:
-    def as_requests(self, context: SerializerContext, value: Any) -> Any:
+    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
         return {"data": str(value).encode("utf8")}
 
-    def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
         return {"data": str(value)}
 
 
 @register("application/octet-stream")
 class OctetStreamSerializer:
-    def as_requests(self, context: SerializerContext, value: Any) -> Any:
+    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
         return {"data": value}
 
-    def as_werkzeug(self, context: SerializerContext, value: Any) -> Any:
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
         return {"data": value}
 
 

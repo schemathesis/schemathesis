@@ -28,6 +28,11 @@ from .utils import NOT_SET, Err, GenericResponse, Ok, Result
 
 
 class MethodsDict(CaseInsensitiveDict):
+    """Container for accessing API operations.
+
+    Provides a more specific error message if API operation is not found.
+    """
+
     def __getitem__(self, item: Any) -> Any:
         try:
             return super().__getitem__(item)

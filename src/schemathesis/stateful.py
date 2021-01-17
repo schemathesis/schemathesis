@@ -111,6 +111,8 @@ class Feedback:
 
 @attr.s(slots=True)  # pragma: no mutate
 class StepResult:
+    """Output from a single transition of a state machine."""
+
     response: GenericResponse = attr.ib()  # pragma: no mutate
     case: Case = attr.ib()  # pragma: no mutate
 
