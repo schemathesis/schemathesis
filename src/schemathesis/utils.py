@@ -140,9 +140,13 @@ def capture_hypothesis_output() -> Generator[List[str], None, None]:
 
 
 def format_exception(error: Exception, include_traceback: bool = False) -> str:
+    """Format exception as text."""
+    error_type = type(error)
     if include_traceback:
-        return "".join(traceback.format_exception(type(error), error, error.__traceback__))
-    return "".join(traceback.format_exception_only(type(error), error))
+        lines = traceback.format_exception(error_type, error, error.__traceback__)
+    else:
+        lines = traceback.format_exception_only(error_type, error)
+    return "".join(lines)
 
 
 def parse_content_type(content_type: str) -> Tuple[str, str]:
