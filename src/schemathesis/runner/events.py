@@ -1,4 +1,5 @@
 import time
+from enum import Enum, unique
 from typing import Dict, List, Optional, Union
 
 import attr
@@ -9,6 +10,21 @@ from ..models import APIOperation, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
 from ..utils import format_exception
 from .serialization import SerializedError, SerializedTestResult
+
+
+@unique
+class Phase(str, Enum):
+    """Schemathesis engine execution phases.
+
+    Each phase represents a logical step of execution, for example, running unit-tests.
+    In the future we might introduce other phases for links inference, re-running, schema pre-processing, etc.
+    """
+
+    unit_testing = "unit_testing"
+    stateful_testing = "stateful_testing"
+
+    def __repr__(self) -> str:
+        return f"Phase.{self.name}"
 
 
 @attr.s()  # pragma: no mutate
@@ -39,6 +55,20 @@ class Initialized(ExecutionEvent):
         )
 
 
+@attr.s(slots=True)  # pragma: no mutate
+class BeforePhase(ExecutionEvent):
+    """Emitted before a new phase starts."""
+
+    phase: Phase = attr.ib()  # pragma: no mutate
+
+
+@attr.s(slots=True)  # pragma: no mutate
+class AfterPhase(ExecutionEvent):
+    """Emitted after a phase finishes."""
+
+    phase: Phase = attr.ib()  # pragma: no mutate
+
+
 class CurrentOperationMixin:
     method: str
     path: str
@@ -58,15 +88,13 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
     method: str = attr.ib()  # pragma: no mutate
     path: str = attr.ib()  # pragma: no mutate
     relative_path: str = attr.ib()  # pragma: no mutate
-    recursion_level: int = attr.ib()  # pragma: no mutate
 
     @classmethod
-    def from_operation(cls, operation: APIOperation, recursion_level: int) -> "BeforeExecution":
+    def from_operation(cls, operation: APIOperation) -> "BeforeExecution":
         return cls(
             method=operation.method.upper(),
             path=operation.full_path,
             relative_path=operation.path,
-            recursion_level=recursion_level,
         )
 
 

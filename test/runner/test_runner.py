@@ -26,6 +26,14 @@ def execute(schema_uri, loader=loaders.from_uri, **options) -> events.Finished:
     return all_events[-1]
 
 
+def get_first_by_type(container, type):
+    return next(item for item in container if isinstance(item, type))
+
+
+def get_last_by_type(container, type):
+    return next(item for item in reversed(container) if isinstance(item, type))
+
+
 def assert_request(
     app: web.Application, idx: int, method: str, path: str, headers: Optional[Dict[str, str]] = None
 ) -> None:
@@ -314,7 +322,8 @@ def test_unknown_response_code(args):
     init, *others, finished = prepare(**kwargs, checks=(status_code_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
     assert finished.has_failures
-    check = others[1].result.checks[0]
+    event = get_last_by_type(others, events.AfterExecution)
+    check = event.result.checks[0]
     assert check.name == "status_code_conformance"
     assert check.value == Status.failure
 
@@ -327,7 +336,8 @@ def test_unknown_response_code_with_default(args):
     init, *others, finished = prepare(**kwargs, checks=(status_code_conformance,), hypothesis_max_examples=1)
     # Then there should be no failure
     assert not finished.has_failures
-    check = others[1].result.checks[0]
+    event = get_last_by_type(others, events.AfterExecution)
+    check = event.result.checks[0]
     assert check.name == "status_code_conformance"
     assert check.value == Status.success
 
@@ -340,7 +350,8 @@ def test_unknown_content_type(args):
     init, *others, finished = prepare(**kwargs, checks=(content_type_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
     assert finished.has_failures
-    check = others[1].result.checks[0]
+    event = get_last_by_type(others, events.AfterExecution)
+    check = event.result.checks[0]
     assert check.name == "content_type_conformance"
     assert check.value == Status.failure
 
@@ -363,7 +374,8 @@ def test_response_conformance_invalid(args):
     init, *others, finished = prepare(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
     # Then there should be a failure
     assert finished.has_failures
-    lines = others[1].result.checks[-1].message.split("\n")
+    event = get_last_by_type(others, events.AfterExecution)
+    lines = event.result.checks[-1].message.split("\n")
     assert lines[0] == "The received response does not conform to the defined schema!"
     assert lines[2] == "Details: "
     assert lines[4] == "'success' is a required property"
@@ -410,7 +422,8 @@ def test_response_conformance_malformed_json(args):
     # Then there should be a failure
     assert finished.has_failures
     assert not finished.has_errors
-    message = others[1].result.checks[-1].message
+    event = get_last_by_type(others, events.AfterExecution)
+    message = event.result.checks[-1].message
     assert "The received response is not valid JSON:" in message
     assert "{malformed}" in message
     assert "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)" in message
@@ -557,7 +570,8 @@ def test_missing_path_parameter(args):
     init, *others, finished = prepare(hypothesis_max_examples=3, **kwargs)
     # Then it leads to an error
     assert finished.has_errors
-    assert "InvalidSchema: Path parameter 'id' is not defined" in others[1].result.errors[0].exception
+    event = get_last_by_type(others, events.AfterExecution)
+    assert "InvalidSchema: Path parameter 'id' is not defined" in event.result.errors[0].exception
 
 
 def test_get_requests_auth():
@@ -661,13 +675,14 @@ def test_reproduce_code_with_overridden_headers(args, openapi3_base_url):
     app, kwargs = args
     headers = {"User-Agent": USER_AGENT, "X-Token": "test"}
 
-    *_, after, finished = prepare(**kwargs, headers=headers, hypothesis_max_examples=1)
+    _, *others, finished = prepare(**kwargs, headers=headers, hypothesis_max_examples=1)
     assert finished.has_failures
     if isinstance(app, Flask):
         expected = f"requests.get('http://localhost/api/failure', headers={headers})"
     else:
         expected = f"requests.get('{openapi3_base_url}/failure', headers={headers})"
-    assert after.result.checks[1].example.requests_code == expected
+    event = get_last_by_type(others, events.AfterExecution)
+    assert event.result.checks[1].example.requests_code == expected
 
 
 @pytest.mark.operations("success")
@@ -693,14 +708,10 @@ def test_url_joining(request, server, get_schema_path, schema_path):
     else:
         base_url = request.getfixturevalue("openapi3_base_url")
     path = get_schema_path(schema_path)
-    *_, after_execution, _ = prepare(
-        path, base_url=f"{base_url}/v3", endpoint="/pet/findByStatus", hypothesis_max_examples=1
-    )
-    assert after_execution.result.path == "/api/v3/pet/findByStatus"
-    assert (
-        f"http://127.0.0.1:{server['port']}/api/v3/pet/findByStatus"
-        in after_execution.result.checks[0].example.requests_code
-    )
+    _, *others, _ = prepare(path, base_url=f"{base_url}/v3", endpoint="/pet/findByStatus", hypothesis_max_examples=1)
+    event = get_last_by_type(others, events.AfterExecution)
+    assert event.result.path == "/api/v3/pet/findByStatus"
+    assert f"http://127.0.0.1:{server['port']}/api/v3/pet/findByStatus" in event.result.checks[0].example.requests_code
 
 
 def test_skip_operations_with_recursive_references(schema_with_recursive_references):

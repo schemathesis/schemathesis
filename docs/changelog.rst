@@ -4,6 +4,12 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Execution phases to the Schemathesis runner. This mechanism aims to distinguish the runner execution flow and provides
+  ``BeforePhase`` and ``AfterPhase`` events for this. Currently, it includes only "unit_testing" and "stateful_testing" phases
+  but will be extended in the future.
+
 `3.0.2`_ - 2021-01-15
 ---------------------
 

@@ -2,147 +2,22 @@
 
 Based on https://swagger.io/docs/specification/links/
 """
-from copy import deepcopy
 from difflib import get_close_matches
-from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Generator, List, Optional, Tuple, Union
 
 import attr
 
 from ...models import APIOperation, Case
-from ...parameters import ParameterSet
-from ...stateful import Direction, ParsedData, StatefulTest
+from ...stateful import Direction
 from ...types import NotSet
-from ...utils import NOT_SET, GenericResponse
+from ...utils import NOT_SET
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
-class Link(StatefulTest):
-    operation: APIOperation = attr.ib()  # pragma: no mutate
-    parameters: Dict[str, Any] = attr.ib()  # pragma: no mutate
-    request_body: Any = attr.ib(default=NOT_SET)  # pragma: no mutate
-
-    @classmethod
-    def from_definition(
-        cls, name: str, definition: Dict[str, Dict[str, Any]], source_operation: APIOperation
-    ) -> "Link":
-        # Links can be behind a reference
-        _, definition = source_operation.schema.resolver.resolve_in_scope(  # type: ignore
-            definition, source_operation.definition.scope
-        )
-        if "operationId" in definition:
-            # source_operation.schema is `BaseOpenAPISchema` and has this method
-            operation = source_operation.schema.get_operation_by_id(definition["operationId"])  # type: ignore
-        else:
-            operation = source_operation.schema.get_operation_by_reference(definition["operationRef"])  # type: ignore
-        return cls(
-            # Pylint can't detect that the API operation is always defined at this point
-            # E.g. if there is no matching operation or no operations at all, then a ValueError will be risen
-            name=name,
-            operation=operation,  # pylint: disable=undefined-loop-variable
-            parameters=definition.get("parameters", {}),
-            request_body=definition.get("requestBody", NOT_SET),  # `None` might be a valid value - `null`
-        )
-
-    def parse(self, case: Case, response: GenericResponse) -> ParsedData:
-        """Parse data into a structure expected by links definition."""
-        context = expressions.ExpressionContext(case=case, response=response)
-        parameters = {
-            parameter: expressions.evaluate(expression, context) for parameter, expression in self.parameters.items()
-        }
-        return ParsedData(
-            parameters=parameters,
-            # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#link-object
-            # > A literal value or {expression} to use as a request body when calling the target operation.
-            # In this case all literals will be passed as is, and expressions will be evaluated
-            body=expressions.evaluate(self.request_body, context),
-        )
-
-    def make_operation(self, collected: List[ParsedData]) -> APIOperation:
-        """Create a modified version of the original API operation with additional data merged in."""
-        # We split the gathered data among all locations & store the original parameter
-        containers = {
-            location: {
-                parameter.name: {"options": [], "parameter": parameter}
-                for parameter in getattr(self.operation, container_name)
-            }
-            for location, container_name in LOCATION_TO_CONTAINER.items()
-        }
-        # There might be duplicates in the data
-        for item in set(collected):
-            for name, value in item.parameters.items():
-                container = self._get_container_by_parameter_name(name, containers)
-                container.append(value)
-        # These are the final `path_parameters`, `query`, and other API operation components
-        components: Dict[str, ParameterSet] = {
-            container_name: getattr(self.operation, container_name).__class__()
-            for location, container_name in LOCATION_TO_CONTAINER.items()
-        }
-        # Here are all components that are filled with parameters
-        for location, parameters in containers.items():
-            for name, parameter_data in parameters.items():
-                if parameter_data["options"]:
-                    definition = deepcopy(parameter_data["parameter"].definition)
-                    if "schema" in definition:
-                        # The actual schema doesn't matter since we have a list of allowed values
-                        definition["schema"] = {"enum": parameter_data["options"]}
-                    else:
-                        # Other schema-related keywords will be ignored later, during the canonicalisation step
-                        # inside `hypothesis-jsonschema`
-                        definition["enum"] = parameter_data["options"]
-                    components[LOCATION_TO_CONTAINER[location]].add(parameter_data["parameter"].__class__(definition))
-                else:
-                    # No options were gathered for this parameter - use the original one
-                    components[LOCATION_TO_CONTAINER[location]].add(parameter_data["parameter"])
-        return self.operation.clone(**components)
-
-    def _get_container_by_parameter_name(self, full_name: str, templates: Dict[str, Dict[str, Dict[str, Any]]]) -> List:
-        """Detect in what request part the parameters is defined."""
-        location: Optional[str]
-        try:
-            # The parameter name is prefixed with its location. Example: `path.id`
-            location, name = full_name.split(".")
-        except ValueError:
-            location, name = None, full_name
-        if location:
-            try:
-                parameters = templates[location]
-            except KeyError:
-                self._unknown_parameter(full_name)
-        else:
-            for parameters in templates.values():
-                if name in parameters:
-                    break
-            else:
-                self._unknown_parameter(full_name)
-        if not parameters:
-            self._unknown_parameter(full_name)
-        return parameters[name]["options"]
-
-    def _unknown_parameter(self, name: str) -> NoReturn:
-        raise ValueError(
-            f"Parameter `{name}` is not defined in API operation {self.operation.method.upper()} {self.operation.path}"
-        )
-
-
-def get_links(response: GenericResponse, operation: APIOperation, field: str) -> Sequence[Link]:
-    """Get `x-links` / `links` definitions from the schema."""
-    responses = operation.definition.resolved["responses"]
-    if str(response.status_code) in responses:
-        response_definition = responses[str(response.status_code)]
-    else:
-        response_definition = responses.get("default", {})
-    links = response_definition.get(field, {})
-    return [Link.from_definition(name, definition, operation) for name, definition in links.items()]
-
-
-@attr.s(slots=True, repr=False)  # pragma: no mutate
 class OpenAPILink(Direction):
-    """Alternative approach to link processing.
-
-    NOTE. This class will replace `Link` in the future.
-    """
+    """Open API link container."""
 
     name: str = attr.ib()  # pragma: no mutate
     status_code: str = attr.ib()  # pragma: no mutate

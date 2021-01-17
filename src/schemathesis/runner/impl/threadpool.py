@@ -9,7 +9,6 @@ import hypothesis
 
 from ..._hypothesis import create_test
 from ...models import CheckFunction, TestResultSet
-from ...stateful import Feedback, Stateful
 from ...targets import Target
 from ...types import RawAuth
 from ...utils import Ok, capture_hypothesis_output, get_requests_auth
@@ -26,17 +25,12 @@ def _run_task(
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
-    stateful: Optional[Stateful],
-    stateful_recursion_limit: int,
     **kwargs: Any,
 ) -> None:
-    def _run_tests(maker: Callable, recursion_level: int = 0) -> None:
-        if recursion_level > stateful_recursion_limit:
-            return
+    def _run_tests(maker: Callable) -> None:
         for _result, _data_generation_method in maker(test_template, settings, seed):
             # `result` is always `Ok` here
             _operation, test = _result.ok()
-            feedback = Feedback(stateful, _operation)
             for _event in run_test(
                 _operation,
                 test,
@@ -44,12 +38,9 @@ def _run_task(
                 data_generation_method,
                 targets,
                 results,
-                recursion_level=recursion_level,
-                feedback=feedback,
                 **kwargs,
             ):
                 events_queue.put(_event)
-            _run_tests(feedback.get_stateful_tests, recursion_level + 1)
 
     with capture_hypothesis_output():
         while not tasks_queue.empty():
@@ -71,7 +62,7 @@ def _run_task(
                 # `feedback.get_stateful_tests`
                 _run_tests(lambda *_: (items,))
             else:
-                for event in handle_schema_error(result.err(), results, data_generation_method, 0):
+                for event in handle_schema_error(result.err(), results, data_generation_method):
                     events_queue.put(event)
 
 
@@ -86,8 +77,6 @@ def thread_task(
     headers: Optional[Dict[str, Any]],
     seed: Optional[int],
     results: TestResultSet,
-    stateful: Optional[Stateful],
-    stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
     """A single task, that threads do.
@@ -105,8 +94,6 @@ def thread_task(
             settings,
             seed,
             results,
-            stateful=stateful,
-            stateful_recursion_limit=stateful_recursion_limit,
             session=session,
             headers=headers,
             **kwargs,
@@ -121,8 +108,6 @@ def wsgi_thread_task(
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
-    stateful: Optional[Stateful],
-    stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
     _run_task(
@@ -134,8 +119,6 @@ def wsgi_thread_task(
         settings,
         seed,
         results,
-        stateful=stateful,
-        stateful_recursion_limit=stateful_recursion_limit,
         **kwargs,
     )
 
@@ -149,8 +132,6 @@ def asgi_thread_task(
     headers: Optional[Dict[str, Any]],
     seed: Optional[int],
     results: TestResultSet,
-    stateful: Optional[Stateful],
-    stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
     _run_task(
@@ -162,8 +143,6 @@ def asgi_thread_task(
         settings,
         seed,
         results,
-        stateful=stateful,
-        stateful_recursion_limit=stateful_recursion_limit,
         headers=headers,
         **kwargs,
     )
@@ -181,7 +160,7 @@ class ThreadPoolRunner(BaseRunner):
     workers_num: int = attr.ib(default=2)  # pragma: no mutate
     request_tls_verify: Union[bool, str] = attr.ib(default=True)  # pragma: no mutate
 
-    def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
+    def _run_unit_tests(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         """All events come from a queue where different workers push their events."""
         tasks_queue = self._get_tasks_queue()
         # Events are pushed by workers via a separate queue
@@ -256,8 +235,6 @@ class ThreadPoolRunner(BaseRunner):
             "headers": self.headers,
             "seed": self.seed,
             "results": results,
-            "stateful": self.stateful,
-            "stateful_recursion_limit": self.stateful_recursion_limit,
             "kwargs": {
                 "request_timeout": self.request_timeout,
                 "request_tls_verify": self.request_tls_verify,
@@ -281,8 +258,6 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
             "settings": self.hypothesis_settings,
             "seed": self.seed,
             "results": results,
-            "stateful": self.stateful,
-            "stateful_recursion_limit": self.stateful_recursion_limit,
             "kwargs": {
                 "auth": self.auth,
                 "auth_type": self.auth_type,
@@ -308,8 +283,6 @@ class ThreadPoolASGIRunner(ThreadPoolRunner):
             "headers": self.headers,
             "seed": self.seed,
             "results": results,
-            "stateful": self.stateful,
-            "stateful_recursion_limit": self.stateful_recursion_limit,
             "kwargs": {
                 "store_interactions": self.store_interactions,
                 "max_response_time": self.max_response_time,
