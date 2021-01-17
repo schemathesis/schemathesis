@@ -13,14 +13,6 @@ if TYPE_CHECKING:
     from .models import APIOperation, Case
 
 
-class HookLocation(Enum):
-    path_parameters = 1
-    headers = 2
-    cookies = 3
-    query = 4
-    body = 5
-
-
 @unique
 class HookScope(Enum):
     GLOBAL = 1
