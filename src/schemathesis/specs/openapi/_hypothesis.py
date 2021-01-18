@@ -2,6 +2,7 @@ import json
 import re
 from base64 import b64encode
 from contextlib import contextmanager, suppress
+from copy import deepcopy
 from typing import Any, Callable, Dict, Generator, Iterable, Optional, Tuple, Union
 from urllib.parse import quote_plus
 
@@ -205,6 +206,7 @@ def get_parameters_value(
         return draw(strategy)
     strategy = get_parameters_strategy(operation, to_strategy, location, exclude=value.keys())
     strategy = apply_hooks(operation, context, hooks, strategy, location)
+    value = deepcopy(value)
     value.update(draw(strategy))
     return value
 
