@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- ``Flaky`` Hypothesis error during explicit examples generation. `#1018`_
+
 `3.0.2`_ - 2021-01-15
 ---------------------
 
@@ -1680,6 +1684,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1018: https://github.com/schemathesis/schemathesis/issues/1018
 .. _#1015: https://github.com/schemathesis/schemathesis/issues/1015
 .. _#1010: https://github.com/schemathesis/schemathesis/issues/1010
 .. _#1007: https://github.com/schemathesis/schemathesis/issues/1007
