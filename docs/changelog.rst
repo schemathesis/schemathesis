@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Generating stateful tests, with common parameters behind a reference. `#1020`_
+
 `3.0.3`_ - 2021-01-18
 ---------------------
 
@@ -1688,6 +1692,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1020: https://github.com/schemathesis/schemathesis/issues/1020
 .. _#1018: https://github.com/schemathesis/schemathesis/issues/1018
 .. _#1015: https://github.com/schemathesis/schemathesis/issues/1015
 .. _#1010: https://github.com/schemathesis/schemathesis/issues/1010
