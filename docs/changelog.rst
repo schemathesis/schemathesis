@@ -8,6 +8,11 @@ Changelog
 
 - Generating stateful tests, with common parameters behind a reference. `#1020`_
 
+**Changed**
+
+- When operations are resolved by ``operationId`` then the same reference resolving logic is applied as in other cases.
+  This change leads to less reference inlining and lower memory consumption for deeply nested schemas. `#945`_
+
 `3.0.3`_ - 2021-01-18
 ---------------------
 
