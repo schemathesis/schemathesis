@@ -215,11 +215,12 @@ class BaseOpenAPISchema(BaseSchema):
     def _group_operations_by_id(self) -> Generator[Tuple[str, APIOperation], None, None]:
         for path, methods in self.raw_schema["paths"].items():
             scope, raw_methods = self._resolve_methods(methods)
-            methods = self.resolver.resolve_all(methods)
-            common_parameters = methods.get("parameters", [])
-            for method, resolved_definition in methods.items():
-                if method not in self.allowed_http_methods or "operationId" not in resolved_definition:
+            common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 5)
+            for method, definition in methods.items():
+                if method not in self.allowed_http_methods or "operationId" not in definition:
                     continue
+                with self.resolver.in_scope(scope):
+                    resolved_definition = self.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 5)
                 parameters = self.collect_parameters(
                     itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
                 )
