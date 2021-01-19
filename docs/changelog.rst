@@ -7,6 +7,8 @@ Changelog
 **Fixed**
 
 - Generating stateful tests, with common parameters behind a reference. `#1020`_
+- Programmatic addition of Open API links via ``add_link`` when schema validation is disabled and response status codes
+  are noted as integers. `#1022`_
 
 **Changed**
 
@@ -1697,6 +1699,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1022: https://github.com/schemathesis/schemathesis/issues/1022
 .. _#1020: https://github.com/schemathesis/schemathesis/issues/1020
 .. _#1018: https://github.com/schemathesis/schemathesis/issues/1018
 .. _#1015: https://github.com/schemathesis/schemathesis/issues/1015
