@@ -225,15 +225,36 @@ def get_all_links(operation: APIOperation) -> Generator[Tuple[str, OpenAPILink],
             yield status_code, OpenAPILink(name, status_code, link_definition, operation)
 
 
+StatusCode = Union[str, int]
+
+
+def _get_response_by_status_code(responses: Dict[StatusCode, Dict[str, Any]], status_code: Union[str, int]) -> Dict:
+    if isinstance(status_code, int):
+        # Invalid schemas may contain status codes as integers
+        if status_code in responses:
+            return responses[status_code]
+        # Passed here as an integer, but there is no such status code as int
+        # We cast it to a string because it is either there already and we'll get relevant responses, otherwise
+        # a new dict will be created because there is no such status code in the schema (as an int or a string)
+        return responses.setdefault(str(status_code), {})
+    if status_code.isnumeric():
+        # Invalid schema but the status code is passed as a string
+        numeric_status_code = int(status_code)
+        if numeric_status_code in responses:
+            return responses[numeric_status_code]
+    # All status codes as strings, including `default` and patterned values like `5XX`
+    return responses.setdefault(status_code, {})
+
+
 def add_link(
-    responses: Dict[str, Dict[str, Any]],
+    responses: Dict[StatusCode, Dict[str, Any]],
     links_field: str,
     parameters: Optional[Dict[str, str]],
     request_body: Any,
-    status_code: Union[str, int],
+    status_code: StatusCode,
     target: Union[str, APIOperation],
 ) -> None:
-    response = responses.setdefault(str(status_code), {})
+    response = _get_response_by_status_code(responses, status_code)
     links_definition = response.setdefault(links_field, {})
     new_link: Dict[str, Union[str, Dict[str, str]]] = {}
     if parameters is not None:

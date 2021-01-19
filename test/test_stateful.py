@@ -196,3 +196,33 @@ def test_misspelled_parameter(schema_url, parameter, message):
     link = schema["/users/"]["POST"].links["201"]["#/paths/~1users~1{user_id}/get"]
     with pytest.raises(ValueError, match=re.escape(message)):
         link.set_data(case, context=expressions.ExpressionContext(case=case, response=None))
+
+
+@pytest.mark.parametrize(
+    "schema_code, link_code",
+    (
+        (200, "200"),
+        (200, 200),
+        ("200", "200"),
+        ("200", 200),
+        ("2XX", "2XX"),
+    ),
+)
+def test_link_override(empty_open_api_3_schema, schema_code, link_code):
+    # See GH-1022
+    # When the schema contains response codes as integers
+    empty_open_api_3_schema["paths"] = {
+        "/foo": {
+            "get": {
+                "parameters": [
+                    {"in": "query", "name": "key", "schema": {"type": "integer"}, "required": True},
+                ],
+                "responses": {schema_code: {"description": "OK", "schema": {"type": "object"}}},
+            }
+        },
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=False)
+    schema.add_link(
+        source=schema["/foo"]["GET"], target=schema["/foo"]["GET"], status_code=link_code, parameters={"key": "42"}
+    )
+    assert "links" in schema.raw_schema["paths"]["/foo"]["get"]["responses"][schema_code]
