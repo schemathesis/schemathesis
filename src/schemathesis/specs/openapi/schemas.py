@@ -237,7 +237,7 @@ class BaseOpenAPISchema(BaseSchema):
         resolved_definition = self.resolver.resolve_all(data)
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
         _, methods = self.resolver.resolve(parent_ref)
-        common_parameters = methods.get("parameters", [])
+        common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 5)
         parameters = self.collect_parameters(
             itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
         )
