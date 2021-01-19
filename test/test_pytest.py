@@ -221,7 +221,7 @@ def test(case):
 def test_skip_operations_with_recursive_references(testdir, schema_with_recursive_references):
     # When the test schema contains recursive references
     testdir.make_test(
-        f"""
+        """
 @schema.parametrize()
 def test(case):
     pass""",

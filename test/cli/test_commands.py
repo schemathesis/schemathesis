@@ -495,7 +495,7 @@ def test_cli_run_output_with_errors(cli, cli_args, workers):
     assert "1. Received a response with 5xx status code: 500" in lines
     assert "Performed checks:" in lines
     assert "    not_a_server_error                    1 / 3 passed          FAILED " in lines
-    assert f"== 1 passed, 1 failed in " in lines[-1]
+    assert "== 1 passed, 1 failed in " in lines[-1]
 
 
 @pytest.mark.operations("failure")
@@ -549,8 +549,8 @@ def test_cli_run_changed_base_url(cli, server, cli_args, workers):
 @pytest.mark.parametrize(
     "url, message",
     (
-        ("/doesnt_exist", f"Schema was not found at http://127.0.0.1"),
-        ("/failure", f"Failed to load schema, code 500 was returned from http://127.0.0.1"),
+        ("/doesnt_exist", "Schema was not found at http://127.0.0.1"),
+        ("/failure", "Failed to load schema, code 500 was returned from http://127.0.0.1"),
     ),
 )
 @pytest.mark.operations("failure")
@@ -1530,7 +1530,7 @@ def test_skip_deprecated_operations(testdir, cli, openapi3_base_url, options, ex
         },
     }
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(raw_schema))
-    result = cli.run(str(schema_file), f"--base-url={openapi3_base_url}", f"--hypothesis-max-examples=1", *options)
+    result = cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--hypothesis-max-examples=1", *options)
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then only not deprecated API operations should be selected
     assert expected in result.stdout.splitlines()

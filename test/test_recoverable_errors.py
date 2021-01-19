@@ -27,7 +27,7 @@ EXPECTED_OUTPUT_LINES = [
 
 def test_in_pytest(testdir, open_api_3_schema_with_recoverable_errors):
     testdir.make_test(
-        f"""
+        """
 @schema.parametrize()
 @settings(max_examples=1)
 def test_(case):
@@ -44,7 +44,7 @@ def test_(case):
 
 def test_in_pytest_subtests(testdir, open_api_3_schema_with_recoverable_errors):
     testdir.make_test(
-        f"""
+        """
 @pytest.fixture
 def simple_schema():
     return schema
