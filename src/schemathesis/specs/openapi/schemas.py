@@ -806,6 +806,13 @@ class SwaggerV20(BaseOpenAPISchema):
             consumes = global_consumes
         return consumes
 
+    def _get_payload_schema(self, definition: Dict[str, Any], media_type: str) -> Optional[Dict[str, Any]]:
+        # TODO. re-check common parameters. I think they are absent in `definition`
+        for parameter in definition.get("parameters", []):
+            if parameter["in"] == "body":
+                return parameter["schema"]
+        return None
+
 
 class OpenApi30(SwaggerV20):
     nullable_name = "nullable"
@@ -898,3 +905,13 @@ class OpenApi30(SwaggerV20):
                     files.append((name, (None, form_data[name])))
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, None
+
+    def _get_payload_schema(self, definition: Dict[str, Any], media_type: str) -> Optional[Dict[str, Any]]:
+        if "requestBody" in definition:
+            if "$ref" in definition["requestBody"]:
+                body = self.resolver.resolve_all(definition["requestBody"], RECURSION_DEPTH_LIMIT)
+            else:
+                body = definition["requestBody"]
+            # TODO. Can `content` or `schema` be absent?
+            return body["content"][media_type]["schema"]
+        return None

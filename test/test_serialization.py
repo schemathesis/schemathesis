@@ -1,13 +1,19 @@
 import csv
+import string
+from contextlib import suppress
+from copy import deepcopy
 from io import StringIO
 from test.utils import assert_requests_call
+from xml.etree import ElementTree
+from xml.etree.ElementTree import ParseError
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis import serializers
-from schemathesis.exceptions import SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE, SerializationNotPossible
+from schemathesis.exceptions import SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE, SerializationError, SerializationNotPossible
 
 
 def to_csv(data):
@@ -31,12 +37,12 @@ def csv_serializer():
         def as_werkzeug(self, context, value):
             return {"data": to_csv(value)}
 
-    assert schemathesis.serializers.SERIALIZERS["text/csv"] is CSVSerializer
-    assert schemathesis.serializers.SERIALIZERS["text/tsv"] is CSVSerializer
+    assert serializers.SERIALIZERS["text/csv"] is CSVSerializer
+    assert serializers.SERIALIZERS["text/tsv"] is CSVSerializer
 
     yield
 
-    schemathesis.serializers.unregister("text/csv")
+    serializers.unregister("text/csv")
     schemathesis.serializers.unregister("text/tsv")
 
 
@@ -230,3 +236,203 @@ def test_binary_data(empty_open_api_3_schema, media_type):
 )
 def test_get_matching_serializers(media_type, expected):
     assert set(serializers.get_matching_media_types(media_type)) == expected
+
+
+@pytest.mark.parametrize(
+    "path, expected",
+    (
+        # TODO. check if `data` clashes with something in the default namespace
+        ("/root-name", b"<data><id>42</id></data>"),
+        ("/auto-name", b"<AutoName><id>42</id></AutoName>"),
+        ("/explicit-name", b"<CustomName><id>42</id></CustomName>"),
+        ("/renamed-property", b"<RenamedProperty><renamed-id>42</renamed-id></RenamedProperty>"),
+        ("/property-attribute", b'<PropertyAsAttribute id="42"></PropertyAsAttribute>'),
+        ("/simple-array", b"<SimpleArray>42</SimpleArray><SimpleArray>42</SimpleArray>"),
+        (
+            "/wrapped-array",
+            b"<WrappedArray><WrappedArray>42</WrappedArray><WrappedArray>42</WrappedArray></WrappedArray>",
+        ),
+        (
+            "/array-with-renaming",
+            b"<items-array><item>42</item><item>42</item></items-array>",
+        ),
+        (
+            "/object-in-array",
+            b"<items><item><item-id>42</item-id></item><item><item-id>42</item-id></item></items>",
+        ),
+        (
+            "/array-in-object",
+            b"<items-object><items-array><id>42</id><id>42</id></items-array></items-object>",
+        ),
+        (
+            "/prefixed-object",
+            b"<smp:PrefixedObject><id>42</id></smp:PrefixedObject>",
+        ),
+        (
+            "/prefixed-array",
+            b'<smp:PrefixedArray xmlns:smp="http://example.com/schema">42</smp:PrefixedArray>'
+            b'<smp:PrefixedArray xmlns:smp="http://example.com/schema">42</smp:PrefixedArray>',
+        ),
+        (
+            "/prefixed-attribute",
+            b'<PrefixedAttribute smp:id="42"></PrefixedAttribute>',
+        ),
+        (
+            "/namespaced-object",
+            b'<NamespacedObject xmlns="http://example.com/schema"><id>42</id></NamespacedObject>',
+        ),
+        (
+            "/namespaced-array",
+            b'<NamespacedArray xmlns="http://example.com/schema">42</NamespacedArray>'
+            b'<NamespacedArray xmlns="http://example.com/schema">42</NamespacedArray>',
+        ),
+        (
+            "/namespaced-wrapped-array",
+            b'<NamespacedWrappedArray xmlns="http://example.com/schema">'
+            b"<NamespacedWrappedArray>42</NamespacedWrappedArray>"
+            b"<NamespacedWrappedArray>42</NamespacedWrappedArray>"
+            b"</NamespacedWrappedArray>",
+        ),
+        (
+            "/namespaced-prefixed-object",
+            b'<smp:NamespacedPrefixedObject xmlns:smp="http://example.com/schema">'
+            b"<id>42</id>"
+            b"</smp:NamespacedPrefixedObject>",
+        ),
+        (
+            "/namespaced-prefixed-array",
+            b'<smp:NamespacedPrefixedArray xmlns:smp="http://example.com/schema">42</smp:NamespacedPrefixedArray>'
+            b'<smp:NamespacedPrefixedArray xmlns:smp="http://example.com/schema">42</smp:NamespacedPrefixedArray>',
+        ),
+        (
+            "/namespaced-prefixed-wrapped-array",
+            b'<smp:NamespacedPrefixedWrappedArray xmlns:smp="http://example.com/schema">'
+            b"<smp:NamespacedPrefixedWrappedArray>42</smp:NamespacedPrefixedWrappedArray>"
+            b"<smp:NamespacedPrefixedWrappedArray>42</smp:NamespacedPrefixedWrappedArray>"
+            b"</smp:NamespacedPrefixedWrappedArray>",
+        ),
+    ),
+)
+def test_serialize_xml(openapi_3_schema_with_xml, path, expected):
+    # When the schema contains XML payload
+    schema = schemathesis.from_dict(openapi_3_schema_with_xml)
+
+    @given(case=schema[path]["POST"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        # Then it should be correctly serialized
+        data = case.as_requests_kwargs()["data"]
+        assert data == expected
+        # Arrays may be serialized into multiple elements without root, therefore wrapping everything and check if
+        # it can be parsed.
+        ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{data.decode('utf8')}</root>")
+
+    original = deepcopy(schema[path]["POST"].body[0].definition)
+
+    test()
+    # And serialization does not modify the original schema
+    assert schema[path]["POST"].body[0].definition == original
+
+
+@pytest.mark.parametrize(
+    "schema_object",
+    (
+        {
+            "type": "object",
+            "properties": {"id": {"enum": [42], "xml": {"prefix": "smp"}}},
+            "additionalProperties": False,
+            "required": ["id"],
+        },
+        {
+            "type": "array",
+            "items": {"enum": [42], "xml": {"prefix": "smp"}},
+            "minItems": 2,
+            "maxItems": 2,
+            "xml": {"wrapped": True},
+        },
+        {"type": "integer", "xml": {"prefix": "smp"}},
+    ),
+)
+def test_serialize_xml_unbound_prefix(empty_open_api_3_schema, schema_object):
+    # When the schema contains an unbound prefix
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "requestBody": {
+                    "content": {"application/xml": {"schema": {"$ref": "#/components/schemas/Main"}}},
+                    "required": True,
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    empty_open_api_3_schema["components"] = {"schemas": {"Main": schema_object}}
+
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    @given(case=schema["/test"]["POST"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        # Then it should be an error during serialization
+        with pytest.raises(SerializationError, match="Unbound prefix: `smp`"):
+            case.as_requests_kwargs()
+
+    test()
+
+
+SIMPLE_TEXT_STRATEGY = st.text(min_size=1, alphabet=st.sampled_from(string.ascii_letters))
+XML_OBJECT_STRATEGY = st.fixed_dictionaries(
+    {},
+    optional={
+        "name": SIMPLE_TEXT_STRATEGY,
+        "namespace": SIMPLE_TEXT_STRATEGY,
+        "prefix": SIMPLE_TEXT_STRATEGY,
+        "attribute": st.booleans(),
+        "wrapped": st.booleans(),
+    },
+)
+PRIMITIVE_SCHEMA_STRATEGY = (
+    st.fixed_dictionaries({"type": st.just("integer")}, optional={"xml": XML_OBJECT_STRATEGY})
+    | st.fixed_dictionaries({"type": st.just("string")}, optional={"xml": XML_OBJECT_STRATEGY})
+    | st.fixed_dictionaries({"type": st.just("boolean")}, optional={"xml": XML_OBJECT_STRATEGY})
+)
+SCHEMA_OBJECT_STRATEGY = st.deferred(
+    lambda: st.fixed_dictionaries(
+        {"type": st.just("object")},
+        optional={
+            "properties": st.dictionaries(SIMPLE_TEXT_STRATEGY, SCHEMA_OBJECT_STRATEGY | PRIMITIVE_SCHEMA_STRATEGY)
+        },
+    )
+    | st.fixed_dictionaries({"type": st.just("array"), "items": SCHEMA_OBJECT_STRATEGY})
+)
+
+
+@given(data=st.data(), schema_object=SCHEMA_OBJECT_STRATEGY)
+@settings(suppress_health_check=HealthCheck.all(), deadline=None)
+def test_serialize_xml_hypothesis(data, schema_object):
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {"application/xml": {"schema": {"$ref": "#/components/schemas/Main"}}},
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        "components": {"schemas": {"Main": schema_object}},
+    }
+
+    schema = schemathesis.from_dict(raw_schema)
+
+    case = data.draw(schema["/test"]["POST"].as_strategy())
+
+    serialized_data = case.as_requests_kwargs()["data"].decode("utf8")
+    # Arrays may be serialized into multiple elements without root, therefore wrapping everything and check if
+    # it can be parsed.
+    with suppress(SerializationError):
+        ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{serialized_data}</root>")

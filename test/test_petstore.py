@@ -43,7 +43,6 @@ def test_(request, case):
     )
     result = testdir.runpytest("-v", "-s", "--hypothesis-verbosity=verbose")
     result.assert_outcomes(passed=2)
-    result.stdout.re_match_lines(["Can't serialize data to"])
 
 
 def test_find_by_status(testdir):

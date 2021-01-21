@@ -2,16 +2,16 @@ import binascii
 import os
 from dataclasses import dataclass
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Generator, Optional, Type
+from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Generator, Optional, Type, cast
 
 import yaml
 from typing_extensions import Protocol, runtime_checkable
 
-from .utils import is_json_media_type, is_plain_text_media_type, parse_content_type
+from ._xml import _to_xml
+from .utils import is_json_media_type, is_plain_text_media_type, parse_content_type, is_xml_media_type
 
 if TYPE_CHECKING:
     from .models import Case
-
 
 try:
     from yaml import CSafeDumper as SafeDumper
@@ -30,6 +30,24 @@ class SerializerContext:
     """
 
     case: "Case"
+
+    @property
+    def media_type(self) -> str:
+        # `media_type` is a string, otherwise we won't serialize anything
+        return cast(str, self.case.media_type)
+
+    # Note on type casting below.
+    # If we serialize data, then there should be non-empty definition for it in the first place
+    # Therefore `schema` is never `None` if called from here. However, `APIOperation.get_raw_payload_schema` is
+    # generic and can be called from other places where it may return `None`
+
+    def get_raw_payload_schema(self) -> Dict[str, Any]:
+        schema = self.case.operation.get_raw_payload_schema(self.media_type)
+        return cast(Dict[str, Any], schema)
+
+    def get_resolved_payload_schema(self) -> Dict[str, Any]:
+        schema = self.case.operation.get_resolved_payload_schema(self.media_type)
+        return cast(Dict[str, Any], schema)
 
 
 @runtime_checkable
@@ -123,6 +141,15 @@ class YAMLSerializer:
 
     def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
         return _to_yaml(value)
+
+
+@register("application/xml")
+class XMLSerializer:
+    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+        return _to_xml(value, context.get_raw_payload_schema(), context.get_resolved_payload_schema())
+
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+        return _to_xml(value, context.get_raw_payload_schema(), context.get_resolved_payload_schema())
 
 
 def _should_coerce_to_bytes(item: Any) -> bool:
@@ -249,4 +276,6 @@ def get(media_type: str) -> Optional[Type[Serializer]]:
         media_type = "application/json"
     if is_plain_text_media_type(media_type):
         media_type = "text/plain"
+    if is_xml_media_type(media_type):
+        media_type = "application/xml"
     return SERIALIZERS.get(media_type)
