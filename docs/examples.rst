@@ -60,3 +60,23 @@ Schemathesis also supports examples in individual properties.
                       example: bar
 
 Don't worry if you don't have examples for all properties - Schemathesis will generate them for you.
+
+External examples
+~~~~~~~~~~~~~~~~~
+
+Examples specified via the ``externalValue`` keyword are also supported:
+
+.. code:: yaml
+
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/MyObject'
+        examples:
+          jsonObject:
+            summary: A sample object
+            externalValue: 'http://example.com/examples/object-example.json'
+
+Schemathesis will load external examples and cache them to avoid hitting the same URL multiple times during the same test run.
+Note that such examples for ``multipart/form-data`` are not supported because they require the ``boundary`` directive to be present.
+Schemathesis can't infer it solely from the response.

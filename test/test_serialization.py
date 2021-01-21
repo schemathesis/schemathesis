@@ -1,5 +1,6 @@
 import csv
 from io import StringIO
+from test.utils import assert_requests_call
 
 import pytest
 from hypothesis import given, settings
@@ -120,3 +121,41 @@ def test_serialize_yaml(open_api_3_schema_with_yaml_payload, method):
         assert kwargs["data"] == "- 42\n"
 
     test()
+
+
+@pytest.mark.parametrize(
+    "media_type", ("text/yaml", "application/x-www-form-urlencoded", "text/plain", "multipart/form-data")
+)
+def test_binary_data(empty_open_api_3_schema, media_type):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        media_type: {
+                            "schema": {},
+                            "examples": {"answer": {"externalValue": f"http://127.0.0.1:1/answer.json"}},
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    operation = schema["/test"]["POST"]
+    # When an explicit bytes value is passed as body (it happens with `externalValue`)
+    body = b"\x92\x42"
+    case = operation.make_case(body=body, media_type=media_type)
+    # Then it should be used as is
+    requests_kwargs = case.as_requests_kwargs()
+    assert requests_kwargs["data"] == body
+    werkzeug_kwargs = case.as_werkzeug_kwargs()
+    assert werkzeug_kwargs["data"] == body
+    if media_type != "multipart/form-data":
+        # Don't know the proper header for raw multipart content
+        assert requests_kwargs["headers"]["Content-Type"] == media_type
+        assert werkzeug_kwargs["headers"]["Content-Type"] == media_type
+    # And it is OK to send it over the network
+    assert_requests_call(case)
