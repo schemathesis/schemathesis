@@ -88,6 +88,9 @@ def unregister(media_type: str) -> None:
 
 
 def _to_json(value: Any) -> Dict[str, Any]:
+    if isinstance(value, bytes):
+        # Possible to get via explicit examples, e.g. `externalValue`
+        return {"data": value}
     if value is None:
         # If the body is `None`, then the app expects `null`, but `None` is also the default value for the `json`
         # argument in `requests.request` and `werkzeug.Client.open` which makes these cases indistinguishable.
