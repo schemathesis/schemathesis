@@ -553,6 +553,7 @@ class APIOperation(Generic[P]):
         cookies: Optional[Cookies] = None,
         query: Optional[Query] = None,
         body: Union[Body, NotSet] = NOT_SET,
+        media_type: Optional[str] = None,
     ) -> Case:
         """Create a new example for this API operation."""
         return Case(
@@ -562,6 +563,7 @@ class APIOperation(Generic[P]):
             cookies=cookies,
             query=query,
             body=body,
+            media_type=media_type,
         )
 
     @property

@@ -57,6 +57,11 @@ def create_openapi_app(
         [web.get("/schema.yaml", schema), web.get("/api/cookies", set_cookies)]
         + [web.route(item.value[0], item.value[1], wrapper(item.name)) for item in Operation if item.name != "all"]
     )
+
+    async def answer(request: web.Request) -> web.Response:
+        return web.json_response(42)
+
+    app.add_routes([web.get("/answer.json", answer)])
     app["users"] = {}
     app["incoming_requests"] = incoming_requests
     app["schema_requests"] = schema_requests

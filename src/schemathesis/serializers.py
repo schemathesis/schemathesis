@@ -88,6 +88,9 @@ def unregister(media_type: str) -> None:
 
 
 def _to_json(value: Any) -> Dict[str, Any]:
+    if isinstance(value, bytes):
+        # Possible to get via explicit examples, e.g. `externalValue`
+        return {"data": value}
     if value is None:
         # If the body is `None`, then the app expects `null`, but `None` is also the default value for the `json`
         # argument in `requests.request` and `werkzeug.Client.open` which makes these cases indistinguishable.
@@ -106,6 +109,8 @@ class JSONSerializer:
 
 
 def _to_yaml(value: Any) -> Dict[str, Any]:
+    if isinstance(value, bytes):
+        return {"data": value}
     return {"data": yaml.dump(value, Dumper=SafeDumper)}
 
 
@@ -147,8 +152,9 @@ def _to_bytes(value: Any) -> bytes:
 
 @register("multipart/form-data")
 class MultipartSerializer:
-    def as_requests(self, context: SerializerContext, value: Dict[str, Any]) -> Dict[str, Any]:
-        # Form data always is generated as a dictionary
+    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+        if isinstance(value, bytes):
+            return {"data": value}
         multipart = _prepare_form_data(value)
         files, data = context.case.operation.prepare_multipart(multipart)
         return {"files": files, "data": data}
@@ -169,9 +175,13 @@ class URLEncodedFormSerializer:
 @register("text/plain")
 class TextSerializer:
     def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+        if isinstance(value, bytes):
+            return {"data": value}
         return {"data": str(value).encode("utf8")}
 
     def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+        if isinstance(value, bytes):
+            return {"data": value}
         return {"data": str(value)}
 
 

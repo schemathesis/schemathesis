@@ -141,13 +141,20 @@ Third, the serializer should have two methods - ``as_requests`` and ``as_werkzeu
 
     class CSVSerializer:
         def as_requests(self, context, value):
+            if isinstance(value, bytes):
+                return {"data": value}
             return {"data": to_csv(value)}
 
         def as_werkzeug(self, context, value):
+            if isinstance(value, bytes):
+                return {"data": value}
             return {"data": to_csv(value)}
 
 They should return dictionaries of keyword arguments that will be passed to ``requests.request`` and ``werkzeug.Client.open``, respectively.
 With the CSV example, we create payload with the ``to_csv`` function defined earlier and return it as ``data``, which is valid for both cases.
+
+Note that both methods explicitly handle binary data - for non-binary media types, it may happen if the API schema contains examples via the ``externalValue`` keyword.
+In these cases, the loaded example is passed directly as binary data.
 
 Additionally, you have ``context`` where you can access the current test case via ``context.case``.
 

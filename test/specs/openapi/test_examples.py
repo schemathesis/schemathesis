@@ -1,3 +1,4 @@
+from test.utils import assert_requests_call
 from typing import Any, Dict
 
 import jsonschema
@@ -10,6 +11,7 @@ import schemathesis
 from schemathesis._hypothesis import get_single_example
 from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import examples
+from schemathesis.specs.openapi.examples import get_examples
 from schemathesis.specs.openapi.parameters import parameters_to_json_schema
 from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
@@ -349,52 +351,6 @@ def test_static_parameters_union_0():
     assert full_sp1["body"] == {"foo1": "example1 string"}
 
 
-EXAMPLE_SCHEMA = {
-    "openapi": "3.0.0",
-    "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
-    "paths": {
-        "/test": {
-            "post": {
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "id",
-                        "schema": {"type": "string"},
-                        "examples": {"foo": {"externalValue": "http://example.com/examples/example.pdf"}},
-                    }
-                ],
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                            },
-                            "examples": {"foo": {"externalValue": "http://example.com/examples/example.pdf"}},
-                        }
-                    },
-                },
-                "responses": {"default": {"description": "test"}},
-            }
-        },
-    },
-}
-
-
-@pytest.mark.parametrize(
-    "func, expected",
-    (
-        (examples.get_request_body_examples, {"examples": [], "type": "body"}),
-        (examples.get_parameter_examples, [{"examples": [], "name": "id", "type": "query"}]),
-    ),
-)
-def test_example_external_value_failure(func, expected):
-    # See GH-882
-    schema = schemathesis.from_dict(EXAMPLE_SCHEMA)
-    operation = schema["/test"]["POST"]
-    assert func(operation.definition.resolved, "examples") == expected
-
-
 def test_multipart_examples():
     # Regression after parameters refactoring
     # When the schema contains examples for multipart forms
@@ -476,3 +432,70 @@ def test_partial_examples(empty_open_api_3_schema):
     example = get_single_example(strategy)
     parameters_schema = parameters_to_json_schema(operation.path_parameters)
     jsonschema.validate(example.path_parameters, parameters_schema)
+
+
+def test_external_value(empty_open_api_3_schema, server):
+    # When the API schema contains examples via `externalValue` keyword
+    empty_open_api_3_schema["paths"] = {
+        "/test/": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "integer"},
+                            "examples": {"answer": {"externalValue": f"http://127.0.0.1:{server['port']}/answer.json"}},
+                        }
+                    }
+                },
+                "responses": {"default": {"description": "OK"}},
+            }
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    operation = schema["/test/"]["POST"]
+    strategy = operation.get_strategies_from_examples()[0]
+    # Then this example should be used
+    example = get_single_example(strategy)
+    assert example.body == b"42"
+    # And this data should be be OK to send
+    assert_requests_call(example)
+    assert example.as_werkzeug_kwargs()["data"] == b"42"
+
+
+def test_external_value_network_error(empty_open_api_3_schema):
+    # When the external value is not available
+    empty_open_api_3_schema["paths"] = {
+        "/test/": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "integer"},
+                            "examples": {
+                                "answer": {
+                                    # Not available
+                                    "externalValue": "http://127.0.0.1:1/answer.json"
+                                }
+                            },
+                        }
+                    }
+                },
+                "responses": {"default": {"description": "OK"}},
+            }
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    operation = schema["/test/"]["POST"]
+    # Then this example should not be used
+    assert not operation.get_strategies_from_examples()
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    (
+        ({"foo": {"value": 42}}, [42]),
+        ({"foo": {}}, []),
+    ),
+)
+def test_empty_example(value, expected, server):
+    assert list(get_examples(value)) == expected
