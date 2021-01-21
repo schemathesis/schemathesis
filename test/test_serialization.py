@@ -5,6 +5,7 @@ import pytest
 from hypothesis import given, settings
 
 import schemathesis
+from schemathesis import serializers
 from schemathesis.exceptions import SerializationNotPossible
 
 
@@ -29,12 +30,12 @@ def csv_serializer():
         def as_werkzeug(self, context, value):
             return {"data": to_csv(value)}
 
-    assert schemathesis.serializers.SERIALIZERS["text/csv"] is CSVSerializer
+    assert serializers.SERIALIZERS["text/csv"] is CSVSerializer
     assert schemathesis.serializers.SERIALIZERS["text/tsv"] is CSVSerializer
 
     yield
 
-    schemathesis.serializers.unregister("text/csv")
+    serializers.unregister("text/csv")
 
 
 @pytest.fixture(params=["aiohttp", "flask"])
@@ -120,3 +121,16 @@ def test_serialize_yaml(open_api_3_schema_with_yaml_payload, method):
         assert kwargs["data"] == "- 42\n"
 
     test()
+
+
+def test_serialize_xml_simple():
+    serializer = serializers.get("application/xml")
+    data = {"id": 0, "title": "string", "author": "string"}
+    expected = """
+<book>
+  <id>0</id>
+  <title>string</title>
+  <author>string</author>
+</book>"""
+    # TODO. make a proper context
+    assert serializer().as_requests(None, data) == expected

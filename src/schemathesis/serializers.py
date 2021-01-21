@@ -121,6 +121,33 @@ class YAMLSerializer:
         return _to_yaml(value)
 
 
+def _to_xml(value: Any, definition: Dict[str, Any]) -> Dict[str, Any]:
+    """Serialize a generated Python object as an XML string.
+
+    :param value: Generated value
+    :param definition: The payload definition. It may contain additional information for fine-tuned XML serialization.
+    """
+    if isinstance(value, bytes):
+        return {"data": value}
+    buffer = ""
+    # TODO. test with hypothesis
+    return {"data": buffer}
+
+
+@register("application/xml", aliases=("text/xml",))
+class XMLSerializer:
+    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+        # TODO. How to detect the root element?
+        # - Get the payload schema via looking at the definition & using case.media_type
+        # - if there is a reference, take the last bit of the path. It is resolvable since we get here
+        # - If there is `xml -> name`, use it
+        # - Take some default? `root` ? Ask OAS devs
+        raise NotImplementedError
+
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+        raise NotImplementedError
+
+
 def _should_coerce_to_bytes(item: Any) -> bool:
     """Whether the item should be converted to bytes."""
     # These types are OK in forms, others should be coerced to bytes

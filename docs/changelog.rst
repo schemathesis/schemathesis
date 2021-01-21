@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Support for external examples via the ``externalValue`` keyword. `#884`_
+- XML serialization, including support for ``xml`` attributes in Open API schemas. `#733`_
 
 `3.0.4`_ - 2021-01-19
 ---------------------
@@ -1778,6 +1779,7 @@ Deprecated
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
 .. _#737: https://github.com/schemathesis/schemathesis/issues/737
 .. _#734: https://github.com/schemathesis/schemathesis/issues/734
+.. _#733: https://github.com/schemathesis/schemathesis/issues/733
 .. _#731: https://github.com/schemathesis/schemathesis/issues/731
 .. _#721: https://github.com/schemathesis/schemathesis/issues/721
 .. _#719: https://github.com/schemathesis/schemathesis/issues/719
