@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Support for external examples via the ``externalValue`` keyword. `#884`_
+
 `3.0.4`_ - 2021-01-19
 ---------------------
 
@@ -1740,6 +1744,7 @@ Deprecated
 .. _#890: https://github.com/schemathesis/schemathesis/issues/890
 .. _#889: https://github.com/schemathesis/schemathesis/issues/889
 .. _#886: https://github.com/schemathesis/schemathesis/issues/886
+.. _#884: https://github.com/schemathesis/schemathesis/issues/884
 .. _#882: https://github.com/schemathesis/schemathesis/issues/882
 .. _#877: https://github.com/schemathesis/schemathesis/issues/877
 .. _#876: https://github.com/schemathesis/schemathesis/issues/876

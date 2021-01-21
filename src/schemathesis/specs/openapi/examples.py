@@ -1,5 +1,8 @@
-from typing import Any, Dict, List
+from contextlib import suppress
+from functools import lru_cache
+from typing import Any, Dict, Generator, List
 
+import requests
 from hypothesis.strategies import SearchStrategy
 
 from ...models import APIOperation, Case
@@ -15,18 +18,33 @@ def get_object_example_from_properties(object_schema: Dict[str, Any]) -> Dict[st
     }
 
 
+@lru_cache()
+def load_external_example(url: str) -> bytes:
+    """Load examples the `externalValue` keyword."""
+    response = requests.get(url)
+    response.raise_for_status()
+    return response.content
+
+
+def get_examples(examples: Dict[str, Any]) -> Generator[Any, None, None]:
+    for example in examples.values():
+        # IDEA: report when it is not a dictionary
+        if isinstance(example, dict):
+            if "value" in example:
+                yield example["value"]
+            elif "externalValue" in example:
+                with suppress(requests.RequestException):
+                    # Report a warning if not available?
+                    yield load_external_example(example["externalValue"])
+
+
 def get_parameter_examples(operation_definition: Dict[str, Any], examples_field: str) -> List[Dict[str, Any]]:
     """Gets parameter examples from OAS3 `examples` keyword or `x-examples` for Swagger 2."""
     return [
         {
             "type": LOCATION_TO_CONTAINER.get(parameter["in"]),
             "name": parameter["name"],
-            "examples": [
-                example["value"]
-                for example in parameter[examples_field].values()
-                # IDEA: report when it is not a dictionary
-                if isinstance(example, dict) and "value" in example
-            ],
+            "examples": list(get_examples(parameter[examples_field])),
         }
         for parameter in operation_definition.get("parameters", [])
         if examples_field in parameter
@@ -58,9 +76,10 @@ def get_request_body_examples(operation_definition: Dict[str, Any], examples_fie
         return {}
     # first element in tuple is media type, second element is dict
     _, schema = next(iter(request_bodies_items))
+    examples = schema.get(examples_field, {})
     return {
         "type": "body",
-        "examples": [example["value"] for example in schema.get(examples_field, {}).values() if "value" in example],
+        "examples": list(get_examples(examples)),
     }
 
 
