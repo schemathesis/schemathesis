@@ -231,3 +231,24 @@ def test(case):
     # Then this test should be skipped with a proper error message
     result.assert_outcomes(skipped=1)
     assert RECURSIVE_REFERENCE_ERROR_MESSAGE in result.stdout.str()
+
+
+def test_checks_as_a_list(testdir, openapi3_base_url):
+    # When the user passes a list of checks instead of a tuple
+    testdir.make_test(
+        f"""
+schema.base_url = "{openapi3_base_url}"
+
+def my_check(response, case):
+    note("CHECKING!")
+
+@schema.parametrize()
+def test(case):
+    response = case.call()
+    case.validate_response(response, checks=(my_check,), additional_checks=[my_check])
+""",
+    )
+    result = testdir.runpytest("-s")
+    # Then it should work
+    result.assert_outcomes(passed=1)
+    assert "CHECKING!" in result.stdout.str()

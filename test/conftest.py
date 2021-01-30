@@ -520,6 +520,9 @@ def testdir(testdir):
         from test.utils import *
         from hypothesis import given, settings, HealthCheck, Phase, assume, strategies as st
         raw_schema = {schema}
+
+        note = print  # An alias to distinguish with leftover prints
+
         schema = schemathesis.from_dict(raw_schema, method={method}, endpoint={endpoint}, tag={tag}, validate_schema={validate_schema})
         """.format(
                 schema=schema,
