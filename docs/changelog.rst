@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.0.5`_ - 2021-01-30
+---------------------
+
 **Fixed**
 
 - Allow to use any iterable type for ``checks`` and ``additional_checks`` arguments to ``Case.validate_response``.
@@ -1587,7 +1590,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.4...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.5...HEAD
+.. _3.0.5: https://github.com/schemathesis/schemathesis/compare/v3.0.4...v3.0.5
 .. _3.0.4: https://github.com/schemathesis/schemathesis/compare/v3.0.3...v3.0.4
 .. _3.0.3: https://github.com/schemathesis/schemathesis/compare/v3.0.2...v3.0.3
 .. _3.0.2: https://github.com/schemathesis/schemathesis/compare/v3.0.1...v3.0.2
