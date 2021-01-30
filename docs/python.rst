@@ -269,6 +269,35 @@ When the received response is validated, Schemathesis runs the following checks:
 - ``response_headers_conformance``. The response headers does not contain all defined headers.
 
 Validation happens in the ``case.validate_response`` function, but you can add your code to verify the response conformance as you do in regular Python tests.
+By default, all available checks will be applied, but you can customize it by passing a tuple of checks explicitly:
+
+.. code-block:: python
+
+    from schemathesis.checks import not_a_server_error
+
+    ...
+
+
+    @schema.parametrize()
+    def test_api(case):
+        response = case.call()
+        case.validate_response(response, checks=(not_a_server_error,))
+
+The code above will run only the ``not_a_server_error`` check. Or a tuple of additional checks will be executed after ones from the ``checks`` argument:
+
+.. code-block:: python
+
+    ...
+
+
+    def my_check(response, case):
+        ...  # some awesome assertions
+
+
+    @schema.parametrize()
+    def test_api(case):
+        response = case.call()
+        case.validate_response(response, additional_checks=(my_check,))
 
 If you don't use Schemathesis for data generation, you can still utilize response validation:
 
