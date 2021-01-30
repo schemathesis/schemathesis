@@ -343,6 +343,15 @@ class Case:  # pylint: disable=too-many-public-methods
         checks: Tuple["CheckFunction", ...] = (),
         additional_checks: Tuple["CheckFunction", ...] = (),
     ) -> None:
+        """Validate application response.
+
+        By default, all available checks will be applied.
+
+        :param response: Application response.
+        :param checks: A tuple of check functions that accept ``response`` and ``case``.
+        :param additional_checks: A tuple of additional checks that will be executed after ones from the ``checks``
+            argument.
+        """
         from .checks import ALL_CHECKS  # pylint: disable=import-outside-toplevel
 
         checks = checks or ALL_CHECKS
