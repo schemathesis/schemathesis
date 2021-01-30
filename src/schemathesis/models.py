@@ -5,6 +5,7 @@ from collections import Counter
 from contextlib import contextmanager
 from copy import deepcopy
 from enum import IntEnum
+from itertools import chain
 from logging import LogRecord
 from typing import (
     TYPE_CHECKING,
@@ -355,9 +356,8 @@ class Case:  # pylint: disable=too-many-public-methods
         from .checks import ALL_CHECKS  # pylint: disable=import-outside-toplevel
 
         checks = checks or ALL_CHECKS
-        checks += additional_checks
         errors = []
-        for check in checks:
+        for check in chain(checks, additional_checks):
             try:
                 check(response, self)
             except CheckFailed as exc:
