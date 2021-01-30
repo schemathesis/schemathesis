@@ -8,6 +8,10 @@ Changelog
 
 - Support for external examples via the ``externalValue`` keyword. `#884`_
 
+**Fixed**
+
+- Allow to use any iterable type for ``checks`` and ``additional_checks`` arguments to ``Case.validate_response``.
+
 `3.0.4`_ - 2021-01-19
 ---------------------
 
