@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: GitHub Package Registry
+      - name: Alpine. GitHub Package Registry
         uses: aevea/action-kaniko@master
         with:
           registry: docker.pkg.github.com
@@ -22,11 +22,31 @@ jobs:
           cache: true
           cache_registry: cache
 
-      - name: Dockerhub
+      - name: Alpine. Dockerhub
         uses: aevea/action-kaniko@master
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
           image: schemathesis/schemathesis
+          cache: true
+          cache_registry: schemathesis/cache
+
+      - name: Buster. GitHub Package Registry
+        uses: aevea/action-kaniko@master
+        with:
+          registry: docker.pkg.github.com
+          password: ${{ secrets.GITHUB_TOKEN }}
+          image: server-buster
+          build_file: Dockerfile.buster
+          cache: true
+          cache_registry: cache
+
+      - name: Buster. Dockerhub
+        uses: aevea/action-kaniko@master
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          image: schemathesis/schemathesis-buster
+          build_file: Dockerfile.buster
           cache: true
           cache_registry: schemathesis/cache
