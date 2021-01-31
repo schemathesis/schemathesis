@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.0.6`_ - 2021-01-31
+---------------------
+
+- Packaging-only release for Docker images based on Debian Buster. `#1028`_
+
 `3.0.5`_ - 2021-01-30
 ---------------------
 
@@ -1590,7 +1595,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.5...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.6...HEAD
+.. _3.0.6: https://github.com/schemathesis/schemathesis/compare/v3.0.5...v3.0.6
 .. _3.0.5: https://github.com/schemathesis/schemathesis/compare/v3.0.4...v3.0.5
 .. _3.0.4: https://github.com/schemathesis/schemathesis/compare/v3.0.3...v3.0.4
 .. _3.0.3: https://github.com/schemathesis/schemathesis/compare/v3.0.2...v3.0.3
@@ -1711,6 +1717,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1028: https://github.com/schemathesis/schemathesis/issues/1028
 .. _#1022: https://github.com/schemathesis/schemathesis/issues/1022
 .. _#1020: https://github.com/schemathesis/schemathesis/issues/1020
 .. _#1018: https://github.com/schemathesis/schemathesis/issues/1018
