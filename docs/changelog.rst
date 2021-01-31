@@ -8,6 +8,9 @@ Changelog
 
 - Support for external examples via the ``externalValue`` keyword. `#884`_
 
+`3.0.7`_ - 2021-01-31
+---------------------
+
 **Fixed**
 
 - Docker tags for Buster-based images.
@@ -1603,7 +1606,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.6...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.7...HEAD
+.. _3.0.7: https://github.com/schemathesis/schemathesis/compare/v3.0.6...v3.0.7
 .. _3.0.6: https://github.com/schemathesis/schemathesis/compare/v3.0.5...v3.0.6
 .. _3.0.5: https://github.com/schemathesis/schemathesis/compare/v3.0.4...v3.0.5
 .. _3.0.4: https://github.com/schemathesis/schemathesis/compare/v3.0.3...v3.0.4
