@@ -36,8 +36,9 @@ jobs:
         with:
           registry: docker.pkg.github.com
           password: ${{ secrets.GITHUB_TOKEN }}
-          image: server-buster
+          image: server
           build_file: Dockerfile.buster
+          tag: latest-buster
           cache: true
           cache_registry: cache
 
@@ -46,7 +47,8 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-          image: schemathesis/schemathesis-buster
+          image: schemathesis/schemathesis
           build_file: Dockerfile.buster
+          tag: latest-buster
           cache: true
           cache_registry: schemathesis/cache
