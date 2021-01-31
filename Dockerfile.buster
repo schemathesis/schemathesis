@@ -1,0 +1,22 @@
+FROM python:3.9-buster
+
+LABEL Name=Schemathesis
+
+WORKDIR /app
+
+RUN groupadd --gid 1000 --system schemathesis && \
+    useradd --uid 1000 --system schemathesis -g schemathesis -s /sbin/nologin
+
+COPY --chown=1000:1000 pyproject.toml README.rst src ./
+
+RUN apt-get update && apt-get install -y build-essential libffi-dev libssl-dev && \
+    pip install --no-cache-dir ./ && \
+    apt remove -y build-essential libffi-dev libssl-dev && \
+    apt -y autoremove && \
+    rm -rf /var/lib/apt/lists/*
+
+# Needed for the `.hypothesis` directory
+RUN chown -R 1000:1000 /app
+
+USER schemathesis
+ENTRYPOINT ["schemathesis"]
