@@ -21,7 +21,7 @@ jobs:
           cache: true
           cache_registry: cache
 
-      - name: Dockerhub
+      - name: Alpine. Dockerhub
         uses: aevea/action-kaniko@master
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -30,12 +30,33 @@ jobs:
           cache: true
           cache_registry: schemathesis/cache
 
-      - name: Dockerhub stable
+      - name: Alpine. Dockerhub stable
         uses: aevea/action-kaniko@master
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
           image: schemathesis/schemathesis
+          cache: true
+          tag: stable
+          cache_registry: schemathesis/cache
+
+      - name: Buster. Dockerhub
+        uses: aevea/action-kaniko@master
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          image: schemathesis/schemathesis-buster
+          build_file: Dockerfile.buster
+          cache: true
+          cache_registry: schemathesis/cache
+
+      - name: Buster. Dockerhub stable
+        uses: aevea/action-kaniko@master
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          image: schemathesis/schemathesis-buster
+          build_file: Dockerfile.buster
           cache: true
           tag: stable
           cache_registry: schemathesis/cache
