@@ -40,13 +40,16 @@ jobs:
           tag: stable
           cache_registry: schemathesis/cache
 
+      - run: echo "buster_tag=$(echo -n ${GITHUB_REF} | sed -E 's/refs\/(heads|tags)\///g' | sed -e 's/\//-/g' | cat - <(echo "-buster"))" >> $GITHUB_ENV
+
       - name: Buster. Dockerhub
         uses: aevea/action-kaniko@master
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-          image: schemathesis/schemathesis-buster
+          image: schemathesis/schemathesis
           build_file: Dockerfile.buster
+          tag: ${{ env.buster_tag }}
           cache: true
           cache_registry: schemathesis/cache
 
@@ -55,10 +58,10 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-          image: schemathesis/schemathesis-buster
+          image: schemathesis/schemathesis
           build_file: Dockerfile.buster
           cache: true
-          tag: stable
+          tag: stable-buster
           cache_registry: schemathesis/cache
 
   release_package:

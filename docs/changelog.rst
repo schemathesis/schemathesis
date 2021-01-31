@@ -8,6 +8,10 @@ Changelog
 
 - Support for external examples via the ``externalValue`` keyword. `#884`_
 
+**Fixed**
+
+- Docker tags for Buster-based images.
+
 `3.0.6`_ - 2021-01-31
 ---------------------
 
