@@ -447,7 +447,6 @@ Important ``Case`` attributes:
 - ``headers`` - HTTP headers
 - ``query`` - query parameters
 - ``body`` - request body
-- ``form_data`` - form payload
 
 For convenience, you can explore the schemas and strategies manually:
 
@@ -471,7 +470,6 @@ For convenience, you can explore the schemas and strategies manually:
     #         'name': '\x15.\x13\U0008f42a',
     #         'photoUrls': ['\x08\U0009f29a', '']
     #     },
-    #     form_data={}
     # )
 
 Schema instances implement the ``Mapping`` protocol.
