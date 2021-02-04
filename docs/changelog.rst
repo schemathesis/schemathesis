@@ -8,6 +8,11 @@ Changelog
 
 - Support for external examples via the ``externalValue`` keyword. `#884`_
 
+`3.0.8`_ - 2021-02-04
+---------------------
+
+- This release updates the documentation to be in-line with the current state.
+
 `3.0.7`_ - 2021-01-31
 ---------------------
 
@@ -1454,7 +1459,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.7...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.8...HEAD
+.. _3.0.8: https://github.com/schemathesis/schemathesis/compare/v3.0.7...v3.0.8
 .. _3.0.7: https://github.com/schemathesis/schemathesis/compare/v3.0.6...v3.0.7
 .. _3.0.6: https://github.com/schemathesis/schemathesis/compare/v3.0.5...v3.0.6
 .. _3.0.5: https://github.com/schemathesis/schemathesis/compare/v3.0.4...v3.0.5
