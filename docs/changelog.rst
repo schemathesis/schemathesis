@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Return a default terminal size to prevent crashes on systems with zero-width terminals (some CI/CD servers).
+
 **Added**
 
 - Support for external examples via the ``externalValue`` keyword. `#884`_

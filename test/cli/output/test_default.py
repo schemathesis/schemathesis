@@ -54,6 +54,10 @@ def after_execution(results_set, operation, swagger_20):
     )
 
 
+def test_get_terminal_width():
+    assert default.get_terminal_width() >= 80
+
+
 @pytest.mark.parametrize(
     "title,separator,printed,expected",
     [
