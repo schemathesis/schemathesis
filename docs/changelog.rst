@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Return a default terminal size to prevent crashes on systems with zero-width terminals (some CI/CD servers).
+
 `3.0.8`_ - 2021-02-04
 ---------------------
 

@@ -22,7 +22,8 @@ DISABLE_SCHEMA_VALIDATION_MESSAGE = (
 
 
 def get_terminal_width() -> int:
-    return shutil.get_terminal_size().columns
+    # Some CI/CD providers (e.g. CircleCI) return a (0, 0) terminal size so provide a default
+    return shutil.get_terminal_size((80, 24)).columns
 
 
 def display_section_name(title: str, separator: str = "=", extra: str = "", **kwargs: Any) -> None:
