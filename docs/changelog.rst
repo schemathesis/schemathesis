@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.0.9`_ - 2021-02-10
+---------------------
+
 **Fixed**
 
 - Return a default terminal size to prevent crashes on systems with zero-width terminals (some CI/CD servers).
@@ -1459,7 +1462,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.8...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.0.9...HEAD
+.. _3.0.9: https://github.com/schemathesis/schemathesis/compare/v3.0.8...v3.0.9
 .. _3.0.8: https://github.com/schemathesis/schemathesis/compare/v3.0.7...v3.0.8
 .. _3.0.7: https://github.com/schemathesis/schemathesis/compare/v3.0.6...v3.0.7
 .. _3.0.6: https://github.com/schemathesis/schemathesis/compare/v3.0.5...v3.0.6
