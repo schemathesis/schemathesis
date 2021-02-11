@@ -79,6 +79,7 @@ Additional notes
 .. toctree::
    :maxdepth: 2
 
+   recipes
    api
    faq
    changelog

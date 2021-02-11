@@ -439,6 +439,13 @@ Such test consists of four main parts:
 
 Each test function where you use ``schema.parametrize`` should have the ``case`` fixture, representing a single test case.
 
+.. note::
+
+    Data generation happens outside of the test function body. It means that the ``case`` object is final, and any modifications on it
+    won't trigger data-generation. If you want to update it partially (e.g., replacing a single field in the payload), keep in mind that
+    it may require some sort of "merging" logic.
+
+
 Important ``Case`` attributes:
 
 - ``method`` - HTTP method
