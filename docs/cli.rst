@@ -163,28 +163,6 @@ If any response will take longer than the provided value (in milliseconds) than 
 
     ======================= 1 failed in 0.29s =======================
 
-API authorization
------------------
-
-Most of the APIs are not public and require some form of authorization.
-Schemathesis CLI accepts ``--auth`` option for Basic Auth and ``--header`` to specify custom headers to be sent with each request.
-You can use it to set the ``Authorization`` header:
-
-
-.. code:: bash
-
-    schemathesis run --auth username:$PASSWORD ...
-
-.. code:: bash
-
-    schemathesis run -H "Authorization: Bearer TOKEN" ...
-
-Each header value should be in the ``KEY: VALUE`` format. You can also provide multiple headers by using the ``-H`` option multiple times:
-
-.. code:: bash
-
-    schemathesis run -H "Authorization: ..." -H "X-API-Key: ..."
-
 Concurrent testing
 ------------------
 
