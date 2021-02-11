@@ -61,7 +61,7 @@ def display_percentage(context: ExecutionContext, event: events.AfterExecution) 
     styled = click.style(current_percentage, fg="cyan")
     # Total length of the message, so it will fill to the right border of the terminal.
     # Padding is already taken into account in `context.current_line_length`
-    length = get_terminal_width() - context.current_line_length + len(styled) - len(current_percentage)
+    length = max(get_terminal_width() - context.current_line_length + len(styled) - len(current_percentage), 1)
     template = f"{{:>{length}}}"
     click.echo(template.format(styled))
 
