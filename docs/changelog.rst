@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Prevent a small terminal width causing a crash (due to negative length used in an f-string) when printing percentage
+
 **Added**
 
 - Support for external examples via the ``externalValue`` keyword. `#884`_
