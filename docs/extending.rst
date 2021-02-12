@@ -7,7 +7,7 @@ sending, and so on. Schemathesis offers multiple extension mechanisms.
 Hooks
 -----
 
-The hook mechanism is similar to the pytest's one. Depending on the scope of the changes, there are three scopes of hooks:
+The hook mechanism is similar to pytest's. Depending on the scope of the changes, there are three scopes of hooks:
 
 - Global. These hooks applied to all schemas in the test run;
 - Schema. Used only for specific schema instance;
