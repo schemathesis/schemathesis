@@ -22,7 +22,7 @@ def uninstall(fixups: Optional[Iterable[str]] = None) -> None:
 
     Without the first argument uninstalls all available fixups.
 
-    :param fixups: Names of fixups to install.
+    :param fixups: Names of fixups to uninstall.
     """
     fixups = fixups or list(ALL_FIXUPS.keys())
     for name in fixups:

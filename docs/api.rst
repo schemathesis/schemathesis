@@ -9,6 +9,10 @@ Checks
 Fixups
 ~~~~~~
 
+**Available fixups**:
+
+- fast_api
+
 .. autofunction:: schemathesis.fixups.install
 .. autofunction:: schemathesis.fixups.uninstall
 
