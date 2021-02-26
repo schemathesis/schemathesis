@@ -4,50 +4,142 @@
 #
 #    pip-compile --output-file=requirements.txt requirements.in
 #
-aiohttp-jinja2==1.2.0     # via connexion
-aiohttp==3.6.2            # via aiohttp-jinja2, connexion
-async-timeout==3.0.1      # via aiohttp
-asyncpg==0.19.0           # via -r requirements.in
-attrs==19.3.0             # via -r requirements.in, aiohttp, hypothesis, jsonschema, pytest, schemathesis
-certifi==2020.6.20        # via requests
-chardet==3.0.4            # via aiohttp, requests
-click==7.1.2              # via clickclick, flask, schemathesis
-clickclick==1.2.2         # via connexion
-connexion[aiohttp,swagger-ui]==2.4.0  # via -r requirements.in
-curlify==2.2.1            # via schemathesis
-flask==1.1.1              # via connexion
-graphql-core==3.1.2       # via hypothesis-graphql
-hypothesis-graphql==0.3.2  # via schemathesis
-hypothesis-jsonschema==0.18.2  # via schemathesis
-hypothesis==5.43.4        # via hypothesis-graphql, hypothesis-jsonschema, schemathesis
-idna==2.8                 # via requests, yarl
-inflection==0.3.1         # via connexion
-iniconfig==1.1.1          # via pytest
-itsdangerous==1.1.0       # via flask
-jinja2==2.10.3            # via aiohttp-jinja2, flask, swagger-ui-bundle
-jsonschema==3.2.0         # via connexion, hypothesis-jsonschema, openapi-spec-validator, schemathesis
-junit-xml==1.9            # via schemathesis
-markupsafe==1.1.1         # via jinja2
-multidict==4.5.2          # via aiohttp, yarl
-openapi-spec-validator==0.2.8  # via connexion
-packaging==20.8           # via pytest
-pluggy==0.13.1            # via pytest
-py==1.10.0                # via pytest
-pyparsing==2.4.7          # via packaging
-pyrsistent==0.15.5        # via jsonschema
-pytest-subtests==0.4.0    # via schemathesis
-pytest==6.2.1             # via -r requirements.in, pytest-subtests, schemathesis
-pyyaml==5.1.2             # via clickclick, connexion, openapi-spec-validator, schemathesis
-requests==2.22.0          # via connexion, curlify, schemathesis
-schemathesis==2.8.5       # via -r requirements.in
-six==1.13.0               # via connexion, jsonschema, junit-xml, openapi-spec-validator, pyrsistent
-sortedcontainers==2.3.0   # via hypothesis
-starlette==0.13.8         # via schemathesis
-swagger-ui-bundle==0.0.8  # via connexion
-toml==0.10.2              # via pytest
-urllib3==1.25.6           # via requests
-werkzeug==1.0.1           # via flask, schemathesis
-yarl==1.6.3               # via aiohttp, schemathesis
+aiohttp-jinja2==1.2.0
+    # via connexion
+aiohttp==3.7.4
+    # via
+    #   aiohttp-jinja2
+    #   connexion
+async-timeout==3.0.1
+    # via aiohttp
+asyncpg==0.19.0
+    # via -r requirements.in
+attrs==19.3.0
+    # via
+    #   -r requirements.in
+    #   aiohttp
+    #   hypothesis
+    #   jsonschema
+    #   pytest
+    #   schemathesis
+certifi==2020.6.20
+    # via requests
+chardet==3.0.4
+    # via
+    #   aiohttp
+    #   requests
+click==7.1.2
+    # via
+    #   clickclick
+    #   flask
+    #   schemathesis
+clickclick==1.2.2
+    # via connexion
+connexion[aiohttp,swagger-ui]==2.4.0
+    # via -r requirements.in
+curlify==2.2.1
+    # via schemathesis
+flask==1.1.1
+    # via connexion
+graphql-core==3.1.2
+    # via hypothesis-graphql
+hypothesis-graphql==0.3.2
+    # via schemathesis
+hypothesis-jsonschema==0.18.2
+    # via schemathesis
+hypothesis==5.43.4
+    # via
+    #   hypothesis-graphql
+    #   hypothesis-jsonschema
+    #   schemathesis
+idna==2.8
+    # via
+    #   requests
+    #   yarl
+inflection==0.3.1
+    # via connexion
+iniconfig==1.1.1
+    # via pytest
+itsdangerous==1.1.0
+    # via flask
+jinja2==2.10.3
+    # via
+    #   aiohttp-jinja2
+    #   flask
+    #   swagger-ui-bundle
+jsonschema==3.2.0
+    # via
+    #   connexion
+    #   hypothesis-jsonschema
+    #   openapi-spec-validator
+    #   schemathesis
+junit-xml==1.9
+    # via schemathesis
+markupsafe==1.1.1
+    # via jinja2
+multidict==4.5.2
+    # via
+    #   aiohttp
+    #   yarl
+openapi-spec-validator==0.2.8
+    # via connexion
+packaging==20.8
+    # via pytest
+pluggy==0.13.1
+    # via pytest
+py==1.10.0
+    # via pytest
+pyparsing==2.4.7
+    # via packaging
+pyrsistent==0.15.5
+    # via jsonschema
+pytest-subtests==0.4.0
+    # via schemathesis
+pytest==6.2.1
+    # via
+    #   -r requirements.in
+    #   pytest-subtests
+    #   schemathesis
+pyyaml==5.1.2
+    # via
+    #   clickclick
+    #   connexion
+    #   openapi-spec-validator
+    #   schemathesis
+requests==2.22.0
+    # via
+    #   connexion
+    #   curlify
+    #   schemathesis
+schemathesis==2.8.5
+    # via -r requirements.in
+six==1.13.0
+    # via
+    #   connexion
+    #   jsonschema
+    #   junit-xml
+    #   openapi-spec-validator
+    #   pyrsistent
+sortedcontainers==2.3.0
+    # via hypothesis
+starlette==0.13.8
+    # via schemathesis
+swagger-ui-bundle==0.0.8
+    # via connexion
+toml==0.10.2
+    # via pytest
+typing-extensions==3.7.4.3
+    # via aiohttp
+urllib3==1.25.6
+    # via requests
+werkzeug==1.0.1
+    # via
+    #   flask
+    #   schemathesis
+yarl==1.6.3
+    # via
+    #   aiohttp
+    #   schemathesis
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
