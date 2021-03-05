@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Loosen ``importlib-metadata`` version constraint and update pyproject.toml `#1039`_
+
 `3.1.0`_ - 2021-02-11
 ---------------------
 
@@ -1600,6 +1604,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1039: https://github.com/schemathesis/schemathesis/issues/1039
 .. _#1033: https://github.com/schemathesis/schemathesis/issues/1033
 .. _#1028: https://github.com/schemathesis/schemathesis/issues/1028
 .. _#1022: https://github.com/schemathesis/schemathesis/issues/1022
