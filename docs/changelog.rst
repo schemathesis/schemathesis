@@ -4,6 +4,15 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Performance**
+
+- Add an internal caching layer for data generation strategies. It relies on the fact that the internal ``BaseSchema`` structure is not mutated over time.
+  It is not directly possible through the public API and is discouraged from doing through hook functions.
+
+**Changed**
+
+- ``APIOperation`` and subclasses of ``Parameter`` are now compared by their identity rather than by value.
+
 `3.1.3`_ - 2021-03-08
 ---------------------
 

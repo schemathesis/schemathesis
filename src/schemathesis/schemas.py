@@ -42,7 +42,7 @@ class MethodsDict(CaseInsensitiveDict):
             raise KeyError(message) from exc
 
 
-@attr.s()  # pragma: no mutate
+@attr.s(eq=False)  # pragma: no mutate
 class BaseSchema(Mapping):
     raw_schema: Dict[str, Any] = attr.ib()  # pragma: no mutate
     location: Optional[str] = attr.ib(default=None)  # pragma: no mutate

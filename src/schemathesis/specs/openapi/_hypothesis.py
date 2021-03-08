@@ -5,6 +5,7 @@ from contextlib import contextmanager, suppress
 from copy import deepcopy
 from typing import Any, Callable, Dict, Generator, Iterable, Optional, Tuple, Union
 from urllib.parse import quote_plus
+from weakref import WeakKeyDictionary
 
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
@@ -175,14 +176,22 @@ def is_yaml_parsing_issue(operation: APIOperation) -> bool:
     return False
 
 
+_BODY_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()
+
+
 def _get_body_strategy(
     parameter: OpenAPIParameter, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], parent_schema: BaseSchema
 ) -> st.SearchStrategy:
+    # The cache key relies on object ids, which means that the parameter should not be mutated
+    # Note, the parent schema is not included as each parameter belong only to one schema
+    if parameter in _BODY_STRATEGIES_CACHE and to_strategy in _BODY_STRATEGIES_CACHE[parameter]:
+        return _BODY_STRATEGIES_CACHE[parameter][to_strategy]
     schema = parameter.as_json_schema()
     schema = parent_schema.prepare_schema(schema)
     strategy = to_strategy(schema)
     if not parameter.is_required:
         strategy |= st.just(NOT_SET)
+    _BODY_STRATEGIES_CACHE.setdefault(parameter, {})[to_strategy] = strategy
     return strategy
 
 
@@ -211,6 +220,9 @@ def get_parameters_value(
     return value
 
 
+_PARAMETER_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()
+
+
 def get_parameters_strategy(
     operation: APIOperation,
     to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy],
@@ -220,6 +232,10 @@ def get_parameters_strategy(
     """Create a new strategy for the case's component from the API operation parameters."""
     parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
     if parameters:
+        # The cache key relies on object ids, which means that the parameter should not be mutated
+        nested_cache_key = (to_strategy, location, tuple(sorted(exclude)))
+        if operation in _PARAMETER_STRATEGIES_CACHE and nested_cache_key in _PARAMETER_STRATEGIES_CACHE[operation]:
+            return _PARAMETER_STRATEGIES_CACHE[operation][nested_cache_key]
         schema = parameters_to_json_schema(parameters)
         if not operation.schema.validate_schema and location == "path":
             # If schema validation is disabled, we try to generate data even if the parameter definition
@@ -247,6 +263,7 @@ def get_parameters_strategy(
         map_func = {"path": quote_all}.get(location)
         if map_func:
             strategy = strategy.map(map_func)
+        _PARAMETER_STRATEGIES_CACHE.setdefault(operation, {})[nested_cache_key] = strategy
         return strategy
     # No parameters defined for this location
     return st.none()

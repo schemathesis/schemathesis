@@ -6,7 +6,7 @@ from ...parameters import Parameter
 from .converter import to_json_schema_recursive
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, eq=False)
 class OpenAPIParameter(Parameter):
     """A single Open API operation parameter."""
 
@@ -109,6 +109,7 @@ class OpenAPIParameter(Parameter):
         }
 
 
+@attr.s(slots=True, eq=False)
 class OpenAPI20Parameter(OpenAPIParameter):
     """Open API 2.0 parameter.
 
@@ -152,6 +153,7 @@ class OpenAPI20Parameter(OpenAPIParameter):
         return None
 
 
+@attr.s(slots=True, eq=False)
 class OpenAPI30Parameter(OpenAPIParameter):
     """Open API 3.0 parameter.
 
@@ -200,7 +202,7 @@ class OpenAPI30Parameter(OpenAPIParameter):
         return super().from_open_api_to_json_schema(open_api_schema)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, eq=False)
 class OpenAPIBody(OpenAPIParameter):
     media_type: str = attr.ib()
 
@@ -214,7 +216,7 @@ class OpenAPIBody(OpenAPIParameter):
         return "body"
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, eq=False)
 class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
     """Open API 2.0 body variant."""
 
@@ -264,7 +266,7 @@ class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
 FORM_MEDIA_TYPES = ("multipart/form-data", "application/x-www-form-urlencoded")
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, eq=False)
 class OpenAPI30Body(OpenAPIBody, OpenAPI30Parameter):
     """Open API 3.0 body variant.
 
@@ -298,7 +300,7 @@ class OpenAPI30Body(OpenAPIBody, OpenAPI30Parameter):
         return self.required
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, eq=False)
 class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
     """A special container to abstract over multiple `formData` parameters."""
 

@@ -134,10 +134,22 @@ def make_openapi_3_schema(empty_open_api_3_schema):
 
 @pytest.fixture
 def assert_parameters():
+    def _compare(left, right):
+        assert type(left) == type(right)
+        for attr in type(left).__attrs_attrs__:
+            left_attr = getattr(left, attr.name)
+            right_attr = getattr(right, attr.name)
+            if isinstance(left_attr, list):
+                assert len(left_attr) == len(right_attr)
+                for sub_left, sub_right in zip(left_attr, right_attr):
+                    _compare(sub_left, sub_right)
+            else:
+                assert left_attr == right_attr
+
     def check(schema, expected, json_schemas, location="body"):
         schema = schemathesis.from_dict(schema)
         container = getattr(schema["/users"]["POST"], location)
-        assert container == expected
+        _compare(container, expected)
         assert [item.as_json_schema() for item in container] == json_schemas
 
     return check

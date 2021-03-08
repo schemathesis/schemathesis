@@ -7,7 +7,7 @@ from typing import Any, Dict, Generator, Generic, List, TypeVar
 import attr
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@attr.s(slots=True, eq=False)  # pragma: no mutate
 class Parameter:
     """A logically separate parameter bound to a location (e.g., to "query string").
 

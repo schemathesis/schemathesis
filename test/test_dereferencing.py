@@ -493,99 +493,76 @@ def test_(request, case):
 def test_complex_dereference(testdir, complex_schema):
     schema = schemathesis.from_path(complex_schema)
     path = Path(str(testdir))
-    body = OpenAPI30Body(
-        {
-            "schema": {
-                "additionalProperties": False,
-                "description": "Test",
-                "properties": {
-                    "profile": {
-                        "additionalProperties": False,
-                        "description": "Test",
-                        "properties": {"id": {"type": "integer"}},
-                        "required": ["id"],
-                        "type": "object",
-                    },
-                    "username": {"type": "string"},
+    body_definition = {
+        "schema": {
+            "additionalProperties": False,
+            "description": "Test",
+            "properties": {
+                "profile": {
+                    "additionalProperties": False,
+                    "description": "Test",
+                    "properties": {"id": {"type": "integer"}},
+                    "required": ["id"],
+                    "type": "object",
                 },
-                "required": ["username", "profile"],
-                "type": "object",
-            }
-        },
-        required=True,
-        media_type="application/json",
-    )
-    assert schema["/teapot"]["POST"] == APIOperation(
-        base_url="file:///",
-        path="/teapot",
-        method="post",
-        definition=OperationDefinition(
-            {
-                "requestBody": {
-                    "content": {
-                        "application/json": {"schema": {"$ref": "../schemas/teapot/create.yaml#/TeapotCreateRequest"}}
-                    },
-                    "description": "Test.",
-                    "required": True,
-                },
-                "responses": {"default": {"$ref": "../../common/responses.yaml#/DefaultError"}},
-                "summary": "Test",
-                "tags": ["ancillaries"],
+                "username": {"type": "string"},
             },
-            {
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "additionalProperties": False,
-                                "description": "Test",
-                                "properties": {
-                                    "profile": {
-                                        "additionalProperties": False,
-                                        "description": "Test",
-                                        "properties": {"id": {"type": "integer"}},
-                                        "required": ["id"],
-                                        "type": "object",
-                                    },
-                                    "username": {"type": "string"},
-                                },
-                                "required": ["username", "profile"],
-                                "type": "object",
-                            }
+            "required": ["username", "profile"],
+            "type": "object",
+        }
+    }
+    operation = schema["/teapot"]["POST"]
+    assert operation.base_url == "file:///"
+    assert operation.path == "/teapot"
+    assert operation.method == "post"
+    assert len(operation.body) == 1
+    assert operation.body[0].required
+    assert operation.body[0].media_type == "application/json"
+    assert operation.body[0].definition == body_definition
+    assert operation.definition.raw == {
+        "requestBody": {
+            "content": {"application/json": {"schema": {"$ref": "../schemas/teapot/create.yaml#/TeapotCreateRequest"}}},
+            "description": "Test.",
+            "required": True,
+        },
+        "responses": {"default": {"$ref": "../../common/responses.yaml#/DefaultError"}},
+        "summary": "Test",
+        "tags": ["ancillaries"],
+    }
+    assert operation.definition.resolved == {
+        "requestBody": {
+            "content": {"application/json": body_definition},
+            "description": "Test.",
+            "required": True,
+        },
+        "responses": {
+            "default": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "additionalProperties": False,
+                            "properties": {
+                                # Note, these `nullable` keywords are not transformed at this point
+                                # It is done during the response validation.
+                                "key": {"type": "string", "nullable": True},
+                                "referenced": {"type": "string", "nullable": True},
+                            },
+                            "required": ["key", "referenced"],
+                            "type": "object",
                         }
-                    },
-                    "description": "Test.",
-                    "required": True,
-                },
-                "responses": {
-                    "default": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "additionalProperties": False,
-                                    "properties": {
-                                        # Note, these `nullable` keywords are not transformed at this point
-                                        # It is done during the response validation.
-                                        "key": {"type": "string", "nullable": True},
-                                        "referenced": {"type": "string", "nullable": True},
-                                    },
-                                    "required": ["key", "referenced"],
-                                    "type": "object",
-                                }
-                            }
-                        },
-                        "description": "Probably an error",
                     }
                 },
-                "summary": "Test",
-                "tags": ["ancillaries"],
-            },
-            scope=f"{path.as_uri()}/root/paths/teapot.yaml#/TeapotCreatePath",
-            parameters=[body],
-        ),
-        body=PayloadAlternatives([body]),
-        schema=schema,
-    )
+                "description": "Probably an error",
+            }
+        },
+        "summary": "Test",
+        "tags": ["ancillaries"],
+    }
+    assert operation.definition.scope == f"{path.as_uri()}/root/paths/teapot.yaml#/TeapotCreatePath"
+    assert len(operation.definition.parameters) == 1
+    assert operation.definition.parameters[0].required
+    assert operation.definition.parameters[0].media_type == "application/json"
+    assert operation.definition.parameters[0].definition == body_definition
 
 
 def test_remote_reference_to_yaml(swagger_20, schema_url):
