@@ -791,3 +791,10 @@ def test_reserved_characters_in_operation_name(args):
     # Then it should be reachable
     assert not result.has_errors
     assert not result.has_failures
+
+
+def test_count_operations(openapi3_schema_url):
+    # When `count_operations` is set to `False`
+    event = next(prepare(openapi3_schema_url, count_operations=False))
+    # Then the total number of operations is not calculated in the `Initialized` event
+    assert event.operations_count is None

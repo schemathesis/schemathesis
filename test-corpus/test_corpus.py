@@ -171,6 +171,7 @@ def test_runner(schema_path):
         validate_schema=False,
         hypothesis_suppress_health_check=HealthCheck.all(),
         hypothesis_phases=[Phase.explicit, Phase.generate],
+        count_operations=False,
     )
 
     schema_id = get_id(schema_path)

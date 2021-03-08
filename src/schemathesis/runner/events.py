@@ -21,7 +21,7 @@ class Initialized(ExecutionEvent):
     """Runner is initialized, settings are prepared, requests session is ready."""
 
     # Total number of operations in the schema
-    operations_count: int = attr.ib()  # pragma: no mutate
+    operations_count: Optional[int] = attr.ib()  # pragma: no mutate
     location: Optional[str] = attr.ib()  # pragma: no mutate
     base_url: str = attr.ib()  # pragma: no mutate
     specification_name: str = attr.ib()  # pragma: no mutate
@@ -29,10 +29,10 @@ class Initialized(ExecutionEvent):
     start_time: float = attr.ib(factory=time.monotonic)  # pragma: no mutate
 
     @classmethod
-    def from_schema(cls, *, schema: BaseSchema) -> "Initialized":
+    def from_schema(cls, *, schema: BaseSchema, count_operations: bool = True) -> "Initialized":
         """Computes all needed data from a schema instance."""
         return cls(
-            operations_count=schema.operations_count,
+            operations_count=schema.operations_count if count_operations else None,
             location=schema.location,
             base_url=schema.get_base_url(),
             specification_name=schema.verbose_name,

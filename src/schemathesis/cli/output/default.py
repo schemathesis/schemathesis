@@ -289,7 +289,7 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
 
 def handle_initialized(context: ExecutionContext, event: events.Initialized) -> None:
     """Display information about the test session."""
-    context.operations_count = event.operations_count
+    context.operations_count = cast(int, event.operations_count)  # INVARIANT: should not be `None`
     display_section_name("Schemathesis test session starts")
     versions = (
         f"platform {platform.system()} -- "
@@ -310,8 +310,8 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     click.echo(f"Base URL: {event.base_url}")
     click.echo(f"Specification version: {event.specification_name}")
     click.echo(f"Workers: {context.workers_num}")
-    click.secho(f"Collected API operations: {event.operations_count}", bold=True)
-    if event.operations_count >= 1:
+    click.secho(f"Collected API operations: {context.operations_count}", bold=True)
+    if context.operations_count >= 1:
         click.echo()
 
 

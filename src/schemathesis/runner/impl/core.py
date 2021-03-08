@@ -56,12 +56,13 @@ class BaseRunner:
     dry_run: bool = attr.ib(default=False)  # pragma: no mutate
     stateful: Optional[Stateful] = attr.ib(default=None)  # pragma: no mutate
     stateful_recursion_limit: int = attr.ib(default=DEFAULT_STATEFUL_RECURSION_LIMIT)  # pragma: no mutate
+    count_operations: bool = attr.ib(default=True)  # pragma: no mutate
 
     def execute(self) -> Generator[events.ExecutionEvent, None, None]:
         """Common logic for all runners."""
         results = TestResultSet()
 
-        initialized = events.Initialized.from_schema(schema=self.schema)
+        initialized = events.Initialized.from_schema(schema=self.schema, count_operations=self.count_operations)
         yield initialized
 
         for event in self._execute(results):

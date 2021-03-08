@@ -4,6 +4,12 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- ``count_operations`` boolean flag to ``runner.prepare``. In case of ``False`` value, Schemathesis won't count the total number of operations upfront.
+  It improves performance for the direct ``runner`` usage, especially on large schemas.
+  Schemathesis CLI will still use these calculations to display the progress during execution, but this behavior may become configurable in the future.
+
 `3.1.2`_ - 2021-03-08
 ---------------------
 
