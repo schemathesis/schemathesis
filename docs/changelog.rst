@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.1.2`_ - 2021-03-08
+---------------------
+
 **Fixed**
 
 - Percent-encode the generated ``.`` and ``..`` strings in path parameters to avoid resolving relative paths and changing the tested path structure. `#1036`_
@@ -1485,7 +1488,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.1.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.1.2...HEAD
+.. _3.1.2: https://github.com/schemathesis/schemathesis/compare/v3.1.1...v3.1.2
 .. _3.1.1: https://github.com/schemathesis/schemathesis/compare/v3.1.0...v3.1.1
 .. _3.1.0: https://github.com/schemathesis/schemathesis/compare/v3.0.9...v3.1.0
 .. _3.0.9: https://github.com/schemathesis/schemathesis/compare/v3.0.8...v3.0.9
