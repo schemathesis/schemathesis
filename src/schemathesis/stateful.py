@@ -37,7 +37,7 @@ class ParsedData:
         if self.body is not NOT_SET:
             if isinstance(self.body, (dict, list)):
                 # The simplest way to get a hash of a potentially nested structure
-                value ^= hash(json.dumps(self.body))
+                value ^= hash(json.dumps(self.body, sort_keys=True))
             else:
                 # These types should be hashable
                 value ^= hash(self.body)
