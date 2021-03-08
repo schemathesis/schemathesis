@@ -257,7 +257,7 @@ def make_positive_strategy(schema: Dict[str, Any]) -> st.SearchStrategy:
 
 
 def is_valid_path(parameters: Dict[str, Any]) -> bool:
-    """Single "." chars and empty strings "" are excluded from path by urllib3.
+    """Empty strings ("") are excluded from path by urllib3.
 
     A path containing to "/" or "%2F" will lead to ambiguous path resolution in
     many frameworks and libraries, such behaviour have been observed in both
@@ -267,17 +267,31 @@ def is_valid_path(parameters: Dict[str, Any]) -> bool:
     Because of it this case doesn't bring much value and might lead to false positives results of Schemathesis runs.
     """
 
-    path_parameter_blacklist = (".", SLASH, "")
+    disallowed_values = (SLASH, "")
 
     return not any(
-        (value in path_parameter_blacklist or is_illegal_surrogate(value) or isinstance(value, str) and SLASH in value)
+        (value in disallowed_values or is_illegal_surrogate(value) or isinstance(value, str) and SLASH in value)
         for value in parameters.values()
     )
 
 
 def quote_all(parameters: Dict[str, Any]) -> Dict[str, Any]:
     """Apply URL quotation for all values in a dictionary."""
-    return {key: quote_plus(value) if isinstance(value, str) else value for key, value in parameters.items()}
+    # Even though, "." is an unreserved character, it has a special meaning in "." and ".." strings.
+    # It will change the path:
+    #   - http://localhost/foo/./ -> http://localhost/foo/
+    #   - http://localhost/foo/../ -> http://localhost/
+    # Which is not desired as we need to test precisely the original path structure.
+
+    def quote(value: str) -> str:
+        quoted = quote_plus(value)
+        if quoted == ".":
+            return "%2E"
+        if quoted == "..":
+            return "%2E%2E"
+        return quoted
+
+    return {key: quote(value) if isinstance(value, str) else value for key, value in parameters.items()}
 
 
 def apply_hooks(

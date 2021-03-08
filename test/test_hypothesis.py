@@ -17,6 +17,7 @@ from schemathesis.specs.openapi._hypothesis import (
     is_valid_path,
     is_valid_query,
     make_positive_strategy,
+    quote_all,
 )
 from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20CompositeBody, OpenAPI20Parameter
 from schemathesis.utils import NOT_SET
@@ -362,6 +363,12 @@ def test_is_valid_query(value, expected):
 @pytest.mark.parametrize("value", ("/", "\udc9b"))
 def test_filter_path_parameters(value):
     assert not is_valid_path({"foo": value})
+
+
+@pytest.mark.parametrize("value, expected", ((".", "%2E"), ("..", "%2E%2E"), (".foo", ".foo")))
+def test_path_parameters_quotation(value, expected):
+    # See GH-1036
+    assert quote_all({"foo": value})["foo"] == expected
 
 
 @pytest.mark.hypothesis_nested
