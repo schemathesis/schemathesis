@@ -58,6 +58,7 @@ def prepare(
     validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
     force_schema_version: Optional[str] = None,
+    count_operations: bool = True,
     # Hypothesis-specific configuration
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
     hypothesis_derandomize: Optional[bool] = None,
@@ -114,6 +115,7 @@ def prepare(
         fixups=fixups,
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,
+        count_operations=count_operations,
     )
 
 
@@ -167,6 +169,7 @@ def execute_from_schema(
     fixups: Iterable[str] = (),
     stateful: Optional[Stateful] = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
+    count_operations: bool = True,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Execute tests for the given schema.
 
@@ -222,6 +225,7 @@ def execute_from_schema(
                     store_interactions=store_interactions,
                     stateful=stateful,
                     stateful_recursion_limit=stateful_recursion_limit,
+                    count_operations=count_operations,
                 )
             elif isinstance(schema.app, Starlette):
                 runner = ThreadPoolASGIRunner(
@@ -239,8 +243,8 @@ def execute_from_schema(
                     store_interactions=store_interactions,
                     stateful=stateful,
                     stateful_recursion_limit=stateful_recursion_limit,
+                    count_operations=count_operations,
                 )
-
             else:
                 runner = ThreadPoolWSGIRunner(
                     schema=schema,
@@ -258,8 +262,8 @@ def execute_from_schema(
                     store_interactions=store_interactions,
                     stateful=stateful,
                     stateful_recursion_limit=stateful_recursion_limit,
+                    count_operations=count_operations,
                 )
-
         else:
             if not schema.app:
                 runner = SingleThreadRunner(
@@ -279,6 +283,7 @@ def execute_from_schema(
                     store_interactions=store_interactions,
                     stateful=stateful,
                     stateful_recursion_limit=stateful_recursion_limit,
+                    count_operations=count_operations,
                 )
             elif isinstance(schema.app, Starlette):
                 runner = SingleThreadASGIRunner(
@@ -296,6 +301,7 @@ def execute_from_schema(
                     store_interactions=store_interactions,
                     stateful=stateful,
                     stateful_recursion_limit=stateful_recursion_limit,
+                    count_operations=count_operations,
                 )
             else:
                 runner = SingleThreadWSGIRunner(
@@ -313,8 +319,8 @@ def execute_from_schema(
                     store_interactions=store_interactions,
                     stateful=stateful,
                     stateful_recursion_limit=stateful_recursion_limit,
+                    count_operations=count_operations,
                 )
-
         yield from runner.execute()
     except Exception as exc:
         yield events.InternalError.from_exc(exc)

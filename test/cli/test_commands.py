@@ -351,6 +351,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "store_interactions": False,
         "seed": None,
         "max_response_time": None,
+        "count_operations": True,
         **expected,
     }
 
