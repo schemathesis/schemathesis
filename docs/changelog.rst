@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.1.3`_ - 2021-03-08
+---------------------
+
 **Added**
 
 - ``count_operations`` boolean flag to ``runner.prepare``. In case of ``False`` value, Schemathesis won't count the total number of operations upfront.
@@ -1494,7 +1497,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.1.2...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.1.3...HEAD
+.. _3.1.3: https://github.com/schemathesis/schemathesis/compare/v3.1.2...v3.1.3
 .. _3.1.2: https://github.com/schemathesis/schemathesis/compare/v3.1.1...v3.1.2
 .. _3.1.1: https://github.com/schemathesis/schemathesis/compare/v3.1.0...v3.1.1
 .. _3.1.0: https://github.com/schemathesis/schemathesis/compare/v3.0.9...v3.1.0
