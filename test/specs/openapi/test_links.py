@@ -84,7 +84,11 @@ def response():
 def test_get_links(openapi3_base_url, schema_url, url, expected):
     schema = schemathesis.from_uri(schema_url)
     response = requests.post(f"{openapi3_base_url}{url}", json={"first_name": "TEST", "last_name": "TEST"})
-    assert schema["/users/"]["POST"].get_stateful_tests(response, Stateful.links) == expected
+    tests = schema["/users/"]["POST"].get_stateful_tests(response, Stateful.links)
+    assert len(tests) == len(expected)
+    for test, value in zip(tests, expected):
+        assert test.name == value.name
+        assert test.parameters == value.parameters
 
 
 def test_parse(case, response):
@@ -151,9 +155,9 @@ def assert_schema(target, expected):
 
 def test_make_operation_single():
     operation = LINK.make_operation([ParsedData({"path.user_id": 1, "query.user_id": 2, "code": 7})])
-    assert operation.path_parameters == ParameterSet(
-        [OpenAPI30Parameter({"in": "path", "name": "user_id", "schema": {"enum": [1]}})]
-    )
+    assert len(operation.path_parameters) == 1
+    assert isinstance(operation.path_parameters[0], OpenAPI30Parameter)
+    assert operation.path_parameters[0].definition == {"in": "path", "name": "user_id", "schema": {"enum": [1]}}
     for item in operation.query:
         schema = item.definition["schema"]
         if item.name == "code":
