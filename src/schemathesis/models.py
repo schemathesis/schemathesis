@@ -433,7 +433,7 @@ class OperationDefinition:
 P = TypeVar("P", bound=Parameter)
 
 
-@attr.s  # pragma: no mutate
+@attr.s(eq=False)  # pragma: no mutate
 class APIOperation(Generic[P]):
     """A single operation defined in an API.
 

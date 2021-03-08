@@ -48,6 +48,11 @@ By default, ``register`` functions will check the registered hook name to determ
 Also, these decorators will check the signature of your hook function to match the specification.
 Each hook should accept ``context`` as the first argument, that provides additional context for hook execution.
 
+.. important::
+
+    Do not mutate ``context.operation`` in hook functions as Schemathesis relies on its immutability for caching purposes.
+    Mutating it may lead to unpredictable problems.
+
 Hooks registered on the same scope will be applied in the order of registration. When there are multiple hooks in the same hook location, then the global ones will be applied first.
 
 These hooks can be applied both in CLI and in-code use cases.

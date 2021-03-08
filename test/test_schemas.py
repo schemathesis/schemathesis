@@ -81,32 +81,29 @@ def test_resolving_multiple_files():
         },
     }
     schema = schemathesis.from_dict(raw_schema)
-    assert schema["/teapot"]["post"].body == PayloadAlternatives(
-        [
-            OpenAPI20Body(
-                {
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "id": {"type": "integer", "format": "int64"},
-                            "username": {"type": "string"},
-                            "firstName": {"type": "string"},
-                            "lastName": {"type": "string"},
-                            "email": {"type": "string"},
-                            "password": {"type": "string"},
-                            "phone": {"type": "string"},
-                            "userStatus": {"type": "integer", "format": "int32", "description": "User Status"},
-                        },
-                        "xml": {"name": "User"},
-                    },
-                    "in": "body",
-                    "name": "user",
-                    "required": True,
-                },
-                media_type="application/json",
-            )
-        ]
-    )
+    assert len(schema["/teapot"]["post"].body) == 1
+    body = schema["/teapot"]["post"].body[0]
+    assert isinstance(body, OpenAPI20Body)
+    assert body.media_type == "application/json"
+    assert body.definition == {
+        "schema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "integer", "format": "int64"},
+                "username": {"type": "string"},
+                "firstName": {"type": "string"},
+                "lastName": {"type": "string"},
+                "email": {"type": "string"},
+                "password": {"type": "string"},
+                "phone": {"type": "string"},
+                "userStatus": {"type": "integer", "format": "int32", "description": "User Status"},
+            },
+            "xml": {"name": "User"},
+        },
+        "in": "body",
+        "name": "user",
+        "required": True,
+    }
 
 
 def test_schema_parsing_error(simple_schema):
