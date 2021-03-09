@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.2.0`_ - 2021-03-09
+---------------------
+
 **Performance**
 
 - Add an internal caching layer for data generation strategies. It relies on the fact that the internal ``BaseSchema`` structure is not mutated over time.
@@ -1506,7 +1509,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.1.3...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.2.0...HEAD
+.. _3.2.0: https://github.com/schemathesis/schemathesis/compare/v3.1.3...v3.2.0
 .. _3.1.3: https://github.com/schemathesis/schemathesis/compare/v3.1.2...v3.1.3
 .. _3.1.2: https://github.com/schemathesis/schemathesis/compare/v3.1.1...v3.1.2
 .. _3.1.1: https://github.com/schemathesis/schemathesis/compare/v3.1.0...v3.1.1
