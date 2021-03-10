@@ -798,3 +798,47 @@ def test_count_operations(openapi3_schema_url):
     event = next(prepare(openapi3_schema_url, count_operations=False))
     # Then the total number of operations is not calculated in the `Initialized` event
     assert event.operations_count is None
+
+
+def test_hypothesis_errors_propagation(empty_open_api_3_schema, openapi3_base_url):
+    # See: GH-1046
+    # When the operation contains a media type, that Schemathesis can't serialize
+    # And there is still a supported media type
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        # This one is known
+                        "application/json": {
+                            "schema": {
+                                "type": "array",
+                            },
+                        },
+                        # This one is not
+                        "application/xml": {
+                            "schema": {
+                                "type": "array",
+                            }
+                        },
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+
+    max_examples = 10
+    initialized, before, after, finished = prepare(
+        empty_open_api_3_schema,
+        loader=schemathesis.from_dict,
+        base_url=openapi3_base_url,
+        hypothesis_max_examples=max_examples,
+    )
+    # Then the test outcomes should not contain errors
+    assert after.status == Status.success
+    # And there should be requested amount of test examples
+    assert len(after.result.checks) == max_examples
+    assert not finished.has_failures
+    assert not finished.has_errors
