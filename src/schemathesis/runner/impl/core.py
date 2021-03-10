@@ -10,7 +10,7 @@ import attr
 import hypothesis
 import requests
 from _pytest.logging import LogCaptureHandler, catching_logs
-from hypothesis.errors import InvalidArgument
+from hypothesis.errors import HypothesisException, InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
@@ -360,6 +360,9 @@ class ErrorCollector:
         #   - The testing process is interrupted
         if not exc_type or issubclass(exc_type, CheckFailed) or not issubclass(exc_type, Exception):
             return False
+        # These exceptions are needed for control flow on the Hypothesis side. E.g. rejecting unsatisfiable examples
+        if isinstance(exc_val, HypothesisException):
+            raise
         # Exception value is not `None` and is a subclass of `Exception` at this point
         exc_val = cast(Exception, exc_val)
         self.errors.append(exc_val.with_traceback(exc_tb))
