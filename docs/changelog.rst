@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Wrong test results in some cases when the tested schema contains a media type that Schemathesis doesn't know how to work with. `#1046`_
+
 `3.2.0`_ - 2021-03-09
 ---------------------
 
@@ -1639,6 +1643,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1046: https://github.com/schemathesis/schemathesis/issues/1046
 .. _#1039: https://github.com/schemathesis/schemathesis/issues/1039
 .. _#1036: https://github.com/schemathesis/schemathesis/issues/1036
 .. _#1033: https://github.com/schemathesis/schemathesis/issues/1033
