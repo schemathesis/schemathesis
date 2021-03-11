@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.2.2`_ - 2021-03-11
+---------------------
+
 **Added**
 
 - Support for Hypothesis 6. `#1013`_
@@ -1520,7 +1523,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.2.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.2.2...HEAD
+.. _3.2.2: https://github.com/schemathesis/schemathesis/compare/v3.2.1...v3.2.2
 .. _3.2.1: https://github.com/schemathesis/schemathesis/compare/v3.2.0...v3.2.1
 .. _3.2.0: https://github.com/schemathesis/schemathesis/compare/v3.1.3...v3.2.0
 .. _3.1.3: https://github.com/schemathesis/schemathesis/compare/v3.1.2...v3.1.3
