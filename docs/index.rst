@@ -54,6 +54,7 @@ User's Guide
    python
    stateful
    how
+   schemas
    compatibility
    examples
    graphql
