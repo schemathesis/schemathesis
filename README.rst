@@ -23,6 +23,7 @@ Features
 - Targeted testing;
 - Storing and replaying network requests;
 - Built-in ASGI / WSGI application support;
+- Code samples for easy failure reproduction;
 - Ready-to-go Docker image;
 - Configurable with user-defined checks, string formats, hooks, and targets.
 
@@ -84,7 +85,7 @@ Also, I occasionally write posts about Schemathesis in `my blog <https://dygalo.
 Commercial support
 ------------------
 
-If you are interested in the effective integration of Schemathesis to your private project, you can `schedule an appointment <https://app.acuityscheduling.com/schedule.php?owner=21203869&appointmentType=18278663>`_ and I will help you do that.
+If you are interested in the effective integration of Schemathesis to your private project, you can contact me via email or `Twitter <https://twitter.com/Stranger6667>`_ and I will help you do that.
 
 Links
 -----
