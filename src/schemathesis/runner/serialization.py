@@ -6,6 +6,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 import attr
+import requests
 
 from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
 from ..utils import format_exception
@@ -28,16 +29,25 @@ class SerializedCase:
 class SerializedCheck:
     name: str = attr.ib()  # pragma: no mutate
     value: Status = attr.ib()  # pragma: no mutate
+    request: Request = attr.ib()  # pragma: no mutate
+    response: Response = attr.ib()  # pragma: no mutate
     example: Optional[SerializedCase] = attr.ib(default=None)  # pragma: no mutate
     message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
     @classmethod
     def from_check(cls, check: Check, headers: Optional[Dict[str, Any]]) -> "SerializedCheck":
+        request = Request.from_prepared_request(check.response.request)
+        if isinstance(check.response, requests.Response):
+            response = Response.from_requests(check.response)
+        else:
+            response = Response.from_wsgi(check.response, check.elapsed)
         return SerializedCheck(
             name=check.name,
             value=check.value,
             example=SerializedCase.from_case(check.example, headers) if check.example else None,
             message=check.message,
+            request=request,
+            response=response,
         )
 
 

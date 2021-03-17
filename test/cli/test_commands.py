@@ -448,13 +448,13 @@ def pytest_generate_tests(metafunc):
 
     It should be runnable by single/multiple workers and running instance/WSGI app.
     """
-    if "cli_args" in metafunc.fixturenames:
-        metafunc.parametrize("cli_args", ["wsgi", "real"], indirect=True)
+    if "app_type" in metafunc.fixturenames:
+        metafunc.parametrize("app_type", ["wsgi", "real"])
 
 
 @pytest.fixture
-def cli_args(openapi_version, request):
-    if request.param == "real":
+def cli_args(openapi_version, request, app_type):
+    if app_type == "real":
         schema_url = request.getfixturevalue("schema_url")
         args = (schema_url,)
     else:
@@ -501,13 +501,17 @@ def test_cli_run_output_with_errors(cli, cli_args, workers):
 
 @pytest.mark.operations("failure")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_cli_run_only_failure(cli, cli_args, workers):
+def test_cli_run_only_failure(cli, cli_args, app_type, workers):
     result = cli.run(*cli_args, f"--workers={workers}")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
 
     lines = result.stdout.strip().split("\n")
+    if app_type == "real":
+        assert "Response payload: `500: Internal Server Error`" in lines
+    else:
+        assert "<h1>Internal Server Error</h1>" in lines
     assert "    not_a_server_error                    0 / 2 passed          FAILED " in lines
     assert "== 1 failed in " in lines[-1]
 
@@ -1347,9 +1351,9 @@ def test_wsgi_app_internal_exception(testdir, cli):
     result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--hypothesis-derandomize")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
-    assert "== APPLICATION LOGS ==" in lines[28], result.stdout.strip()
-    assert "ERROR in app: Exception on /api/success [GET]" in lines[30]
-    assert lines[46] == "ZeroDivisionError: division by zero"
+    assert "== APPLICATION LOGS ==" in lines[44], result.stdout.strip()
+    assert "ERROR in app: Exception on /api/success [GET]" in lines[46]
+    assert lines[62] == "ZeroDivisionError: division by zero"
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
