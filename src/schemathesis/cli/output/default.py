@@ -174,8 +174,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
             message = f"{idx}. {check.message}"
         else:
             message = None
-        example = cast(SerializedCase, check.example)  # filtered in `get_unique_failures`
-        display_example(context, example, check.response, message, result.seed)
+        display_example(context, check.example, check.response, message, result.seed)
         # Display every time except the last check
         if idx != len(checks):
             click.echo("\n")
