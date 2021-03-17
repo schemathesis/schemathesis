@@ -39,7 +39,7 @@ class SerializedCheck:
     value: Status = attr.ib()  # pragma: no mutate
     request: Request = attr.ib()  # pragma: no mutate
     response: Response = attr.ib()  # pragma: no mutate
-    example: Optional[SerializedCase] = attr.ib(default=None)  # pragma: no mutate
+    example: SerializedCase = attr.ib()  # pragma: no mutate
     message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
     @classmethod
@@ -52,7 +52,7 @@ class SerializedCheck:
         return SerializedCheck(
             name=check.name,
             value=check.value,
-            example=SerializedCase.from_case(check.example, headers) if check.example else None,
+            example=SerializedCase.from_case(check.example, headers),
             message=check.message,
             request=request,
             response=response,

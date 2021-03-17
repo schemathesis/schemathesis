@@ -634,7 +634,7 @@ class Check:
     value: Status = attr.ib()  # pragma: no mutate
     response: GenericResponse = attr.ib()  # pragma: no mutate
     elapsed: float = attr.ib()  # pragma: no mutate
-    example: Optional[Case] = attr.ib(default=None)  # pragma: no mutate
+    example: Case = attr.ib()  # pragma: no mutate
     message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
 

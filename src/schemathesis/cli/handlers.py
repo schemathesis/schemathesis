@@ -21,7 +21,7 @@ def get_unique_failures(checks: List[SerializedCheck]) -> List[SerializedCheck]:
     unique_checks = []
     for check in reversed(checks):
         # There are also could be checks that didn't fail
-        if check.example is not None and check.value == Status.failure and (check.name, check.message) not in seen:
+        if check.value == Status.failure and (check.name, check.message) not in seen:
             unique_checks.append(check)
             seen.add((check.name, check.message))
     return unique_checks
