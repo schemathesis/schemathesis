@@ -11,7 +11,7 @@ from starlette.testclient import TestClient as ASGIClient
 from werkzeug.test import Client
 from yarl import URL
 
-from .constants import DEFAULT_DATA_GENERATION_METHODS, USER_AGENT, DataGenerationMethod
+from .constants import DEFAULT_DATA_GENERATION_METHODS, USER_AGENT, CodeSampleStyle, DataGenerationMethod
 from .exceptions import HTTPError
 from .hooks import HookContext, dispatch
 from .lazy import LazySchema
@@ -34,6 +34,7 @@ def from_path(
     skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
+    code_sample_style: str = CodeSampleStyle.default().name,
 ) -> BaseOpenAPISchema:
     """Load Open API schema via a file from an OS path.
 
@@ -53,6 +54,7 @@ def from_path(
             skip_deprecated_operations=skip_deprecated_operations,
             data_generation_methods=data_generation_methods,
             force_schema_version=force_schema_version,
+            code_sample_style=code_sample_style,
         )
 
 
@@ -70,6 +72,7 @@ def from_uri(
     skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
+    code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from the network.
@@ -97,6 +100,7 @@ def from_uri(
         skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
+        code_sample_style=code_sample_style,
     )
 
 
@@ -114,6 +118,7 @@ def from_file(
     skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
+    code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,  # needed in the runner to have compatible API across all loaders
 ) -> BaseOpenAPISchema:
     """Load Open API schema from a file descriptor, string or bytes.
@@ -134,6 +139,7 @@ def from_file(
         skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
+        code_sample_style=code_sample_style,
     )
 
 
@@ -151,11 +157,13 @@ def from_dict(
     skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
+    code_sample_style: str = CodeSampleStyle.default().name,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from a Python dictionary.
 
     :param dict raw_schema: A schema to load.
     """
+    _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     dispatch("before_load_schema", HookContext(), raw_schema)
 
     def init_openapi_2() -> SwaggerV20:
@@ -172,6 +180,7 @@ def from_dict(
             validate_schema=validate_schema,
             skip_deprecated_operations=skip_deprecated_operations,
             data_generation_methods=data_generation_methods,
+            code_sample_style=_code_sample_style,
         )
 
     def init_openapi_3() -> OpenApi30:
@@ -188,6 +197,7 @@ def from_dict(
             validate_schema=validate_schema,
             skip_deprecated_operations=skip_deprecated_operations,
             data_generation_methods=data_generation_methods,
+            code_sample_style=_code_sample_style,
         )
 
     if force_schema_version == "20":
@@ -220,6 +230,7 @@ def from_pytest_fixture(
     validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    code_sample_style: str = CodeSampleStyle.default().name,
 ) -> LazySchema:
     """Load schema from a ``pytest`` fixture.
 
@@ -230,6 +241,7 @@ def from_pytest_fixture(
 
     :param str fixture_name: The name of a fixture to load.
     """
+    _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     return LazySchema(
         fixture_name,
         method=method,
@@ -239,6 +251,7 @@ def from_pytest_fixture(
         validate_schema=validate_schema,
         skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
+        code_sample_style=_code_sample_style,
     )
 
 
@@ -254,6 +267,7 @@ def from_wsgi(
     skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
+    code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from a WSGI app.
@@ -278,6 +292,7 @@ def from_wsgi(
         skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
+        code_sample_style=code_sample_style,
     )
 
 
@@ -302,6 +317,7 @@ def from_aiohttp(
     skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
+    code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from an AioHTTP app.
@@ -325,6 +341,7 @@ def from_aiohttp(
         skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
+        code_sample_style=code_sample_style,
         **kwargs,
     )
 
@@ -340,6 +357,7 @@ def from_asgi(
     skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
+    code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from an ASGI app.
@@ -363,6 +381,7 @@ def from_asgi(
         skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
+        code_sample_style=code_sample_style,
     )
 
 

@@ -137,3 +137,8 @@ def test_force_open_api_version(version, expected):
     }
     loaded = schemathesis.from_dict(schema, force_schema_version=version, validate_schema=False)
     assert isinstance(loaded, expected)
+
+
+def test_invalid_code_sample_style(empty_open_api_3_schema):
+    with pytest.raises(ValueError, match="Invalid value for code sample style: ruby. Available styles: python, curl"):
+        schemathesis.from_dict(empty_open_api_3_schema, code_sample_style="ruby")

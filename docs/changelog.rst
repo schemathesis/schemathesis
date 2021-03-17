@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Display failing response payload in the CLI output, similarly to the pytest plugin output. `#1050`_
+- A way to control which code sample style to use - Python or cURL. `#908`_
 
 **Internal**
 
@@ -1700,6 +1701,7 @@ Deprecated
 .. _#916: https://github.com/schemathesis/schemathesis/issues/916
 .. _#914: https://github.com/schemathesis/schemathesis/issues/914
 .. _#911: https://github.com/schemathesis/schemathesis/issues/911
+.. _#908: https://github.com/schemathesis/schemathesis/issues/908
 .. _#905: https://github.com/schemathesis/schemathesis/issues/905
 .. _#904: https://github.com/schemathesis/schemathesis/issues/904
 .. _#897: https://github.com/schemathesis/schemathesis/issues/897
