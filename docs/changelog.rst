@@ -9,6 +9,10 @@ Changelog
 - Display failing response payload in the CLI output, similarly to the pytest plugin output. `#1050`_
 - A way to control which code sample style to use - Python or cURL. `#908`_
 
+**Fixed**
+
+- ``UnicodeDecodeError`` when generating cURL commands for failed test case reproduction if the request's body contains non-UTF8 characters.
+
 **Internal**
 
 - Extra information to events, emitted by the Schemathesis runner.
