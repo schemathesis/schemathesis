@@ -205,7 +205,11 @@ class Case:  # pylint: disable=too-many-public-methods
             final_headers.update(headers)
             kwargs["headers"] = final_headers
         request = requests.Request(**kwargs)
-        return curlify.to_curl(request.prepare())
+        prepared = request.prepare()
+        if isinstance(prepared.body, bytes):
+            # Note, it may be not sufficient to reproduce the error :(
+            prepared.body = prepared.body.decode("utf-8", errors="replace")
+        return curlify.to_curl(prepared)
 
     def _get_base_url(self, base_url: Optional[str] = None) -> str:
         if base_url is None:
