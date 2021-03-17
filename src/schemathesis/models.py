@@ -614,6 +614,8 @@ class Check:
 
     name: str = attr.ib()  # pragma: no mutate
     value: Status = attr.ib()  # pragma: no mutate
+    response: GenericResponse = attr.ib()  # pragma: no mutate
+    elapsed: float = attr.ib()  # pragma: no mutate
     example: Optional[Case] = attr.ib(default=None)  # pragma: no mutate
     message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
@@ -774,11 +776,13 @@ class TestResult:
     def has_logs(self) -> bool:
         return bool(self.logs)
 
-    def add_success(self, name: str, example: Case) -> None:
-        self.checks.append(Check(name, Status.success, example))
+    def add_success(self, name: str, example: Case, response: GenericResponse, elapsed: float) -> None:
+        self.checks.append(Check(name=name, value=Status.success, response=response, elapsed=elapsed, example=example))
 
-    def add_failure(self, name: str, example: Case, message: str) -> None:
-        self.checks.append(Check(name, Status.failure, example, message))
+    def add_failure(self, name: str, example: Case, response: GenericResponse, elapsed: float, message: str) -> None:
+        self.checks.append(
+            Check(name=name, value=Status.failure, response=response, elapsed=elapsed, example=example, message=message)
+        )
 
     def add_error(self, exception: Exception, example: Optional[Case] = None) -> None:
         self.errors.append((exception, example))

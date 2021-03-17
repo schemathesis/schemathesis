@@ -3,7 +3,9 @@ import sys
 
 import click
 import pytest
+import requests
 from hypothesis.reporting import report
+from urllib3 import HTTPResponse
 
 import schemathesis
 import schemathesis.cli.context
@@ -33,6 +35,18 @@ def execution_context():
 @pytest.fixture
 def operation(swagger_20):
     return models.APIOperation("/success", "GET", definition={}, base_url="http://127.0.0.1:8080", schema=swagger_20)
+
+
+@pytest.fixture
+def response():
+    response = requests.Response()
+    response._content = b'{"id": 5}'
+    response.status_code = 201
+    response.headers["Content-Type"] = "application/json"
+    response.raw = HTTPResponse(body=response._content, status=response.status_code, headers=response.headers)
+    response.request = requests.PreparedRequest()
+    response.request.prepare(method="POST", url="http://example.com", headers={"Content-Type": "application/json"})
+    return response
 
 
 @pytest.fixture()
@@ -96,15 +110,22 @@ def test_handle_initialized(capsys, execution_context, results_set, swagger_20):
     assert out.endswith("\n\n")
 
 
-def test_display_statistic(capsys, swagger_20, execution_context, operation):
+def test_display_statistic(capsys, swagger_20, execution_context, operation, response):
     # Given multiple successful & failed checks in a single test
-    success = models.Check("not_a_server_error", models.Status.success)
-    failure = models.Check("not_a_server_error", models.Status.failure)
+    success = models.Check("not_a_server_error", models.Status.success, response, 0)
+    failure = models.Check("not_a_server_error", models.Status.failure, response, 0)
     single_test_statistic = models.TestResult(
         operation.method,
         operation.full_path,
         DataGenerationMethod.default(),
-        [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
+        [
+            success,
+            success,
+            success,
+            failure,
+            failure,
+            models.Check("different_check", models.Status.success, response, 0),
+        ],
     )
     results = models.TestResultSet([single_test_statistic])
     event = Finished.from_results(results, running_time=1.0)
@@ -180,15 +201,22 @@ def test_display_hypothesis_output(capsys):
 
 
 @pytest.mark.parametrize("body", ({}, {"foo": "bar"}, None))
-def test_display_single_failure(capsys, swagger_20, execution_context, operation, body):
+def test_display_single_failure(capsys, swagger_20, execution_context, operation, body, response):
     # Given a single test result with multiple successful & failed checks
-    success = models.Check("not_a_server_error", models.Status.success)
-    failure = models.Check("not_a_server_error", models.Status.failure, models.Case(operation, body=body))
+    success = models.Check("not_a_server_error", models.Status.success, response, 0)
+    failure = models.Check("not_a_server_error", models.Status.failure, response, 0, models.Case(operation, body=body))
     test_statistic = models.TestResult(
         operation.method,
         operation.full_path,
         DataGenerationMethod.default(),
-        [success, success, success, failure, failure, models.Check("different_check", models.Status.success)],
+        [
+            success,
+            success,
+            success,
+            failure,
+            failure,
+            models.Check("different_check", models.Status.success, response, 0),
+        ],
     )
     # When this failure is displayed
     default.display_failures_for_single_test(execution_context, SerializedTestResult.from_test_result(test_statistic))
@@ -274,12 +302,12 @@ def test_display_single_error(capsys, swagger_20, operation, execution_context, 
 
 
 @pytest.mark.parametrize("verbosity", (0, 1))
-def test_display_failures(swagger_20, capsys, execution_context, results_set, verbosity):
+def test_display_failures(swagger_20, capsys, execution_context, results_set, verbosity, response):
     execution_context.verbosity = verbosity
     # Given two test results - success and failure
     operation = models.APIOperation("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)
     failure = models.TestResult(operation.method, operation.full_path, DataGenerationMethod.default())
-    failure.add_failure("test", models.Case(operation), "Message")
+    failure.add_failure("test", models.Case(operation), response, 0, "Message")
     execution_context.results.append(SerializedTestResult.from_test_result(failure))
     results_set.append(failure)
     event = Finished.from_results(results_set, 1.0)
