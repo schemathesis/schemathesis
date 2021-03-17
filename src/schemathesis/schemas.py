@@ -18,7 +18,7 @@ from hypothesis.utils.conventions import InferType
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import create_test
-from .constants import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
+from .constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
 from .exceptions import InvalidSchema
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import APIOperation, Case
@@ -59,6 +59,7 @@ class BaseSchema(Mapping):
     data_generation_methods: Iterable[DataGenerationMethod] = attr.ib(
         default=DEFAULT_DATA_GENERATION_METHODS
     )  # pragma: no mutate
+    code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.operations)
@@ -177,8 +178,12 @@ class BaseSchema(Mapping):
         validate_schema: Union[bool, NotSet] = NOT_SET,
         skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
+        code_sample_style: Union[str, NotSet] = NOT_SET,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
+        _code_sample_style = (
+            CodeSampleStyle.from_str(code_sample_style) if isinstance(code_sample_style, str) else code_sample_style
+        )
 
         def wrapper(func: GenericTest) -> GenericTest:
             HookDispatcher.add_dispatcher(func)
@@ -191,6 +196,7 @@ class BaseSchema(Mapping):
                 validate_schema=validate_schema,
                 skip_deprecated_operations=skip_deprecated_operations,
                 data_generation_methods=data_generation_methods,
+                code_sample_style=_code_sample_style,  # type: ignore
             )
             return func
 
@@ -218,6 +224,7 @@ class BaseSchema(Mapping):
         validate_schema: Union[bool, NotSet] = NOT_SET,
         skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
+        code_sample_style: Union[CodeSampleStyle, NotSet] = NOT_SET,
     ) -> "BaseSchema":
         if method is NOT_SET:
             method = self.method
@@ -235,6 +242,8 @@ class BaseSchema(Mapping):
             hooks = self.hooks
         if data_generation_methods is NOT_SET:
             data_generation_methods = self.data_generation_methods
+        if code_sample_style is NOT_SET:
+            code_sample_style = self.code_sample_style
 
         return self.__class__(
             self.raw_schema,
@@ -250,6 +259,7 @@ class BaseSchema(Mapping):
             validate_schema=validate_schema,  # type: ignore
             skip_deprecated_operations=skip_deprecated_operations,  # type: ignore
             data_generation_methods=data_generation_methods,  # type: ignore
+            code_sample_style=code_sample_style,  # type: ignore
         )
 
     def get_local_hook_dispatcher(self) -> Optional[HookDispatcher]:

@@ -4,6 +4,7 @@ from typing import List, Optional
 
 import attr
 
+from ..constants import CodeSampleStyle
 from ..runner.serialization import SerializedTestResult
 
 
@@ -24,3 +25,4 @@ class ExecutionContext:
     cassette_file_name: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     junit_xml_file: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     verbosity: int = attr.ib(default=0)  # pragma: no mutate
+    code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate

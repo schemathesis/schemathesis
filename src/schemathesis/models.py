@@ -35,7 +35,7 @@ from hypothesis.strategies import SearchStrategy
 from starlette.testclient import TestClient as ASGIClient
 
 from . import serializers
-from .constants import SERIALIZERS_SUGGESTION_MESSAGE, USER_AGENT, DataGenerationMethod
+from .constants import SERIALIZERS_SUGGESTION_MESSAGE, USER_AGENT, CodeSampleStyle, DataGenerationMethod
 from .exceptions import CheckFailed, InvalidSchema, SerializationNotPossible, get_grouped_exception
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .serializers import Serializer, SerializerContext
@@ -343,6 +343,7 @@ class Case:  # pylint: disable=too-many-public-methods
         response: GenericResponse,
         checks: Tuple["CheckFunction", ...] = (),
         additional_checks: Tuple["CheckFunction", ...] = (),
+        code_sample_style: Optional[str] = None,
     ) -> None:
         """Validate application response.
 
@@ -352,6 +353,7 @@ class Case:  # pylint: disable=too-many-public-methods
         :param checks: A tuple of check functions that accept ``response`` and ``case``.
         :param additional_checks: A tuple of additional checks that will be executed after ones from the ``checks``
             argument.
+        :param code_sample_style: Controls the style of code samples for failure reproduction.
         """
         from .checks import ALL_CHECKS  # pylint: disable=import-outside-toplevel
 
@@ -365,11 +367,22 @@ class Case:  # pylint: disable=too-many-public-methods
         if errors:
             exception_cls = get_grouped_exception(self.operation.verbose_name, *errors)
             formatted_errors = "\n\n".join(f"{idx}. {error.args[0]}" for idx, error in enumerate(errors, 1))
-            code = self.get_code_to_reproduce(request=response.request)
+            code_sample_style = (
+                CodeSampleStyle.from_str(code_sample_style)
+                if code_sample_style is not None
+                else self.operation.schema.code_sample_style
+            )
+            if code_sample_style == CodeSampleStyle.python:
+                code = self.get_code_to_reproduce(request=response.request)
+                code_message = f"Run this Python code to reproduce this response: \n\n    {code}\n"
+            elif code_sample_style == CodeSampleStyle.curl:
+                code = self.as_curl_command(headers=dict(response.request.headers))
+                code_message = f"Run this cURL command to reproduce this response: \n\n    {code}\n"
+            else:  # pragma: no cover
+                raise ValueError(f"Unknown code sample style: {code_sample_style.name}")
             payload = get_response_payload(response)
             raise exception_cls(
-                f"\n\n{formatted_errors}\n\n----------\n\nResponse payload: `{payload}`\n\n"
-                f"Run this Python code to reproduce this response: \n\n    {code}\n"
+                f"\n\n{formatted_errors}\n\n----------\n\nResponse payload: `{payload}`\n\n{code_message}"
             )
 
     def call_and_validate(
@@ -378,10 +391,11 @@ class Case:  # pylint: disable=too-many-public-methods
         session: Optional[requests.Session] = None,
         headers: Optional[Dict[str, Any]] = None,
         checks: Tuple["CheckFunction", ...] = (),
+        code_sample_style: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         response = self.call(base_url, session, headers, **kwargs)
-        self.validate_response(response, checks)
+        self.validate_response(response, checks, code_sample_style=code_sample_style)
 
     def get_full_url(self) -> str:
         """Make a full URL to the current API operation, including query parameters."""

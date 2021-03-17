@@ -175,6 +175,21 @@ In some cases, you can speed up the testing process by distributing all tests am
 In the example above, all tests will be distributed among eight worker threads.
 Note that it is not guaranteed to improve performance because it depends on your application behavior.
 
+Code samples style
+------------------
+
+To reproduce test failures Schemathesis generates code samples:
+
+.. code:: python
+
+    requests.get("http://127.0.0.1:8081/api/failure")
+
+You can control these samples via the ``--code-sample-style`` CLI option. For example, passing ``curl`` will generate a cURL command like this:
+
+.. code:: bash
+
+    curl -X GET http://127.0.0.1:8081/api/failure
+
 ASGI / WSGI support
 -------------------
 

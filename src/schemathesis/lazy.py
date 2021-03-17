@@ -5,7 +5,7 @@ import attr
 from _pytest.fixtures import FixtureRequest
 from pytest_subtests import SubTests, nullcontext
 
-from .constants import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
+from .constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
 from .hooks import HookDispatcher, HookScope
 from .models import APIOperation
 from .schemas import BaseSchema
@@ -24,6 +24,7 @@ class LazySchema:
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
     skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
     data_generation_methods: Iterable[DataGenerationMethod] = attr.ib(default=DEFAULT_DATA_GENERATION_METHODS)
+    code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate
 
     def parametrize(
         self,
@@ -34,6 +35,7 @@ class LazySchema:
         validate_schema: Union[bool, NotSet] = NOT_SET,
         skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
+        code_sample_style: Union[str, NotSet] = NOT_SET,
     ) -> Callable:
         if method is NOT_SET:
             method = self.method
@@ -45,6 +47,10 @@ class LazySchema:
             operation_id = self.operation_id
         if data_generation_methods is NOT_SET:
             data_generation_methods = self.data_generation_methods
+        if isinstance(code_sample_style, str):
+            _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
+        else:
+            _code_sample_style = self.code_sample_style
 
         def wrapper(func: Callable) -> Callable:
             def test(request: FixtureRequest) -> None:
@@ -64,6 +70,7 @@ class LazySchema:
                     validate_schema=validate_schema,
                     skip_deprecated_operations=skip_deprecated_operations,
                     data_generation_methods=data_generation_methods,
+                    code_sample_style=_code_sample_style,
                 )
                 fixtures = get_fixtures(func, request)
                 # Changing the node id is required for better reporting - the method and path will appear there
@@ -138,6 +145,7 @@ def get_schema(
     validate_schema: Union[bool, NotSet] = NOT_SET,
     skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
     data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
+    code_sample_style: CodeSampleStyle,
 ) -> BaseSchema:
     """Loads a schema from the fixture."""
     schema = request.getfixturevalue(name)
@@ -153,6 +161,7 @@ def get_schema(
         validate_schema=validate_schema,
         skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
+        code_sample_style=code_sample_style,
     )
 
 

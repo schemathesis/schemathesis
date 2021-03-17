@@ -41,3 +41,24 @@ class DataGenerationMethod(str, Enum):
 
 
 DEFAULT_DATA_GENERATION_METHODS = (DataGenerationMethod.default(),)
+
+
+class CodeSampleStyle(str, Enum):
+    """Controls the style of code samples for failure reproduction."""
+
+    python = "python"
+    curl = "curl"
+
+    @classmethod
+    def default(cls) -> "CodeSampleStyle":
+        return cls.python
+
+    @classmethod
+    def from_str(cls, value: str) -> "CodeSampleStyle":
+        try:
+            return cls[value]
+        except KeyError:
+            available_styles = ", ".join(cls)
+            raise ValueError(
+                f"Invalid value for code sample style: {value}. Available styles: {available_styles}"
+            ) from None

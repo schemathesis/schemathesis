@@ -13,7 +13,12 @@ import yaml
 from .. import checks as checks_module
 from .. import runner
 from .. import targets as targets_module
-from ..constants import DEFAULT_DATA_GENERATION_METHODS, DEFAULT_STATEFUL_RECURSION_LIMIT, DataGenerationMethod
+from ..constants import (
+    DEFAULT_DATA_GENERATION_METHODS,
+    DEFAULT_STATEFUL_RECURSION_LIMIT,
+    CodeSampleStyle,
+    DataGenerationMethod,
+)
 from ..fixups import ALL_FIXUPS
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..models import CheckFunction
@@ -339,6 +344,13 @@ class GroupedOption(click.Option):
     show_default=True,
 )
 @click.option(
+    "--code-sample-style",
+    help="Controls the style of code samples for failure reproduction.",
+    type=click.Choice([item.name for item in CodeSampleStyle]),
+    default=CodeSampleStyle.default().name,
+    callback=callbacks.convert_code_sample_style,
+)
+@click.option(
     "--store-network-log", help="Store requests and responses into a file.", type=click.File("w", encoding="utf-8")
 )
 @click.option(
@@ -452,6 +464,7 @@ def run(
     skip_deprecated_operations: bool = False,
     junit_xml: Optional[click.utils.LazyFile] = None,
     show_errors_tracebacks: bool = False,
+    code_sample_style: CodeSampleStyle = CodeSampleStyle.default(),
     store_network_log: Optional[click.utils.LazyFile] = None,
     fixups: Tuple[str] = (),  # type: ignore
     stateful: Optional[Stateful] = None,
@@ -517,7 +530,14 @@ def run(
         hypothesis_verbosity=hypothesis_verbosity,
     )
     execute(
-        prepared_runner, workers_num, show_errors_tracebacks, validate_schema, store_network_log, junit_xml, verbosity
+        prepared_runner,
+        workers_num,
+        show_errors_tracebacks,
+        validate_schema,
+        store_network_log,
+        junit_xml,
+        verbosity,
+        code_sample_style,
     )
 
 
@@ -561,6 +581,7 @@ def execute(
     store_network_log: Optional[click.utils.LazyFile],
     junit_xml: Optional[click.utils.LazyFile],
     verbosity: int,
+    code_sample_style: CodeSampleStyle,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handlers: List[EventHandler] = []
@@ -577,6 +598,7 @@ def execute(
         cassette_file_name=store_network_log.name if store_network_log is not None else None,
         junit_xml_file=junit_xml.name if junit_xml is not None else None,
         verbosity=verbosity,
+        code_sample_style=code_sample_style,
     )
     GLOBAL_HOOK_DISPATCHER.dispatch("after_init_cli_run_handlers", HookContext(), handlers, execution_context)
     try:

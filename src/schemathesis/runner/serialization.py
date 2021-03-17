@@ -16,6 +16,7 @@ from ..utils import format_exception
 class SerializedCase:
     text_lines: List[str] = attr.ib()  # pragma: no mutate
     requests_code: str = attr.ib()
+    curl_code: str = attr.ib()
     path_template: str = attr.ib()
     path_parameters: Optional[Dict[str, Any]] = attr.ib()
     query: Optional[Dict[str, Any]] = attr.ib()
@@ -25,6 +26,7 @@ class SerializedCase:
         return cls(
             text_lines=case.as_text_lines(),
             requests_code=case.get_code_to_reproduce(headers),
+            curl_code=case.as_curl_command(headers),
             path_template=case.full_path,
             path_parameters=case.path_parameters,
             query=case.query,

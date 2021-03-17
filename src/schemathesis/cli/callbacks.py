@@ -9,6 +9,7 @@ import hypothesis
 from requests import PreparedRequest, RequestException
 
 from .. import utils
+from ..constants import CodeSampleStyle
 from ..stateful import Stateful
 from .constants import DEFAULT_WORKERS
 
@@ -133,6 +134,10 @@ def convert_stateful(ctx: click.core.Context, param: click.core.Parameter, value
     if value is None:
         return value
     return Stateful[value]
+
+
+def convert_code_sample_style(ctx: click.core.Context, param: click.core.Parameter, value: str) -> CodeSampleStyle:
+    return CodeSampleStyle.from_str(value)
 
 
 def convert_request_tls_verify(ctx: click.core.Context, param: click.core.Parameter, value: str) -> Union[str, bool]:
