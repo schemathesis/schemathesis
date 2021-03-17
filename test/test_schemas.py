@@ -3,7 +3,6 @@ from jsonschema import ValidationError
 
 import schemathesis
 from schemathesis.exceptions import InvalidSchema
-from schemathesis.parameters import PayloadAlternatives
 from schemathesis.specs.openapi.parameters import OpenAPI20Body
 from schemathesis.specs.openapi.schemas import InliningResolver
 from schemathesis.utils import Err, Ok

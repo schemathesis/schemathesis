@@ -8,7 +8,7 @@ import click
 from hypothesis import settings
 
 from ..._compat import metadata
-from ...constants import __version__
+from ...constants import CodeSampleStyle, __version__
 from ...models import Response, Status
 from ...runner import events
 from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult
@@ -208,7 +208,10 @@ def display_example(
     if response is not None:
         payload = base64.b64decode(response.body).decode("utf8", errors="replace")
         click.secho(f"----------\n\nResponse payload: `{payload}`\n", fg="red")
-    click.secho(f"Run this Python code to reproduce this failure: \n\n    {case.requests_code}\n", fg="red")
+    if context.code_sample_style == CodeSampleStyle.python:
+        click.secho(f"Run this Python code to reproduce this failure: \n\n    {case.requests_code}\n", fg="red")
+    if context.code_sample_style == CodeSampleStyle.curl:
+        click.secho(f"Run this cURL command to reproduce this failure: \n\n    {case.curl_code}\n", fg="red")
     if seed is not None:
         click.secho(f"Or add this option to your command line parameters: --hypothesis-seed={seed}", fg="red")
 

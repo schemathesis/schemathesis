@@ -18,6 +18,7 @@ from hypothesis import HealthCheck, Phase, Verbosity
 from schemathesis import Case, DataGenerationMethod, fixups
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.cli import reset_checks
+from schemathesis.constants import USER_AGENT
 from schemathesis.hooks import unregister_all
 from schemathesis.loaders import from_uri
 from schemathesis.models import APIOperation
@@ -260,6 +261,10 @@ def test_commands_run_help(cli):
         "",
         "  --show-errors-tracebacks        Show full tracebacks for internal errors.",
         "                                  [default: False]",
+        "",
+        "  --code-sample-style [python|curl]",
+        "                                  Controls the style of code samples for failure",
+        "                                  reproduction.",
         "",
         "  --store-network-log FILENAME    Store requests and responses into a file.",
         "  --fixups [fast_api|all]         Install specified compatibility fixups.",
@@ -514,6 +519,24 @@ def test_cli_run_only_failure(cli, cli_args, app_type, workers):
         assert "<h1>Internal Server Error</h1>" in lines
     assert "    not_a_server_error                    0 / 2 passed          FAILED " in lines
     assert "== 1 failed in " in lines[-1]
+
+
+@pytest.mark.operations("failure")
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.parametrize("style", ("python", "curl"))
+def test_cli_code_sample_style(cli, base_url, schema_url, style, openapi_version):
+    result = cli.run(schema_url, f"--code-sample-style={style}")
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    assert " HYPOTHESIS OUTPUT " not in result.stdout
+    assert " SUMMARY " in result.stdout
+
+    lines = result.stdout.strip().split("\n")
+    if style == "python":
+        assert "Run this Python code to reproduce this failure: " in lines
+        assert f"    requests.get('{base_url}/failure', headers={{'User-Agent': '{USER_AGENT}'}})" in lines
+    else:
+        assert "Run this cURL command to reproduce this failure: " in lines
+        assert f"    curl -X GET -H 'User-Agent: {USER_AGENT}' {base_url}/failure" in lines
 
 
 @pytest.mark.operations("upload_file")
