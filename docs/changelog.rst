@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Display failing response payload in the CLI output, similarly to the pytest plugin output. `#1050`_
+
 `3.2.2`_ - 2021-03-11
 ---------------------
 
@@ -1655,6 +1659,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1050: https://github.com/schemathesis/schemathesis/issues/1050
 .. _#1046: https://github.com/schemathesis/schemathesis/issues/1046
 .. _#1039: https://github.com/schemathesis/schemathesis/issues/1039
 .. _#1036: https://github.com/schemathesis/schemathesis/issues/1036

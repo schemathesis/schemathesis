@@ -1,3 +1,4 @@
+import base64
 import os
 import platform
 import shutil
@@ -8,7 +9,7 @@ from hypothesis import settings
 
 from ..._compat import metadata
 from ...constants import __version__
-from ...models import Status
+from ...models import Response, Status
 from ...runner import events
 from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult
 from ..context import ExecutionContext
@@ -174,7 +175,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
         else:
             message = None
         example = cast(SerializedCase, check.example)  # filtered in `get_unique_failures`
-        display_example(context, example, message, result.seed)
+        display_example(context, example, check.response, message, result.seed)
         # Display every time except the last check
         if idx != len(checks):
             click.echo("\n")
@@ -191,6 +192,7 @@ def reduce_schema_error(message: str) -> str:
 def display_example(
     context: ExecutionContext,
     case: SerializedCase,
+    response: Optional[Response] = None,
     message: Optional[str] = None,
     seed: Optional[int] = None,
 ) -> None:
@@ -203,6 +205,9 @@ def display_example(
         click.secho(line, fg="red")
     if case.text_lines:
         click.echo()
+    if response is not None:
+        payload = base64.b64decode(response.body).decode("utf8", errors="replace")
+        click.secho(f"----------\n\nResponse payload: `{payload}`\n", fg="red")
     click.secho(f"Run this Python code to reproduce this failure: \n\n    {case.requests_code}\n", fg="red")
     if seed is not None:
         click.secho(f"Or add this option to your command line parameters: --hypothesis-seed={seed}", fg="red")

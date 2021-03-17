@@ -292,24 +292,35 @@ def run_checks(
         try:
             skip_check = check(response, case)
             if not skip_check:
-                result.add_success(check_name, case)
-                check_results.append(Check(check_name, Status.success, case))
+                result.add_success(check_name, case, response, elapsed_time)
+                check_results.append(
+                    Check(name=check_name, value=Status.success, response=response, elapsed=elapsed_time, example=case)
+                )
         except AssertionError as exc:
             message = str(exc)
             if not message:
                 message = f"Check '{check_name}' failed"
                 exc.args = (message,)
             errors.append(exc)
-            result.add_failure(check_name, case, message)
-            check_results.append(Check(check_name, Status.failure, case, message))
+            result.add_failure(check_name, case, response, elapsed_time, message)
+            check_results.append(
+                Check(
+                    name=check_name,
+                    value=Status.failure,
+                    response=response,
+                    elapsed=elapsed_time,
+                    example=case,
+                    message=message,
+                )
+            )
 
     if max_response_time:
         if elapsed_time > max_response_time:
             message = f"Response time exceeded the limit of {max_response_time} ms"
             errors.append(AssertionError(message))
-            result.add_failure("max_response_time", case, message)
+            result.add_failure("max_response_time", case, response, elapsed_time, message)
         else:
-            result.add_success("max_response_time", case)
+            result.add_success("max_response_time", case, response, elapsed_time)
 
     if errors:
         raise get_grouped_exception(case.operation.verbose_name, *errors)
