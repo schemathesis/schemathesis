@@ -113,8 +113,8 @@ def test_handle_initialized(capsys, execution_context, results_set, swagger_20):
 
 def test_display_statistic(capsys, swagger_20, execution_context, operation, response):
     # Given multiple successful & failed checks in a single test
-    success = models.Check("not_a_server_error", models.Status.success, response, 0)
-    failure = models.Check("not_a_server_error", models.Status.failure, response, 0)
+    success = models.Check("not_a_server_error", models.Status.success, response, 0, models.Case(operation))
+    failure = models.Check("not_a_server_error", models.Status.failure, response, 0, models.Case(operation))
     single_test_statistic = models.TestResult(
         operation.method,
         operation.full_path,
@@ -125,7 +125,7 @@ def test_display_statistic(capsys, swagger_20, execution_context, operation, res
             success,
             failure,
             failure,
-            models.Check("different_check", models.Status.success, response, 0),
+            models.Check("different_check", models.Status.success, response, 0, models.Case(operation)),
         ],
     )
     results = models.TestResultSet([single_test_statistic])
@@ -204,7 +204,7 @@ def test_display_hypothesis_output(capsys):
 @pytest.mark.parametrize("body", ({}, {"foo": "bar"}, None))
 def test_display_single_failure(capsys, swagger_20, execution_context, operation, body, response):
     # Given a single test result with multiple successful & failed checks
-    success = models.Check("not_a_server_error", models.Status.success, response, 0)
+    success = models.Check("not_a_server_error", models.Status.success, response, 0, models.Case(operation, body=body))
     failure = models.Check("not_a_server_error", models.Status.failure, response, 0, models.Case(operation, body=body))
     test_statistic = models.TestResult(
         operation.method,
@@ -216,7 +216,7 @@ def test_display_single_failure(capsys, swagger_20, execution_context, operation
             success,
             failure,
             failure,
-            models.Check("different_check", models.Status.success, response, 0),
+            models.Check("different_check", models.Status.success, response, 0, models.Case(operation, body=body)),
         ],
     )
     # When this failure is displayed
