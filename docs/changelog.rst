@@ -8,6 +8,10 @@ Changelog
 
 - Display failing response payload in the CLI output, similarly to the pytest plugin output. `#1050`_
 
+**Internal**
+
+- Extra information to events, emitted by the Schemathesis runner.
+
 `3.2.2`_ - 2021-03-11
 ---------------------
 

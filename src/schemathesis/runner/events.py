@@ -1,3 +1,4 @@
+import threading
 import time
 from typing import Dict, List, Optional, Union
 
@@ -27,6 +28,7 @@ class Initialized(ExecutionEvent):
     specification_name: str = attr.ib()  # pragma: no mutate
     # Timestamp of test run start
     start_time: float = attr.ib(factory=time.monotonic)  # pragma: no mutate
+    thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
 
     @classmethod
     def from_schema(cls, *, schema: BaseSchema, count_operations: bool = True) -> "Initialized":
@@ -59,14 +61,17 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
     path: str = attr.ib()  # pragma: no mutate
     relative_path: str = attr.ib()  # pragma: no mutate
     recursion_level: int = attr.ib()  # pragma: no mutate
+    correlation_id: str = attr.ib()  # pragma: no mutate
+    thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
 
     @classmethod
-    def from_operation(cls, operation: APIOperation, recursion_level: int) -> "BeforeExecution":
+    def from_operation(cls, operation: APIOperation, recursion_level: int, correlation_id: str) -> "BeforeExecution":
         return cls(
             method=operation.method.upper(),
             path=operation.full_path,
             relative_path=operation.path,
             recursion_level=recursion_level,
+            correlation_id=correlation_id,
         )
 
 
@@ -83,6 +88,8 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
     result: SerializedTestResult = attr.ib()  # pragma: no mutate
     # Test running time
     elapsed_time: float = attr.ib()  # pragma: no mutate
+    correlation_id: str = attr.ib()  # pragma: no mutate
+    thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
     # Captured hypothesis stdout
     hypothesis_output: List[str] = attr.ib(factory=list)  # pragma: no mutate
 
@@ -94,6 +101,7 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
         elapsed_time: float,
         hypothesis_output: List[str],
         operation: APIOperation,
+        correlation_id: str,
     ) -> "AfterExecution":
         return cls(
             method=operation.method.upper(),
@@ -103,12 +111,15 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
             status=status,
             elapsed_time=elapsed_time,
             hypothesis_output=hypothesis_output,
+            correlation_id=correlation_id,
         )
 
 
 @attr.s(slots=True)  # pragma: no mutate
 class Interrupted(ExecutionEvent):
     """If execution was interrupted by Ctrl-C, or a received SIGTERM."""
+
+    thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -119,6 +130,7 @@ class InternalError(ExecutionEvent):
     exception_type: str = attr.ib()  # pragma: no mutate
     exception: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     exception_with_traceback: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
 
     @classmethod
     def from_exc(cls, exc: Exception) -> "InternalError":
@@ -164,6 +176,7 @@ class Finished(ExecutionEvent):
 
     # Total test run execution time
     running_time: float = attr.ib()  # pragma: no mutate
+    thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
 
     @classmethod
     def from_results(cls, results: TestResultSet, running_time: float) -> "Finished":

@@ -1,6 +1,7 @@
 # pylint: disable=too-many-statements,too-many-branches
 import logging
 import time
+import uuid
 from contextlib import contextmanager
 from types import TracebackType
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Type, Union, cast
@@ -136,9 +137,13 @@ def handle_schema_error(
             data_generation_method=data_generation_method,
         )
         result.add_error(error)
-
+        correlation_id = uuid.uuid4().hex
         yield events.BeforeExecution(
-            method=method, path=error.full_path, relative_path=error.path, recursion_level=recursion_level
+            method=method,
+            path=error.full_path,
+            relative_path=error.path,
+            recursion_level=recursion_level,
+            correlation_id=correlation_id,
         )
         yield events.AfterExecution(
             method=method,
@@ -148,6 +153,7 @@ def handle_schema_error(
             result=SerializedTestResult.from_test_result(result),
             elapsed_time=0.0,
             hypothesis_output=[],
+            correlation_id=correlation_id,
         )
         results.append(result)
     else:
@@ -174,7 +180,11 @@ def run_test(  # pylint: disable=too-many-locals
         overridden_headers=headers,
         data_generation_method=data_generation_method,
     )
-    yield events.BeforeExecution.from_operation(operation=operation, recursion_level=recursion_level)
+    # To simplify connecting `before` and `after` events in external systems
+    correlation_id = uuid.uuid4().hex
+    yield events.BeforeExecution.from_operation(
+        operation=operation, recursion_level=recursion_level, correlation_id=correlation_id
+    )
     hypothesis_output: List[str] = []
     errors: List[Exception] = []
     test_start_time = time.monotonic()
@@ -242,6 +252,7 @@ def run_test(  # pylint: disable=too-many-locals
         elapsed_time=test_elapsed_time,
         hypothesis_output=hypothesis_output,
         operation=operation,
+        correlation_id=correlation_id,
     )
 
 
