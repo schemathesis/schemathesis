@@ -533,10 +533,18 @@ def test_cli_code_sample_style(cli, base_url, schema_url, style, openapi_version
     lines = result.stdout.strip().split("\n")
     if style == "python":
         assert "Run this Python code to reproduce this failure: " in lines
-        assert f"    requests.get('{base_url}/failure', headers={{'User-Agent': '{USER_AGENT}'}})" in lines
+        headers = (
+            f"{{'User-Agent': '{USER_AGENT}', 'Accept-Encoding': 'gzip, deflate', "
+            f"'Accept': '*/*', 'Connection': 'keep-alive'}}"
+        )
+        assert f"    requests.get('{base_url}/failure', headers={headers})" in lines
     else:
         assert "Run this cURL command to reproduce this failure: " in lines
-        assert f"    curl -X GET -H 'User-Agent: {USER_AGENT}' {base_url}/failure" in lines
+        headers = (
+            f"-H 'Accept: */*' -H 'Accept-Encoding: gzip, deflate' "
+            f"-H 'Connection: keep-alive' -H 'User-Agent: {USER_AGENT}'"
+        )
+        assert f"    curl -X GET {headers} {base_url}/failure" in lines
 
 
 @pytest.mark.operations("upload_file")
@@ -1374,9 +1382,9 @@ def test_wsgi_app_internal_exception(testdir, cli):
     result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--hypothesis-derandomize")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
-    assert "== APPLICATION LOGS ==" in lines[44], result.stdout.strip()
-    assert "ERROR in app: Exception on /api/success [GET]" in lines[46]
-    assert lines[62] == "ZeroDivisionError: division by zero"
+    assert "== APPLICATION LOGS ==" in lines[48], result.stdout.strip()
+    assert "ERROR in app: Exception on /api/success [GET]" in lines[50]
+    assert lines[66] == "ZeroDivisionError: division by zero"
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
@@ -1862,3 +1870,44 @@ def test_unsupported_regex(testdir, cli, empty_open_api_3_schema):
     else:
         pytest.fail("Line not found")
     assert r"Got pattern='\\p{Alpha}', but this is not valid syntax for a Python regular expression" in lines[idx + 1]
+
+
+@pytest.mark.parametrize("extra", ("--auth='test:wrong'", "-H Authorization: Basic J3Rlc3Q6d3Jvbmcn"))
+@pytest.mark.operations("basic")
+def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra):
+    # See GH-792
+    # When the tested API operation has basic auth
+    # And the auth is overridden (directly or via headers)
+    result = cli.run(schema_url, "--checks=all", extra)
+    # And there is an error during testing
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    lines = result.stdout.splitlines()
+    # Then request representation in the output should have the overridden value
+    assert (
+        lines[18] == f"Headers         : {{'Authorization': 'Basic J3Rlc3Q6d3Jvbmcn', 'User-Agent': '{USER_AGENT}',"
+        f" 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive'}}"
+    )
+    # And code sample as well
+    assert (
+        lines[26] == f"    requests.get('{base_url}/basic', headers={{'Authorization': 'Basic J3Rlc3Q6d3Jvbmcn', "
+        f"'User-Agent': '{USER_AGENT}', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', "
+        f"'Connection': 'keep-alive'}})"
+    )
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("flaky")
+def test_explicit_headers_in_output_on_errors(cli, base_url, schema_url, openapi_version):
+    # When there is a non-fatal error during testing (e.g. flakiness)
+    # And custom headers were passed explicitly
+    auth = "Basic J3Rlc3Q6d3Jvbmcn"
+    result = cli.run(schema_url, "--checks=all", f"-H Authorization: {auth}")
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    lines = result.stdout.splitlines()
+    # Then request representation in the output should have the overridden value
+    assert lines[17] == f"Headers         : {{'Authorization': '{auth}', 'User-Agent': '{USER_AGENT}'}}"
+    # And code sample as well
+    assert (
+        lines[22] == f"    requests.get('{base_url}/flaky', headers={{'User-Agent': '{USER_AGENT}', "
+        f"'Authorization': '{auth}'}}, params={{'id': 0}})"
+    )

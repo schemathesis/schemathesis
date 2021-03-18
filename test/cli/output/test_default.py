@@ -321,7 +321,8 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set, ve
     assert " GET: /v1/api/failure " in out
     assert "Message" in out
     assert "Run this Python code to reproduce this failure: " in out
-    assert f"requests.get('http://127.0.0.1:8080/api/failure', headers={{'User-Agent': '{USER_AGENT}'}})" in out
+    headers = f"{{'User-Agent': '{USER_AGENT}', 'Content-Type': 'application/json', 'Content-Length': '0'}}"
+    assert f"requests.get('http://127.0.0.1:8080/api/failure', headers={headers})" in out
 
 
 @pytest.mark.parametrize("show_errors_tracebacks", (True, False))

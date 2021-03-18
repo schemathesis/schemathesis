@@ -24,7 +24,7 @@ class SerializedCase:
     @classmethod
     def from_case(cls, case: Case, headers: Optional[Dict[str, Any]]) -> "SerializedCase":
         return cls(
-            text_lines=case.as_text_lines(),
+            text_lines=case.as_text_lines(headers),
             requests_code=case.get_code_to_reproduce(headers),
             curl_code=case.as_curl_command(headers),
             path_template=case.full_path,
@@ -43,12 +43,13 @@ class SerializedCheck:
     message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
     @classmethod
-    def from_check(cls, check: Check, headers: Optional[Dict[str, Any]]) -> "SerializedCheck":
+    def from_check(cls, check: Check) -> "SerializedCheck":
         request = Request.from_prepared_request(check.response.request)
         if isinstance(check.response, requests.Response):
             response = Response.from_requests(check.response)
         else:
             response = Response.from_wsgi(check.response, check.elapsed)
+        headers = {key: value[0] for key, value in request.headers.items()}
         return SerializedCheck(
             name=check.name,
             value=check.value,
@@ -87,11 +88,11 @@ class SerializedInteraction:
     recorded_at: str = attr.ib()  # pragma: no mutate
 
     @classmethod
-    def from_interaction(cls, interaction: Interaction, headers: Optional[Dict[str, Any]]) -> "SerializedInteraction":
+    def from_interaction(cls, interaction: Interaction) -> "SerializedInteraction":
         return cls(
             request=interaction.request,
             response=interaction.response,
-            checks=[SerializedCheck.from_check(check, headers) for check in interaction.checks],
+            checks=[SerializedCheck.from_check(check) for check in interaction.checks],
             status=interaction.status,
             recorded_at=interaction.recorded_at,
         )
@@ -124,11 +125,8 @@ class SerializedTestResult:
             is_errored=result.is_errored,
             seed=result.seed,
             data_generation_method=result.data_generation_method.as_short_name(),
-            checks=[SerializedCheck.from_check(check, headers=result.overridden_headers) for check in result.checks],
+            checks=[SerializedCheck.from_check(check) for check in result.checks],
             logs=[formatter.format(record) for record in result.logs],
             errors=[SerializedError.from_error(*error, headers=result.overridden_headers) for error in result.errors],
-            interactions=[
-                SerializedInteraction.from_interaction(interaction, headers=result.overridden_headers)
-                for interaction in result.interactions
-            ],
+            interactions=[SerializedInteraction.from_interaction(interaction) for interaction in result.interactions],
         )

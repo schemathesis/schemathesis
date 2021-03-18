@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Displaying wrong headers in the ``FAILURES`` block of the CLI output. `#792`_
+
 `3.3.0`_ - 2021-03-17
 ---------------------
 
@@ -1742,6 +1746,7 @@ Deprecated
 .. _#812: https://github.com/schemathesis/schemathesis/issues/812
 .. _#795: https://github.com/schemathesis/schemathesis/issues/795
 .. _#793: https://github.com/schemathesis/schemathesis/issues/793
+.. _#792: https://github.com/schemathesis/schemathesis/issues/792
 .. _#788: https://github.com/schemathesis/schemathesis/issues/788
 .. _#783: https://github.com/schemathesis/schemathesis/issues/783
 .. _#768: https://github.com/schemathesis/schemathesis/issues/768
