@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.3.1`_ - 2021-03-18
+---------------------
+
 **Fixed**
 
 - Displaying wrong headers in the ``FAILURES`` block of the CLI output. `#792`_
@@ -1543,7 +1546,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.3.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.3.1...HEAD
+.. _3.3.1: https://github.com/schemathesis/schemathesis/compare/v3.3.0...v3.3.1
 .. _3.3.0: https://github.com/schemathesis/schemathesis/compare/v3.2.2...v3.3.0
 .. _3.2.2: https://github.com/schemathesis/schemathesis/compare/v3.2.1...v3.2.2
 .. _3.2.1: https://github.com/schemathesis/schemathesis/compare/v3.2.0...v3.2.1
