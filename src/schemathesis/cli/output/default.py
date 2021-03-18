@@ -202,8 +202,7 @@ def display_example(
         click.echo()
     for line in case.text_lines:
         click.secho(line, fg="red")
-    if case.text_lines:
-        click.echo()
+    click.echo()
     if response is not None:
         payload = base64.b64decode(response.body).decode("utf8", errors="replace")
         click.secho(f"----------\n\nResponse payload: `{payload}`\n", fg="red")

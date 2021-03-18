@@ -26,6 +26,12 @@ async def success(request: web.Request) -> web.Response:
     return web.json_response({"success": True})
 
 
+async def basic(request: web.Request) -> web.Response:
+    if "Authorization" in request.headers and request.headers["Authorization"] == "Basic dGVzdDp0ZXN0":
+        return web.json_response({"secret": 42})
+    raise web.HTTPUnauthorized(text='{"detail": "Unauthorized"}', content_type="application/json")
+
+
 async def payload(request: web.Request) -> web.Response:
     body = await request.read()
     if body:

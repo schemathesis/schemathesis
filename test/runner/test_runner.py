@@ -649,14 +649,30 @@ def test_custom_loader(swagger_20, openapi2_base_url):
 @pytest.mark.operations("failure")
 def test_reproduce_code_with_overridden_headers(args, openapi3_base_url):
     app, kwargs = args
-    headers = {"User-Agent": USER_AGENT, "X-Token": "test"}
+    # Note, headers are essentially the same, but keys are ordered differently due to implementation details of
+    # real vs wsgi apps. It is the simplest solution, but not the most flexible one, though.
+    if isinstance(app, Flask):
+        headers = {
+            "User-Agent": USER_AGENT,
+            "X-Token": "test",
+            "Accept-Encoding": "gzip, deflate",
+            "Accept": "*/*",
+            "Connection": "keep-alive",
+        }
+        expected = f"requests.get('http://localhost/api/failure', headers={headers})"
+    else:
+        headers = {
+            "User-Agent": USER_AGENT,
+            "Accept-Encoding": "gzip, deflate",
+            "Accept": "*/*",
+            "Connection": "keep-alive",
+            "X-Token": "test",
+        }
+        expected = f"requests.get('{openapi3_base_url}/failure', headers={headers})"
 
     *_, after, finished = prepare(**kwargs, headers=headers, hypothesis_max_examples=1)
     assert finished.has_failures
-    if isinstance(app, Flask):
-        expected = f"requests.get('http://localhost/api/failure', headers={headers})"
-    else:
-        expected = f"requests.get('{openapi3_base_url}/failure', headers={headers})"
+
     assert after.result.checks[1].example.requests_code == expected
 
 
