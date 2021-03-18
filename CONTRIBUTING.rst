@@ -110,6 +110,7 @@ By default, the server will generate an API schema with the following API operat
 - ``POST /api/performance`` - depending on the number of "0" in the input value, responds slower and if the input value has more than ten "0", returns 500
 - ``GET /api/flaky`` - returns 1:1 ratio of 200/500 responses
 - ``GET /api/recursive`` - accepts a recursive structure and responds with a recursive one
+- ``GET /api/basic`` - Requires HTTP basic auth (use `test` as username and password)
 - ``POST /api/multipart`` - accepts two body parameters as multipart payload
 - ``POST /api/upload_file`` - accepts a file and a body parameter
 - ``POST /api/form`` - accepts ``application/x-www-form-urlencoded`` payload

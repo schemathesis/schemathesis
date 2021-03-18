@@ -78,6 +78,12 @@ def create_openapi_app(
     def get_payload():
         return jsonify(request.json)
 
+    @app.route("/api/basic", methods=["GET"])
+    def basic():
+        if "Authorization" in request.headers and request.headers["Authorization"] == "Basic dGVzdDp0ZXN0":
+            return jsonify({"secret": 42})
+        return {"detail": "Unauthorized"}, 401
+
     @app.route("/api/headers", methods=["GET"])
     def headers():
         values = dict(request.headers)

@@ -140,7 +140,7 @@ class Case:  # pylint: disable=too-many-public-methods
             return urlunsplit(("http", "localhost", path or "", "", ""))
         return self.base_url
 
-    def as_text_lines(self) -> List[str]:
+    def as_text_lines(self, headers: Optional[Dict[str, Any]] = None) -> List[str]:
         """Textual representation.
 
         Each component is a separate line.
@@ -152,6 +152,11 @@ class Case:  # pylint: disable=too-many-public-methods
             "Query": self.query,
             "Body": self.body,
         }
+        if headers:
+            final_headers = output["Headers"] or {}
+            final_headers = cast(Dict[str, Any], final_headers)
+            final_headers.update(headers)
+            output["Headers"] = final_headers
         max_length = max(map(len, output))
         template = f"{{:<{max_length}}} : {{}}"
 
@@ -776,7 +781,8 @@ class TestResult:
     logs: List[LogRecord] = attr.ib(factory=list)  # pragma: no mutate
     is_errored: bool = attr.ib(default=False)  # pragma: no mutate
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
-    # To show a proper reproduction code if a failure happens
+    # To show a proper reproduction code if an error happens and there is no way to get actual headers that were
+    # sent over the network. Or there could be no actual requests at all
     overridden_headers: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
 
     def mark_errored(self) -> None:

@@ -10,6 +10,7 @@ class Operation(Enum):
     payload = ("POST", "/api/payload")
     # Not compliant, but used by some tools like Elasticsearch
     get_payload = ("GET", "/api/get_payload")
+    basic = ("GET", "/api/basic")
     multiple_failures = ("GET", "/api/multiple_failures")
     slow = ("GET", "/api/slow")
     path_variable = ("GET", "/api/path_variable/{key}")
@@ -111,7 +112,10 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
         "schemes": ["http"],
         "produces": ["application/json"],
         "paths": {},
-        "securityDefinitions": {"api_key": {"type": "apiKey", "name": "X-Token", "in": "header"}},
+        "securityDefinitions": {
+            "api_key": {"type": "apiKey", "name": "X-Token", "in": "header"},
+            "basicAuth": {"type": "basic"},
+        },
     }
 
     def add_link(name, definition):
@@ -223,6 +227,17 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
                         "headers": {"X-Custom-Header": {"description": "Custom header", "type": "integer"}},
                     },
                     "default": {"description": "Default response"},
+                },
+            }
+        elif name == "basic":
+            schema = {
+                "security": [{"basicAuth": []}],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {"type": "object", "properties": {"secret": {"type": "integer"}}},
+                    },
+                    # 401 is not described on purpose to cause a testing error
                 },
             }
         elif name == "create_user":
@@ -367,12 +382,17 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
         "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},
         "paths": {},
         "servers": [{"url": "https://127.0.0.1:8888/{basePath}", "variables": {"basePath": {"default": _base_path}}}],
+        "components": {
+            "securitySchemes": {
+                "api_key": {"type": "apiKey", "name": "X-Token", "in": "header"},
+                "basicAuth": {"type": "http", "scheme": "basic"},
+            }
+        },
     }
     base_path = f"/{_base_path}"
 
     def add_link(name, definition):
-        components = template.setdefault("components", {})
-        links = components.setdefault("links", {})
+        links = template["components"].setdefault("links", {})
         links.setdefault(name, definition)
 
     for name in operations:
@@ -523,6 +543,21 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                         "headers": {"X-Custom-Header": {"description": "Custom header", "schema": {"type": "integer"}}},
                     },
                     "default": {"description": "Default response"},
+                },
+            }
+        elif name == "basic":
+            schema = {
+                "security": [{"basicAuth": []}],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"secret": {"type": "integer"}}}
+                            }
+                        },
+                    },
+                    # 401 is not described on purpose to cause a testing error
                 },
             }
         elif name == "create_user":
