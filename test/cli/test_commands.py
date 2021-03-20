@@ -1478,7 +1478,10 @@ def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_b
         cassette = yaml.safe_load(fd)
 
     def decode(idx):
-        return base64.b64decode(cassette["http_interactions"][idx]["request"]["body"]["base64_string"])
+        request = cassette["http_interactions"][idx]["request"]
+        if "body" not in request:
+            return None
+        return base64.b64decode(request["body"]["base64_string"])
 
     first_decoded = decode(0)
     if first_decoded:

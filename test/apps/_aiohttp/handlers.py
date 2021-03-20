@@ -32,6 +32,14 @@ async def basic(request: web.Request) -> web.Response:
     raise web.HTTPUnauthorized(text='{"detail": "Unauthorized"}', content_type="application/json")
 
 
+async def empty(request: web.Request) -> web.Response:
+    return web.Response(body=None, status=204)
+
+
+async def empty_string(request: web.Request) -> web.Response:
+    return web.Response(body="")
+
+
 async def payload(request: web.Request) -> web.Response:
     body = await request.read()
     if body:
