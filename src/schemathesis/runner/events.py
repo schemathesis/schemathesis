@@ -16,6 +16,8 @@ from .serialization import SerializedError, SerializedTestResult
 class ExecutionEvent:
     """Generic execution event."""
 
+    asdict = attr.asdict
+
 
 @attr.s(slots=True)  # pragma: no mutate
 class Initialized(ExecutionEvent):

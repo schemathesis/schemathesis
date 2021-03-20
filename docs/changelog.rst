@@ -4,12 +4,17 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- ``--debug-output-file`` CLI option to enable storing the underlying runner events in the JSON Lines format in a separate file for debugging purposes. `#1059`_
+
 **Changed**
 
 - Make ``Request.body``, ``Response.body`` and ``Response.encoding`` internal attributes optional. For ``Request``,
   it means that absent body will lead to ``Request.body`` to be ``None``. For ``Response``, ``body`` will be ``None``
   if the app response did not have any payload. Previously these values were empty strings, which was not distinguishable from the cases described above.
   For the end-user, it means that in VCR cassettes, fields ``request.body`` and ``response.body`` may be absent.
+- ``models.Status`` enum now has string values for more readable representation.
 
 `3.3.1`_ - 2021-03-18
 ---------------------
@@ -1687,6 +1692,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1059: https://github.com/schemathesis/schemathesis/issues/1059
 .. _#1050: https://github.com/schemathesis/schemathesis/issues/1050
 .. _#1046: https://github.com/schemathesis/schemathesis/issues/1046
 .. _#1039: https://github.com/schemathesis/schemathesis/issues/1039

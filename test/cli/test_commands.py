@@ -259,6 +259,9 @@ def test_commands_run_help(cli):
         "  --junit-xml FILENAME            Create junit-xml style report file at given",
         "                                  path.",
         "",
+        "  --debug-output-file FILENAME    Save debug output as JSON lines in the given",
+        "                                  file.",
+        "",
         "  --show-errors-tracebacks        Show full tracebacks for internal errors.",
         "                                  [default: False]",
         "",
@@ -1910,7 +1913,31 @@ def test_explicit_headers_in_output_on_errors(cli, base_url, schema_url, openapi
     # Then request representation in the output should have the overridden value
     assert lines[17] == f"Headers         : {{'Authorization': '{auth}', 'User-Agent': '{USER_AGENT}'}}"
     # And code sample as well
-    assert (
-        lines[22] == f"    requests.get('{base_url}/flaky', headers={{'User-Agent': '{USER_AGENT}', "
-        f"'Authorization': '{auth}'}}, params={{'id': 0}})"
+    assert lines[22].startswith(
+        f"    requests.get('{base_url}/flaky', headers={{'User-Agent': '{USER_AGENT}', "
+        f"'Authorization': '{auth}'}}, params={{'id': "
     )
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("__all__")
+def test_debug_output(tmp_path, cli, schema_url, openapi_version, hypothesis_max_examples):
+    # When the `--debug-output-file` option is passed
+    debug_file = tmp_path / "debug.jsonl"
+    cassette_path = tmp_path / "output.yaml"
+    result = cli.run(
+        schema_url,
+        f"--debug-output-file={debug_file}",
+        "--validate-schema=false",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        f"--store-network-log={cassette_path}",
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # Then all underlying runner events should be stored as JSONL file
+    assert debug_file.exists()
+    with debug_file.open(encoding="utf-8") as fd:
+        lines = fd.readlines()
+    for line in lines:
+        json.loads(line)
+    # And statuses are encoded as strings
+    assert list(json.loads(lines[-1])["total"]["not_a_server_error"]) == ["success", "total", "failure"]

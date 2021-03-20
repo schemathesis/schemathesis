@@ -29,6 +29,7 @@ from ..types import Filter
 from . import callbacks, cassettes, output
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
 from .context import ExecutionContext
+from .debug import DebugOutputHandler
 from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
 from .options import CSVOption, CustomHelpMessageChoice, NotSet, OptionalInt
@@ -336,6 +337,11 @@ class GroupedOption(click.Option):
     "--junit-xml", help="Create junit-xml style report file at given path.", type=click.File("w", encoding="utf-8")
 )
 @click.option(
+    "--debug-output-file",
+    help="Save debug output as JSON lines in the given file.",
+    type=click.File("w", encoding="utf-8"),
+)
+@click.option(
     "--show-errors-tracebacks",
     help="Show full tracebacks for internal errors.",
     is_flag=True,
@@ -463,6 +469,7 @@ def run(
     validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
     junit_xml: Optional[click.utils.LazyFile] = None,
+    debug_output_file: Optional[click.utils.LazyFile] = None,
     show_errors_tracebacks: bool = False,
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default(),
     store_network_log: Optional[click.utils.LazyFile] = None,
@@ -538,6 +545,7 @@ def run(
         junit_xml,
         verbosity,
         code_sample_style,
+        debug_output_file,
     )
 
 
@@ -582,11 +590,14 @@ def execute(
     junit_xml: Optional[click.utils.LazyFile],
     verbosity: int,
     code_sample_style: CodeSampleStyle,
+    debug_output_file: Optional[click.utils.LazyFile],
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handlers: List[EventHandler] = []
     if junit_xml is not None:
         handlers.append(JunitXMLHandler(junit_xml))
+    if debug_output_file is not None:
+        handlers.append(DebugOutputHandler(debug_output_file))
     if store_network_log is not None:
         # This handler should be first to have logs writing completed when the output handler will display statistic
         handlers.append(cassettes.CassetteWriter(store_network_log))

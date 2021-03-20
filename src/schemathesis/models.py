@@ -4,7 +4,7 @@ import http
 from collections import Counter
 from contextlib import contextmanager
 from copy import deepcopy
-from enum import IntEnum
+from enum import Enum
 from itertools import chain
 from logging import LogRecord
 from typing import (
@@ -623,12 +623,12 @@ class APIOperation(Generic[P]):
 Endpoint = APIOperation
 
 
-class Status(IntEnum):
+class Status(str, Enum):
     """Status of an action or multiple actions."""
 
-    success = 1  # pragma: no mutate
-    failure = 2  # pragma: no mutate
-    error = 3  # pragma: no mutate
+    success = "success"  # pragma: no mutate
+    failure = "failure"  # pragma: no mutate
+    error = "error"  # pragma: no mutate
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
