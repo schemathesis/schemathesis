@@ -11,6 +11,8 @@ class Operation(Enum):
     # Not compliant, but used by some tools like Elasticsearch
     get_payload = ("GET", "/api/get_payload")
     basic = ("GET", "/api/basic")
+    empty = ("GET", "/api/empty")
+    empty_string = ("GET", "/api/empty_string")
     multiple_failures = ("GET", "/api/multiple_failures")
     slow = ("GET", "/api/slow")
     path_variable = ("GET", "/api/path_variable/{key}")

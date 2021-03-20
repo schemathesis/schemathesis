@@ -1,3 +1,4 @@
+import io
 import os
 import sys
 
@@ -43,7 +44,9 @@ def response():
     response._content = b'{"id": 5}'
     response.status_code = 201
     response.headers["Content-Type"] = "application/json"
-    response.raw = HTTPResponse(body=response._content, status=response.status_code, headers=response.headers)
+    response.raw = HTTPResponse(
+        body=io.BytesIO(response._content), status=response.status_code, headers=response.headers
+    )
     response.request = requests.PreparedRequest()
     response.request.prepare(method="POST", url="http://example.com", headers={"Content-Type": "application/json"})
     return response

@@ -649,7 +649,7 @@ class Request:
 
     method: str = attr.ib()  # pragma: no mutate
     uri: str = attr.ib()  # pragma: no mutate
-    body: str = attr.ib()  # pragma: no mutate
+    body: Optional[str] = attr.ib()  # pragma: no mutate
     headers: Headers = attr.ib()  # pragma: no mutate
 
     @classmethod
@@ -664,7 +664,7 @@ class Request:
     @classmethod
     def from_prepared_request(cls, prepared: requests.PreparedRequest) -> "Request":
         """A prepared request version is already stored in `requests.Response`."""
-        body = prepared.body or b""
+        body = prepared.body
 
         if isinstance(body, str):
             # can be a string for `application/x-www-form-urlencoded`
@@ -677,7 +677,7 @@ class Request:
             uri=uri,
             method=method,
             headers={key: [value] for (key, value) in prepared.headers.items()},
-            body=base64.b64encode(body).decode(),
+            body=base64.b64encode(body).decode() if body is not None else body,
         )
 
 
@@ -692,8 +692,8 @@ class Response:
     status_code: int = attr.ib()  # pragma: no mutate
     message: str = attr.ib()  # pragma: no mutate
     headers: Dict[str, List[str]] = attr.ib()  # pragma: no mutate
-    body: str = attr.ib()  # pragma: no mutate
-    encoding: str = attr.ib()  # pragma: no mutate
+    body: Optional[str] = attr.ib()  # pragma: no mutate
+    encoding: Optional[str] = attr.ib()  # pragma: no mutate
     http_version: str = attr.ib()  # pragma: no mutate
     elapsed: float = attr.ib()  # pragma: no mutate
 
@@ -703,11 +703,19 @@ class Response:
         headers = {name: response.raw.headers.getlist(name) for name in response.raw.headers.keys()}
         # Similar to http.client:319 (HTTP version detection in stdlib's `http` package)
         http_version = "1.0" if response.raw.version == 10 else "1.1"
+
+        def is_empty(_response: requests.Response) -> bool:
+            # Assume the response is empty if:
+            #   - no `Content-Length` header
+            #   - no chunks when iterating over its content
+            return "Content-Length" not in headers and list(_response.iter_content()) == []
+
+        body = None if is_empty(response) else serialize_payload(response.content)
         return cls(
             status_code=response.status_code,
             message=response.reason,
-            body=serialize_payload(response.content),
-            encoding=response.encoding or "utf8",
+            body=body,
+            encoding=response.encoding,
             headers=headers,
             http_version=http_version,
             elapsed=response.elapsed.total_seconds(),
@@ -718,11 +726,15 @@ class Response:
         """Create a response from WSGI response."""
         message = http.client.responses.get(response.status_code, "UNKNOWN")
         headers = {name: response.headers.getlist(name) for name in response.headers.keys()}
+        # Note, this call ensures that `response.response` is a sequence, which is needed for comparison
+        data = response.get_data()
+        body = None if response.response == [] else serialize_payload(data)
+        encoding = None if body is None else response.charset
         return cls(
             status_code=response.status_code,
             message=message,
-            body=serialize_payload(response.data),
-            encoding=response.content_encoding or "utf-8",
+            body=body,
+            encoding=encoding,
             headers=headers,
             http_version="1.1",
             elapsed=elapsed,
