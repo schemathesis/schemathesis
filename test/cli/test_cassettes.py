@@ -206,8 +206,9 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
             )
             assert unquote_plus(url) == unquote_plus(serialized["uri"]), request.url
             content = await request.read()
-            assert content == base64.b64decode(serialized["body"]["base64_string"])
-            compare_headers(request, serialized["headers"])
+            if "body" in serialized:
+                assert content == base64.b64decode(serialized["body"]["base64_string"])
+                compare_headers(request, serialized["headers"])
 
 
 @pytest.mark.operations("headers")

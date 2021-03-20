@@ -84,6 +84,14 @@ def create_openapi_app(
             return jsonify({"secret": 42})
         return {"detail": "Unauthorized"}, 401
 
+    @app.route("/api/empty", methods=["GET"])
+    def empty():
+        return Response(status=204)
+
+    @app.route("/api/empty_string", methods=["GET"])
+    def empty_string():
+        return Response(response="")
+
     @app.route("/api/headers", methods=["GET"])
     def headers():
         values = dict(request.headers)

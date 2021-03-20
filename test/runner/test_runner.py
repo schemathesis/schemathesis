@@ -1,5 +1,6 @@
 import base64
 import json
+from test.apps import OpenAPIVersion
 from typing import Dict, Optional
 
 import attr
@@ -140,7 +141,7 @@ def test_interactions(request, args, workers):
     assert attr.asdict(failure.request) == {
         "uri": f"{base_url}/failure",
         "method": "GET",
-        "body": "",
+        "body": None,
         "headers": {
             "Accept": ["*/*"],
             "Accept-Encoding": ["gzip, deflate"],
@@ -164,7 +165,7 @@ def test_interactions(request, args, workers):
     assert attr.asdict(success.request) == {
         "uri": f"{base_url}/success",
         "method": "GET",
-        "body": "",
+        "body": None,
         "headers": {
             "Accept": ["*/*"],
             "Accept-Encoding": ["gzip, deflate"],
@@ -175,6 +176,7 @@ def test_interactions(request, args, workers):
     assert success.response.status_code == 200
     assert success.response.message == "OK"
     assert json.loads(base64.b64decode(success.response.body)) == {"success": True}
+    assert success.response.encoding == "utf-8"
     if isinstance(app, Flask):
         assert success.response.headers == {"Content-Type": ["application/json"], "Content-Length": ["17"]}
     else:
@@ -189,6 +191,35 @@ def test_asgi_interactions(loadable_fastapi_app):
     interaction = ev[1].result.interactions[0]
     assert interaction.status == Status.success
     assert interaction.request.uri == "http://testserver/users"
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("empty")
+def test_empty_response_interaction(openapi_version, args):
+    # When there is a GET request and a response that doesn't return content (e.g. 204)
+    app, kwargs = args
+    init, *others, finished = prepare(**kwargs, store_interactions=True)
+    interactions = [event for event in others if isinstance(event, events.AfterExecution)][0].result.interactions
+    for interaction in interactions:  # There could be multiple calls
+        # Then the stored request has no body
+        assert interaction.request.body is None
+        # And its response as well
+        assert interaction.response.body is None
+        # And response encoding is missing
+        assert interaction.response.encoding is None
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("empty_string")
+def test_empty_string_response_interaction(openapi_version, args):
+    # When there is a response that returns payload of length 0
+    app, kwargs = args
+    init, *others, finished = prepare(**kwargs, store_interactions=True)
+    interactions = [event for event in others if isinstance(event, events.AfterExecution)][0].result.interactions
+    for interaction in interactions:  # There could be multiple calls
+        # Then the stored response body should be an empty string
+        assert interaction.response.body == ""
+        assert interaction.response.encoding == "utf-8"
 
 
 def test_auth(args):

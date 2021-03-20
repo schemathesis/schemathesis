@@ -111,6 +111,8 @@ By default, the server will generate an API schema with the following API operat
 - ``GET /api/flaky`` - returns 1:1 ratio of 200/500 responses
 - ``GET /api/recursive`` - accepts a recursive structure and responds with a recursive one
 - ``GET /api/basic`` - Requires HTTP basic auth (use `test` as username and password)
+- ``GET /api/empty`` - Returns an empty response
+- ``GET /api/empty_string`` - Returns a response with an empty string as a payload
 - ``POST /api/multipart`` - accepts two body parameters as multipart payload
 - ``POST /api/upload_file`` - accepts a file and a body parameter
 - ``POST /api/form`` - accepts ``application/x-www-form-urlencoded`` payload

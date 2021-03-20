@@ -13,6 +13,7 @@ from requests.cookies import RequestsCookieJar
 from requests.structures import CaseInsensitiveDict
 
 from .. import constants
+from ..models import Request, Response
 from ..runner import events
 from ..runner.serialization import SerializedCheck, SerializedInteraction
 from .context import ExecutionContext
@@ -118,6 +119,20 @@ def worker(file_handle: click.utils.LazyFile, queue: Queue) -> None:
             for check in checks
         )
 
+    def format_request_body(request: Request) -> str:
+        if request.body is not None:
+            return f"""    body:
+      encoding: 'utf-8'
+      base64_string: '{request.body}'"""
+        return ""
+
+    def format_response_body(response: Response) -> str:
+        if response.body is not None:
+            return f"""    body:
+      encoding: '{response.encoding}'
+      base64_string: '{response.body}'"""
+        return ""
+
     while True:
         item = queue.get()
         if isinstance(item, Initialize):
@@ -142,18 +157,14 @@ http_interactions:"""
     method: '{interaction.request.method}'
     headers:
 {format_headers(interaction.request.headers)}
-    body:
-      encoding: 'utf-8'
-      base64_string: '{interaction.request.body}'
+{format_request_body(interaction.request)}
   response:
     status:
       code: '{interaction.response.status_code}'
       message: {json.dumps(interaction.response.message)}
     headers:
 {format_headers(interaction.response.headers)}
-    body:
-      encoding: '{interaction.response.encoding}'
-      base64_string: '{interaction.response.body}'
+{format_response_body(interaction.response)}
     http_version: '{interaction.response.http_version}'"""
                 )
                 current_id += 1
@@ -232,9 +243,10 @@ def get_prepared_request(data: Dict[str, Any]) -> requests.PreparedRequest:
     prepared.method = data["method"]
     prepared.url = data["uri"]
     prepared._cookies = RequestsCookieJar()  # type: ignore
-    encoded = data["body"]["base64_string"]
-    if encoded:
-        prepared.body = base64.b64decode(encoded)
+    if "body" in data:
+        encoded = data["body"]["base64_string"]
+        if encoded:
+            prepared.body = base64.b64decode(encoded)
     # There is always 1 value in a request
     headers = [(key, value[0]) for key, value in data["headers"].items()]
     prepared.headers = CaseInsensitiveDict(headers)

@@ -4,6 +4,13 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Make ``Request.body``, ``Response.body`` and ``Response.encoding`` internal attributes optional. For ``Request``,
+  it means that absent body will lead to ``Request.body`` to be ``None``. For ``Response``, ``body`` will be ``None``
+  if the app response did not have any payload. Previously these values were empty strings, which was not distinguishable from the cases described above.
+  For the end-user, it means that in VCR cassettes, fields ``request.body`` and ``response.body`` may be absent.
+
 `3.3.1`_ - 2021-03-18
 ---------------------
 
