@@ -25,8 +25,11 @@ class Initialized(ExecutionEvent):
 
     # Total number of operations in the schema
     operations_count: Optional[int] = attr.ib()  # pragma: no mutate
+    # The place, where the API schema is located
     location: Optional[str] = attr.ib()  # pragma: no mutate
+    # The base URL against which the tests are running
     base_url: str = attr.ib()  # pragma: no mutate
+    # API schema specification name
     specification_name: str = attr.ib()  # pragma: no mutate
     # Timestamp of test run start
     start_time: float = attr.ib(factory=time.monotonic)  # pragma: no mutate
@@ -59,10 +62,16 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
     It happens before a single hypothesis test, that may contain many examples inside.
     """
 
+    # HTTP method
     method: str = attr.ib()  # pragma: no mutate
+    # Full path, including the base path
     path: str = attr.ib()  # pragma: no mutate
+    # Path without the base path
     relative_path: str = attr.ib()  # pragma: no mutate
+    # The current level of recursion during stateful testing
     recursion_level: int = attr.ib()  # pragma: no mutate
+    # An unique ID which connects events that happen during testing of the same API operation
+    # It may be useful when multiple threads are involved where incoming events are not ordered
     correlation_id: str = attr.ib()  # pragma: no mutate
     thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
 

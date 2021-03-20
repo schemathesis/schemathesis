@@ -35,10 +35,13 @@ class SerializedCase:
 
 @attr.s(slots=True)  # pragma: no mutate
 class SerializedCheck:
+    # Check name
     name: str = attr.ib()  # pragma: no mutate
+    # Check result
     value: Status = attr.ib()  # pragma: no mutate
     request: Request = attr.ib()  # pragma: no mutate
     response: Response = attr.ib()  # pragma: no mutate
+    # Generated example
     example: SerializedCase = attr.ib()  # pragma: no mutate
     message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
