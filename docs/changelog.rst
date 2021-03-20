@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.4.0`_ - 2021-03-20
+---------------------
+
 **Added**
 
 - ``--debug-output-file`` CLI option to enable storing the underlying runner events in the JSON Lines format in a separate file for debugging purposes. `#1059`_
@@ -1558,7 +1561,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.3.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.4.0...HEAD
+.. _3.4.0: https://github.com/schemathesis/schemathesis/compare/v3.3.1...v3.4.0
 .. _3.3.1: https://github.com/schemathesis/schemathesis/compare/v3.3.0...v3.3.1
 .. _3.3.0: https://github.com/schemathesis/schemathesis/compare/v3.2.2...v3.3.0
 .. _3.2.2: https://github.com/schemathesis/schemathesis/compare/v3.2.1...v3.2.2
