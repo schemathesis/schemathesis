@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.4.1`_ - 2021-03-21
+---------------------
+
 **Added**
 
 - ``event_type`` field to the debug output.
@@ -1565,7 +1568,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.4.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.4.1...HEAD
+.. _3.4.1: https://github.com/schemathesis/schemathesis/compare/v3.4.0...v3.4.1
 .. _3.4.0: https://github.com/schemathesis/schemathesis/compare/v3.3.1...v3.4.0
 .. _3.3.1: https://github.com/schemathesis/schemathesis/compare/v3.3.0...v3.3.1
 .. _3.3.0: https://github.com/schemathesis/schemathesis/compare/v3.2.2...v3.3.0
