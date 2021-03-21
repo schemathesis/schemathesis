@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- ``event_type`` field to the debug output.
+
 `3.4.0`_ - 2021-03-20
 ---------------------
 

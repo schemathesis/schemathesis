@@ -13,7 +13,9 @@ class DebugOutputHandler(EventHandler):
 
     def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
         stream = self.file_handle.open()
-        stream.write(json.dumps(event.asdict()))
+        data = event.asdict()
+        data["event_type"] = event.__class__.__name__
+        stream.write(json.dumps(data))
         stream.write("\n")
 
     def shutdown(self) -> None:
