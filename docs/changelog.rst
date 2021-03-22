@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.5.0`_ - 2021-03-22
+---------------------
+
 **Added**
 
 - ``before_generate_case`` hook, that allows the user to modify or filter generated ``Case`` instances. `#1067`_
@@ -1577,7 +1580,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.4.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.5.0...HEAD
+.. _3.5.0: https://github.com/schemathesis/schemathesis/compare/v3.4.1...v3.5.0
 .. _3.4.1: https://github.com/schemathesis/schemathesis/compare/v3.4.0...v3.4.1
 .. _3.4.0: https://github.com/schemathesis/schemathesis/compare/v3.3.1...v3.4.0
 .. _3.3.1: https://github.com/schemathesis/schemathesis/compare/v3.3.0...v3.3.1
