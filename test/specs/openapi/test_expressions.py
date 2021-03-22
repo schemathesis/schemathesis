@@ -60,14 +60,14 @@ def context(case, response):
         ("spam_{$request.path.user_id}", "spam_5"),
         ("spam_{$request.header.X-Token}", "spam_secret"),
         ("spam_{$request.header.x-token}", "spam_secret"),
-        ("$request.body", '{"a": 1}'),
+        ("$request.body", {"a": 1}),
         ("$request.body#/a", 1),
         ("spam_{$response.header.X-Response}", "spam_Y"),
         ("spam_{$response.header.x-response}", "spam_Y"),
         ("$response.body#/foo/0", "bar"),
         ("$response.body#/g|h", 4),
         (42, 42),
-        ("$response.body", json.dumps(DOCUMENT)),
+        ("$response.body", DOCUMENT),
         ("ID_{$response.body#/g|h}", "ID_4"),
         ("ID_{$response.body#/g|h}_{$response.body#/a~1b}", "ID_4_1"),
     ),
@@ -105,13 +105,6 @@ def test_random_expression(expr):
         expressions.evaluate(expr, context)
     except RuntimeExpressionError:
         pass
-
-
-def test_non_json_serializable_body(operation, response):
-    case = Case(operation, body={"a": b"content"})
-    context = expressions.ExpressionContext(response=response, case=case)
-    with pytest.raises(RuntimeExpressionError, match="^The request body is not JSON-serializable$"):
-        expressions.evaluate("$request.body", context=context)
 
 
 @pytest.mark.parametrize(

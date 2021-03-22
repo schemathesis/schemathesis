@@ -1,5 +1,4 @@
 """Expression nodes description and evaluation logic."""
-import json
 from enum import Enum, unique
 from typing import Any, Dict, Optional, Union
 
@@ -9,7 +8,6 @@ from requests.structures import CaseInsensitiveDict
 from ....utils import WSGIResponse
 from . import pointers
 from .context import ExpressionContext
-from .errors import RuntimeExpressionError
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -94,12 +92,9 @@ class BodyRequest(Node):
     pointer: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
     def evaluate(self, context: ExpressionContext) -> Any:
-        if self.pointer is None:
-            try:
-                return json.dumps(context.case.body)
-            except TypeError as exc:
-                raise RuntimeExpressionError("The request body is not JSON-serializable") from exc
         document = context.case.body
+        if self.pointer is None:
+            return document
         return pointers.resolve(document, self.pointer[1:])
 
 
@@ -120,10 +115,11 @@ class BodyResponse(Node):
     pointer: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
     def evaluate(self, context: ExpressionContext) -> Any:
-        if self.pointer is None:
-            return context.response.text
         if isinstance(context.response, WSGIResponse):
             document = context.response.json
         else:
             document = context.response.json()
+        if self.pointer is None:
+            # We need the parsed document - data will be serialized before sending to the application
+            return document
         return pointers.resolve(document, self.pointer[1:])
