@@ -6,9 +6,9 @@ import requests
 
 import schemathesis
 from schemathesis.models import APIOperation, Case, OperationDefinition
-from schemathesis.parameters import ParameterSet
+from schemathesis.parameters import ParameterSet, PayloadAlternatives
 from schemathesis.specs.openapi.links import Link, get_container
-from schemathesis.specs.openapi.parameters import OpenAPI30Parameter
+from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI30Body, OpenAPI30Parameter
 from schemathesis.stateful import ParsedData, Stateful
 
 API_OPERATION = APIOperation(
@@ -166,6 +166,62 @@ def test_make_operation_single():
             assert schema == {"enum": [2]}
         else:
             assert schema == {"type": "integer"}
+
+
+BODY_SCHEMA = {"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}}
+
+
+@pytest.mark.parametrize(
+    "body",
+    (
+        OpenAPI20Body(
+            {
+                "name": "attributes",
+                "in": "body",
+                "required": True,
+                "schema": BODY_SCHEMA,
+            },
+            media_type="application/json",
+        ),
+        OpenAPI30Body(definition={"schema": BODY_SCHEMA}, media_type="application/json", required=True),
+    ),
+)
+def test_make_operation_body(body):
+    # See GH-1069
+    # When `requestBody` is present in the link definition
+    # And in the target operation
+    operation = APIOperation(
+        path="/users/",
+        method="post",
+        definition=ANY,
+        schema=ANY,
+        base_url=ANY,
+        body=PayloadAlternatives([body]),
+    )
+    body = {"foo": "bar"}  # Literal value
+    link = Link(
+        name="Link",
+        operation=operation,
+        parameters={},
+        request_body={"requestBody": body},
+    )
+    # Then it should be taken into account during creation a modified version of that operation
+    new_operation = link.make_operation([ParsedData({}, body=body)])  # Actual parsed data will contain the literal
+    assert new_operation.body[0].definition["schema"] == {"enum": [body]}
+
+
+def test_invalid_request_body_definition():
+    # When a link defines `requestBody` for operation that does not accept one
+    operation = APIOperation(
+        path="/users/",
+        method="get",
+        definition=ANY,
+        schema=ANY,
+        base_url=ANY,
+    )
+    # Then a proper error should be triggered
+    with pytest.raises(ValueError):
+        Link(name="Link", operation=operation, parameters={}, request_body={"requestBody": {"foo": "bar"}})
 
 
 @pytest.mark.parametrize("parameter", ("wrong.id", "unknown", "header.id"))

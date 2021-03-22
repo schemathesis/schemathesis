@@ -15,6 +15,7 @@ from ...types import NotSet
 from ...utils import NOT_SET, GenericResponse
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
+from .parameters import OpenAPI20Body, OpenAPI30Body, OpenAPIParameter
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
@@ -22,6 +23,14 @@ class Link(StatefulTest):
     operation: APIOperation = attr.ib()  # pragma: no mutate
     parameters: Dict[str, Any] = attr.ib()  # pragma: no mutate
     request_body: Any = attr.ib(default=NOT_SET)  # pragma: no mutate
+
+    @request_body.validator
+    def is_defined(self, attribute: attr.Attribute, value: Any) -> None:
+        if value is not NOT_SET and not self.operation.body:
+            # Link defines `requestBody` for a parameter that does not accept one
+            raise ValueError(
+                f"Request body is not defined in API operation {self.operation.method.upper()} {self.operation.path}"
+            )
 
     @classmethod
     def from_definition(
@@ -74,6 +83,8 @@ class Link(StatefulTest):
             for name, value in item.parameters.items():
                 container = self._get_container_by_parameter_name(name, containers)
                 container.append(value)
+            if "body" in containers["body"] and item.body is not NOT_SET:
+                containers["body"]["body"]["options"].append(item.body)
         # These are the final `path_parameters`, `query`, and other API operation components
         components: Dict[str, ParameterSet] = {
             container_name: getattr(self.operation, container_name).__class__()
@@ -82,8 +93,9 @@ class Link(StatefulTest):
         # Here are all components that are filled with parameters
         for location, parameters in containers.items():
             for name, parameter_data in parameters.items():
+                parameter = parameter_data["parameter"]
                 if parameter_data["options"]:
-                    definition = deepcopy(parameter_data["parameter"].definition)
+                    definition = deepcopy(parameter.definition)
                     if "schema" in definition:
                         # The actual schema doesn't matter since we have a list of allowed values
                         definition["schema"] = {"enum": parameter_data["options"]}
@@ -91,10 +103,19 @@ class Link(StatefulTest):
                         # Other schema-related keywords will be ignored later, during the canonicalisation step
                         # inside `hypothesis-jsonschema`
                         definition["enum"] = parameter_data["options"]
-                    components[LOCATION_TO_CONTAINER[location]].add(parameter_data["parameter"].__class__(definition))
+                    new_parameter: OpenAPIParameter
+                    if isinstance(parameter, OpenAPI30Body):
+                        new_parameter = parameter.__class__(
+                            definition, media_type=parameter.media_type, required=parameter.required
+                        )
+                    elif isinstance(parameter, OpenAPI20Body):
+                        new_parameter = parameter.__class__(definition, media_type=parameter.media_type)
+                    else:
+                        new_parameter = parameter.__class__(definition)
+                    components[LOCATION_TO_CONTAINER[location]].add(new_parameter)
                 else:
                     # No options were gathered for this parameter - use the original one
-                    components[LOCATION_TO_CONTAINER[location]].add(parameter_data["parameter"])
+                    components[LOCATION_TO_CONTAINER[location]].add(parameter)
         return self.operation.clone(**components)
 
     def _get_container_by_parameter_name(self, full_name: str, templates: Dict[str, Dict[str, Dict[str, Any]]]) -> List:

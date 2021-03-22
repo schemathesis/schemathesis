@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Missing ``body`` parameters during Open API links processing in CLI. `#1069`_
+
 `3.4.1`_ - 2021-03-21
 ---------------------
 
@@ -1704,6 +1708,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1069: https://github.com/schemathesis/schemathesis/issues/1069
 .. _#1059: https://github.com/schemathesis/schemathesis/issues/1059
 .. _#1050: https://github.com/schemathesis/schemathesis/issues/1050
 .. _#1046: https://github.com/schemathesis/schemathesis/issues/1046
