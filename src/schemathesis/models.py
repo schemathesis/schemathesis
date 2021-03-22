@@ -31,19 +31,19 @@ import curlify
 import requests
 import werkzeug
 from hypothesis import event, note, reject
-from hypothesis.strategies import SearchStrategy
+from hypothesis import strategies as st
 from starlette.testclient import TestClient as ASGIClient
 
 from . import serializers
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE, USER_AGENT, CodeSampleStyle, DataGenerationMethod
 from .exceptions import CheckFailed, InvalidSchema, SerializationNotPossible, get_grouped_exception
+from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .serializers import Serializer, SerializerContext
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
 from .utils import NOT_SET, GenericResponse, WSGIResponse, deprecated_property, get_response_payload
 
 if TYPE_CHECKING:
-    from .hooks import HookDispatcher
     from .schemas import BaseSchema
     from .stateful import Stateful, StatefulTest
 
@@ -521,11 +521,22 @@ class APIOperation(Generic[P]):
         self,
         hooks: Optional["HookDispatcher"] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
-    ) -> SearchStrategy:
+    ) -> st.SearchStrategy:
         """Turn this API operation into a Hypothesis strategy."""
-        return self.schema.get_case_strategy(self, hooks, data_generation_method)
+        strategy = self.schema.get_case_strategy(self, hooks, data_generation_method)
 
-    def get_strategies_from_examples(self) -> List[SearchStrategy[Case]]:
+        def _apply_hooks(dispatcher: HookDispatcher, _strategy: st.SearchStrategy[Case]) -> st.SearchStrategy[Case]:
+            for hook in dispatcher.get_all_by_name("before_generate_case"):
+                _strategy = hook(HookContext(self), _strategy)
+            return _strategy
+
+        strategy = _apply_hooks(GLOBAL_HOOK_DISPATCHER, strategy)
+        strategy = _apply_hooks(self.schema.hooks, strategy)
+        if hooks is not None:
+            strategy = _apply_hooks(hooks, strategy)
+        return strategy
+
+    def get_strategies_from_examples(self) -> List[st.SearchStrategy[Case]]:
         """Get examples from the API operation."""
         return self.schema.get_strategies_from_examples(self)
 
