@@ -91,6 +91,71 @@ def test_get_links(openapi3_base_url, schema_url, url, expected):
         assert test.parameters == value.parameters
 
 
+def test_response_type(case, empty_open_api_3_schema):
+    # See GH-1068
+    # When runtime expression for `requestBody` contains a reference to the whole body
+    empty_open_api_3_schema["paths"] = {
+        "/users/{user_id}/": {
+            "get": {
+                "operationId": "getUser",
+                "parameters": [
+                    {"in": "query", "name": "user_id", "required": True, "schema": {"type": "string"}},
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "links": {
+                            "UpdateUserById": {
+                                "operationRef": "#/paths/~1users~1{user_id}~1/patch",
+                                "parameters": {"user_id": "$response.body#/id"},
+                                "requestBody": "$response.body",
+                            }
+                        },
+                    },
+                    "404": {"description": "Not found"},
+                },
+            },
+            "patch": {
+                "operationId": "updateUser",
+                "parameters": [
+                    {"in": "query", "name": "user_id", "required": True, "schema": {"type": "string"}},
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "string", "minLength": 3},
+                                    "first_name": {"type": "string", "minLength": 3},
+                                    "last_name": {"type": "string", "minLength": 3},
+                                },
+                                "required": ["first_name", "last_name"],
+                                "additionalProperties": False,
+                            }
+                        }
+                    },
+                    "required": True,
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    response = requests.Response()
+    body = b'{"id": "foo", "first_name": "TEST", "last_name": "TEST"}'
+    response._content = body
+    response.status_code = 200
+    response.headers["Content-Type"] = "application/json"
+    tests = schema["/users/{user_id}/"]["GET"].get_stateful_tests(response, Stateful.links)
+    assert len(tests) == 1
+    link = tests[0]
+    parsed = link.parse(case, response)
+    assert parsed.parameters == {"user_id": "foo"}
+    # Then the parsed result should body with the actual type of the JSON value
+    assert parsed.body == json.loads(body)
+
+
 def test_parse(case, response):
     assert LINK.parse(case, response) == ParsedData({"path.user_id": 5, "query.user_id": 5})
 
