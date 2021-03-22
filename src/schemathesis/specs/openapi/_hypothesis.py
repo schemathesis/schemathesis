@@ -315,9 +315,9 @@ def apply_hooks(
     operation: APIOperation,
     context: HookContext,
     hooks: Optional[HookDispatcher],
-    strategy: st.SearchStrategy[Case],
+    strategy: st.SearchStrategy,
     location: str,
-) -> st.SearchStrategy[Case]:
+) -> st.SearchStrategy:
     """Apply all `before_generate_` hooks related to the given location."""
     strategy = _apply_hooks(context, GLOBAL_HOOK_DISPATCHER, strategy, location)
     strategy = _apply_hooks(context, operation.schema.hooks, strategy, location)
@@ -327,8 +327,8 @@ def apply_hooks(
 
 
 def _apply_hooks(
-    context: HookContext, hooks: HookDispatcher, strategy: st.SearchStrategy[Case], location: str
-) -> st.SearchStrategy[Case]:
+    context: HookContext, hooks: HookDispatcher, strategy: st.SearchStrategy, location: str
+) -> st.SearchStrategy:
     """Apply all `before_generate_` hooks related to the given location & dispatcher."""
     container = LOCATION_TO_CONTAINER[location]
     for hook in hooks.get_all_by_name(f"before_generate_{container}"):
