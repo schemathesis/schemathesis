@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- ``before_generate_case`` hook, that allows the user to modify or filter generated ``Case`` instances. `#1067`_
+
 **Fixed**
 
 - Missing ``body`` parameters during Open API links processing in CLI. `#1069`_
@@ -1711,6 +1715,7 @@ Deprecated
 
 .. _#1069: https://github.com/schemathesis/schemathesis/issues/1069
 .. _#1068: https://github.com/schemathesis/schemathesis/issues/1068
+.. _#1067: https://github.com/schemathesis/schemathesis/issues/1067
 .. _#1059: https://github.com/schemathesis/schemathesis/issues/1059
 .. _#1050: https://github.com/schemathesis/schemathesis/issues/1050
 .. _#1046: https://github.com/schemathesis/schemathesis/issues/1046

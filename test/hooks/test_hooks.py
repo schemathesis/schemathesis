@@ -68,6 +68,38 @@ def test_global_body_hook(schema):
 
 
 @pytest.mark.hypothesis_nested
+@pytest.mark.operations("create_user")
+def test_case_hook(schema):
+    dispatcher = HookDispatcher(scope=HookScope.TEST)
+
+    @dispatcher.register
+    def before_generate_case(context, strategy):
+        def tune_case(case):
+            case.body["extra"] = 42
+            return case
+
+        return strategy.map(tune_case)
+
+    @schemathesis.hooks.register
+    def before_generate_case(context, strategy):
+        def tune_case(case):
+            case.body["first_name"] = case.body["last_name"]
+            return case
+
+        return strategy.map(tune_case)
+
+    strategy = schema["/users/"]["POST"].as_strategy(hooks=dispatcher)
+
+    @given(case=strategy)
+    @settings(max_examples=10, suppress_health_check=[HealthCheck.filter_too_much])
+    def test(case):
+        assert case.body["first_name"] == case.body["last_name"]
+        assert case.body["extra"] == 42
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
 @pytest.mark.operations("custom_format")
 def test_schema_query_hook(schema, schema_url):
     @schema.hooks.register

@@ -60,7 +60,7 @@ These hooks can be applied both in CLI and in-code use cases.
 ``before_generate_*``
 ~~~~~~~~~~~~~~~~~~~~~
 
-This group of six hooks shares the same purpose - adjust data generation for specific request's part.
+This group of six hooks shares the same purpose - adjust data generation for specific request's part or the whole request.
 
 - ``before_generate_path_parameters``
 - ``before_generate_headers``
@@ -68,6 +68,7 @@ This group of six hooks shares the same purpose - adjust data generation for spe
 - ``before_generate_query``
 - ``before_generate_body``
 - ``before_generate_form_data``
+- ``before_generate_case``
 
 They have the same signature that looks like this:
 
@@ -83,7 +84,7 @@ They have the same signature that looks like this:
     ) -> hypothesis.strategies.SearchStrategy:
         pass
 
-The ``strategy`` argument is a Hypothesis strategy that will generate a certain request part. For example, your API operation under test
+The ``strategy`` argument is a Hypothesis strategy that will generate a certain request part or the whole request (in case of the ``before_generate_case`` hook). For example, your API operation under test
 expects ``id`` query parameter that is a number, and you'd like to have only values that have at least three occurrences of "1".
 Then your hook might look like this:
 
@@ -91,6 +92,23 @@ Then your hook might look like this:
 
     def before_generate_query(context, strategy):
         return strategy.filter(lambda x: str(x["id"]).count("1") >= 3)
+
+To filter or modify the whole request:
+
+.. code:: python
+
+    def before_generate_case(context, strategy):
+        op = context.operation
+
+        def tune_case(case):
+            if op.method == "PATCH" and op.path == "/users/{user_id}/":
+                case.path_parameters["user_id"] = case.body["data"]["id"]
+            return case
+
+        return strategy.map(tune_case)
+
+The example above will modify generated test cases for ``PATCH /users/{user_id}/`` by setting the ``user_id`` path parameter
+to the value generated for payload.
 
 ``before_process_path``
 ~~~~~~~~~~~~~~~~~~~~~~~

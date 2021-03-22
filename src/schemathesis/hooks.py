@@ -213,6 +213,11 @@ def before_generate_body(context: HookContext, strategy: st.SearchStrategy) -> s
 
 
 @all_scopes
+def before_generate_case(context: HookContext, strategy: st.SearchStrategy["Case"]) -> st.SearchStrategy["Case"]:
+    """Called on a strategy that generates ``Case`` instances."""
+
+
+@all_scopes
 def before_process_path(context: HookContext, path: str, methods: Dict[str, Any]) -> None:
     """Called before API path is processed."""
 
