@@ -118,6 +118,7 @@ By default, the server will generate an API schema with the following API operat
 - ``POST /api/form`` - accepts ``application/x-www-form-urlencoded`` payload
 - ``POST /api/teapot`` - returns 418 status code that is not listed in the schema
 - ``GET /api/text`` - returns ``text/plain`` responses, which are not declared in the schema
+- ``GET /api/cp866`` - returns ``text/plain`` responses encoded with CP866. This content type is not expected by the schema
 - ``POST /api/text`` - expects payload as ``text/plain``
 - ``POST /api/csv`` - expects payload as ``text/csv`` and returns its equivalent in JSON.
 - ``GET /api/malformed_json`` - returns malformed JSON with ``application/json`` content type header

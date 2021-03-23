@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Encoding for response payloads displayed in the CLI output. `#1073`_
+- Use actual charset (from ``flask.Response.mimetype_params``) when storing WSGI responses rather than defaulting to ``flask.Response.charset``.
+
 `3.5.0`_ - 2021-03-22
 ---------------------
 
@@ -1717,6 +1722,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1073: https://github.com/schemathesis/schemathesis/issues/1073
 .. _#1069: https://github.com/schemathesis/schemathesis/issues/1069
 .. _#1068: https://github.com/schemathesis/schemathesis/issues/1068
 .. _#1067: https://github.com/schemathesis/schemathesis/issues/1067

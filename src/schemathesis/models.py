@@ -740,7 +740,11 @@ class Response:
         # Note, this call ensures that `response.response` is a sequence, which is needed for comparison
         data = response.get_data()
         body = None if response.response == [] else serialize_payload(data)
-        encoding = None if body is None else response.charset
+        encoding: Optional[str]
+        if body is not None:
+            encoding = response.mimetype_params.get("charset", response.charset)
+        else:
+            encoding = None
         return cls(
             status_code=response.status_code,
             message=message,

@@ -188,6 +188,12 @@ def create_openapi_app(
     def text():
         return Response("Text response", content_type="text/plain")
 
+    @app.route("/api/cp866", methods=["GET"])
+    def cp866():
+        # NOTE. Setting `Response.charset` don't have effect in test client as it re-wraps this response with the
+        # default one where `charset` is `utf-8`
+        return Response("Тест".encode("cp866"), content_type="text/plain;charset=cp866")
+
     @app.route("/api/text", methods=["POST"])
     def plain_text_body():
         expect_content_type("text/plain")
