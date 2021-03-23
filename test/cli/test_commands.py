@@ -1941,3 +1941,13 @@ def test_debug_output(tmp_path, cli, schema_url, openapi_version, hypothesis_max
         json.loads(line)
     # And statuses are encoded as strings
     assert list(json.loads(lines[-1])["total"]["not_a_server_error"]) == ["success", "total", "failure"]
+
+
+@pytest.mark.operations("cp866")
+def test_response_payload_encoding(cli, cli_args):
+    # See GH-1073
+    # When the "failed" response has non UTF-8 encoding
+    result = cli.run(*cli_args, "--checks=all")
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # Then it should be displayed according its actual encoding
+    assert "Response payload: `Тест`" in result.stdout.splitlines()
