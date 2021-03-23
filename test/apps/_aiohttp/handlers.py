@@ -77,6 +77,10 @@ async def text(request: web.Request) -> web.Response:
     return web.Response(body="Text response", content_type="text/plain")
 
 
+async def cp866(request: web.Request) -> web.Response:
+    return web.Response(body="Тест".encode("cp866"), content_type="text/plain", charset="cp866")
+
+
 async def plain_text_body(request: web.Request) -> web.Response:
     body = await expect_content_type(request, "text/plain")
     return web.Response(body=body, content_type="text/plain")

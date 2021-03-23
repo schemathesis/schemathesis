@@ -26,6 +26,7 @@ class Operation(Enum):
     form = ("POST", "/api/form")
     teapot = ("POST", "/api/teapot")
     text = ("GET", "/api/text")
+    cp866 = ("GET", "/api/cp866")
     plain_text_body = ("POST", "/api/text")
     csv_payload = ("POST", "/api/csv")
     malformed_json = ("GET", "/api/malformed_json")
@@ -213,6 +214,10 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
                 "consumes": ["text/plain"],
                 "produces": ["text/plain"],
                 "responses": {"200": {"description": "OK"}},
+            }
+        elif name == "cp866":
+            schema = {
+                "responses": {"200": {"description": "OK", "schema": {"type": "string"}}},
             }
         elif name == "invalid_path_parameter":
             schema = {
@@ -429,6 +434,12 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
             schema = {
                 "requestBody": {"content": {"text/plain": {"schema": {"type": "string"}}}, "required": True},
                 "responses": {"200": {"description": "OK"}},
+            }
+        elif name == "cp866":
+            schema = {
+                "responses": {
+                    "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "string"}}}}
+                },
             }
         elif name in ("flaky", "multiple_failures"):
             schema = {
