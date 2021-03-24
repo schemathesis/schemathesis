@@ -233,9 +233,11 @@ class ThreadPoolRunner(BaseRunner):
         """Initialize & start workers that will execute tests."""
         workers = [
             threading.Thread(
-                target=self._get_task(), kwargs=self._get_worker_kwargs(tasks_queue, events_queue, results)
+                target=self._get_task(),
+                kwargs=self._get_worker_kwargs(tasks_queue, events_queue, results),
+                name=f"schemathesis_{num}",
             )
-            for _ in range(self.workers_num)
+            for num in range(self.workers_num)
         ]
         for worker in workers:
             worker.start()

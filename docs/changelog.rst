@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Prefix worker thread names with ``schemathesis_``.
+
 `3.5.1`_ - 2021-03-23
 ---------------------
 
