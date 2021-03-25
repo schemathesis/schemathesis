@@ -1,4 +1,4 @@
-import os
+import platform
 from types import SimpleNamespace
 
 import click
@@ -68,7 +68,18 @@ def test_reraise_format_error():
 
 @pytest.mark.parametrize(
     "value",
-    ("+", "\\", "[", r"0EEE|[>:>\UEEEEEEEEEEEEEEEEEEEEEEEE>", "(?(8))"),
+    (
+        "+",
+        "\\",
+        "[",
+        r"0EEE|[>:>\UEEEEEEEEEEEEEEEEEEEEEEEE>",
+        pytest.param(
+            "(?(8))",
+            marks=pytest.mark.skipif(
+                platform.python_implementation() == "PyPy", reason="This regex compiles under PyPy"
+            ),
+        ),
+    ),
 )
 def test_validate_regex(value):
     with pytest.raises(click.BadParameter, match="Invalid regex: "):
