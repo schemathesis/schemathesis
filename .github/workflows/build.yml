@@ -82,7 +82,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python: [3.6, 3.7, 3.8, 3.9]
+        python: [3.6, 3.7, 3.8, 3.9, "pypy-3.7"]
 
     name: ${{ matrix.os }}/tests_${{ matrix.python }}
     runs-on: ${{ matrix.os }}
@@ -91,14 +91,15 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: actions/setup-python@v2
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v2
         with:
-          python-version: '${{ matrix.python }}.0-dev - ${{ matrix.python }}.X'
+          python-version: ${{ matrix.python }}
 
       - run: pip install tox coverage poetry
 
       - name: Run ${{ matrix.python }} tox job
-        run: tox -e py${TOX_JOB//.} # Strip dot from python version to match tox job
+        run: tox -e py
         env:
           TOX_JOB: ${{ matrix.python }}
 

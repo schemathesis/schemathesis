@@ -1,5 +1,6 @@
 import base64
 import json
+import platform
 from test.apps import OpenAPIVersion
 from typing import Dict, Optional
 
@@ -444,7 +445,11 @@ def test_response_conformance_malformed_json(args):
     message = others[1].result.checks[-1].message
     assert "The received response is not valid JSON:" in message
     assert "{malformed}" in message
-    assert "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)" in message
+    if platform.python_implementation() == "PyPy":
+        expected = "Key name must be string at char: line 1 column 2 (char 1)"
+    else:
+        expected = "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"
+    assert expected in message
 
 
 @pytest.fixture()
