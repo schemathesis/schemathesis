@@ -100,7 +100,7 @@ pytest==6.2.1
     #   -r requirements.in
     #   pytest-subtests
     #   schemathesis
-pyyaml==5.1.2
+pyyaml==5.4
     # via
     #   clickclick
     #   connexion
