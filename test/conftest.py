@@ -148,12 +148,12 @@ def openapi3_schema_url(server, openapi_3_app):
     return f"http://127.0.0.1:{server['port']}/schema.yaml"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def graphql_path():
     return "/graphql"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def graphql_app(graphql_path):
     return graphql._flask.create_app(graphql_path)
 
@@ -641,6 +641,18 @@ def loadable_aiohttp_app(testdir, operations):
         from test.apps.openapi._aiohttp import create_app
 
         app = create_app({operations})
+        """
+    )
+    return f"{module.purebasename}:app"
+
+
+@pytest.fixture
+def loadable_graphql_fastapi_app(testdir, graphql_path):
+    module = testdir.make_importable_pyfile(
+        location=f"""
+        from test.apps._graphql._fastapi import create_app
+
+        app = create_app('{graphql_path}')
         """
     )
     return f"{module.purebasename}:app"

@@ -11,6 +11,7 @@ from ..constants import (
     DEFAULT_STATEFUL_RECURSION_LIMIT,
     DataGenerationMethod,
 )
+from ..exceptions import HTTPError, UnsupportedSpecification
 from ..models import CheckFunction
 from ..schemas import BaseSchema
 from ..specs.graphql import loaders as gql_loaders

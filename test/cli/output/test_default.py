@@ -55,7 +55,10 @@ def response():
 @pytest.fixture()
 def results_set(operation):
     statistic = models.TestResult(
-        operation.method, operation.full_path, data_generation_method=DataGenerationMethod.default()
+        operation.method,
+        operation.full_path,
+        data_generation_method=DataGenerationMethod.default(),
+        verbose_name=f"{operation.method} {operation.full_path}",
     )
     return models.TestResultSet([statistic])
 
@@ -119,10 +122,11 @@ def test_display_statistic(capsys, swagger_20, execution_context, operation, res
     success = models.Check("not_a_server_error", models.Status.success, response, 0, models.Case(operation))
     failure = models.Check("not_a_server_error", models.Status.failure, response, 0, models.Case(operation))
     single_test_statistic = models.TestResult(
-        operation.method,
-        operation.full_path,
-        DataGenerationMethod.default(),
-        [
+        method=operation.method,
+        path=operation.full_path,
+        verbose_name=f"{operation.method} {operation.full_path}",
+        data_generation_method=DataGenerationMethod.default(),
+        checks=[
             success,
             success,
             success,
@@ -210,10 +214,11 @@ def test_display_single_failure(capsys, swagger_20, execution_context, operation
     success = models.Check("not_a_server_error", models.Status.success, response, 0, models.Case(operation, body=body))
     failure = models.Check("not_a_server_error", models.Status.failure, response, 0, models.Case(operation, body=body))
     test_statistic = models.TestResult(
-        operation.method,
-        operation.full_path,
-        DataGenerationMethod.default(),
-        [
+        method=operation.method,
+        path=operation.full_path,
+        data_generation_method=DataGenerationMethod.default(),
+        verbose_name=f"{operation.method} {operation.full_path}",
+        checks=[
             success,
             success,
             success,
@@ -283,7 +288,12 @@ def test_display_single_error(capsys, swagger_20, operation, execution_context, 
     except SyntaxError as exc:
         exception = exc
 
-    result = models.TestResult(operation.method, operation.path, DataGenerationMethod.default())
+    result = models.TestResult(
+        operation.method,
+        operation.path,
+        verbose_name=f"{operation.method} {operation.full_path}",
+        data_generation_method=DataGenerationMethod.default(),
+    )
     result.add_error(exception)
     # When the related test result is displayed
     execution_context.show_errors_tracebacks = show_errors_tracebacks
@@ -310,7 +320,12 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set, ve
     execution_context.verbosity = verbosity
     # Given two test results - success and failure
     operation = models.APIOperation("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)
-    failure = models.TestResult(operation.method, operation.full_path, DataGenerationMethod.default())
+    failure = models.TestResult(
+        operation.method,
+        operation.full_path,
+        verbose_name=f"{operation.method} {operation.full_path}",
+        data_generation_method=DataGenerationMethod.default(),
+    )
     failure.add_failure("test", models.Case(operation), response, 0, "Message", None)
     execution_context.results.append(SerializedTestResult.from_test_result(failure))
     results_set.append(failure)
@@ -332,7 +347,13 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set, ve
 def test_display_errors(swagger_20, capsys, results_set, execution_context, show_errors_tracebacks):
     # Given two test results - success and error
     operation = models.APIOperation("/api/error", "GET", {}, swagger_20)
-    error = models.TestResult(operation.method, operation.full_path, DataGenerationMethod.default(), seed=123)
+    error = models.TestResult(
+        operation.method,
+        operation.full_path,
+        verbose_name=f"{operation.method} {operation.full_path}",
+        data_generation_method=DataGenerationMethod.default(),
+        seed=123,
+    )
     error.add_error(ConnectionError("Connection refused!"), models.Case(operation, query={"a": 1}))
     results_set.append(error)
     execution_context.results.append(SerializedTestResult.from_test_result(error))

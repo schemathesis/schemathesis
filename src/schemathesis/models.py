@@ -866,6 +866,7 @@ class TestResult:
 
     method: str = attr.ib()  # pragma: no mutate
     path: str = attr.ib()  # pragma: no mutate
+    verbose_name: str = attr.ib()  # pragma: no mutate
     data_generation_method: DataGenerationMethod = attr.ib()  # pragma: no mutate
     checks: List[Check] = attr.ib(factory=list)  # pragma: no mutate
     errors: List[Tuple[Exception, Optional[Case]]] = attr.ib(factory=list)  # pragma: no mutate

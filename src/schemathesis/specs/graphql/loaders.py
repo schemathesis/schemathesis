@@ -1,9 +1,10 @@
 import pathlib
-from typing import IO, Any, Dict, Iterable, Optional, Union, cast
+from typing import IO, Any, Callable, Dict, Iterable, Optional, Union, cast
 
 import graphql
 import requests
 from graphql import ExecutionResult
+from starlette.applications import Starlette
 from starlette.testclient import TestClient as ASGIClient
 from werkzeug import Client
 from yarl import URL
@@ -206,3 +207,9 @@ def from_asgi(
         data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
     )
+
+
+def get_loader_for_app(app: Any) -> Callable:
+    if isinstance(app, Starlette):
+        return from_asgi
+    return from_wsgi

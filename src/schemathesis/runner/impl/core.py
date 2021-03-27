@@ -136,6 +136,7 @@ def handle_schema_error(
         result = TestResult(
             method=method,
             path=error.full_path,
+            verbose_name=verbose_name,
             data_generation_method=data_generation_method,
         )
         result.add_error(error)
@@ -180,6 +181,7 @@ def run_test(  # pylint: disable=too-many-locals
     result = TestResult(
         method=operation.method.upper(),
         path=operation.full_path,
+        verbose_name=operation.verbose_name,
         overridden_headers=headers,
         data_generation_method=data_generation_method,
     )

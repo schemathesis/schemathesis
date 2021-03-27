@@ -140,6 +140,10 @@ class DeadlineExceeded(Exception):
         )
 
 
+class UnsupportedSpecification(ValueError):
+    """The API specification is not supported."""
+
+
 class NonCheckError(Exception):
     """An error happened in side the runner, but is not related to failed checks.
 
