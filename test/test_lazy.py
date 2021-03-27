@@ -85,9 +85,9 @@ def test_(request, case):
     result.assert_outcomes(passed=1, failed=1)
     result.stdout.re_match_lines(
         [
-            r"test_invalid_operation.py::test_[GET:/v1/valid][P] PASSED                [ 25%]",
-            r"test_invalid_operation.py::test_[GET:/v1/invalid][P] FAILED              [ 50%]",
-            r"test_invalid_operation.py::test_[GET:/v1/users][P] PASSED                [ 75%]",
+            r"test_invalid_operation.py::test_[GET /valid][P] PASSED                   [ 25%]",
+            r"test_invalid_operation.py::test_[GET /invalid][P] FAILED                 [ 50%]",
+            r"test_invalid_operation.py::test_[GET /users][P] PASSED                   [ 75%]",
             r".*1 passed",
         ]
     )

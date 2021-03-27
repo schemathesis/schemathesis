@@ -4,6 +4,14 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Schemathesis generates separate tests for each field defined in the GraphQL ``Query`` type. It makes the testing process
+  unified for both, Open API and GraphQL schemas.
+- Unified test IDs across CLI & pytest plugin. They constructed as ``<method> <relative_path>`` for Open API.
+  Corresponding field names are used for GraphQL. Previously, the pytest plugin used full paths, including the base path, and
+  CLI used only relative paths. Using relative paths doesn't lead to different test names when different base URLs are used.
+
 `3.5.3`_ - 2021-03-27
 ---------------------
 

@@ -60,9 +60,7 @@ class SchemathesisCase(PyCollector):
         super().__init__(*args, **kwargs)
 
     def _get_test_name(self, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:
-        return (
-            f"{self.name}[{operation.method.upper()}:{operation.full_path}][{data_generation_method.as_short_name()}]"
-        )
+        return f"{self.name}[{operation.verbose_name}][{data_generation_method.as_short_name()}]"
 
     def _gen_items(
         self, result: Result[APIOperation, InvalidSchema], data_generation_method: DataGenerationMethod
@@ -89,9 +87,8 @@ class SchemathesisCase(PyCollector):
             error = result.err()
             funcobj = error.as_failing_test_function()
             name = self.name
-            # `full_path` is always available in this case
             if error.method:
-                name += f"[{error.method.upper()}:{error.full_path}]"
+                name += f"[{error.method.upper()} {error.full_path}]"
             else:
                 name += f"[{error.full_path}]"
             name += f"[{data_generation_method.as_short_name()}]"

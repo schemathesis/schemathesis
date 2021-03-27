@@ -36,7 +36,7 @@ def display_section_name(title: str, separator: str = "=", extra: str = "", **kw
 
 
 def display_subsection(result: SerializedTestResult, color: Optional[str] = "red") -> None:
-    section_name = f"{result.method}: {result.path}"
+    section_name = f"{result.method} {result.path}"
     display_section_name(section_name, "_", result.data_generation_method, fg=color)
 
 

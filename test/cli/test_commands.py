@@ -709,7 +709,7 @@ def test_flaky(cli, cli_args, workers):
         assert lines[10] == "E"
     # And it should be displayed only once in "ERRORS" section
     assert "= ERRORS =" in result.stdout
-    assert "_ GET: /api/flaky [P] _" in result.stdout
+    assert "_ GET /api/flaky [P] _" in result.stdout
     # And it should not go into "FAILURES" section
     assert "= FAILURES =" not in result.stdout
     # And more clear error message is displayed instead of Hypothesis one
@@ -737,7 +737,7 @@ def test_invalid_operation(cli, cli_args, workers):
         assert lines[10].startswith("POST /api/invalid E")
     else:
         assert lines[10] == "E"
-    assert " POST: /api/invalid " in lines[13]
+    assert " POST /api/invalid " in lines[13]
     # There shouldn't be a section end immediately after section start - there should be some error text
     # An internal error happened during a test run
     # Error: AssertionError
@@ -855,8 +855,8 @@ def test_connection_error(cli, schema_url, workers):
     # And errors section title should be displayed
     assert "= ERRORS =" in result.stdout
     # And all API operations should be mentioned in this section as subsections
-    assert "_ GET: /api/success [P] _" in result.stdout
-    assert "_ GET: /api/failure [P] _" in result.stdout
+    assert "_ GET /api/success [P] _" in result.stdout
+    assert "_ GET /api/failure [P] _" in result.stdout
     # And the proper error messages should be displayed for each operation
     assert "Max retries exceeded with url: /api/success" in result.stdout
     assert "Max retries exceeded with url: /api/failure" in result.stdout
@@ -1871,7 +1871,7 @@ def test_unsupported_regex(testdir, cli, empty_open_api_3_schema):
     assert "POST /foo E" in result.stdout
     lines = result.stdout.splitlines()
     for idx, line in enumerate(lines):
-        if "__ POST: /foo [P] __" in line:
+        if "__ POST /foo [P] __" in line:
             break
     else:
         pytest.fail("Line not found")

@@ -8,7 +8,7 @@ schema = schemathesis.graphql.from_url('{graphql_url}')
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/graphql"
-    assert "patron" in case.body
+    assert case.operation.verbose_name in case.body
     response = case.call()
     assert response.status_code == 200
     case.validate_response(response)
@@ -16,7 +16,11 @@ def test_(request, case):
 """,
     )
     result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=1)
+    result.assert_outcomes(passed=2)
     result.stdout.re_match_lines(
-        [r"test_basic_pytest_graphql.py::test_\[POST:/graphql\]\[P\] PASSED", r"Hypothesis calls: 10"]
+        [
+            r"test_basic_pytest_graphql.py::test_\[getBooks]\[P\] PASSED",
+            r"test_basic_pytest_graphql.py::test_\[getAuthors]\[P\] PASSED",
+            r"Hypothesis calls: 20",
+        ]
     )
