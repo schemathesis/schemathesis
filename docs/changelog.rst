@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.5.3`_ - 2021-03-27
+---------------------
+
 **Fixed**
 
 - Do not use `importlib-metadata==3.8` in dependencies as it causes ``RuntimeError``. Ref: https://github.com/python/importlib_metadata/issues/293
@@ -1599,7 +1602,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.5.2...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.5.3...HEAD
+.. _3.5.3: https://github.com/schemathesis/schemathesis/compare/v3.5.2...v3.5.3
 .. _3.5.2: https://github.com/schemathesis/schemathesis/compare/v3.5.1...v3.5.2
 .. _3.5.1: https://github.com/schemathesis/schemathesis/compare/v3.5.0...v3.5.1
 .. _3.5.0: https://github.com/schemathesis/schemathesis/compare/v3.4.1...v3.5.0
