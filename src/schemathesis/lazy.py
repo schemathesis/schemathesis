@@ -111,15 +111,15 @@ class LazySchema:
 
 
 def _get_node_name(node_id: str, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:
-    """Make a test node name. For example: test_api[GET:/users]."""
-    return f"{node_id}[{operation.method.upper()}:{operation.full_path}][{data_generation_method.as_short_name()}]"
+    """Make a test node name. For example: test_api[GET /users]."""
+    return f"{node_id}[{operation.method.upper()} {operation.path}][{data_generation_method.as_short_name()}]"
 
 
 def _get_partial_node_name(node_id: str, data_generation_method: DataGenerationMethod, **kwargs: Any) -> str:
     """Make a test node name for failing tests caused by schema errors."""
     name = node_id
     if "method" in kwargs:
-        name += f"[{kwargs['method']}:{kwargs['path']}]"
+        name += f"[{kwargs['method']} {kwargs['path']}]"
     else:
         name += f"[{kwargs['path']}]"
     name += f"[{data_generation_method.as_short_name()}]"

@@ -58,6 +58,10 @@ class GraphQLSchema(BaseSchema):
         return "GraphQL"
 
     @property
+    def client_schema(self) -> graphql.GraphQLSchema:
+        return graphql.build_client_schema(self.raw_schema)
+
+    @property
     def base_path(self) -> str:
         if self.base_url:
             return urlsplit(self.base_url).path
@@ -67,11 +71,15 @@ class GraphQLSchema(BaseSchema):
         return cast(str, urlsplit(self.location).path)
 
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
-        yield Ok(
-            APIOperation(
-                base_url=self.get_base_url(), path=self.base_path, method="POST", schema=self, definition=None  # type: ignore
+        schema = self.client_schema
+        if schema.query_type is None:
+            return
+        for field_name in schema.query_type.fields:
+            yield Ok(
+                APIOperation(
+                    base_url=self.get_base_url(), path=self.base_path, verbose_name=field_name, method="POST", schema=self, definition=None  # type: ignore
+                )
             )
-        )
 
     def get_case_strategy(
         self,
@@ -80,8 +88,7 @@ class GraphQLSchema(BaseSchema):
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
         constructor = partial(GraphQLCase, operation=operation)
-        schema = graphql.build_client_schema(self.raw_schema)
-        return st.builds(constructor, body=gql_st.query(schema))
+        return st.builds(constructor, body=gql_st.query(self.client_schema, fields=[operation.verbose_name]))
 
     def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
         return []

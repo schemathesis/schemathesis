@@ -476,6 +476,7 @@ class APIOperation(Generic[P]):
     method: str = attr.ib()  # pragma: no mutate
     definition: OperationDefinition = attr.ib(repr=False)  # pragma: no mutate
     schema: "BaseSchema" = attr.ib()  # pragma: no mutate
+    verbose_name: str = attr.ib()  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     path_parameters: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
@@ -484,8 +485,8 @@ class APIOperation(Generic[P]):
     query: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
     body: PayloadAlternatives[P] = attr.ib(factory=PayloadAlternatives)  # pragma: no mutate
 
-    @property
-    def verbose_name(self) -> str:
+    @verbose_name.default
+    def _verbose_name_default(self) -> str:
         return f"{self.method.upper()} {self.path}"
 
     @property

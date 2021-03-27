@@ -17,9 +17,9 @@ EXPECTED_OUTPUT_LINES = [
     # Path-level error. no method is displayed
     r".*test_\[/foo\]\[P\] FAILED",
     # Valid operation
-    r".*test_\[GET:/bar\]\[P\] PASSED",
+    r".*test_\[GET /bar\]\[P\] PASSED",
     # Operation-level error
-    r".*test_\[POST:/bar\]\[P\] FAILED",
+    r".*test_\[POST /bar\]\[P\] FAILED",
     # The error in both failing cases
     ".*Unresolvable JSON pointer:.*",
 ]

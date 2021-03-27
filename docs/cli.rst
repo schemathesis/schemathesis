@@ -146,7 +146,7 @@ If any response will take longer than the provided value (in milliseconds) than 
     GET /api/slow F                                            [100%]
 
     ============================ FAILURES ===========================
-    _________________________ GET: /api/slow ________________________
+    __________________________ GET /api/slow ________________________
     1. Response time exceeded the limit of 50 ms
 
     Run this Python code to reproduce this failure:
