@@ -17,7 +17,7 @@ from ...schemas import BaseSchema
 from ...utils import GenericResponse, Ok, Result
 
 
-@attr.s()  # pragma: no mutate
+@attr.s(slots=True, repr=False)  # pragma: no mutate
 class GraphQLCase(Case):
     def as_requests_kwargs(
         self, base_url: Optional[str] = None, headers: Optional[Dict[str, str]] = None

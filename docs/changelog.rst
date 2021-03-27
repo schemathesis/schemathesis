@@ -11,6 +11,7 @@ Changelog
 - Unified test IDs across CLI & pytest plugin. They constructed as ``<method> <relative_path>`` for Open API.
   Corresponding field names are used for GraphQL. Previously, the pytest plugin used full paths, including the base path, and
   CLI used only relative paths. Using relative paths doesn't lead to different test names when different base URLs are used.
+- Do not show overly verbose raw schemas in Hypothesis output for failed GraphQL tests.
 
 `3.5.3`_ - 2021-03-27
 ---------------------
