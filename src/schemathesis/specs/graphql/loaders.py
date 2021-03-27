@@ -3,7 +3,9 @@ from typing import Any, Dict, Optional
 import requests
 from yarl import URL
 
+from ...exceptions import HTTPError
 from ...hooks import HookContext, dispatch
+from ...utils import setup_headers
 from .schemas import GraphQLSchema
 
 INTROSPECTION_QUERY = """
@@ -92,7 +94,7 @@ fragment TypeRef on __Type {
 }"""
 
 
-def from_url(url: str, base_url: Optional[str] = None, port: Optional[int] = None) -> GraphQLSchema:
+def from_url(url: str, base_url: Optional[str] = None, port: Optional[int] = None, **kwargs: Any) -> GraphQLSchema:
     """Load GraphQL schema from the network.
 
     :param url: Schema URL.
@@ -101,9 +103,12 @@ def from_url(url: str, base_url: Optional[str] = None, port: Optional[int] = Non
                                port in ``url``.
     :return: GraphQLSchema
     """
+    setup_headers(kwargs)
+    kwargs.setdefault("json", {"query": INTROSPECTION_QUERY})
     if not base_url and port:
         base_url = str(URL(url).with_port(port))
-    response = requests.post(url, json={"query": INTROSPECTION_QUERY})
+    response = requests.post(url, **kwargs)
+    HTTPError.raise_for_status(response)
     decoded = response.json()
     return from_dict(raw_schema=decoded["data"], location=url, base_url=base_url)
 
