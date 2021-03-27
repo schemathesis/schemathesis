@@ -164,6 +164,7 @@ def test_add_link_unknown_operation(schema_url, change, message):
     # When the source API operation is modified and can't be found
     source = schema["/users/"]["POST"]
     change(schema, source)
+    source.verbose_name = source._verbose_name_default()
     with pytest.raises(
         ValueError, match=re.escape(f"{message} Check if the requested API operation passes the filters in the schema.")
     ):

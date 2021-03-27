@@ -227,7 +227,7 @@ def test_display_single_failure(capsys, swagger_20, execution_context, operation
     out = capsys.readouterr().out
     lines = out.split("\n")
     # Then the path is displayed as a subsection
-    assert " GET: /v1/success " in lines[0]
+    assert " GET /v1/success " in lines[0]
     # And body should be displayed if it is not NOT_SET
     if body is NOT_SET:
         assert "Body" not in out
@@ -321,7 +321,7 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set, ve
     # Then section title is displayed
     assert " FAILURES " in out
     # And operation with a failure is displayed as a subsection
-    assert " GET: /v1/api/failure " in out
+    assert " GET /v1/api/failure " in out
     assert "Message" in out
     assert "Run this Python code to reproduce this failure: " in out
     headers = f"{{'User-Agent': '{USER_AGENT}', 'Content-Type': 'application/json', 'Content-Length': '0'}}"
@@ -349,7 +349,7 @@ def test_display_errors(swagger_20, capsys, results_set, execution_context, show
     # And help message is displayed only if tracebacks are not shown
     assert help_message_exists is not show_errors_tracebacks
     # And operation with an error is displayed as a subsection
-    assert " GET: /v1/api/error " in out
+    assert " GET /v1/api/error " in out
     # And the error itself is displayed
     assert "ConnectionError: Connection refused!" in out
     # And the example is displayed

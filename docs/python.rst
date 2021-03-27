@@ -35,9 +35,9 @@ We recommend running your tests with the latest `pytest <https://docs.pytest.org
     plugins: hypothesis-5.23.0, schemathesis-2.5.0
     collected 3 items
 
-    test_api.py::test_api[GET:/api/path_variable/{key}] PASSED [ 33%]
-    test_api.py::test_api[GET:/api/success] PASSED             [ 66%]
-    test_api.py::test_api[POST:/api/users/] PASSED             [100%]
+    test_api.py::test_api[GET /api/path_variable/{key}] PASSED [ 33%]
+    test_api.py::test_api[GET /api/success] PASSED             [ 66%]
+    test_api.py::test_api[POST /api/users/] PASSED             [100%]
 
     ======================= 3 passed in 1.55s =======================
 
