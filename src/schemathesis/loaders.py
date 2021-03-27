@@ -11,14 +11,14 @@ from starlette.testclient import TestClient as ASGIClient
 from werkzeug.test import Client
 from yarl import URL
 
-from .constants import DEFAULT_DATA_GENERATION_METHODS, USER_AGENT, CodeSampleStyle, DataGenerationMethod
+from .constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
 from .exceptions import HTTPError
 from .hooks import HookContext, dispatch
 from .lazy import LazySchema
 from .specs.openapi import definitions
 from .specs.openapi.schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
 from .types import Filter, PathLike
-from .utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse
+from .utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, setup_headers
 
 
 def from_path(
@@ -79,14 +79,11 @@ def from_uri(
 
     :param str uri: Schema URL.
     """
-    _setup_headers(kwargs)
+    setup_headers(kwargs)
     if not base_url and port:
         base_url = str(URL(uri).with_port(port))
     response = requests.get(uri, **kwargs)
-    try:
-        response.raise_for_status()
-    except requests.HTTPError as exc:
-        raise HTTPError(response=response, url=uri) from exc
+    HTTPError.raise_for_status(response)
     return from_file(
         response.text,
         location=uri,
@@ -275,7 +272,7 @@ def from_wsgi(
     :param str schema_path: An in-app relative URL to the schema.
     :param app: A WSGI app instance.
     """
-    _setup_headers(kwargs)
+    setup_headers(kwargs)
     client = Client(app, WSGIResponse)
     response = client.get(schema_path, **kwargs)
     check_response(response, schema_path)
@@ -365,7 +362,7 @@ def from_asgi(
     :param str schema_path: An in-app relative URL to the schema.
     :param app: An ASGI app instance.
     """
-    _setup_headers(kwargs)
+    setup_headers(kwargs)
     client = ASGIClient(app)
     response = client.get(schema_path, **kwargs)
     check_response(response, schema_path)
@@ -390,9 +387,3 @@ def check_response(response: requests.Response, schema_path: str) -> None:
     # E.g. it will be handled in CLI - a proper error message will be shown
     if 400 <= response.status_code < 600:
         raise HTTPError(response=response, url=schema_path)
-
-
-def _setup_headers(kwargs: Dict[str, Any]) -> None:
-    headers = kwargs.setdefault("headers", {})
-    if "user-agent" not in {header.lower() for header in headers}:
-        kwargs["headers"]["User-Agent"] = USER_AGENT

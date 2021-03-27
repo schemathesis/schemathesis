@@ -3,6 +3,7 @@ from json import JSONDecodeError
 from typing import Any, Callable, Dict, NoReturn, Optional, Type, Union
 
 import attr
+import requests
 from jsonschema import ValidationError
 
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE
@@ -142,3 +143,10 @@ class InvalidRegularExpression(Exception):
 class HTTPError(Exception):
     response: GenericResponse = attr.ib()  # pragma: no mutate
     url: str = attr.ib()  # pragma: no mutate
+
+    @classmethod
+    def raise_for_status(cls, response: requests.Response) -> None:
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            raise cls(response=response, url=response.url) from exc
