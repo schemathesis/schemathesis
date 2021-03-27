@@ -123,6 +123,7 @@ class SerializedInteraction:
 class SerializedTestResult:
     method: str = attr.ib()  # pragma: no mutate
     path: str = attr.ib()  # pragma: no mutate
+    verbose_name: str = attr.ib()  # pragma: no mutate
     has_failures: bool = attr.ib()  # pragma: no mutate
     has_errors: bool = attr.ib()  # pragma: no mutate
     has_logs: bool = attr.ib()  # pragma: no mutate
@@ -140,6 +141,7 @@ class SerializedTestResult:
         return SerializedTestResult(
             method=result.method,
             path=result.path,
+            verbose_name=result.verbose_name,
             has_failures=result.has_failures,
             has_errors=result.has_errors,
             has_logs=result.has_logs,

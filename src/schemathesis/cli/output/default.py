@@ -36,7 +36,7 @@ def display_section_name(title: str, separator: str = "=", extra: str = "", **kw
 
 
 def display_subsection(result: SerializedTestResult, color: Optional[str] = "red") -> None:
-    section_name = f"{result.method} {result.path}"
+    section_name = f"{result.method} {result.path}" if result.verbose_name is None else result.verbose_name
     display_section_name(section_name, "_", result.data_generation_method, fg=color)
 
 
@@ -342,7 +342,7 @@ def handle_before_execution(context: ExecutionContext, event: events.BeforeExecu
     """Display what method / path will be tested next."""
     # We should display execution result + percentage in the end. For example:
     max_length = get_terminal_width() - len(" . [XXX%]") - len(TRUNCATION_PLACEHOLDER)
-    message = f"{event.method} {event.path}"
+    message = event.verbose_name
     if event.recursion_level > 0:
         message = f"{'    ' * event.recursion_level}-> {message}"
         # This value is not `None` - the value is set in runtime before this line

@@ -16,7 +16,7 @@ from hypothesis import HealthCheck, Phase, Verbosity
 
 from schemathesis import Case, DataGenerationMethod, fixups
 from schemathesis.checks import ALL_CHECKS
-from schemathesis.cli import reset_checks
+from schemathesis.cli import LoaderConfig, reset_checks
 from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT
 from schemathesis.hooks import unregister_all
 from schemathesis.models import APIOperation
@@ -374,26 +374,31 @@ def test_load_schema_arguments(cli, mocker, args, expected):
     load_schema = mocker.patch("schemathesis.cli.load_schema", autospec=True)
 
     result = cli.run(SCHEMA_URI, *args)
-    expected = {
-        "app": None,
-        "base_url": None,
-        "auth": None,
-        "auth_type": "basic",
-        "endpoint": None,
-        "headers": {},
-        "data_generation_methods": [DataGenerationMethod.default()],
-        "method": None,
-        "tag": None,
-        "operation_id": None,
-        "validate_schema": True,
-        "skip_deprecated_operations": False,
-        "force_schema_version": None,
-        "request_tls_verify": True,
-        **expected,
-    }
+    expected = LoaderConfig(
+        SCHEMA_URI,
+        **{
+            **{
+                "app": None,
+                "base_url": None,
+                "auth": None,
+                "auth_type": "basic",
+                "endpoint": None,
+                "headers": {},
+                "data_generation_methods": [DataGenerationMethod.default()],
+                "method": None,
+                "tag": None,
+                "operation_id": None,
+                "validate_schema": True,
+                "skip_deprecated_operations": False,
+                "force_schema_version": None,
+                "request_tls_verify": True,
+            },
+            **expected,
+        },
+    )
 
     assert result.exit_code == ExitCode.OK, result.stdout
-    assert load_schema.call_args[1] == expected
+    assert load_schema.call_args[0][0] == expected
 
 
 def test_load_schema_arguments_headers_to_loader_for_app(testdir, cli, mocker):
@@ -1924,3 +1929,24 @@ def test_no_color(monkeypatch, cli, schema_url, kind):
     result = cli.run(*args, color=True)
     assert result.exit_code == ExitCode.OK, result.stdout
     assert "[1m" not in result.stdout
+
+
+@pytest.mark.parametrize("graphql_path", ("/graphql", "/foo"))
+def test_graphql_url(cli, graphql_url, graphql_path):
+    # When the target API is GraphQL
+    result = cli.run(graphql_url, "--hypothesis-max-examples=5")
+    assert_graphql(result)
+
+
+def test_graphql_asgi(cli, loadable_graphql_fastapi_app, graphql_path):
+    # When the target API is GraphQL
+    result = cli.run(f"--app={loadable_graphql_fastapi_app}", "--hypothesis-max-examples=5", graphql_path)
+    assert_graphql(result)
+
+
+def assert_graphql(result):
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # Then it should be detected automatically
+    assert "Specification version: GraphQL" in result.stdout
+    assert "getBooks . " in result.stdout
+    assert "getAuthors . " in result.stdout
