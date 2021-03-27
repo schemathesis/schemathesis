@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Do not use `importlib-metadata==3.8` in dependencies as it causes ``RuntimeError``. Ref: https://github.com/python/importlib_metadata/issues/293
+
 `3.5.2`_ - 2021-03-24
 ---------------------
 
