@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Custom keyword arguments to ``schemathesis.graphql.from_url`` that are proxied to ``requests.post``.
+
 **Changed**
 
 - Schemathesis generates separate tests for each field defined in the GraphQL ``Query`` type. It makes the testing process
@@ -12,6 +16,7 @@ Changelog
   Corresponding field names are used for GraphQL. Previously, the pytest plugin used full paths, including the base path, and
   CLI used only relative paths. Using relative paths doesn't lead to different test names when different base URLs are used.
 - Do not show overly verbose raw schemas in Hypothesis output for failed GraphQL tests.
+- The ``schemathesis.graphql.from_url`` loader now uses the usual Schemathesis User-Agent.
 
 `3.5.3`_ - 2021-03-27
 ---------------------

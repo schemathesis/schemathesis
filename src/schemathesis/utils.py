@@ -32,6 +32,7 @@ from requests.utils import check_header_validity  # type: ignore
 from werkzeug.wrappers import Response as BaseResponse
 from werkzeug.wrappers.json import JSONMixin
 
+from .constants import USER_AGENT
 from .types import Filter, NotSet, RawAuth
 
 try:
@@ -290,6 +291,12 @@ def deprecated_property(*, removed_in: str, replacement: str) -> Callable:
         return inner
 
     return wrapper
+
+
+def setup_headers(kwargs: Dict[str, Any]) -> None:
+    headers = kwargs.setdefault("headers", {})
+    if "user-agent" not in {header.lower() for header in headers}:
+        kwargs["headers"]["User-Agent"] = USER_AGENT
 
 
 T = TypeVar("T")
