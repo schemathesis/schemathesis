@@ -7,6 +7,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
+import attr
 import click
 import hypothesis
 import yaml
@@ -22,11 +23,14 @@ from ..constants import (
     CodeSampleStyle,
     DataGenerationMethod,
 )
+from ..exceptions import HTTPError
 from ..fixups import ALL_FIXUPS
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..models import CheckFunction
 from ..runner import events, prepare_hypothesis_settings
 from ..schemas import BaseSchema
+from ..specs.graphql import loaders as gql_loaders
+from ..specs.graphql.schemas import GraphQLSchema
 from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import Target
@@ -569,6 +573,32 @@ def run(
     )
 
 
+@attr.s(slots=True)
+class LoaderConfig:
+    """Container for API loader parameters.
+
+    The main goal is to avoid too many parameters in function signatures.
+    """
+
+    schema_location: str = attr.ib()  # pragma: no mutate
+    app: Any = attr.ib()  # pragma: no mutate
+    base_url: Optional[str] = attr.ib()  # pragma: no mutate
+    validate_schema: bool = attr.ib()  # pragma: no mutate
+    skip_deprecated_operations: bool = attr.ib()  # pragma: no mutate
+    data_generation_methods: Tuple[DataGenerationMethod, ...] = attr.ib()  # pragma: no mutate
+    force_schema_version: Optional[str] = attr.ib()  # pragma: no mutate
+    request_tls_verify: Union[bool, str] = attr.ib()  # pragma: no mutate
+    # Network request parameters
+    auth: Optional[Tuple[str, str]] = attr.ib()  # pragma: no mutate
+    auth_type: Optional[str] = attr.ib()  # pragma: no mutate
+    headers: Optional[Dict[str, str]] = attr.ib()  # pragma: no mutate
+    # Schema filters
+    endpoint: Optional[Filter] = attr.ib()  # pragma: no mutate
+    method: Optional[Filter] = attr.ib()  # pragma: no mutate
+    tag: Optional[Filter] = attr.ib()  # pragma: no mutate
+    operation_id: Optional[Filter] = attr.ib()  # pragma: no mutate
+
+
 def into_event_stream(
     schema_location: str,
     *,
@@ -605,8 +635,8 @@ def into_event_stream(
     try:
         if app is not None:
             app = import_app(app)
-        loaded_schema = load_schema(
-            schema_location,
+        config = LoaderConfig(
+            schema_location=schema_location,
             app=app,
             base_url=base_url,
             validate_schema=validate_schema,
@@ -622,6 +652,7 @@ def into_event_stream(
             tag=tag or None,
             operation_id=operation_id or None,
         )
+        loaded_schema = load_schema(config)
         yield from runner.from_schema(
             loaded_schema,
             auth=auth,
@@ -645,101 +676,106 @@ def into_event_stream(
         yield events.InternalError.from_exc(exc)
 
 
-def load_schema(
-    schema_location: str,
-    *,
-    app: Any,
-    base_url: Optional[str],
-    validate_schema: bool,
-    skip_deprecated_operations: bool,
-    data_generation_methods: Tuple[DataGenerationMethod, ...],
-    force_schema_version: Optional[str],
-    request_tls_verify: Union[bool, str],
-    # Network request parameters
-    auth: Optional[Tuple[str, str]],
-    auth_type: Optional[str],
-    headers: Optional[Dict[str, str]],
-    # Schema filters
-    endpoint: Optional[Filter],
-    method: Optional[Filter],
-    tag: Optional[Filter],
-    operation_id: Optional[Filter],
-) -> BaseSchema:
+def load_schema(config: LoaderConfig) -> BaseSchema:
     """Automatically load API schema."""
-    loader = detect_loader(schema_location, app)
-    kwargs = get_loader_kwargs(
-        loader,
-        app=app,
-        base_url=base_url,
-        validate_schema=validate_schema,
-        skip_deprecated_operations=skip_deprecated_operations,
-        data_generation_methods=data_generation_methods,
-        force_schema_version=force_schema_version,
-        request_tls_verify=request_tls_verify,
-        auth=auth,
-        auth_type=auth_type,
-        headers=headers,
-        endpoint=endpoint,
-        method=method,
-        tag=tag,
-        operation_id=operation_id,
-    )
-    return loader(schema_location, **kwargs)
+    first: Callable[[LoaderConfig], BaseSchema]
+    second: Callable[[LoaderConfig], BaseSchema]
+    if is_probably_graphql(config.schema_location):
+        # Try GraphQL first, then fallback to Open API
+        first, second = (_load_graphql_schema, _load_openapi_schema)
+    else:
+        # Try Open API first, then fallback to GraphQL
+        first, second = (_load_openapi_schema, _load_graphql_schema)
+    return _try_load_schema(config, first, second)
 
 
-def detect_loader(schema_location: str, app: Any) -> Callable:
+def _try_load_schema(
+    config: LoaderConfig, first: Callable[[LoaderConfig], BaseSchema], second: Callable[[LoaderConfig], BaseSchema]
+) -> BaseSchema:
+    try:
+        return first(config)
+    except HTTPError as exc:
+        try:
+            return second(config)
+        except HTTPError:
+            # Raise the first loader's error
+            raise exc  # pylint: disable=raise-missing-from
+
+
+def _load_graphql_schema(config: LoaderConfig) -> GraphQLSchema:
+    loader = detect_loader(config.schema_location, config.app, is_openapi=False)
+    kwargs = get_graphql_loader_kwargs(loader, config)
+    return loader(config.schema_location, **kwargs)
+
+
+def _load_openapi_schema(config: LoaderConfig) -> BaseSchema:
+    loader = detect_loader(config.schema_location, config.app, is_openapi=True)
+    kwargs = get_loader_kwargs(loader, config)
+    return loader(config.schema_location, **kwargs)
+
+
+def detect_loader(schema_location: str, app: Any, is_openapi: bool) -> Callable:
     """Detect API schema loader."""
     if file_exists(schema_location):
         # If there is an existing file with the given name,
         # then it is likely that the user wants to load API schema from there
-        return oas_loaders.from_path
+        return oas_loaders.from_path if is_openapi else gql_loaders.from_path  # type: ignore
     if app is not None and not urlparse(schema_location).netloc:
         # App is passed & location is relative
-        return oas_loaders.get_loader_for_app(app)
+        return oas_loaders.get_loader_for_app(app) if is_openapi else gql_loaders.get_loader_for_app(app)
     # Default behavior
-    return oas_loaders.from_uri
+    return oas_loaders.from_uri if is_openapi else gql_loaders.from_url  # type: ignore
 
 
-def get_loader_kwargs(
+def get_loader_kwargs(loader: Callable, config: LoaderConfig) -> Dict[str, Any]:
+    """Detect the proper set of parameters for a loader."""
+    # These kwargs are shared by all loaders
+    kwargs = {
+        "app": config.app,
+        "base_url": config.base_url,
+        "method": config.method,
+        "endpoint": config.endpoint,
+        "tag": config.tag,
+        "operation_id": config.operation_id,
+        "skip_deprecated_operations": config.skip_deprecated_operations,
+        "validate_schema": config.validate_schema,
+        "force_schema_version": config.force_schema_version,
+        "data_generation_methods": config.data_generation_methods,
+    }
+    if loader is not oas_loaders.from_path:
+        kwargs["headers"] = config.headers
+    if loader in (oas_loaders.from_uri, oas_loaders.from_aiohttp):
+        _add_requests_kwargs(kwargs, config)
+    return kwargs
+
+
+def get_graphql_loader_kwargs(
     loader: Callable,
-    *,
-    app: Any,
-    base_url: Optional[str],
-    endpoint: Optional[Filter],
-    method: Optional[Filter],
-    tag: Optional[Filter],
-    operation_id: Optional[Filter],
-    skip_deprecated_operations: bool,
-    validate_schema: bool,
-    force_schema_version: Optional[str],
-    data_generation_methods: Tuple[DataGenerationMethod, ...],
-    # Network request parameters
-    auth: Optional[Tuple[str, str]],
-    auth_type: Optional[str],
-    headers: Optional[Dict[str, str]],
-    request_tls_verify: Union[bool, str],
+    config: LoaderConfig,
 ) -> Dict[str, Any]:
     """Detect the proper set of parameters for a loader."""
     # These kwargs are shared by all loaders
     kwargs = {
-        "app": app,
-        "base_url": base_url,
-        "method": method,
-        "endpoint": endpoint,
-        "tag": tag,
-        "operation_id": operation_id,
-        "skip_deprecated_operations": skip_deprecated_operations,
-        "validate_schema": validate_schema,
-        "force_schema_version": force_schema_version,
-        "data_generation_methods": data_generation_methods,
+        "app": config.app,
+        "base_url": config.base_url,
+        "data_generation_methods": config.data_generation_methods,
     }
-    if loader is not oas_loaders.from_path:
-        kwargs["headers"] = headers
-    if loader in (oas_loaders.from_uri, oas_loaders.from_aiohttp):
-        kwargs["verify"] = request_tls_verify
-        if auth is not None:
-            kwargs["auth"] = get_requests_auth(auth, auth_type)
+    if loader is not gql_loaders.from_path:
+        kwargs["headers"] = config.headers
+    if loader is gql_loaders.from_url:
+        _add_requests_kwargs(kwargs, config)
     return kwargs
+
+
+def _add_requests_kwargs(kwargs: Dict[str, Any], config: LoaderConfig) -> None:
+    kwargs["verify"] = config.request_tls_verify
+    if config.auth is not None:
+        kwargs["auth"] = get_requests_auth(config.auth, config.auth_type)
+
+
+def is_probably_graphql(location: str) -> bool:
+    """Detect whether it is likely that the given location is a GraphQL endpoint."""
+    return location.endswith(("/graphql", "/graphql/"))
 
 
 def check_auth(auth: Optional[Tuple[str, str]], headers: Dict[str, str]) -> None:
