@@ -188,6 +188,7 @@ def run_test(  # pylint: disable=too-many-locals
     hypothesis_output: List[str] = []
     errors: List[Exception] = []
     test_start_time = time.monotonic()
+    setup_hypothesis_database_key(test, operation)
     try:
         with catch_warnings(record=True) as warnings, capture_hypothesis_output() as hypothesis_output:
             test(checks, targets, result, errors=errors, headers=headers, **kwargs)
@@ -254,6 +255,19 @@ def run_test(  # pylint: disable=too-many-locals
         operation=operation,
         correlation_id=correlation_id,
     )
+
+
+def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> None:
+    """Make Hypothesis use separate database entries for every API operation.
+
+    It increases the effectiveness of the Hypothesis database in the CLI.
+    """
+    # Hypothesis's function digest depends on the test function signature. To reflect it for the web API case,
+    # we use all API operation parameters in the digest.
+    extra = operation.verbose_name.encode("utf8")
+    for parameter in operation.definition.parameters:
+        extra += parameter.serialize().encode("utf8")
+    test.hypothesis.inner_test._hypothesis_internal_add_digest = extra  # type: ignore
 
 
 def get_invalid_regular_expression_message(warnings: List[WarningMessage]) -> Optional[str]:
