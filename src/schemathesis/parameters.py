@@ -41,6 +41,10 @@ class Parameter:
         """Parameter example."""
         raise NotImplementedError
 
+    def serialize(self) -> str:
+        """Get parameter's string representation."""
+        raise NotImplementedError
+
 
 P = TypeVar("P", bound=Parameter)
 
