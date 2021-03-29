@@ -37,9 +37,10 @@ def test_add_link_default(schema_url):
     # When we add a link to the target API operation
     # And it is an `APIOperation` instance
     # And it has the `operationId` key
-    links = add_link(schema, schema["/users/{user_id}"]["GET"], parameters={"userId": "$response.body#/id"})
+    target = schema["/users/{user_id}"]["GET"]
+    links = add_link(schema, target, parameters={"userId": "$response.body#/id"})
     # Then it should be added without errors
-    assert links[schema["/users/{user_id}"]["GET"].verbose_name] == {
+    assert links[f"{target.method.upper()} {target.path}"] == {
         "operationId": "getUser",
         **EXPECTED_LINK_PARAMETERS,
     }
@@ -63,7 +64,7 @@ def test_add_link_no_operations_cache(schema_url, status_code):
     # Then it should be added without errors
     # And the cache cleanup should be no-op
     links = schema["/users/"]["POST"].definition.resolved["responses"]["201"]["links"]
-    assert links[schema["/users/{user_id}"]["GET"].verbose_name] == {
+    assert links[f"{target.method.upper()} {target.path}"] == {
         "operationId": "getUser",
         **EXPECTED_LINK_PARAMETERS,
     }
@@ -74,8 +75,8 @@ def test_add_link_no_operation_id(schema_url):
     schema = schemathesis.from_uri(schema_url)
     target = schema["/users/{user_id}"]["GET"]
     del target.definition.resolved["operationId"]
-    links = add_link(schema, schema["/users/{user_id}"]["GET"], parameters={"userId": "$response.body#/id"})
-    assert links[schema["/users/{user_id}"]["GET"].verbose_name] == {
+    links = add_link(schema, target, parameters={"userId": "$response.body#/id"})
+    assert links[f"{target.method.upper()} {target.path}"] == {
         "operationRef": "#/paths/~1users~1{user_id}/get",
         **EXPECTED_LINK_PARAMETERS,
     }
@@ -164,7 +165,6 @@ def test_add_link_unknown_operation(schema_url, change, message):
     # When the source API operation is modified and can't be found
     source = schema["/users/"]["POST"]
     change(schema, source)
-    source.verbose_name = source._verbose_name_default()
     with pytest.raises(
         ValueError, match=re.escape(f"{message} Check if the requested API operation passes the filters in the schema.")
     ):

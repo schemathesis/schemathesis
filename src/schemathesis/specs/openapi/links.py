@@ -193,7 +193,7 @@ class OpenAPILink(Direction):
             # but the schema has no parameters of such type at all.
             # Therefore the container is empty, otherwise it will be at least an empty object
             if container is None:
-                message = f"No such parameter in `{case.operation.verbose_name}`: `{name}`."
+                message = f"No such parameter in `{case.operation.method.upper()} {case.operation.path}`: `{name}`."
                 possibilities = [param.name for param in case.operation.definition.parameters]
                 matches = get_close_matches(name, possibilities)
                 if matches:
@@ -286,7 +286,7 @@ def add_link(
         name = target
         new_link["operationRef"] = target
     else:
-        name = target.verbose_name
+        name = f"{target.method.upper()} {target.path}"
         # operationId is a dict lookup which is more efficient than using `operationRef`, since it
         # doesn't involve reference resolving when we will look up for this target during testing.
         if "operationId" in target.definition.resolved:
