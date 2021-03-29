@@ -14,6 +14,7 @@ from schemathesis.stateful import ParsedData, Stateful
 API_OPERATION = APIOperation(
     path="/users/{user_id}",
     method="get",
+    verbose_name="GET /users/{user_id}",
     definition=ANY,
     schema=ANY,
     base_url=ANY,
@@ -62,6 +63,7 @@ def response():
                     operation=APIOperation(
                         path="/users/{user_id}",
                         method="get",
+                        verbose_name="GET /users/{user_id}",
                         definition=ANY,
                         schema=ANY,
                         base_url=ANY,
@@ -258,6 +260,7 @@ def test_make_operation_body(body):
     operation = APIOperation(
         path="/users/",
         method="post",
+        verbose_name="GET /users/{user_id}",
         definition=ANY,
         schema=ANY,
         base_url=ANY,
@@ -280,6 +283,7 @@ def test_invalid_request_body_definition():
     operation = APIOperation(
         path="/users/",
         method="get",
+        verbose_name="GET /users/{user_id}",
         definition=ANY,
         schema=ANY,
         base_url=ANY,
@@ -302,6 +306,7 @@ def test_get_container_invalid_location():
         path="/users/{user_id}",
         method="get",
         schema=None,
+        verbose_name="GET /users/{user_id}",
         definition=OperationDefinition(
             raw={},
             resolved={},

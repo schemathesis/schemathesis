@@ -26,7 +26,9 @@ def test_(request, case):
     result.assert_outcomes(passed=1)
     # Then test name should contain method:path
     # And there should be only 1 hypothesis call
-    result.stdout.re_match_lines([r"test_parametrization.py::test_\[GET /users\]\[P\] PASSED", r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines(
+        [r"test_parametrization.py::test_\[GET /v1/users\]\[P\] PASSED", r"Hypothesis calls: 1"]
+    )
 
 
 def test_pytest_parametrize(testdir):
@@ -54,8 +56,8 @@ def test_(request, param, case):
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
-            r"test_pytest_parametrize.py::test_\[GET /users\]\[P\]\[A\] PASSED",
-            r"test_pytest_parametrize.py::test_\[GET /users\]\[P\]\[B\] PASSED",
+            r"test_pytest_parametrize.py::test_\[GET /v1/users\]\[P\]\[A\] PASSED",
+            r"test_pytest_parametrize.py::test_\[GET /v1/users\]\[P\]\[B\] PASSED",
             r"Hypothesis calls: 4",
         ]
     )
@@ -84,8 +86,8 @@ class TestAPI:
     result.assert_outcomes(passed=2)
     result.stdout.re_match_lines(
         [
-            r"test_method.py::TestAPI::test_\[GET /users\]\[P\] PASSED",
-            r"test_method.py::TestAPI::test_\[POST /users\]\[P\] PASSED",
+            r"test_method.py::TestAPI::test_\[GET /v1/users\]\[P\] PASSED",
+            r"test_method.py::TestAPI::test_\[POST /v1/users\]\[P\] PASSED",
             r"Hypothesis calls: 2",
         ]
     )
@@ -444,7 +446,7 @@ def test_b(request, case):
     # Then only relevant tests should be selected for running
     result.assert_outcomes(passed=2)
     # "/users" path is excluded in the first test function
-    result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST /pets\]", r"Hypothesis calls: 2"])
+    result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST /v1/pets\]", r"Hypothesis calls: 2"])
 
 
 def test_skip_deprecated_operations(testdir):
@@ -481,12 +483,12 @@ def test_b(request, case):
     result.assert_outcomes(passed=5)
     result.stdout.re_match_lines(
         [
-            r".*test_a\[PATCH /users\]\[P\]",
-            r".*test_a\[GET /users\]\[P\]",
+            r".*test_a\[PATCH /v1/users\]\[P\]",
+            r".*test_a\[GET /v1/users\]\[P\]",
             # Here POST is not skipped due to using skip_deprecated_operations=False in the `parametrize` call
-            r".*test_b\[POST /users\]\[P\]",
-            r".*test_b\[PATCH /users\]\[P\]",
-            r".*test_b\[GET /users\]\[P\]",
+            r".*test_b\[POST /v1/users\]\[P\]",
+            r".*test_b\[PATCH /v1/users\]\[P\]",
+            r".*test_b\[GET /v1/users\]\[P\]",
             r"Hypothesis calls: 5",
         ]
     )
@@ -624,7 +626,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-rf")
     # Then the tests should fail with the relevant error message
     result.assert_outcomes(failed=1, passed=2)
-    result.stdout.re_match_lines([r".*test_invalid_operation.py::test_\[GET /invalid\]\[P\] FAILED"])
+    result.stdout.re_match_lines([r".*test_invalid_operation.py::test_\[GET /v1/invalid\]\[P\] FAILED"])
 
 
 def test_no_base_path(testdir):
@@ -660,7 +662,7 @@ def test_(request, case):
     # Then base URL can be discovered automatically
     # And can be omitted in `call`
     result.assert_outcomes(passed=2)
-    result.stdout.re_match_lines([r".*\[GET /failure\]", r".*\[GET /success\]"])
+    result.stdout.re_match_lines([r".*\[GET /api/failure\]", r".*\[GET /api/success\]"])
     assert len(openapi_3_app["incoming_requests"]) == 2
 
 
@@ -783,7 +785,7 @@ def test_(request, case):
     result = testdir.runpytest("-v")
     # Then it should not be propagated & collection should be continued
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r".*\[GET /users\]"])
+    result.stdout.re_match_lines([r".*\[GET /v1/users\]"])
 
 
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))

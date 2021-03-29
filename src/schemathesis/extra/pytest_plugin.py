@@ -87,6 +87,7 @@ class SchemathesisCase(PyCollector):
             error = result.err()
             funcobj = error.as_failing_test_function()
             name = self.name
+            # `full_path` is always available in this case
             if error.method:
                 name += f"[{error.method.upper()} {error.full_path}]"
             else:

@@ -344,9 +344,14 @@ class BaseOpenAPISchema(BaseSchema):
                 self.raw_schema["paths"][operation].pop("$ref", None)
                 if found:
                     return
-        message = f"No such API operation: `{source.verbose_name}`."
-        possibilities = [op.ok().verbose_name for op in self.get_all_operations() if isinstance(op, Ok)]
-        matches = get_close_matches(source.verbose_name, possibilities)
+        name = f"{source.method.upper()} {source.path}"
+        # Use a name without basePath, as the user doesn't use it.
+        # E.g. `source=schema["/users/"]["POST"]` without a prefix
+        message = f"No such API operation: `{name}`."
+        possibilities = [
+            f"{op.ok().method.upper()} {op.ok().path}" for op in self.get_all_operations() if isinstance(op, Ok)
+        ]
+        matches = get_close_matches(name, possibilities)
         if matches:
             message += f" Did you mean `{matches[0]}`?"
         message += " Check if the requested API operation passes the filters in the schema."

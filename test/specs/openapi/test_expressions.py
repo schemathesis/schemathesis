@@ -17,7 +17,9 @@ DOCUMENT = {"foo": ["bar", "baz"], "": 0, "a/b": 1, "c%d": 2, "e^f": 3, "g|h": 4
 
 @pytest.fixture(scope="module")
 def operation():
-    return APIOperation("/users/{user_id}", "GET", None, None, base_url="http://127.0.0.1:8080/api")
+    return APIOperation(
+        "/users/{user_id}", "GET", None, None, verbose_name="GET /users/{user_id}", base_url="http://127.0.0.1:8080/api"
+    )
 
 
 @pytest.fixture(scope="module")
