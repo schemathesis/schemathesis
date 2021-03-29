@@ -12,7 +12,7 @@ from werkzeug.test import Client
 from yarl import URL
 
 from .constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
-from .exceptions import HTTPError
+from .exceptions import HTTPError, UnsupportedSpecification
 from .hooks import HookContext, dispatch
 from .lazy import LazySchema
 from .specs.openapi import definitions
@@ -205,7 +205,7 @@ def from_dict(
         return init_openapi_2()
     if "openapi" in raw_schema:
         return init_openapi_3()
-    raise ValueError("Unsupported schema type")
+    raise UnsupportedSpecification("Unsupported schema type")
 
 
 def _maybe_validate_schema(

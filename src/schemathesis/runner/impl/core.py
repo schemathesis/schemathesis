@@ -131,9 +131,11 @@ def handle_schema_error(
         assert error.path is not None
         assert error.full_path is not None
         method = error.method.upper()
+        verbose_name = f"{method} {error.path}"
         result = TestResult(
             method=method,
             path=error.full_path,
+            verbose_name=verbose_name,
             data_generation_method=data_generation_method,
         )
         result.add_error(error)
@@ -141,6 +143,7 @@ def handle_schema_error(
         yield events.BeforeExecution(
             method=method,
             path=error.full_path,
+            verbose_name=verbose_name,
             relative_path=error.path,
             recursion_level=recursion_level,
             correlation_id=correlation_id,
@@ -177,6 +180,7 @@ def run_test(  # pylint: disable=too-many-locals
     result = TestResult(
         method=operation.method.upper(),
         path=operation.full_path,
+        verbose_name=operation.verbose_name,
         overridden_headers=headers,
         data_generation_method=data_generation_method,
     )

@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Custom keyword arguments to ``schemathesis.graphql.from_url`` that are proxied to ``requests.post``.
+- GraphQL support in CLI. `#746`_
 
 **Changed**
 
@@ -1836,6 +1837,7 @@ Deprecated
 .. _#768: https://github.com/schemathesis/schemathesis/issues/768
 .. _#757: https://github.com/schemathesis/schemathesis/issues/757
 .. _#748: https://github.com/schemathesis/schemathesis/issues/748
+.. _#746: https://github.com/schemathesis/schemathesis/issues/746
 .. _#742: https://github.com/schemathesis/schemathesis/issues/742
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
 .. _#737: https://github.com/schemathesis/schemathesis/issues/737

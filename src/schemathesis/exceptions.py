@@ -106,6 +106,10 @@ class InvalidSchema(Exception):
         return actual_test
 
 
+class UnsupportedSpecification(ValueError):
+    """The API specification is not supported."""
+
+
 class NonCheckError(Exception):
     """An error happened in side the runner, but is not related to failed checks.
 

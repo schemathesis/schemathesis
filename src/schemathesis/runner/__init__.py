@@ -8,6 +8,7 @@ from .. import fixups as _fixups
 from .. import loaders
 from ..checks import DEFAULT_CHECKS
 from ..constants import DEFAULT_DATA_GENERATION_METHODS, DEFAULT_STATEFUL_RECURSION_LIMIT, DataGenerationMethod
+from ..exceptions import HTTPError, UnsupportedSpecification
 from ..models import CheckFunction
 from ..schemas import BaseSchema
 from ..stateful import Stateful
@@ -374,13 +375,25 @@ def load_schema(
     if loader in (loaders.from_uri, loaders.from_aiohttp):
         loader_options["verify"] = request_tls_verify
 
-    return loader(
-        schema_uri,
-        validate_schema=validate_schema,
-        skip_deprecated_operations=skip_deprecated_operations,
-        force_schema_version=force_schema_version,
-        **loader_options,
-    )
+    try:
+        return loader(
+            schema_uri,
+            validate_schema=validate_schema,
+            skip_deprecated_operations=skip_deprecated_operations,
+            force_schema_version=force_schema_version,
+            **loader_options,
+        )
+    except (UnsupportedSpecification, HTTPError) as exc:
+        from ..specs import graphql  # pylint: disable=import-outside-toplevel
+
+        if isinstance(schema_uri, dict):
+            return graphql.from_dict(schema_uri, base_url=base_url)
+        try:
+            return graphql.from_url(
+                schema_uri, base_url=base_url, verify=loader_options["verify"], auth=loader_options.get("auth")
+            )
+        except HTTPError:
+            raise exc from None
 
 
 def prepare_hypothesis_options(
