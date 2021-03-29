@@ -6,6 +6,7 @@ import hypothesis
 from hypothesis import Phase
 from hypothesis import strategies as st
 from hypothesis.errors import Unsatisfiable
+from hypothesis.internal.reflection import proxies
 from hypothesis.strategies import SearchStrategy
 from hypothesis.utils.conventions import InferType
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
@@ -33,7 +34,16 @@ def create_test(
     strategy = operation.as_strategy(hooks=hook_dispatcher, data_generation_method=data_generation_method)
     _given_kwargs = (_given_kwargs or {}).copy()
     _given_kwargs.setdefault("case", strategy)
-    wrapped_test = hypothesis.given(*_given_args, **_given_kwargs)(test)
+
+    # Each generated test should be a unique function. It is especially important for the case when Schemathesis runs
+    # tests in multiple threads because Hypothesis stores some internal attributes on function objects and re-writing
+    # them from different threads may lead to unpredictable side-effects.
+
+    @proxies(test)  # type: ignore
+    def test_function(*args: Any, **kwargs: Any) -> Any:
+        return test(*args, **kwargs)
+
+    wrapped_test = hypothesis.given(*_given_args, **_given_kwargs)(test_function)
     if seed is not None:
         wrapped_test = hypothesis.seed(seed)(wrapped_test)
     if asyncio.iscoroutinefunction(test):

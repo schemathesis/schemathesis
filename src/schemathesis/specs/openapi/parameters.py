@@ -1,3 +1,4 @@
+import json
 from typing import Any, ClassVar, Dict, Iterable, List, Tuple
 
 import attr
@@ -107,6 +108,11 @@ class OpenAPIParameter(Parameter):
             # Allow only supported keywords or vendor extensions
             if key in self.supported_jsonschema_keywords or key.startswith("x-") or key == self.nullable_field
         }
+
+    def serialize(self) -> str:
+        # For simplicity, JSON Schema semantics is not taken into account (e.g. 1 == 1.0)
+        # I.e. two semantically equal schemas may have different representation
+        return json.dumps(self.as_json_schema(), sort_keys=True)
 
 
 @attr.s(slots=True, eq=False)
