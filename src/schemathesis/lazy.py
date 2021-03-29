@@ -112,7 +112,7 @@ class LazySchema:
 
 def _get_node_name(node_id: str, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:
     """Make a test node name. For example: test_api[GET /users]."""
-    return f"{node_id}[{operation.method.upper()} {operation.path}][{data_generation_method.as_short_name()}]"
+    return f"{node_id}[{operation.method.upper()} {operation.full_path}][{data_generation_method.as_short_name()}]"
 
 
 def _get_partial_node_name(node_id: str, data_generation_method: DataGenerationMethod, **kwargs: Any) -> str:

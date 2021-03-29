@@ -487,7 +487,7 @@ class APIOperation(Generic[P]):
 
     @verbose_name.default
     def _verbose_name_default(self) -> str:
-        return f"{self.method.upper()} {self.path}"
+        return f"{self.method.upper()} {self.full_path}"
 
     @property
     def full_path(self) -> str:
@@ -578,6 +578,7 @@ class APIOperation(Generic[P]):
         return self.__class__(
             path=self.path,
             method=self.method,
+            verbose_name=self.verbose_name,
             definition=self.definition,
             schema=self.schema,
             app=self.app,
