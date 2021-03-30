@@ -493,3 +493,63 @@ def test_(request, case):
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines(["Hypothesis calls: 5"])
+
+
+@pytest.mark.parametrize("given", ("data=st.data()", "st.data()"))
+def test_schema_given(testdir, given):
+    # When the schema is defined via a pytest fixture
+    # And `schema.given` is used
+    testdir.make_test(
+        f"""
+from hypothesis.strategies._internal.core import DataObject
+
+@pytest.fixture
+def simple_schema():
+    return schema
+
+lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+OPERATIONS = []
+
+@lazy_schema.parametrize()
+@lazy_schema.given({given})
+def test_a(data, case):
+    assert isinstance(data, DataObject)
+    OPERATIONS.append(f"{{case.method}} {{case.path}}")
+
+def teardown_module(module):
+    assert OPERATIONS == ['GET /users', 'POST /users']
+    """,
+        paths={
+            "/users": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"200": {"description": "OK"}}},
+            }
+        },
+    )
+    # Then its arguments should be proxied to the `hypothesis.given`
+    # And be available in the test
+    result = testdir.runpytest()
+    # And the total number of passed tests is 1: one high-level test with multiple subtests
+    result.assert_outcomes(passed=1)
+
+
+def test_invalid_given_usage(testdir):
+    # When `schema.given` is used incorrectly (e.g. called without arguments)
+    testdir.make_test(
+        """
+@pytest.fixture
+def simple_schema():
+    return schema
+
+lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+
+@lazy_schema.parametrize()
+@lazy_schema.given()
+def test(case):
+    pass
+        """,
+    )
+    # Then the wrapped test should fail with an error
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    result.stdout.re_match_lines([".+given must be called with at least one argument"])

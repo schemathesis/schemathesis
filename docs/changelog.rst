@@ -17,6 +17,10 @@ Changelog
 - The ``schemathesis.graphql.from_url`` loader now uses the usual Schemathesis User-Agent.
 - The Hypothesis database now uses separate entries for each API operation when executed via CLI. It increases its effectiveness when tests are re-run.
 
+**Fixed**
+
+- Add the missing ``@schema.given`` implementation for schemas created via the ``from_pytest_fixture`` loader. `#1093`_
+
 `3.5.3`_ - 2021-03-27
 ---------------------
 
@@ -1755,6 +1759,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1093: https://github.com/schemathesis/schemathesis/issues/1093
 .. _#1073: https://github.com/schemathesis/schemathesis/issues/1073
 .. _#1069: https://github.com/schemathesis/schemathesis/issues/1069
 .. _#1068: https://github.com/schemathesis/schemathesis/issues/1068
