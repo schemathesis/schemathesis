@@ -1,9 +1,8 @@
-from inspect import getfullargspec, signature
-from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Union
+from inspect import signature
+from typing import Any, Callable, Dict, Iterable, Optional, Union
 
 import attr
 from _pytest.fixtures import FixtureRequest
-from hypothesis.core import is_invalid_test
 from pytest_subtests import SubTests, nullcontext
 
 from .constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
@@ -12,7 +11,17 @@ from .hooks import HookDispatcher, HookScope
 from .models import APIOperation
 from .schemas import BaseSchema
 from .types import Filter, GenericTest, NotSet
-from .utils import NOT_SET, GivenInput, Ok, get_given_args, get_given_kwargs, given_proxy, has_given_applied
+from .utils import (
+    NOT_SET,
+    GivenInput,
+    Ok,
+    get_given_args,
+    get_given_kwargs,
+    given_proxy,
+    is_given_applied,
+    merge_given_args,
+    validate_given_args,
+)
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -55,14 +64,15 @@ class LazySchema:
             _code_sample_style = self.code_sample_style
 
         def wrapper(func: Callable) -> Callable:
-            if has_given_applied(func):
+            if is_given_applied(func):
                 # The user wrapped the test function with `@schema.given`
                 # These args & kwargs go as extra to the underlying test generator
                 given_args = get_given_args(func)
                 given_kwargs = get_given_kwargs(func)
-                check_invalid = process_given_args(func, given_args, given_kwargs)
-                if check_invalid is not None:
-                    return check_invalid
+                test_function = validate_given_args(func, given_args, given_kwargs)
+                if test_function is not None:
+                    return test_function
+                given_kwargs = merge_given_args(func, given_args, given_kwargs)
                 del given_args
             else:
                 given_kwargs = {}
@@ -116,21 +126,6 @@ class LazySchema:
 
     def given(self, *args: GivenInput, **kwargs: GivenInput) -> Callable:
         return given_proxy(*args, **kwargs)
-
-
-def process_given_args(func: GenericTest, args: Tuple, kwargs: Dict[str, Any]) -> Optional[Callable]:
-    """Prepare arguments to `@schema.given` to be used with the test generator.
-
-    For simplicity, positional arguments are converted to keyword arguments.
-    """
-    original_argspec = getfullargspec(func)
-    check_invalid = is_invalid_test(func.__name__, original_argspec, args, kwargs)  # type: ignore
-    if check_invalid:
-        return check_invalid
-    if args:
-        for name, strategy in zip(reversed([arg for arg in original_argspec.args if arg != "case"]), reversed(args)):
-            kwargs[name] = strategy
-    return None
 
 
 def _get_node_name(node_id: str, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:

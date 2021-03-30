@@ -20,6 +20,7 @@ Changelog
 **Fixed**
 
 - Add the missing ``@schema.given`` implementation for schemas created via the ``from_pytest_fixture`` loader. `#1093`_
+- Silently ignoring some incorrect usages of ``@schema.given``.
 
 `3.5.3`_ - 2021-03-27
 ---------------------
