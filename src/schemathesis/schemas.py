@@ -14,7 +14,6 @@ from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 import attr
 import hypothesis
 from hypothesis.strategies import SearchStrategy
-from hypothesis.utils.conventions import InferType
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import create_test
@@ -24,7 +23,7 @@ from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import APIOperation, Case
 from .stateful import APIStateMachine, Stateful, StatefulTest
 from .types import Filter, FormData, GenericTest, NotSet
-from .utils import NOT_SET, Err, GenericResponse, Ok, Result
+from .utils import NOT_SET, Err, GenericResponse, GivenInput, Ok, Result, given_proxy
 
 
 class MethodsDict(CaseInsensitiveDict):
@@ -153,6 +152,7 @@ class BaseSchema(Mapping):
         func: Callable,
         settings: Optional[hypothesis.settings] = None,
         seed: Optional[int] = None,
+        _given_kwargs: Optional[Dict[str, GivenInput]] = None,
     ) -> Generator[Tuple[Result[Tuple[APIOperation, Callable], InvalidSchema], DataGenerationMethod], None, None]:
         """Generate all operations and Hypothesis tests for them."""
         for result in self.get_all_operations():
@@ -164,6 +164,7 @@ class BaseSchema(Mapping):
                         settings=settings,
                         seed=seed,
                         data_generation_method=data_generation_method,
+                        _given_kwargs=_given_kwargs,
                     )
                     yield Ok((result.ok(), test)), data_generation_method
                 else:
@@ -202,15 +203,9 @@ class BaseSchema(Mapping):
 
         return wrapper
 
-    def given(self, *args: Union[SearchStrategy, InferType], **kwargs: Union[SearchStrategy, InferType]) -> Callable:
+    def given(self, *args: GivenInput, **kwargs: GivenInput) -> Callable:
         """Proxy Hypothesis strategies to ``hypothesis.given``."""
-
-        def wrapper(func: GenericTest) -> GenericTest:
-            func._schemathesis_given_args = args  # type: ignore
-            func._schemathesis_given_kwargs = kwargs  # type: ignore
-            return func
-
-        return wrapper
+        return given_proxy(*args, **kwargs)
 
     def clone(
         self,
