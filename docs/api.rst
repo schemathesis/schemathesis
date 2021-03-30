@@ -85,6 +85,7 @@ Loaders
 .. autofunction:: schemathesis.from_wsgi
 .. autofunction:: schemathesis.graphql.from_dict
 .. autofunction:: schemathesis.graphql.from_url
+.. autofunction:: schemathesis.graphql.from_wsgi
 
 Schema
 ~~~~~~
