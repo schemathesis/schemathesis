@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any, Callable, Generator, List, Optional, Type, TypeVar, cast
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Type, TypeVar, cast
 
 import pytest
 from _pytest import fixtures, nodes
@@ -16,7 +16,16 @@ from .._hypothesis import create_test
 from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from ..exceptions import InvalidSchema
 from ..models import APIOperation
-from ..utils import Ok, Result, get_given_args, get_given_kwargs, is_schemathesis_test
+from ..utils import (
+    Ok,
+    Result,
+    get_given_args,
+    get_given_kwargs,
+    is_given_applied,
+    is_schemathesis_test,
+    merge_given_args,
+    validate_given_args,
+)
 
 USE_FROM_PARENT = version.parse(pytest.__version__) >= version.parse("5.4.0")
 
@@ -53,10 +62,26 @@ class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
 
 class SchemathesisCase(PyCollector):
     def __init__(self, test_function: Callable, *args: Any, **kwargs: Any) -> None:
-        self.test_function = test_function
+        self.given_kwargs: Optional[Dict[str, Any]]
+        given_args = get_given_args(test_function)
+        given_kwargs = get_given_kwargs(test_function)
+
+        def _init_with_valid_test(_test_function: Callable, _args: Tuple, _kwargs: Dict[str, Any]) -> None:
+            self.test_function = _test_function
+            self.is_invalid_test = False
+            self.given_kwargs = merge_given_args(test_function, _args, _kwargs)
+
+        if is_given_applied(test_function):
+            failing_test = validate_given_args(test_function, given_args, given_kwargs)
+            if failing_test is not None:
+                self.test_function = failing_test
+                self.is_invalid_test = True
+                self.given_kwargs = None
+            else:
+                _init_with_valid_test(test_function, given_args, given_kwargs)
+        else:
+            _init_with_valid_test(test_function, given_args, given_kwargs)
         self.schemathesis_case = test_function._schemathesis_test  # type: ignore
-        self.given_args = get_given_args(test_function)
-        self.given_kwargs = get_given_kwargs(test_function)
         super().__init__(*args, **kwargs)
 
     def _get_test_name(self, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:
@@ -75,13 +100,15 @@ class SchemathesisCase(PyCollector):
         """
         if isinstance(result, Ok):
             operation = result.ok()
-            funcobj = create_test(
-                operation=operation,
-                test=self.test_function,
-                _given_args=self.given_args,
-                _given_kwargs=self.given_kwargs,
-                data_generation_method=data_generation_method,
-            )
+            if self.is_invalid_test:
+                funcobj = self.test_function
+            else:
+                funcobj = create_test(
+                    operation=operation,
+                    test=self.test_function,
+                    _given_kwargs=self.given_kwargs,
+                    data_generation_method=data_generation_method,
+                )
             name = self._get_test_name(operation, data_generation_method)
         else:
             error = result.err()
