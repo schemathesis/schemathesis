@@ -150,3 +150,10 @@ class HTTPError(Exception):
             response.raise_for_status()
         except requests.HTTPError as exc:
             raise cls(response=response, url=response.url) from exc
+
+    @classmethod
+    def check_response(cls, response: requests.Response, schema_path: str) -> None:
+        # Raising exception to provide unified behavior
+        # E.g. it will be handled in CLI - a proper error message will be shown
+        if 400 <= response.status_code < 600:
+            raise cls(response=response, url=schema_path)
