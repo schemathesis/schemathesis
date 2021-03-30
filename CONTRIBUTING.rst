@@ -83,14 +83,19 @@ This spec serves a simple schema:
 
 .. code:: graphql
 
-    type Query {
-      patron: Patron
+    type Author {
+      name: String
+      books: [Book]
     }
 
-    type Patron {
-      id: ID
-      name: String
-      age: Int
+    type Book {
+      title: String
+      author: Author
+    }
+
+    type Query {
+      getBooks: [Book]
+      getAuthors: [Author]
     }
 
 OpenAPI
