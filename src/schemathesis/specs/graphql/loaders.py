@@ -1,11 +1,12 @@
 from typing import Any, Dict, Optional
 
 import requests
+from werkzeug import Client
 from yarl import URL
 
 from ...exceptions import HTTPError
 from ...hooks import HookContext, dispatch
-from ...utils import setup_headers
+from ...utils import WSGIResponse, setup_headers
 from .schemas import GraphQLSchema
 
 INTROSPECTION_QUERY = """
@@ -94,13 +95,16 @@ fragment TypeRef on __Type {
 }"""
 
 
-def from_url(url: str, base_url: Optional[str] = None, port: Optional[int] = None, **kwargs: Any) -> GraphQLSchema:
+def from_url(
+    url: str, base_url: Optional[str] = None, port: Optional[int] = None, *, app: Any = None, **kwargs: Any
+) -> GraphQLSchema:
     """Load GraphQL schema from the network.
 
     :param url: Schema URL.
     :param Optional[str] base_url: Base URL to send requests to.
     :param Optional[int] port: An optional port if you don't want to pass the ``base_url`` parameter, but only to change
                                port in ``url``.
+    :param app: A WSGI app instance.
     :return: GraphQLSchema
     """
     setup_headers(kwargs)
@@ -110,18 +114,35 @@ def from_url(url: str, base_url: Optional[str] = None, port: Optional[int] = Non
     response = requests.post(url, **kwargs)
     HTTPError.raise_for_status(response)
     decoded = response.json()
-    return from_dict(raw_schema=decoded["data"], location=url, base_url=base_url)
+    return from_dict(raw_schema=decoded["data"], location=url, base_url=base_url, app=app)
 
 
 def from_dict(
-    raw_schema: Dict[str, Any], location: Optional[str] = None, base_url: Optional[str] = None
+    raw_schema: Dict[str, Any], location: Optional[str] = None, base_url: Optional[str] = None, *, app: Any = None
 ) -> GraphQLSchema:
     """Load GraphQL schema from a Python dictionary.
 
     :param dict raw_schema: A schema to load.
     :param Optional[str] location: Optional schema location. Either a full URL or a filesystem path.
     :param Optional[str] base_url: Base URL to send requests to.
+    :param app: A WSGI app instance.
     :return: GraphQLSchema
     """
     dispatch("before_load_schema", HookContext(), raw_schema)
-    return GraphQLSchema(raw_schema, location=location, base_url=base_url)  # type: ignore
+    return GraphQLSchema(raw_schema, location=location, base_url=base_url, app=app)  # type: ignore
+
+
+def from_wsgi(schema_path: str, app: Any, base_url: Optional[str] = None, **kwargs: Any) -> GraphQLSchema:
+    """Load GraphQL schema from a WSGI app.
+
+    :param str schema_path: An in-app relative URL to the schema.
+    :param app: A WSGI app instance.
+    :param Optional[str] base_url: Base URL to send requests to.
+    :return: GraphQLSchema
+    """
+    setup_headers(kwargs)
+    kwargs.setdefault("json", {"query": INTROSPECTION_QUERY})
+    client = Client(app, WSGIResponse)
+    response = client.post(schema_path, **kwargs)
+    HTTPError.check_response(response, schema_path)
+    return from_dict(raw_schema=response.json["data"], location=schema_path, base_url=base_url, app=app)
