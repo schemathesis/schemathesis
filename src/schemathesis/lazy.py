@@ -1,16 +1,18 @@
-from inspect import signature
-from typing import Any, Callable, Dict, Iterable, Optional, Union
+from inspect import getfullargspec, signature
+from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Union
 
 import attr
 from _pytest.fixtures import FixtureRequest
+from hypothesis.core import is_invalid_test
 from pytest_subtests import SubTests, nullcontext
 
 from .constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
+from .exceptions import InvalidSchema
 from .hooks import HookDispatcher, HookScope
 from .models import APIOperation
 from .schemas import BaseSchema
 from .types import Filter, GenericTest, NotSet
-from .utils import NOT_SET, Ok
+from .utils import NOT_SET, GivenInput, Ok, get_given_args, get_given_kwargs, given_proxy, has_given_applied
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -53,6 +55,18 @@ class LazySchema:
             _code_sample_style = self.code_sample_style
 
         def wrapper(func: Callable) -> Callable:
+            if has_given_applied(func):
+                # The user wrapped the test function with `@schema.given`
+                # These args & kwargs go as extra to the underlying test generator
+                given_args = get_given_args(func)
+                given_kwargs = get_given_kwargs(func)
+                check_invalid = process_given_args(func, given_args, given_kwargs)
+                if check_invalid is not None:
+                    return check_invalid
+                del given_args
+            else:
+                given_kwargs = {}
+
             def test(request: FixtureRequest) -> None:
                 """The actual test, which is executed by pytest."""
                 __tracebackhide__ = True  # pylint: disable=unused-variable
@@ -72,11 +86,11 @@ class LazySchema:
                     data_generation_methods=data_generation_methods,
                     code_sample_style=_code_sample_style,
                 )
-                fixtures = get_fixtures(func, request)
+                fixtures = get_fixtures(func, request, given_kwargs)
                 # Changing the node id is required for better reporting - the method and path will appear there
                 node_id = request.node._nodeid
                 settings = getattr(test, "_hypothesis_internal_use_settings", None)
-                tests = list(schema.get_all_tests(func, settings))
+                tests = list(schema.get_all_tests(func, settings, _given_kwargs=given_kwargs))
                 request.session.testscollected += len(tests)
                 capmam = request.node.config.pluginmanager.get_plugin("capturemanager")
                 if capmam is not None:
@@ -90,16 +104,7 @@ class LazySchema:
                         subtests.item._nodeid = _get_node_name(node_id, operation, data_generation_method)
                         run_subtest(operation, fixtures, sub_test, subtests)
                     else:
-                        # Schema errors
-                        error = result.err()
-                        sub_test = error.as_failing_test_function()
-                        # `full_path` is always available in this case
-                        kwargs = {"path": error.full_path}
-                        if error.method:
-                            kwargs["method"] = error.method.upper()
-                        subtests.item._nodeid = _get_partial_node_name(node_id, data_generation_method, **kwargs)
-                        with subtests.test(**kwargs):
-                            sub_test()
+                        _schema_error(subtests, result.err(), node_id, data_generation_method)
                 subtests.item._nodeid = node_id
 
             # Needed to prevent a failure when settings are applied to the test function
@@ -108,6 +113,24 @@ class LazySchema:
             return test
 
         return wrapper
+
+    def given(self, *args: GivenInput, **kwargs: GivenInput) -> Callable:
+        return given_proxy(*args, **kwargs)
+
+
+def process_given_args(func: GenericTest, args: Tuple, kwargs: Dict[str, Any]) -> Optional[Callable]:
+    """Prepare arguments to `@schema.given` to be used with the test generator.
+
+    For simplicity, positional arguments are converted to keyword arguments.
+    """
+    original_argspec = getfullargspec(func)
+    check_invalid = is_invalid_test(func.__name__, original_argspec, args, kwargs)  # type: ignore
+    if check_invalid:
+        return check_invalid
+    if args:
+        for name, strategy in zip(reversed([arg for arg in original_argspec.args if arg != "case"]), reversed(args)):
+            kwargs[name] = strategy
+    return None
 
 
 def _get_node_name(node_id: str, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:
@@ -130,6 +153,20 @@ def run_subtest(operation: APIOperation, fixtures: Dict[str, Any], sub_test: Cal
     """Run the given subtest with pytest fixtures."""
     with subtests.test(method=operation.method.upper(), path=operation.path):
         sub_test(**fixtures)
+
+
+def _schema_error(
+    subtests: SubTests, error: InvalidSchema, node_id: str, data_generation_method: DataGenerationMethod
+) -> None:
+    """Run a failing test, that will show the underlying problem."""
+    sub_test = error.as_failing_test_function()
+    # `full_path` is always available in this case
+    kwargs = {"path": error.full_path}
+    if error.method:
+        kwargs["method"] = error.method.upper()
+    subtests.item._nodeid = _get_partial_node_name(node_id, data_generation_method, **kwargs)
+    with subtests.test(**kwargs):
+        sub_test()
 
 
 def get_schema(
@@ -165,7 +202,9 @@ def get_schema(
     )
 
 
-def get_fixtures(func: Callable, request: FixtureRequest) -> Dict[str, Any]:
+def get_fixtures(func: Callable, request: FixtureRequest, given_kwargs: Dict[str, Any]) -> Dict[str, Any]:
     """Load fixtures, needed for the test function."""
     sig = signature(func)
-    return {name: request.getfixturevalue(name) for name in sig.parameters if name != "case"}
+    return {
+        name: request.getfixturevalue(name) for name in sig.parameters if name != "case" and name not in given_kwargs
+    }

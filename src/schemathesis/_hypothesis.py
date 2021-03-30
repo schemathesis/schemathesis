@@ -1,22 +1,19 @@
 """High-level API for creating Hypothesis tests."""
 import asyncio
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import hypothesis
 from hypothesis import Phase
 from hypothesis import strategies as st
 from hypothesis.errors import Unsatisfiable
 from hypothesis.internal.reflection import proxies
-from hypothesis.strategies import SearchStrategy
-from hypothesis.utils.conventions import InferType
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
 from .constants import DEFAULT_DEADLINE, DataGenerationMethod
 from .exceptions import InvalidSchema
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import APIOperation, Case
-
-GivenInput = Union[SearchStrategy, InferType]
+from .utils import GivenInput
 
 
 def create_test(

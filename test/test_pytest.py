@@ -157,12 +157,12 @@ OPERATIONS = []
 
 @schema.parametrize()
 @schema.given(data=st.data())
-def test(data, case):
+def test_a(data, case):
     assert isinstance(data, DataObject)
     OPERATIONS.append(f"{case.method} {case.path}")
 
 
-def test_operations():
+def teardown_module(module):
     assert OPERATIONS == ['GET /users', 'POST /users']
     """,
         paths={
@@ -175,7 +175,7 @@ def test_operations():
     # Then its arguments should be proxied to the `hypothesis.given`
     # And be available in the test
     result = testdir.runpytest()
-    result.assert_outcomes(passed=3)
+    result.assert_outcomes(passed=2)
 
 
 def test_invalid_test(testdir):

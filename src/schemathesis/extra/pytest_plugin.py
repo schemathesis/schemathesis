@@ -16,7 +16,7 @@ from .._hypothesis import create_test
 from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from ..exceptions import InvalidSchema
 from ..models import APIOperation
-from ..utils import Ok, Result, is_schemathesis_test
+from ..utils import Ok, Result, get_given_args, get_given_kwargs, is_schemathesis_test
 
 USE_FROM_PARENT = version.parse(pytest.__version__) >= version.parse("5.4.0")
 
@@ -55,8 +55,8 @@ class SchemathesisCase(PyCollector):
     def __init__(self, test_function: Callable, *args: Any, **kwargs: Any) -> None:
         self.test_function = test_function
         self.schemathesis_case = test_function._schemathesis_test  # type: ignore
-        self.given_args = getattr(test_function, "_schemathesis_given_args", ())
-        self.given_kwargs = getattr(test_function, "_schemathesis_given_kwargs", {})
+        self.given_args = get_given_args(test_function)
+        self.given_kwargs = get_given_kwargs(test_function)
         super().__init__(*args, **kwargs)
 
     def _get_test_name(self, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:

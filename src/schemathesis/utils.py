@@ -26,6 +26,8 @@ from typing import (
 import requests
 import yaml
 from hypothesis.reporting import with_reporter
+from hypothesis.strategies import SearchStrategy
+from hypothesis.utils.conventions import InferType
 from requests.auth import HTTPDigestAuth
 from requests.exceptions import InvalidHeader  # type: ignore
 from requests.utils import check_header_validity  # type: ignore
@@ -33,7 +35,7 @@ from werkzeug.wrappers import Response as BaseResponse
 from werkzeug.wrappers.json import JSONMixin
 
 from .constants import USER_AGENT
-from .types import Filter, NotSet, RawAuth
+from .types import Filter, GenericTest, NotSet, RawAuth
 
 try:
     from yaml import CSafeLoader as SafeLoader
@@ -324,3 +326,29 @@ class Err(Generic[E]):
 
 
 Result = Union[Ok[T], Err[E]]
+GivenInput = Union[SearchStrategy, InferType]
+GIVEN_ARGS_MARKER = "_schemathesis_given_args"
+GIVEN_KWARGS_MARKER = "_schemathesis_given_kwargs"
+
+
+def get_given_args(func: GenericTest) -> Tuple:
+    return getattr(func, GIVEN_ARGS_MARKER, ())
+
+
+def get_given_kwargs(func: GenericTest) -> Dict[str, Any]:
+    return getattr(func, GIVEN_KWARGS_MARKER, {})
+
+
+def has_given_applied(func: GenericTest) -> bool:
+    return hasattr(func, GIVEN_ARGS_MARKER) or hasattr(func, GIVEN_KWARGS_MARKER)
+
+
+def given_proxy(*args: GivenInput, **kwargs: GivenInput) -> Callable[[GenericTest], GenericTest]:
+    """Proxy Hypothesis strategies to ``hypothesis.given``."""
+
+    def wrapper(func: GenericTest) -> GenericTest:
+        setattr(func, GIVEN_ARGS_MARKER, args)
+        setattr(func, GIVEN_KWARGS_MARKER, kwargs)
+        return func
+
+    return wrapper
