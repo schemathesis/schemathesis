@@ -5,6 +5,7 @@ import sys
 import traceback
 import warnings
 from contextlib import contextmanager
+from inspect import getfullargspec
 from json import JSONDecodeError
 from typing import (
     Any,
@@ -25,6 +26,7 @@ from typing import (
 
 import requests
 import yaml
+from hypothesis.core import is_invalid_test
 from hypothesis.reporting import with_reporter
 from hypothesis.strategies import SearchStrategy
 from hypothesis.utils.conventions import InferType
@@ -339,7 +341,7 @@ def get_given_kwargs(func: GenericTest) -> Dict[str, Any]:
     return getattr(func, GIVEN_KWARGS_MARKER, {})
 
 
-def has_given_applied(func: GenericTest) -> bool:
+def is_given_applied(func: GenericTest) -> bool:
     return hasattr(func, GIVEN_ARGS_MARKER) or hasattr(func, GIVEN_KWARGS_MARKER)
 
 
@@ -352,3 +354,20 @@ def given_proxy(*args: GivenInput, **kwargs: GivenInput) -> Callable[[GenericTes
         return func
 
     return wrapper
+
+
+def merge_given_args(func: GenericTest, args: Tuple, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge positional arguments to ``@schema.given`` into a dictionary with keyword arguments.
+
+    Kwargs are modified inplace.
+    """
+    if args:
+        argspec = getfullargspec(func)
+        for name, strategy in zip(reversed([arg for arg in argspec.args if arg != "case"]), reversed(args)):
+            kwargs[name] = strategy
+    return kwargs
+
+
+def validate_given_args(func: GenericTest, args: Tuple, kwargs: Dict[str, Any]) -> Optional[Callable]:
+    argspec = getfullargspec(func)
+    return is_invalid_test(func.__name__, argspec, args, kwargs)  # type: ignore

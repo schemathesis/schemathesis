@@ -178,6 +178,22 @@ def teardown_module(module):
     result.assert_outcomes(passed=2)
 
 
+def test_invalid_given_usage(testdir):
+    # When `schema.given` is used incorrectly (e.g. called without arguments)
+    testdir.make_test(
+        """
+@schema.parametrize()
+@schema.given()
+def test(case):
+    pass
+        """,
+    )
+    # Then the wrapped test should fail with an error
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    result.stdout.re_match_lines([".+given must be called with at least one argument"])
+
+
 def test_invalid_test(testdir):
     # When the test doesn't use the strategy provided in `schema.given`
     testdir.make_test(
