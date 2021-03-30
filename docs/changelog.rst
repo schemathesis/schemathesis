@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Custom keyword arguments to ``schemathesis.graphql.from_url`` that are proxied to ``requests.post``.
+- ``from_wsgi`` loader for GraphQL apps. `#1097`_
 
 **Changed**
 
@@ -1760,6 +1761,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1097: https://github.com/schemathesis/schemathesis/issues/1097
 .. _#1093: https://github.com/schemathesis/schemathesis/issues/1093
 .. _#1073: https://github.com/schemathesis/schemathesis/issues/1073
 .. _#1069: https://github.com/schemathesis/schemathesis/issues/1069
