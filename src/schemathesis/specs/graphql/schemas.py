@@ -8,8 +8,8 @@ from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
 from hypothesis_graphql import strategies as gql_st
 
-from ... import DataGenerationMethod
 from ...checks import not_a_server_error
+from ...constants import DataGenerationMethod
 from ...exceptions import InvalidSchema
 from ...hooks import HookDispatcher
 from ...models import APIOperation, Case, CheckFunction
