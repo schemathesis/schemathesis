@@ -20,9 +20,9 @@ from schemathesis.checks import ALL_CHECKS
 from schemathesis.cli import reset_checks
 from schemathesis.constants import USER_AGENT
 from schemathesis.hooks import unregister_all
-from schemathesis.loaders import from_uri
 from schemathesis.models import APIOperation
 from schemathesis.runner import DEFAULT_CHECKS
+from schemathesis.specs.openapi.loaders import from_uri
 from schemathesis.targets import DEFAULT_TARGETS
 
 PHASES = ", ".join(map(lambda x: x.name, Phase))
@@ -324,7 +324,7 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
     response = requests.Response()
     response.status_code = 200
     response._content = json.dumps(simple_schema).encode()
-    mocker.patch("schemathesis.loaders.requests.get", return_value=response)
+    mocker.patch("schemathesis.specs.openapi.loaders.requests.get", return_value=response)
     execute = mocker.patch("schemathesis.runner.execute_from_schema", autospec=True)
 
     result = cli.run(SCHEMA_URI, *args)
@@ -412,7 +412,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
 
 
 def test_load_schema_arguments_headers_to_loader_for_app(testdir, cli, mocker):
-    from_wsgi = mocker.patch("schemathesis.loaders.from_wsgi", autospec=True)
+    from_wsgi = mocker.patch("schemathesis.specs.openapi.loaders.from_wsgi", autospec=True)
 
     module = testdir.make_importable_pyfile(
         location="""

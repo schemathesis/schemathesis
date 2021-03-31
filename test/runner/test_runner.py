@@ -12,16 +12,16 @@ from hypothesis import Phase
 from requests.auth import HTTPDigestAuth
 
 import schemathesis
-from schemathesis import loaders
 from schemathesis._hypothesis import add_examples
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
 from schemathesis.models import Status
 from schemathesis.runner import ThreadPoolRunner, events, get_requests_auth, prepare
 from schemathesis.runner.impl.core import get_wsgi_auth, reraise
+from schemathesis.specs.openapi import loaders as oas_loaders
 
 
-def execute(schema_uri, loader=loaders.from_uri, **options) -> events.Finished:
+def execute(schema_uri, loader=oas_loaders.from_uri, **options) -> events.Finished:
     generator = prepare(schema_uri=schema_uri, loader=loader, **options)
     all_events = list(generator)
     return all_events[-1]
@@ -87,7 +87,7 @@ def args(openapi_version, request, mocker):
         app_path = request.getfixturevalue("loadable_flask_app")
         # To have simpler tests it is easier to reuse already imported application for inspection
         mocker.patch("schemathesis.runner.import_app", return_value=app)
-        kwargs = {"schema_uri": "/schema.yaml", "app": app_path, "loader": loaders.from_wsgi}
+        kwargs = {"schema_uri": "/schema.yaml", "app": app_path, "loader": oas_loaders.from_wsgi}
     return app, kwargs
 
 
@@ -186,7 +186,7 @@ def test_interactions(request, args, workers):
 @pytest.mark.operations("root")
 def test_asgi_interactions(loadable_fastapi_app):
     init, *ev, finished = prepare(
-        "/openapi.json", app=loadable_fastapi_app, loader=loaders.from_asgi, store_interactions=True
+        "/openapi.json", app=loadable_fastapi_app, loader=oas_loaders.from_asgi, store_interactions=True
     )
     interaction = ev[1].result.interactions[0]
     assert interaction.status == Status.success
@@ -630,21 +630,21 @@ def relative_schema_url():
 @pytest.mark.parametrize(
     "loader, fixture",
     (
-        (loaders.from_dict, "raw_schema"),
-        (loaders.from_file, "json_string"),
-        (loaders.from_path, "schema_path"),
-        (loaders.from_wsgi, "relative_schema_url"),
-        (loaders.from_aiohttp, "relative_schema_url"),
+        (oas_loaders.from_dict, "raw_schema"),
+        (oas_loaders.from_file, "json_string"),
+        (oas_loaders.from_path, "schema_path"),
+        (oas_loaders.from_wsgi, "relative_schema_url"),
+        (oas_loaders.from_aiohttp, "relative_schema_url"),
     ),
 )
 @pytest.mark.operations("success")
 def test_non_default_loader(openapi_version, request, loader, fixture):
     schema = request.getfixturevalue(fixture)
     kwargs = {}
-    if loader is loaders.from_wsgi:
+    if loader is oas_loaders.from_wsgi:
         kwargs["app"] = request.getfixturevalue("loadable_flask_app")
     else:
-        if loader is loaders.from_aiohttp:
+        if loader is oas_loaders.from_aiohttp:
             kwargs["app"] = request.getfixturevalue("loadable_aiohttp_app")
         kwargs["base_url"] = request.getfixturevalue("base_url")
     init, *others, finished = prepare(schema, loader=loader, headers={"TEST": "foo"}, **kwargs)
@@ -658,11 +658,11 @@ FROM_DICT_ERROR_MESSAGE = "Dictionary as a schema is allowed only with `from_dic
 @pytest.mark.parametrize(
     "loader, schema, message",
     (
-        (loaders.from_uri, {}, FROM_DICT_ERROR_MESSAGE),
-        (loaders.from_dict, "", "Schema should be a dictionary for `from_dict` loader"),
-        (loaders.from_wsgi, {}, FROM_DICT_ERROR_MESSAGE),
-        (loaders.from_file, {}, FROM_DICT_ERROR_MESSAGE),
-        (loaders.from_path, {}, FROM_DICT_ERROR_MESSAGE),
+        (oas_loaders.from_uri, {}, FROM_DICT_ERROR_MESSAGE),
+        (oas_loaders.from_dict, "", "Schema should be a dictionary for `from_dict` loader"),
+        (oas_loaders.from_wsgi, {}, FROM_DICT_ERROR_MESSAGE),
+        (oas_loaders.from_file, {}, FROM_DICT_ERROR_MESSAGE),
+        (oas_loaders.from_path, {}, FROM_DICT_ERROR_MESSAGE),
     ),
 )
 def test_validation(loader, schema, message):
@@ -742,7 +742,7 @@ def test_url_joining(request, server, get_schema_path, schema_path):
 
 def test_skip_operations_with_recursive_references(schema_with_recursive_references):
     # When the test schema contains recursive references
-    *_, after, finished = prepare(schema_with_recursive_references, loader=loaders.from_dict)
+    *_, after, finished = prepare(schema_with_recursive_references, loader=oas_loaders.from_dict)
     # Then it causes an error with a proper error message
     assert after.status == Status.error
     assert RECURSIVE_REFERENCE_ERROR_MESSAGE in after.result.errors[0].exception
@@ -780,7 +780,7 @@ def test_unsatisfiable_example(empty_open_api_3_schema):
         }
     }
     # Then the testing process should not raise an internal error
-    *_, after, finished = prepare(empty_open_api_3_schema, loader=loaders.from_dict, hypothesis_max_examples=1)
+    *_, after, finished = prepare(empty_open_api_3_schema, loader=oas_loaders.from_dict, hypothesis_max_examples=1)
     # And the tests are failing because of the unsatisfiable schema
     assert finished.has_errors
     assert "Unable to satisfy schema parameters for this API operation" in after.result.errors[0].exception

@@ -5,9 +5,9 @@ from typing import Any, Dict
 import pytest
 from hypothesis import HealthCheck, Phase
 
-from schemathesis import loaders
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.runner import events, prepare
+from schemathesis.specs.openapi import loaders
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 CATALOG_DIR = CURRENT_DIR / "openapi-directory/APIs/"

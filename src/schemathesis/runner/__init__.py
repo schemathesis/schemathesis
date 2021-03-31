@@ -5,11 +5,11 @@ import hypothesis.errors
 from starlette.applications import Starlette
 
 from .. import fixups as _fixups
-from .. import loaders
 from ..checks import DEFAULT_CHECKS
 from ..constants import DEFAULT_DATA_GENERATION_METHODS, DEFAULT_STATEFUL_RECURSION_LIMIT, DataGenerationMethod
 from ..models import CheckFunction
 from ..schemas import BaseSchema
+from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import DEFAULT_TARGETS, Target
 from ..types import Filter, NotSet, RawAuth
@@ -43,7 +43,7 @@ def prepare(
     stateful: Optional[Stateful] = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     # Schema loading
-    loader: Callable = loaders.from_uri,
+    loader: Callable = oas_loaders.from_uri,
     base_url: Optional[str] = None,
     auth: Optional[Tuple[str, str]] = None,
     auth_type: Optional[str] = None,
@@ -122,26 +122,26 @@ def prepare(
 def validate_loader(loader: Callable, schema_uri: Union[str, Dict[str, Any]]) -> None:
     """Sanity checking for input schema & loader."""
     if loader not in (
-        loaders.from_uri,
-        loaders.from_aiohttp,
-        loaders.from_dict,
-        loaders.from_file,
-        loaders.from_path,
-        loaders.from_wsgi,
+        oas_loaders.from_uri,
+        oas_loaders.from_aiohttp,
+        oas_loaders.from_dict,
+        oas_loaders.from_file,
+        oas_loaders.from_path,
+        oas_loaders.from_wsgi,
     ):
         # Custom loaders are not checked
         return
     if isinstance(schema_uri, dict):
-        if loader is not loaders.from_dict:
+        if loader is not oas_loaders.from_dict:
             raise ValueError("Dictionary as a schema is allowed only with `from_dict` loader")
-    elif loader is loaders.from_dict:
+    elif loader is oas_loaders.from_dict:
         raise ValueError("Schema should be a dictionary for `from_dict` loader")
 
 
 def execute_from_schema(
     *,
     schema_uri: Union[str, Dict[str, Any]],
-    loader: Callable = loaders.from_uri,
+    loader: Callable = oas_loaders.from_uri,
     base_url: Optional[str] = None,
     endpoint: Optional[Filter] = None,
     method: Optional[Filter] = None,
@@ -330,7 +330,7 @@ def load_schema(
     schema_uri: Union[str, Dict[str, Any]],
     *,
     base_url: Optional[str] = None,
-    loader: Callable = loaders.from_uri,
+    loader: Callable = oas_loaders.from_uri,
     app: Any = None,
     validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
@@ -360,18 +360,18 @@ def load_schema(
 
     if not isinstance(schema_uri, dict):
         if file_exists(schema_uri):
-            loader = loaders.from_path
+            loader = oas_loaders.from_path
         elif app is not None and not urlparse(schema_uri).netloc:
             # If `schema` is not an existing filesystem path, or a URL then it is considered as a path within
             # the given app
-            loader = loaders.get_loader_for_app(app)
+            loader = oas_loaders.get_loader_for_app(app)
             loader_options.update(dict_true_values(headers=headers))
         else:
             loader_options.update(dict_true_values(headers=headers, auth=auth, auth_type=auth_type))
 
-    if loader is loaders.from_uri and loader_options.get("auth"):
+    if loader is oas_loaders.from_uri and loader_options.get("auth"):
         loader_options["auth"] = get_requests_auth(loader_options["auth"], loader_options.pop("auth_type", None))
-    if loader in (loaders.from_uri, loaders.from_aiohttp):
+    if loader in (oas_loaders.from_uri, oas_loaders.from_aiohttp):
         loader_options["verify"] = request_tls_verify
 
     return loader(
