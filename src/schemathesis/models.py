@@ -20,6 +20,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Type,
     TypeVar,
     Union,
     cast,
@@ -454,10 +455,11 @@ class OperationDefinition:
 
 
 P = TypeVar("P", bound=Parameter)
+C = TypeVar("C", bound=Case)
 
 
 @attr.s(eq=False)  # pragma: no mutate
-class APIOperation(Generic[P]):
+class APIOperation(Generic[P, C]):
     """A single operation defined in an API.
 
     You can get one via a ``schema`` instance.
@@ -484,6 +486,7 @@ class APIOperation(Generic[P]):
     cookies: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
     query: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
     body: PayloadAlternatives[P] = attr.ib(factory=PayloadAlternatives)  # pragma: no mutate
+    case_cls: Type[C] = attr.ib(default=Case)
 
     @verbose_name.default
     def _verbose_name_default(self) -> str:
@@ -599,9 +602,9 @@ class APIOperation(Generic[P]):
         query: Optional[Query] = None,
         body: Union[Body, NotSet] = NOT_SET,
         media_type: Optional[str] = None,
-    ) -> Case:
+    ) -> C:
         """Create a new example for this API operation."""
-        return Case(
+        return self.case_cls(
             operation=self,
             path_parameters=path_parameters,
             headers=headers,

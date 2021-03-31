@@ -3,6 +3,7 @@ from hypothesis import given, settings
 
 import schemathesis
 from schemathesis.constants import USER_AGENT
+from schemathesis.specs.graphql.schemas import GraphQLCase
 
 
 @pytest.fixture()
@@ -69,3 +70,7 @@ def test_custom_base_url(graphql_url, kwargs, base_path, expected):
     case = strategy.example()
     # And all requests should go to the specified URL
     assert case.as_requests_kwargs()["url"] == expected
+
+
+def test_make_case(graphql_schema):
+    assert isinstance(graphql_schema["/graphql"]["POST"].make_case(), GraphQLCase)
