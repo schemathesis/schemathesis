@@ -18,6 +18,7 @@ from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
 from schemathesis.models import Status
 from schemathesis.runner import ThreadPoolRunner, events, get_requests_auth, prepare
 from schemathesis.runner.impl.core import get_wsgi_auth, reraise
+from schemathesis.specs.graphql import loaders as gql_loaders
 from schemathesis.specs.openapi import loaders as oas_loaders
 
 
@@ -660,9 +661,11 @@ FROM_DICT_ERROR_MESSAGE = "Dictionary as a schema is allowed only with `from_dic
     (
         (oas_loaders.from_uri, {}, FROM_DICT_ERROR_MESSAGE),
         (oas_loaders.from_dict, "", "Schema should be a dictionary for `from_dict` loader"),
+        (gql_loaders.from_dict, "", "Schema should be a dictionary for `from_dict` loader"),
         (oas_loaders.from_wsgi, {}, FROM_DICT_ERROR_MESSAGE),
         (oas_loaders.from_file, {}, FROM_DICT_ERROR_MESSAGE),
         (oas_loaders.from_path, {}, FROM_DICT_ERROR_MESSAGE),
+        (gql_loaders.from_wsgi, {}, FROM_DICT_ERROR_MESSAGE),
     ),
 )
 def test_validation(loader, schema, message):

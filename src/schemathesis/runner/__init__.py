@@ -9,6 +9,7 @@ from ..checks import DEFAULT_CHECKS
 from ..constants import DEFAULT_DATA_GENERATION_METHODS, DEFAULT_STATEFUL_RECURSION_LIMIT, DataGenerationMethod
 from ..models import CheckFunction
 from ..schemas import BaseSchema
+from ..specs.graphql import loaders as gql_loaders
 from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import DEFAULT_TARGETS, Target
@@ -127,14 +128,18 @@ def validate_loader(loader: Callable, schema_uri: Union[str, Dict[str, Any]]) ->
         oas_loaders.from_dict,
         oas_loaders.from_file,
         oas_loaders.from_path,
+        oas_loaders.from_asgi,
         oas_loaders.from_wsgi,
+        gql_loaders.from_dict,
+        gql_loaders.from_url,
+        gql_loaders.from_wsgi,
     ):
         # Custom loaders are not checked
         return
     if isinstance(schema_uri, dict):
-        if loader is not oas_loaders.from_dict:
+        if loader not in (oas_loaders.from_dict, gql_loaders.from_dict):
             raise ValueError("Dictionary as a schema is allowed only with `from_dict` loader")
-    elif loader is oas_loaders.from_dict:
+    elif loader in (oas_loaders.from_dict, gql_loaders.from_dict):
         raise ValueError("Schema should be a dictionary for `from_dict` loader")
 
 
