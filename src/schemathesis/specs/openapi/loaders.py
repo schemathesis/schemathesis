@@ -11,14 +11,14 @@ from starlette.testclient import TestClient as ASGIClient
 from werkzeug.test import Client
 from yarl import URL
 
-from .constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
-from .exceptions import HTTPError
-from .hooks import HookContext, dispatch
-from .lazy import LazySchema
-from .specs.openapi import definitions
-from .specs.openapi.schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
-from .types import Filter, PathLike
-from .utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, setup_headers
+from ...constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
+from ...exceptions import HTTPError
+from ...hooks import HookContext, dispatch
+from ...lazy import LazySchema
+from ...types import Filter, PathLike
+from ...utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, setup_headers
+from . import definitions
+from .schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
 
 
 def from_path(
@@ -322,7 +322,7 @@ def from_aiohttp(
     :param str schema_path: An in-app relative URL to the schema.
     :param app: An AioHTTP app instance.
     """
-    from .extra._aiohttp import run_server  # pylint: disable=import-outside-toplevel
+    from ...extra._aiohttp import run_server  # pylint: disable=import-outside-toplevel
 
     port = run_server(app)
     app_url = f"http://127.0.0.1:{port}/"
