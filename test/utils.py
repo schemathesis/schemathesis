@@ -56,10 +56,6 @@ def integer(**kwargs: Any) -> Dict[str, Any]:
     return {"type": "integer", "in": "query", **kwargs}
 
 
-def string(**kwargs: Any) -> Dict[str, Any]:
-    return {"type": "string", **kwargs}
-
-
 def array(**kwargs: Any) -> Dict[str, Any]:
     return {
         "name": "values",
@@ -71,12 +67,6 @@ def array(**kwargs: Any) -> Dict[str, Any]:
 
 def as_param(*parameters: Any) -> Dict[str, Any]:
     return {"paths": {"/users": {"get": {"parameters": list(parameters), "responses": {"200": {"description": "OK"}}}}}}
-
-
-def as_array(**kwargs: Any) -> Dict[str, Any]:
-    return {
-        "paths": {"/users": {"post": {"parameters": [array(**kwargs)], "responses": {"200": {"description": "OK"}}}}}
-    }
 
 
 def noop(value: Any) -> bool:
