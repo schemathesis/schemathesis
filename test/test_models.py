@@ -1,5 +1,4 @@
 import re
-from test.utils import SIMPLE_PATH
 
 import pytest
 import requests
@@ -145,61 +144,6 @@ def test_case_partial_deepcopy(swagger_20):
     assert original_case.cookies["TOKEN"] == "secret"
     assert original_case.query["a"] == 1
     assert original_case.body["b"] == 1
-
-
-schema = schemathesis.from_path(SIMPLE_PATH)
-
-
-def make_case(**kwargs):
-    operation = APIOperation("/api/success", "POST", {}, base_url="http://example.com", schema=schema)
-    return Case(operation, media_type="application/json", **kwargs)
-
-
-def expected(payload=""):
-    # Simple way to detect json for these tests
-    if payload.startswith("json"):
-        headers = ", 'Content-Type': 'application/json'"
-    else:
-        headers = ""
-    if payload:
-        payload = f", {payload}"
-    return (
-        f"requests.post('http://example.com/api/success', "
-        f"headers={{'User-Agent': '{USER_AGENT}'{headers}}}{payload})"
-    )
-
-
-@pytest.mark.parametrize(
-    "case, expected",
-    (
-        # Body can be of any primitive type supported by Open API
-        (make_case(body={"test": 1}), expected("json={'test': 1}")),
-        (make_case(body=["foo"]), expected("json=['foo']")),
-        (make_case(body="foo"), expected("json='foo'")),
-        (make_case(body=1), expected("json=1")),
-        (make_case(body=1.1), expected("json=1.1")),
-        (make_case(body=True), expected("json=True")),
-        (make_case(), expected()),
-        (make_case(query={"a": 1}), expected("params={'a': 1}")),
-    ),
-)
-def test_get_code_to_reproduce(case, expected):
-    assert case.get_code_to_reproduce() == expected, case.get_code_to_reproduce()
-
-
-def test_code_to_reproduce():
-    case = Case(APIOperation("/api/success", "GET", {}, base_url="http://127.0.0.1:1", schema=schema), body={"foo": 42})
-    request = requests.Request(**case.as_requests_kwargs()).prepare()
-    code = case.get_code_to_reproduce(request=request)
-    with pytest.raises(requests.exceptions.ConnectionError):
-        eval(code)
-
-
-def test_code_to_reproduce_without_extra_args():
-    case = Case(APIOperation("/api/success", "GET", {}, base_url="http://0.0.0.0", schema=schema))
-    request = requests.Request(method="GET", url="http://0.0.0.0/api/success").prepare()
-    code = case.get_code_to_reproduce(request=request)
-    assert code == "requests.get('http://0.0.0.0/api/success')"
 
 
 def test_validate_response(testdir):
