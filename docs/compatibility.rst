@@ -23,6 +23,6 @@ To use it, you need to add this code before you load your schema with Schemathes
     # will install all available compatibility fixups.
     schemathesis.fixups.install()
     # You can provide a list of fixup names as the first argument
-    # schemathesis.fixups.install(["fastapi"])
+    # schemathesis.fixups.install(["fast_api"])
 
 If you use the Command Line Interface, then you can utilize the ``--fixups=all`` option.
