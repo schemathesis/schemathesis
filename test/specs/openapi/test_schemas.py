@@ -2,7 +2,6 @@ import pytest
 
 import schemathesis
 from schemathesis.models import APIOperation
-from schemathesis.parameters import ParameterSet
 from schemathesis.specs.openapi.parameters import OpenAPI20Parameter, OpenAPI30Parameter
 
 

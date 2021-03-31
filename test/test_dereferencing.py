@@ -3,9 +3,6 @@ from pathlib import Path
 import pytest
 
 import schemathesis
-from schemathesis.models import APIOperation, OperationDefinition
-from schemathesis.parameters import PayloadAlternatives
-from schemathesis.specs.openapi.parameters import OpenAPI30Body
 
 from .utils import as_param, get_schema, integer
 
