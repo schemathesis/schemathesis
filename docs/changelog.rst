@@ -23,6 +23,7 @@ Changelog
 - Add the missing ``@schema.given`` implementation for schemas created via the ``from_pytest_fixture`` loader. `#1093`_
 - Silently ignoring some incorrect usages of ``@schema.given``.
 - Fixups examples were using incorrect fixup name.
+- Return type of ``make_case`` for GraphQL schemas.
 
 `3.5.3`_ - 2021-03-27
 ---------------------

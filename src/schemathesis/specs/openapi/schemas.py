@@ -174,7 +174,7 @@ class BaseOpenAPISchema(BaseSchema):
     ) -> APIOperation:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         base_url = self.get_base_url()
-        operation: APIOperation[OpenAPIParameter] = APIOperation(
+        operation: APIOperation[OpenAPIParameter, Case] = APIOperation(
             path=path,
             method=method,
             definition=raw_definition,
