@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any, Dict, Generator, List, Optional, Tuple, cast
+from typing import Any, Dict, Generator, List, Optional, Sequence, Tuple, cast
 from urllib.parse import urlsplit
 
 import attr
@@ -14,6 +14,7 @@ from ...exceptions import InvalidSchema
 from ...hooks import HookDispatcher
 from ...models import APIOperation, Case, CheckFunction
 from ...schemas import BaseSchema
+from ...stateful import Stateful, StatefulTest
 from ...utils import GenericResponse, Ok, Result
 
 
@@ -98,4 +99,9 @@ class GraphQLSchema(BaseSchema):
         return st.builds(constructor, body=gql_st.query(self.client_schema, fields=[operation.verbose_name]))
 
     def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
+        return []
+
+    def get_stateful_tests(
+        self, response: GenericResponse, operation: APIOperation, stateful: Optional[Stateful]
+    ) -> Sequence[StatefulTest]:
         return []
