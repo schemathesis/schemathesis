@@ -1,7 +1,5 @@
 import pytest
 
-from .apps import OpenAPIVersion
-
 
 def test_default(testdir):
     # When LazySchema is used
@@ -385,27 +383,6 @@ def test_(request, case):
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1, failed=1)
     result.stdout.re_match_lines([r"E +InvalidSchema: Body parameters are defined for GET request."])
-
-
-@pytest.mark.operations("failure")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
-def test_code_sample_style(testdir, openapi3_base_url, app_schema, openapi_version):
-    testdir.make_test(
-        f"""
-schema.base_url = "{openapi3_base_url}"
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema", code_sample_style="curl")
-
-@lazy_schema.parametrize()
-def test_(case):
-    case.call_and_validate()
-""",
-        schema=app_schema,
-    )
-    result = testdir.runpytest("-v")
-    result.assert_outcomes(passed=1, failed=1)
-    result.stdout.re_match_lines(
-        [r"E +Run this cURL command to reproduce this response:", rf"E + curl -X GET.+ {openapi3_base_url}/failure"]
-    )
 
 
 @pytest.mark.parametrize(

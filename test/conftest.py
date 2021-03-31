@@ -8,6 +8,7 @@ from hypothesis import settings
 import schemathesis.cli
 from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
+from schemathesis.specs.openapi import loaders as oas_loaders
 
 from .apps import Operation, _aiohttp, _fastapi, _flask, _graphql
 from .apps.utils import OpenAPIVersion
@@ -170,6 +171,16 @@ def graphql_server(graphql_app):
 @pytest.fixture()
 def graphql_url(graphql_server, graphql_path):
     return f"http://127.0.0.1:{graphql_server['port']}{graphql_path}"
+
+
+@pytest.fixture()
+def graphql_schema(graphql_url):
+    return schemathesis.graphql.from_url(graphql_url)
+
+
+@pytest.fixture
+def graphql_strategy(graphql_schema):
+    return graphql_schema["/graphql"]["POST"].as_strategy()
 
 
 @pytest.fixture(scope="session")
@@ -629,3 +640,18 @@ def loadable_fastapi_app(testdir, operations):
         """
     )
     return f"{module.purebasename}:app"
+
+
+@pytest.fixture
+def args(openapi_version, request, mocker):
+    if request.param == "real":
+        schema_url = request.getfixturevalue("schema_url")
+        kwargs = {"schema_uri": schema_url}
+        app = request.getfixturevalue("app")
+    else:
+        app = request.getfixturevalue("flask_app")
+        app_path = request.getfixturevalue("loadable_flask_app")
+        # To have simpler tests it is easier to reuse already imported application for inspection
+        mocker.patch("schemathesis.runner.import_app", return_value=app)
+        kwargs = {"schema_uri": "/schema.yaml", "app": app_path, "loader": oas_loaders.from_wsgi}
+    return app, kwargs

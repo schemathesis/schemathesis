@@ -78,21 +78,6 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("args", ["wsgi", "real"], indirect=True)
 
 
-@pytest.fixture
-def args(openapi_version, request, mocker):
-    if request.param == "real":
-        schema_url = request.getfixturevalue("schema_url")
-        kwargs = {"schema_uri": schema_url}
-        app = request.getfixturevalue("app")
-    else:
-        app = request.getfixturevalue("flask_app")
-        app_path = request.getfixturevalue("loadable_flask_app")
-        # To have simpler tests it is easier to reuse already imported application for inspection
-        mocker.patch("schemathesis.runner.import_app", return_value=app)
-        kwargs = {"schema_uri": "/schema.yaml", "app": app_path, "loader": oas_loaders.from_wsgi}
-    return app, kwargs
-
-
 def test_execute_base_url_not_found(openapi3_base_url, schema_url, app):
     # When base URL is pointing to an unknown location
     execute(schema_url, base_url=f"{openapi3_base_url}/404/")
@@ -702,36 +687,6 @@ def test_from_path_loader_ignore_network_parameters(openapi2_base_url):
     else:
         exception_type = "builtins.FileNotFoundError"
     assert all_events[0].exception_type == exception_type
-
-
-@pytest.mark.operations("failure")
-def test_reproduce_code_with_overridden_headers(args, openapi3_base_url):
-    app, kwargs = args
-    # Note, headers are essentially the same, but keys are ordered differently due to implementation details of
-    # real vs wsgi apps. It is the simplest solution, but not the most flexible one, though.
-    if isinstance(app, Flask):
-        headers = {
-            "User-Agent": USER_AGENT,
-            "X-Token": "test",
-            "Accept-Encoding": "gzip, deflate",
-            "Accept": "*/*",
-            "Connection": "keep-alive",
-        }
-        expected = f"requests.get('http://localhost/api/failure', headers={headers})"
-    else:
-        headers = {
-            "User-Agent": USER_AGENT,
-            "Accept-Encoding": "gzip, deflate",
-            "Accept": "*/*",
-            "Connection": "keep-alive",
-            "X-Token": "test",
-        }
-        expected = f"requests.get('{openapi3_base_url}/failure', headers={headers})"
-
-    *_, after, finished = prepare(**kwargs, headers=headers, hypothesis_max_examples=1)
-    assert finished.has_failures
-
-    assert after.result.checks[1].example.requests_code == expected
 
 
 @pytest.mark.operations("success")
