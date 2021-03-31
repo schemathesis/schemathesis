@@ -7,10 +7,6 @@ def test_default(testdir):
     # When LazySchema is used
     testdir.make_test(
         """
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 
 @lazy_schema.parametrize()
@@ -29,10 +25,6 @@ def test_with_settings(testdir):
     # When hypothesis settings are applied to the test function
     testdir.make_test(
         """
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 
 @settings(phases=[])
@@ -54,10 +46,6 @@ def test_invalid_operation(testdir, hypothesis_max_examples):
     # And schema validation is disabled
     testdir.make_test(
         """
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 
 @lazy_schema.parametrize()
@@ -100,10 +88,6 @@ def test_with_fixtures(testdir):
     # When the test uses custom arguments for pytest fixtures
     testdir.make_test(
         """
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 
 @pytest.fixture
@@ -129,10 +113,6 @@ def test_with_parametrize_filters(testdir):
     # When the test uses method / endpoint / tag / operation-id filter
     testdir.make_test(
         """
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 
 @lazy_schema.parametrize(endpoint="/first")
@@ -189,10 +169,6 @@ def test_with_parametrize_filters_override(testdir):
     # When the test uses method / endpoint filter
     testdir.make_test(
         """
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 
 @lazy_schema.parametrize(endpoint=None, method="GET")
@@ -248,10 +224,6 @@ def test_with_schema_filters(testdir):
     # When the test uses method / endpoint filter
     testdir.make_test(
         """
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema", endpoint="/v1/pets", method="POST")
 
 @lazy_schema.parametrize()
@@ -273,11 +245,8 @@ def test_with_schema_filters_override(testdir):
     # When the test uses method / endpoint filter
     testdir.make_test(
         """
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema", endpoint=None, method="POST")
+
 @lazy_schema.parametrize()
 def test_a(request, case):
     request.config.HYPOTHESIS_CASES += 1
@@ -321,10 +290,6 @@ def test_schema_filters_with_parametrize_override(testdir):
     # When the test uses method / endpoint filter
     testdir.make_test(
         """
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema", endpoint="/v1/first", method="POST")
 
 @lazy_schema.parametrize(endpoint="/second", method="GET")
@@ -348,7 +313,6 @@ def test_d(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.full_path == "/v1/first"
     assert case.method == "POST"
-
 """,
         paths={
             "/first": {
@@ -385,10 +349,10 @@ def test_invalid_fixture(testdir):
     testdir.make_test(
         """
 @pytest.fixture
-def simple_schema():
+def bad_schema():
     return 1
 
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+lazy_schema = schemathesis.from_pytest_fixture("bad_schema")
 
 @lazy_schema.parametrize()
 def test_(request, case):
@@ -410,10 +374,6 @@ def test_(request, case):
 def test_get_request_with_body(testdir, schema_with_get_payload):
     testdir.make_test(
         """
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 
 @lazy_schema.parametrize()
@@ -433,11 +393,6 @@ def test_code_sample_style(testdir, openapi3_base_url, app_schema, openapi_versi
     testdir.make_test(
         f"""
 schema.base_url = "{openapi3_base_url}"
-
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema", code_sample_style="curl")
 
 @lazy_schema.parametrize()
@@ -465,10 +420,6 @@ def test_(case):
 def test_hooks_with_lazy_schema(testdir, simple_openapi, decorators):
     testdir.make_test(
         f"""
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 
 @lazy_schema.hooks.register
@@ -503,10 +454,6 @@ def test_schema_given(testdir, given):
         f"""
 from hypothesis.strategies._internal.core import DataObject
 
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 OPERATIONS = []
 
@@ -537,10 +484,6 @@ def test_invalid_given_usage(testdir):
     # When `schema.given` is used incorrectly (e.g. called without arguments)
     testdir.make_test(
         """
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 
 @lazy_schema.parametrize()

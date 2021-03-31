@@ -524,6 +524,10 @@ def testdir(testdir):
         note = print  # An alias to distinguish with leftover prints
 
         schema = schemathesis.from_dict(raw_schema, method={method}, endpoint={endpoint}, tag={tag}, validate_schema={validate_schema})
+
+        @pytest.fixture
+        def simple_schema():
+            return schema
         """.format(
                 schema=schema,
                 method=repr(method),

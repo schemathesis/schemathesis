@@ -45,10 +45,6 @@ def test_(case):
 def test_in_pytest_subtests(testdir, open_api_3_schema_with_recoverable_errors):
     testdir.make_test(
         """
-@pytest.fixture
-def simple_schema():
-    return schema
-
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 
 @lazy_schema.parametrize()
