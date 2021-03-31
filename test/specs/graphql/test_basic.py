@@ -6,16 +6,6 @@ from schemathesis.constants import USER_AGENT
 from schemathesis.specs.graphql.schemas import GraphQLCase
 
 
-@pytest.fixture()
-def graphql_schema(graphql_url):
-    return schemathesis.graphql.from_url(graphql_url)
-
-
-@pytest.fixture
-def graphql_strategy(graphql_schema):
-    return graphql_schema["/graphql"]["POST"].as_strategy()
-
-
 def test_raw_schema(graphql_schema):
     assert graphql_schema.verbose_name == "GraphQL"
 
@@ -29,16 +19,6 @@ def test_query_strategy(graphql_strategy):
         assert response.status_code < 500
 
     test()
-
-
-@pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_get_code_to_reproduce(graphql_url, graphql_strategy):
-    case = graphql_strategy.example()
-    assert (
-        case.get_code_to_reproduce() == f"requests.post('{graphql_url}', "
-        f"json={{'query': {repr(case.body)}}}, "
-        f"headers={{'User-Agent': '{USER_AGENT}'}})"
-    )
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")

@@ -524,32 +524,6 @@ def test_cli_run_only_failure(cli, cli_args, app_type, workers):
     assert "== 1 failed in " in lines[-1]
 
 
-@pytest.mark.operations("failure")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
-@pytest.mark.parametrize("style", ("python", "curl"))
-def test_cli_code_sample_style(cli, base_url, schema_url, style, openapi_version):
-    result = cli.run(schema_url, f"--code-sample-style={style}")
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    assert " HYPOTHESIS OUTPUT " not in result.stdout
-    assert " SUMMARY " in result.stdout
-
-    lines = result.stdout.strip().split("\n")
-    if style == "python":
-        assert "Run this Python code to reproduce this failure: " in lines
-        headers = (
-            f"{{'User-Agent': '{USER_AGENT}', 'Accept-Encoding': 'gzip, deflate', "
-            f"'Accept': '*/*', 'Connection': 'keep-alive'}}"
-        )
-        assert f"    requests.get('{base_url}/failure', headers={headers})" in lines
-    else:
-        assert "Run this cURL command to reproduce this failure: " in lines
-        headers = (
-            f"-H 'Accept: */*' -H 'Accept-Encoding: gzip, deflate' "
-            f"-H 'Connection: keep-alive' -H 'User-Agent: {USER_AGENT}'"
-        )
-        assert f"    curl -X GET {headers} {base_url}/failure" in lines
-
-
 @pytest.mark.operations("upload_file")
 def test_cli_binary_body(cli, schema_url, hypothesis_max_examples):
     result = cli.run(
