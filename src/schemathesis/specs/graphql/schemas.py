@@ -77,7 +77,14 @@ class GraphQLSchema(BaseSchema):
         for field_name in schema.query_type.fields:
             yield Ok(
                 APIOperation(
-                    base_url=self.get_base_url(), path=self.base_path, verbose_name=field_name, method="POST", app=self.app, schema=self, definition=None  # type: ignore
+                    base_url=self.get_base_url(),
+                    path=self.base_path,
+                    verbose_name=field_name,
+                    method="POST",
+                    app=self.app,
+                    schema=self,
+                    definition=None,  # type: ignore
+                    case_cls=GraphQLCase,
                 )
             )
 
