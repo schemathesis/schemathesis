@@ -107,7 +107,7 @@ Schemathesis is more strict in schema handling by default, but we provide option
     # will install all available compatibility fixups.
     schemathesis.fixups.install()
     # You can also provide a list of fixup names as the first argument
-    # schemathesis.fixups.install(["fastapi"])
+    # schemathesis.fixups.install(["fast_api"])
 
 For more information, take a look into the "Compatibility" section.
 
