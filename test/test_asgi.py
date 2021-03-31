@@ -4,7 +4,7 @@ from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis import Case
-from schemathesis.loaders import from_asgi
+from schemathesis.specs.openapi.loaders import from_asgi
 
 from .apps._fastapi import create_app
 
