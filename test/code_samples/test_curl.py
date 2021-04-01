@@ -1,4 +1,4 @@
-from test.apps._fastapi.app import app
+from test.apps.openapi._fastapi.app import app
 
 import pytest
 

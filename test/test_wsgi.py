@@ -132,7 +132,7 @@ def test_app_with_parametrize(testdir):
     testdir.makepyfile(
         """
     import schemathesis
-    from test.apps._flask.app import app
+    from test.apps.openapi._flask.app import app
     from hypothesis import settings
 
     schema = schemathesis.from_wsgi("/schema.yaml", app)
