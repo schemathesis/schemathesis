@@ -6,7 +6,7 @@ from yarl import URL
 
 from ...exceptions import HTTPError
 from ...hooks import HookContext, dispatch
-from ...utils import WSGIResponse, setup_headers
+from ...utils import WSGIResponse, require_relative_url, setup_headers
 from .schemas import GraphQLSchema
 
 INTROSPECTION_QUERY = """
@@ -140,6 +140,7 @@ def from_wsgi(schema_path: str, app: Any, base_url: Optional[str] = None, **kwar
     :param Optional[str] base_url: Base URL to send requests to.
     :return: GraphQLSchema
     """
+    require_relative_url(schema_path)
     setup_headers(kwargs)
     kwargs.setdefault("json", {"query": INTROSPECTION_QUERY})
     client = Client(app, WSGIResponse)
