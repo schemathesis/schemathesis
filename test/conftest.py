@@ -10,8 +10,9 @@ from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.specs.openapi import loaders as oas_loaders
 
-from .apps import Operation, _aiohttp, _fastapi, _flask, _graphql
-from .apps.utils import OpenAPIVersion
+from .apps import _graphql
+from .apps.openapi import _aiohttp, _fastapi, _flask
+from .apps.openapi.schema import OpenAPIVersion, Operation
 from .utils import get_schema_path, make_schema
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
@@ -50,7 +51,7 @@ def pytest_configure(config):
 @pytest.fixture(scope="session")
 def _app():
     """A global AioHTTP application with configurable API operations."""
-    return _aiohttp.create_openapi_app(("success", "failure"))
+    return _aiohttp.create_app(("success", "failure"))
 
 
 @pytest.fixture
@@ -159,7 +160,7 @@ def graphql_path():
 
 @pytest.fixture(scope="session")
 def graphql_app(graphql_path):
-    return _graphql.create_app(graphql_path)
+    return _graphql._flask.create_app(graphql_path)
 
 
 @pytest.fixture()
@@ -582,7 +583,7 @@ def testdir(testdir):
 
 @pytest.fixture
 def wsgi_app_factory():
-    return _flask.create_openapi_app
+    return _flask.create_app
 
 
 @pytest.fixture()
@@ -610,9 +611,9 @@ def make_importable(module):
 def loadable_flask_app(testdir, operations):
     module = testdir.make_importable_pyfile(
         location=f"""
-        from test.apps._flask import create_openapi_app
+        from test.apps.openapi._flask import create_app
 
-        app = create_openapi_app({operations})
+        app = create_app({operations})
         """
     )
     return f"{module.purebasename}:app"
@@ -622,9 +623,9 @@ def loadable_flask_app(testdir, operations):
 def loadable_aiohttp_app(testdir, operations):
     module = testdir.make_importable_pyfile(
         location=f"""
-        from test.apps._aiohttp import create_openapi_app
+        from test.apps.openapi._aiohttp import create_app
 
-        app = create_openapi_app({operations})
+        app = create_app({operations})
         """
     )
     return f"{module.purebasename}:app"
@@ -634,7 +635,7 @@ def loadable_aiohttp_app(testdir, operations):
 def loadable_fastapi_app(testdir, operations):
     module = testdir.make_importable_pyfile(
         location=f"""
-        from test.apps._fastapi import create_app
+        from test.apps.openapi._fastapi import create_app
 
         app = create_app({operations})
         """

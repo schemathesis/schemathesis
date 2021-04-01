@@ -4,15 +4,11 @@ from typing import Callable, Tuple
 import yaml
 from aiohttp import web
 
+from ..schema import OpenAPIVersion, Operation, make_openapi_schema
 from . import handlers
 
-try:
-    from ..utils import OpenAPIVersion, Operation, make_openapi_schema
-except (ImportError, ValueError):
-    from utils import OpenAPIVersion, Operation, make_openapi_schema
 
-
-def create_openapi_app(
+def create_app(
     operations: Tuple[str, ...] = ("success", "failure"), version: OpenAPIVersion = OpenAPIVersion("2.0")
 ) -> web.Application:
     """Factory for aioHTTP app.

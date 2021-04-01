@@ -7,7 +7,7 @@ from schemathesis.specs.openapi import expressions
 from schemathesis.stateful import ParsedData
 from schemathesis.utils import NOT_SET
 
-from .apps.utils import OpenAPIVersion
+from .apps.openapi.schema import OpenAPIVersion
 
 
 @pytest.mark.parametrize(

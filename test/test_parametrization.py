@@ -5,7 +5,7 @@ from packaging import version
 import schemathesis
 from schemathesis.parameters import PayloadAlternatives
 
-from .apps import OpenAPIVersion
+from .apps.openapi.schema import OpenAPIVersion
 from .utils import integer
 
 

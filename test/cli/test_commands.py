@@ -4,7 +4,7 @@ import os
 import pathlib
 import sys
 import time
-from test.apps import OpenAPIVersion
+from test.apps.openapi.schema import OpenAPIVersion
 from test.utils import HERE, SIMPLE_PATH
 from urllib.parse import urljoin
 
@@ -416,9 +416,9 @@ def test_load_schema_arguments_headers_to_loader_for_app(testdir, cli, mocker):
 
     module = testdir.make_importable_pyfile(
         location="""
-        from test.apps._flask import create_openapi_app
+        from test.apps.openapi._flask import create_app
 
-        app = create_openapi_app()
+        app = create_app()
         """
     )
     cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "-H", "Authorization: Bearer 123")
@@ -1310,9 +1310,9 @@ async def test_multiple_files_schema(openapi_2_app, testdir, cli, hypothesis_max
 def test_wsgi_app(testdir, cli):
     module = testdir.make_importable_pyfile(
         location="""
-        from test.apps._flask import create_openapi_app
+        from test.apps.openapi._flask import create_app
 
-        app = create_openapi_app()
+        app = create_app()
         """
     )
     result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app")
@@ -1323,7 +1323,7 @@ def test_wsgi_app(testdir, cli):
 def test_wsgi_app_exception(testdir, cli):
     module = testdir.make_importable_pyfile(
         location="""
-        from test.apps._flask import create_openapi_app
+        from test.apps.openapi._flask import create_app
 
         1 / 0
         """
@@ -1337,7 +1337,7 @@ def test_wsgi_app_exception(testdir, cli):
 def test_wsgi_app_missing(testdir, cli):
     module = testdir.make_importable_pyfile(
         location="""
-        from test.apps._flask import create_openapi_app
+        from test.apps.openapi._flask import create_app
         """
     )
     result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app")
@@ -1350,9 +1350,9 @@ def test_wsgi_app_missing(testdir, cli):
 def test_wsgi_app_internal_exception(testdir, cli):
     module = testdir.make_importable_pyfile(
         location="""
-        from test.apps._flask import create_openapi_app
+        from test.apps.openapi._flask import create_app
 
-        app = create_openapi_app()
+        app = create_app()
         app.config["internal_exception"] = True
         """
     )

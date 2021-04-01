@@ -1,7 +1,7 @@
 import base64
 import json
 import platform
-from test.apps import OpenAPIVersion
+from test.apps.openapi.schema import OpenAPIVersion
 from typing import Dict, Optional
 
 import attr
