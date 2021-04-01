@@ -16,7 +16,7 @@ from ...exceptions import HTTPError
 from ...hooks import HookContext, dispatch
 from ...lazy import LazySchema
 from ...types import Filter, PathLike
-from ...utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, setup_headers
+from ...utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, require_relative_url, setup_headers
 from . import definitions
 from .schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
 
@@ -272,6 +272,7 @@ def from_wsgi(
     :param str schema_path: An in-app relative URL to the schema.
     :param app: A WSGI app instance.
     """
+    require_relative_url(schema_path)
     setup_headers(kwargs)
     client = Client(app, WSGIResponse)
     response = client.get(schema_path, **kwargs)
@@ -362,6 +363,7 @@ def from_asgi(
     :param str schema_path: An in-app relative URL to the schema.
     :param app: An ASGI app instance.
     """
+    require_relative_url(schema_path)
     setup_headers(kwargs)
     client = ASGIClient(app)
     response = client.get(schema_path, **kwargs)

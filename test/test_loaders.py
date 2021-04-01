@@ -142,3 +142,11 @@ def test_force_open_api_version(version, expected):
 def test_invalid_code_sample_style(empty_open_api_3_schema):
     with pytest.raises(ValueError, match="Invalid value for code sample style: ruby. Available styles: python, curl"):
         schemathesis.from_dict(empty_open_api_3_schema, code_sample_style="ruby")
+
+
+@pytest.mark.parametrize("loader", (schemathesis.from_asgi, schemathesis.from_wsgi, schemathesis.graphql.from_wsgi))
+def test_absolute_urls_for_apps(loader):
+    # When an absolute URL passed to a ASGI / WSGI loader
+    # Then it should be rejected
+    with pytest.raises(ValueError, match="Schema path should be relative for WSGI/ASGI loaders"):
+        loader("http://127.0.0.1:1/schema.json", app=None)  # actual app doesn't matter here

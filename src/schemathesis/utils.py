@@ -26,6 +26,7 @@ from typing import (
 
 import requests
 import yaml
+import yarl
 from hypothesis.core import is_invalid_test
 from hypothesis.reporting import with_reporter
 from hypothesis.strategies import SearchStrategy
@@ -301,6 +302,12 @@ def setup_headers(kwargs: Dict[str, Any]) -> None:
     headers = kwargs.setdefault("headers", {})
     if "user-agent" not in {header.lower() for header in headers}:
         kwargs["headers"]["User-Agent"] = USER_AGENT
+
+
+def require_relative_url(url: str) -> None:
+    """Raise an error if the URL is not relative."""
+    if yarl.URL(url).is_absolute():
+        raise ValueError("Schema path should be relative for WSGI/ASGI loaders")
 
 
 T = TypeVar("T")
