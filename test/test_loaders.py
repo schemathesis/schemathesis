@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from hypothesis import given, settings
 from requests.models import Response
 from yarl import URL
 
@@ -150,3 +151,31 @@ def test_absolute_urls_for_apps(loader):
     # Then it should be rejected
     with pytest.raises(ValueError, match="Schema path should be relative for WSGI/ASGI loaders"):
         loader("http://127.0.0.1:1/schema.json", app=None)  # actual app doesn't matter here
+
+
+def test_graphql_wsgi_loader(graphql_path, graphql_app):
+    schema = schemathesis.graphql.from_wsgi(graphql_path, app=graphql_app)
+    strategy = schema[graphql_path]["POST"].as_strategy()
+
+    @given(case=strategy)
+    @settings(max_examples=1)
+    def test(case):
+        response = case.call_wsgi()
+        assert response.status_code == 200
+        assert "data" in response.json
+
+    test()
+
+
+def test_graphql_asgi_loader(graphql_path, fastapi_graphql_app):
+    schema = schemathesis.graphql.from_asgi(graphql_path, app=fastapi_graphql_app)
+    strategy = schema[graphql_path]["POST"].as_strategy()
+
+    @given(case=strategy)
+    @settings(max_examples=1)
+    def test(case):
+        response = case.call_asgi()
+        assert response.status_code == 200
+        assert "data" in response.json()
+
+    test()
