@@ -366,13 +366,14 @@ def load_schema(
     if not isinstance(schema_uri, dict):
         if file_exists(schema_uri):
             loader = oas_loaders.from_path
-        elif app is not None and not urlparse(schema_uri).netloc:
-            # If `schema` is not an existing filesystem path, or a URL then it is considered as a path within
-            # the given app
-            loader = oas_loaders.get_loader_for_app(app)
-            loader_options.update(dict_true_values(headers=headers))
-        else:
-            loader_options.update(dict_true_values(headers=headers, auth=auth, auth_type=auth_type))
+        elif loader is not oas_loaders.from_path:
+            if app is not None and not urlparse(schema_uri).netloc:
+                # If `schema` is not an existing filesystem path, or a URL then it is considered as a path within
+                # the given app
+                loader = oas_loaders.get_loader_for_app(app)
+                loader_options.update(dict_true_values(headers=headers))
+            else:
+                loader_options.update(dict_true_values(headers=headers, auth=auth, auth_type=auth_type))
 
     if loader is oas_loaders.from_uri and loader_options.get("auth"):
         loader_options["auth"] = get_requests_auth(loader_options["auth"], loader_options.pop("auth_type", None))

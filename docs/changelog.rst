@@ -18,6 +18,7 @@ Changelog
 - The ``schemathesis.graphql.from_url`` loader now uses the usual Schemathesis User-Agent.
 - The Hypothesis database now uses separate entries for each API operation when executed via CLI. It increases its effectiveness when tests are re-run.
 - Module ``schemathesis.loaders`` is moved to ``schemathesis.specs.openapi.loaders``.
+- Show a more precise exception on incorrect usage of the ``from_path`` loader in Schemathesis runner.
 
 **Fixed**
 
