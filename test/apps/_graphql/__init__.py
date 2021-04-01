@@ -1,1 +1,1 @@
-from . import _flask
+from . import _fastapi, _flask

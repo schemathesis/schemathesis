@@ -4,6 +4,7 @@ from urllib.parse import urlsplit
 
 import attr
 import graphql
+import requests
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
 from hypothesis_graphql import strategies as gql_st
@@ -47,6 +48,15 @@ class GraphQLCase(Case):
         checks = checks or (not_a_server_error,)
         checks += additional_checks
         return super().validate_response(response, checks, code_sample_style=code_sample_style)
+
+    def call_asgi(
+        self,
+        app: Any = None,
+        base_url: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
+    ) -> requests.Response:
+        return super().call_asgi(app=app, base_url=base_url, headers=headers, **kwargs)
 
 
 @attr.s()  # pragma: no mutate
