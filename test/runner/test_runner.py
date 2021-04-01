@@ -680,6 +680,25 @@ def test_custom_loader(swagger_20, openapi2_base_url):
     assert not finished.has_failures
 
 
+def test_from_path_loader_ignore_network_parameters(openapi2_base_url):
+    # When `from_path` loader is used
+    # And network-related parameters are passed
+    all_events = list(
+        prepare(
+            openapi2_base_url,
+            loader=oas_loaders.from_path,
+            auth=("user", "password"),
+            headers={"X-Foo": "Bar"},
+            auth_type="basic",
+        )
+    )
+    # Then those parameters should be ignored during schema loading
+    # And a proper error message should be displayed
+    assert len(all_events) == 1
+    assert isinstance(all_events[0], events.InternalError)
+    assert all_events[0].exception_type == "builtins.FileNotFoundError"
+
+
 @pytest.mark.operations("failure")
 def test_reproduce_code_with_overridden_headers(args, openapi3_base_url):
     app, kwargs = args
