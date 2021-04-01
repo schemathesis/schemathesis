@@ -1,5 +1,6 @@
 import base64
 import json
+import platform
 from test.apps import OpenAPIVersion
 from typing import Dict, Optional
 
@@ -696,7 +697,11 @@ def test_from_path_loader_ignore_network_parameters(openapi2_base_url):
     # And a proper error message should be displayed
     assert len(all_events) == 1
     assert isinstance(all_events[0], events.InternalError)
-    assert all_events[0].exception_type == "builtins.FileNotFoundError"
+    if platform.system() == "Windows":
+        exception_type = "builtins.OSError"
+    else:
+        exception_type = "builtins.FileNotFoundError"
+    assert all_events[0].exception_type == exception_type
 
 
 @pytest.mark.operations("failure")

@@ -496,3 +496,29 @@ def test(case):
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
     result.stdout.re_match_lines([".+given must be called with at least one argument"])
+
+
+def test_override_base_url(testdir):
+    # When `base_url` is passed to `from_pytest_fixture`
+    testdir.make_test(
+        """
+schema.base_url = "http://127.0.0.1/a1"
+lazy_schema = schemathesis.from_pytest_fixture("simple_schema", base_url="http://127.0.0.1/a2")
+
+@lazy_schema.parametrize()
+def test_a(case):
+    assert schema.base_url == "http://127.0.0.1/a1"
+    assert case.operation.schema.base_url == "http://127.0.0.1/a2"
+
+lazy_schema2 = schemathesis.from_pytest_fixture("simple_schema")
+
+@lazy_schema2.parametrize()
+def test_b(case):
+    # No override
+    assert schema.base_url == case.operation.schema.base_url == "http://127.0.0.1/a1"
+        """,
+    )
+    # Then it should be overridden in the resulting schema
+    # And the original one should remain the same
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=2)

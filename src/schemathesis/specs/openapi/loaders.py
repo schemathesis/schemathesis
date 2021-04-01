@@ -15,7 +15,7 @@ from ...constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataG
 from ...exceptions import HTTPError
 from ...hooks import HookContext, dispatch
 from ...lazy import LazySchema
-from ...types import Filter, PathLike
+from ...types import Filter, NotSet, PathLike
 from ...utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, require_relative_url, setup_headers
 from . import definitions
 from .schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
@@ -220,6 +220,7 @@ def _maybe_validate_schema(
 
 def from_pytest_fixture(
     fixture_name: str,
+    base_url: Union[Optional[str], NotSet] = NOT_SET,
     method: Optional[Filter] = NOT_SET,
     endpoint: Optional[Filter] = NOT_SET,
     tag: Optional[Filter] = NOT_SET,
@@ -228,6 +229,7 @@ def from_pytest_fixture(
     skip_deprecated_operations: bool = False,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
+    app: Any = NOT_SET,
 ) -> LazySchema:
     """Load schema from a ``pytest`` fixture.
 
@@ -241,6 +243,7 @@ def from_pytest_fixture(
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     return LazySchema(
         fixture_name,
+        base_url=base_url,
         method=method,
         endpoint=endpoint,
         tag=tag,
@@ -249,6 +252,7 @@ def from_pytest_fixture(
         skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         code_sample_style=_code_sample_style,
+        app=app,
     )
 
 

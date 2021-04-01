@@ -8,6 +8,7 @@ Changelog
 
 - Custom keyword arguments to ``schemathesis.graphql.from_url`` that are proxied to ``requests.post``.
 - ``from_wsgi`` loader for GraphQL apps. `#1097`_
+- Support for ``app`` & ``base_url`` arguments for the ``from_pytest_fixture`` runner.
 
 **Changed**
 

@@ -210,17 +210,21 @@ class BaseSchema(Mapping):
     def clone(
         self,
         *,
+        base_url: Union[Optional[str], NotSet] = NOT_SET,
         test_function: Optional[GenericTest] = None,
         method: Optional[Filter] = NOT_SET,
         endpoint: Optional[Filter] = NOT_SET,
         tag: Optional[Filter] = NOT_SET,
         operation_id: Optional[Filter] = NOT_SET,
+        app: Any = NOT_SET,
         hooks: Union[HookDispatcher, NotSet] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
         skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
         code_sample_style: Union[CodeSampleStyle, NotSet] = NOT_SET,
     ) -> "BaseSchema":
+        if base_url is NOT_SET:
+            base_url = self.base_url
         if method is NOT_SET:
             method = self.method
         if endpoint is NOT_SET:
@@ -229,6 +233,8 @@ class BaseSchema(Mapping):
             tag = self.tag
         if operation_id is NOT_SET:
             operation_id = self.operation_id
+        if app is NOT_SET:
+            app = self.app
         if validate_schema is NOT_SET:
             validate_schema = self.validate_schema
         if skip_deprecated_operations is NOT_SET:
@@ -243,12 +249,12 @@ class BaseSchema(Mapping):
         return self.__class__(
             self.raw_schema,
             location=self.location,
-            base_url=self.base_url,
+            base_url=base_url,  # type: ignore
             method=method,
             endpoint=endpoint,
             tag=tag,
             operation_id=operation_id,
-            app=self.app,
+            app=app,
             hooks=hooks,  # type: ignore
             test_function=test_function,
             validate_schema=validate_schema,  # type: ignore

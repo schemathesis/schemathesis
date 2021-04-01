@@ -27,10 +27,12 @@ from .utils import (
 @attr.s(slots=True)  # pragma: no mutate
 class LazySchema:
     fixture_name: str = attr.ib()  # pragma: no mutate
+    base_url: Union[Optional[str], NotSet] = attr.ib(default=NOT_SET)  # pragma: no mutate
     method: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
     endpoint: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
     tag: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
     operation_id: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
+    app: Any = attr.ib(default=NOT_SET)  # pragma: no mutate
     hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
     skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
@@ -85,6 +87,7 @@ class LazySchema:
                 schema = get_schema(
                     request=request,
                     name=self.fixture_name,
+                    base_url=self.base_url,
                     method=method,
                     endpoint=endpoint,
                     tag=tag,
@@ -95,6 +98,7 @@ class LazySchema:
                     skip_deprecated_operations=skip_deprecated_operations,
                     data_generation_methods=data_generation_methods,
                     code_sample_style=_code_sample_style,
+                    app=self.app,
                 )
                 fixtures = get_fixtures(func, request, given_kwargs)
                 # Changing the node id is required for better reporting - the method and path will appear there
@@ -168,10 +172,12 @@ def get_schema(
     *,
     request: FixtureRequest,
     name: str,
+    base_url: Union[Optional[str], NotSet] = None,
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
+    app: Any = None,
     test_function: GenericTest,
     hooks: HookDispatcher,
     validate_schema: Union[bool, NotSet] = NOT_SET,
@@ -184,10 +190,12 @@ def get_schema(
     if not isinstance(schema, BaseSchema):
         raise ValueError(f"The given schema must be an instance of BaseSchema, got: {type(schema)}")
     return schema.clone(
+        base_url=base_url,
         method=method,
         endpoint=endpoint,
         tag=tag,
         operation_id=operation_id,
+        app=app,
         test_function=test_function,
         hooks=hooks,
         validate_schema=validate_schema,
