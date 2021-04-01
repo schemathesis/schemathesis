@@ -4,7 +4,7 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from ..utils import OpenAPIVersion
+from ..schema import OpenAPIVersion
 
 
 class User(BaseModel):

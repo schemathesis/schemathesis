@@ -9,7 +9,7 @@ import jsonschema
 from aiohttp import web
 
 try:
-    from ..utils import PAYLOAD_VALIDATOR
+    from ..schema import PAYLOAD_VALIDATOR
 except (ImportError, ValueError):
     from utils import PAYLOAD_VALIDATOR
 

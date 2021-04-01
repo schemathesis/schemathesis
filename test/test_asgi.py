@@ -6,12 +6,10 @@ import schemathesis
 from schemathesis import Case
 from schemathesis.specs.openapi.loaders import from_asgi
 
-from .apps._fastapi import create_app
-
 
 @pytest.fixture()
-def schema():
-    return from_asgi("/openapi.json", create_app())
+def schema(fastapi_app):
+    return from_asgi("/openapi.json", fastapi_app)
 
 
 @pytest.mark.hypothesis_nested

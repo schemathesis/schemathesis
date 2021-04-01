@@ -1,4 +1,4 @@
-from test.apps import OpenAPIVersion
+from test.apps.openapi.schema import OpenAPIVersion
 
 import pytest
 import requests

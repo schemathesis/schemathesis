@@ -29,7 +29,7 @@ def test_(request, case):
 def test_from_wsgi(testdir, graphql_path):
     testdir.make_test(
         f"""
-from test.apps._graphql.app import app
+from test.apps._graphql._flask.app import app
 
 schema = schemathesis.graphql.from_wsgi("{graphql_path}", app=app)
 

@@ -10,10 +10,7 @@ import yaml
 from flask import Flask, Response, _request_ctx_stack, jsonify, request
 from werkzeug.exceptions import BadRequest, GatewayTimeout, InternalServerError
 
-try:
-    from ..utils import PAYLOAD_VALIDATOR, OpenAPIVersion, make_openapi_schema
-except (ImportError, ValueError):
-    from utils import PAYLOAD_VALIDATOR, OpenAPIVersion, make_openapi_schema
+from ..schema import PAYLOAD_VALIDATOR, OpenAPIVersion, make_openapi_schema
 
 
 def expect_content_type(value: str):
@@ -23,7 +20,7 @@ def expect_content_type(value: str):
         raise InternalServerError(f"Expected {value} payload")
 
 
-def create_openapi_app(
+def create_app(
     operations: Tuple[str, ...] = ("success", "failure"), version: OpenAPIVersion = OpenAPIVersion("2.0")
 ) -> Flask:
     app = Flask("test_app")
