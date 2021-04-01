@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional
 
 import requests
+from starlette.testclient import TestClient as ASGIClient
 from werkzeug import Client
 from yarl import URL
 
@@ -147,3 +148,28 @@ def from_wsgi(schema_path: str, app: Any, base_url: Optional[str] = None, **kwar
     response = client.post(schema_path, **kwargs)
     HTTPError.check_response(response, schema_path)
     return from_dict(raw_schema=response.json["data"], location=schema_path, base_url=base_url, app=app)
+
+
+def from_asgi(
+    schema_path: str,
+    app: Any,
+    base_url: Optional[str] = None,
+    **kwargs: Any,
+) -> GraphQLSchema:
+    """Load GraphQL schema from an ASGI app.
+
+    :param str schema_path: An in-app relative URL to the schema.
+    :param app: An ASGI app instance.
+    """
+    require_relative_url(schema_path)
+    setup_headers(kwargs)
+    kwargs.setdefault("json", {"query": INTROSPECTION_QUERY})
+    client = ASGIClient(app)
+    response = client.post(schema_path, **kwargs)
+    HTTPError.check_response(response, schema_path)
+    return from_dict(
+        response.json()["data"],
+        location=schema_path,
+        base_url=base_url,
+        app=app,
+    )

@@ -10,8 +10,8 @@ from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.specs.openapi import loaders as oas_loaders
 
-from .apps import _graphql
-from .apps.openapi import _aiohttp, _fastapi, _flask
+from .apps import _graphql as graphql
+from .apps import openapi
 from .apps.openapi.schema import OpenAPIVersion, Operation
 from .utils import get_schema_path, make_schema
 
@@ -51,7 +51,7 @@ def pytest_configure(config):
 @pytest.fixture(scope="session")
 def _app():
     """A global AioHTTP application with configurable API operations."""
-    return _aiohttp.create_app(("success", "failure"))
+    return openapi._aiohttp.create_app(("success", "failure"))
 
 
 @pytest.fixture
@@ -70,7 +70,7 @@ def operations(request):
 @pytest.fixture
 def reset_app(_app, operations):
     def inner(version):
-        _aiohttp.reset_app(_app, operations, version)
+        openapi._aiohttp.reset_app(_app, operations, version)
 
     return inner
 
@@ -160,7 +160,7 @@ def graphql_path():
 
 @pytest.fixture(scope="session")
 def graphql_app(graphql_path):
-    return _graphql._flask.create_app(graphql_path)
+    return graphql._flask.create_app(graphql_path)
 
 
 @pytest.fixture()
@@ -506,7 +506,7 @@ def openapi_30():
 
 @pytest.fixture()
 def app_schema(openapi_version, operations):
-    return _aiohttp.make_openapi_schema(operations=operations, version=openapi_version)
+    return openapi._aiohttp.make_openapi_schema(operations=operations, version=openapi_version)
 
 
 @pytest.fixture()
@@ -583,7 +583,7 @@ def testdir(testdir):
 
 @pytest.fixture
 def wsgi_app_factory():
-    return _flask.create_app
+    return openapi._flask.create_app
 
 
 @pytest.fixture()
@@ -593,12 +593,17 @@ def flask_app(wsgi_app_factory, operations):
 
 @pytest.fixture
 def asgi_app_factory():
-    return _fastapi.create_app
+    return openapi._fastapi.create_app
 
 
 @pytest.fixture()
 def fastapi_app(asgi_app_factory):
     return asgi_app_factory()
+
+
+@pytest.fixture()
+def fastapi_graphql_app(graphql_path):
+    return graphql._fastapi.create_app(graphql_path)
 
 
 def make_importable(module):
