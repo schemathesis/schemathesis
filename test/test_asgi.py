@@ -13,19 +13,6 @@ def schema(fastapi_app):
 
 
 @pytest.mark.hypothesis_nested
-def test_call(schema, simple_schema):
-    strategy = schema["/users"]["GET"].as_strategy()
-
-    @given(case=strategy)
-    def test(case):
-        response = case.call_asgi()
-        assert response.status_code == 200
-        assert response.json() == {"success": True}
-
-    test()
-
-
-@pytest.mark.hypothesis_nested
 def test_cookies(fastapi_app):
     @fastapi_app.get("/cookies")
     def cookies(token: str = Cookie(None)):
