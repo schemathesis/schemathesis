@@ -23,17 +23,17 @@ from .schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
 
 def from_path(
     path: PathLike,
+    *,
+    app: Any = None,
     base_url: Optional[str] = None,
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    *,
-    app: Any = None,
-    validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
 ) -> BaseOpenAPISchema:
     """Load Open API schema via a file from an OS path.
@@ -43,35 +43,35 @@ def from_path(
     with open(path) as fd:
         return from_file(
             fd,
-            location=pathlib.Path(path).absolute().as_uri(),
+            app=app,
             base_url=base_url,
             method=method,
             endpoint=endpoint,
             tag=tag,
             operation_id=operation_id,
-            app=app,
-            validate_schema=validate_schema,
             skip_deprecated_operations=skip_deprecated_operations,
-            data_generation_methods=data_generation_methods,
+            validate_schema=validate_schema,
             force_schema_version=force_schema_version,
+            data_generation_methods=data_generation_methods,
             code_sample_style=code_sample_style,
+            location=pathlib.Path(path).absolute().as_uri(),
         )
 
 
 def from_uri(
     uri: str,
+    *,
+    app: Any = None,
     base_url: Optional[str] = None,
+    port: Optional[int] = None,
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    port: Optional[int] = None,
-    *,
-    app: Any = None,
-    validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
@@ -86,36 +86,36 @@ def from_uri(
     HTTPError.raise_for_status(response)
     return from_file(
         response.text,
-        location=uri,
+        app=app,
         base_url=base_url,
         method=method,
         endpoint=endpoint,
         tag=tag,
         operation_id=operation_id,
-        app=app,
-        validate_schema=validate_schema,
         skip_deprecated_operations=skip_deprecated_operations,
-        data_generation_methods=data_generation_methods,
+        validate_schema=validate_schema,
         force_schema_version=force_schema_version,
+        data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
+        location=uri,
     )
 
 
 def from_file(
     file: Union[IO[str], str],
-    location: Optional[str] = None,
+    *,
+    app: Any = None,
     base_url: Optional[str] = None,
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    *,
-    app: Any = None,
-    validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
+    location: Optional[str] = None,
     **kwargs: Any,  # needed in the runner to have compatible API across all loaders
 ) -> BaseOpenAPISchema:
     """Load Open API schema from a file descriptor, string or bytes.
@@ -125,36 +125,36 @@ def from_file(
     raw = yaml.load(file, StringDatesYAMLLoader)
     return from_dict(
         raw,
-        location=location,
+        app=app,
         base_url=base_url,
         method=method,
         endpoint=endpoint,
         tag=tag,
         operation_id=operation_id,
-        app=app,
-        validate_schema=validate_schema,
         skip_deprecated_operations=skip_deprecated_operations,
-        data_generation_methods=data_generation_methods,
+        validate_schema=validate_schema,
         force_schema_version=force_schema_version,
+        data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
+        location=location,
     )
 
 
 def from_dict(
     raw_schema: Dict[str, Any],
-    location: Optional[str] = None,
+    *,
+    app: Any = None,
     base_url: Optional[str] = None,
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    *,
-    app: Any = None,
-    validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
+    location: Optional[str] = None,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from a Python dictionary.
 
@@ -167,34 +167,34 @@ def from_dict(
         _maybe_validate_schema(raw_schema, definitions.SWAGGER_20_VALIDATOR, validate_schema)
         return SwaggerV20(
             raw_schema,
-            location=location,
+            app=app,
             base_url=base_url,
             method=method,
             endpoint=endpoint,
             tag=tag,
             operation_id=operation_id,
-            app=app,
-            validate_schema=validate_schema,
             skip_deprecated_operations=skip_deprecated_operations,
+            validate_schema=validate_schema,
             data_generation_methods=data_generation_methods,
             code_sample_style=_code_sample_style,
+            location=location,
         )
 
     def init_openapi_3() -> OpenApi30:
         _maybe_validate_schema(raw_schema, definitions.OPENAPI_30_VALIDATOR, validate_schema)
         return OpenApi30(
             raw_schema,
-            location=location,
+            app=app,
             base_url=base_url,
             method=method,
             endpoint=endpoint,
             tag=tag,
             operation_id=operation_id,
-            app=app,
-            validate_schema=validate_schema,
             skip_deprecated_operations=skip_deprecated_operations,
+            validate_schema=validate_schema,
             data_generation_methods=data_generation_methods,
             code_sample_style=_code_sample_style,
+            location=location,
         )
 
     if force_schema_version == "20":
@@ -220,16 +220,17 @@ def _maybe_validate_schema(
 
 def from_pytest_fixture(
     fixture_name: str,
+    *,
+    app: Any = NOT_SET,
     base_url: Union[Optional[str], NotSet] = NOT_SET,
     method: Optional[Filter] = NOT_SET,
     endpoint: Optional[Filter] = NOT_SET,
     tag: Optional[Filter] = NOT_SET,
     operation_id: Optional[Filter] = NOT_SET,
-    validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
+    validate_schema: bool = True,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    app: Any = NOT_SET,
 ) -> LazySchema:
     """Load schema from a ``pytest`` fixture.
 
@@ -243,31 +244,32 @@ def from_pytest_fixture(
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     return LazySchema(
         fixture_name,
+        app=app,
         base_url=base_url,
         method=method,
         endpoint=endpoint,
         tag=tag,
         operation_id=operation_id,
-        validate_schema=validate_schema,
         skip_deprecated_operations=skip_deprecated_operations,
+        validate_schema=validate_schema,
         data_generation_methods=data_generation_methods,
         code_sample_style=_code_sample_style,
-        app=app,
     )
 
 
 def from_wsgi(
     schema_path: str,
     app: Any,
+    *,
     base_url: Optional[str] = None,
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
@@ -283,18 +285,18 @@ def from_wsgi(
     HTTPError.check_response(response, schema_path)
     return from_file(
         response.data,
-        location=schema_path,
+        app=app,
         base_url=base_url,
         method=method,
         endpoint=endpoint,
         tag=tag,
         operation_id=operation_id,
-        app=app,
-        validate_schema=validate_schema,
         skip_deprecated_operations=skip_deprecated_operations,
-        data_generation_methods=data_generation_methods,
+        validate_schema=validate_schema,
         force_schema_version=force_schema_version,
+        data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
+        location=schema_path,
     )
 
 
@@ -309,16 +311,16 @@ def get_loader_for_app(app: Any) -> Callable:
 def from_aiohttp(
     schema_path: str,
     app: Any,
+    *,
     base_url: Optional[str] = None,
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    *,
-    validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
@@ -339,10 +341,10 @@ def from_aiohttp(
         endpoint=endpoint,
         tag=tag,
         operation_id=operation_id,
-        validate_schema=validate_schema,
         skip_deprecated_operations=skip_deprecated_operations,
-        data_generation_methods=data_generation_methods,
+        validate_schema=validate_schema,
         force_schema_version=force_schema_version,
+        data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
         **kwargs,
     )
@@ -351,14 +353,16 @@ def from_aiohttp(
 def from_asgi(
     schema_path: str,
     app: Any,
+    *,
     base_url: Optional[str] = None,
     method: Optional[Filter] = None,
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
-    validate_schema: bool = True,
+    operation_id: Optional[Filter] = None,
     skip_deprecated_operations: bool = False,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
@@ -374,15 +378,16 @@ def from_asgi(
     HTTPError.check_response(response, schema_path)
     return from_file(
         response.text,
-        location=schema_path,
+        app=app,
         base_url=base_url,
         method=method,
         endpoint=endpoint,
         tag=tag,
-        app=app,
-        validate_schema=validate_schema,
+        operation_id=operation_id,
         skip_deprecated_operations=skip_deprecated_operations,
-        data_generation_methods=data_generation_methods,
+        validate_schema=validate_schema,
         force_schema_version=force_schema_version,
+        data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
+        location=schema_path,
     )

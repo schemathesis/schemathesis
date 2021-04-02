@@ -12,6 +12,22 @@ Changelog
 - Support for ``data_generation_methods`` and ``code_sample_style`` in all GraphQL loaders.
 - Support for ``app`` & ``base_url`` arguments for the ``from_pytest_fixture`` runner.
 
+**Breaking**
+
+- Loaders' signatures are unified. Most of the arguments became keyword-only. All except the first two for ASGI/WSGI, all except the first one for the others.
+  It forces loader calls to be more consistent.
+
+.. code-block:: python
+
+    # BEFORE
+    schema = schemathesis.from_uri(
+        "http://example.com/openapi.json", "http://127.0.0.1:8000/", "GET"
+    )
+    # NOW
+    schema = schemathesis.from_uri(
+        "http://example.com/openapi.json", base_url="http://127.0.0.1:8000/", method="GET"
+    )
+
 **Changed**
 
 - Schemathesis generates separate tests for each field defined in the GraphQL ``Query`` type. It makes the testing process
@@ -29,6 +45,7 @@ Changelog
 - Silently ignoring some incorrect usages of ``@schema.given``.
 - Fixups examples were using incorrect fixup name.
 - Return type of ``make_case`` for GraphQL schemas.
+- Missed ``operation_id`` argument in ``from_asgi`` loader.
 
 `3.5.3`_ - 2021-03-27
 ---------------------
