@@ -305,18 +305,18 @@ SCHEMA_URI = "https://example.com/swagger.json"
                 "--hypothesis-verbosity=normal",
             ],
             {
-                "hypothesis_options": {
-                    "deadline": 1000,
-                    "derandomize": True,
-                    "max_examples": 1000,
-                    "phases": [Phase.explicit, Phase.generate],
-                    "report_multiple_bugs": False,
-                    "suppress_health_check": [HealthCheck.too_slow, HealthCheck.filter_too_much],
-                    "verbosity": Verbosity.normal,
-                }
+                "hypothesis_settings": hypothesis.settings(
+                    deadline=1000,
+                    derandomize=True,
+                    max_examples=1000,
+                    phases=[Phase.explicit, Phase.generate],
+                    report_multiple_bugs=False,
+                    suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
+                    verbosity=Verbosity.normal,
+                )
             },
         ),
-        (["--hypothesis-deadline=None"], {"hypothesis_options": {"deadline": None}}),
+        (["--hypothesis-deadline=None"], {"hypothesis_settings": hypothesis.settings(deadline=None)}),
         (["--max-response-time=10"], {"max_response_time": 10}),
     ),
 )
@@ -344,7 +344,6 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "skip_deprecated_operations": False,
         "force_schema_version": None,
         "loader": from_uri,
-        "hypothesis_options": {},
         "workers_num": 1,
         "exit_first": False,
         "dry_run": False,
@@ -362,9 +361,14 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "count_operations": True,
         **expected,
     }
-
     assert result.exit_code == ExitCode.OK, result.stdout
-    assert execute.call_args[1] == expected
+    hypothesis_settings = expected.pop("hypothesis_settings", None)
+    call_kwargs = execute.call_args[1]
+    executed_hypothesis_settings = call_kwargs.pop("hypothesis_settings", None)
+    if hypothesis_settings is not None:
+        # Compare non-default Hypothesis settings as `hypothesis.settings` can't be compared
+        assert executed_hypothesis_settings.show_changed() == hypothesis_settings.show_changed()
+    assert call_kwargs == expected
 
 
 @pytest.mark.parametrize(
