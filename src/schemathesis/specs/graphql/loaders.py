@@ -99,10 +99,10 @@ fragment TypeRef on __Type {
 
 def from_url(
     url: str,
-    base_url: Optional[str] = None,
-    port: Optional[int] = None,
     *,
     app: Any = None,
+    base_url: Optional[str] = None,
+    port: Optional[int] = None,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
@@ -135,12 +135,12 @@ def from_url(
 
 def from_dict(
     raw_schema: Dict[str, Any],
-    location: Optional[str] = None,
-    base_url: Optional[str] = None,
     *,
+    app: Any = None,
+    base_url: Optional[str] = None,
+    location: Optional[str] = None,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    app: Any = None,
 ) -> GraphQLSchema:
     """Load GraphQL schema from a Python dictionary.
 
@@ -158,6 +158,7 @@ def from_dict(
 def from_wsgi(
     schema_path: str,
     app: Any,
+    *,
     base_url: Optional[str] = None,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
@@ -189,6 +190,7 @@ def from_wsgi(
 def from_asgi(
     schema_path: str,
     app: Any,
+    *,
     base_url: Optional[str] = None,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
