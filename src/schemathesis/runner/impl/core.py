@@ -16,7 +16,6 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
 from ...constants import (
-    DEFAULT_DEADLINE,
     DEFAULT_STATEFUL_RECURSION_LIMIT,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
     USER_AGENT,
@@ -34,19 +33,13 @@ from ...utils import GenericResponse, Ok, WSGIResponse, capture_hypothesis_outpu
 from ..serialization import SerializedTestResult
 
 
-def get_hypothesis_settings(hypothesis_options: Dict[str, Any]) -> hypothesis.settings:
-    # Default settings, used as a parent settings object below
-    hypothesis_options.setdefault("deadline", DEFAULT_DEADLINE)
-    return hypothesis.settings(**hypothesis_options)
-
-
 @attr.s  # pragma: no mutate
 class BaseRunner:
     schema: BaseSchema = attr.ib()  # pragma: no mutate
     checks: Iterable[CheckFunction] = attr.ib()  # pragma: no mutate
     max_response_time: Optional[int] = attr.ib()  # pragma: no mutate
     targets: Iterable[Target] = attr.ib()  # pragma: no mutate
-    hypothesis_settings: hypothesis.settings = attr.ib(converter=get_hypothesis_settings)  # pragma: no mutate
+    hypothesis_settings: hypothesis.settings = attr.ib()  # pragma: no mutate
     auth: Optional[RawAuth] = attr.ib(default=None)  # pragma: no mutate
     auth_type: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     headers: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate

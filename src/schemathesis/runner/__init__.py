@@ -6,7 +6,12 @@ from starlette.applications import Starlette
 
 from .. import fixups as _fixups
 from ..checks import DEFAULT_CHECKS
-from ..constants import DEFAULT_DATA_GENERATION_METHODS, DEFAULT_STATEFUL_RECURSION_LIMIT, DataGenerationMethod
+from ..constants import (
+    DEFAULT_DATA_GENERATION_METHODS,
+    DEFAULT_DEADLINE,
+    DEFAULT_STATEFUL_RECURSION_LIMIT,
+    DataGenerationMethod,
+)
 from ..models import CheckFunction
 from ..schemas import BaseSchema
 from ..specs.graphql import loaders as gql_loaders
@@ -77,7 +82,7 @@ def prepare(
     if auth is None:
         # Auth type doesn't matter if auth is not passed
         auth_type = None  # type: ignore
-    hypothesis_options = prepare_hypothesis_options(
+    hypothesis_settings = prepare_hypothesis_settings(
         deadline=hypothesis_deadline,
         derandomize=hypothesis_derandomize,
         max_examples=hypothesis_max_examples,
@@ -102,7 +107,7 @@ def prepare(
         data_generation_methods=data_generation_methods,
         max_response_time=max_response_time,
         targets=targets,
-        hypothesis_options=hypothesis_options,
+        hypothesis_settings=hypothesis_settings,
         seed=seed,
         workers_num=workers_num,
         exit_first=exit_first,
@@ -161,7 +166,7 @@ def execute_from_schema(
     max_response_time: Optional[int] = None,
     targets: Iterable[Target],
     workers_num: int = 1,
-    hypothesis_options: Dict[str, Any],
+    hypothesis_settings: hypothesis.settings,
     auth: Optional[RawAuth] = None,
     auth_type: Optional[str] = None,
     headers: Optional[Dict[str, Any]] = None,
@@ -217,7 +222,7 @@ def execute_from_schema(
                     checks=checks,
                     max_response_time=max_response_time,
                     targets=targets,
-                    hypothesis_settings=hypothesis_options,
+                    hypothesis_settings=hypothesis_settings,
                     auth=auth,
                     auth_type=auth_type,
                     headers=headers,
@@ -238,7 +243,7 @@ def execute_from_schema(
                     checks=checks,
                     max_response_time=max_response_time,
                     targets=targets,
-                    hypothesis_settings=hypothesis_options,
+                    hypothesis_settings=hypothesis_settings,
                     auth=auth,
                     auth_type=auth_type,
                     headers=headers,
@@ -256,7 +261,7 @@ def execute_from_schema(
                     checks=checks,
                     max_response_time=max_response_time,
                     targets=targets,
-                    hypothesis_settings=hypothesis_options,
+                    hypothesis_settings=hypothesis_settings,
                     auth=auth,
                     auth_type=auth_type,
                     headers=headers,
@@ -276,7 +281,7 @@ def execute_from_schema(
                     checks=checks,
                     max_response_time=max_response_time,
                     targets=targets,
-                    hypothesis_settings=hypothesis_options,
+                    hypothesis_settings=hypothesis_settings,
                     auth=auth,
                     auth_type=auth_type,
                     headers=headers,
@@ -296,7 +301,7 @@ def execute_from_schema(
                     checks=checks,
                     max_response_time=max_response_time,
                     targets=targets,
-                    hypothesis_settings=hypothesis_options,
+                    hypothesis_settings=hypothesis_settings,
                     auth=auth,
                     auth_type=auth_type,
                     headers=headers,
@@ -314,7 +319,7 @@ def execute_from_schema(
                     checks=checks,
                     max_response_time=max_response_time,
                     targets=targets,
-                    hypothesis_settings=hypothesis_options,
+                    hypothesis_settings=hypothesis_settings,
                     auth=auth,
                     auth_type=auth_type,
                     headers=headers,
@@ -389,7 +394,7 @@ def load_schema(
     )
 
 
-def prepare_hypothesis_options(
+def prepare_hypothesis_settings(
     deadline: Optional[Union[int, NotSet]] = None,
     derandomize: Optional[bool] = None,
     max_examples: Optional[int] = None,
@@ -397,8 +402,8 @@ def prepare_hypothesis_options(
     report_multiple_bugs: Optional[bool] = None,
     suppress_health_check: Optional[List[hypothesis.HealthCheck]] = None,
     verbosity: Optional[hypothesis.Verbosity] = None,
-) -> Dict[str, Any]:
-    options = dict_not_none_values(
+) -> hypothesis.settings:
+    kwargs = dict_not_none_values(
         derandomize=derandomize,
         max_examples=max_examples,
         phases=phases,
@@ -409,7 +414,8 @@ def prepare_hypothesis_options(
     # `deadline` is special, since Hypothesis allows passing `None`
     if deadline is not None:
         if isinstance(deadline, NotSet):
-            options["deadline"] = None
+            kwargs["deadline"] = None
         else:
-            options["deadline"] = deadline
-    return options
+            kwargs["deadline"] = deadline
+    kwargs.setdefault("deadline", DEFAULT_DEADLINE)
+    return hypothesis.settings(**kwargs)
