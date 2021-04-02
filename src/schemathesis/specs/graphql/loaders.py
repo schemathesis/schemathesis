@@ -1,10 +1,11 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 
 import requests
 from starlette.testclient import TestClient as ASGIClient
 from werkzeug import Client
 from yarl import URL
 
+from ...constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
 from ...exceptions import HTTPError
 from ...hooks import HookContext, dispatch
 from ...utils import WSGIResponse, require_relative_url, setup_headers
@@ -97,7 +98,14 @@ fragment TypeRef on __Type {
 
 
 def from_url(
-    url: str, base_url: Optional[str] = None, port: Optional[int] = None, *, app: Any = None, **kwargs: Any
+    url: str,
+    base_url: Optional[str] = None,
+    port: Optional[int] = None,
+    *,
+    app: Any = None,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    code_sample_style: str = CodeSampleStyle.default().name,
+    **kwargs: Any,
 ) -> GraphQLSchema:
     """Load GraphQL schema from the network.
 
@@ -115,11 +123,24 @@ def from_url(
     response = requests.post(url, **kwargs)
     HTTPError.raise_for_status(response)
     decoded = response.json()
-    return from_dict(raw_schema=decoded["data"], location=url, base_url=base_url, app=app)
+    return from_dict(
+        raw_schema=decoded["data"],
+        location=url,
+        base_url=base_url,
+        app=app,
+        data_generation_methods=data_generation_methods,
+        code_sample_style=code_sample_style,
+    )
 
 
 def from_dict(
-    raw_schema: Dict[str, Any], location: Optional[str] = None, base_url: Optional[str] = None, *, app: Any = None
+    raw_schema: Dict[str, Any],
+    location: Optional[str] = None,
+    base_url: Optional[str] = None,
+    *,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    code_sample_style: str = CodeSampleStyle.default().name,
+    app: Any = None,
 ) -> GraphQLSchema:
     """Load GraphQL schema from a Python dictionary.
 
@@ -129,11 +150,19 @@ def from_dict(
     :param app: A WSGI app instance.
     :return: GraphQLSchema
     """
+    _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     dispatch("before_load_schema", HookContext(), raw_schema)
-    return GraphQLSchema(raw_schema, location=location, base_url=base_url, app=app)  # type: ignore
+    return GraphQLSchema(raw_schema, location=location, base_url=base_url, app=app, data_generation_methods=data_generation_methods, code_sample_style=_code_sample_style)  # type: ignore
 
 
-def from_wsgi(schema_path: str, app: Any, base_url: Optional[str] = None, **kwargs: Any) -> GraphQLSchema:
+def from_wsgi(
+    schema_path: str,
+    app: Any,
+    base_url: Optional[str] = None,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    code_sample_style: str = CodeSampleStyle.default().name,
+    **kwargs: Any,
+) -> GraphQLSchema:
     """Load GraphQL schema from a WSGI app.
 
     :param str schema_path: An in-app relative URL to the schema.
@@ -147,19 +176,29 @@ def from_wsgi(schema_path: str, app: Any, base_url: Optional[str] = None, **kwar
     client = Client(app, WSGIResponse)
     response = client.post(schema_path, **kwargs)
     HTTPError.check_response(response, schema_path)
-    return from_dict(raw_schema=response.json["data"], location=schema_path, base_url=base_url, app=app)
+    return from_dict(
+        raw_schema=response.json["data"],
+        location=schema_path,
+        base_url=base_url,
+        app=app,
+        data_generation_methods=data_generation_methods,
+        code_sample_style=code_sample_style,
+    )
 
 
 def from_asgi(
     schema_path: str,
     app: Any,
     base_url: Optional[str] = None,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> GraphQLSchema:
     """Load GraphQL schema from an ASGI app.
 
     :param str schema_path: An in-app relative URL to the schema.
     :param app: An ASGI app instance.
+    :param Optional[str] base_url: Base URL to send requests to.
     """
     require_relative_url(schema_path)
     setup_headers(kwargs)
@@ -172,4 +211,6 @@ def from_asgi(
         location=schema_path,
         base_url=base_url,
         app=app,
+        data_generation_methods=data_generation_methods,
+        code_sample_style=code_sample_style,
     )
