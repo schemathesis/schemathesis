@@ -13,7 +13,7 @@ from schemathesis.specs.openapi import loaders as oas_loaders
 from .apps import _graphql as graphql
 from .apps import openapi
 from .apps.openapi.schema import OpenAPIVersion, Operation
-from .utils import get_schema_path, make_schema
+from .utils import SIMPLE_PATH, get_schema_path, make_schema
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
 
@@ -88,6 +88,11 @@ def app(openapi_version, _app, reset_app):
     """
     reset_app(openapi_version)
     return _app
+
+
+@pytest.fixture
+def simple_schema_path():
+    return SIMPLE_PATH
 
 
 @pytest.fixture
