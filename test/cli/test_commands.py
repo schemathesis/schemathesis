@@ -347,7 +347,6 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
         "workers_num": 1,
         "exit_first": False,
         "dry_run": False,
-        "fixups": (),
         "stateful": None,
         "stateful_recursion_limit": 5,
         "auth": None,

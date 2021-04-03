@@ -39,6 +39,10 @@ Changelog
 - Module ``schemathesis.loaders`` is moved to ``schemathesis.specs.openapi.loaders``.
 - Show a more precise exception on incorrect usage of the ``from_path`` loader in Schemathesis runner.
 
+**Removed**
+
+- Undocumented way to install fixups via the ``fixups`` argument for ``schemathesis.runner.prepare`` is removed.
+
 **Fixed**
 
 - Add the missing ``@schema.given`` implementation for schemas created via the ``from_pytest_fixture`` loader. `#1093`_

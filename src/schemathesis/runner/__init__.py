@@ -4,7 +4,6 @@ from urllib.parse import urlparse
 import hypothesis.errors
 from starlette.applications import Starlette
 
-from .. import fixups as _fixups
 from ..checks import DEFAULT_CHECKS
 from ..constants import (
     DEFAULT_DATA_GENERATION_METHODS,
@@ -45,7 +44,6 @@ def prepare(
     exit_first: bool = False,
     dry_run: bool = False,
     store_interactions: bool = False,
-    fixups: Iterable[str] = (),
     stateful: Optional[Stateful] = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     # Schema loading
@@ -118,7 +116,6 @@ def prepare(
         request_timeout=request_timeout,
         request_tls_verify=request_tls_verify,
         store_interactions=store_interactions,
-        fixups=fixups,
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,
         count_operations=count_operations,
@@ -176,7 +173,6 @@ def execute_from_schema(
     exit_first: bool = False,
     dry_run: bool = False,
     store_interactions: bool = False,
-    fixups: Iterable[str] = (),
     stateful: Optional[Stateful] = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     count_operations: bool = True,
@@ -187,12 +183,6 @@ def execute_from_schema(
     """
     # pylint: disable=too-many-locals
     try:
-        if fixups:
-            if "all" in fixups:
-                _fixups.install()
-            else:
-                _fixups.install(fixups)
-
         if app is not None:
             app = import_app(app)
         schema = load_schema(
