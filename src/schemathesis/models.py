@@ -439,8 +439,12 @@ def cookie_handler(client: werkzeug.Client, cookies: Optional[Cookies]) -> Gener
             client.delete_cookie("localhost", key)
 
 
-@attr.s(slots=True)  # pragma: no mutate
-class OperationDefinition:
+P = TypeVar("P", bound=Parameter)
+D = TypeVar("D")
+
+
+@attr.s  # pragma: no mutate
+class OperationDefinition(Generic[P, D]):
     """A wrapper to store not resolved API operation definitions.
 
     To prevent recursion errors we need to store definitions without resolving references. But operation definitions
@@ -448,13 +452,12 @@ class OperationDefinition:
     scope change to have a proper reference resolving later.
     """
 
-    raw: Dict[str, Any] = attr.ib()  # pragma: no mutate
-    resolved: Dict[str, Any] = attr.ib()  # pragma: no mutate
+    raw: D = attr.ib()  # pragma: no mutate
+    resolved: D = attr.ib()  # pragma: no mutate
     scope: str = attr.ib()  # pragma: no mutate
-    parameters: Sequence[Parameter] = attr.ib()  # pragma: no mutate
+    parameters: Sequence[P] = attr.ib()  # pragma: no mutate
 
 
-P = TypeVar("P", bound=Parameter)
 C = TypeVar("C", bound=Case)
 
 

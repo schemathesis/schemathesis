@@ -1,4 +1,4 @@
-from . import fixups, hooks, serializers, targets
+from . import fixups, hooks, runner, serializers, targets
 from .cli import register_check, register_target
 from .constants import DataGenerationMethod, __version__
 from .models import Case
