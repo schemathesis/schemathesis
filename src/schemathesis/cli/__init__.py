@@ -11,6 +11,7 @@ import hypothesis
 import yaml
 
 from .. import checks as checks_module
+from .. import fixups as _fixups
 from .. import runner
 from .. import targets as targets_module
 from ..constants import (
@@ -500,6 +501,12 @@ def run(
     else:
         selected_checks = tuple(check for check in checks_module.ALL_CHECKS if check.__name__ in checks)
 
+    if fixups:
+        if "all" in fixups:
+            _fixups.install()
+        else:
+            _fixups.install(fixups)
+
     prepared_runner = runner.prepare(
         schema,
         auth=auth,
@@ -524,7 +531,6 @@ def run(
         workers_num=workers_num,
         validate_schema=validate_schema,
         skip_deprecated_operations=skip_deprecated_operations,
-        fixups=fixups,
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,
         force_schema_version=force_schema_version,
