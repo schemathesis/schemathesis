@@ -5,6 +5,7 @@ from test.apps.openapi.schema import OpenAPIVersion
 from typing import Dict, Optional
 
 import attr
+import hypothesis
 import pytest
 from aiohttp import web
 from aiohttp.streams import EmptyStreamReader
@@ -17,7 +18,7 @@ from schemathesis._hypothesis import add_examples
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
 from schemathesis.models import Status
-from schemathesis.runner import ThreadPoolRunner, events, get_requests_auth, prepare
+from schemathesis.runner import ThreadPoolRunner, events, from_schema, get_requests_auth, prepare
 from schemathesis.runner.impl.core import get_wsgi_auth, reraise
 from schemathesis.specs.graphql import loaders as gql_loaders
 from schemathesis.specs.openapi import loaders as oas_loaders
@@ -764,3 +765,12 @@ def test_hypothesis_errors_propagation(empty_open_api_3_schema, openapi3_base_ur
     assert len(after.result.checks) == max_examples
     assert not finished.has_failures
     assert not finished.has_errors
+
+
+def test_graphql(graphql_url):
+    schema = gql_loaders.from_url(graphql_url)
+    initialized, *others, finished = list(
+        from_schema(schema, hypothesis_settings=hypothesis.settings(max_examples=5)).execute()
+    )
+    assert initialized.operations_count == 2
+    assert finished.passed_count == 2

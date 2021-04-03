@@ -11,6 +11,19 @@ Changelog
 - ``from_asgi`` loader for GraphQL apps. `#1100`_
 - Support for ``data_generation_methods`` and ``code_sample_style`` in all GraphQL loaders.
 - Support for ``app`` & ``base_url`` arguments for the ``from_pytest_fixture`` runner.
+- Initial support for GraphQL schemas in Schemathesis runner.
+
+.. code-block:: python
+
+    import schemathesis
+
+    # Load schema
+    schema = schemathesis.graphql.from_url("http://localhost:8000/graphql")
+    # Initialize runner
+    runner = schemathesis.runner.from_schema(schema)
+    # Emit events
+    for event in runner.execute():
+        ...
 
 **Breaking**
 

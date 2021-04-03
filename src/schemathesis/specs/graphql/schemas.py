@@ -13,7 +13,7 @@ from ...checks import not_a_server_error
 from ...constants import DataGenerationMethod
 from ...exceptions import InvalidSchema
 from ...hooks import HookDispatcher
-from ...models import APIOperation, Case, CheckFunction
+from ...models import APIOperation, Case, CheckFunction, OperationDefinition
 from ...schemas import BaseSchema
 from ...stateful import Stateful, StatefulTest
 from ...utils import GenericResponse, Ok, Result
@@ -85,7 +85,7 @@ class GraphQLSchema(BaseSchema):
         schema = self.client_schema
         if schema.query_type is None:
             return
-        for field_name in schema.query_type.fields:
+        for field_name, definition in schema.query_type.fields.items():
             yield Ok(
                 APIOperation(
                     base_url=self.get_base_url(),
@@ -94,7 +94,8 @@ class GraphQLSchema(BaseSchema):
                     method="POST",
                     app=self.app,
                     schema=self,
-                    definition=None,  # type: ignore
+                    # Parameters are not yet supported
+                    definition=OperationDefinition(raw=definition, resolved=definition, scope="", parameters=[]),
                     case_cls=GraphQLCase,
                 )
             )
