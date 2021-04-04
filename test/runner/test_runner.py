@@ -1,6 +1,5 @@
 import base64
 import json
-import platform
 from test.apps.openapi.schema import OpenAPIVersion
 from typing import Dict, Optional
 
@@ -18,16 +17,15 @@ from schemathesis._hypothesis import add_examples
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
 from schemathesis.models import Status
-from schemathesis.runner import ThreadPoolRunner, events, from_schema, get_requests_auth, prepare
+from schemathesis.runner import ThreadPoolRunner, events, from_schema, get_requests_auth
 from schemathesis.runner.impl.core import get_wsgi_auth, reraise
 from schemathesis.specs.graphql import loaders as gql_loaders
 from schemathesis.specs.openapi import loaders as oas_loaders
 
 
-def execute(schema_uri, loader=oas_loaders.from_uri, **options) -> events.Finished:
-    generator = prepare(schema_uri=schema_uri, loader=loader, **options)
-    all_events = list(generator)
-    return all_events[-1]
+def execute(schema, **options) -> events.Finished:
+    *_, last = from_schema(schema, **options).execute()
+    return last
 
 
 def assert_request(
@@ -74,51 +72,47 @@ def assert_schema_requests_num(app, number):
     assert len(get_schema_requests(app)) == number
 
 
-def pytest_generate_tests(metafunc):
-    if "args" in metafunc.fixturenames:
-        metafunc.parametrize("args", ["wsgi", "real"], indirect=True)
+@pytest.fixture
+def any_app(request, any_app_schema):
+    return any_app_schema.app if any_app_schema.app is not None else request.getfixturevalue("app")
 
 
 def test_execute_base_url_not_found(openapi3_base_url, schema_url, app):
     # When base URL is pointing to an unknown location
-    execute(schema_url, base_url=f"{openapi3_base_url}/404/")
+    schema = oas_loaders.from_uri(schema_url, base_url=f"{openapi3_base_url}/404/")
+    execute(schema)
     # Then the runner should use this base
     # And they will not reach the application
     assert_incoming_requests_num(app, 0)
 
 
-def test_execute_base_url_found(openapi3_base_url, schema_url, app):
-    # When base_url is specified
-    execute(schema_url, base_url=openapi3_base_url)
-    # Then it should be used by the runner
-    assert_incoming_requests_num(app, 3)
-
-
-def test_execute(args):
-    app, kwargs = args
+def test_execute(any_app, any_app_schema):
     # When the runner is executed against the default test app
-    stats = execute(**kwargs)
+    stats = execute(any_app_schema)
 
     # Then there are three executed cases
     # Two errors - the second one is a flakiness check
     headers = {"User-Agent": USER_AGENT}
-    assert_schema_requests_num(app, 1)
-    schema_requests = get_schema_requests(app)
+    assert_schema_requests_num(any_app, 1)
+    schema_requests = get_schema_requests(any_app)
     assert schema_requests[0].headers.get("User-Agent") == headers["User-Agent"]
-    assert_incoming_requests_num(app, 3)
-    assert_request(app, 0, "GET", "/api/failure", headers)
-    assert_request(app, 1, "GET", "/api/failure", headers)
-    assert_request(app, 2, "GET", "/api/success", headers)
+    assert_incoming_requests_num(any_app, 3)
+    assert_request(any_app, 0, "GET", "/api/failure", headers)
+    assert_request(any_app, 1, "GET", "/api/failure", headers)
+    assert_request(any_app, 2, "GET", "/api/success", headers)
 
     # And statistic is showing the breakdown of cases types
     assert stats.total == {"not_a_server_error": {Status.success: 1, Status.failure: 2, "total": 3}}
 
 
 @pytest.mark.parametrize("workers", (1, 2))
-def test_interactions(request, args, workers):
-    app, kwargs = args
-    init, *others, finished = prepare(**kwargs, workers_num=workers, store_interactions=True)
-    base_url = "http://localhost/api" if isinstance(app, Flask) else request.getfixturevalue("openapi3_base_url")
+def test_interactions(request, any_app_schema, workers):
+    init, *others, finished = from_schema(any_app_schema, workers_num=workers, store_interactions=True).execute()
+    base_url = (
+        "http://localhost/api"
+        if isinstance(any_app_schema.app, Flask)
+        else request.getfixturevalue("openapi3_base_url")
+    )
 
     # failure
     interactions = [
@@ -139,7 +133,7 @@ def test_interactions(request, args, workers):
     }
     assert failure.response.status_code == 500
     assert failure.response.message == "Internal Server Error"
-    if isinstance(app, Flask):
+    if isinstance(any_app_schema.app, Flask):
         assert failure.response.headers == {"Content-Type": ["text/html; charset=utf-8"], "Content-Length": ["290"]}
     else:
         assert failure.response.headers["Content-Type"] == ["text/plain; charset=utf-8"]
@@ -165,28 +159,25 @@ def test_interactions(request, args, workers):
     assert success.response.message == "OK"
     assert json.loads(base64.b64decode(success.response.body)) == {"success": True}
     assert success.response.encoding == "utf-8"
-    if isinstance(app, Flask):
+    if isinstance(any_app_schema.app, Flask):
         assert success.response.headers == {"Content-Type": ["application/json"], "Content-Length": ["17"]}
     else:
         assert success.response.headers["Content-Type"] == ["application/json; charset=utf-8"]
 
 
 @pytest.mark.operations("root")
-def test_asgi_interactions(loadable_fastapi_app):
-    init, *ev, finished = prepare(
-        "/openapi.json", app=loadable_fastapi_app, loader=oas_loaders.from_asgi, store_interactions=True
-    )
+def test_asgi_interactions(fastapi_app):
+    schema = oas_loaders.from_asgi("/openapi.json", fastapi_app)
+    init, *ev, finished = from_schema(schema, store_interactions=True).execute()
     interaction = ev[1].result.interactions[0]
     assert interaction.status == Status.success
     assert interaction.request.uri == "http://testserver/users"
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 @pytest.mark.operations("empty")
-def test_empty_response_interaction(openapi_version, args):
+def test_empty_response_interaction(any_app_schema):
     # When there is a GET request and a response that doesn't return content (e.g. 204)
-    app, kwargs = args
-    init, *others, finished = prepare(**kwargs, store_interactions=True)
+    init, *others, finished = from_schema(any_app_schema, store_interactions=True).execute()
     interactions = [event for event in others if isinstance(event, events.AfterExecution)][0].result.interactions
     for interaction in interactions:  # There could be multiple calls
         # Then the stored request has no body
@@ -199,10 +190,9 @@ def test_empty_response_interaction(openapi_version, args):
 
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 @pytest.mark.operations("empty_string")
-def test_empty_string_response_interaction(openapi_version, args):
+def test_empty_string_response_interaction(any_app_schema):
     # When there is a response that returns payload of length 0
-    app, kwargs = args
-    init, *others, finished = prepare(**kwargs, store_interactions=True)
+    init, *others, finished = from_schema(any_app_schema, store_interactions=True).execute()
     interactions = [event for event in others if isinstance(event, events.AfterExecution)][0].result.interactions
     for interaction in interactions:  # There could be multiple calls
         # Then the stored response body should be an empty string
@@ -210,24 +200,24 @@ def test_empty_string_response_interaction(openapi_version, args):
         assert interaction.response.encoding == "utf-8"
 
 
-def test_auth(args):
-    app, kwargs = args
+def test_auth(any_app, any_app_schema):
     # When auth is specified as a tuple of 2 strings
-    execute(**kwargs, auth=("test", "test"))
+    execute(any_app_schema, auth=("test", "test"))
 
     # Then each request should contain corresponding basic auth header
-    assert_incoming_requests_num(app, 3)
+    assert_incoming_requests_num(any_app, 3)
     headers = {"Authorization": "Basic dGVzdDp0ZXN0"}
-    assert_request(app, 0, "GET", "/api/failure", headers)
-    assert_request(app, 1, "GET", "/api/failure", headers)
-    assert_request(app, 2, "GET", "/api/success", headers)
+    assert_request(any_app, 0, "GET", "/api/failure", headers)
+    assert_request(any_app, 1, "GET", "/api/failure", headers)
+    assert_request(any_app, 2, "GET", "/api/success", headers)
 
 
 @pytest.mark.parametrize("converter", (lambda x: x, lambda x: x + "/"))
 def test_base_url(openapi3_base_url, schema_url, app, converter):
     base_url = converter(openapi3_base_url)
     # When `base_url` is specified explicitly with or without trailing slash
-    execute(schema_url, base_url=base_url)
+    schema = oas_loaders.from_uri(schema_url, base_url=base_url)
+    execute(schema)
 
     # Then each request should reach the app in both cases
     assert_incoming_requests_num(app, 3)
@@ -236,24 +226,22 @@ def test_base_url(openapi3_base_url, schema_url, app, converter):
     assert_request(app, 2, "GET", "/api/success")
 
 
-def test_execute_with_headers(args):
-    app, kwargs = args
+def test_execute_with_headers(any_app, any_app_schema):
     # When headers are specified for the `execute` call
     headers = {"Authorization": "Bearer 123"}
-    execute(**kwargs, headers=headers)
+    execute(any_app_schema, headers=headers)
 
     # Then each request should contain these headers
-    assert_incoming_requests_num(app, 3)
-    assert_request(app, 0, "GET", "/api/failure", headers)
-    assert_request(app, 1, "GET", "/api/failure", headers)
-    assert_request(app, 2, "GET", "/api/success", headers)
+    assert_incoming_requests_num(any_app, 3)
+    assert_request(any_app, 0, "GET", "/api/failure", headers)
+    assert_request(any_app, 1, "GET", "/api/failure", headers)
+    assert_request(any_app, 2, "GET", "/api/success", headers)
 
 
-def test_execute_filter_endpoint(args):
-    app, kwargs = args
+def test_execute_filter_endpoint(app, schema_url):
+    schema = oas_loaders.from_uri(schema_url, endpoint=["success"])
     # When `endpoint` is passed in the `execute` call
-    kwargs.setdefault("endpoint", ["success"])
-    execute(**kwargs)
+    execute(schema)
 
     # Then the runner will make calls only to the specified path
     assert_incoming_requests_num(app, 1)
@@ -261,33 +249,29 @@ def test_execute_filter_endpoint(args):
     assert_not_request(app, "GET", "/api/failure")
 
 
-def test_execute_filter_method(args):
-    app, kwargs = args
+def test_execute_filter_method(app, schema_url):
+    schema = oas_loaders.from_uri(schema_url, method="POST")
     # When `method` corresponds to a method that is not defined in the app schema
-    kwargs.setdefault("method", "POST")
-    execute(**kwargs)
+    execute(schema)
     # Then runner will not make any requests
     assert_incoming_requests_num(app, 0)
 
 
 @pytest.mark.operations("slow")
-def test_hypothesis_deadline(args):
-    app, kwargs = args
+def test_hypothesis_deadline(any_app, any_app_schema):
     # When `hypothesis_deadline` is passed in the `execute` call
-    execute(**kwargs, hypothesis_deadline=500)
-    assert_incoming_requests_num(app, 1)
-    assert_request(app, 0, "GET", "/api/slow")
+    execute(any_app_schema, hypothesis_settings=hypothesis.settings(deadline=500))
+    assert_incoming_requests_num(any_app, 1)
+    assert_request(any_app, 0, "GET", "/api/slow")
 
 
 @pytest.mark.operations("multipart")
-def test_form_data(args):
-    app, kwargs = args
-
+def test_form_data(any_app, any_app_schema):
     def is_ok(response, case):
         assert response.status_code == 200
 
     def check_content(response, case):
-        if isinstance(app, Flask):
+        if isinstance(any_app, Flask):
             data = response.json
         else:
             data = response.json()
@@ -296,41 +280,45 @@ def test_form_data(args):
 
     # When API operation specifies parameters with `in=formData`
     # Then responses should have 200 status, and not 415 (unsupported media type)
-    results = execute(**kwargs, checks=(is_ok, check_content), hypothesis_max_examples=3)
+    results = execute(
+        any_app_schema, checks=(is_ok, check_content), hypothesis_settings=hypothesis.settings(max_examples=3)
+    )
     # And there should be no errors or failures
     assert not results.has_errors
     assert not results.has_failures
     # And the application should receive 3 requests as specified in `max_examples`
-    assert_incoming_requests_num(app, 3)
+    assert_incoming_requests_num(any_app, 3)
     # And the Content-Type of incoming requests should be `multipart/form-data`
-    incoming_requests = get_incoming_requests(app)
+    incoming_requests = get_incoming_requests(any_app)
     assert incoming_requests[0].headers["Content-Type"].startswith("multipart/form-data")
 
 
 @pytest.mark.operations("headers")
-def test_headers_override(args):
-    app, kwargs = args
-
+def test_headers_override(any_app_schema):
     def check_headers(response, case):
-        if isinstance(app, Flask):
+        if isinstance(any_app_schema.app, Flask):
             data = response.json
         else:
             data = response.json()
         assert data["X-Token"] == "test"
 
-    init, *others, finished = prepare(
-        **kwargs, checks=(check_headers,), headers={"X-Token": "test"}, hypothesis_max_examples=1
-    )
+    init, *others, finished = from_schema(
+        any_app_schema,
+        checks=(check_headers,),
+        headers={"X-Token": "test"},
+        hypothesis_settings=hypothesis.settings(max_examples=1),
+    ).execute()
     assert not finished.has_failures
     assert not finished.has_errors
 
 
 @pytest.mark.operations("teapot")
-def test_unknown_response_code(args):
-    app, kwargs = args
+def test_unknown_response_code(any_app_schema):
     # When API operation returns a status code, that is not listed in "responses"
     # And "status_code_conformance" is specified
-    init, *others, finished = prepare(**kwargs, checks=(status_code_conformance,), hypothesis_max_examples=1)
+    init, *others, finished = from_schema(
+        any_app_schema, checks=(status_code_conformance,), hypothesis_settings=hypothesis.settings(max_examples=1)
+    ).execute()
     # Then there should be a failure
     assert finished.has_failures
     check = others[1].result.checks[0]
@@ -339,11 +327,12 @@ def test_unknown_response_code(args):
 
 
 @pytest.mark.operations("failure")
-def test_unknown_response_code_with_default(args):
-    app, kwargs = args
+def test_unknown_response_code_with_default(any_app_schema):
     # When API operation returns a status code, that is not listed in "responses", but there is a "default" response
     # And "status_code_conformance" is specified
-    init, *others, finished = prepare(**kwargs, checks=(status_code_conformance,), hypothesis_max_examples=1)
+    init, *others, finished = from_schema(
+        any_app_schema, checks=(status_code_conformance,), hypothesis_settings=hypothesis.settings(max_examples=1)
+    ).execute()
     # Then there should be no failure
     assert not finished.has_failures
     check = others[1].result.checks[0]
@@ -352,11 +341,12 @@ def test_unknown_response_code_with_default(args):
 
 
 @pytest.mark.operations("text")
-def test_unknown_content_type(args):
-    app, kwargs = args
+def test_unknown_content_type(any_app_schema):
     # When API operation returns a response with content type, not specified in "produces"
     # And "content_type_conformance" is specified
-    init, *others, finished = prepare(**kwargs, checks=(content_type_conformance,), hypothesis_max_examples=1)
+    init, *others, finished = from_schema(
+        any_app_schema, checks=(content_type_conformance,), hypothesis_settings=hypothesis.settings(max_examples=1)
+    ).execute()
     # Then there should be a failure
     assert finished.has_failures
     check = others[1].result.checks[0]
@@ -365,21 +355,23 @@ def test_unknown_content_type(args):
 
 
 @pytest.mark.operations("success")
-def test_known_content_type(args):
-    app, kwargs = args
+def test_known_content_type(any_app_schema):
     # When API operation returns a response with a proper content type
     # And "content_type_conformance" is specified
-    *_, finished = prepare(**kwargs, checks=(content_type_conformance,), hypothesis_max_examples=1)
+    *_, finished = from_schema(
+        any_app_schema, checks=(content_type_conformance,), hypothesis_settings=hypothesis.settings(max_examples=1)
+    ).execute()
     # Then there should be no a failures
     assert not finished.has_failures
 
 
 @pytest.mark.operations("invalid_response")
-def test_response_conformance_invalid(args):
-    app, kwargs = args
+def test_response_conformance_invalid(any_app_schema):
     # When API operation returns a response that doesn't conform to the schema
     # And "response_schema_conformance" is specified
-    init, *others, finished = prepare(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
+    init, *others, finished = from_schema(
+        any_app_schema, checks=(response_schema_conformance,), hypothesis_settings=hypothesis.settings(max_examples=1)
+    ).execute()
     # Then there should be a failure
     assert finished.has_failures
     lines = others[1].result.checks[-1].message.split("\n")
@@ -389,43 +381,48 @@ def test_response_conformance_invalid(args):
 
 
 @pytest.mark.operations("success")
-def test_response_conformance_valid(args):
-    app, kwargs = args
+def test_response_conformance_valid(any_app_schema):
     # When API operation returns a response that conforms to the schema
     # And "response_schema_conformance" is specified
-    results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
+    results = execute(
+        any_app_schema, checks=(response_schema_conformance,), hypothesis_settings=hypothesis.settings(max_examples=1)
+    )
     # Then there should be no failures or errors
     assert not results.has_failures
     assert not results.has_errors
 
 
 @pytest.mark.operations("recursive")
-def test_response_conformance_recursive_valid(schema_url):
+def test_response_conformance_recursive_valid(any_app_schema):
     # When API operation contains a response that have recursive references
     # And "response_schema_conformance" is specified
-    results = execute(schema_url, checks=(response_schema_conformance,), hypothesis_max_examples=1)
+    results = execute(
+        any_app_schema, checks=(response_schema_conformance,), hypothesis_settings=hypothesis.settings(max_examples=1)
+    )
     # Then there should be no failures or errors
     assert not results.has_failures
     assert not results.has_errors
 
 
 @pytest.mark.operations("text")
-def test_response_conformance_text(args):
-    app, kwargs = args
+def test_response_conformance_text(any_app_schema):
     # When API operation returns a response that is not JSON
     # And "response_schema_conformance" is specified
-    results = execute(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
+    results = execute(
+        any_app_schema, checks=(response_schema_conformance,), hypothesis_settings=hypothesis.settings(max_examples=1)
+    )
     # Then the check should be ignored if the response headers are not application/json
     assert not results.has_failures
     assert not results.has_errors
 
 
 @pytest.mark.operations("malformed_json")
-def test_response_conformance_malformed_json(args):
-    app, kwargs = args
+def test_response_conformance_malformed_json(any_app_schema):
     # When API operation returns a response that contains a malformed JSON, but has a valid content type header
     # And "response_schema_conformance" is specified
-    init, *others, finished = prepare(**kwargs, checks=(response_schema_conformance,), hypothesis_max_examples=1)
+    init, *others, finished = from_schema(
+        any_app_schema, checks=(response_schema_conformance,), hypothesis_settings=hypothesis.settings(max_examples=1)
+    ).execute()
     # Then there should be a failure
     assert finished.has_failures
     assert not finished.has_errors
@@ -452,32 +449,42 @@ def filter_path_parameters():
 
 @pytest.mark.operations("path_variable")
 @pytest.mark.usefixtures("filter_path_parameters")
-def test_path_parameters_encoding(schema_url):
+def test_path_parameters_encoding(real_app_schema):
     # NOTE. WSGI and ASGI applications decodes %2F as / and returns 404
     # When API operation has a path parameter
-    results = execute(schema_url, checks=(status_code_conformance,), hypothesis_derandomize=True)
+    results = execute(
+        real_app_schema, checks=(status_code_conformance,), hypothesis_settings=hypothesis.settings(derandomize=True)
+    )
     # Then there should be no failures
     # since all path parameters are quoted
     assert not results.has_errors
     assert not results.has_failures
 
 
-@pytest.mark.parametrize("options", ({"base_url": "http://127.0.0.1:1/"}, {"hypothesis_deadline": 1}))
+@pytest.mark.parametrize(
+    "loader_options, from_schema_options",
+    (
+        ({"base_url": "http://127.0.0.1:1/"}, {}),
+        ({}, {"hypothesis_settings": hypothesis.settings(deadline=1)}),
+    ),
+)
 @pytest.mark.operations("slow")
-def test_exceptions(schema_url, app, options):
-    results = prepare(schema_url, **options)
+def test_exceptions(schema_url, app, loader_options, from_schema_options):
+    schema = oas_loaders.from_uri(schema_url, **loader_options)
+    results = from_schema(schema, **from_schema_options).execute()
     assert any([event.status == Status.error for event in results if isinstance(event, events.AfterExecution)])
 
 
 @pytest.mark.operations("multipart")
-def test_internal_exceptions(args, mocker):
+def test_internal_exceptions(any_app_schema, mocker):
     # GH: #236
-    app, kwargs = args
     # When there is an exception during the test
     # And Hypothesis consider this test as a flaky one
     mocker.patch("schemathesis.Case.call", side_effect=ValueError)
     mocker.patch("schemathesis.Case.call_wsgi", side_effect=ValueError)
-    init, *others, finished = prepare(**kwargs, hypothesis_max_examples=3)
+    init, *others, finished = from_schema(
+        any_app_schema, hypothesis_settings=hypothesis.settings(max_examples=3)
+    ).execute()
     # Then the execution result should indicate errors
     assert finished.has_errors
     # And an error from the buggy code should be collected
@@ -487,17 +494,15 @@ def test_internal_exceptions(args, mocker):
 
 
 @pytest.mark.operations("payload")
-async def test_payload_explicit_example(args):
+async def test_payload_explicit_example(any_app, any_app_schema):
     # When API operation has an example specified
-    app, kwargs = args
-    kwargs.setdefault("hypothesis_phases", [Phase.explicit])
-    result = execute(**kwargs)
+    result = execute(any_app_schema, hypothesis_settings=hypothesis.settings(phases=[Phase.explicit]))
     # Then run should be successful
     assert not result.has_errors
     assert not result.has_failures
-    incoming_requests = get_incoming_requests(app)
+    incoming_requests = get_incoming_requests(any_app)
 
-    if isinstance(app, Flask):
+    if isinstance(any_app, Flask):
         body = incoming_requests[0].json
     else:
         body = await incoming_requests[0].json()
@@ -506,21 +511,18 @@ async def test_payload_explicit_example(args):
 
 
 @pytest.mark.operations("payload")
-async def test_explicit_example_disable(args, mocker):
+async def test_explicit_example_disable(any_app, any_app_schema, mocker):
     # When API operation has an example specified
     # And the `explicit` phase is excluded
-    app, kwargs = args
-    kwargs.setdefault("hypothesis_max_examples", 1)
-    kwargs.setdefault("hypothesis_phases", [Phase.generate])
     spy = mocker.patch("schemathesis._hypothesis.add_examples", wraps=add_examples)
-    result = execute(**kwargs)
+    result = execute(any_app_schema, hypothesis_settings=hypothesis.settings(max_examples=1, phases=[Phase.generate]))
     # Then run should be successful
     assert not result.has_errors
     assert not result.has_failures
-    incoming_requests = get_incoming_requests(app)
+    incoming_requests = get_incoming_requests(any_app)
     assert len(incoming_requests) == 1
 
-    if isinstance(app, Flask):
+    if isinstance(any_app, Flask):
         body = incoming_requests[0].json
     else:
         body = await incoming_requests[0].json()
@@ -531,39 +533,38 @@ async def test_explicit_example_disable(args, mocker):
 
 
 @pytest.mark.operations("plain_text_body")
-async def test_plain_text_body(args):
+async def test_plain_text_body(any_app, any_app_schema):
     # When the expected payload is text/plain
-    app, kwargs = args
-
     # Then the payload is not encoded as JSON
     def check_content(response, case):
-        if isinstance(app, Flask):
+        if isinstance(any_app, Flask):
             data = response.get_data()
         else:
             data = response.content
         assert case.body.encode("utf8") == data
 
-    result = execute(**kwargs, checks=(check_content,), hypothesis_max_examples=3)
+    result = execute(any_app_schema, checks=(check_content,), hypothesis_settings=hypothesis.settings(max_examples=3))
     assert not result.has_errors
     assert not result.has_failures
 
 
 @pytest.mark.operations("invalid_path_parameter")
-def test_invalid_path_parameter(args):
+def test_invalid_path_parameter(schema_url):
     # When a path parameter is marked as not required
-    app, kwargs = args
     # And schema validation is disabled
-    init, *others, finished = prepare(validate_schema=False, hypothesis_max_examples=3, **kwargs)
+    schema = oas_loaders.from_uri(schema_url, validate_schema=False)
+    init, *others, finished = from_schema(schema, hypothesis_settings=hypothesis.settings(max_examples=3)).execute()
     # Then Schemathesis enforces all path parameters to be required
     # And there should be no errors
     assert not finished.has_errors
 
 
 @pytest.mark.operations("missing_path_parameter")
-def test_missing_path_parameter(args):
+def test_missing_path_parameter(any_app_schema):
     # When a path parameter is missing
-    app, kwargs = args
-    init, *others, finished = prepare(hypothesis_max_examples=3, **kwargs)
+    init, *others, finished = from_schema(
+        any_app_schema, hypothesis_settings=hypothesis.settings(max_examples=3)
+    ).execute()
     # Then it leads to an error
     assert finished.has_errors
     assert "InvalidSchema: Path parameter 'id' is not defined" in others[1].result.errors[0].exception
@@ -579,25 +580,17 @@ def test_get_wsgi_auth():
 
 
 @pytest.mark.operations("failure", "multiple_failures")
-def test_exit_first(args):
-    app, kwargs = args
-    results = prepare(**kwargs, exit_first=True)
-    results = list(results)
+def test_exit_first(any_app_schema):
+    results = list(from_schema(any_app_schema, exit_first=True).execute())
     assert results[-1].has_failures is True
     assert results[-1].failed_count == 1
 
 
-def test_auth_loader_options(openapi3_base_url, schema_url, app):
-    execute(schema_url, base_url=openapi3_base_url, auth=("test", "test"), auth_type="basic")
-    schema_request = get_schema_requests(app)
-    assert schema_request[0].headers["Authorization"] == "Basic dGVzdDp0ZXN0"
-
-
 @pytest.mark.operations("success")
-def test_workers_num_regression(mocker, schema_url):
+def test_workers_num_regression(mocker, real_app_schema):
     # GH: 579
     spy = mocker.patch("schemathesis.runner.ThreadPoolRunner", wraps=ThreadPoolRunner)
-    execute(schema_url, workers_num=5)
+    execute(real_app_schema, workers_num=5)
     assert spy.call_args[1]["workers_num"] == 5
 
 
@@ -616,9 +609,8 @@ def test_url_joining(request, server, get_schema_path, schema_path):
     else:
         base_url = request.getfixturevalue("openapi3_base_url")
     path = get_schema_path(schema_path)
-    *_, after_execution, _ = prepare(
-        path, base_url=f"{base_url}/v3", endpoint="/pet/findByStatus", hypothesis_max_examples=1
-    )
+    schema = oas_loaders.from_path(path, base_url=f"{base_url}/v3", endpoint="/pet/findByStatus")
+    *_, after_execution, _ = from_schema(schema, hypothesis_settings=hypothesis.settings(max_examples=1)).execute()
     assert after_execution.result.path == "/api/v3/pet/findByStatus"
     assert (
         f"http://127.0.0.1:{server['port']}/api/v3/pet/findByStatus"
@@ -628,7 +620,8 @@ def test_url_joining(request, server, get_schema_path, schema_path):
 
 def test_skip_operations_with_recursive_references(schema_with_recursive_references):
     # When the test schema contains recursive references
-    *_, after, finished = prepare(schema_with_recursive_references, loader=oas_loaders.from_dict)
+    schema = oas_loaders.from_dict(schema_with_recursive_references)
+    *_, after, finished = from_schema(schema).execute()
     # Then it causes an error with a proper error message
     assert after.status == Status.error
     assert RECURSIVE_REFERENCE_ERROR_MESSAGE in after.result.errors[0].exception
@@ -666,14 +659,15 @@ def test_unsatisfiable_example(empty_open_api_3_schema):
         }
     }
     # Then the testing process should not raise an internal error
-    *_, after, finished = prepare(empty_open_api_3_schema, loader=oas_loaders.from_dict, hypothesis_max_examples=1)
+    schema = oas_loaders.from_dict(empty_open_api_3_schema)
+    *_, after, finished = from_schema(schema, hypothesis_settings=hypothesis.settings(max_examples=1)).execute()
     # And the tests are failing because of the unsatisfiable schema
     assert finished.has_errors
     assert "Unable to satisfy schema parameters for this API operation" in after.result.errors[0].exception
 
 
 @pytest.mark.operations("success")
-def test_dry_run(args):
+def test_dry_run(any_app_schema):
     called = False
 
     def check(response, case):
@@ -681,14 +675,13 @@ def test_dry_run(args):
         called = True
 
     # When the user passes `dry_run=True`
-    app, kwargs = args
-    execute(checks=(check,), dry_run=True, **kwargs)
+    execute(any_app_schema, checks=(check,), dry_run=True)
     # Then no requests should be sent & no responses checked
     assert not called
 
 
 @pytest.mark.operations("root")
-def test_dry_run_asgi(loadable_fastapi_app):
+def test_dry_run_asgi(fastapi_app):
     called = False
 
     def check(response, case):
@@ -696,29 +689,29 @@ def test_dry_run_asgi(loadable_fastapi_app):
         called = True
 
     # When the user passes `dry_run=True`
-    execute("/openapi.json", app=loadable_fastapi_app, checks=(check,), dry_run=True)
+    schema = oas_loaders.from_asgi("/openapi.json", fastapi_app)
+    execute(schema, checks=(check,), dry_run=True)
     # Then no requests should be sent & no responses checked
     assert not called
 
 
 @pytest.mark.operations("reserved")
-def test_reserved_characters_in_operation_name(args):
+def test_reserved_characters_in_operation_name(any_app_schema):
     # See GH-992
 
     def check(response, case):
         assert response.status_code == 200
 
     # When there is `:` in the API operation path
-    app, kwargs = args
-    result = execute(checks=(check,), **kwargs)
+    result = execute(any_app_schema, checks=(check,))
     # Then it should be reachable
     assert not result.has_errors
     assert not result.has_failures
 
 
-def test_count_operations(openapi3_schema_url):
+def test_count_operations(real_app_schema):
     # When `count_operations` is set to `False`
-    event = next(prepare(openapi3_schema_url, count_operations=False))
+    event = next(from_schema(real_app_schema, count_operations=False).execute())
     # Then the total number of operations is not calculated in the `Initialized` event
     assert event.operations_count is None
 
@@ -753,12 +746,10 @@ def test_hypothesis_errors_propagation(empty_open_api_3_schema, openapi3_base_ur
     }
 
     max_examples = 10
-    initialized, before, after, finished = prepare(
-        empty_open_api_3_schema,
-        loader=schemathesis.from_dict,
-        base_url=openapi3_base_url,
-        hypothesis_max_examples=max_examples,
-    )
+    schema = oas_loaders.from_dict(empty_open_api_3_schema, base_url=openapi3_base_url)
+    initialized, before, after, finished = from_schema(
+        schema, hypothesis_settings=hypothesis.settings(max_examples=max_examples)
+    ).execute()
     # Then the test outcomes should not contain errors
     assert after.status == Status.success
     # And there should be requested amount of test examples

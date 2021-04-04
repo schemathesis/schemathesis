@@ -18,7 +18,7 @@ from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import DEFAULT_TARGETS, Target
 from ..types import Filter, NotSet, RawAuth
-from ..utils import dict_not_none_values, dict_true_values, file_exists, get_requests_auth, import_app
+from ..utils import deprecated, dict_not_none_values, dict_true_values, file_exists, get_requests_auth, import_app
 from . import events
 from .impl import (
     BaseRunner,
@@ -31,6 +31,7 @@ from .impl import (
 )
 
 
+@deprecated(removed_in="4.0", replacement="schemathesis.runner.from_schema")
 def prepare(
     schema_uri: Union[str, Dict[str, Any]],
     *,
