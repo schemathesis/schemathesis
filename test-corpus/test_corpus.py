@@ -2,11 +2,12 @@ import json
 import pathlib
 from typing import Any, Dict
 
+import hypothesis
 import pytest
 from hypothesis import HealthCheck, Phase
 
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
-from schemathesis.runner import events, prepare
+from schemathesis.runner import events, from_schema
 from schemathesis.specs.openapi import loaders
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
@@ -163,15 +164,14 @@ for name in ("invalid_path_parameters.json", "incompatible_regex.json", "incompa
 
 
 def test_runner(schema_path):
-    runner = prepare(
-        schema_path,
-        loader=loaders.from_path,
+    schema = loaders.from_path(schema_path, validate_schema=False)
+    runner = from_schema(
+        schema,
         dry_run=True,
-        hypothesis_max_examples=1,
-        validate_schema=False,
-        hypothesis_suppress_health_check=HealthCheck.all(),
-        hypothesis_phases=[Phase.explicit, Phase.generate],
         count_operations=False,
+        hypothesis_settings=hypothesis.settings(
+            max_examples=1, suppress_health_check=HealthCheck.all(), phases=[Phase.explicit, Phase.generate]
+        ),
     )
 
     schema_id = get_id(schema_path)

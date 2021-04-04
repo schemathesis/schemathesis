@@ -297,13 +297,15 @@ It can run tests against the given schema URI and will do some simple checks for
 
 .. code:: python
 
-    from schemathesis import runner
+    import schemathesis
 
-    events = runner.prepare("http://127.0.0.1:8080/swagger.json")
-    for event in events:
+    schema = schemathesis.from_uri("http://127.0.0.1:8080/swagger.json")
+
+    runner = schemathesis.runner.from_schema(schema)
+    for event in runner.execute():
         ...  # do something with event
 
-``runner.prepare`` creates a generator that yields events of different kinds - ``BeforeExecution``, ``AfterExecution``, etc.
+``runner.execute`` creates a generator that yields events of different kinds - ``BeforeExecution``, ``AfterExecution``, etc.
 They provide a lot of useful information about what happens during tests, but your responsibility is handling these events.
 You can take some inspiration from Schemathesis `CLI implementation <https://github.com/schemathesis/schemathesis/blob/master/src/schemathesis/cli/__init__.py#L230>`_.
 See the full description of events in the `source code <https://github.com/schemathesis/schemathesis/blob/master/src/schemathesis/runner/events.py>`_.
@@ -320,6 +322,7 @@ You can provide your custom checks to the execute function; the check is a calla
         assert response.elapsed < timedelta(milliseconds=300)
 
 
-    events = runner.prepare("http://127.0.0.1:8080/swagger.json", checks=[not_too_long])
-    for event in events:
+    schema = schemathesis.from_uri("http://127.0.0.1:8080/swagger.json")
+    runner = schemathesis.runner.from_schema(schema, checks=[not_too_long])
+    for event in runner.execute():
         ...  # do something with event

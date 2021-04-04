@@ -156,6 +156,7 @@ def relative_schema_url():
     ),
 )
 @pytest.mark.operations("success")
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_non_default_loader(openapi_version, request, loader, fixture):
     schema = request.getfixturevalue(fixture)
     kwargs = {}
@@ -186,6 +187,7 @@ FROM_DICT_ERROR_MESSAGE = "Dictionary as a schema is allowed only with `from_dic
         (schemathesis.graphql.from_wsgi, {}, FROM_DICT_ERROR_MESSAGE),
     ),
 )
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_validation(loader, schema, message):
     # When incorrect schema is passed to a loader
     with pytest.raises(ValueError, match=message):
@@ -193,6 +195,7 @@ def test_validation(loader, schema, message):
         list(prepare(schema, loader=loader))
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_custom_loader(swagger_20, openapi2_base_url):
     swagger_20.base_url = openapi2_base_url
     # Custom loaders are not validated
@@ -201,6 +204,7 @@ def test_custom_loader(swagger_20, openapi2_base_url):
     assert not finished.has_failures
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_from_path_loader_ignore_network_parameters(openapi2_base_url):
     # When `from_path` loader is used
     # And network-related parameters are passed
@@ -222,3 +226,8 @@ def test_from_path_loader_ignore_network_parameters(openapi2_base_url):
     else:
         exception_type = "builtins.FileNotFoundError"
     assert all_events[0].exception_type == exception_type
+
+
+def test_auth_loader_options(schema_url, app):
+    schemathesis.openapi.from_uri(schema_url, auth=("test", "test"))
+    assert app["schema_requests"][0].headers["Authorization"] == "Basic dGVzdDp0ZXN0"

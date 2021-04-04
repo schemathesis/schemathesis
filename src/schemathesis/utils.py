@@ -282,16 +282,31 @@ def traverse_schema(schema: Schema, callback: Callable[..., Dict[str, Any]], *ar
     return schema
 
 
+def _warn_deprecation(*, thing: str, removed_in: str, replacement: str) -> None:
+    warnings.warn(
+        f"Property `{thing}` is deprecated and will be removed in Schemathesis {removed_in}. "
+        f"Use `{replacement}` instead.",
+        DeprecationWarning,
+    )
+
+
 def deprecated_property(*, removed_in: str, replacement: str) -> Callable:
     def wrapper(prop: Callable) -> Callable:
         @property  # type: ignore
         def inner(self: Any) -> Any:
-            warnings.warn(
-                f"Property `{prop.__name__}` is deprecated and will be removed in Schemathesis {removed_in}. "
-                f"Use `{replacement}` instead.",
-                DeprecationWarning,
-            )
+            _warn_deprecation(thing=prop.__name__, removed_in=removed_in, replacement=replacement)
             return prop(self)
+
+        return inner
+
+    return wrapper
+
+
+def deprecated(*, removed_in: str, replacement: str) -> Callable:
+    def wrapper(func: Callable) -> Callable:
+        def inner(*args: Any, **kwargs: Any) -> Any:
+            _warn_deprecation(thing=func.__name__, removed_in=removed_in, replacement=replacement)
+            return func(*args, **kwargs)
 
         return inner
 

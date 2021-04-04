@@ -611,6 +611,21 @@ def fastapi_graphql_app(graphql_path):
     return graphql._fastapi.create_app(graphql_path)
 
 
+@pytest.fixture
+def real_app_schema(schema_url):
+    return oas_loaders.from_uri(schema_url)
+
+
+@pytest.fixture
+def wsgi_app_schema(schema_url, flask_app):
+    return oas_loaders.from_wsgi("/schema.yaml", flask_app)
+
+
+@pytest.fixture(params=["real_app_schema", "wsgi_app_schema"])
+def any_app_schema(openapi_version, request):
+    return request.getfixturevalue(request.param)
+
+
 def make_importable(module):
     """Make the package importable by the inline CLI execution."""
     pkgroot = module.dirpath()
@@ -651,18 +666,3 @@ def loadable_fastapi_app(testdir, operations):
         """
     )
     return f"{module.purebasename}:app"
-
-
-@pytest.fixture
-def args(openapi_version, request, mocker):
-    if request.param == "real":
-        schema_url = request.getfixturevalue("schema_url")
-        kwargs = {"schema_uri": schema_url}
-        app = request.getfixturevalue("app")
-    else:
-        app = request.getfixturevalue("flask_app")
-        app_path = request.getfixturevalue("loadable_flask_app")
-        # To have simpler tests it is easier to reuse already imported application for inspection
-        mocker.patch("schemathesis.runner.import_app", return_value=app)
-        kwargs = {"schema_uri": "/schema.yaml", "app": app_path, "loader": oas_loaders.from_wsgi}
-    return app, kwargs

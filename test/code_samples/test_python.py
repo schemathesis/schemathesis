@@ -1,9 +1,10 @@
+import hypothesis
 import pytest
 import requests
 from flask import Flask
 
 from schemathesis.constants import USER_AGENT
-from schemathesis.runner import prepare
+from schemathesis.runner import from_schema
 
 
 @pytest.fixture
@@ -82,13 +83,11 @@ def test_cli_output(cli, base_url, schema_url):
     assert f"    requests.get('{base_url}/failure', headers={headers})" in lines
 
 
-@pytest.mark.parametrize("args", ("real", "wsgi"), indirect=["args"])
 @pytest.mark.operations("failure")
-def test_reproduce_code_with_overridden_headers(args, base_url, openapi3_base_url):
-    app, kwargs = args
+def test_reproduce_code_with_overridden_headers(any_app_schema, base_url):
     # Note, headers are essentially the same, but keys are ordered differently due to implementation details of
     # real vs wsgi apps. It is the simplest solution, but not the most flexible one, though.
-    if isinstance(app, Flask):
+    if isinstance(any_app_schema.app, Flask):
         headers = {
             "User-Agent": USER_AGENT,
             "X-Token": "test",
@@ -105,8 +104,10 @@ def test_reproduce_code_with_overridden_headers(args, base_url, openapi3_base_ur
             "Connection": "keep-alive",
             "X-Token": "test",
         }
-        expected = f"requests.get('{openapi3_base_url}/failure', headers={headers})"
+        expected = f"requests.get('{base_url}/failure', headers={headers})"
 
-    *_, after, finished = prepare(**kwargs, headers=headers, hypothesis_max_examples=1)
+    *_, after, finished = from_schema(
+        any_app_schema, headers=headers, hypothesis_settings=hypothesis.settings(max_examples=1)
+    ).execute()
     assert finished.has_failures
     assert after.result.checks[1].example.requests_code == expected
