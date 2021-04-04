@@ -320,44 +320,28 @@ SCHEMA_URI = "https://example.com/swagger.json"
         (["--max-response-time=10"], {"max_response_time": 10}),
     ),
 )
-def test_execute_arguments(cli, mocker, simple_schema, args, expected):
-    response = requests.Response()
-    response.status_code = 200
-    response._content = json.dumps(simple_schema).encode()
-    mocker.patch("schemathesis.specs.openapi.loaders.requests.get", return_value=response)
-    execute = mocker.patch("schemathesis.runner.execute_from_schema", autospec=True)
+def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
+    mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
+    execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
 
     result = cli.run(SCHEMA_URI, *args)
 
     expected = {
-        "app": None,
-        "base_url": None,
         "checks": DEFAULT_CHECKS,
         "targets": DEFAULT_TARGETS,
-        "endpoint": (),
-        "method": (),
-        "tag": (),
-        "operation_id": (),
-        "schema_uri": SCHEMA_URI,
-        "validate_schema": True,
-        "data_generation_methods": [DataGenerationMethod.default()],
-        "skip_deprecated_operations": False,
-        "force_schema_version": None,
-        "loader": from_uri,
         "workers_num": 1,
         "exit_first": False,
         "dry_run": False,
         "stateful": None,
         "stateful_recursion_limit": 5,
         "auth": None,
-        "auth_type": None,
+        "auth_type": "basic",
         "headers": {},
         "request_timeout": None,
         "request_tls_verify": True,
         "store_interactions": False,
         "seed": None,
         "max_response_time": None,
-        "count_operations": True,
         **expected,
     }
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -388,21 +372,20 @@ def test_execute_arguments(cli, mocker, simple_schema, args, expected):
 )
 def test_load_schema_arguments(cli, mocker, args, expected):
     mocker.patch("schemathesis.runner.SingleThreadRunner.execute", autospec=True)
-    load_schema = mocker.patch("schemathesis.runner.load_schema", autospec=True)
+    load_schema = mocker.patch("schemathesis.cli.load_schema", autospec=True)
 
     result = cli.run(SCHEMA_URI, *args)
     expected = {
         "app": None,
         "base_url": None,
         "auth": None,
-        "auth_type": None,
-        "endpoint": (),
+        "auth_type": "basic",
+        "endpoint": None,
         "headers": {},
-        "loader": from_uri,
         "data_generation_methods": [DataGenerationMethod.default()],
-        "method": (),
-        "tag": (),
-        "operation_id": (),
+        "method": None,
+        "tag": None,
+        "operation_id": None,
         "validate_schema": True,
         "skip_deprecated_operations": False,
         "force_schema_version": None,
@@ -429,8 +412,9 @@ def test_load_schema_arguments_headers_to_loader_for_app(testdir, cli, mocker):
     assert from_wsgi.call_args[1]["headers"]["Authorization"] == "Bearer 123"
 
 
-def test_all_checks(cli, mocker):
-    execute = mocker.patch("schemathesis.runner.execute_from_schema", autospec=True)
+def test_all_checks(cli, mocker, swagger_20):
+    mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
+    execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
     result = cli.run(SCHEMA_URI, "--checks=all")
     assert result.exit_code == ExitCode.OK, result.stdout
     assert execute.call_args[1]["checks"] == ALL_CHECKS

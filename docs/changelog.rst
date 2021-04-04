@@ -11,7 +11,7 @@ Changelog
 - ``from_asgi`` loader for GraphQL apps. `#1100`_
 - Support for ``data_generation_methods`` and ``code_sample_style`` in all GraphQL loaders.
 - Support for ``app`` & ``base_url`` arguments for the ``from_pytest_fixture`` runner.
-- Initial support for GraphQL schemas in Schemathesis runner.
+- Initial support for GraphQL schemas in the Schemathesis runner.
 
 .. code-block:: python
 
@@ -50,11 +50,13 @@ Changelog
 - The ``schemathesis.graphql.from_url`` loader now uses the usual Schemathesis User-Agent.
 - The Hypothesis database now uses separate entries for each API operation when executed via CLI. It increases its effectiveness when tests are re-run.
 - Module ``schemathesis.loaders`` is moved to ``schemathesis.specs.openapi.loaders``.
-- Show a more precise exception on incorrect usage of the ``from_path`` loader in Schemathesis runner.
+- Show a more precise exception on incorrect usage of the ``from_path`` loader in the Schemathesis runner.
 
-**Removed**
+**Deprecated**
 
-- Undocumented way to install fixups via the ``fixups`` argument for ``schemathesis.runner.prepare`` is removed.
+- ``schemathesis.runner.prepare`` will be removed in Schemathesis 4.0. Use ``schemathesis.runner.from_schema`` instead. With this change, the schema loading part
+  goes to your code, similar to using the regular Schemathesis Python API. It leads to a unified user experience where the starting point is API schema loading, which is
+  much clearer than passing a callback & keyword arguments to the ``prepare`` function.
 
 **Fixed**
 
@@ -63,6 +65,10 @@ Changelog
 - Fixups examples were using incorrect fixup name.
 - Return type of ``make_case`` for GraphQL schemas.
 - Missed ``operation_id`` argument in ``from_asgi`` loader.
+
+**Removed**
+
+- Undocumented way to install fixups via the ``fixups`` argument for ``schemathesis.runner.prepare`` is removed.
 
 `3.5.3`_ - 2021-03-27
 ---------------------

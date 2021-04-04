@@ -5,6 +5,7 @@ import traceback
 from collections import defaultdict
 from enum import Enum
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
+from urllib.parse import urlparse
 
 import click
 import hypothesis
@@ -23,10 +24,13 @@ from ..constants import (
 from ..fixups import ALL_FIXUPS
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..models import CheckFunction
-from ..runner import events
+from ..runner import events, prepare_hypothesis_settings
+from ..schemas import BaseSchema
+from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import Target
 from ..types import Filter
+from ..utils import file_exists, get_requests_auth, import_app
 from . import callbacks, cassettes, output
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
 from .context import ExecutionContext
@@ -506,44 +510,46 @@ def run(
             _fixups.install()
         else:
             _fixups.install(fixups)
-
-    prepared_runner = runner.prepare(
+    hypothesis_settings = prepare_hypothesis_settings(
+        deadline=hypothesis_deadline,
+        derandomize=hypothesis_derandomize,
+        max_examples=hypothesis_max_examples,
+        phases=hypothesis_phases,
+        report_multiple_bugs=hypothesis_report_multiple_bugs,
+        suppress_health_check=hypothesis_suppress_health_check,
+        verbosity=hypothesis_verbosity,
+    )
+    event_stream = into_event_stream(
         schema,
+        app=app,
+        base_url=base_url,
+        validate_schema=validate_schema,
+        skip_deprecated_operations=skip_deprecated_operations,
+        data_generation_methods=data_generation_methods,
+        force_schema_version=force_schema_version,
+        request_tls_verify=request_tls_verify,
         auth=auth,
         auth_type=auth_type,
         headers=headers,
+        endpoint=endpoints or None,
+        method=methods or None,
+        tag=tags or None,
+        operation_id=operation_ids or None,
         request_timeout=request_timeout,
-        request_tls_verify=request_tls_verify,
-        base_url=base_url,
-        endpoint=endpoints,
-        method=methods,
-        tag=tags,
-        operation_id=operation_ids,
-        app=app,
         seed=hypothesis_seed,
         exit_first=exit_first,
         dry_run=dry_run,
         store_interactions=store_network_log is not None,
         checks=selected_checks,
-        data_generation_methods=data_generation_methods,
         max_response_time=max_response_time,
         targets=selected_targets,
         workers_num=workers_num,
-        validate_schema=validate_schema,
-        skip_deprecated_operations=skip_deprecated_operations,
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,
-        force_schema_version=force_schema_version,
-        hypothesis_deadline=hypothesis_deadline,
-        hypothesis_derandomize=hypothesis_derandomize,
-        hypothesis_max_examples=hypothesis_max_examples,
-        hypothesis_phases=hypothesis_phases,
-        hypothesis_report_multiple_bugs=hypothesis_report_multiple_bugs,
-        hypothesis_suppress_health_check=hypothesis_suppress_health_check,
-        hypothesis_verbosity=hypothesis_verbosity,
+        hypothesis_settings=hypothesis_settings,
     )
     execute(
-        prepared_runner,
+        event_stream,
         workers_num,
         show_errors_tracebacks,
         validate_schema,
@@ -553,6 +559,179 @@ def run(
         code_sample_style,
         debug_output_file,
     )
+
+
+def into_event_stream(
+    schema_location: str,
+    *,
+    app: Any,
+    base_url: Optional[str],
+    validate_schema: bool,
+    skip_deprecated_operations: bool,
+    data_generation_methods: Tuple[DataGenerationMethod, ...],
+    force_schema_version: Optional[str],
+    request_tls_verify: Union[bool, str],
+    # Network request parameters
+    auth: Optional[Tuple[str, str]],
+    auth_type: Optional[str],
+    headers: Optional[Dict[str, str]],
+    request_timeout: Optional[int],
+    # Schema filters
+    endpoint: Optional[Filter],
+    method: Optional[Filter],
+    tag: Optional[Filter],
+    operation_id: Optional[Filter],
+    # Runtime behavior
+    checks: Iterable[CheckFunction],
+    max_response_time: Optional[int],
+    targets: Iterable[Target],
+    workers_num: int,
+    hypothesis_settings: Optional[hypothesis.settings],
+    seed: Optional[int],
+    exit_first: bool,
+    dry_run: bool,
+    store_interactions: bool,
+    stateful: Optional[Stateful],
+    stateful_recursion_limit: int,
+) -> Generator[events.ExecutionEvent, None, None]:
+    try:
+        if app is not None:
+            app = import_app(app)
+        loaded_schema = load_schema(
+            schema_location,
+            app=app,
+            base_url=base_url,
+            validate_schema=validate_schema,
+            skip_deprecated_operations=skip_deprecated_operations,
+            data_generation_methods=data_generation_methods,
+            force_schema_version=force_schema_version,
+            request_tls_verify=request_tls_verify,
+            auth=auth,
+            auth_type=auth_type,
+            headers=headers,
+            endpoint=endpoint or None,
+            method=method or None,
+            tag=tag or None,
+            operation_id=operation_id or None,
+        )
+        yield from runner.from_schema(
+            loaded_schema,
+            auth=auth,
+            auth_type=auth_type,
+            headers=headers,
+            request_timeout=request_timeout,
+            request_tls_verify=request_tls_verify,
+            seed=seed,
+            exit_first=exit_first,
+            dry_run=dry_run,
+            store_interactions=store_interactions,
+            checks=checks,
+            max_response_time=max_response_time,
+            targets=targets,
+            workers_num=workers_num,
+            stateful=stateful,
+            stateful_recursion_limit=stateful_recursion_limit,
+            hypothesis_settings=hypothesis_settings,
+        ).execute()
+    except Exception as exc:
+        yield events.InternalError.from_exc(exc)
+
+
+def load_schema(
+    schema_location: str,
+    *,
+    app: Any,
+    base_url: Optional[str],
+    validate_schema: bool,
+    skip_deprecated_operations: bool,
+    data_generation_methods: Tuple[DataGenerationMethod, ...],
+    force_schema_version: Optional[str],
+    request_tls_verify: Union[bool, str],
+    # Network request parameters
+    auth: Optional[Tuple[str, str]],
+    auth_type: Optional[str],
+    headers: Optional[Dict[str, str]],
+    # Schema filters
+    endpoint: Optional[Filter],
+    method: Optional[Filter],
+    tag: Optional[Filter],
+    operation_id: Optional[Filter],
+) -> BaseSchema:
+    """Automatically load API schema."""
+    loader = detect_loader(schema_location, app)
+    kwargs = get_loader_kwargs(
+        loader,
+        app=app,
+        base_url=base_url,
+        validate_schema=validate_schema,
+        skip_deprecated_operations=skip_deprecated_operations,
+        data_generation_methods=data_generation_methods,
+        force_schema_version=force_schema_version,
+        request_tls_verify=request_tls_verify,
+        auth=auth,
+        auth_type=auth_type,
+        headers=headers,
+        endpoint=endpoint,
+        method=method,
+        tag=tag,
+        operation_id=operation_id,
+    )
+    return loader(schema_location, **kwargs)
+
+
+def detect_loader(schema_location: str, app: Any) -> Callable:
+    """Detect API schema loader."""
+    if file_exists(schema_location):
+        # If there is an existing file with the given name,
+        # then it is likely that the user wants to load API schema from there
+        return oas_loaders.from_path
+    if app is not None and not urlparse(schema_location).netloc:
+        # App is passed & location is relative
+        return oas_loaders.get_loader_for_app(app)
+    # Default behavior
+    return oas_loaders.from_uri
+
+
+def get_loader_kwargs(
+    loader: Callable,
+    *,
+    app: Any,
+    base_url: Optional[str],
+    endpoint: Optional[Filter],
+    method: Optional[Filter],
+    tag: Optional[Filter],
+    operation_id: Optional[Filter],
+    skip_deprecated_operations: bool,
+    validate_schema: bool,
+    force_schema_version: Optional[str],
+    data_generation_methods: Tuple[DataGenerationMethod, ...],
+    # Network request parameters
+    auth: Optional[Tuple[str, str]],
+    auth_type: Optional[str],
+    headers: Optional[Dict[str, str]],
+    request_tls_verify: Union[bool, str],
+) -> Dict[str, Any]:
+    """Detect the proper set of parameters for a loader."""
+    # These kwargs are shared by all loaders
+    kwargs = {
+        "app": app,
+        "base_url": base_url,
+        "method": method,
+        "endpoint": endpoint,
+        "tag": tag,
+        "operation_id": operation_id,
+        "skip_deprecated_operations": skip_deprecated_operations,
+        "validate_schema": validate_schema,
+        "force_schema_version": force_schema_version,
+        "data_generation_methods": data_generation_methods,
+    }
+    if loader is not oas_loaders.from_path:
+        kwargs["headers"] = headers
+    if loader in (oas_loaders.from_uri, oas_loaders.from_aiohttp):
+        kwargs["verify"] = request_tls_verify
+        if auth is not None:
+            kwargs["auth"] = get_requests_auth(auth, auth_type)
+    return kwargs
 
 
 def check_auth(auth: Optional[Tuple[str, str]], headers: Dict[str, str]) -> None:
