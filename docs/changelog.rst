@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.6.0`_ - 2021-04-04
+---------------------
+
 **Added**
 
 - Custom keyword arguments to ``schemathesis.graphql.from_url`` that are proxied to ``requests.post``.
@@ -43,13 +46,13 @@ Changelog
 **Changed**
 
 - Schemathesis generates separate tests for each field defined in the GraphQL ``Query`` type. It makes the testing process
-  unified for both, Open API and GraphQL schemas.
+  unified for both Open API and GraphQL schemas.
 - IDs for GraphQL tests use the corresponding ``Query`` field instead of HTTP method & path.
 - Do not show overly verbose raw schemas in Hypothesis output for failed GraphQL tests.
 - The ``schemathesis.graphql.from_url`` loader now uses the usual Schemathesis User-Agent.
 - The Hypothesis database now uses separate entries for each API operation when executed via CLI. It increases its effectiveness when tests are re-run.
 - Module ``schemathesis.loaders`` is moved to ``schemathesis.specs.openapi.loaders``.
-- Show a more precise exception on incorrect usage of the ``from_path`` loader in the Schemathesis runner.
+- Show a more specific exception on incorrect usage of the ``from_path`` loader in the Schemathesis runner.
 
 **Deprecated**
 
@@ -61,7 +64,7 @@ Changelog
 
 - Add the missing ``@schema.given`` implementation for schemas created via the ``from_pytest_fixture`` loader. `#1093`_
 - Silently ignoring some incorrect usages of ``@schema.given``.
-- Fixups examples were using incorrect fixup name.
+- Fixups examples were using the incorrect fixup name.
 - Return type of ``make_case`` for GraphQL schemas.
 - Missed ``operation_id`` argument in ``from_asgi`` loader.
 
@@ -1667,7 +1670,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.5.3...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.0...HEAD
+.. _3.6.0: https://github.com/schemathesis/schemathesis/compare/v3.5.3...v3.6.0
 .. _3.5.3: https://github.com/schemathesis/schemathesis/compare/v3.5.2...v3.5.3
 .. _3.5.2: https://github.com/schemathesis/schemathesis/compare/v3.5.1...v3.5.2
 .. _3.5.1: https://github.com/schemathesis/schemathesis/compare/v3.5.0...v3.5.1
