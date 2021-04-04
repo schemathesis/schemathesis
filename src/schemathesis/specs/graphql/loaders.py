@@ -1,6 +1,9 @@
-from typing import Any, Dict, Iterable, Optional
+import pathlib
+from typing import IO, Any, Dict, Iterable, Optional, Union, cast
 
+import graphql
 import requests
+from graphql import ExecutionResult
 from starlette.testclient import TestClient as ASGIClient
 from werkzeug import Client
 from yarl import URL
@@ -8,93 +11,35 @@ from yarl import URL
 from ...constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
 from ...exceptions import HTTPError
 from ...hooks import HookContext, dispatch
+from ...types import PathLike
 from ...utils import WSGIResponse, require_relative_url, setup_headers
 from .schemas import GraphQLSchema
 
-INTROSPECTION_QUERY = """
-query IntrospectionQuery {
-  __schema {
-    queryType { name }
-    mutationType { name }
-    subscriptionType { name }
-    types {
-      ...FullType
-    }
-    directives {
-      name
-      locations
-      args {
-        ...InputValue
-      }
-    }
-  }
-}
-fragment FullType on __Type {
-  kind
-  name
-  fields(includeDeprecated: true) {
-    name
-    args {
-      ...InputValue
-    }
-    type {
-      ...TypeRef
-    }
-    isDeprecated
-    deprecationReason
-  }
-  inputFields {
-    ...InputValue
-  }
-  interfaces {
-    ...TypeRef
-  }
-  enumValues(includeDeprecated: true) {
-    name
-    isDeprecated
-    deprecationReason
-  }
-  possibleTypes {
-    ...TypeRef
-  }
-}
-fragment InputValue on __InputValue {
-  name
-  type { ...TypeRef }
-  defaultValue
-}
-fragment TypeRef on __Type {
-  kind
-  name
-  ofType {
-    kind
-    name
-    ofType {
-      kind
-      name
-      ofType {
-        kind
-        name
-        ofType {
-          kind
-          name
-          ofType {
-            kind
-            name
-            ofType {
-              kind
-              name
-              ofType {
-                kind
-                name
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}"""
+INTROSPECTION_QUERY = graphql.get_introspection_query()
+INTROSPECTION_QUERY_AST = graphql.parse(INTROSPECTION_QUERY)
+
+
+def from_path(
+    path: PathLike,
+    *,
+    app: Any = None,
+    base_url: Optional[str] = None,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    code_sample_style: str = CodeSampleStyle.default().name,
+) -> GraphQLSchema:
+    """Load GraphQL schema via a file from an OS path.
+
+    :param path: A path to the schema file.
+    """
+    with open(path) as fd:
+        return from_file(
+            fd,
+            app=app,
+            base_url=base_url,
+            data_generation_methods=data_generation_methods,
+            code_sample_style=code_sample_style,
+            location=pathlib.Path(path).absolute().as_uri(),
+        )
 
 
 def from_url(
@@ -133,6 +78,42 @@ def from_url(
     )
 
 
+def from_file(
+    file: Union[IO[str], str],
+    *,
+    app: Any = None,
+    base_url: Optional[str] = None,
+    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    code_sample_style: str = CodeSampleStyle.default().name,
+    location: Optional[str] = None,
+) -> GraphQLSchema:
+    """Load GraphQL schema from a file descriptor or a string.
+
+    :param file: Could be a file descriptor, string or bytes.
+    """
+    if isinstance(file, str):
+        data = file
+    else:
+        data = file.read()
+    document = graphql.build_schema(data)
+    result = graphql.execute(document, INTROSPECTION_QUERY_AST)
+    # TYPES: We don't pass `is_awaitable` above, therefore `result` is of the `ExecutionResult` type
+    result = cast(ExecutionResult, result)
+    # TYPES:
+    #  - `document` is a valid schema, because otherwise `build_schema` will rise an error;
+    #  - `INTROSPECTION_QUERY` is a valid query - it is known upfront;
+    # Therefore the execution result is always valid at this point and `result.data` is not `None`
+    raw_schema = cast(Dict[str, Any], result.data)
+    return from_dict(
+        raw_schema,
+        app=app,
+        base_url=base_url,
+        data_generation_methods=data_generation_methods,
+        code_sample_style=code_sample_style,
+        location=location,
+    )
+
+
 def from_dict(
     raw_schema: Dict[str, Any],
     *,
@@ -152,7 +133,14 @@ def from_dict(
     """
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     dispatch("before_load_schema", HookContext(), raw_schema)
-    return GraphQLSchema(raw_schema, location=location, base_url=base_url, app=app, data_generation_methods=data_generation_methods, code_sample_style=_code_sample_style)  # type: ignore
+    return GraphQLSchema(
+        raw_schema,
+        location=location,
+        base_url=base_url,
+        app=app,
+        data_generation_methods=data_generation_methods,
+        code_sample_style=_code_sample_style,
+    )  # type: ignore
 
 
 def from_wsgi(
