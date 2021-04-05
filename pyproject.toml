@@ -60,7 +60,7 @@ pytest-xdist = "^1.30"
 typing_extensions = "^3.7"
 flask = "^1.1"
 fastapi = "^0.62.0"
-sphinx = "^3.0.3"
+sphinx = "^3.5.3"
 
 [tool.poetry.plugins]
 pytest11 = {schemathesis = "schemathesis.extra.pytest_plugin"}
