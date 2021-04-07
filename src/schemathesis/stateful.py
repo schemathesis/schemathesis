@@ -298,7 +298,7 @@ class APIStateMachine(RuleBasedStateMachine):
 
             class APIWorkflow(schema.as_state_machine()):
                 def get_call_kwargs(self, case):
-                    return {"verify": True}
+                    return {"verify": False}
 
         The above example disables the server's TLS certificate verification.
         """
