@@ -2,6 +2,7 @@ from inspect import signature
 from typing import Any, Callable, Dict, Iterable, Optional, Union
 
 import attr
+import pytest
 from _pytest.fixtures import FixtureRequest
 from pytest_subtests import SubTests, nullcontext
 
@@ -120,6 +121,8 @@ class LazySchema:
                     else:
                         _schema_error(subtests, result.err(), node_id, data_generation_method)
                 subtests.item._nodeid = node_id
+
+            test = pytest.mark.usefixtures(self.fixture_name)(test)
 
             # Needed to prevent a failure when settings are applied to the test function
             test.is_hypothesis_test = True  # type: ignore
