@@ -499,3 +499,31 @@ def test_b(case):
     # And the original one should remain the same
     result = testdir.runpytest()
     result.assert_outcomes(passed=2)
+
+
+def test_parametrized_fixture(testdir, openapi3_base_url):
+    # When the used pytest fixture is parametrized via `params`
+    testdir.make_test(
+        f"""
+schema.base_url = "{openapi3_base_url}"
+
+@pytest.fixture(params=["a", "b"])
+def parametrized_lazy_schema(request):
+    return schema
+
+lazy_schema = schemathesis.from_pytest_fixture("parametrized_lazy_schema")
+
+@lazy_schema.parametrize()
+def test_(case):
+    case.call()
+""",
+    )
+    result = testdir.runpytest("-v")
+    # Then tests should be parametrized as usual
+    result.assert_outcomes(passed=2)
+    result.stdout.re_match_lines(
+        [
+            r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\]\[P\] PASSED",
+            r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\]\[P\] PASSED",
+        ]
+    )
