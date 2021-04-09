@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Using parametrized ``pytest`` fixtures with the ``from_pytest_fixture`` loader. `#1121`_
+
 `3.6.0`_ - 2021-04-04
 ---------------------
 
@@ -1811,6 +1815,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1121: https://github.com/schemathesis/schemathesis/issues/1121
 .. _#1100: https://github.com/schemathesis/schemathesis/issues/1100
 .. _#1097: https://github.com/schemathesis/schemathesis/issues/1097
 .. _#1093: https://github.com/schemathesis/schemathesis/issues/1093
