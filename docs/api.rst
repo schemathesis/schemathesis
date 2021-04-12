@@ -43,7 +43,7 @@ These functions affect Schemathesis behavior globally:
 
     .. code-block:: python
 
-        def before_generate_query(strategy, context):
+        def before_generate_query(context, strategy):
             ...
 
 
