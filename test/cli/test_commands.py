@@ -10,7 +10,6 @@ from urllib.parse import urljoin
 
 import hypothesis
 import pytest
-import requests
 import yaml
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
@@ -22,7 +21,6 @@ from schemathesis.constants import USER_AGENT
 from schemathesis.hooks import unregister_all
 from schemathesis.models import APIOperation
 from schemathesis.runner import DEFAULT_CHECKS
-from schemathesis.specs.openapi.loaders import from_uri
 from schemathesis.targets import DEFAULT_TARGETS
 
 PHASES = ", ".join(map(lambda x: x.name, Phase))
