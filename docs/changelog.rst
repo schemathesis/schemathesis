@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Windows: ``UnicodeDecodeError`` during schema loading via the ``from_path`` loader if it contains certain Unicode symbols.
+  ``from_path`` loader defaults to `UTF-8` from now on.
+
 `3.6.1`_ - 2021-04-09
 ---------------------
 

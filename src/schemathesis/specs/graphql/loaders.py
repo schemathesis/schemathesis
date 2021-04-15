@@ -26,12 +26,14 @@ def from_path(
     base_url: Optional[str] = None,
     data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
+    encoding: str = "utf8",
 ) -> GraphQLSchema:
     """Load GraphQL schema via a file from an OS path.
 
     :param path: A path to the schema file.
+    :param encoding: The name of the encoding used to decode the file.
     """
-    with open(path) as fd:
+    with open(path, encoding=encoding) as fd:
         return from_file(
             fd,
             app=app,
