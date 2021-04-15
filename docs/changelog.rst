@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.6.2`_ - 2021-04-15
+---------------------
+
 **Fixed**
 
 - Windows: ``UnicodeDecodeError`` during schema loading via the ``from_path`` loader if it contains certain Unicode symbols.
@@ -1682,7 +1685,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.2...HEAD
+.. _3.6.2: https://github.com/schemathesis/schemathesis/compare/v3.6.1...v3.6.2
 .. _3.6.1: https://github.com/schemathesis/schemathesis/compare/v3.6.0...v3.6.1
 .. _3.6.0: https://github.com/schemathesis/schemathesis/compare/v3.5.3...v3.6.0
 .. _3.5.3: https://github.com/schemathesis/schemathesis/compare/v3.5.2...v3.5.3
