@@ -12,7 +12,7 @@ aiohttp==3.7.4
     #   connexion
 async-timeout==3.0.1
     # via aiohttp
-asyncpg==0.19.0
+asyncpg==0.21.0
     # via -r requirements.in
 attrs==19.3.0
     # via
