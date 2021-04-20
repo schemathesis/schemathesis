@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.6.3`_ - 2021-04-20
+---------------------
+
 **Fixed**
 
 - Bump minimum ``hypothesis-graphql`` version to ``0.4.1``. It fixes `a problem <https://github.com/Stranger6667/hypothesis-graphql/issues/30>`_ with generating queries with surrogate characters.
@@ -1690,7 +1693,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.2...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.3...HEAD
+.. _3.6.3: https://github.com/schemathesis/schemathesis/compare/v3.6.2...v3.6.3
 .. _3.6.2: https://github.com/schemathesis/schemathesis/compare/v3.6.1...v3.6.2
 .. _3.6.1: https://github.com/schemathesis/schemathesis/compare/v3.6.0...v3.6.1
 .. _3.6.0: https://github.com/schemathesis/schemathesis/compare/v3.5.3...v3.6.0
