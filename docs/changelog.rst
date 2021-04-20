@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Bump minimum ``hypothesis-graphql`` version to ``0.4.1``. It fixes `a problem <https://github.com/Stranger6667/hypothesis-graphql/issues/30>`_ with generating queries with surrogate characters.
+- ``UnicodeEncodeError`` when sending ``application/octet-stream`` payloads that have no ``format: binary`` in their schemas. `#1134`_
 
 `3.6.2`_ - 2021-04-15
 ---------------------
@@ -1832,6 +1833,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1134: https://github.com/schemathesis/schemathesis/issues/1134
 .. _#1121: https://github.com/schemathesis/schemathesis/issues/1121
 .. _#1100: https://github.com/schemathesis/schemathesis/issues/1100
 .. _#1097: https://github.com/schemathesis/schemathesis/issues/1097
