@@ -758,6 +758,36 @@ def test_hypothesis_errors_propagation(empty_open_api_3_schema, openapi3_base_ur
     assert not finished.has_errors
 
 
+def test_encoding_octet_stream(empty_open_api_3_schema, openapi3_base_url):
+    # See: GH-1134
+    # When the operation contains the `application/octet-stream` media type
+    # And has no `format: binary` in its schema
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/octet-stream": {
+                            "schema": {
+                                "type": "string",
+                            },
+                        },
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    schema = oas_loaders.from_dict(empty_open_api_3_schema, base_url=openapi3_base_url)
+    initialized, before, after, finished = from_schema(schema).execute()
+    # Then the test outcomes should not contain errors
+    # And it should not lead to encoding errors
+    assert after.status == Status.success
+    assert not finished.has_failures
+    assert not finished.has_errors
+
+
 def test_graphql(graphql_url):
     schema = gql_loaders.from_url(graphql_url)
     initialized, *others, finished = list(

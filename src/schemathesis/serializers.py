@@ -147,6 +147,8 @@ def _prepare_form_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
 def _to_bytes(value: Any) -> bytes:
     """Convert the input value to bytes and ignore any conversion errors."""
+    if isinstance(value, bytes):
+        return value
     return str(value).encode(errors="ignore")
 
 
@@ -188,10 +190,10 @@ class TextSerializer:
 @register("application/octet-stream")
 class OctetStreamSerializer:
     def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
-        return {"data": value}
+        return {"data": _to_bytes(value)}
 
     def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
-        return {"data": value}
+        return {"data": _to_bytes(value)}
 
 
 def get(media_type: str) -> Optional[Type[Serializer]]:
