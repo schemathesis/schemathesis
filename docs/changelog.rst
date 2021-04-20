@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Bump minimum ``hypothesis-graphql`` version to ``0.4.1``. It fixes `a problem <https://github.com/Stranger6667/hypothesis-graphql/issues/30>`_ with generating queries with surrogate characters.
+
 `3.6.2`_ - 2021-04-15
 ---------------------
 
