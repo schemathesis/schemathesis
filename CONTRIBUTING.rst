@@ -44,9 +44,9 @@ Submitting Pull Requests
 #. Follow **PEP-8** for naming and `black <https://github.com/psf/black>`_ for formatting.
 #. Tests are run using ``tox``::
 
-    tox -e pylint,mypy,py37
+    tox -e py37
 
-   The test environments above are usually enough to cover most cases locally.
+   The test environment above is usually enough to cover most cases locally.
 
 #. Write an entry to `changelog.rst <https://github.com/schemathesis/schemathesis/blob/master/docs/changelog.rst>`_
 #. Format your commit message according to the Conventional Commits `specification <https://www.conventionalcommits.org/en/>`_
