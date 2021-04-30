@@ -130,7 +130,7 @@ toml==0.10.2
     # via pytest
 typing-extensions==3.7.4.3
     # via aiohttp
-urllib3==1.25.6
+urllib3==1.25.8
     # via requests
 werkzeug==1.0.1
     # via
