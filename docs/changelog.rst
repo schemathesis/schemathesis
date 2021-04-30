@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Bump minimum ``hypothesis-graphql`` version to ``0.5.0``. It brings support for interfaces and unions and fixes a couple of bugs in query generation.
+
 `3.6.3`_ - 2021-04-20
 ---------------------
 
