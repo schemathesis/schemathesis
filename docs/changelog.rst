@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.6.4`_ - 2021-04-30
+---------------------
+
 **Changed**
 
 - Bump minimum ``hypothesis-graphql`` version to ``0.5.0``. It brings support for interfaces and unions and fixes a couple of bugs in query generation.
@@ -1697,7 +1700,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.3...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.4...HEAD
+.. _3.6.4: https://github.com/schemathesis/schemathesis/compare/v3.6.3...v3.6.4
 .. _3.6.3: https://github.com/schemathesis/schemathesis/compare/v3.6.2...v3.6.3
 .. _3.6.2: https://github.com/schemathesis/schemathesis/compare/v3.6.1...v3.6.2
 .. _3.6.1: https://github.com/schemathesis/schemathesis/compare/v3.6.0...v3.6.1
