@@ -20,6 +20,7 @@ from ...schemas import BaseSchema
 from ...types import NotSet
 from ...utils import NOT_SET
 from .constants import LOCATION_TO_CONTAINER
+from .negative import negative_schema
 from .parameters import OpenAPIParameter, parameters_to_json_schema
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
@@ -110,7 +111,10 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     The primary purpose of this behavior is to prevent sending incomplete explicit examples by generating missing parts
     as it works with `body`.
     """
-    to_strategy = {DataGenerationMethod.positive: make_positive_strategy}[data_generation_method]
+    to_strategy = {
+        DataGenerationMethod.positive: make_positive_strategy,
+        DataGenerationMethod.negative: make_negative_strategy,
+    }[data_generation_method]
 
     context = HookContext(operation)
 
@@ -186,7 +190,7 @@ _BODY_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()
 
 
 def _get_body_strategy(
-    parameter: OpenAPIParameter, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], parent_schema: BaseSchema
+    parameter: OpenAPIParameter, to_strategy: Callable[[Dict[str, Any], str], st.SearchStrategy], parent_schema: BaseSchema
 ) -> st.SearchStrategy:
     # The cache key relies on object ids, which means that the parameter should not be mutated
     # Note, the parent schema is not included as each parameter belong only to one schema
@@ -194,7 +198,7 @@ def _get_body_strategy(
         return _BODY_STRATEGIES_CACHE[parameter][to_strategy]
     schema = parameter.as_json_schema()
     schema = parent_schema.prepare_schema(schema)
-    strategy = to_strategy(schema)
+    strategy = to_strategy(schema, "body")
     if not parameter.is_required:
         strategy |= st.just(NOT_SET)
     _BODY_STRATEGIES_CACHE.setdefault(parameter, {})[to_strategy] = strategy
@@ -231,7 +235,7 @@ _PARAMETER_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()
 
 def get_parameters_strategy(
     operation: APIOperation,
-    to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy],
+    to_strategy: Callable[[Dict[str, Any], str], st.SearchStrategy],
     location: str,
     exclude: Iterable[str] = (),
 ) -> st.SearchStrategy:
@@ -255,7 +259,7 @@ def get_parameters_strategy(
             schema["properties"].pop(name, None)
             with suppress(ValueError):
                 schema["required"].remove(name)
-        strategy = to_strategy(schema)
+        strategy = to_strategy(schema, location)
         serialize = operation.get_parameter_serializer(location)
         if serialize is not None:
             strategy = strategy.map(serialize)
@@ -275,8 +279,12 @@ def get_parameters_strategy(
     return st.none()
 
 
-def make_positive_strategy(schema: Dict[str, Any]) -> st.SearchStrategy:
+def make_positive_strategy(schema: Dict[str, Any], location: str) -> st.SearchStrategy:
     return from_schema(schema, custom_formats=STRING_FORMATS)
+
+
+def make_negative_strategy(schema: Dict[str, Any], location: str) -> st.SearchStrategy:
+    return negative_schema(schema, location=location, custom_formats=STRING_FORMATS)
 
 
 def is_valid_path(parameters: Dict[str, Any]) -> bool:
