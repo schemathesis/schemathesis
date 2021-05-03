@@ -52,7 +52,13 @@ def init_default_strategies() -> None:
     latin1_text = st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255))
 
     register_string_format("_basic_auth", st.tuples(latin1_text, latin1_text).map(make_basic_auth_str))  # type: ignore
-    register_string_format("_bearer_auth", st.text().map("Bearer {}".format))
+    register_string_format(
+        "_bearer_auth",
+        # Define valid characters here to avoid filtering them out in `is_valid_header` later
+        st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255, blacklist_characters="\n\r")).map(
+            "Bearer {}".format
+        ),
+    )
 
 
 def is_valid_header(headers: Dict[str, Any]) -> bool:
