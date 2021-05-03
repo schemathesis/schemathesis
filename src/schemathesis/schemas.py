@@ -315,6 +315,9 @@ class BaseSchema(Mapping):
     def prepare_schema(self, schema: Any) -> Any:
         raise NotImplementedError
 
+    def _get_payload_schema(self, definition: Dict[str, Any], media_type: str) -> Optional[Dict[str, Any]]:
+        raise NotImplementedError
+
 
 def operations_to_dict(
     operations: Generator[Result[APIOperation, InvalidSchema], None, None]

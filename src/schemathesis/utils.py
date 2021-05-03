@@ -179,6 +179,12 @@ def is_plain_text_media_type(value: str) -> bool:
     return parse_content_type(value) == ("text", "plain")
 
 
+def is_xml_media_type(value: str) -> bool:
+    """Detect variations of the ``application/xml`` media type."""
+    _, sub = parse_content_type(value)
+    return sub == "xml" or sub.endswith("+xml")
+
+
 def are_content_types_equal(source: str, target: str) -> bool:
     """Check if two content types are the same excluding options."""
     return parse_content_type(source) == parse_content_type(target)
