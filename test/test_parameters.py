@@ -3,9 +3,11 @@ from copy import deepcopy
 
 import pytest
 import yaml
-from hypothesis import HealthCheck, assume, given, settings
+from hypothesis import HealthCheck, assume, find, given, settings
+from hypothesis.errors import NoSuchExample
 
 import schemathesis
+from schemathesis.specs.openapi._hypothesis import STRING_FORMATS, is_valid_header
 
 from .utils import as_param
 
@@ -336,6 +338,14 @@ def test_(case):
     )
     # Then the generated test case should contain a valid "Authorization" header
     testdir.run_and_assert("-s", passed=1)
+
+
+def test_bearer_auth_valid_header():
+    # When a HTTP Bearer Auth headers is generated
+    # Then it should be a valid header
+    # And no invalid headers should be generated
+    with pytest.raises(NoSuchExample):
+        find(STRING_FORMATS["_bearer_auth"], lambda x: not is_valid_header({"x": x}))
 
 
 def test_unknown_data(testdir):
