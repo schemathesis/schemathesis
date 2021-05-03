@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Generate valid header values for Bearer auth by construction rather than by filtering.
+
 `3.6.4`_ - 2021-04-30
 ---------------------
 
