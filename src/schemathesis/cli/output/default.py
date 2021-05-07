@@ -114,22 +114,25 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
         return
 
     display_section_name("ERRORS")
+    should_display_full_traceback_message = False
     for result in context.results:
         if not result.has_errors:
             continue
-        display_single_error(context, result)
+        should_display_full_traceback_message |= display_single_error(context, result)
     if event.generic_errors:
         display_generic_errors(context, event.generic_errors)
-    if not context.show_errors_tracebacks:
+    if should_display_full_traceback_message and not context.show_errors_tracebacks:
         click.secho(
             "Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks", fg="red"
         )
 
 
-def display_single_error(context: ExecutionContext, result: SerializedTestResult) -> None:
+def display_single_error(context: ExecutionContext, result: SerializedTestResult) -> bool:
     display_subsection(result)
+    should_display_full_traceback_message = False
     for error in result.errors:
-        _display_error(context, error, result.seed)
+        should_display_full_traceback_message |= _display_error(context, error, result.seed)
+    return should_display_full_traceback_message
 
 
 def display_generic_errors(context: ExecutionContext, errors: List[SerializedError]) -> None:
@@ -138,16 +141,27 @@ def display_generic_errors(context: ExecutionContext, errors: List[SerializedErr
         _display_error(context, error)
 
 
-def _display_error(context: ExecutionContext, error: SerializedError, seed: Optional[int] = None) -> None:
+def display_full_traceback_message(exception: str) -> bool:
+    # Some errors should not trigger the message that suggests to show full tracebacks to the user
+    return not exception.startswith("DeadlineExceeded")
+
+
+def _display_error(context: ExecutionContext, error: SerializedError, seed: Optional[int] = None) -> bool:
     if context.show_errors_tracebacks:
         message = error.exception_with_traceback
     else:
         message = error.exception
     if error.exception.startswith("InvalidSchema") and context.validate_schema:
         message += DISABLE_SCHEMA_VALIDATION_MESSAGE + "\n"
+    if error.exception.startswith("DeadlineExceeded"):
+        message += (
+            "Consider extending the deadline with the `--hypothesis-deadline` CLI option.\n"
+            "You can disable it completely with `--hypothesis-deadline=None`.\n"
+        )
     click.secho(message, fg="red")
     if error.example is not None:
         display_example(context, error.example, seed=seed)
+    return display_full_traceback_message(error.exception)
 
 
 def display_failures(context: ExecutionContext, event: events.Finished) -> None:

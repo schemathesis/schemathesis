@@ -21,7 +21,14 @@ from ...constants import (
     USER_AGENT,
     DataGenerationMethod,
 )
-from ...exceptions import CheckFailed, InvalidRegularExpression, InvalidSchema, NonCheckError, get_grouped_exception
+from ...exceptions import (
+    CheckFailed,
+    DeadlineExceeded,
+    InvalidRegularExpression,
+    InvalidSchema,
+    NonCheckError,
+    get_grouped_exception,
+)
 from ...hooks import HookContext, get_all_by_name
 from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResult, TestResultSet
 from ...runner import events
@@ -230,6 +237,9 @@ def run_test(  # pylint: disable=too-many-locals
             result.add_error(InvalidRegularExpression(message))
         else:
             result.add_error(error)
+    except hypothesis.errors.DeadlineExceeded as error:
+        status = Status.error
+        result.add_error(DeadlineExceeded.from_exc(error))
     except Exception as error:
         status = Status.error
         result.add_error(error)

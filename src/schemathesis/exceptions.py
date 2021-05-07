@@ -3,6 +3,7 @@ from json import JSONDecodeError
 from typing import Any, Callable, Dict, NoReturn, Optional, Type, Union
 
 import attr
+import hypothesis.errors
 import requests
 from jsonschema import ValidationError
 
@@ -104,6 +105,20 @@ class InvalidSchema(Exception):
             raise self
 
         return actual_test
+
+
+class DeadlineExceeded(Exception):
+    """Test took too long to run."""
+
+    __module__ = "builtins"
+
+    @classmethod
+    def from_exc(cls, exc: hypothesis.errors.DeadlineExceeded) -> "DeadlineExceeded":
+        runtime = exc.runtime.total_seconds() * 1000
+        deadline = exc.deadline.total_seconds() * 1000
+        return cls(
+            f"API response time is too slow! It took {runtime:.2f}ms, which exceeds the deadline of {deadline:.2f}ms.\n"
+        )
 
 
 class NonCheckError(Exception):
