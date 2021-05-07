@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Improve error message for failing Hypothesis deadline healthcheck in CLI. `#880`_
+
 `3.6.5`_ - 2021-05-07
 ---------------------
 
@@ -1915,6 +1919,7 @@ Deprecated
 .. _#886: https://github.com/schemathesis/schemathesis/issues/886
 .. _#884: https://github.com/schemathesis/schemathesis/issues/884
 .. _#882: https://github.com/schemathesis/schemathesis/issues/882
+.. _#880: https://github.com/schemathesis/schemathesis/issues/880
 .. _#877: https://github.com/schemathesis/schemathesis/issues/877
 .. _#876: https://github.com/schemathesis/schemathesis/issues/876
 .. _#874: https://github.com/schemathesis/schemathesis/issues/874
