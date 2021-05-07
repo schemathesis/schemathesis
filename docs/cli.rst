@@ -46,6 +46,8 @@ loaded API schema, processed operations, found errors, and used checks.
 
 By default, Schemathesis refuses to work with schemas that do not conform to the Open API spec, but you can disable this behavior with ``--validate-schema=false``.
 
+.. note:: Schemathesis supports colorless output via the `NO_COLOR <https://no-color.org/>` environment variable or the ``--no-color`` CLI option.
+
 Testing specific operations
 ---------------------------
 

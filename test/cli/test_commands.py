@@ -277,6 +277,7 @@ def test_commands_run_help(cli):
         "  --force-schema-version [20|30]  Force Schemathesis to parse the input schema",
         "                                  with the specified spec version.",
         "",
+        "  --no-color                      Disable ANSI color escape codes.",
         "  -v, --verbosity                 Reduce verbosity of error output.",
         "  -h, --help                      Show this message and exit.",
     ]
@@ -1910,3 +1911,17 @@ def test_response_payload_encoding(cli, cli_args):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then it should be displayed according its actual encoding
     assert "Response payload: `Тест`" in result.stdout.splitlines()
+
+
+@pytest.mark.parametrize("kind", ("env_var", "arg"))
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("success")
+def test_no_color(monkeypatch, cli, schema_url, kind):
+    args = (schema_url,)
+    if kind == "env_var":
+        monkeypatch.setenv("NO_COLOR", "1")
+    if kind == "arg":
+        args += ("--no-color",)
+    result = cli.run(*args, color=True)
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert "[1m" not in result.stdout
