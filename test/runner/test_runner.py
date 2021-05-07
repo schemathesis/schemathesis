@@ -453,7 +453,9 @@ def test_path_parameters_encoding(real_app_schema):
     # NOTE. WSGI and ASGI applications decodes %2F as / and returns 404
     # When API operation has a path parameter
     results = execute(
-        real_app_schema, checks=(status_code_conformance,), hypothesis_settings=hypothesis.settings(derandomize=True)
+        real_app_schema,
+        checks=(status_code_conformance,),
+        hypothesis_settings=hypothesis.settings(derandomize=True, deadline=None),
     )
     # Then there should be no failures
     # since all path parameters are quoted
