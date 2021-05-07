@@ -450,8 +450,11 @@ class GroupedOption(click.Option):
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,
 )
+@click.option("--no-color", help="Disable ANSI color escape codes.", type=bool, is_flag=True)
 @click.option("--verbosity", "-v", help="Reduce verbosity of error output.", count=True)
+@click.pass_context
 def run(
+    ctx: click.Context,
     schema: str,
     auth: Optional[Tuple[str, str]],
     auth_type: str,
@@ -491,12 +494,14 @@ def run(
     hypothesis_seed: Optional[int] = None,
     hypothesis_verbosity: Optional[hypothesis.Verbosity] = None,
     verbosity: int = 0,
+    no_color: bool = False,
 ) -> None:
     """Perform schemathesis test against an API specified by SCHEMA.
 
     SCHEMA must be a valid URL or file path pointing to an Open API / Swagger specification.
     """
     # pylint: disable=too-many-locals
+    maybe_disable_color(ctx, no_color)
     check_auth(auth, headers)
     selected_targets = tuple(target for target in targets_module.ALL_TARGETS if target.__name__ in targets)
 
@@ -822,18 +827,23 @@ def execute(
 @click.option("--status", help="Status of interactions to replay.", type=str)
 @click.option("--uri", help="A regexp that filters interactions by their request URI.", type=str)
 @click.option("--method", help="A regexp that filters interactions by their request method.", type=str)
+@click.option("--no-color", help="Disable ANSI color escape codes.", type=bool, is_flag=True)
+@click.pass_context
 def replay(
+    ctx: click.Context,
     cassette_path: str,
     id_: Optional[str],
     status: Optional[str] = None,
     uri: Optional[str] = None,
     method: Optional[str] = None,
+    no_color: bool = False,
 ) -> None:
     """Replay a cassette.
 
     Cassettes in VCR-compatible format can be replayed.
     For example, ones that are recorded with ``store-network-log`` option of `schemathesis run` command.
     """
+    maybe_disable_color(ctx, no_color)
     click.secho(f"{bold('Replaying cassette')}: {cassette_path}")
     with open(cassette_path) as fd:
         cassette = yaml.load(fd, Loader=SafeLoader)
@@ -847,6 +857,11 @@ def replay(
 
 def bold(message: str) -> str:
     return click.style(message, bold=True)
+
+
+def maybe_disable_color(ctx: click.Context, no_color: bool) -> None:
+    if no_color or "NO_COLOR" in os.environ:
+        ctx.color = False
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])

@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Support for disabling ANSI color escape codes via the `NO_COLOR <https://no-color.org/>` environment variable or the ``--no-color`` CLI option. `#1153`_
+
 **Changed**
 
 - Generate valid header values for Bearer auth by construction rather than by filtering.
@@ -1849,6 +1853,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1153: https://github.com/schemathesis/schemathesis/issues/1153
 .. _#1134: https://github.com/schemathesis/schemathesis/issues/1134
 .. _#1121: https://github.com/schemathesis/schemathesis/issues/1121
 .. _#1100: https://github.com/schemathesis/schemathesis/issues/1100
