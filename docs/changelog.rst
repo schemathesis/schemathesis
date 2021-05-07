@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.6.5`_ - 2021-05-07
+---------------------
+
 **Added**
 
 - Support for disabling ANSI color escape codes via the `NO_COLOR <https://no-color.org/>` environment variable or the ``--no-color`` CLI option. `#1153`_
@@ -1708,7 +1711,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.4...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.5...HEAD
+.. _3.6.5: https://github.com/schemathesis/schemathesis/compare/v3.6.4...v3.6.5
 .. _3.6.4: https://github.com/schemathesis/schemathesis/compare/v3.6.3...v3.6.4
 .. _3.6.3: https://github.com/schemathesis/schemathesis/compare/v3.6.2...v3.6.3
 .. _3.6.2: https://github.com/schemathesis/schemathesis/compare/v3.6.1...v3.6.2
