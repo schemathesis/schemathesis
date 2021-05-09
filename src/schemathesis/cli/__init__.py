@@ -801,6 +801,11 @@ def execute(
         verbosity=verbosity,
         code_sample_style=code_sample_style,
     )
+
+    def shutdown() -> None:
+        for _handler in handlers:
+            _handler.shutdown()
+
     GLOBAL_HOOK_DISPATCHER.dispatch("after_init_cli_run_handlers", HookContext(), handlers, execution_context)
     try:
         for event in prepared_runner:
@@ -811,10 +816,10 @@ def execute(
                     exit_code = 1
                 else:
                     exit_code = 0
+                shutdown()
                 sys.exit(exit_code)
     except Exception as exc:
-        for handler in handlers:
-            handler.shutdown()
+        shutdown()
         if isinstance(exc, click.Abort):
             # To avoid showing "Aborted!" message, which is the default behavior in Click
             sys.exit(1)
