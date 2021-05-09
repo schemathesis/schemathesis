@@ -485,7 +485,7 @@ You can specify recursive links if you want. The default recursion depth limit i
 ``--stateful-recursion-limit=<N>`` CLI option.
 
 Schemathesis's CLI currently uses the old approach to stateful testing, not based on state machines.
-We plan to use the new approach in CLI, beginning from Schemathesis 3.1. It may include slight changes to the visual
+We plan to use the new approach in CLI in the future. It may include slight changes to the visual
 appearance and the way to configure it. It also means that using stateful testing in CLI is not yet as customizable
 as in the in-code approach.
 
