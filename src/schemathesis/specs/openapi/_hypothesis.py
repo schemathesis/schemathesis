@@ -308,7 +308,6 @@ def is_valid_path(parameters: Dict[str, Any]) -> bool:
     In this case one variable in the path template will be empty, which will lead to 404 in most of the cases.
     Because of it this case doesn't bring much value and might lead to false positives results of Schemathesis runs.
     """
-
     disallowed_values = (SLASH, "")
 
     return not any(
