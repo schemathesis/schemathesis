@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Missing support for the ``date`` string format (only ``full-date`` was supported).
+
 `3.6.6`_ - 2021-05-07
 ---------------------
 
