@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.6.7`_ - 2021-05-12
+---------------------
+
 **Fixed**
 
 - Missing support for the ``date`` string format (only ``full-date`` was supported).
@@ -1722,7 +1725,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.6...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.7...HEAD
+.. _3.6.7: https://github.com/schemathesis/schemathesis/compare/v3.6.6...v3.6.7
 .. _3.6.6: https://github.com/schemathesis/schemathesis/compare/v3.6.5...v3.6.6
 .. _3.6.5: https://github.com/schemathesis/schemathesis/compare/v3.6.4...v3.6.5
 .. _3.6.4: https://github.com/schemathesis/schemathesis/compare/v3.6.3...v3.6.4
