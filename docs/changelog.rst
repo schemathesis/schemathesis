@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.6.8`_ - 2021-05-13
+---------------------
+
 **Changed**
 
 - Relax dependency on ``starlette`` to ``>=0.13,<1``. `#1160`_
@@ -1729,7 +1732,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.7...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.8...HEAD
+.. _3.6.8: https://github.com/schemathesis/schemathesis/compare/v3.6.7...v3.6.8
 .. _3.6.7: https://github.com/schemathesis/schemathesis/compare/v3.6.6...v3.6.7
 .. _3.6.6: https://github.com/schemathesis/schemathesis/compare/v3.6.5...v3.6.6
 .. _3.6.5: https://github.com/schemathesis/schemathesis/compare/v3.6.4...v3.6.5
