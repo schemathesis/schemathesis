@@ -219,6 +219,8 @@ def create_app(
     @app.route("/api/users/", methods=["POST"])
     def create_user():
         data = request.json
+        if not isinstance(data, dict):
+            return jsonify({"detail": "Invalid payload"}), 400
         for field in ("first_name", "last_name"):
             if field not in data:
                 return jsonify({"detail": f"Missing `{field}`"}), 400

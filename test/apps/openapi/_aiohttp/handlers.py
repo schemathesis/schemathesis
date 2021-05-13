@@ -186,9 +186,20 @@ async def upload_file(request: web.Request) -> web.Response:
     return web.json_response({"size": request.content_length})
 
 
+def is_properly_encoded(data: bytes, charset: str) -> bool:
+    try:
+        data.decode(charset)
+        return True
+    except UnicodeDecodeError:
+        return False
+
+
 async def form(request: web.Request) -> web.Response:
     if not request.headers.get("Content-Type", "").startswith("application/x-www-form-urlencoded"):
         raise web.HTTPInternalServerError(text="Not an urlencoded request!")
+    raw = await request.read()
+    if not is_properly_encoded(raw, request.charset or "utf8"):
+        raise web.HTTPBadRequest(text='{"detail": "Invalid payload"}')
     data = await request.post()
     for field in ("first_name", "last_name"):
         if field not in data:
@@ -200,6 +211,8 @@ async def form(request: web.Request) -> web.Response:
 
 async def create_user(request: web.Request) -> web.Response:
     data = await request.json()
+    if not isinstance(data, dict):
+        raise web.HTTPBadRequest(text='{"detail": "Invalid payload"}')
     for field in ("first_name", "last_name"):
         if field not in data:
             raise web.HTTPBadRequest(text=f'{{"detail": "Missing `{field}`"}}')
