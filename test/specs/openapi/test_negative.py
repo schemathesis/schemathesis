@@ -12,6 +12,7 @@ from schemathesis.specs.openapi.negative.mutations import (
     MutationResult,
     change_properties,
     change_schema_type,
+    negate_constraints,
     negate_schema,
     remove_required_property,
 )
@@ -121,7 +122,6 @@ def test_negate_schema_failure(data, schema):
 )
 @given(data=st.data())
 def test_change_properties_success(data, schema):
-    schema = {"properties": {"foo": {"type": "integer"}}, "type": "object", "required": ["foo"]}
     validator = Draft4Validator(schema)
     schema = deepcopy(schema)
     # When the schema is mutated
@@ -129,3 +129,27 @@ def test_change_properties_success(data, schema):
     # Then its instances should not be valid against the original schema
     new_instance = data.draw(from_schema(schema))
     assert not validator.is_valid(new_instance)
+
+
+@pytest.mark.parametrize(
+    "schema",
+    (
+        {"type": "integer", "minimum": 42},
+        {"minimum": 42},
+    ),
+)
+@given(data=st.data())
+def test_negate_constraints_success(data, schema):
+    validator = Draft4Validator(schema)
+    schema = deepcopy(schema)
+    # When the schema is mutated
+    assert negate_constraints(data.draw, schema) == MutationResult.SUCCESS
+    # Then its instances should not be valid against the original schema
+    new_instance = data.draw(from_schema(schema))
+    assert not validator.is_valid(new_instance)
+
+
+@given(data=st.data())
+def test_negate_constraints_failure(data):
+    # This mutation is not applicable for such schemas
+    assert negate_constraints(data.draw, {"type": "integer"}) == MutationResult.FAILURE

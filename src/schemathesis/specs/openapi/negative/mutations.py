@@ -117,7 +117,20 @@ def apply_mutations(draw: Draw, schema: Schema) -> MutationResult:
 
 
 def negate_constraints(draw: Draw, schema: Schema) -> MutationResult:
-    # TODO. implement constraints negation
+    """Negate schema constrains while keeping the original type."""
+    copied = schema.copy()
+    schema.clear()
+    is_negated = False
+    for key, value in copied.items():
+        if key in ("type",):  # TODO. more?
+            schema[key] = value
+        else:
+            # TODO. Swarm testing to negate only certain keywords?
+            is_negated = True
+            negated = schema.setdefault("not", {})
+            negated[key] = value
+    if is_negated:
+        return MutationResult.SUCCESS
     return MutationResult.FAILURE
 
 
