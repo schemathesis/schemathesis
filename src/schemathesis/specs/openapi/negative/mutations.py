@@ -82,13 +82,20 @@ def change_properties(draw: Draw, schema: Schema) -> MutationResult:
     if not properties:
         # No properties to mutate
         return MutationResult.FAILURE
-    # TODO. make all mutated properties required - otherwise, it is possible that the effect of successful mutations
-    # will not be visible in the generated data.
     # Order properties randomly and iterate over them until at least one mutation is successfully applied to at least
     # one property
     ordered_properties = draw(st.lists(st.sampled_from(properties), min_size=len(properties), unique_by=lambda x: x[0]))
     for property_name, property_schema in ordered_properties:
         if apply_mutations(draw, property_schema) == MutationResult.SUCCESS:
+            # It is still possible to generate "positive" cases, for example, when this property is optional.
+            # They are filtered out on the upper level anyway, but to avoid performance penalty we adjust the schema
+            # so the generated samples are less likely to be "positive"
+            required = schema.setdefault("required", [])
+            required.append(property_name)
+            # If `type` is already there, then it should contain "object" as we check it upfront
+            # Otherwise restrict `type` to "object"
+            if "type" not in schema:
+                schema["type"] = "object"
             break
     else:
         # No successful mutations

@@ -117,7 +117,9 @@ def test_negate_schema_failure(data, schema):
     "schema",
     (
         {"properties": {"foo": {"type": "integer"}}, "type": "object", "required": ["foo"]},
-        # TODO. check it without `required` / `type`
+        {"properties": {"foo": {"type": "integer"}}, "type": ["object"]},
+        {"properties": {"foo": {"type": "integer"}}, "type": "object"},
+        {"properties": {"foo": {"type": "integer"}}},
     ),
 )
 @given(data=st.data())
@@ -128,7 +130,7 @@ def test_change_properties_success(data, schema):
     assert change_properties(data.draw, schema) == MutationResult.SUCCESS
     # Then its instances should not be valid against the original schema
     new_instance = data.draw(from_schema(schema))
-    assert not validator.is_valid(new_instance)
+    assert not validator.is_valid(new_instance), new_instance
 
 
 @pytest.mark.parametrize(
