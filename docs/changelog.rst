@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Relax dependency on ``starlette`` to ``>=0.13,<1``. `#1160`_
+
 `3.6.7`_ - 2021-05-12
 ---------------------
 
@@ -1873,6 +1877,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1160: https://github.com/schemathesis/schemathesis/issues/1160
 .. _#1153: https://github.com/schemathesis/schemathesis/issues/1153
 .. _#1134: https://github.com/schemathesis/schemathesis/issues/1134
 .. _#1121: https://github.com/schemathesis/schemathesis/issues/1121
