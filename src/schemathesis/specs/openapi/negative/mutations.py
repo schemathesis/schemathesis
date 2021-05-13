@@ -1,7 +1,7 @@
 """Schema mutations."""
 import enum
 from functools import wraps
-from typing import Callable, Tuple
+from typing import Any, Callable, List, Sequence, Tuple, TypeVar
 
 from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
@@ -9,6 +9,8 @@ from hypothesis_jsonschema._canonicalise import canonicalish
 
 from .types import Draw, Schema
 from .utils import get_type
+
+T = TypeVar("T")
 
 
 class MutationResult(enum.Enum):
@@ -100,7 +102,7 @@ def change_properties(draw: Draw, schema: Schema) -> MutationResult:
         return MutationResult.FAILURE
     # Order properties randomly and iterate over them until at least one mutation is successfully applied to at least
     # one property
-    ordered_properties = draw(st.lists(st.sampled_from(properties), min_size=len(properties), unique_by=lambda x: x[0]))
+    ordered_properties = draw(ordered(properties, unique_by=lambda x: x[0]))
     for property_name, property_schema in ordered_properties:
         if apply_mutations(draw, property_schema) == MutationResult.SUCCESS:
             # It is still possible to generate "positive" cases, for example, when this property is optional.
@@ -126,14 +128,14 @@ def change_properties(draw: Draw, schema: Schema) -> MutationResult:
         # The `features` strategy is reused for property names and mutation names for simplicity as it is not likely
         # to have an overlap between them.
         if features.is_enabled(name):
-            for mutation in get_mutations(property_schema):
+            for mutation in get_mutations(draw, property_schema):
                 if features.is_enabled(mutation.__name__):
                     mutation(draw, property_schema)
     return MutationResult.SUCCESS
 
 
 def apply_mutations(draw: Draw, schema: Schema) -> MutationResult:
-    for mutation in get_mutations(schema):
+    for mutation in get_mutations(draw, schema):
         if mutation(draw, schema) == MutationResult.SUCCESS:
             return MutationResult.SUCCESS
     return MutationResult.FAILURE
@@ -145,7 +147,7 @@ def negate_constraints(draw: Draw, schema: Schema) -> MutationResult:
     schema.clear()
     is_negated = False
     for key, value in copied.items():
-        if key in ("type",):  # TODO. more?
+        if key in ("type", "properties"):  # TODO. more?
             schema[key] = value
         else:
             # TODO. Swarm testing to negate only certain keywords?
@@ -170,18 +172,27 @@ def negate_schema(draw: Draw, schema: Schema) -> MutationResult:
     return MutationResult.SUCCESS
 
 
-def get_mutations(schema: Schema) -> Tuple[Mutation, ...]:
-    """Get mutations possible for a schema.
-
-    Mutations are sorted by their anticipated effectiveness. The ordering is essential when we need to unconditionally
-    apply at least one mutation.
-    """
+def get_mutations(draw: Draw, schema: Schema) -> Tuple[Mutation, ...]:
+    """Get mutations possible for a schema."""
     types = get_type(schema)
     # On the top-level of Open API schemas, types are always strings, but inside "schema" objects, they are the same as
     # in JSON Schema, where it could be either a string or an array of strings.
-    # TODO. How to handle multiple types? Maybe each mutation can have a guard that will return FAILURE on a type that
-    # is not applicable
+    # TODO. How to handle multiple types?
     if "object" in types:
-        return change_properties, negate_constraints, remove_required_property, change_schema_type, negate_schema
+        options = [change_properties, negate_constraints, remove_required_property, change_schema_type, negate_schema]
+        return draw(ordered(options))
     # TODO. add some for arrays - mutate "items" (if an object) or particular items (if an array)?
-    return negate_constraints, change_schema_type, negate_schema
+    options = [negate_constraints, change_schema_type, negate_schema]
+    return draw(ordered(options))
+
+
+def ident(x: T) -> T:
+    return x
+
+
+def ordered(items: Sequence[T], unique_by: Callable[[T], Any] = ident) -> st.SearchStrategy[List[T]]:
+    """Returns a strategy that generates randomly ordered lists of T.
+
+    NOTE. Items should be unique.
+    """
+    return st.lists(st.sampled_from(items), min_size=len(items), unique_by=unique_by)
