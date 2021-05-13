@@ -1,5 +1,6 @@
 """Schema mutations."""
 import enum
+from functools import wraps
 from typing import Callable, Tuple
 
 from hypothesis import strategies as st
@@ -26,11 +27,29 @@ class MutationResult(enum.Enum):
 Mutation = Callable[[Draw, Schema], MutationResult]
 
 
+def for_types(*allowed_types: str) -> Callable[[Mutation], Mutation]:
+    """Immediately return FAILURE for schemas with types not from ``allowed_types``."""
+
+    _allowed_types = set(allowed_types)
+
+    def wrapper(mutation: Mutation) -> Mutation:
+        @wraps(mutation)
+        def inner(draw: Draw, schema: Schema) -> MutationResult:
+            types = get_type(schema)
+            if _allowed_types & set(types):
+                return mutation(draw, schema)
+            return MutationResult.FAILURE
+
+        return inner
+
+    return wrapper
+
+
+@for_types("object")
 def remove_required_property(draw: Draw, schema: Schema) -> MutationResult:
     """Remove a required property.
 
     Effect: Some property won't be generated.
-    Applicable types: object
     """
     required = schema.get("required")
     if not required:
@@ -53,10 +72,7 @@ def remove_required_property(draw: Draw, schema: Schema) -> MutationResult:
 
 
 def change_schema_type(draw: Draw, schema: Schema) -> MutationResult:
-    """Change type of values accepted by a schema.
-
-    Applicable types: any
-    """
+    """Change type of values accepted by a schema."""
     if "type" not in schema:
         # The absence of this keyword means that the schema values can be of any type;
         # Therefore, we can't choose a different type
@@ -72,11 +88,11 @@ def change_schema_type(draw: Draw, schema: Schema) -> MutationResult:
     return MutationResult.SUCCESS
 
 
+@for_types("object")
 def change_properties(draw: Draw, schema: Schema) -> MutationResult:
     """Mutate individual object schema properties.
 
     Effect: Some properties will not validate the original schema
-    Applicable types: object
     """
     properties = sorted(schema.get("properties", {}).items())
     if not properties:
@@ -145,8 +161,6 @@ def negate_schema(draw: Draw, schema: Schema) -> MutationResult:
     """Negate the schema with JSON Schema's `not` keyword.
 
     It is the least effective mutation as it negates the whole schema without trying to change its small parts.
-
-    Applicable types: any
     """
     if canonicalish(schema) == {}:
         return MutationResult.FAILURE

@@ -77,10 +77,10 @@ def test_remove_required_property_success(data, schema, expected):
     assert schema == expected
 
 
+@pytest.mark.parametrize("schema", ({}, {"type": "array"}))
 @given(data=st.data())
-def test_remove_required_property_failure(data):
-    # Can't apply this mutation to an empty schema
-    assert remove_required_property(data.draw, {}) == MutationResult.FAILURE
+def test_remove_required_property_failure(data, schema):
+    assert remove_required_property(data.draw, schema) == MutationResult.FAILURE
 
 
 @pytest.mark.parametrize(
