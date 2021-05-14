@@ -51,3 +51,53 @@ def test_explicit_attributes(operation, values, expected):
             assert value == expected_values
 
     test()
+
+
+@pytest.fixture
+def deeply_nested_schema(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "query",
+                        "required": True,
+                        "schema": {
+                            # In the end it will be replaced with "#/components/schemas/bar"
+                            "$ref": "#/components/schemas/foo1"
+                        },
+                    }
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    empty_open_api_3_schema["components"] = {
+        "schemas": {
+            "foo1": {"$ref": "#/components/schemas/foo2"},
+            "foo2": {"$ref": "#/components/schemas/foo3"},
+            "foo3": {"$ref": "#/components/schemas/foo4"},
+            "foo4": {"$ref": "#/components/schemas/foo5"},
+            "foo5": {"$ref": "#/components/schemas/foo6"},
+            "foo6": {"$ref": "#/components/schemas/bar"},
+            "bar": {
+                "type": "string",
+            },
+        }
+    }
+    return empty_open_api_3_schema
+
+
+def test_missed_ref(deeply_nested_schema):
+    # See GH-1167
+    # When not resolved references are present in the schema during constructing a strategy
+    schema = schemathesis.from_dict(deeply_nested_schema)
+
+    @given(schema["/data"]["GET"].as_strategy())
+    @settings(max_examples=10)
+    def test(case):
+        # Then the reference should be correctly resolved
+        assert isinstance(case.query["key"], str)
+
+    test()

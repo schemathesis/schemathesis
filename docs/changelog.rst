@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Ignored ``$ref`` keyword in schemas with deeply nested references. `#1167`_
+
 `3.6.8`_ - 2021-05-13
 ---------------------
 
@@ -1881,6 +1885,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1167: https://github.com/schemathesis/schemathesis/issues/1167
 .. _#1160: https://github.com/schemathesis/schemathesis/issues/1160
 .. _#1153: https://github.com/schemathesis/schemathesis/issues/1153
 .. _#1134: https://github.com/schemathesis/schemathesis/issues/1134

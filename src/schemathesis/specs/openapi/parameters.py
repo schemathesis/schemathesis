@@ -132,6 +132,7 @@ class OpenAPI20Parameter(OpenAPIParameter):
     # into an "object" schema, and the value of this keyword is used there.
     # The following keywords are relevant only for non-body parameters.
     supported_jsonschema_keywords: ClassVar[Tuple[str, ...]] = (
+        "$ref",
         "type",  # only as a string
         "format",
         "items",
@@ -173,6 +174,7 @@ class OpenAPI30Parameter(OpenAPIParameter):
     # Excluding informative keywords - `title`, `description`, `default`.
     # In contrast with Open API 2.0 non-body parameters, in Open API 3.0, all parameters have the `schema` keyword.
     supported_jsonschema_keywords = (
+        "$ref",
         "multipleOf",
         "maximum",
         "exclusiveMaximum",
