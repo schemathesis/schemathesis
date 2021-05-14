@@ -1,8 +1,11 @@
+import json
+
 import pytest
 from hypothesis import assume, given, settings
 
 import schemathesis
 from schemathesis.specs.openapi._hypothesis import get_case_strategy, is_valid_header, make_positive_strategy
+from schemathesis.specs.openapi.references import load_file
 
 
 @pytest.fixture
@@ -167,3 +170,88 @@ def test_no_much_filtering_in_headers():
         pass
 
     test()
+
+
+@pytest.fixture
+def clear_caches():
+    yield
+    load_file.cache_clear()
+
+
+def _remote_schema(testdir):
+    testdir.makefile(".json", bar='{"bar": {"type": "integer"}}')
+
+
+def _nested_remote_schema(testdir):
+    # Remote reference contains a remote reference
+    testdir.makefile(".json", bar='{"bar": {"$ref": "spam.json#/spam"}}')
+    testdir.makefile(".json", spam='{"spam": {"type": "integer"}}')
+
+
+def _deep_nested_remote_schema(testdir):
+    # Remote reference contains a remote reference located inside a keyword
+    testdir.makefile(
+        ".json", bar='{"bar": {"properties": {"a": {"$ref": "spam.json#/spam"}}, "type": "object", "required": ["a"]}}'
+    )
+    testdir.makefile(".json", spam='{"spam": {"type": "integer"}}')
+
+
+def _colliding_remote_schema(testdir):
+    # References' keys could collide if created without separators
+    testdir.makefile(
+        ".json",
+        bar='{"bar": {"properties": {"a": {"$ref": "b.json#/a"}, "b": {"$ref": "b.json#/ab"}}, '
+        '"type": "object", "required": ["a", "b"]}}',
+    )
+    testdir.makefile(".json", b='{"a": {"$ref": "bc.json#/d"}, "ab": {"$ref": "c.json#/d"}}')
+    testdir.makefile(".json", bc='{"d": {"type": "integer"}}')
+    testdir.makefile(".json", c='{"d": {"type": "string"}}')
+
+
+def _recursive_remote_schema(testdir):
+    # Remote reference (1) contains a remote reference (2) that points back to the 1
+    testdir.makefile(".json", bar='{"bar": {"$ref": "spam.json#/spam"}, "baz": {"type": "integer"}}')
+    testdir.makefile(".json", spam='{"spam": {"$ref": "bar.json#/baz"}}')
+
+
+def _scoped_remote_schema(testdir):
+    # The same references might lead to difference files, depending on the resolution scope
+    testdir.makefile(".json", bar='{"bar": {"$ref": "./sub/foo.json#/foo"}}')
+    sub = testdir.mkdir("sub")
+    # `$ref` value is the same, but it is pointing to a different file (as it is a relative path)
+    (sub / "foo.json").write_text('{"foo": {"$ref": "./sub/foo.json#/foo"}}', "utf8")
+    subsub = sub.mkdir("sub")
+    (subsub / "foo.json").write_text('{"foo": {"type": "integer"}}', "utf8")
+
+
+@pytest.mark.usefixtures("clear_caches")
+@pytest.mark.parametrize(
+    "setup, check",
+    (
+        (_remote_schema, lambda v: isinstance(v, int)),
+        (_nested_remote_schema, lambda v: isinstance(v, int)),
+        (_deep_nested_remote_schema, lambda v: isinstance(v["a"], int)),
+        (_colliding_remote_schema, lambda v: isinstance(v["a"], int) and isinstance(v["b"], str)),
+        (_recursive_remote_schema, lambda v: isinstance(v, int)),
+        (_scoped_remote_schema, lambda v: isinstance(v, int)),
+    ),
+)
+def test_inline_remote_refs(testdir, deeply_nested_schema, setup, check):
+    # See GH-986
+    setup(testdir)
+    deeply_nested_schema["components"]["schemas"]["foo6"] = {"$ref": "bar.json#/bar"}
+
+    original = json.dumps(deeply_nested_schema, sort_keys=True, ensure_ascii=True)
+    schema = schemathesis.from_dict(deeply_nested_schema)
+
+    @given(schema["/data"]["GET"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        # Then the referenced schema should be accessible by `hypothesis-jsonschema` and the right value should be
+        # generated
+        assert check(case.query["key"])
+
+    test()
+
+    # And the original schema is not mutated
+    assert json.dumps(deeply_nested_schema, sort_keys=True, ensure_ascii=True) == original
