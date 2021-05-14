@@ -4,7 +4,9 @@ from collections import defaultdict
 from contextlib import ExitStack, contextmanager
 from copy import deepcopy
 from difflib import get_close_matches
+from hashlib import sha1
 from json import JSONDecodeError
+from threading import RLock
 from typing import (
     Any,
     Callable,
@@ -22,6 +24,7 @@ from typing import (
 )
 from urllib.parse import urlsplit
 
+import attr
 import jsonschema
 import requests
 from hypothesis.strategies import SearchStrategy
@@ -40,10 +43,19 @@ from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import BaseSchema
 from ...stateful import APIStateMachine, Stateful, StatefulTest
 from ...types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
-from ...utils import NOT_SET, Err, GenericResponse, Ok, Result, get_response_payload, is_json_media_type
+from ...utils import (
+    NOT_SET,
+    Err,
+    GenericResponse,
+    Ok,
+    Result,
+    get_response_payload,
+    is_json_media_type,
+    traverse_schema,
+)
 from . import links, serialization
 from ._hypothesis import get_case_strategy
-from .converter import to_json_schema_recursive
+from .converter import to_json_schema, to_json_schema_recursive
 from .examples import get_strategies_from_examples
 from .filters import (
     should_skip_by_operation_id,
@@ -68,6 +80,7 @@ SCHEMA_ERROR_MESSAGE = "Schema parsing failed. Please check your schema."
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError)
 
 
+@attr.s(eq=False, repr=False)
 class BaseOpenAPISchema(BaseSchema):
     nullable_name: str
     links_field: str
@@ -75,6 +88,14 @@ class BaseOpenAPISchema(BaseSchema):
     security: BaseSecurityProcessor
     component_locations: ClassVar[Tuple[str, ...]] = ()
     _operations_by_id: Dict[str, APIOperation]
+    _remote_reference_cache: Dict[str, Any]
+    # Remote references cache can be populated from multiple threads, therefore we need some synchronisation to avoid
+    # excessive resolving
+    _remote_reference_cache_lock: RLock
+
+    def __attrs_post_init__(self) -> None:
+        self._remote_reference_cache = {}
+        self._remote_reference_cache_lock = RLock()
 
     @property  # pragma: no mutate
     def spec_version(self) -> str:
@@ -443,11 +464,57 @@ class BaseOpenAPISchema(BaseSchema):
         Inlining components helps `hypothesis-jsonschema` generate data that involves non-resolved references.
         """
         schema = deepcopy(schema)
+        schema = traverse_schema(schema, lambda s: self._rewrite_remote_references(s, self.resolver))
+
+        def callback(_schema: Dict[str, Any], nullable_name: str) -> Dict[str, Any]:
+            _schema = to_json_schema(_schema, nullable_name)
+            return self._rewrite_remote_references(_schema, self.resolver)
+
         # Different spec versions allow different keywords to store possible reference targets
         for key in self.component_locations:
             if key in self.raw_schema:
-                schema[key] = to_json_schema_recursive(self.raw_schema[key], self.nullable_name)
+                schema[key] = traverse_schema(self.raw_schema[key], callback, self.nullable_name)
+        # If there are any cached references - add them to the resulting schema.
+        # Note that not all of them might be used for data generation, but at this point it is the simplest way to go
+        if self._remote_reference_cache:
+            schema[REMOTE_SCHEMAS_STORAGE_KEY] = self._remote_reference_cache
         return schema
+
+    def _rewrite_remote_references(self, schema: Dict[str, Any], resolver: InliningResolver) -> Dict[str, Any]:
+        """Inline non-local references present in the schema.
+
+        The idea is to resolve remote references, cache the result and replace these references with new ones
+        that point to a local path which is populated from this cache later on.
+        """
+        reference = schema.get("$ref")
+        # If `$ref` is not a property name and is not a local reference
+        if reference is not None and isinstance(reference, str) and not reference.startswith("#/"):
+            key = _make_reference_key(resolver._scopes_stack, reference)
+            with self._remote_reference_cache_lock:
+                if key not in self._remote_reference_cache:
+                    with resolver.resolving(reference) as resolved:
+                        # Resolved object also may have non-local references
+                        self._remote_reference_cache[key] = traverse_schema(
+                            resolved, lambda s: self._rewrite_remote_references(s, self.resolver)
+                        )
+            schema["$ref"] = f"#/{REMOTE_SCHEMAS_STORAGE_KEY}/{key}"
+        return schema
+
+
+def _make_reference_key(scopes: List[str], reference: str) -> str:
+    """A name under which the resolved reference data will be stored."""
+    # Using a hexdigest is the simplest way to associate practically unique keys with each reference
+    digest = sha1()
+    for scope in scopes:
+        digest.update(scope.encode("utf-8"))
+        # Separator to avoid collissions like this: ["a"], "bc" vs. ["ab"], "c". Otherwise, the resulting digest
+        # will be the same for both cases
+        digest.update(b"#")
+    digest.update(reference.encode("utf-8"))
+    return digest.hexdigest()
+
+
+REMOTE_SCHEMAS_STORAGE_KEY = "x-inlined"
 
 
 @contextmanager
