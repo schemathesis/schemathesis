@@ -417,7 +417,7 @@ class BaseOpenAPISchema(BaseSchema):
         # Different spec versions allow different keywords to store possible reference targets
         for key in self.component_locations:
             if key in self.raw_schema:
-                schema[key] = deepcopy(self.raw_schema[key])
+                schema[key] = to_json_schema_recursive(self.raw_schema[key], self.nullable_name)
         return schema
 
 
