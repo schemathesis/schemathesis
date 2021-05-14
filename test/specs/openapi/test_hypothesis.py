@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import given, settings
+from hypothesis import assume, given, settings
 
 import schemathesis
 from schemathesis.specs.openapi._hypothesis import get_case_strategy
@@ -99,5 +99,22 @@ def test_missed_ref(deeply_nested_schema):
     def test(case):
         # Then the reference should be correctly resolved
         assert isinstance(case.query["key"], str)
+
+    test()
+
+
+def test_inlined_definitions(deeply_nested_schema):
+    # See GH-1162
+    # When not resolved references are present in the schema during constructing a strategy
+    # And the referenced schema contains Open API specific keywords
+    deeply_nested_schema["components"]["schemas"]["bar"]["nullable"] = True
+
+    schema = schemathesis.from_dict(deeply_nested_schema)
+
+    @given(schema["/data"]["GET"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        # Then the referenced schema should be properly transformed to the JSON Schema form
+        assume(case.query["key"] is None)
 
     test()
