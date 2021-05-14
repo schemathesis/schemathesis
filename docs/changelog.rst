@@ -20,6 +20,7 @@ Changelog
 - ``TypeError`` on ``case.call`` with bytes data on GraphQL schemas.
 - Worker threads may not be immediately stopped on SIGINT. `#1066`_
 - Re-used referenced objects during inlining. Now they are independent.
+- Rewrite not resolved remote references to local ones. `#986`_
 
 `3.9.7`_ - 2021-07-26
 ---------------------
@@ -2172,6 +2173,7 @@ Deprecated
 .. _#992: https://github.com/schemathesis/schemathesis/issues/992
 .. _#990: https://github.com/schemathesis/schemathesis/issues/990
 .. _#987: https://github.com/schemathesis/schemathesis/issues/987
+.. _#986: https://github.com/schemathesis/schemathesis/issues/986
 .. _#982: https://github.com/schemathesis/schemathesis/issues/982
 .. _#980: https://github.com/schemathesis/schemathesis/issues/980
 .. _#975: https://github.com/schemathesis/schemathesis/issues/975
