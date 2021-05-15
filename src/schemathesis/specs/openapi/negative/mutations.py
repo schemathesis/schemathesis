@@ -220,8 +220,12 @@ ALL_MUTATIONS = {remove_required_property, change_type, change_properties, negat
 _INCOMPATIBLE_MUTATIONS = (
     # Schema: {"type": "string", "minLength": 5}
     # Mutated: {"not": {"type": "string", "not": {"minLength": 5}}}
-    # Valid example: "12345"
+    # Valid example: "ABCDE"
     (negate_schema, negate_constraints),
+    # Schema: {"type": "string"}
+    # Mutated: {"not": {"type": "array"}}
+    # Valid example: "A"
+    (negate_schema, change_type),
 )
 
 INCOMPATIBLE_MUTATIONS: Dict[Mutation, Set[Mutation]] = {}
