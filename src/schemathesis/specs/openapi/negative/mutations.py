@@ -68,6 +68,7 @@ def remove_required_property(draw: Draw, schema: Schema) -> MutationResult:
     # An optional property still can be generated, and to avoid it, we need to remove it from other keywords.
     properties = schema.get("properties", {})
     properties.pop(property_name, None)
+    schema["type"] = "object"
     # This property still can be generated via `patternProperties`, but this implementation doesn't cover this case
     # Its probability is relatively low, and the complete solution compatible with Draft 4 will require extra complexity
     # The output filter covers cases like this

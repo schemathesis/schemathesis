@@ -1,7 +1,7 @@
 from copy import deepcopy
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import given
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from jsonschema import Draft4Validator
@@ -56,133 +56,83 @@ def validate_schema(schema):
         ("body", INTEGER_SCHEMA),
     ],
 )
-def test_negative(schema, location):
+@given(data=st.data())
+def test_top_level_strategy(data, location, schema):
     validate_schema(schema)
     validator = Draft4Validator(schema)
-
-    @given(negative_schema(schema, location=location, custom_formats={}))
-    @settings(max_examples=10)
-    def test(instance):
-        assert not validator.is_valid(instance)
-
-    test()
+    instance = data.draw(negative_schema(schema, location=location, custom_formats={}))
+    assert not validator.is_valid(instance)
 
 
 @pytest.mark.parametrize(
-    "schema, expected",
+    "mutation, schema",
     (
-        ({"properties": {"foo": {}}, "required": ["foo"]}, {"properties": {}}),
-        ({"properties": {"foo": {}, "bar": {}}, "required": ["foo"]}, {"properties": {"bar": {}}}),
+        # No constraints besides `type`
+        (negate_constraints, {"type": "integer"}),
+        # Accept-everything schema
+        (negate_schema, {}),
+        # Equivalent to accept-everything schema
+        (negate_schema, {"uniqueItems": False}),
+        # Missing type (i.e all types are possible)
+        (change_type, {}),
+        # All types explicitly
+        (change_type, {"type": ["string", "integer", "number", "object", "array", "boolean", "null"]}),
+        # No properties to remove
+        (remove_required_property, {}),
+        # Non-"object" type
+        (remove_required_property, {"type": "array"}),
+        # No properties at all
+        (change_properties, {}),
+        # No properties that can be mutated
+        (change_properties, {"properties": {"foo": {}}}),
     ),
 )
 @given(data=st.data())
-def test_remove_required_property_success(data, schema, expected):
+def test_failing_mutations(data, mutation, schema):
     validate_schema(schema)
-    schema = deepcopy(schema)
-    assert remove_required_property(data.draw, schema) == MutationResult.SUCCESS
-    validate_schema(schema)
-    assert schema == expected
-
-
-@pytest.mark.parametrize("schema", ({}, {"type": "array"}))
-@given(data=st.data())
-def test_remove_required_property_failure(data, schema):
-    assert remove_required_property(data.draw, schema) == MutationResult.FAILURE
+    original_schema = deepcopy(schema)
+    # When mutation can't be applied
+    # Then it returns "failure"
+    assert mutation(data.draw, schema) == MutationResult.FAILURE
+    # And doesn't mutate the input schema
+    assert schema == original_schema
 
 
 @pytest.mark.parametrize(
-    "schema",
-    ({"type": "object"}, {"type": ["object", "array"]}),
-)
-@given(data=st.data())
-def test_change_schema_type_success(data, schema):
-    types = schema["type"] if isinstance(schema["type"], list) else [schema["type"]]
-    schema = deepcopy(schema)
-    assert change_type(data.draw, schema) == MutationResult.SUCCESS
-    validate_schema(schema)
-    assert all(schema["type"] != type_ for type_ in types)
-
-
-@given(data=st.data())
-def test_change_schema_type_failure(data):
-    assert change_type(data.draw, {}) == MutationResult.FAILURE
-
-
-@given(data=st.data())
-def test_negate_schema_success(data):
-    schema = {"type": "object"}
-    assert negate_schema(data.draw, schema) == MutationResult.SUCCESS
-    assert schema == {"not": {"type": "object"}}
-
-
-@pytest.mark.parametrize("schema", ({}, {"uniqueItems": False}))
-@given(data=st.data())
-def test_negate_schema_failure(data, schema):
-    assert negate_schema(data.draw, schema) == MutationResult.FAILURE
-
-
-@pytest.mark.parametrize(
-    "schema",
+    "mutation, schema",
     (
-        {"properties": {"foo": {"type": "integer"}}, "type": "object", "required": ["foo"]},
-        {"properties": {"foo": {"type": "integer"}}, "type": ["object"]},
-        {"properties": {"foo": {"type": "integer"}}, "type": "object"},
-        {"properties": {"foo": {"type": "integer"}}},
+        (negate_constraints, {"type": "integer", "minimum": 42}),
+        (negate_constraints, {"minimum": 42}),
+        (negate_schema, {"type": "object"}),
+        (change_type, {"type": "object"}),
+        (change_type, {"type": ["object", "array"]}),
+        (remove_required_property, {"properties": {"foo": {}}, "required": ["foo"]}),
+        (remove_required_property, {"properties": {"foo": {}, "bar": {}}, "required": ["foo"]}),
+        (change_properties, {"properties": {"foo": {"type": "integer"}}, "type": "object", "required": ["foo"]}),
+        (change_properties, {"properties": {"foo": {"type": "integer"}}, "type": ["object"]}),
+        (change_properties, {"properties": {"foo": {"type": "integer"}}, "type": "object"}),
+        (change_properties, {"properties": {"foo": {"type": "integer"}}}),
+        (
+            change_properties,
+            {
+                "properties": {"foo": {"type": "string", "minLength": 5}, "bar": {"type": "string", "minLength": 5}},
+                "type": "object",
+                "required": ["foo", "bar"],
+                "additionalProperties": False,
+            },
+        ),
     ),
 )
 @given(data=st.data())
-def test_change_properties_success(data, schema):
+def test_successful_mutations(data, mutation, schema):
     validate_schema(schema)
     validator = Draft4Validator(schema)
     schema = deepcopy(schema)
-    # When the schema is mutated
-    assert change_properties(data.draw, schema) == MutationResult.SUCCESS
-    # Then it produces a valid schema
+    # When mutation can be applied
+    # Then it returns "success"
+    assert mutation(data.draw, schema) == MutationResult.SUCCESS
+    # And the mutated schema is a valid JSON Schema
     validate_schema(schema)
-    # Then its instances should not be valid against the original schema
-    new_instance = data.draw(from_schema(schema))
-    assert not validator.is_valid(new_instance), new_instance
-
-
-@given(data=st.data())
-def test_change_properties_valid_combinations(data):
-    # When there are multiple mutations that can be applied, but those mutations are not compatible
-    schema = {
-        "properties": {"foo": {"type": "string", "minLength": 5}, "bar": {"type": "string", "minLength": 5}},
-        "type": "object",
-        "required": ["foo", "bar"],
-        "additionalProperties": False,
-    }
-    validate_schema(schema)
-    validator = Draft4Validator(schema)
-    schema = deepcopy(schema)
-    # Then there should be no incompatible mutations applied
-    change_properties(data.draw, schema)
-    validate_schema(schema)
-    new_instance = data.draw(from_schema(schema))
-    assert not validator.is_valid(new_instance), new_instance
-
-
-@pytest.mark.parametrize(
-    "schema",
-    (
-        {"type": "integer", "minimum": 42},
-        {"minimum": 42},
-    ),
-)
-@given(data=st.data())
-def test_negate_constraints_success(data, schema):
-    validator = Draft4Validator(schema)
-    schema = deepcopy(schema)
-    # When the schema is mutated
-    assert negate_constraints(data.draw, schema) == MutationResult.SUCCESS
-    # Then its instances should not be valid against the original schema
-    validate_schema(schema)
+    # And instances valid for this schema are not valid for the original one
     new_instance = data.draw(from_schema(schema))
     assert not validator.is_valid(new_instance)
-
-
-@given(data=st.data())
-def test_negate_constraints_failure(data):
-    # This mutation is not applicable for such schemas
-    assert negate_constraints(data.draw, {"type": "integer"}) == MutationResult.FAILURE
