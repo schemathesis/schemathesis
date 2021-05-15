@@ -103,6 +103,7 @@ def change_properties(draw: Draw, schema: Schema) -> MutationResult:
     """
     properties = sorted(schema.get("properties", {}).items())
     if not properties:
+        # TODO. check boolean schemas
         # No properties to mutate
         return MutationResult.FAILURE
     # Order properties randomly and iterate over them until at least one mutation is successfully applied to at least
@@ -138,6 +139,64 @@ def change_properties(draw: Draw, schema: Schema) -> MutationResult:
             for mutation in get_mutations(draw, property_schema):
                 if mutator.can_apply(mutation) and features.is_enabled(mutation.__name__):
                     mutator.apply(mutation, draw, property_schema)
+    return MutationResult.SUCCESS
+
+
+@for_types("array")
+def change_items(draw: Draw, schema: Schema) -> MutationResult:
+    """Mutate individual array items.
+
+    Effect: Some items will not validate the original schema
+    """
+    items = schema.get("items", {})
+    if items is False:
+        # As any items were forbidden, allowing at least one item of any type is a successful negation
+        schema["items"] = {}
+        min_items = schema.get("minItems", 0)
+        schema["minItems"] = max(min_items, 1)
+        return MutationResult.SUCCESS
+    if not items:
+        # No items to mutate
+        return MutationResult.FAILURE
+    if isinstance(items, dict):
+        return _change_items_object(draw, schema, items)
+    if isinstance(items, list):
+        return _change_items_array(draw, schema, items)
+    # `True` and invalid schemas go here
+    return MutationResult.FAILURE
+
+
+def _change_items_object(draw: Draw, schema: Schema, items: Schema) -> MutationResult:
+    # TODO. swarm testing
+    mutator = Mutator()
+    result = MutationResult.FAILURE
+    for mutation in get_mutations(draw, items):
+        if mutator.can_apply(mutation):
+            if mutator.apply(mutation, draw, items) == MutationResult.SUCCESS:
+                result = MutationResult.SUCCESS
+    if result == MutationResult.FAILURE:
+        return MutationResult.FAILURE
+    min_items = schema.get("minItems", 0)
+    schema["minItems"] = max(min_items, 1)
+    return MutationResult.SUCCESS
+
+
+def _change_items_array(draw: Draw, schema: Schema, items: List) -> MutationResult:
+    # TODO. swarm testing
+    latest_success_index = None
+    for idx, item in enumerate(items):
+        mutator = Mutator()
+        result = MutationResult.FAILURE
+        for mutation in get_mutations(draw, item):
+            if mutator.can_apply(mutation):
+                if mutator.apply(mutation, draw, item) == MutationResult.SUCCESS:
+                    result = MutationResult.SUCCESS
+        if result == MutationResult.SUCCESS:
+            latest_success_index = idx
+    if latest_success_index is None:
+        return MutationResult.FAILURE
+    min_items = schema.get("minItems", 0)
+    schema["minItems"] = max(min_items, latest_success_index + 1)
     return MutationResult.SUCCESS
 
 
@@ -190,9 +249,10 @@ def get_mutations(draw: Draw, schema: Schema) -> Tuple[Mutation, ...]:
     # TODO. How to handle multiple types?
     if "object" in types:
         options = [change_properties, negate_constraints, remove_required_property, change_type, negate_schema]
-        return draw(ordered(options))
-    # TODO. add some for arrays - mutate "items" (if an object) or particular items (if an array)?
-    options = [negate_constraints, change_type, negate_schema]
+    elif "array" in types:
+        options = [change_items, negate_constraints, change_type, negate_schema]
+    else:
+        options = [negate_constraints, change_type, negate_schema]
     return draw(ordered(options))
 
 
@@ -208,7 +268,14 @@ def ordered(items: Sequence[T], unique_by: Callable[[T], Any] = ident) -> st.Sea
     return st.lists(st.sampled_from(items), min_size=len(items), unique_by=unique_by)
 
 
-ALL_MUTATIONS = {remove_required_property, change_type, change_properties, negate_constraints, negate_schema}
+ALL_MUTATIONS = {
+    remove_required_property,
+    change_type,
+    change_properties,
+    change_items,
+    negate_constraints,
+    negate_schema,
+}
 # Some mutations applied to the same schema simultaneously may make the schema accept previously valid values
 # Excluding some mutations reduces the amount of filtering required on the level above + increase the variety of
 # generated data if applied carefully.
@@ -245,8 +312,10 @@ class Mutator:
         """Whether the given mutation can be applied."""
         return mutation in self.applicable_mutations
 
-    def apply(self, mutation: Mutation, draw: Draw, schema: Schema) -> None:
+    def apply(self, mutation: Mutation, draw: Draw, schema: Schema) -> MutationResult:
+        # TODO maybe return FAILURE if it can't be applied?
         result = mutation(draw, schema)
         # If mutation is successfully applied and has some incompatible ones, exclude them from the future use
         if result == MutationResult.SUCCESS and mutation in INCOMPATIBLE_MUTATIONS:
             self.applicable_mutations -= INCOMPATIBLE_MUTATIONS[mutation]
+        return result
