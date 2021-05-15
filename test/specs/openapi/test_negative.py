@@ -11,7 +11,7 @@ from schemathesis.specs.openapi.negative import negative_schema
 from schemathesis.specs.openapi.negative.mutations import (
     MutationResult,
     change_properties,
-    change_schema_type,
+    change_type,
     negate_constraints,
     negate_schema,
     remove_required_property,
@@ -42,6 +42,10 @@ INTEGER_SCHEMA = {
 }
 
 
+def validate_schema(schema):
+    Draft4Validator.check_schema(schema)
+
+
 @pytest.mark.parametrize(
     "location, schema",
     [(location, OBJECT_SCHEMA) for location in sorted(LOCATION_TO_CONTAINER)]
@@ -53,6 +57,7 @@ INTEGER_SCHEMA = {
     ],
 )
 def test_negative(schema, location):
+    validate_schema(schema)
     validator = Draft4Validator(schema)
 
     @given(negative_schema(schema, location=location, custom_formats={}))
@@ -72,8 +77,10 @@ def test_negative(schema, location):
 )
 @given(data=st.data())
 def test_remove_required_property_success(data, schema, expected):
+    validate_schema(schema)
     schema = deepcopy(schema)
     assert remove_required_property(data.draw, schema) == MutationResult.SUCCESS
+    validate_schema(schema)
     assert schema == expected
 
 
@@ -91,13 +98,14 @@ def test_remove_required_property_failure(data, schema):
 def test_change_schema_type_success(data, schema):
     types = schema["type"] if isinstance(schema["type"], list) else [schema["type"]]
     schema = deepcopy(schema)
-    assert change_schema_type(data.draw, schema) == MutationResult.SUCCESS
+    assert change_type(data.draw, schema) == MutationResult.SUCCESS
+    validate_schema(schema)
     assert all(schema["type"] != type_ for type_ in types)
 
 
 @given(data=st.data())
 def test_change_schema_type_failure(data):
-    assert change_schema_type(data.draw, {}) == MutationResult.FAILURE
+    assert change_type(data.draw, {}) == MutationResult.FAILURE
 
 
 @given(data=st.data())
@@ -124,11 +132,33 @@ def test_negate_schema_failure(data, schema):
 )
 @given(data=st.data())
 def test_change_properties_success(data, schema):
+    validate_schema(schema)
     validator = Draft4Validator(schema)
     schema = deepcopy(schema)
     # When the schema is mutated
     assert change_properties(data.draw, schema) == MutationResult.SUCCESS
+    # Then it produces a valid schema
+    validate_schema(schema)
     # Then its instances should not be valid against the original schema
+    new_instance = data.draw(from_schema(schema))
+    assert not validator.is_valid(new_instance), new_instance
+
+
+@given(data=st.data())
+def test_change_properties_valid_combinations(data):
+    # When there are multiple mutations that can be applied, but those mutations are not compatible
+    schema = {
+        "properties": {"foo": {"type": "string", "minLength": 5}, "bar": {"type": "string", "minLength": 5}},
+        "type": "object",
+        "required": ["foo", "bar"],
+        "additionalProperties": False,
+    }
+    validate_schema(schema)
+    validator = Draft4Validator(schema)
+    schema = deepcopy(schema)
+    # Then there should be no incompatible mutations applied
+    change_properties(data.draw, schema)
+    validate_schema(schema)
     new_instance = data.draw(from_schema(schema))
     assert not validator.is_valid(new_instance), new_instance
 
@@ -147,6 +177,7 @@ def test_negate_constraints_success(data, schema):
     # When the schema is mutated
     assert negate_constraints(data.draw, schema) == MutationResult.SUCCESS
     # Then its instances should not be valid against the original schema
+    validate_schema(schema)
     new_instance = data.draw(from_schema(schema))
     assert not validator.is_valid(new_instance)
 

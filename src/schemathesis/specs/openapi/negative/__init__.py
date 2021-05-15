@@ -7,7 +7,7 @@ from hypothesis_jsonschema import from_schema
 from .mutations import (
     Mutation,
     change_properties,
-    change_schema_type,
+    change_type,
     get_mutations,
     negate_constraints,
     ordered,

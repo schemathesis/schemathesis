@@ -1,8 +1,9 @@
 """Schema mutations."""
 import enum
 from functools import wraps
-from typing import Any, Callable, List, Sequence, Tuple, TypeVar
+from typing import Any, Callable, Dict, List, Sequence, Set, Tuple, TypeVar
 
+import attr
 from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
 from hypothesis_jsonschema._canonicalise import canonicalish
@@ -73,7 +74,7 @@ def remove_required_property(draw: Draw, schema: Schema) -> MutationResult:
     return MutationResult.SUCCESS
 
 
-def change_schema_type(draw: Draw, schema: Schema) -> MutationResult:
+def change_type(draw: Draw, schema: Schema) -> MutationResult:
     """Change type of values accepted by a schema."""
     if "type" not in schema:
         # The absence of this keyword means that the schema values can be of any type;
@@ -109,7 +110,8 @@ def change_properties(draw: Draw, schema: Schema) -> MutationResult:
             # They are filtered out on the upper level anyway, but to avoid performance penalty we adjust the schema
             # so the generated samples are less likely to be "positive"
             required = schema.setdefault("required", [])
-            required.append(property_name)
+            if property_name not in required:
+                required.append(property_name)
             # If `type` is already there, then it should contain "object" as we check it upfront
             # Otherwise restrict `type` to "object"
             if "type" not in schema:
@@ -119,6 +121,7 @@ def change_properties(draw: Draw, schema: Schema) -> MutationResult:
         # No successful mutations
         return MutationResult.FAILURE
     features = draw(st.shared(FeatureStrategy(), key="properties"))  # type: ignore
+    mutator = Mutator()
     for name, property_schema in properties:
         # Skip already mutated property
         if name == property_name:  # pylint: disable=undefined-loop-variable
@@ -129,8 +132,8 @@ def change_properties(draw: Draw, schema: Schema) -> MutationResult:
         # to have an overlap between them.
         if features.is_enabled(name):
             for mutation in get_mutations(draw, property_schema):
-                if features.is_enabled(mutation.__name__):
-                    mutation(draw, property_schema)
+                if mutator.can_apply(mutation) and features.is_enabled(mutation.__name__):
+                    mutator.apply(mutation, draw, property_schema)
     return MutationResult.SUCCESS
 
 
@@ -147,13 +150,14 @@ def negate_constraints(draw: Draw, schema: Schema) -> MutationResult:
     schema.clear()
     is_negated = False
     for key, value in copied.items():
-        if key in ("type", "properties"):  # TODO. more?
+        if key in ("type", "properties"):  # TODO. more? items when array mutations are implemented
             schema[key] = value
         else:
             # TODO. Swarm testing to negate only certain keywords?
             is_negated = True
             negated = schema.setdefault("not", {})
             negated[key] = value
+    # TODO. should empty string be generated for path parameters?
     if is_negated:
         return MutationResult.SUCCESS
     return MutationResult.FAILURE
@@ -179,10 +183,10 @@ def get_mutations(draw: Draw, schema: Schema) -> Tuple[Mutation, ...]:
     # in JSON Schema, where it could be either a string or an array of strings.
     # TODO. How to handle multiple types?
     if "object" in types:
-        options = [change_properties, negate_constraints, remove_required_property, change_schema_type, negate_schema]
+        options = [change_properties, negate_constraints, remove_required_property, change_type, negate_schema]
         return draw(ordered(options))
     # TODO. add some for arrays - mutate "items" (if an object) or particular items (if an array)?
-    options = [negate_constraints, change_schema_type, negate_schema]
+    options = [negate_constraints, change_type, negate_schema]
     return draw(ordered(options))
 
 
@@ -196,3 +200,43 @@ def ordered(items: Sequence[T], unique_by: Callable[[T], Any] = ident) -> st.Sea
     NOTE. Items should be unique.
     """
     return st.lists(st.sampled_from(items), min_size=len(items), unique_by=unique_by)
+
+
+ALL_MUTATIONS = {remove_required_property, change_type, change_properties, negate_constraints, negate_schema}
+# Some mutations applied to the same schema simultaneously may make the schema accept previously valid values
+# Excluding some mutations reduces the amount of filtering required on the level above + increase the variety of
+# generated data if applied carefully.
+# TODO. Check if order is that important here
+# TODO. `remove_required_property` may cancel `change_properties` - need to keep track of what properties were removed
+# TODO. negating constraints + change type. If constraints were related only to the old type, then changing the type
+#       lead to an unsatisfiable schema
+# TODO. Is it possible to verify that excluding certain mutations there will not decrease the amount of possible values?
+_INCOMPATIBLE_MUTATIONS = (
+    # Schema: {"type": "string", "minLength": 5}
+    # Mutated: {"not": {"type": "string", "not": {"minLength": 5}}}
+    # Valid example: "12345"
+    (negate_schema, negate_constraints),
+)
+
+INCOMPATIBLE_MUTATIONS: Dict[Mutation, Set[Mutation]] = {}
+
+for left, right in _INCOMPATIBLE_MUTATIONS:
+    INCOMPATIBLE_MUTATIONS.setdefault(left, set()).add(right)
+    INCOMPATIBLE_MUTATIONS.setdefault(right, set()).add(left)
+
+
+@attr.s(slots=True)
+class Mutator:
+    """Helper to avoid combining incompatible mutations."""
+
+    applicable_mutations: Set[Mutation] = attr.ib(factory=ALL_MUTATIONS.copy)
+
+    def can_apply(self, mutation: Mutation) -> bool:
+        """Whether the given mutation can be applied."""
+        return mutation in self.applicable_mutations
+
+    def apply(self, mutation: Mutation, draw: Draw, schema: Schema) -> None:
+        result = mutation(draw, schema)
+        # If mutation is successfully applied and has some incompatible ones, exclude them from the future use
+        if result == MutationResult.SUCCESS and mutation in INCOMPATIBLE_MUTATIONS:
+            self.applicable_mutations -= INCOMPATIBLE_MUTATIONS[mutation]
