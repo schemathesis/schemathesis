@@ -150,6 +150,8 @@ def apply_mutations(draw: Draw, schema: Schema) -> MutationResult:
 
 def negate_constraints(draw: Draw, schema: Schema) -> MutationResult:
     """Negate schema constrains while keeping the original type."""
+    if canonicalish(schema) == {}:
+        return MutationResult.FAILURE
     copied = schema.copy()
     schema.clear()
     is_negated = False
