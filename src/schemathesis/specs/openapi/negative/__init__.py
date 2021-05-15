@@ -6,6 +6,7 @@ from hypothesis_jsonschema import from_schema
 
 from .mutations import (
     Mutation,
+    Mutator,
     change_properties,
     change_type,
     get_mutations,
@@ -53,8 +54,10 @@ def negative_schema(
 
         new_schema = deepcopy(schema)
         # TODO. apply swarm testing? If nothing succeeds, then call `reject()`
+        mutator = Mutator()
         for mutation in mutations:
-            mutation(draw, new_schema)
+            if mutator.can_apply(mutation):
+                mutator.apply(mutation, draw, new_schema)
         return new_schema
 
     # The mutated schema is passed to `from_schema` and guarded against producing instances valid against
