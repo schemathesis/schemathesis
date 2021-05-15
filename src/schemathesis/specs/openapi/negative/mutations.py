@@ -83,6 +83,9 @@ def change_type(draw: Draw, schema: Schema) -> MutationResult:
         return MutationResult.FAILURE
     types = set(get_type(schema))
     candidates = {"string", "integer", "number", "object", "array", "boolean", "null"} - types
+    if "integer" in types and "number" in candidates:
+        # Do not change "integer" to "number" as any integer is also a number
+        candidates.remove("number")
     if not candidates:
         # Schema covers all possible types, not possible to choose something else
         return MutationResult.FAILURE
