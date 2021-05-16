@@ -126,7 +126,6 @@ def change_properties(draw: Draw, schema: Schema) -> MutationResult:
         # No successful mutations
         return MutationResult.FAILURE
     features = draw(st.shared(FeatureStrategy(), key="properties"))  # type: ignore
-    mutator = Mutator()
     for name, property_schema in properties:
         # Skip already mutated property
         if name == property_name:  # pylint: disable=undefined-loop-variable
@@ -136,6 +135,7 @@ def change_properties(draw: Draw, schema: Schema) -> MutationResult:
         # The `features` strategy is reused for property names and mutation names for simplicity as it is not likely
         # to have an overlap between them.
         if features.is_enabled(name):
+            mutator = Mutator()
             for mutation in get_mutations(draw, property_schema):
                 if mutator.can_apply(mutation) and features.is_enabled(mutation.__name__):
                     mutator.apply(mutation, draw, property_schema)
