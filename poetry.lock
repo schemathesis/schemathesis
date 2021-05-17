@@ -270,7 +270,7 @@ resolved_reference = "e8f3a89a64d75e8668f5f4762b87d34a1840d926"
 
 [[package]]
 name = "hypothesis"
-version = "6.12.0"
+version = "6.12.1"
 description = "A library for property-based testing"
 category = "main"
 optional = false
@@ -654,7 +654,7 @@ python-versions = "*"
 
 [[package]]
 name = "sortedcontainers"
-version = "2.3.0"
+version = "2.4.0"
 description = "Sorted Containers -- Sorted List, Sorted Dict, Sorted Set"
 category = "main"
 optional = false
@@ -844,7 +844,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=1.2.3)", "pytest-flake8", "pyt
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6"
-content-hash = "aa7291b9feb4483192281edc83d1b97f1a43cd88d4348c1a1103dd9259d39980"
+content-hash = "21121e12b6fc297aa7a88b6dd201a7015b3c45ff5d3e06251d3043dc2117c688"
 
 [metadata.files]
 aiohttp = [
@@ -1021,8 +1021,8 @@ graphql-relay = [
 ]
 graphql-server-core = []
 hypothesis = [
-    {file = "hypothesis-6.12.0-py3-none-any.whl", hash = "sha256:d26f2b7bb6e3edebc6eded70ff99cd15425bf4266608e7a041d75f00b58ac7cb"},
-    {file = "hypothesis-6.12.0.tar.gz", hash = "sha256:a24b2ccb7b84860762df3fabb8faa196bf627cbee62917a5095f3de8ff71050b"},
+    {file = "hypothesis-6.12.1-py3-none-any.whl", hash = "sha256:27b489fedf54746a1ecfdf1d49dd01611f3fd833c164283c341f8cc1eed2a5fd"},
+    {file = "hypothesis-6.12.1.tar.gz", hash = "sha256:7fdca79cc4005c9a8c5a4688537d47578bcfa307595769858ef811fa3f16e3c7"},
 ]
 hypothesis-graphql = [
     {file = "hypothesis-graphql-0.5.0.tar.gz", hash = "sha256:94193989cd3282422ee2e7fa50b486db7f33631e52f258d150ea20d327f081ac"},
@@ -1260,8 +1260,8 @@ snowballstemmer = [
     {file = "snowballstemmer-2.1.0.tar.gz", hash = "sha256:e997baa4f2e9139951b6f4c631bad912dfd3c792467e2f03d7239464af90e914"},
 ]
 sortedcontainers = [
-    {file = "sortedcontainers-2.3.0-py2.py3-none-any.whl", hash = "sha256:37257a32add0a3ee490bb170b599e93095eed89a55da91fa9f48753ea12fd73f"},
-    {file = "sortedcontainers-2.3.0.tar.gz", hash = "sha256:59cc937650cf60d677c16775597c89a960658a09cf7c1a668f86e1e4464b10a1"},
+    {file = "sortedcontainers-2.4.0-py2.py3-none-any.whl", hash = "sha256:a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0"},
+    {file = "sortedcontainers-2.4.0.tar.gz", hash = "sha256:25caa5a06cc30b6b83d11423433f65d1f9d76c4c6a0c90e3379eaa43b9bfdb88"},
 ]
 sphinx = [
     {file = "Sphinx-3.5.4-py3-none-any.whl", hash = "sha256:2320d4e994a191f4b4be27da514e46b3d6b420f2ff895d064f52415d342461e8"},
