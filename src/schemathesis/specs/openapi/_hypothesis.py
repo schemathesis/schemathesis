@@ -43,7 +43,6 @@ def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
 
 def init_default_strategies() -> None:
     """Register all default "format" strategies."""
-    register_string_format("date", st.dates().map(str))
     register_string_format("binary", st.binary())
     register_string_format("byte", st.binary().map(lambda x: b64encode(x).decode()))
 
