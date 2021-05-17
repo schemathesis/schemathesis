@@ -311,7 +311,7 @@ hypothesis = ">5.8.0"
 
 [[package]]
 name = "hypothesis-jsonschema"
-version = "0.19.1"
+version = "0.19.2"
 description = "Generate test data from JSON schemata with Hypothesis"
 category = "main"
 optional = false
@@ -844,7 +844,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=1.2.3)", "pytest-flake8", "pyt
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6"
-content-hash = "21121e12b6fc297aa7a88b6dd201a7015b3c45ff5d3e06251d3043dc2117c688"
+content-hash = "00fe34e15fd8b64fc9159b37a6ef611c19984ee6893420e3b1e43730fde86112"
 
 [metadata.files]
 aiohttp = [
@@ -1029,8 +1029,8 @@ hypothesis-graphql = [
     {file = "hypothesis_graphql-0.5.0-py3-none-any.whl", hash = "sha256:63e1ddf207cd86ebf957d9bb801c3761b2c2ac6dad67f31494e54549d786f97a"},
 ]
 hypothesis-jsonschema = [
-    {file = "hypothesis-jsonschema-0.19.1.tar.gz", hash = "sha256:fe90acdf1def1a47057c6976d59fe5da7455d615039b2bb65313ab9b9bdea0f5"},
-    {file = "hypothesis_jsonschema-0.19.1-py3-none-any.whl", hash = "sha256:742ca784b1c7875f1692d57431a27840cac7db8d0a3589c07fba7e363128f28b"},
+    {file = "hypothesis-jsonschema-0.19.2.tar.gz", hash = "sha256:6382a2789c36cad15d9bdf543b9b64d421bc411580a3a24a9daaee0804beae2a"},
+    {file = "hypothesis_jsonschema-0.19.2-py3-none-any.whl", hash = "sha256:7391c8010bb5ae238e487c68d89c7f0822f40f418da74f5ea4fea46d21ae30da"},
 ]
 idna = [
     {file = "idna-2.10-py2.py3-none-any.whl", hash = "sha256:b97d804b1e9b523befed77c48dacec60e6dcb0b5391d57af6a65a312a90648c0"},
