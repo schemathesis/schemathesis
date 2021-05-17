@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Explicitly add ``colorama`` to project's dependencies.
+
 `3.6.9`_ - 2021-05-14
 ---------------------
 
