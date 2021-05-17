@@ -231,7 +231,7 @@ def test_runner(schema_path):
             return pytest.fail("Expected YAML parsing error")
         return False
 
-    for event in runner:
+    for event in runner.execute():
         if isinstance(event, events.AfterExecution):
             if check_xfailed(event):
                 continue
