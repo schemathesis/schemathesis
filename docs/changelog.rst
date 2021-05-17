@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.6.10`_ - 2021-05-17
+----------------------
+
 **Changed**
 
 - Explicitly add ``colorama`` to project's dependencies.
@@ -1745,7 +1748,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.9...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.10...HEAD
+.. _3.6.10: https://github.com/schemathesis/schemathesis/compare/v3.6.9...v3.6.10
 .. _3.6.9: https://github.com/schemathesis/schemathesis/compare/v3.6.8...v3.6.9
 .. _3.6.8: https://github.com/schemathesis/schemathesis/compare/v3.6.7...v3.6.8
 .. _3.6.7: https://github.com/schemathesis/schemathesis/compare/v3.6.6...v3.6.7
