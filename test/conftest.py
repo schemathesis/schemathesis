@@ -91,16 +91,6 @@ def app(openapi_version, _app, reset_app):
 
 
 @pytest.fixture
-def simple_schema_path():
-    return SIMPLE_PATH
-
-
-@pytest.fixture
-def open_api_2():
-    return OpenAPIVersion("2.0")
-
-
-@pytest.fixture
 def open_api_3():
     return OpenAPIVersion("3.0")
 
@@ -649,18 +639,6 @@ def loadable_aiohttp_app(testdir, operations):
     module = testdir.make_importable_pyfile(
         location=f"""
         from test.apps.openapi._aiohttp import create_app
-
-        app = create_app({operations})
-        """
-    )
-    return f"{module.purebasename}:app"
-
-
-@pytest.fixture
-def loadable_fastapi_app(testdir, operations):
-    module = testdir.make_importable_pyfile(
-        location=f"""
-        from test.apps.openapi._fastapi import create_app
 
         app = create_app({operations})
         """
