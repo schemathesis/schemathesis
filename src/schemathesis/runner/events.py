@@ -66,6 +66,8 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
     method: str = attr.ib()  # pragma: no mutate
     # Full path, including the base path
     path: str = attr.ib()  # pragma: no mutate
+    # Specification-specific operation name
+    verbose_name: str = attr.ib()  # pragma: no mutate
     # Path without the base path
     relative_path: str = attr.ib()  # pragma: no mutate
     # The current level of recursion during stateful testing
@@ -80,6 +82,7 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
         return cls(
             method=operation.method.upper(),
             path=operation.full_path,
+            verbose_name=operation.verbose_name,
             relative_path=operation.path,
             recursion_level=recursion_level,
             correlation_id=correlation_id,
