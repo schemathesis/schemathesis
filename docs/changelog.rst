@@ -4,9 +4,12 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.6.11`_ - 2021-05-20
+----------------------
+
 **Added**
 
-- Runner: ``BeforeExecution.verbose_name`` & ``SerializedCase.verbose_name`` that reflect specification-specific API operation name.
+- Internal: ``BeforeExecution.verbose_name`` & ``SerializedCase.verbose_name`` that reflect specification-specific API operation name.
 
 `3.6.10`_ - 2021-05-17
 ----------------------
@@ -1752,7 +1755,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.10...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.11...HEAD
+.. _3.6.11: https://github.com/schemathesis/schemathesis/compare/v3.6.10...v3.6.11
 .. _3.6.10: https://github.com/schemathesis/schemathesis/compare/v3.6.9...v3.6.10
 .. _3.6.9: https://github.com/schemathesis/schemathesis/compare/v3.6.8...v3.6.9
 .. _3.6.8: https://github.com/schemathesis/schemathesis/compare/v3.6.7...v3.6.8
