@@ -20,6 +20,7 @@ class SerializedCase:
     path_template: str = attr.ib()
     path_parameters: Optional[Dict[str, Any]] = attr.ib()
     query: Optional[Dict[str, Any]] = attr.ib()
+    verbose_name: str = attr.ib()
 
     @classmethod
     def from_case(cls, case: Case, headers: Optional[Dict[str, Any]]) -> "SerializedCase":
@@ -30,6 +31,7 @@ class SerializedCase:
             path_template=case.full_path,
             path_parameters=case.path_parameters,
             query=case.query,
+            verbose_name=case.operation.verbose_name,
         )
 
 

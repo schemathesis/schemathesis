@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Runner: ``BeforeExecution.verbose_name`` & ``SerializedCase.verbose_name`` that reflect specification-specific API operation name.
+
 `3.6.10`_ - 2021-05-17
 ----------------------
 
