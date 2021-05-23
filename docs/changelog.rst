@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Additional context for each failure coming from the runner. It allows the end-user to customize failure formatting.
+
 **Changed**
 
 - Use different exception classes for ``not_a_server_error`` and ``status_code_conformance`` checks. It improves the variance of found errors.

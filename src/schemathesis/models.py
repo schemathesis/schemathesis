@@ -37,7 +37,7 @@ from starlette.testclient import TestClient as ASGIClient
 
 from . import serializers
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE, USER_AGENT, CodeSampleStyle, DataGenerationMethod
-from .exceptions import CheckFailed, InvalidSchema, SerializationNotPossible, get_grouped_exception
+from .exceptions import CheckFailed, FailureContext, InvalidSchema, SerializationNotPossible, get_grouped_exception
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .serializers import Serializer, SerializerContext
@@ -660,6 +660,8 @@ class Check:
     elapsed: float = attr.ib()  # pragma: no mutate
     example: Case = attr.ib()  # pragma: no mutate
     message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    # Failure-specific context
+    context: Optional[FailureContext] = attr.ib(default=None)  # pragma: no mutate
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
@@ -838,9 +840,25 @@ class TestResult:
     def add_success(self, name: str, example: Case, response: GenericResponse, elapsed: float) -> None:
         self.checks.append(Check(name=name, value=Status.success, response=response, elapsed=elapsed, example=example))
 
-    def add_failure(self, name: str, example: Case, response: GenericResponse, elapsed: float, message: str) -> None:
+    def add_failure(
+        self,
+        name: str,
+        example: Case,
+        response: GenericResponse,
+        elapsed: float,
+        message: str,
+        context: Optional[FailureContext],
+    ) -> None:
         self.checks.append(
-            Check(name=name, value=Status.failure, response=response, elapsed=elapsed, example=example, message=message)
+            Check(
+                name=name,
+                value=Status.failure,
+                response=response,
+                elapsed=elapsed,
+                example=example,
+                message=message,
+                context=context,
+            )
         )
 
     def add_error(self, exception: Exception, example: Optional[Case] = None) -> None:

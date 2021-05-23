@@ -12,6 +12,7 @@ import jsonschema
 import requests
 from hypothesis.strategies import SearchStrategy
 
+from ... import failures
 from ...constants import DataGenerationMethod
 from ...exceptions import (
     InvalidSchema,
@@ -379,10 +380,12 @@ class BaseOpenAPISchema(BaseSchema):
             return
         content_type = response.headers.get("Content-Type")
         if content_type is None:
-            media_types = "\n    ".join(self.get_content_types(operation, response))
+            media_types = self.get_content_types(operation, response)
+            formatted_media_types = "\n    ".join(media_types)
             raise get_missing_content_type_error()(
                 "The response is missing the `Content-Type` header. The schema defines the following media types:\n\n"
-                f"    {media_types}"
+                f"    {formatted_media_types}",
+                context=failures.MissingContentType(media_types),
             )
         if not is_json_media_type(content_type):
             return
@@ -395,7 +398,10 @@ class BaseOpenAPISchema(BaseSchema):
             exc_class = get_response_parsing_error(exc)
             payload = get_response_payload(response)
             raise exc_class(
-                f"The received response is not valid JSON:\n\n    {payload}\n\nException: \n\n    {exc}"
+                f"The received response is not valid JSON:\n\n    {payload}\n\nException: \n\n    {exc}",
+                context=failures.JSONDecodeErrorContext(
+                    message=exc.msg, document=exc.doc, position=exc.pos, lineno=exc.lineno, colno=exc.colno
+                ),
             ) from exc
         resolver = ConvertingResolver(self.location or "", self.raw_schema, nullable_name=self.nullable_name)
         with in_scopes(resolver, scopes):
@@ -404,7 +410,14 @@ class BaseOpenAPISchema(BaseSchema):
             except jsonschema.ValidationError as exc:
                 exc_class = get_schema_validation_error(exc)
                 raise exc_class(
-                    f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}"
+                    f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}",
+                    context=failures.ValidationErrorContext(
+                        validation_message=exc.message,
+                        schema_path=list(exc.absolute_schema_path),
+                        schema=schema,
+                        instance_path=list(exc.absolute_path),
+                        instance=data,
+                    ),
                 ) from exc
         return None  # explicitly return None for mypy
 

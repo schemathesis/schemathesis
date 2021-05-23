@@ -328,6 +328,9 @@ def test_unknown_response_code(any_app_schema):
     check = others[1].result.checks[0]
     assert check.name == "status_code_conformance"
     assert check.value == Status.failure
+    assert check.context.status_code == 418
+    assert check.context.allowed_status_codes == [200]
+    assert check.context.defined_status_codes == ["200"]
 
 
 @pytest.mark.operations("failure")
@@ -360,6 +363,8 @@ def test_unknown_content_type(any_app_schema):
     check = others[1].result.checks[0]
     assert check.name == "content_type_conformance"
     assert check.value == Status.failure
+    assert check.context.content_type == "text/plain"
+    assert check.context.defined_content_types == ["application/json"]
 
 
 @pytest.mark.operations("success")
@@ -386,10 +391,21 @@ def test_response_conformance_invalid(any_app_schema):
     ).execute()
     # Then there should be a failure
     assert finished.has_failures
-    lines = others[1].result.checks[-1].message.split("\n")
+    check = others[1].result.checks[-1]
+    lines = check.message.split("\n")
     assert lines[0] == "The received response does not conform to the defined schema!"
     assert lines[2] == "Details: "
-    assert lines[4] == "'success' is a required property"
+    validation_message = "'success' is a required property"
+    assert lines[4] == validation_message
+    assert check.context.instance == {"random": "key"}
+    assert check.context.instance_path == []
+    assert check.context.schema == {
+        "properties": {"success": {"type": "boolean"}},
+        "required": ["success"],
+        "type": "object",
+    }
+    assert check.context.schema_path == ["required"]
+    assert check.context.validation_message == validation_message
 
 
 @pytest.mark.operations("success")
@@ -446,10 +462,13 @@ def test_response_conformance_malformed_json(any_app_schema):
     # Then there should be a failure
     assert finished.has_failures
     assert not finished.has_errors
-    message = others[1].result.checks[-1].message
+    check = others[1].result.checks[-1]
+    message = check.message
     assert "The received response is not valid JSON:" in message
     assert "{malformed}" in message
     assert "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)" in message
+    assert check.context.message == "Expecting property name enclosed in double quotes"
+    assert check.context.position == 1
 
 
 @pytest.fixture()

@@ -311,7 +311,7 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set, ve
     # Given two test results - success and failure
     operation = models.APIOperation("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)
     failure = models.TestResult(operation.method, operation.full_path, DataGenerationMethod.default())
-    failure.add_failure("test", models.Case(operation), response, 0, "Message")
+    failure.add_failure("test", models.Case(operation), response, 0, "Message", None)
     execution_context.results.append(SerializedTestResult.from_test_result(failure))
     results_set.append(failure)
     event = Finished.from_results(results_set, 1.0)

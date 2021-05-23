@@ -15,6 +15,7 @@ from hypothesis.errors import HypothesisException, InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
+from ... import failures
 from ...constants import (
     DEFAULT_STATEFUL_RECURSION_LIMIT,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
@@ -332,7 +333,11 @@ def run_checks(
                 message = f"Check '{check_name}' failed"
                 exc.args = (message,)
             errors.append(exc)
-            result.add_failure(check_name, case, response, elapsed_time, message)
+            if isinstance(exc, CheckFailed):
+                context = exc.context
+            else:
+                context = None
+            result.add_failure(check_name, case, response, elapsed_time, message, context)
             check_results.append(
                 Check(
                     name=check_name,
@@ -348,7 +353,14 @@ def run_checks(
         if elapsed_time > max_response_time:
             message = f"Response time exceeded the limit of {max_response_time} ms"
             errors.append(AssertionError(message))
-            result.add_failure("max_response_time", case, response, elapsed_time, message)
+            result.add_failure(
+                "max_response_time",
+                case,
+                response,
+                elapsed_time,
+                message,
+                failures.ResponseTimeExceeded(elapsed=elapsed_time, deadline=max_response_time),
+            )
         else:
             result.add_success("max_response_time", case, response, elapsed_time)
 
