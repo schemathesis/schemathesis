@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.7.1`_ - 2021-05-23
+---------------------
+
 **Added**
 
 - **Internal**: ``FailureContext.title`` attribute that gives a short failure description.
@@ -1780,7 +1783,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.1...HEAD
+.. _3.7.1: https://github.com/schemathesis/schemathesis/compare/v3.7.0...v3.7.1
 .. _3.7.0: https://github.com/schemathesis/schemathesis/compare/v3.6.11...v3.7.0
 .. _3.6.11: https://github.com/schemathesis/schemathesis/compare/v3.6.10...v3.6.11
 .. _3.6.10: https://github.com/schemathesis/schemathesis/compare/v3.6.9...v3.6.10
