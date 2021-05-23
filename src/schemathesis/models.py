@@ -310,8 +310,8 @@ class Case:  # pylint: disable=too-many-public-methods
             timeout = 1000 * data["timeout"]  # It is defined and not empty, since the exception happened
             code_message = self._get_code_message(self.operation.schema.code_sample_style, exc.request)
             raise get_timeout_error(timeout)(
-                f"\n\n1. Response timed out after {timeout:.2f}ms\n\n----------\n\n{code_message}",
-                context=failures.ResponseTimeout(timeout=timeout),
+                f"\n\n1. Request timed out after {timeout:.2f}ms\n\n----------\n\n{code_message}",
+                context=failures.RequestTimeout(timeout=timeout),
             ) from None
         if close_session:
             session.close()

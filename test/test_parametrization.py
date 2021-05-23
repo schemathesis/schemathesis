@@ -825,4 +825,4 @@ def test_(case):
     )
     result = testdir.runpytest()
     # Then it should be reported as any other test failure
-    assert "E           1. Response timed out after 1.00ms" in result.outlines
+    assert "E           1. Request timed out after 1.00ms" in result.outlines
