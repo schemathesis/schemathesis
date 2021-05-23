@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 import attr
 import requests
 
+from ..exceptions import FailureContext
 from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
 from ..utils import format_exception
 
@@ -46,6 +47,8 @@ class SerializedCheck:
     # Generated example
     example: SerializedCase = attr.ib()  # pragma: no mutate
     message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    # Failure-specific context
+    context: Optional[FailureContext] = attr.ib(default=None)  # pragma: no mutate
 
     @classmethod
     def from_check(cls, check: Check) -> "SerializedCheck":
@@ -62,6 +65,7 @@ class SerializedCheck:
             message=check.message,
             request=request,
             response=response,
+            context=check.context,
         )
 
 
