@@ -400,7 +400,7 @@ class BaseOpenAPISchema(BaseSchema):
             raise exc_class(
                 f"The received response is not valid JSON:\n\n    {payload}\n\nException: \n\n    {exc}",
                 context=failures.JSONDecodeErrorContext(
-                    message=exc.msg, document=exc.doc, position=exc.pos, lineno=exc.lineno, colno=exc.colno
+                    validation_message=exc.msg, document=exc.doc, position=exc.pos, lineno=exc.lineno, colno=exc.colno
                 ),
             ) from exc
         resolver = ConvertingResolver(self.location or "", self.raw_schema, nullable_name=self.nullable_name)
@@ -414,9 +414,9 @@ class BaseOpenAPISchema(BaseSchema):
                     context=failures.ValidationErrorContext(
                         validation_message=exc.message,
                         schema_path=list(exc.absolute_schema_path),
-                        schema=schema,
+                        schema=exc.schema,
                         instance_path=list(exc.absolute_path),
-                        instance=data,
+                        instance=exc.instance,
                     ),
                 ) from exc
         return None  # explicitly return None for mypy

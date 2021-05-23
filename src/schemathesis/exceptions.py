@@ -97,7 +97,7 @@ def get_headers_error(message: str) -> Type[CheckFailed]:
 
 
 def get_timeout_error(deadline: Union[float, int]) -> Type[CheckFailed]:
-    """Response took too long."""
+    """Request took too long."""
     return _get_hashed_exception("TimeoutError", str(deadline))
 
 

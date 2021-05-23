@@ -4,6 +4,17 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- **Internal**: ``FailureContext.title`` attribute that gives a short failure description.
+- **Internal**: ``FailureContext.message`` attribute that gives a longer failure description.
+
+**Changed**
+
+- Rename ``JSONDecodeErrorContext.message`` to ``JSONDecodeErrorContext.validation_message`` for consistency.
+- Store the more precise ``schema`` & ``instance`` in ``ValidationErrorContext``.
+- Rename ``ResponseTimeout`` to ``RequestTimeout``.
+
 `3.7.0`_ - 2021-05-23
 ---------------------
 

@@ -1,3 +1,4 @@
+import json
 import re
 
 import pytest
@@ -6,6 +7,7 @@ from hypothesis import given, settings
 
 import schemathesis
 from schemathesis.constants import USER_AGENT
+from schemathesis.exceptions import CheckFailed
 from schemathesis.models import APIOperation, Case, Request, Response
 
 
@@ -196,6 +198,49 @@ def test_(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+
+
+@pytest.mark.parametrize(
+    "response_schema, payload, schema_path, instance, instance_path",
+    (
+        ({"type": "object"}, [], ["type"], [], []),
+        ({"$ref": "#/components/schemas/Foo"}, [], ["type"], [], []),
+        (
+            {"type": "object", "properties": {"foo": {"type": "object"}}},
+            {"foo": 42},
+            ["properties", "foo", "type"],
+            42,
+            ["foo"],
+        ),
+    ),
+)
+def test_validate_response_schema_path(
+    empty_open_api_3_schema, response_schema, payload, schema_path, instance, instance_path
+):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {"application/json": {"schema": response_schema}},
+                    },
+                },
+            },
+        }
+    }
+    empty_open_api_3_schema["components"] = {"schemas": {"Foo": {"type": "object"}}}
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    response = requests.Response()
+    response.status_code = 200
+    response.headers = {"Content-Type": "application/json"}
+    response._content = json.dumps(payload).encode("utf-8")
+    with pytest.raises(CheckFailed) as exc:
+        schema["/test"]["POST"].validate_response(response)
+    assert exc.value.context.schema_path == schema_path
+    assert exc.value.context.schema == {"type": "object"}
+    assert exc.value.context.instance == instance
+    assert exc.value.context.instance_path == instance_path
 
 
 @pytest.mark.operations()
