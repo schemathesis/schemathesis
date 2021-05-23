@@ -467,7 +467,7 @@ def test_response_conformance_malformed_json(any_app_schema):
     assert "The received response is not valid JSON:" in message
     assert "{malformed}" in message
     assert "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)" in message
-    assert check.context.message == "Expecting property name enclosed in double quotes"
+    assert check.context.validation_message == "Expecting property name enclosed in double quotes"
     assert check.context.position == 1
 
 

@@ -7,11 +7,18 @@ import attr
 class FailureContext:
     """Additional data specific to certain failure kind."""
 
+    # Short description of what happened
+    title: str
+    # A longer one
+    message: str
+
 
 @attr.s(slots=True, repr=False)
 class ValidationErrorContext(FailureContext):
     """Additional information about JSON Schema validation errors."""
 
+    title = "Non-conforming response payload"
+    message = "Response does not conform to the defined schema"
     validation_message: str = attr.ib()
     schema_path: List[Union[str, int]] = attr.ib()
     schema: Union[Dict[str, Any], bool] = attr.ib()
@@ -23,7 +30,9 @@ class ValidationErrorContext(FailureContext):
 class JSONDecodeErrorContext(FailureContext):
     """Failed to decode JSON."""
 
-    message: str = attr.ib()
+    title = "JSON deserialization error"
+    message = "Response is not a valid JSON"
+    validation_message: str = attr.ib()
     document: str = attr.ib()
     position: int = attr.ib()
     lineno: int = attr.ib()
@@ -32,6 +41,8 @@ class JSONDecodeErrorContext(FailureContext):
 
 @attr.s(slots=True, repr=False)
 class ServerError(FailureContext):
+    title = "Internal server error"
+    message = "Server got itself in trouble"
     status_code: int = attr.ib()
 
 
@@ -39,6 +50,8 @@ class ServerError(FailureContext):
 class MissingContentType(FailureContext):
     """Content type header is missing."""
 
+    title = "Missing Content-Type header"
+    message = "Response is missing the `Content-Type` header"
     media_types: List[str] = attr.ib()
 
 
@@ -46,6 +59,8 @@ class MissingContentType(FailureContext):
 class UndefinedContentType(FailureContext):
     """Response has Content-Type that is not defined in the schema."""
 
+    title = "Undefined Content-Type"
+    message = "Response has `Content-Type` that is not declared in the schema"
     content_type: str = attr.ib()
     defined_content_types: List[str] = attr.ib()
 
@@ -54,6 +69,8 @@ class UndefinedContentType(FailureContext):
 class UndefinedStatusCode(FailureContext):
     """Response has a status code that is not defined in the schema."""
 
+    title = "Undefined status code"
+    message = "Response has a status code that is not declared in the schema"
     # Response's status code
     status_code: int = attr.ib()
     # Status codes as defined in schema
@@ -66,6 +83,8 @@ class UndefinedStatusCode(FailureContext):
 class MissingHeaders(FailureContext):
     """Some required headers are missing."""
 
+    title = "Missing required headers"
+    message = "Response is missing headers required by the schema"
     missing_headers: List[str] = attr.ib()
 
 
@@ -76,6 +95,8 @@ class MalformedMediaType(FailureContext):
     Example: `application-json` instead of `application/json`
     """
 
+    title = "Malformed media type name"
+    message = "Media type name is not valid"
     actual: str = attr.ib()
     defined: str = attr.ib()
 
@@ -84,12 +105,16 @@ class MalformedMediaType(FailureContext):
 class ResponseTimeExceeded(FailureContext):
     """Response took longer than expected."""
 
+    title = "Response time exceeded"
+    message = "Response time exceeds the deadline"
     elapsed: float = attr.ib()
     deadline: int = attr.ib()
 
 
 @attr.s(slots=True, repr=False)
-class ResponseTimeout(FailureContext):
-    """Response took longer than timeout and wasn't received."""
+class RequestTimeout(FailureContext):
+    """Request took longer than timeout."""
 
+    title = "Request timeout"
+    message = "The request timed out"
     timeout: int = attr.ib()
