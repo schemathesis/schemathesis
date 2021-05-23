@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any, Dict, Generator, Optional, Union
 
+from ... import failures
 from ...exceptions import (
     get_headers_error,
     get_malformed_media_type_error,
@@ -22,15 +23,23 @@ def status_code_conformance(response: GenericResponse, case: "Case") -> Optional
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
     if "default" in responses:
         return None
-    allowed_response_statuses = list(_expand_responses(responses))
-    if response.status_code not in allowed_response_statuses:
-        responses_list = ", ".join(map(str, responses))
+    allowed_status_codes = list(_expand_responses(responses))
+    if response.status_code not in allowed_status_codes:
+        defined_status_codes = list(map(str, responses))
+        responses_list = ", ".join(defined_status_codes)
         message = (
             f"Received a response with a status code, which is not defined in the schema: "
             f"{response.status_code}\n\nDeclared status codes: {responses_list}"
         )
         exc_class = get_status_code_error(response.status_code)
-        raise exc_class(message)
+        raise exc_class(
+            message,
+            context=failures.UndefinedStatusCode(
+                status_code=response.status_code,
+                defined_status_codes=defined_status_codes,
+                allowed_status_codes=allowed_status_codes,
+            ),
+        )
     return None  # explicitly return None for mypy
 
 
@@ -42,25 +51,31 @@ def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, N
 def content_type_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
-    content_types = case.operation.schema.get_content_types(case.operation, response)
-    if not content_types:
+    defined_content_types = case.operation.schema.get_content_types(case.operation, response)
+    if not defined_content_types:
         return None
     content_type = response.headers.get("Content-Type")
     if not content_type:
-        raise get_missing_content_type_error()("Response is missing the `Content-Type` header")
-    for option in content_types:
+        raise get_missing_content_type_error()(
+            "Response is missing the `Content-Type` header",
+            context=failures.MissingContentType(defined_content_types),
+        )
+    for option in defined_content_types:
         try:
             if are_content_types_equal(option, content_type):
                 return None
         except ValueError as exc:
-            raise get_malformed_media_type_error(str(exc))(str(exc)) from exc
+            raise get_malformed_media_type_error(str(exc))(
+                str(exc), context=failures.MalformedMediaType(actual=content_type, defined=option)
+            ) from exc
         expected_main, expected_sub = parse_content_type(option)
         received_main, received_sub = parse_content_type(content_type)
     exc_class = get_response_type_error(f"{expected_main}_{expected_sub}", f"{received_main}_{received_sub}")
     raise exc_class(
         f"Received a response with '{content_type}' Content-Type, "
         f"but it is not declared in the schema.\n\n"
-        f"Defined content types: {', '.join(content_types)}"
+        f"Defined content types: {', '.join(defined_content_types)}",
+        context=failures.UndefinedContentType(content_type=content_type, defined_content_types=defined_content_types),
     )
 
 
@@ -76,7 +91,10 @@ def response_headers_conformance(response: GenericResponse, case: "Case") -> Opt
         return None
     message = ",".join(missing_headers)
     exc_class = get_headers_error(message)
-    raise exc_class(f"Received a response with missing headers: {message}")
+    raise exc_class(
+        f"Received a response with missing headers: {message}",
+        context=failures.MissingHeaders(missing_headers=missing_headers),
+    )
 
 
 def response_schema_conformance(response: GenericResponse, case: "Case") -> None:

@@ -8,6 +8,7 @@ import requests
 from jsonschema import ValidationError
 
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE
+from .failures import FailureContext
 from .utils import GenericResponse
 
 
@@ -15,6 +16,11 @@ class CheckFailed(AssertionError):
     """Custom error type to distinguish from arbitrary AssertionError that may happen in the dependent libraries."""
 
     __module__ = "builtins"
+    context: Optional[FailureContext]
+
+    def __init__(self, *args: Any, context: Optional[FailureContext] = None):
+        super().__init__(*args)
+        self.context = context
 
 
 CACHE: Dict[Union[str, int], Type[CheckFailed]] = {}
