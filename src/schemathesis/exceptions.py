@@ -47,6 +47,12 @@ def get_grouped_exception(prefix: str, *exceptions: AssertionError) -> Type[Chec
     return _get_hashed_exception("GroupedException", f"{prefix}{message}")
 
 
+def get_server_error(status_code: int) -> Type[CheckFailed]:
+    """Return new exception for the Internal Server Error cases."""
+    name = f"ServerError{status_code}"
+    return get_exception(name)
+
+
 def get_status_code_error(status_code: int) -> Type[CheckFailed]:
     """Return new exception for an unexpected status code."""
     name = f"StatusCodeError{status_code}"

@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Use different exception classes for ``not_a_server_error`` and ``status_code_conformance`` checks. It improves the variance of found errors.
+
 `3.6.11`_ - 2021-05-20
 ----------------------
 
