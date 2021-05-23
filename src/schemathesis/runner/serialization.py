@@ -8,9 +8,9 @@ from typing import Any, Dict, List, Optional
 import attr
 import requests
 
-from ..exceptions import FailureContext
+from ..exceptions import FailureContext, InternalError
 from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
-from ..utils import format_exception
+from ..utils import WSGIResponse, format_exception
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -43,7 +43,7 @@ class SerializedCheck:
     # Check result
     value: Status = attr.ib()  # pragma: no mutate
     request: Request = attr.ib()  # pragma: no mutate
-    response: Response = attr.ib()  # pragma: no mutate
+    response: Optional[Response] = attr.ib()  # pragma: no mutate
     # Generated example
     example: SerializedCase = attr.ib()  # pragma: no mutate
     message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
@@ -52,11 +52,21 @@ class SerializedCheck:
 
     @classmethod
     def from_check(cls, check: Check) -> "SerializedCheck":
-        request = Request.from_prepared_request(check.response.request)
+        if check.response is not None:
+            request = Request.from_prepared_request(check.response.request)
+        elif check.request is not None:
+            # Response is not available, but it is not an error (only time-out behaves this way at the moment)
+            request = Request.from_prepared_request(check.request)
+        else:
+            raise InternalError("Can not find request data")
+
+        response: Optional[Response]
         if isinstance(check.response, requests.Response):
             response = Response.from_requests(check.response)
-        else:
+        elif isinstance(check.response, WSGIResponse):
             response = Response.from_wsgi(check.response, check.elapsed)
+        else:
+            response = None
         headers = {key: value[0] for key, value in request.headers.items()}
         return SerializedCheck(
             name=check.name,

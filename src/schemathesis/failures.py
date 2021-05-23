@@ -86,3 +86,10 @@ class ResponseTimeExceeded(FailureContext):
 
     elapsed: float = attr.ib()
     deadline: int = attr.ib()
+
+
+@attr.s(slots=True, repr=False)
+class ResponseTimeout(FailureContext):
+    """Response took longer than timeout and wasn't received."""
+
+    timeout: int = attr.ib()

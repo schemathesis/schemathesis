@@ -143,7 +143,7 @@ def test_d():
     )
     # When there is a test with Pytest
     result = testdir.runpytest()
-    # # Then it should use the global Schemathesis deadline for Hypothesis (DEFAULT_DEADLINE value)
+    # Then it should use the global Schemathesis deadline for Hypothesis (DEFAULT_DEADLINE value)
     result.assert_outcomes(passed=4)
 
 

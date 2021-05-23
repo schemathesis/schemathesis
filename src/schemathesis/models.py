@@ -36,8 +36,22 @@ from hypothesis import strategies as st
 from starlette.testclient import TestClient as ASGIClient
 
 from . import serializers
-from .constants import SERIALIZERS_SUGGESTION_MESSAGE, USER_AGENT, CodeSampleStyle, DataGenerationMethod
-from .exceptions import CheckFailed, FailureContext, InvalidSchema, SerializationNotPossible, get_grouped_exception
+from .constants import (
+    DEFAULT_RESPONSE_TIMEOUT,
+    SERIALIZERS_SUGGESTION_MESSAGE,
+    USER_AGENT,
+    CodeSampleStyle,
+    DataGenerationMethod,
+)
+from .exceptions import (
+    CheckFailed,
+    FailureContext,
+    InvalidSchema,
+    SerializationNotPossible,
+    get_grouped_exception,
+    get_timeout_error,
+)
+from .failures import ResponseTimeout
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .serializers import Serializer, SerializerContext
@@ -290,7 +304,16 @@ class Case:  # pylint: disable=too-many-public-methods
             close_session = False
         data = self.as_requests_kwargs(base_url, headers)
         data.update(kwargs)
-        response = session.request(**data)  # type: ignore
+        data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
+        try:
+            response = session.request(**data)  # type: ignore
+        except requests.Timeout as exc:
+            timeout = 1000 * data["timeout"]  # It is defined and not empty, since the exception happened
+            code_message = self._get_code_message(self.operation.schema.code_sample_style, exc.request)
+            raise get_timeout_error(timeout)(
+                f"\n\n1. Response timed out after {timeout:.2f}ms\n\n----------\n\n{code_message}",
+                context=ResponseTimeout(timeout=timeout),
+            ) from None
         if close_session:
             session.close()
         return response
@@ -382,18 +405,20 @@ class Case:  # pylint: disable=too-many-public-methods
                 if code_sample_style is not None
                 else self.operation.schema.code_sample_style
             )
-            if code_sample_style == CodeSampleStyle.python:
-                code = self.get_code_to_reproduce(request=response.request)
-                code_message = f"Run this Python code to reproduce this response: \n\n    {code}\n"
-            elif code_sample_style == CodeSampleStyle.curl:
-                code = self.as_curl_command(headers=dict(response.request.headers))
-                code_message = f"Run this cURL command to reproduce this response: \n\n    {code}\n"
-            else:  # pragma: no cover
-                raise ValueError(f"Unknown code sample style: {code_sample_style.name}")
+            code_message = self._get_code_message(code_sample_style, response.request)
             payload = get_response_payload(response)
             raise exception_cls(
                 f"\n\n{formatted_errors}\n\n----------\n\nResponse payload: `{payload}`\n\n{code_message}"
             )
+
+    def _get_code_message(self, code_sample_style: CodeSampleStyle, request: requests.PreparedRequest) -> str:
+        if code_sample_style == CodeSampleStyle.python:
+            code = self.get_code_to_reproduce(request=request)
+            return f"Run this Python code to reproduce this response: \n\n    {code}\n"
+        if code_sample_style == CodeSampleStyle.curl:
+            code = self.as_curl_command(headers=dict(request.headers))
+            return f"Run this cURL command to reproduce this response: \n\n    {code}\n"
+        raise ValueError(f"Unknown code sample style: {code_sample_style.name}")
 
     def call_and_validate(
         self,
@@ -656,12 +681,13 @@ class Check:
 
     name: str = attr.ib()  # pragma: no mutate
     value: Status = attr.ib()  # pragma: no mutate
-    response: GenericResponse = attr.ib()  # pragma: no mutate
+    response: Optional[GenericResponse] = attr.ib()  # pragma: no mutate
     elapsed: float = attr.ib()  # pragma: no mutate
     example: Case = attr.ib()  # pragma: no mutate
     message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     # Failure-specific context
     context: Optional[FailureContext] = attr.ib(default=None)  # pragma: no mutate
+    request: Optional[requests.PreparedRequest] = attr.ib(default=None)  # pragma: no mutate
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
@@ -837,29 +863,35 @@ class TestResult:
     def has_logs(self) -> bool:
         return bool(self.logs)
 
-    def add_success(self, name: str, example: Case, response: GenericResponse, elapsed: float) -> None:
-        self.checks.append(Check(name=name, value=Status.success, response=response, elapsed=elapsed, example=example))
+    def add_success(self, name: str, example: Case, response: GenericResponse, elapsed: float) -> Check:
+        check = Check(
+            name=name, value=Status.success, response=response, elapsed=elapsed, example=example, request=None
+        )
+        self.checks.append(check)
+        return check
 
     def add_failure(
         self,
         name: str,
         example: Case,
-        response: GenericResponse,
+        response: Optional[GenericResponse],
         elapsed: float,
         message: str,
         context: Optional[FailureContext],
-    ) -> None:
-        self.checks.append(
-            Check(
-                name=name,
-                value=Status.failure,
-                response=response,
-                elapsed=elapsed,
-                example=example,
-                message=message,
-                context=context,
-            )
+        request: Optional[requests.PreparedRequest] = None,
+    ) -> Check:
+        check = Check(
+            name=name,
+            value=Status.failure,
+            response=response,
+            elapsed=elapsed,
+            example=example,
+            message=message,
+            context=context,
+            request=request,
         )
+        self.checks.append(check)
+        return check
 
     def add_error(self, exception: Exception, example: Optional[Case] = None) -> None:
         self.errors.append((exception, example))

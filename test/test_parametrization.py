@@ -806,3 +806,23 @@ def test_(case):
     result = testdir.runpytest("--hypothesis-seed=42")
     # Then it should not output the internal name of the exception class, but a common name instead
     assert "schemathesis.exceptions.CheckFailed: " in result.outlines
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("slow")
+def test_long_response(testdir, app_schema, openapi3_base_url, openapi_version):
+    # When response takes too long
+    testdir.make_test(
+        f"""
+schema.base_url = "{openapi3_base_url}"
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_(case):
+    case.call_and_validate(timeout=0.001)
+""",
+        schema=app_schema,
+    )
+    result = testdir.runpytest()
+    # Then it should be reported as any other test failure
+    assert "E           1. Response timed out after 1.00ms" in result.outlines
