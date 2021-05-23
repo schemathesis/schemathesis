@@ -605,9 +605,9 @@ def test_connection_timeout(cli, server, schema_url, workers):
 @pytest.mark.operations("success", "slow")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_default_hypothesis_settings(cli, cli_args, workers):
-    # When there is a slow operation and if it is faster than 500ms
+    # When there is a slow operation and if it is faster than 15s
     result = cli.run(*cli_args, f"--workers={workers}")
-    # Then the tests should pass, because of default 500ms deadline
+    # Then the tests should pass, because of default 15s deadline
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
     if workers == 1:

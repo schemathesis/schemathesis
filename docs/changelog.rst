@@ -13,6 +13,7 @@ Changelog
 - Use different exception classes for ``not_a_server_error`` and ``status_code_conformance`` checks. It improves the variance of found errors.
 - All network requests (not WSGI) now have the default timeout of 10 seconds. If the response is time-outing, Schemathesis will report it as a failure.
   It also solves the case when the tested app hangs. `#1164`_
+- The default test duration deadline is extended to 15 seconds.
 
 `3.6.11`_ - 2021-05-20
 ----------------------

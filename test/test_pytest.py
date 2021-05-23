@@ -125,12 +125,12 @@ def test_default_hypothesis_deadline(testdir):
         f"""
 @schema.parametrize()
 def test_a(case):
-    assert settings().deadline.microseconds == {DEFAULT_DEADLINE} * 1000
+    assert settings().deadline.total_seconds() == {DEFAULT_DEADLINE} / 1000
 
 @schema.parametrize()
 @settings(max_examples=5)
 def test_b(case):
-    assert settings().deadline.microseconds == {DEFAULT_DEADLINE} * 1000
+    assert settings().deadline.total_seconds() == {DEFAULT_DEADLINE} / 1000
 
 @schema.parametrize()
 @settings(max_examples=5, deadline=100)

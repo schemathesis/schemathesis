@@ -11,7 +11,7 @@ except metadata.PackageNotFoundError:
 
 USER_AGENT = f"schemathesis/{__version__}"
 # Maximum test running time
-DEFAULT_DEADLINE = 500  # pragma: no mutate
+DEFAULT_DEADLINE = 15000  # pragma: no mutate
 DEFAULT_RESPONSE_TIMEOUT = 10000  # pragma: no mutate
 DEFAULT_STATEFUL_RECURSION_LIMIT = 5  # pragma: no mutate
 RECURSIVE_REFERENCE_ERROR_MESSAGE = (

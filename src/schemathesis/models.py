@@ -35,7 +35,7 @@ from hypothesis import event, note, reject
 from hypothesis import strategies as st
 from starlette.testclient import TestClient as ASGIClient
 
-from . import serializers
+from . import failures, serializers
 from .constants import (
     DEFAULT_RESPONSE_TIMEOUT,
     SERIALIZERS_SUGGESTION_MESSAGE,
@@ -51,7 +51,6 @@ from .exceptions import (
     get_grouped_exception,
     get_timeout_error,
 )
-from .failures import ResponseTimeout
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .serializers import Serializer, SerializerContext
@@ -312,7 +311,7 @@ class Case:  # pylint: disable=too-many-public-methods
             code_message = self._get_code_message(self.operation.schema.code_sample_style, exc.request)
             raise get_timeout_error(timeout)(
                 f"\n\n1. Response timed out after {timeout:.2f}ms\n\n----------\n\n{code_message}",
-                context=ResponseTimeout(timeout=timeout),
+                context=failures.ResponseTimeout(timeout=timeout),
             ) from None
         if close_session:
             session.close()
