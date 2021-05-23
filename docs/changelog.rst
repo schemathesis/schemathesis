@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.7.0`_ - 2021-05-23
+---------------------
+
 **Added**
 
 - Additional context for each failure coming from the runner. It allows the end-user to customize failure formatting.
@@ -1766,7 +1769,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.6.11...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.0...HEAD
+.. _3.7.0: https://github.com/schemathesis/schemathesis/compare/v3.6.11...v3.7.0
 .. _3.6.11: https://github.com/schemathesis/schemathesis/compare/v3.6.10...v3.6.11
 .. _3.6.10: https://github.com/schemathesis/schemathesis/compare/v3.6.9...v3.6.10
 .. _3.6.9: https://github.com/schemathesis/schemathesis/compare/v3.6.8...v3.6.9
