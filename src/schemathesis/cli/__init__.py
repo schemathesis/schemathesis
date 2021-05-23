@@ -17,6 +17,7 @@ from .. import runner
 from .. import targets as targets_module
 from ..constants import (
     DEFAULT_DATA_GENERATION_METHODS,
+    DEFAULT_RESPONSE_TIMEOUT,
     DEFAULT_STATEFUL_RECURSION_LIMIT,
     CodeSampleStyle,
     DataGenerationMethod,
@@ -309,6 +310,7 @@ class GroupedOption(click.Option):
     "--request-timeout",
     help="Timeout in milliseconds for network requests during the test run.",
     type=click.IntRange(1),
+    default=DEFAULT_RESPONSE_TIMEOUT,
 )
 @click.option(
     "--request-tls-verify",

@@ -17,7 +17,7 @@ from hypothesis import HealthCheck, Phase, Verbosity
 from schemathesis import Case, DataGenerationMethod, fixups
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.cli import reset_checks
-from schemathesis.constants import USER_AGENT
+from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT
 from schemathesis.hooks import unregister_all
 from schemathesis.models import APIOperation
 from schemathesis.runner import DEFAULT_CHECKS
@@ -336,7 +336,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "auth": None,
         "auth_type": "basic",
         "headers": {},
-        "request_timeout": None,
+        "request_timeout": DEFAULT_RESPONSE_TIMEOUT,
         "request_tls_verify": True,
         "store_interactions": False,
         "seed": None,
@@ -590,19 +590,16 @@ def test_connection_timeout(cli, server, schema_url, workers):
     result = cli.run(schema_url, "--request-timeout=80", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And the given operation should be displayed as an error
+    # And the given operation should be displayed as a failure
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[10].startswith("GET /api/slow E")
+        assert lines[10].startswith("GET /api/slow F")
         assert lines[11].startswith("GET /api/success .")
     else:
         # It could be in any sequence, because of multiple threads
-        assert lines[10].split("\n")[0] in ("E.", ".E")
+        assert lines[10].split("\n")[0] in ("F.", ".F")
     # And the proper error message should be displayed
-    assert (
-        f"requests.exceptions.ReadTimeout: HTTPConnectionPool(host='127.0.0.1', port={server['port']}): "
-        "Read timed out. (read timeout=0.08)" in result.stdout
-    )
+    assert "1. Response timed out after 80.00ms" in result.stdout
 
 
 @pytest.mark.operations("success", "slow")

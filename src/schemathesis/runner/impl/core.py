@@ -323,10 +323,8 @@ def run_checks(
         try:
             skip_check = check(response, case)
             if not skip_check:
-                result.add_success(check_name, case, response, elapsed_time)
-                check_results.append(
-                    Check(name=check_name, value=Status.success, response=response, elapsed=elapsed_time, example=case)
-                )
+                check_result = result.add_success(check_name, case, response, elapsed_time)
+                check_results.append(check_result)
         except AssertionError as exc:
             message = str(exc)
             if not message:
@@ -337,17 +335,8 @@ def run_checks(
                 context = exc.context
             else:
                 context = None
-            result.add_failure(check_name, case, response, elapsed_time, message, context)
-            check_results.append(
-                Check(
-                    name=check_name,
-                    value=Status.failure,
-                    response=response,
-                    elapsed=elapsed_time,
-                    example=case,
-                    message=message,
-                )
-            )
+            check_result = result.add_failure(check_name, case, response, elapsed_time, message, context)
+            check_results.append(check_result)
 
     if max_response_time:
         if elapsed_time > max_response_time:
@@ -486,11 +475,22 @@ def _network_test(
     request_tls_verify: bool,
     max_response_time: Optional[int],
 ) -> requests.Response:
-    response = case.call(session=session, headers=headers, timeout=timeout, verify=request_tls_verify)
+    check_results: List[Check] = []
+    try:
+        response = case.call(session=session, headers=headers, timeout=timeout, verify=request_tls_verify)
+    except CheckFailed as exc:
+        check_name = "request_timeout"
+        requests_kwargs = case.as_requests_kwargs(base_url=case.get_full_base_url(), headers=headers)
+        request = requests.Request(**requests_kwargs).prepare()
+        elapsed = cast(float, timeout)  # It is defined and not empty, since the exception happened
+        check_result = result.add_failure(
+            check_name, case, None, elapsed, f"Response timed out after {1000 * elapsed:.2f}ms", exc.context, request
+        )
+        check_results.append(check_result)
+        raise exc
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
     status = Status.success
-    check_results: List[Check] = []
     try:
         run_checks(case, checks, check_results, result, response, context.response_time * 1000, max_response_time)
     except CheckFailed:
