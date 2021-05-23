@@ -96,6 +96,11 @@ def get_headers_error(message: str) -> Type[CheckFailed]:
     return _get_hashed_exception("MissingHeadersError", message)
 
 
+def get_timeout_error(deadline: Union[float, int]) -> Type[CheckFailed]:
+    """Response took too long."""
+    return _get_hashed_exception("TimeoutError", str(deadline))
+
+
 @attr.s(slots=True)
 class InvalidSchema(Exception):
     """Schema associated with an API operation contains an error."""
@@ -139,6 +144,12 @@ class NonCheckError(Exception):
     Used primarily to not let Hypothesis to consider the test as flaky or detect multiple failures as we handle it
     on our side.
     """
+
+    __module__ = "builtins"
+
+
+class InternalError(Exception):
+    """Internal error in Schemathesis."""
 
     __module__ = "builtins"
 
