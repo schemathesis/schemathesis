@@ -247,6 +247,8 @@ behavior in the API by changing the duplicate request's specific details.
         case.headers["Content-Type"] = "application/json"
         return case
 
+.. note:: The ``add_case`` hook works only in CLI.
+
 If you only want to create another case conditionally, you may return None, and no additional test will be created. For example, you may only want to create
 an additional test case if the original case received a successful response from the server.
 
