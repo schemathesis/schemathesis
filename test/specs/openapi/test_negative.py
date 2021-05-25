@@ -1,13 +1,13 @@
 from copy import deepcopy
 
 import pytest
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from jsonschema import Draft7Validator
 
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
-from schemathesis.specs.openapi.negative import negative_schema
+from schemathesis.specs.openapi.negative import mutated, negative_schema
 from schemathesis.specs.openapi.negative.mutations import (
     MutationResult,
     change_items,
@@ -58,6 +58,7 @@ def validate_schema(schema):
     ],
 )
 @given(data=st.data())
+@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
 def test_top_level_strategy(data, location, schema):
     validate_schema(schema)
     validator = Draft7Validator(schema)
@@ -103,7 +104,7 @@ def test_failing_mutations(data, mutation, schema):
     original_schema = deepcopy(schema)
     # When mutation can't be applied
     # Then it returns "failure"
-    assert mutation(data.draw, schema) == MutationResult.FAILURE
+    assert mutation(data.draw, schema, "body") == MutationResult.FAILURE
     # And doesn't mutate the input schema
     assert schema == original_schema
 
@@ -141,15 +142,59 @@ def test_failing_mutations(data, mutation, schema):
     ),
 )
 @given(data=st.data())
+@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
 def test_successful_mutations(data, mutation, schema):
     validate_schema(schema)
     validator = Draft7Validator(schema)
     schema = deepcopy(schema)
     # When mutation can be applied
     # Then it returns "success"
-    assert mutation(data.draw, schema) == MutationResult.SUCCESS
+    assert mutation(data.draw, schema, "body") == MutationResult.SUCCESS
     # And the mutated schema is a valid JSON Schema
     validate_schema(schema)
     # And instances valid for this schema are not valid for the original one
     new_instance = data.draw(from_schema(schema))
+    assert not validator.is_valid(new_instance)
+
+
+@pytest.mark.parametrize(
+    "schema",
+    (
+        {
+            "type": "object",
+            "properties": {
+                "foo": {"type": "string"},
+            },
+            "required": [
+                "foo",
+            ],
+            "additionalProperties": False,
+        },
+        {
+            "type": "object",
+            "properties": {
+                "foo": {"type": "string", "format": "date"},
+            },
+            "required": [
+                "foo",
+            ],
+            "additionalProperties": False,
+        },
+    ),
+)
+@given(data=st.data())
+def test_path_parameters_are_string(data, schema):
+    validator = Draft7Validator(schema)
+    new_schema = deepcopy(schema)
+    # When path parameters are mutated
+    new_schema = data.draw(mutated(new_schema, "path"))
+    assert new_schema["type"] == "object"
+    # Then mutated schema is a valid JSON Schema
+    validate_schema(new_schema)
+    # And parameters remain primitive types
+    new_instance = data.draw(from_schema(new_schema))
+    assert not isinstance(new_instance["foo"], (list, dict))
+    # And there should be no additional parameters
+    assert len(new_instance) == 1
+    # And instances valid for this schema are not valid for the original one
     assert not validator.is_valid(new_instance)
