@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Internal error on unusual schemas for the ``multipart/form-data`` media type. `#1152`_
+
 `3.7.1`_ - 2021-05-23
 ---------------------
 
@@ -1942,6 +1946,7 @@ Deprecated
 .. _#1162: https://github.com/schemathesis/schemathesis/issues/1162
 .. _#1160: https://github.com/schemathesis/schemathesis/issues/1160
 .. _#1153: https://github.com/schemathesis/schemathesis/issues/1153
+.. _#1152: https://github.com/schemathesis/schemathesis/issues/1152
 .. _#1134: https://github.com/schemathesis/schemathesis/issues/1134
 .. _#1121: https://github.com/schemathesis/schemathesis/issues/1121
 .. _#1100: https://github.com/schemathesis/schemathesis/issues/1100
