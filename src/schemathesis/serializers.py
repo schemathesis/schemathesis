@@ -1,3 +1,6 @@
+import binascii
+import os
+from io import BytesIO
 from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Optional, Type
 
 import attr
@@ -152,14 +155,38 @@ def _to_bytes(value: Any) -> bytes:
     return str(value).encode(errors="ignore")
 
 
+def choose_boundary() -> str:
+    """Random boundary name."""
+    return binascii.hexlify(os.urandom(16)).decode("ascii")
+
+
+def _encode_multipart(value: Any, boundary: str) -> bytes:
+    """Encode any value as multipart.
+
+    NOTE. It doesn't aim to be 100% correct multipart payload, but rather a way to send data which is not intended to
+    be used as multipart, in cases when the API schema dictates so.
+    """
+    # For such cases we stringify the value and wrap it to a randomly-generated boundary
+    body = BytesIO(f"--{boundary}\r\n".encode())
+    body.write(str(value).encode())
+    body.write(f"--{boundary}--\r\n".encode("latin-1"))
+    return body.getvalue()
+
+
 @register("multipart/form-data")
 class MultipartSerializer:
     def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
         if isinstance(value, bytes):
             return {"data": value}
-        multipart = _prepare_form_data(value)
-        files, data = context.case.operation.prepare_multipart(multipart)
-        return {"files": files, "data": data}
+        if isinstance(value, dict):
+            multipart = _prepare_form_data(value)
+            files, data = context.case.operation.prepare_multipart(multipart)
+            return {"files": files, "data": data}
+        # Uncommon schema. For example - `{"type": "string"}`
+        boundary = choose_boundary()
+        raw_data = _encode_multipart(value, boundary)
+        content_type = f"multipart/form-data; boundary={boundary}"
+        return {"data": raw_data, "headers": {"Content-Type": content_type}}
 
     def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
         return {"data": value}

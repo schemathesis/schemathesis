@@ -1,8 +1,9 @@
 import json
+from test.utils import assert_requests_call
 from urllib.parse import quote, unquote
 
 import pytest
-from hypothesis import given
+from hypothesis import given, settings
 
 import schemathesis
 from schemathesis.specs.openapi.serialization import (
@@ -426,3 +427,49 @@ def test_nullable_parameters(
 ):
     # Nullable parameters are converted to an empty string
     assert func("foo", **kwargs)({"foo": None}) == {"foo": ""}
+
+
+@pytest.mark.parametrize(
+    "type_name",
+    # `null` is not a valid Open API type, but it is possible to have `None` with custom hooks, therefore it is here
+    # for simplicity
+    ("null", "string", "boolean", "array", "integer", "number"),
+)
+def test_unusual_form_schema(empty_open_api_3_schema, type_name):
+    # See GH-1152
+    # When API schema defines multipart media type
+    # And its schema is not an object or bytes (string + format=byte)
+    empty_open_api_3_schema["paths"] = {
+        "/multipart": {
+            "post": {
+                "requestBody": {"content": {"multipart/form-data": {"schema": {"type": type_name}}}, "required": True},
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=False)
+
+    @given(case=schema["/multipart"]["POST"].as_strategy())
+    @settings(max_examples=5, deadline=None)
+    def test(case):
+        # Then it should lead to a valid network request
+        assert_requests_call(case)
+        # And should contain the proper content type
+        headers = case.as_requests_kwargs()["headers"]
+        assert headers["Content-Type"].startswith("multipart/form-data; boundary=")
+        # When custom headers are passed
+        headers = case.as_requests_kwargs(headers={"Authorization": "Bearer FOO"})["headers"]
+        # Then content type should be valid
+        assert headers["Content-Type"].startswith("multipart/form-data; boundary=")
+        # And the original headers are preserved
+        assert headers["Authorization"] == "Bearer FOO"
+        # When the Content-Type header is passed explicitly
+        headers = case.as_requests_kwargs(headers={"Content-Type": "text/plain"})["headers"]
+        # Then it should be preferred
+        assert headers["Content-Type"] == "text/plain"
+        # And it should be case insensitive
+        headers = case.as_requests_kwargs(headers={"content-type": "text/plain"})["headers"]
+        assert headers["content-type"] == "text/plain"
+        assert "Content-Type" not in headers
+
+    test()

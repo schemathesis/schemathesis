@@ -279,6 +279,12 @@ class Case:  # pylint: disable=too-many-public-methods
             extra = serializer.as_requests(context, self.body)
         else:
             extra = {}
+        additional_headers = extra.pop("headers", None)
+        if additional_headers:
+            # Additional headers, needed for the serializer
+            for key, value in additional_headers.items():
+                if key.lower() not in {header.lower() for header in final_headers}:
+                    final_headers[key] = value
         return {
             "method": self.method,
             "url": url,
