@@ -8,6 +8,10 @@ Changelog
 
 - Invalid multipart payload generated for unusual schemas for the ``multipart/form-data`` media type.
 
+**Performance**
+
+- Reduce the amount of filtering needed to generate valid headers and cookies.
+
 `3.7.2`_ - 2021-05-27
 ---------------------
 
