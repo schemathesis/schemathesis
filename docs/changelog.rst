@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- ``SerializedCase.media_type`` that stores the information about what media type was used for a particular case.
+
 **Fixed**
 
 - Internal error on unusual schemas for the ``multipart/form-data`` media type. `#1152`_
