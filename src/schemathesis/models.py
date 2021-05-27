@@ -268,7 +268,8 @@ class Case:  # pylint: disable=too-many-public-methods
         final_headers = self._get_headers(headers)
         if self.media_type and self.media_type != "multipart/form-data" and self.body is not NOT_SET:
             # `requests` will handle multipart form headers with the proper `boundary` value.
-            final_headers["Content-Type"] = self.media_type
+            if "content-type" not in {header.lower() for header in final_headers}:
+                final_headers["Content-Type"] = self.media_type
         base_url = self._get_base_url(base_url)
         formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
         url = unquote(urljoin(base_url + "/", quote(formatted_path)))

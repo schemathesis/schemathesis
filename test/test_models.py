@@ -92,6 +92,34 @@ def test_as_requests_kwargs_override_user_agent(server, openapi2_base_url, swagg
     assert response.json() == {"success": True}
 
 
+@pytest.mark.parametrize("header", ("content-Type", "Content-Type"))
+def test_as_requests_kwargs_override_content_type(empty_open_api_3_schema, header):
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {"text/plain": {"schema": {"type": "string"}}},
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    case = schema["/data"]["post"].make_case(body="<html></html>", media_type="text/plain")
+    # When the `Content-Type` header is explicitly passed
+    data = case.as_requests_kwargs(headers={header: "text/html"})
+    # Then it should be used in network requests
+    assert data == {
+        "method": "POST",
+        "data": b"<html></html>",
+        "params": None,
+        "cookies": None,
+        "headers": {header: "text/html", "User-Agent": USER_AGENT},
+        "url": "/data",
+    }
+
+
 @pytest.mark.parametrize("override", (False, True))
 @pytest.mark.filterwarnings("always")
 def test_call(override, base_url, swagger_20):
