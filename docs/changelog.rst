@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.7.2`_ - 2021-05-27
+---------------------
+
 **Added**
 
 - ``SerializedCase.media_type`` that stores the information about what media type was used for a particular case.
@@ -1792,7 +1795,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.2...HEAD
+.. _3.7.2: https://github.com/schemathesis/schemathesis/compare/v3.7.1...v3.7.2
 .. _3.7.1: https://github.com/schemathesis/schemathesis/compare/v3.7.0...v3.7.1
 .. _3.7.0: https://github.com/schemathesis/schemathesis/compare/v3.6.11...v3.7.0
 .. _3.6.11: https://github.com/schemathesis/schemathesis/compare/v3.6.10...v3.6.11
