@@ -11,6 +11,7 @@ Changelog
 **Fixed**
 
 - Internal error on unusual schemas for the ``multipart/form-data`` media type. `#1152`_
+- Ignored explicit ``Content-Type`` override in ``Case.as_requests_kwargs``.
 
 `3.7.1`_ - 2021-05-23
 ---------------------
