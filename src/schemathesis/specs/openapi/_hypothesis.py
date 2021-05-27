@@ -21,6 +21,7 @@ from ...types import NotSet
 from ...utils import NOT_SET
 from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPIParameter, parameters_to_json_schema
+from .utils import is_header_location, set_keyword_on_properties
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
 SLASH = "/"
@@ -51,13 +52,15 @@ def init_default_strategies() -> None:
 
     latin1_text = st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255))
 
+    # Define valid characters here to avoid filtering them out in `is_valid_header` later
+    header_value = st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255, blacklist_characters="\n\r"))
+    # Header values with leading non-visible chars can't be sent with `requests`
+    register_string_format("_header_value", header_value.map(str.lstrip))
+
     register_string_format("_basic_auth", st.tuples(latin1_text, latin1_text).map(make_basic_auth_str))  # type: ignore
     register_string_format(
         "_bearer_auth",
-        # Define valid characters here to avoid filtering them out in `is_valid_header` later
-        st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255, blacklist_characters="\n\r")).map(
-            "Bearer {}".format
-        ),
+        header_value.map("Bearer {}".format),
     )
 
 
@@ -186,7 +189,9 @@ _BODY_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()
 
 
 def _get_body_strategy(
-    parameter: OpenAPIParameter, to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy], parent_schema: BaseSchema
+    parameter: OpenAPIParameter,
+    to_strategy: Callable[[Dict[str, Any], str], st.SearchStrategy],
+    parent_schema: BaseSchema,
 ) -> st.SearchStrategy:
     # The cache key relies on object ids, which means that the parameter should not be mutated
     # Note, the parent schema is not included as each parameter belong only to one schema
@@ -194,7 +199,7 @@ def _get_body_strategy(
         return _BODY_STRATEGIES_CACHE[parameter][to_strategy]
     schema = parameter.as_json_schema()
     schema = parent_schema.prepare_schema(schema)
-    strategy = to_strategy(schema)
+    strategy = to_strategy(schema, "body")
     if not parameter.is_required:
         strategy |= st.just(NOT_SET)
     _BODY_STRATEGIES_CACHE.setdefault(parameter, {})[to_strategy] = strategy
@@ -208,7 +213,7 @@ def get_parameters_value(
     operation: APIOperation,
     context: HookContext,
     hooks: Optional[HookDispatcher],
-    to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy],
+    to_strategy: Callable[[Dict[str, Any], str], st.SearchStrategy],
 ) -> Dict[str, Any]:
     """Get the final value for the specified location.
 
@@ -231,7 +236,7 @@ _PARAMETER_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()
 
 def get_parameters_strategy(
     operation: APIOperation,
-    to_strategy: Callable[[Dict[str, Any]], st.SearchStrategy],
+    to_strategy: Callable[[Dict[str, Any], str], st.SearchStrategy],
     location: str,
     exclude: Iterable[str] = (),
 ) -> st.SearchStrategy:
@@ -255,7 +260,7 @@ def get_parameters_strategy(
             schema["properties"].pop(name, None)
             with suppress(ValueError):
                 schema["required"].remove(name)
-        strategy = to_strategy(schema)
+        strategy = to_strategy(schema, location)
         serialize = operation.get_parameter_serializer(location)
         if serialize is not None:
             strategy = strategy.map(serialize)
@@ -275,7 +280,12 @@ def get_parameters_strategy(
     return st.none()
 
 
-def make_positive_strategy(schema: Dict[str, Any]) -> st.SearchStrategy:
+def make_positive_strategy(schema: Dict[str, Any], location: str) -> st.SearchStrategy:
+    """Strategy for generating values that fit the schema."""
+    if is_header_location(location):
+        # We try to enforce the right header values via "format"
+        # This way, only allowed values will be used during data generation, which reduces the amount of filtering later
+        set_keyword_on_properties(schema, "format", "_header_value")
     return from_schema(schema, custom_formats=STRING_FORMATS)
 
 
