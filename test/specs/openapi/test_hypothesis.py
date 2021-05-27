@@ -1,8 +1,10 @@
+import sys
+
 import pytest
 from hypothesis import assume, given, settings
 
 import schemathesis
-from schemathesis.specs.openapi._hypothesis import get_case_strategy
+from schemathesis.specs.openapi._hypothesis import get_case_strategy, is_valid_header, make_positive_strategy
 
 
 @pytest.fixture
@@ -116,5 +118,27 @@ def test_inlined_definitions(deeply_nested_schema):
     def test(case):
         # Then the referenced schema should be properly transformed to the JSON Schema form
         assume(case.query["key"] is None)
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+def test_always_valid_headers():
+    # When headers are generated
+    # And there is no custom "format"
+    strategy = make_positive_strategy(
+        {
+            "type": "object",
+            "properties": {"X-Foo": {"type": "string"}},
+            "required": ["X-Foo"],
+            "additionalProperties": False,
+        },
+        "header",
+    )
+
+    @given(strategy)
+    def test(headers):
+        # Then headers are always valid
+        assert is_valid_header(headers)
 
     test()
