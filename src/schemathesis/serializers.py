@@ -167,7 +167,8 @@ def _encode_multipart(value: Any, boundary: str) -> bytes:
     be used as multipart, in cases when the API schema dictates so.
     """
     # For such cases we stringify the value and wrap it to a randomly-generated boundary
-    body = BytesIO(f"--{boundary}\r\n".encode())
+    body = BytesIO()
+    body.write(f"--{boundary}\r\n".encode())
     body.write(str(value).encode())
     body.write(f"--{boundary}--\r\n".encode("latin-1"))
     return body.getvalue()
