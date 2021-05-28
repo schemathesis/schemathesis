@@ -30,7 +30,7 @@ class SerializedCase:
             text_lines=case.as_text_lines(headers),
             requests_code=case.get_code_to_reproduce(headers),
             curl_code=case.as_curl_command(headers),
-            path_template=case.full_path,
+            path_template=case.path,
             path_parameters=case.path_parameters,
             query=case.query,
             verbose_name=case.operation.verbose_name,
