@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.7.3`_ - 2021-05-28
+---------------------
+
 **Fixed**
 
 - Invalid multipart payload generated for unusual schemas for the ``multipart/form-data`` media type.
@@ -1803,7 +1806,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.2...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.3...HEAD
+.. _3.7.3: https://github.com/schemathesis/schemathesis/compare/v3.7.2...v3.7.3
 .. _3.7.2: https://github.com/schemathesis/schemathesis/compare/v3.7.1...v3.7.2
 .. _3.7.1: https://github.com/schemathesis/schemathesis/compare/v3.7.0...v3.7.1
 .. _3.7.0: https://github.com/schemathesis/schemathesis/compare/v3.6.11...v3.7.0
