@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- **Internal**: ``SerializedCase.path_template`` returns path templates as they are in the schema, without base path.
+
 `3.7.3`_ - 2021-05-28
 ---------------------
 
