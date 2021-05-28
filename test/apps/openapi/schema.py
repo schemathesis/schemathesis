@@ -466,6 +466,7 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                         "multipart/form-data": {
                             "schema": {
                                 "type": "object",
+                                "additionalProperties": False,
                                 "properties": {
                                     "data": {"type": "string", "format": "binary"},
                                     "note": {"type": "string"},
@@ -518,6 +519,7 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                                     "maybe": {"type": "boolean"},
                                 },
                                 "required": ["key", "value"],
+                                "additionalProperties": False,
                             }
                         }
                     },
