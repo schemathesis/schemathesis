@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.7.4`_ - 2021-05-28
+---------------------
+
 **Changed**
 
 - **Internal**: ``SerializedCase.path_template`` returns path templates as they are in the schema, without base path.
@@ -1810,7 +1813,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.3...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.4...HEAD
+.. _3.7.4: https://github.com/schemathesis/schemathesis/compare/v3.7.3...v3.7.4
 .. _3.7.3: https://github.com/schemathesis/schemathesis/compare/v3.7.2...v3.7.3
 .. _3.7.2: https://github.com/schemathesis/schemathesis/compare/v3.7.1...v3.7.2
 .. _3.7.1: https://github.com/schemathesis/schemathesis/compare/v3.7.0...v3.7.1
