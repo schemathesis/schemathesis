@@ -6,6 +6,7 @@ from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from jsonschema import Draft7Validator
 
+from schemathesis.specs.openapi._hypothesis import STRING_FORMATS, is_valid_header
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.specs.openapi.negative import mutated, negative_schema
 from schemathesis.specs.openapi.negative.mutations import (
@@ -17,6 +18,7 @@ from schemathesis.specs.openapi.negative.mutations import (
     negate_schema,
     remove_required_property,
 )
+from schemathesis.specs.openapi.utils import is_header_location
 
 OBJECT_SCHEMA = {
     "type": "object",
@@ -62,8 +64,12 @@ def validate_schema(schema):
 def test_top_level_strategy(data, location, schema):
     validate_schema(schema)
     validator = Draft7Validator(schema)
-    instance = data.draw(negative_schema(schema, location=location, custom_formats={}))
+    instance = data.draw(
+        negative_schema(schema, operation_name="GET /users/", location=location, custom_formats=STRING_FORMATS)
+    )
     assert not validator.is_valid(instance)
+    if is_header_location(location):
+        assert is_valid_header(instance)
 
 
 @pytest.mark.parametrize(
@@ -119,6 +125,7 @@ def test_failing_mutations(data, mutation, schema):
         (change_type, {"type": ["object", "array"]}),
         (remove_required_property, {"properties": {"foo": {}}, "required": ["foo"]}),
         (remove_required_property, {"properties": {"foo": {}, "bar": {}}, "required": ["foo"]}),
+        (remove_required_property, {"required": ["foo"]}),
         (change_items, {"type": "array", "items": {"type": "string"}}),
         (change_items, {"type": "array", "items": {"type": "string"}, "minItems": 1}),
         (change_items, {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 1}),
@@ -142,7 +149,7 @@ def test_failing_mutations(data, mutation, schema):
     ),
 )
 @given(data=st.data())
-@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
+@settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
 def test_successful_mutations(data, mutation, schema):
     validate_schema(schema)
     validator = Draft7Validator(schema)
@@ -198,3 +205,32 @@ def test_path_parameters_are_string(data, schema):
     assert len(new_instance) == 1
     # And instances valid for this schema are not valid for the original one
     assert not validator.is_valid(new_instance)
+
+
+@given(data=st.data())
+@settings(suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow])
+def test_headers_are_valid(data):
+    # When headers are mutated
+    schema = {
+        "type": "object",
+        "properties": {"X-Foo": {"type": "string", "maxLength": 5}},
+        "additionalProperties": False,
+    }
+    instance = data.draw(negative_schema(schema, "GET /users/", "header", custom_formats=STRING_FORMATS))
+    # Then they still should be valid headers
+    assert is_valid_header(instance)
+
+
+@pytest.mark.parametrize("key", ("components", "description"))
+@given(data=st.data())
+def test_custom_fields_are_intact(data, key):
+    # When the schema contains some non-JSON Schema keywords (e.g. components from Open API)
+    schema = {
+        "type": "object",
+        "properties": {"X-Foo": {"type": "string", "maxLength": 5}},
+        "additionalProperties": False,
+        key: {},
+    }
+    # Then they should not be negated
+    new_schema = data.draw(mutated(schema, "body"))
+    assert key in new_schema

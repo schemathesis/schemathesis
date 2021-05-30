@@ -8,6 +8,7 @@ from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
 from hypothesis_jsonschema._canonicalise import canonicalish
 
+from ..utils import is_header_location
 from .types import Draw, Schema
 from .utils import get_type
 
@@ -68,6 +69,8 @@ def remove_required_property(draw: Draw, schema: Schema, location: str) -> Mutat
     # An optional property still can be generated, and to avoid it, we need to remove it from other keywords.
     properties = schema.get("properties", {})
     properties.pop(property_name, None)
+    if properties == {}:
+        schema.pop("properties", None)
     schema["type"] = "object"
     # This property still can be generated via `patternProperties`, but this implementation doesn't cover this case
     # Its probability is relatively low, and the complete solution compatible with Draft 4 will require extra complexity
@@ -80,6 +83,9 @@ def change_type(draw: Draw, schema: Schema, location: str) -> MutationResult:
     if "type" not in schema:
         # The absence of this keyword means that the schema values can be of any type;
         # Therefore, we can't choose a different type
+        return MutationResult.FAILURE
+    if is_header_location(location):
+        # TODO. What about headers defined as non-strings. Changing it to "string" is a valid mutation
         return MutationResult.FAILURE
     candidates = _get_type_candidates(schema, location)
     if not candidates:
@@ -223,7 +229,7 @@ def negate_constraints(draw: Draw, schema: Schema, location: str) -> MutationRes
     schema.clear()
     is_negated = False
     for key, value in copied.items():
-        if key in ("type", "properties"):  # TODO. more? items when array mutations are implemented
+        if key in ("type", "properties", "items") or (key == "additionalProperties" and is_header_location(location)):
             schema[key] = value
         else:
             # TODO. Swarm testing to negate only certain keywords?
@@ -243,6 +249,15 @@ def negate_schema(draw: Draw, schema: Schema, location: str) -> MutationResult:
     """
     if canonicalish(schema) == {}:
         return MutationResult.FAILURE
+    # if _is_header(location) and len(schema) == 1 and "type" in schema:
+    if is_header_location(location):
+        # Headers should remain strings
+        types = get_type(schema)
+        if "string" in types:
+            # Can't make headers non-strings
+            return MutationResult.FAILURE
+        # TODO. What about cases with type + other keywords?
+        # return MutationResult.FAILURE
     inner = schema.copy()  # Shallow copy is OK
     schema.clear()
     schema["not"] = inner
@@ -327,7 +342,6 @@ class Mutator:
         return mutation in self.applicable_mutations
 
     def apply(self, mutation: Mutation, draw: Draw, schema: Schema, location: str) -> MutationResult:
-        # TODO maybe return FAILURE if it can't be applied?
         result = mutation(draw, schema, location)
         # If mutation is successfully applied and has some incompatible ones, exclude them from the future use
         if result == MutationResult.SUCCESS and mutation in INCOMPATIBLE_MUTATIONS:

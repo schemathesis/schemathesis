@@ -1,5 +1,6 @@
 import json
 import re
+import string
 from base64 import b64encode
 from contextlib import contextmanager, suppress
 from copy import deepcopy
@@ -16,7 +17,6 @@ from ...constants import DataGenerationMethod
 from ...exceptions import InvalidSchema
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import APIOperation, Case
-from ...schemas import BaseSchema
 from ...types import NotSet
 from ...utils import NOT_SET
 from .constants import LOCATION_TO_CONTAINER
@@ -53,11 +53,15 @@ def init_default_strategies() -> None:
 
     latin1_text = st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255))
 
+    # RFC 7230, Section 3.2.6
+    register_string_format(
+        "_header_name",
+        st.text(min_size=1, alphabet=st.sampled_from("!#$%&'*+-.^_`|~" + string.digits + string.ascii_letters)),
+    )
     # Define valid characters here to avoid filtering them out in `is_valid_header` later
     header_value = st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255, blacklist_characters="\n\r"))
     # Header values with leading non-visible chars can't be sent with `requests`
     register_string_format("_header_value", header_value.map(str.lstrip))
-
     register_string_format("_basic_auth", st.tuples(latin1_text, latin1_text).map(make_basic_auth_str))  # type: ignore
     register_string_format(
         "_bearer_auth",
@@ -131,7 +135,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
         if body is NOT_SET:
             if operation.body:
                 parameter = draw(st.sampled_from(operation.body.items))
-                strategy = _get_body_strategy(parameter, to_strategy, operation.schema)
+                strategy = _get_body_strategy(parameter, to_strategy, operation)
                 strategy = apply_hooks(operation, context, hooks, strategy, "body")
                 media_type = parameter.media_type
                 body = draw(strategy)
@@ -194,16 +198,16 @@ _BODY_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()
 
 def _get_body_strategy(
     parameter: OpenAPIParameter,
-    to_strategy: Callable[[Dict[str, Any], str], st.SearchStrategy],
-    parent_schema: BaseSchema,
+    to_strategy: Callable[[Dict[str, Any], str, str], st.SearchStrategy],
+    operation: APIOperation,
 ) -> st.SearchStrategy:
     # The cache key relies on object ids, which means that the parameter should not be mutated
     # Note, the parent schema is not included as each parameter belong only to one schema
     if parameter in _BODY_STRATEGIES_CACHE and to_strategy in _BODY_STRATEGIES_CACHE[parameter]:
         return _BODY_STRATEGIES_CACHE[parameter][to_strategy]
     schema = parameter.as_json_schema()
-    schema = parent_schema.prepare_schema(schema)
-    strategy = to_strategy(schema, "body")
+    schema = operation.schema.prepare_schema(schema)
+    strategy = to_strategy(schema, operation.verbose_name, "body")
     if not parameter.is_required:
         strategy |= st.just(NOT_SET)
     _BODY_STRATEGIES_CACHE.setdefault(parameter, {})[to_strategy] = strategy
@@ -217,7 +221,7 @@ def get_parameters_value(
     operation: APIOperation,
     context: HookContext,
     hooks: Optional[HookDispatcher],
-    to_strategy: Callable[[Dict[str, Any], str], st.SearchStrategy],
+    to_strategy: Callable[[Dict[str, Any], str, str], st.SearchStrategy],
 ) -> Dict[str, Any]:
     """Get the final value for the specified location.
 
@@ -240,7 +244,7 @@ _PARAMETER_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()
 
 def get_parameters_strategy(
     operation: APIOperation,
-    to_strategy: Callable[[Dict[str, Any], str], st.SearchStrategy],
+    to_strategy: Callable[[Dict[str, Any], str, str], st.SearchStrategy],
     location: str,
     exclude: Iterable[str] = (),
 ) -> st.SearchStrategy:
@@ -264,7 +268,7 @@ def get_parameters_strategy(
             schema["properties"].pop(name, None)
             with suppress(ValueError):
                 schema["required"].remove(name)
-        strategy = to_strategy(schema, location)
+        strategy = to_strategy(schema, operation.verbose_name, location)
         serialize = operation.get_parameter_serializer(location)
         if serialize is not None:
             strategy = strategy.map(serialize)
@@ -284,18 +288,18 @@ def get_parameters_strategy(
     return st.none()
 
 
-def make_positive_strategy(schema: Dict[str, Any], location: str) -> st.SearchStrategy:
+def make_positive_strategy(schema: Dict[str, Any], operation_name: str, location: str) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
     if is_header_location(location):
         # We try to enforce the right header values via "format"
         # This way, only allowed values will be used during data generation, which reduces the amount of filtering later
         # If a property schema contains `pattern` it leads to heavy filtering and worse performance - therefore, skip it
-        set_keyword_on_properties(schema, "format", "_header_value", lambda s: len(s) == 1 and "type" in s)
+        set_keyword_on_properties(schema, format="_header_value", lambda s: len(s) == 1 and "type" in s)
     return from_schema(schema, custom_formats=STRING_FORMATS)
 
 
-def make_negative_strategy(schema: Dict[str, Any], location: str) -> st.SearchStrategy:
-    return negative_schema(schema, location=location, custom_formats=STRING_FORMATS)
+def make_negative_strategy(schema: Dict[str, Any], operation_name: str, location: str) -> st.SearchStrategy:
+    return negative_schema(schema, operation_name=operation_name, location=location, custom_formats=STRING_FORMATS)
 
 
 def is_valid_path(parameters: Dict[str, Any]) -> bool:

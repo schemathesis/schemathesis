@@ -10,7 +10,7 @@ def expand_status_code(status_code: Union[str, int]) -> Generator[int, None, Non
 
 
 def set_keyword_on_properties(
-    schema: Dict[str, Any], keyword: str, value: Any, predicate: Callable[[Dict[str, Any]], bool]
+    schema: Dict[str, Any], predicate: Callable[[Dict[str, Any]], bool], **keywords: Any,
 ) -> None:
     """Set JSON Schema keyword on all properties in the schema.
 
@@ -18,7 +18,8 @@ def set_keyword_on_properties(
     """
     for sub_schema in schema.get("properties", {}).values():
         if predicate(sub_schema):
-            sub_schema.setdefault(keyword, value)
+            for keyword, value in keywords.items():
+                sub_schema.setdefault(keyword, value)
 
 
 def is_header_location(location: str) -> bool:
