@@ -1,8 +1,9 @@
 from copy import deepcopy
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Sequence, Tuple
 
 import jsonschema
 from hypothesis import strategies as st
+from hypothesis.strategies._internal.featureflags import FeatureStrategy
 from hypothesis_jsonschema import from_schema
 
 from ..utils import is_header_location, set_keyword_on_properties
@@ -60,12 +61,12 @@ ALL_KEYWORDS = (
 _VALIDATORS_CACHE = {}
 
 
-def get_validator(schema: Schema, operation_name: str, location: str) -> jsonschema.Draft7Validator:
+def get_validator(schema: Schema, operation_name: str, location: str) -> jsonschema.Draft4Validator:
     """Get JSON Schema validator for the given schema."""
     # Each operation / location combo has only a single schema, therefore could be cached
     key = (operation_name, location)
     if key not in _VALIDATORS_CACHE:
-        _VALIDATORS_CACHE[key] = jsonschema.Draft7Validator(schema)
+        _VALIDATORS_CACHE[key] = jsonschema.Draft4Validator(schema)
     return _VALIDATORS_CACHE[key]
 
 
@@ -102,7 +103,7 @@ def negative_schema(
 def mutated(draw: Draw, schema: Schema, location: str) -> Any:
     # On the top level, Schemathesis creates "object" schemas for all parameter "in" values except "body", which is
     # taken as-is. Therefore we can only apply mutations that won't change the Open API semantics of the schema.
-    mutations: Tuple[Mutation, ...]
+    mutations: List[Mutation]
     if location in ("header", "cookie", "query"):
         # These objects follow this pattern:
         # {
@@ -116,14 +117,14 @@ def mutated(draw: Draw, schema: Schema, location: str) -> Any:
         #   - remove required parameters
         #   - negate constraints (only `additionalProperties` in this case)
         #   - mutate individual properties
-        mutations = draw(ordered((remove_required_property, negate_constraints, change_properties)))
+        mutations = ordered_subset(draw, (remove_required_property, negate_constraints, change_properties))
     elif location == "path":
         # The same as above, but we can only mutate individual properties as their names are predefined in the
         # path template, and all of them are required.
-        mutations = (change_properties,)
+        mutations = [change_properties]
     else:
         # Body can be of any type and does not have any specific type semantic.
-        mutations = get_mutations(draw, schema)
+        mutations = ordered_subset(draw, get_mutations(draw, schema))
     keywords, non_keywords = split_schema(schema)
     # Deep copy all keywords to avoid modifying the original schema
     new_schema = deepcopy(keywords)
@@ -143,3 +144,19 @@ def mutated(draw: Draw, schema: Schema, location: str) -> Any:
             "format": "_header_value",
         }
     return new_schema
+
+
+def ordered_subset(draw: Draw, mutations: Sequence[Mutation]) -> List[Mutation]:
+    """Get a subset of mutations."""
+    features = draw(st.shared(FeatureStrategy(), key="mutations"))  # type: ignore
+    remaining = draw(st.sampled_from(mutations))
+    return draw(
+        ordered(
+            [remaining]  # Keep at least one mutation to avoid excluding all of them
+            + [
+                mutation
+                for mutation in mutations
+                if mutation is not remaining and features.is_enabled(mutation.__name__)
+            ]
+        )
+    )

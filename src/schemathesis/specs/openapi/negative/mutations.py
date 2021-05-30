@@ -59,8 +59,13 @@ def remove_required_property(draw: Draw, schema: Schema, location: str) -> Mutat
     if not required:
         # No required properties - can't mutate
         return MutationResult.FAILURE
-    # TODO: apply swarm testing here
-    property_name = draw(st.sampled_from(sorted(required)))
+    if len(required) == 1:
+        property_name = draw(st.sampled_from(sorted(required)))
+    else:
+        remaining_property = draw(st.sampled_from(sorted(required)))
+        features = draw(st.shared(FeatureStrategy(), key="properties"))  # type: ignore
+        candidates = [remaining_property] + sorted([prop for prop in required if features.is_enabled(prop)])
+        property_name = draw(st.sampled_from(candidates))
     required.remove(property_name)
     if not required:
         # In JSON Schema Draft 4, `required` must contain at least one string
@@ -91,9 +96,17 @@ def change_type(draw: Draw, schema: Schema, location: str) -> MutationResult:
     if not candidates:
         # Schema covers all possible types, not possible to choose something else
         return MutationResult.FAILURE
-    # TODO. apply swarm testing here, but avoid FAILURE result
-    # otherwise, it will be possible to not have any mutations at all on the top level
-    schema["type"] = draw(st.sampled_from(sorted(candidates)))
+    if len(candidates) == 1:
+        schema["type"] = candidates.pop()
+        return MutationResult.SUCCESS
+    # Choose one type that will be present in the final candidates list
+    remaining_type = draw(st.sampled_from(sorted(candidates)))
+    candidates.remove(remaining_type)
+    features = draw(st.shared(FeatureStrategy(), key="types"))  # type: ignore
+    remaining_candidates = [remaining_type] + sorted(
+        [candidate for candidate in candidates if features.is_enabled(candidate)]
+    )
+    schema["type"] = draw(st.sampled_from(remaining_candidates))
     return MutationResult.SUCCESS
 
 
@@ -117,7 +130,6 @@ def change_properties(draw: Draw, schema: Schema, location: str) -> MutationResu
     """
     properties = sorted(schema.get("properties", {}).items())
     if not properties:
-        # TODO. check boolean schemas
         # No properties to mutate
         return MutationResult.FAILURE
     # Order properties randomly and iterate over them until at least one mutation is successfully applied to at least
@@ -228,14 +240,28 @@ def negate_constraints(draw: Draw, schema: Schema, location: str) -> MutationRes
     copied = schema.copy()
     schema.clear()
     is_negated = False
+
+    def is_mutation_candidate(k: str) -> bool:
+        # Should we negate this key?
+        return not (
+            k in ("type", "properties", "items") or (k == "additionalProperties" and is_header_location(location))
+        )
+
+    features = draw(st.shared(FeatureStrategy(), key="keywords"))  # type: ignore
+    remaining_candidate = None
+    mutation_candidates = [key for key in copied if is_mutation_candidate(key)]
+    if mutation_candidates:
+        # There should be at least one mutated keyword
+        remaining_candidate = draw(st.sampled_from([key for key in copied if is_mutation_candidate(key)]))
+        # TODO. add all dependencies of this candidate
     for key, value in copied.items():
-        if key in ("type", "properties", "items") or (key == "additionalProperties" and is_header_location(location)):
-            schema[key] = value
+        if is_mutation_candidate(key):
+            if key == remaining_candidate or features.is_enabled(key):
+                is_negated = True
+                negated = schema.setdefault("not", {})
+                negated[key] = value
         else:
-            # TODO. Swarm testing to negate only certain keywords?
-            is_negated = True
-            negated = schema.setdefault("not", {})
-            negated[key] = value
+            schema[key] = value
     # TODO. should empty string be generated for path parameters?
     if is_negated:
         return MutationResult.SUCCESS
@@ -249,15 +275,9 @@ def negate_schema(draw: Draw, schema: Schema, location: str) -> MutationResult:
     """
     if canonicalish(schema) == {}:
         return MutationResult.FAILURE
-    # if _is_header(location) and len(schema) == 1 and "type" in schema:
-    if is_header_location(location):
-        # Headers should remain strings
-        types = get_type(schema)
-        if "string" in types:
-            # Can't make headers non-strings
-            return MutationResult.FAILURE
-        # TODO. What about cases with type + other keywords?
-        # return MutationResult.FAILURE
+    if is_header_location(location) and "string" in get_type(schema):
+        # Can't make headers non-strings
+        return MutationResult.FAILURE
     inner = schema.copy()  # Shallow copy is OK
     schema.clear()
     schema["not"] = inner
@@ -275,13 +295,11 @@ def get_mutations(draw: Draw, schema: Schema) -> Tuple[Mutation, ...]:
     types = get_type(schema)
     # On the top-level of Open API schemas, types are always strings, but inside "schema" objects, they are the same as
     # in JSON Schema, where it could be either a string or an array of strings.
-    # TODO. How to handle multiple types?
+    options: List[Mutation] = [negate_constraints, change_type, negate_schema]
     if "object" in types:
-        options = [change_properties, negate_constraints, remove_required_property, change_type, negate_schema]
+        options.extend([change_properties, remove_required_property])
     elif "array" in types:
-        options = [change_items, negate_constraints, change_type, negate_schema]
-    else:
-        options = [negate_constraints, change_type, negate_schema]
+        options.append(change_items)
     return draw(ordered(options))
 
 
