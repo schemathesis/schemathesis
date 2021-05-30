@@ -5,6 +5,7 @@ from functools import wraps
 from typing import Any, Callable, Dict, List, Sequence, Set, Tuple, TypeVar
 
 import attr
+from hypothesis import reject
 from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
 from hypothesis_jsonschema._canonicalise import canonicalish
@@ -27,6 +28,24 @@ class MutationResult(enum.Enum):
 
     SUCCESS = 1
     FAILURE = 2
+
+    @property
+    def is_success(self) -> bool:
+        return self == MutationResult.SUCCESS
+
+    @property
+    def is_failure(self) -> bool:
+        return self == MutationResult.FAILURE
+
+    def __ior__(self, other: Any) -> "MutationResult":
+        return self | other
+
+    def __or__(self, other: Any) -> "MutationResult":
+        if not isinstance(other, MutationResult):
+            return NotImplemented
+        if self.is_success:
+            return self
+        return other
 
 
 Mutation = Callable[["MutationContext", Draw, Schema], MutationResult]
@@ -100,22 +119,25 @@ class MutationContext:
             #   - remove required parameters
             #   - negate constraints (only `additionalProperties` in this case)
             #   - mutate individual properties
-            mutations = ordered_subset(draw, (remove_required_property, negate_constraints, change_properties))
+            mutations = draw(ordered((remove_required_property, negate_constraints, change_properties)))
         elif self.location == "path":
             # The same as above, but we can only mutate individual properties as their names are predefined in the
             # path template, and all of them are required.
             mutations = [change_properties]
         else:
             # Body can be of any type and does not have any specific type semantic.
-            mutations = ordered_subset(draw, get_mutations(draw, self.schema))
+            mutations = draw(ordered(get_mutations(draw, self.schema)))
         keywords, non_keywords = split_schema(self.schema)
         # Deep copy all keywords to avoid modifying the original schema
         new_schema = deepcopy(keywords)
-        # TODO. apply swarm testing? If nothing succeeds, then call `reject()`
         mutator = Mutator()
+        features = draw(st.shared(FeatureStrategy(), key="mutations"))  # type: ignore
+        result = MutationResult.FAILURE
         for mutation in mutations:
-            if mutator.can_apply(mutation):
-                mutator.apply(self, mutation, draw, new_schema)
+            if mutator.can_apply(mutation) and features.is_enabled(mutation.__name__):
+                result |= mutator.apply(self, mutation, draw, new_schema)
+        if result.is_failure:
+            reject()  # type: ignore
         new_schema.update(non_keywords)
         if self.is_header_location:
             new_schema["propertyNames"] = {"format": "_header_name"}
@@ -248,7 +270,7 @@ def change_properties(context: MutationContext, draw: Draw, schema: Schema) -> M
     # one property
     ordered_properties = draw(ordered(properties, unique_by=lambda x: x[0]))
     for property_name, property_schema in ordered_properties:
-        if apply_mutations(context, draw, property_schema) == MutationResult.SUCCESS:
+        if apply_until_success(context, draw, property_schema).is_success:
             # It is still possible to generate "positive" cases, for example, when this property is optional.
             # They are filtered out on the upper level anyway, but to avoid performance penalty we adjust the schema
             # so the generated samples are less likely to be "positive"
@@ -287,12 +309,6 @@ def change_items(context: MutationContext, draw: Draw, schema: Schema) -> Mutati
     Effect: Some items will not validate the original schema
     """
     items = schema.get("items", {})
-    if items is False:
-        # As any items were forbidden, allowing at least one item of any type is a successful negation
-        schema["items"] = {}
-        min_items = schema.get("minItems", 0)
-        schema["minItems"] = max(min_items, 1)
-        return MutationResult.SUCCESS
     if not items:
         # No items to mutate
         return MutationResult.FAILURE
@@ -300,7 +316,6 @@ def change_items(context: MutationContext, draw: Draw, schema: Schema) -> Mutati
         return _change_items_object(context, draw, schema, items)
     if isinstance(items, list):
         return _change_items_array(context, draw, schema, items)
-    # `True` and invalid schemas go here
     return MutationResult.FAILURE
 
 
@@ -310,9 +325,8 @@ def _change_items_object(context: MutationContext, draw: Draw, schema: Schema, i
     result = MutationResult.FAILURE
     for mutation in get_mutations(draw, items):
         if mutator.can_apply(mutation):
-            if mutator.apply(context, mutation, draw, items) == MutationResult.SUCCESS:
-                result = MutationResult.SUCCESS
-    if result == MutationResult.FAILURE:
+            result |= mutator.apply(context, mutation, draw, items)
+    if result.is_failure:
         return MutationResult.FAILURE
     min_items = schema.get("minItems", 0)
     schema["minItems"] = max(min_items, 1)
@@ -327,9 +341,8 @@ def _change_items_array(context: MutationContext, draw: Draw, schema: Schema, it
         result = MutationResult.FAILURE
         for mutation in get_mutations(draw, item):
             if mutator.can_apply(mutation):
-                if mutator.apply(context, mutation, draw, item) == MutationResult.SUCCESS:
-                    result = MutationResult.SUCCESS
-        if result == MutationResult.SUCCESS:
+                result |= mutator.apply(context, mutation, draw, item)
+        if result.is_success:
             latest_success_index = idx
     if latest_success_index is None:
         return MutationResult.FAILURE
@@ -338,9 +351,9 @@ def _change_items_array(context: MutationContext, draw: Draw, schema: Schema, it
     return MutationResult.SUCCESS
 
 
-def apply_mutations(context: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
+def apply_until_success(context: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
     for mutation in get_mutations(draw, schema):
-        if mutation(context, draw, schema) == MutationResult.SUCCESS:
+        if mutation(context, draw, schema).is_success:
             return MutationResult.SUCCESS
     return MutationResult.FAILURE
 
@@ -427,22 +440,6 @@ def ordered(items: Sequence[T], unique_by: Callable[[T], Any] = ident) -> st.Sea
     return st.lists(st.sampled_from(items), min_size=len(items), unique_by=unique_by)
 
 
-def ordered_subset(draw: Draw, mutations: Sequence[Mutation]) -> List[Mutation]:
-    """Get a subset of mutations."""
-    features = draw(st.shared(FeatureStrategy(), key="mutations"))  # type: ignore
-    remaining = draw(st.sampled_from(mutations))
-    return draw(
-        ordered(
-            [remaining]  # Keep at least one mutation to avoid excluding all of them
-            + [
-                mutation
-                for mutation in mutations
-                if mutation is not remaining and features.is_enabled(mutation.__name__)
-            ]
-        )
-    )
-
-
 ALL_MUTATIONS = {
     remove_required_property,
     change_type,
@@ -490,6 +487,6 @@ class Mutator:
     def apply(self, context: MutationContext, mutation: Mutation, draw: Draw, schema: Schema) -> MutationResult:
         result = mutation(context, draw, schema)
         # If mutation is successfully applied and has some incompatible ones, exclude them from the future use
-        if result == MutationResult.SUCCESS and mutation in INCOMPATIBLE_MUTATIONS:
+        if result.is_success and mutation in INCOMPATIBLE_MUTATIONS:
             self.applicable_mutations -= INCOMPATIBLE_MUTATIONS[mutation]
         return result

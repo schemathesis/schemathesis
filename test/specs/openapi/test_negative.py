@@ -4,7 +4,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
-from jsonschema import Draft7Validator
+from jsonschema import Draft4Validator
 
 from schemathesis.specs.openapi._hypothesis import STRING_FORMATS, is_valid_header
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
@@ -47,7 +47,7 @@ INTEGER_SCHEMA = {
 
 
 def validate_schema(schema):
-    Draft7Validator.check_schema(schema)
+    Draft4Validator.check_schema(schema)
 
 
 @pytest.mark.parametrize(
@@ -64,7 +64,7 @@ def validate_schema(schema):
 @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
 def test_top_level_strategy(data, location, schema):
     validate_schema(schema)
-    validator = Draft7Validator(schema)
+    validator = Draft4Validator(schema)
     instance = data.draw(
         negative_schema(schema, operation_name="GET /users/", location=location, custom_formats=STRING_FORMATS)
     )
@@ -97,7 +97,6 @@ def test_top_level_strategy(data, location, schema):
         # No items
         (change_items, {"type": "array"}),
         # `items` accept everything
-        (change_items, {"type": "array", "items": True}),
         (change_items, {"type": "array", "items": {}}),
         # `items` is equivalent to accept-everything schema
         (change_items, {"type": "array", "items": {"uniqueItems": False}}),
@@ -130,7 +129,6 @@ def test_failing_mutations(data, mutation, schema):
         (change_items, {"type": "array", "items": {"type": "string"}}),
         (change_items, {"type": "array", "items": {"type": "string"}, "minItems": 1}),
         (change_items, {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 1}),
-        (change_items, {"type": "array", "items": False}),
         (change_items, {"type": "array", "items": [{"type": "string"}]}),
         (change_items, {"type": "array", "items": [{"type": "string"}], "minItems": 1}),
         (change_items, {"type": "array", "items": [{"type": "string"}], "minItems": 1, "maxItems": 1}),
@@ -153,7 +151,7 @@ def test_failing_mutations(data, mutation, schema):
 @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
 def test_successful_mutations(data, mutation, schema):
     validate_schema(schema)
-    validator = Draft7Validator(schema)
+    validator = Draft4Validator(schema)
     schema = deepcopy(schema)
     # When mutation can be applied
     # Then it returns "success"
@@ -192,7 +190,7 @@ def test_successful_mutations(data, mutation, schema):
 )
 @given(data=st.data())
 def test_path_parameters_are_string(data, schema):
-    validator = Draft7Validator(schema)
+    validator = Draft4Validator(schema)
     new_schema = deepcopy(schema)
     # When path parameters are mutated
     new_schema = data.draw(mutated(new_schema, "path"))
@@ -235,3 +233,18 @@ def test_custom_fields_are_intact(data, key):
     # Then they should not be negated
     new_schema = data.draw(mutated(schema, "body"))
     assert key in new_schema
+
+
+@pytest.mark.parametrize(
+    "left, right, expected",
+    (
+        (MutationResult.SUCCESS, MutationResult.SUCCESS, MutationResult.SUCCESS),
+        (MutationResult.FAILURE, MutationResult.SUCCESS, MutationResult.SUCCESS),
+        (MutationResult.SUCCESS, MutationResult.FAILURE, MutationResult.SUCCESS),
+        (MutationResult.FAILURE, MutationResult.FAILURE, MutationResult.FAILURE),
+    ),
+)
+def test_mutation_result_success(left, right, expected):
+    assert left | right == expected
+    left |= right
+    assert left == expected
