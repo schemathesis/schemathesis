@@ -10,6 +10,7 @@ from schemathesis.specs.openapi._hypothesis import STRING_FORMATS, is_valid_head
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.specs.openapi.negative import mutated, negative_schema
 from schemathesis.specs.openapi.negative.mutations import (
+    MutationContext,
     MutationResult,
     change_items,
     change_properties,
@@ -110,7 +111,7 @@ def test_failing_mutations(data, mutation, schema):
     original_schema = deepcopy(schema)
     # When mutation can't be applied
     # Then it returns "failure"
-    assert mutation(data.draw, schema, "body") == MutationResult.FAILURE
+    assert mutation(MutationContext(schema, "body"), data.draw, schema) == MutationResult.FAILURE
     # And doesn't mutate the input schema
     assert schema == original_schema
 
@@ -156,7 +157,7 @@ def test_successful_mutations(data, mutation, schema):
     schema = deepcopy(schema)
     # When mutation can be applied
     # Then it returns "success"
-    assert mutation(data.draw, schema, "body") == MutationResult.SUCCESS
+    assert mutation(MutationContext(schema, "body"), data.draw, schema) == MutationResult.SUCCESS
     # And the mutated schema is a valid JSON Schema
     validate_schema(schema)
     # And instances valid for this schema are not valid for the original one

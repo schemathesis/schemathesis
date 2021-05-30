@@ -1,5 +1,6 @@
 """Schema mutations."""
 import enum
+from copy import deepcopy
 from functools import wraps
 from typing import Any, Callable, Dict, List, Sequence, Set, Tuple, TypeVar
 
@@ -8,7 +9,7 @@ from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
 from hypothesis_jsonschema._canonicalise import canonicalish
 
-from ..utils import is_header_location
+from ..utils import is_header_location, set_keyword_on_properties
 from .types import Draw, Schema
 from .utils import get_type
 
@@ -28,7 +29,118 @@ class MutationResult(enum.Enum):
     FAILURE = 2
 
 
-Mutation = Callable[[Draw, Schema, str], MutationResult]
+Mutation = Callable[["MutationContext", Draw, Schema], MutationResult]
+ALL_KEYWORDS = (
+    "additionalItems",
+    "additionalProperties",
+    "allOf",
+    "anyOf",
+    "const",
+    "contains",
+    "contentEncoding",
+    "contentMediaType",
+    "dependencies",
+    "enum",
+    "else",
+    "exclusiveMaximum",
+    "exclusiveMinimum",
+    "format",
+    "if",
+    "items",
+    "maxItems",
+    "maxLength",
+    "maxProperties",
+    "maximum",
+    "minItems",
+    "minLength",
+    "minProperties",
+    "minimum",
+    "multipleOf",
+    "not",
+    "oneOf",
+    "pattern",
+    "patternProperties",
+    "properties",
+    "propertyNames",
+    "$ref",
+    "required",
+    "then",
+    "type",
+    "uniqueItems",
+)
+
+
+@attr.s(slots=True)
+class MutationContext:
+    """Meta information about the current mutation state."""
+
+    # The original schema
+    schema: Schema = attr.ib()
+    # Schema location within API operation (header, query, etc)
+    location: str = attr.ib()
+
+    @property
+    def is_header_location(self) -> bool:
+        return is_header_location(self.location)
+
+    def mutate(self, draw: Draw) -> Schema:
+        # On the top level, Schemathesis creates "object" schemas for all parameter "in" values except "body", which is
+        # taken as-is. Therefore we can only apply mutations that won't change the Open API semantics of the schema.
+        mutations: List[Mutation]
+        if self.location in ("header", "cookie", "query"):
+            # These objects follow this pattern:
+            # {
+            #     "properties": properties,
+            #     "additionalProperties": False,
+            #     "type": "object",
+            #     "required": required
+            # }
+            # Open API semantics expect mapping; therefore, they should have the "object" type.
+            # We can:
+            #   - remove required parameters
+            #   - negate constraints (only `additionalProperties` in this case)
+            #   - mutate individual properties
+            mutations = ordered_subset(draw, (remove_required_property, negate_constraints, change_properties))
+        elif self.location == "path":
+            # The same as above, but we can only mutate individual properties as their names are predefined in the
+            # path template, and all of them are required.
+            mutations = [change_properties]
+        else:
+            # Body can be of any type and does not have any specific type semantic.
+            mutations = ordered_subset(draw, get_mutations(draw, self.schema))
+        keywords, non_keywords = split_schema(self.schema)
+        # Deep copy all keywords to avoid modifying the original schema
+        new_schema = deepcopy(keywords)
+        # TODO. apply swarm testing? If nothing succeeds, then call `reject()`
+        mutator = Mutator()
+        for mutation in mutations:
+            if mutator.can_apply(mutation):
+                mutator.apply(self, mutation, draw, new_schema)
+        new_schema.update(non_keywords)
+        if self.is_header_location:
+            new_schema["propertyNames"] = {"format": "_header_name"}
+            set_keyword_on_properties(new_schema, type="string", format="_header_value")
+            # TODO. this one should be randomly applied
+            new_schema["additionalProperties"] = {
+                "propertyNames": {"format": "_header_name"},
+                "type": "string",
+                "format": "_header_value",
+            }
+        return new_schema
+
+
+def split_schema(schema: Schema) -> Tuple[Schema, Schema]:
+    """Split the schema into two parts.
+
+    The first one contains only validation JSON Schema keywords, the second one everything else.
+    """
+    keywords, non_keywords = {}, {}
+    for keyword, value in schema.items():
+        if keyword in ALL_KEYWORDS:
+            keywords[keyword] = value
+        else:
+            non_keywords[keyword] = value
+    return keywords, non_keywords
 
 
 def for_types(*allowed_types: str) -> Callable[[Mutation], Mutation]:
@@ -38,10 +150,10 @@ def for_types(*allowed_types: str) -> Callable[[Mutation], Mutation]:
 
     def wrapper(mutation: Mutation) -> Mutation:
         @wraps(mutation)
-        def inner(draw: Draw, schema: Schema, location: str) -> MutationResult:
+        def inner(context: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
             types = get_type(schema)
             if _allowed_types & set(types):
-                return mutation(draw, schema, location)
+                return mutation(context, draw, schema)
             return MutationResult.FAILURE
 
         return inner
@@ -50,7 +162,7 @@ def for_types(*allowed_types: str) -> Callable[[Mutation], Mutation]:
 
 
 @for_types("object")
-def remove_required_property(draw: Draw, schema: Schema, location: str) -> MutationResult:
+def remove_required_property(context: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
     """Remove a required property.
 
     Effect: Some property won't be generated.
@@ -83,16 +195,16 @@ def remove_required_property(draw: Draw, schema: Schema, location: str) -> Mutat
     return MutationResult.SUCCESS
 
 
-def change_type(draw: Draw, schema: Schema, location: str) -> MutationResult:
+def change_type(context: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
     """Change type of values accepted by a schema."""
     if "type" not in schema:
         # The absence of this keyword means that the schema values can be of any type;
         # Therefore, we can't choose a different type
         return MutationResult.FAILURE
-    if is_header_location(location):
+    if context.is_header_location:
         # TODO. What about headers defined as non-strings. Changing it to "string" is a valid mutation
         return MutationResult.FAILURE
-    candidates = _get_type_candidates(schema, location)
+    candidates = _get_type_candidates(schema, context.location)
     if not candidates:
         # Schema covers all possible types, not possible to choose something else
         return MutationResult.FAILURE
@@ -123,7 +235,7 @@ def _get_type_candidates(schema: Schema, location: str) -> Set[str]:
 
 
 @for_types("object")
-def change_properties(draw: Draw, schema: Schema, location: str) -> MutationResult:
+def change_properties(context: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
     """Mutate individual object schema properties.
 
     Effect: Some properties will not validate the original schema
@@ -136,7 +248,7 @@ def change_properties(draw: Draw, schema: Schema, location: str) -> MutationResu
     # one property
     ordered_properties = draw(ordered(properties, unique_by=lambda x: x[0]))
     for property_name, property_schema in ordered_properties:
-        if apply_mutations(draw, property_schema, location) == MutationResult.SUCCESS:
+        if apply_mutations(context, draw, property_schema) == MutationResult.SUCCESS:
             # It is still possible to generate "positive" cases, for example, when this property is optional.
             # They are filtered out on the upper level anyway, but to avoid performance penalty we adjust the schema
             # so the generated samples are less likely to be "positive"
@@ -164,12 +276,12 @@ def change_properties(draw: Draw, schema: Schema, location: str) -> MutationResu
             mutator = Mutator()
             for mutation in get_mutations(draw, property_schema):
                 if mutator.can_apply(mutation) and features.is_enabled(mutation.__name__):
-                    mutator.apply(mutation, draw, property_schema, location)
+                    mutator.apply(context, mutation, draw, property_schema)
     return MutationResult.SUCCESS
 
 
 @for_types("array")
-def change_items(draw: Draw, schema: Schema, location: str) -> MutationResult:
+def change_items(context: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
     """Mutate individual array items.
 
     Effect: Some items will not validate the original schema
@@ -185,20 +297,20 @@ def change_items(draw: Draw, schema: Schema, location: str) -> MutationResult:
         # No items to mutate
         return MutationResult.FAILURE
     if isinstance(items, dict):
-        return _change_items_object(draw, schema, items, location)
+        return _change_items_object(context, draw, schema, items)
     if isinstance(items, list):
-        return _change_items_array(draw, schema, items, location)
+        return _change_items_array(context, draw, schema, items)
     # `True` and invalid schemas go here
     return MutationResult.FAILURE
 
 
-def _change_items_object(draw: Draw, schema: Schema, items: Schema, location: str) -> MutationResult:
+def _change_items_object(context: MutationContext, draw: Draw, schema: Schema, items: Schema) -> MutationResult:
     # TODO. swarm testing
     mutator = Mutator()
     result = MutationResult.FAILURE
     for mutation in get_mutations(draw, items):
         if mutator.can_apply(mutation):
-            if mutator.apply(mutation, draw, items, location) == MutationResult.SUCCESS:
+            if mutator.apply(context, mutation, draw, items) == MutationResult.SUCCESS:
                 result = MutationResult.SUCCESS
     if result == MutationResult.FAILURE:
         return MutationResult.FAILURE
@@ -207,7 +319,7 @@ def _change_items_object(draw: Draw, schema: Schema, items: Schema, location: st
     return MutationResult.SUCCESS
 
 
-def _change_items_array(draw: Draw, schema: Schema, items: List, location: str) -> MutationResult:
+def _change_items_array(context: MutationContext, draw: Draw, schema: Schema, items: List) -> MutationResult:
     # TODO. swarm testing
     latest_success_index = None
     for idx, item in enumerate(items):
@@ -215,7 +327,7 @@ def _change_items_array(draw: Draw, schema: Schema, items: List, location: str) 
         result = MutationResult.FAILURE
         for mutation in get_mutations(draw, item):
             if mutator.can_apply(mutation):
-                if mutator.apply(mutation, draw, item, location) == MutationResult.SUCCESS:
+                if mutator.apply(context, mutation, draw, item) == MutationResult.SUCCESS:
                     result = MutationResult.SUCCESS
         if result == MutationResult.SUCCESS:
             latest_success_index = idx
@@ -226,14 +338,14 @@ def _change_items_array(draw: Draw, schema: Schema, items: List, location: str) 
     return MutationResult.SUCCESS
 
 
-def apply_mutations(draw: Draw, schema: Schema, location: str) -> MutationResult:
+def apply_mutations(context: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
     for mutation in get_mutations(draw, schema):
-        if mutation(draw, schema, location) == MutationResult.SUCCESS:
+        if mutation(context, draw, schema) == MutationResult.SUCCESS:
             return MutationResult.SUCCESS
     return MutationResult.FAILURE
 
 
-def negate_constraints(draw: Draw, schema: Schema, location: str) -> MutationResult:
+def negate_constraints(context: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
     """Negate schema constrains while keeping the original type."""
     if canonicalish(schema) == {}:
         return MutationResult.FAILURE
@@ -244,7 +356,7 @@ def negate_constraints(draw: Draw, schema: Schema, location: str) -> MutationRes
     def is_mutation_candidate(k: str) -> bool:
         # Should we negate this key?
         return not (
-            k in ("type", "properties", "items") or (k == "additionalProperties" and is_header_location(location))
+            k in ("type", "properties", "items") or (k == "additionalProperties" and context.is_header_location)
         )
 
     features = draw(st.shared(FeatureStrategy(), key="keywords"))  # type: ignore
@@ -268,20 +380,20 @@ def negate_constraints(draw: Draw, schema: Schema, location: str) -> MutationRes
     return MutationResult.FAILURE
 
 
-def negate_schema(draw: Draw, schema: Schema, location: str) -> MutationResult:
+def negate_schema(context: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
     """Negate the schema with JSON Schema's `not` keyword.
 
     It is the least effective mutation as it negates the whole schema without trying to change its small parts.
     """
     if canonicalish(schema) == {}:
         return MutationResult.FAILURE
-    if is_header_location(location) and "string" in get_type(schema):
+    if context.is_header_location and "string" in get_type(schema):
         # Can't make headers non-strings
         return MutationResult.FAILURE
     inner = schema.copy()  # Shallow copy is OK
     schema.clear()
     schema["not"] = inner
-    if location == "path" and "type" in inner:
+    if context.location == "path" and "type" in inner:
         # Path should be a primitive object
         inner["type"] = [inner["type"]] if not isinstance(inner["type"], list) else inner["type"]
         for type_ in ("array", "object"):
@@ -313,6 +425,22 @@ def ordered(items: Sequence[T], unique_by: Callable[[T], Any] = ident) -> st.Sea
     NOTE. Items should be unique.
     """
     return st.lists(st.sampled_from(items), min_size=len(items), unique_by=unique_by)
+
+
+def ordered_subset(draw: Draw, mutations: Sequence[Mutation]) -> List[Mutation]:
+    """Get a subset of mutations."""
+    features = draw(st.shared(FeatureStrategy(), key="mutations"))  # type: ignore
+    remaining = draw(st.sampled_from(mutations))
+    return draw(
+        ordered(
+            [remaining]  # Keep at least one mutation to avoid excluding all of them
+            + [
+                mutation
+                for mutation in mutations
+                if mutation is not remaining and features.is_enabled(mutation.__name__)
+            ]
+        )
+    )
 
 
 ALL_MUTATIONS = {
@@ -359,8 +487,8 @@ class Mutator:
         """Whether the given mutation can be applied."""
         return mutation in self.applicable_mutations
 
-    def apply(self, mutation: Mutation, draw: Draw, schema: Schema, location: str) -> MutationResult:
-        result = mutation(draw, schema, location)
+    def apply(self, context: MutationContext, mutation: Mutation, draw: Draw, schema: Schema) -> MutationResult:
+        result = mutation(context, draw, schema)
         # If mutation is successfully applied and has some incompatible ones, exclude them from the future use
         if result == MutationResult.SUCCESS and mutation in INCOMPATIBLE_MUTATIONS:
             self.applicable_mutations -= INCOMPATIBLE_MUTATIONS[mutation]
