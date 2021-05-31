@@ -122,14 +122,15 @@ def test_inlined_definitions(deeply_nested_schema):
     test()
 
 
+@pytest.mark.parametrize("keywords", ({}, {"pattern": r"\A[A-F0-9]{12}\Z"}))
 @pytest.mark.hypothesis_nested
-def test_always_valid_headers():
+def test_always_valid_headers(keywords):
     # When headers are generated
     # And there is no custom "format"
     strategy = make_positive_strategy(
         {
             "type": "object",
-            "properties": {"X-Foo": {"type": "string"}},
+            "properties": {"X-Foo": {"type": "string", **keywords}},
             "required": ["X-Foo"],
             "additionalProperties": False,
         },
