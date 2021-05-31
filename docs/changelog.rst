@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Disable filtering optimization for headers when there are keywords other than ``type``. `#1189`_
+
 `3.7.5`_ - 2021-05-31
 ---------------------
 
