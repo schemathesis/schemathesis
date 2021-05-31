@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.7.5`_ - 2021-05-31
+---------------------
+
 **Fixed**
 
 - Too much filtering in headers that have schemas with the ``pattern`` keyword. `#1189`_
@@ -1817,7 +1820,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.4...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.5...HEAD
+.. _3.7.5: https://github.com/schemathesis/schemathesis/compare/v3.7.4...v3.7.5
 .. _3.7.4: https://github.com/schemathesis/schemathesis/compare/v3.7.3...v3.7.4
 .. _3.7.3: https://github.com/schemathesis/schemathesis/compare/v3.7.2...v3.7.3
 .. _3.7.2: https://github.com/schemathesis/schemathesis/compare/v3.7.1...v3.7.2
