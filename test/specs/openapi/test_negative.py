@@ -248,3 +248,21 @@ def test_mutation_result_success(left, right, expected):
     assert left | right == expected
     left |= right
     assert left == expected
+
+
+@pytest.mark.parametrize(
+    "schema",
+    (
+        {"minimum": 5, "exclusiveMinimum": True},
+        {"maximum": 5, "exclusiveMaximum": True},
+        {"maximum": 5, "exclusiveMaximum": True, "minimum": 1, "exclusiveMinimum": True},
+    ),
+)
+@given(data=st.data())
+def test_negate_constraints_keep_dependencies(data, schema):
+    # When `negate_constraints` is used
+    schema = deepcopy(schema)
+    negate_constraints(MutationContext(schema, "body"), data.draw, schema)
+    # Then it should always produce valid schemas
+    validate_schema(schema)
+    # E.g. `exclusiveMaximum` / `exclusiveMinimum` only work when `maximum` / `minimum` are present in the same schema

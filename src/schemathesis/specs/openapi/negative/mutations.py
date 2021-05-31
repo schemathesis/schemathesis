@@ -41,6 +41,7 @@ class MutationResult(enum.Enum):
         return self | other
 
     def __or__(self, other: Any) -> "MutationResult":
+        # Syntactic sugar to simplify handling of multiple results
         if not isinstance(other, MutationResult):
             return NotImplemented
         if self.is_success:
@@ -102,6 +103,10 @@ class MutationContext:
     def is_header_location(self) -> bool:
         return is_header_location(self.location)
 
+    @property
+    def is_path_location(self) -> bool:
+        return self.location == "path"
+
     def mutate(self, draw: Draw) -> Schema:
         # On the top level, Schemathesis creates "object" schemas for all parameter "in" values except "body", which is
         # taken as-is. Therefore we can only apply mutations that won't change the Open API semantics of the schema.
@@ -120,7 +125,7 @@ class MutationContext:
             #   - negate constraints (only `additionalProperties` in this case)
             #   - mutate individual properties
             mutations = draw(ordered((remove_required_property, negate_constraints, change_properties)))
-        elif self.location == "path":
+        elif self.is_path_location:
             # The same as above, but we can only mutate individual properties as their names are predefined in the
             # path template, and all of them are required.
             mutations = [change_properties]
@@ -131,23 +136,26 @@ class MutationContext:
         # Deep copy all keywords to avoid modifying the original schema
         new_schema = deepcopy(keywords)
         mutator = Mutator()
-        features = draw(st.shared(FeatureStrategy(), key="mutations"))  # type: ignore
+        enabled_mutations = draw(st.shared(FeatureStrategy(), key="mutations"))  # type: ignore
         result = MutationResult.FAILURE
         for mutation in mutations:
-            if mutator.can_apply(mutation) and features.is_enabled(mutation.__name__):
+            if mutator.can_apply(mutation) and enabled_mutations.is_enabled(mutation.__name__):
                 result |= mutator.apply(self, mutation, draw, new_schema)
         if result.is_failure:
+            # If we failed to apply anything, then reject the whole case
             reject()  # type: ignore
         new_schema.update(non_keywords)
         if self.is_header_location:
             new_schema["propertyNames"] = {"format": "_header_name"}
             set_keyword_on_properties(new_schema, type="string", format="_header_value")
-            # TODO. this one should be randomly applied
-            new_schema["additionalProperties"] = {
-                "propertyNames": {"format": "_header_name"},
-                "type": "string",
-                "format": "_header_value",
-            }
+            if draw(st.booleans()):
+                # In headers, `additionalProperties` are False by default, which means that Schemathesis won't generate
+                # any headers that are not defined. This change adds the possibility of generating valid extra headers
+                new_schema["additionalProperties"] = {
+                    "propertyNames": {"format": "_header_name"},
+                    "type": "string",
+                    "format": "_header_value",
+                }
         return new_schema
 
 
@@ -196,9 +204,9 @@ def remove_required_property(context: MutationContext, draw: Draw, schema: Schem
     if len(required) == 1:
         property_name = draw(st.sampled_from(sorted(required)))
     else:
-        remaining_property = draw(st.sampled_from(sorted(required)))
-        features = draw(st.shared(FeatureStrategy(), key="properties"))  # type: ignore
-        candidates = [remaining_property] + sorted([prop for prop in required if features.is_enabled(prop)])
+        candidate = draw(st.sampled_from(sorted(required)))
+        enabled_properties = draw(st.shared(FeatureStrategy(), key="properties"))  # type: ignore
+        candidates = [candidate] + sorted([prop for prop in required if enabled_properties.is_enabled(prop)])
         property_name = draw(st.sampled_from(candidates))
     required.remove(property_name)
     if not required:
@@ -226,7 +234,7 @@ def change_type(context: MutationContext, draw: Draw, schema: Schema) -> Mutatio
     if context.is_header_location:
         # TODO. What about headers defined as non-strings. Changing it to "string" is a valid mutation
         return MutationResult.FAILURE
-    candidates = _get_type_candidates(schema, context.location)
+    candidates = _get_type_candidates(context, schema)
     if not candidates:
         # Schema covers all possible types, not possible to choose something else
         return MutationResult.FAILURE
@@ -234,19 +242,19 @@ def change_type(context: MutationContext, draw: Draw, schema: Schema) -> Mutatio
         schema["type"] = candidates.pop()
         return MutationResult.SUCCESS
     # Choose one type that will be present in the final candidates list
-    remaining_type = draw(st.sampled_from(sorted(candidates)))
-    candidates.remove(remaining_type)
-    features = draw(st.shared(FeatureStrategy(), key="types"))  # type: ignore
-    remaining_candidates = [remaining_type] + sorted(
-        [candidate for candidate in candidates if features.is_enabled(candidate)]
+    candidate = draw(st.sampled_from(sorted(candidates)))
+    candidates.remove(candidate)
+    enabled_types = draw(st.shared(FeatureStrategy(), key="types"))  # type: ignore
+    remaining_candidates = [candidate] + sorted(
+        [candidate for candidate in candidates if enabled_types.is_enabled(candidate)]
     )
     schema["type"] = draw(st.sampled_from(remaining_candidates))
     return MutationResult.SUCCESS
 
 
-def _get_type_candidates(schema: Schema, location: str) -> Set[str]:
+def _get_type_candidates(context: MutationContext, schema: Schema) -> Set[str]:
     types = set(get_type(schema))
-    if location == "path":
+    if context.is_path_location:
         candidates = {"string", "integer", "number", "boolean", "null"} - types
     else:
         candidates = {"string", "integer", "number", "object", "array", "boolean", "null"} - types
@@ -285,19 +293,18 @@ def change_properties(context: MutationContext, draw: Draw, schema: Schema) -> M
     else:
         # No successful mutations
         return MutationResult.FAILURE
-    features = draw(st.shared(FeatureStrategy(), key="properties"))  # type: ignore
+    enabled_properties = draw(st.shared(FeatureStrategy(), key="properties"))  # type: ignore
+    enabled_mutations = draw(st.shared(FeatureStrategy(), key="mutations"))  # type: ignore
     for name, property_schema in properties:
         # Skip already mutated property
         if name == property_name:  # pylint: disable=undefined-loop-variable
             # Pylint: `properties` variable has at least one element as it is checked at the beginning of the function
             # Then those properties are ordered and iterated over, therefore `property_name` is always defined
             continue
-        # The `features` strategy is reused for property names and mutation names for simplicity as it is not likely
-        # to have an overlap between them.
-        if features.is_enabled(name):
+        if enabled_properties.is_enabled(name):
             mutator = Mutator()
             for mutation in get_mutations(draw, property_schema):
-                if mutator.can_apply(mutation) and features.is_enabled(mutation.__name__):
+                if mutator.can_apply(mutation) and enabled_mutations.is_enabled(mutation.__name__):
                     mutator.apply(context, mutation, draw, property_schema)
     return MutationResult.SUCCESS
 
@@ -372,25 +379,35 @@ def negate_constraints(context: MutationContext, draw: Draw, schema: Schema) -> 
             k in ("type", "properties", "items") or (k == "additionalProperties" and context.is_header_location)
         )
 
-    features = draw(st.shared(FeatureStrategy(), key="keywords"))  # type: ignore
-    remaining_candidate = None
+    enabled_keywords = draw(st.shared(FeatureStrategy(), key="keywords"))  # type: ignore
+    candidates = []
     mutation_candidates = [key for key in copied if is_mutation_candidate(key)]
     if mutation_candidates:
         # There should be at least one mutated keyword
-        remaining_candidate = draw(st.sampled_from([key for key in copied if is_mutation_candidate(key)]))
-        # TODO. add all dependencies of this candidate
+        candidate = draw(st.sampled_from([key for key in copied if is_mutation_candidate(key)]))
+        candidates.append(candidate)
+        # If the chosen candidate has dependency, then the dependency should also be present in the final schema
+        if candidate in DEPENDENCIES:
+            candidates.append(DEPENDENCIES[candidate])
     for key, value in copied.items():
         if is_mutation_candidate(key):
-            if key == remaining_candidate or features.is_enabled(key):
+            if key in candidates or enabled_keywords.is_enabled(key):
                 is_negated = True
                 negated = schema.setdefault("not", {})
                 negated[key] = value
+                if key in DEPENDENCIES:
+                    # If this keyword has a dependency, then it should be also negated
+                    dependency = DEPENDENCIES[key]
+                    if dependency not in negated:
+                        negated[dependency] = copied[dependency]  # Assuming the schema is valid
         else:
             schema[key] = value
-    # TODO. should empty string be generated for path parameters?
     if is_negated:
         return MutationResult.SUCCESS
     return MutationResult.FAILURE
+
+
+DEPENDENCIES = {"exclusiveMaximum": "maximum", "exclusiveMinimum": "minimum"}
 
 
 def negate_schema(context: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
@@ -406,7 +423,7 @@ def negate_schema(context: MutationContext, draw: Draw, schema: Schema) -> Mutat
     inner = schema.copy()  # Shallow copy is OK
     schema.clear()
     schema["not"] = inner
-    if context.location == "path" and "type" in inner:
+    if context.is_path_location and "type" in inner:
         # Path should be a primitive object
         inner["type"] = [inner["type"]] if not isinstance(inner["type"], list) else inner["type"]
         for type_ in ("array", "object"):
