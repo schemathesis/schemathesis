@@ -124,9 +124,9 @@ def test_inlined_definitions(deeply_nested_schema):
 
 @pytest.mark.parametrize("keywords", ({}, {"pattern": r"\A[A-F0-9]{12}\Z"}))
 @pytest.mark.hypothesis_nested
-def test_always_valid_headers(keywords):
+def test_valid_headers(keywords):
     # When headers are generated
-    # And there is no custom "format"
+    # And there is no other keywords than "type"
     strategy = make_positive_strategy(
         {
             "type": "object",
@@ -141,5 +141,27 @@ def test_always_valid_headers(keywords):
     def test(headers):
         # Then headers are always valid
         assert is_valid_header(headers)
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+def test_no_much_filtering_in_headers():
+    # When headers are generated
+    # And there are keywords other than "type"
+    strategy = make_positive_strategy(
+        {
+            "type": "object",
+            "properties": {"X-Foo": {"type": "string", "minLength": 12, "maxLength": 12}},
+            "required": ["X-Foo"],
+            "additionalProperties": False,
+        },
+        "header",
+    )
+
+    @given(strategy)
+    def test(_):
+        # Then there should be no failed health checks
+        pass
 
     test()
