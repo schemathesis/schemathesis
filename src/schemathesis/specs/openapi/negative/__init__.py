@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import jsonschema
 from hypothesis import strategies as st
@@ -30,7 +30,12 @@ def get_validator(schema: Schema, operation_name: str, location: str) -> jsonsch
 
 
 def negative_schema(
-    schema: Schema, operation_name: str, location: str, *, custom_formats: Dict[str, st.SearchStrategy[str]]
+    schema: Schema,
+    operation_name: str,
+    location: str,
+    media_type: Optional[str],
+    *,
+    custom_formats: Dict[str, st.SearchStrategy[str]],
 ) -> st.SearchStrategy:
     """A strategy for instances that DO NOT match the input schema.
 
@@ -39,11 +44,11 @@ def negative_schema(
     # The mutated schema is passed to `from_schema` and guarded against producing instances valid against
     # the original schema.
     validator = get_validator(schema, operation_name, location)
-    return mutated(schema, location).flatmap(
+    return mutated(schema, location, media_type).flatmap(
         lambda s: from_schema(s, custom_formats=custom_formats).filter(lambda v: not validator.is_valid(v))
     )
 
 
 @st.composite  # type: ignore
-def mutated(draw: Draw, schema: Schema, location: str) -> Any:
-    return MutationContext(schema=schema, location=location).mutate(draw)
+def mutated(draw: Draw, schema: Schema, location: str, media_type: Optional[str]) -> Any:
+    return MutationContext(schema=schema, location=location, media_type=media_type).mutate(draw)

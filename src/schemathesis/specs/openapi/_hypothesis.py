@@ -21,12 +21,13 @@ from ...types import NotSet
 from ...utils import NOT_SET
 from .constants import LOCATION_TO_CONTAINER
 from .negative import negative_schema
-from .parameters import OpenAPIParameter, parameters_to_json_schema
+from .parameters import OpenAPIBody, parameters_to_json_schema
 from .utils import is_header_location, set_keyword_on_properties
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
 SLASH = "/"
 STRING_FORMATS = {}
+StrategyFactory = Callable[[Dict[str, Any], str, str, Optional[str]], st.SearchStrategy]
 
 
 def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
@@ -197,8 +198,8 @@ _BODY_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()
 
 
 def _get_body_strategy(
-    parameter: OpenAPIParameter,
-    to_strategy: Callable[[Dict[str, Any], str, str], st.SearchStrategy],
+    parameter: OpenAPIBody,
+    to_strategy: StrategyFactory,
     operation: APIOperation,
 ) -> st.SearchStrategy:
     # The cache key relies on object ids, which means that the parameter should not be mutated
@@ -207,7 +208,7 @@ def _get_body_strategy(
         return _BODY_STRATEGIES_CACHE[parameter][to_strategy]
     schema = parameter.as_json_schema()
     schema = operation.schema.prepare_schema(schema)
-    strategy = to_strategy(schema, operation.verbose_name, "body")
+    strategy = to_strategy(schema, operation.verbose_name, "body", parameter.media_type)
     if not parameter.is_required:
         strategy |= st.just(NOT_SET)
     _BODY_STRATEGIES_CACHE.setdefault(parameter, {})[to_strategy] = strategy
@@ -221,7 +222,7 @@ def get_parameters_value(
     operation: APIOperation,
     context: HookContext,
     hooks: Optional[HookDispatcher],
-    to_strategy: Callable[[Dict[str, Any], str, str], st.SearchStrategy],
+    to_strategy: StrategyFactory,
 ) -> Dict[str, Any]:
     """Get the final value for the specified location.
 
@@ -244,7 +245,7 @@ _PARAMETER_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()
 
 def get_parameters_strategy(
     operation: APIOperation,
-    to_strategy: Callable[[Dict[str, Any], str, str], st.SearchStrategy],
+    to_strategy: StrategyFactory,
     location: str,
     exclude: Iterable[str] = (),
 ) -> st.SearchStrategy:
@@ -268,7 +269,7 @@ def get_parameters_strategy(
             schema["properties"].pop(name, None)
             with suppress(ValueError):
                 schema["required"].remove(name)
-        strategy = to_strategy(schema, operation.verbose_name, location)
+        strategy = to_strategy(schema, operation.verbose_name, location, None)
         serialize = operation.get_parameter_serializer(location)
         if serialize is not None:
             strategy = strategy.map(serialize)
@@ -288,7 +289,9 @@ def get_parameters_strategy(
     return st.none()
 
 
-def make_positive_strategy(schema: Dict[str, Any], operation_name: str, location: str) -> st.SearchStrategy:
+def make_positive_strategy(
+    schema: Dict[str, Any], operation_name: str, location: str, media_type: Optional[str]
+) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
     if is_header_location(location):
         # We try to enforce the right header values via "format"
@@ -298,8 +301,12 @@ def make_positive_strategy(schema: Dict[str, Any], operation_name: str, location
     return from_schema(schema, custom_formats=STRING_FORMATS)
 
 
-def make_negative_strategy(schema: Dict[str, Any], operation_name: str, location: str) -> st.SearchStrategy:
-    return negative_schema(schema, operation_name=operation_name, location=location, custom_formats=STRING_FORMATS)
+def make_negative_strategy(
+    schema: Dict[str, Any], operation_name: str, location: str, media_type: Optional[str]
+) -> st.SearchStrategy:
+    return negative_schema(
+        schema, operation_name=operation_name, location=location, media_type=media_type, custom_formats=STRING_FORMATS
+    )
 
 
 def is_valid_path(parameters: Dict[str, Any]) -> bool:

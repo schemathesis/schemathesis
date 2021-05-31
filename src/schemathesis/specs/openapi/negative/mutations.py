@@ -2,7 +2,7 @@
 import enum
 from copy import deepcopy
 from functools import wraps
-from typing import Any, Callable, Dict, List, Sequence, Set, Tuple, TypeVar
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, TypeVar
 
 import attr
 from hypothesis import reject
@@ -98,6 +98,8 @@ class MutationContext:
     schema: Schema = attr.ib()
     # Schema location within API operation (header, query, etc)
     location: str = attr.ib()
+    # Payload media type, if available
+    media_type: Optional[str] = attr.ib()
 
     @property
     def is_header_location(self) -> bool:
@@ -230,6 +232,9 @@ def change_type(context: MutationContext, draw: Draw, schema: Schema) -> Mutatio
     if "type" not in schema:
         # The absence of this keyword means that the schema values can be of any type;
         # Therefore, we can't choose a different type
+        return MutationResult.FAILURE
+    if context.media_type == "application/x-www-form-urlencoded":
+        # Form data should be an object, do not change it
         return MutationResult.FAILURE
     if context.is_header_location:
         # TODO. What about headers defined as non-strings. Changing it to "string" is a valid mutation
@@ -423,12 +428,17 @@ def negate_schema(context: MutationContext, draw: Draw, schema: Schema) -> Mutat
     inner = schema.copy()  # Shallow copy is OK
     schema.clear()
     schema["not"] = inner
-    if context.is_path_location and "type" in inner:
-        # Path should be a primitive object
-        inner["type"] = [inner["type"]] if not isinstance(inner["type"], list) else inner["type"]
-        for type_ in ("array", "object"):
-            if type_ not in inner["type"]:
-                inner["type"].append(type_)
+    if "type" in inner:
+        if context.is_path_location:
+            # Path should be a primitive object
+            inner["type"] = [inner["type"]] if not isinstance(inner["type"], list) else inner["type"]
+            for type_ in ("array", "object"):
+                if type_ not in inner["type"]:
+                    inner["type"].append(type_)
+        if context.media_type == "application/x-www-form-urlencoded":
+            # Form data should be an object, do not change it
+            schema["type"] = inner.pop("type")
+
     return MutationResult.SUCCESS
 
 
