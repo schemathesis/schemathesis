@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.7.6`_ - 2021-05-31
+---------------------
+
 **Fixed**
 
 - Disable filtering optimization for headers when there are keywords other than ``type``. `#1189`_
@@ -1824,7 +1827,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.5...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.6...HEAD
+.. _3.7.6: https://github.com/schemathesis/schemathesis/compare/v3.7.5...v3.7.6
 .. _3.7.5: https://github.com/schemathesis/schemathesis/compare/v3.7.4...v3.7.5
 .. _3.7.4: https://github.com/schemathesis/schemathesis/compare/v3.7.3...v3.7.4
 .. _3.7.3: https://github.com/schemathesis/schemathesis/compare/v3.7.2...v3.7.3
