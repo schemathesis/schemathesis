@@ -286,7 +286,7 @@ def make_positive_strategy(schema: Dict[str, Any], location: str) -> st.SearchSt
         # We try to enforce the right header values via "format"
         # This way, only allowed values will be used during data generation, which reduces the amount of filtering later
         # If a property schema contains `pattern` it leads to heavy filtering and worse performance - therefore, skip it
-        set_keyword_on_properties(schema, "format", "_header_value", lambda s: "pattern" not in s)
+        set_keyword_on_properties(schema, "format", "_header_value", lambda s: len(s) == 1 and "type" in s)
     return from_schema(schema, custom_formats=STRING_FORMATS)
 
 
