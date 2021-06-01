@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Apply the Open API's ``style`` & ``explode`` keywords to explicit examples. `#1190`_
+
 `3.7.6`_ - 2021-05-31
 ---------------------
 
@@ -1986,6 +1990,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1190: https://github.com/schemathesis/schemathesis/issues/1190
 .. _#1189: https://github.com/schemathesis/schemathesis/issues/1189
 .. _#1167: https://github.com/schemathesis/schemathesis/issues/1167
 .. _#1164: https://github.com/schemathesis/schemathesis/issues/1164
