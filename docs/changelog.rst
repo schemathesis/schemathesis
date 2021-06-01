@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.7.7`_ - 2021-06-01
+---------------------
+
 **Fixed**
 
 - Apply the Open API's ``style`` & ``explode`` keywords to explicit examples. `#1190`_
@@ -1831,7 +1834,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.6...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.7...HEAD
+.. _3.7.7: https://github.com/schemathesis/schemathesis/compare/v3.7.6...v3.7.7
 .. _3.7.6: https://github.com/schemathesis/schemathesis/compare/v3.7.5...v3.7.6
 .. _3.7.5: https://github.com/schemathesis/schemathesis/compare/v3.7.4...v3.7.5
 .. _3.7.4: https://github.com/schemathesis/schemathesis/compare/v3.7.3...v3.7.4
