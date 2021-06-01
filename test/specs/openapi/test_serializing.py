@@ -25,15 +25,15 @@ from schemathesis.specs.openapi.serialization import (
 
 PRIMITIVE_SCHEMA = {"type": "integer", "enum": [1]}
 NULLABLE_PRIMITIVE_SCHEMA = {"type": "integer", "enum": [1], "nullable": True}
-ARRAY_SCHEMA = {"type": "array", "enum": [["blue", "black", "brown"]]}
+ARRAY_SCHEMA = {"type": "array", "enum": [["blue", "black", "brown"]], "example": ["blue", "black", "brown"]}
 NULLABLE_ARRAY_SCHEMA = {"type": "array", "enum": [["blue", "black", "brown"]], "nullable": True}
 OBJECT_SCHEMA = {
     "additionalProperties": False,
     "type": "object",
     "properties": {
-        "r": {"type": "integer", "enum": [100]},  # "const" is not supported by Open API
-        "g": {"type": "integer", "enum": [200]},
-        "b": {"type": "integer", "enum": [150]},
+        "r": {"type": "integer", "enum": [100], "example": 100},  # "const" is not supported by Open API
+        "g": {"type": "integer", "enum": [200], "example": 200},
+        "b": {"type": "integer", "enum": [150], "example": 150},
     },
     "required": ["r", "g", "b"],
 }
@@ -81,7 +81,7 @@ class Prefixed:
         return self.instance
 
     def __repr__(self):
-        return f"'{self.instance}'"
+        return f"{self.__class__.__name__}('{self.instance}', '{self.prefix}')"
 
 
 class CommaDelimitedObject(Prefixed):
@@ -114,14 +114,69 @@ def make_openapi_schema(*parameters):
     }
 
 
-def assert_generates(raw_schema, expected, parameter):
+def assert_generates(testdir, raw_schema, expected, parameter):
     schema = schemathesis.from_dict(raw_schema)
+
+    attribute = "path_parameters" if parameter == "path" else parameter
 
     @given(case=schema["/teapot"]["GET"].as_strategy())
     def test(case):
-        assert getattr(case, "path_parameters" if parameter == "path" else parameter) in expected
+        assert getattr(case, attribute) in expected
 
     test()
+
+    testdir.make_test(
+        f"""
+from urllib.parse import quote, unquote
+
+def chunks(items, n):
+    for i in range(0, len(items), n):
+        yield items[i : i + n]
+
+class Prefixed:
+    def __init__(self, instance, prefix=""):
+        self.instance = instance
+        self.prefix = prefix
+
+    def __eq__(self, other):
+        if self.prefix:
+            if not other.startswith(self.prefix):
+                return False
+            prefix_length = len(self.prefix)
+            instance = self.instance[prefix_length:]
+            other = other[prefix_length:]
+        else:
+            instance = self.instance
+        return self.prepare(instance) == self.prepare(other)
+
+
+class CommaDelimitedObject(Prefixed):
+    def prepare(self, value):
+        if not value:
+            return {{}}
+        items = unquote(value).split(",")
+        return dict(chunks(items, 2))
+
+
+class DelimitedObject(Prefixed):
+    def __init__(self, *args, delimiter=",", **kwargs):
+        super().__init__(*args, **kwargs)
+        self.delimiter = delimiter
+
+    def prepare(self, value):
+        items = unquote(value).split(self.delimiter)
+        return dict(item.split("=") for item in items)
+
+@schema.parametrize()
+@settings(phases=[Phase.explicit])
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    assert case.{attribute} in {repr(expected)}
+    """,
+        schema=raw_schema,
+    )
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=1)
 
 
 @pytest.mark.hypothesis_nested
@@ -140,11 +195,11 @@ def assert_generates(raw_schema, expected, parameter):
         (ARRAY_SCHEMA, True, "form", {"color": ["blue", "black", "brown"]}),
     ),
 )
-def test_query_serialization_styles_openapi3(schema, explode, style, expected):
+def test_query_serialization_styles_openapi3(testdir, schema, explode, style, expected):
     raw_schema = make_openapi_schema(
         {"name": "color", "in": "query", "required": True, "schema": schema, "explode": explode, "style": style}
     )
-    assert_generates(raw_schema, (expected,), "query")
+    assert_generates(testdir, raw_schema, (expected,), "query")
 
 
 @pytest.mark.hypothesis_nested
@@ -157,11 +212,11 @@ def test_query_serialization_styles_openapi3(schema, explode, style, expected):
         (OBJECT_SCHEMA, False, {"X-Api-Key": CommaDelimitedObject("r,100,g,200,b,150")}),
     ),
 )
-def test_header_serialization_styles_openapi3(schema, explode, expected):
+def test_header_serialization_styles_openapi3(testdir, schema, explode, expected):
     raw_schema = make_openapi_schema(
         {"name": "X-Api-Key", "in": "header", "required": True, "schema": schema, "explode": explode}
     )
-    assert_generates(raw_schema, (expected,), "headers")
+    assert_generates(testdir, raw_schema, (expected,), "headers")
 
 
 @pytest.mark.hypothesis_nested
@@ -174,11 +229,11 @@ def test_header_serialization_styles_openapi3(schema, explode, expected):
         (OBJECT_SCHEMA, False, {"SessionID": CommaDelimitedObject("r,100,g,200,b,150")}),
     ),
 )
-def test_cookie_serialization_styles_openapi3(schema, explode, expected):
+def test_cookie_serialization_styles_openapi3(testdir, schema, explode, expected):
     raw_schema = make_openapi_schema(
         {"name": "SessionID", "in": "cookie", "required": True, "schema": schema, "explode": explode}
     )
-    assert_generates(raw_schema, (expected,), "cookies")
+    assert_generates(testdir, raw_schema, (expected,), "cookies")
 
 
 @pytest.mark.hypothesis_nested
@@ -262,7 +317,7 @@ def test_path_serialization_styles_openapi3(schema, style, explode, expected):
 
 
 @pytest.mark.hypothesis_nested
-def test_query_serialization_styles_openapi_multiple_params():
+def test_query_serialization_styles_openapi_multiple_params(testdir):
     raw_schema = make_openapi_schema(
         {
             "name": "color1",
@@ -281,7 +336,7 @@ def test_query_serialization_styles_openapi_multiple_params():
             "style": "spaceDelimited",
         },
     )
-    assert_generates(raw_schema, ({"color1": "blue|black|brown", "color2": "blue black brown"},), "query")
+    assert_generates(testdir, raw_schema, ({"color1": "blue|black|brown", "color2": "blue black brown"},), "query")
 
 
 @pytest.mark.hypothesis_nested
@@ -295,7 +350,7 @@ def test_query_serialization_styles_openapi_multiple_params():
         ("multi", {"color": ["blue", "black", "brown"]}),
     ),
 )
-def test_query_serialization_styles_swagger2(collection_format, expected):
+def test_query_serialization_styles_swagger2(testdir, collection_format, expected):
     raw_schema = {
         "swagger": "2.0",
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -322,7 +377,7 @@ def test_query_serialization_styles_swagger2(collection_format, expected):
             }
         },
     }
-    assert_generates(raw_schema, (expected,), "query")
+    assert_generates(testdir, raw_schema, (expected,), "query")
 
 
 @pytest.mark.parametrize("item, expected", (({}, {}), ({"key": 1}, {"key": "TEST"})))
@@ -345,11 +400,11 @@ class JSONString(Prefixed):
         return json.loads(unquote(value))
 
 
-def test_content_serialization():
+def test_content_serialization(testdir):
     raw_schema = make_openapi_schema(
         {"in": "query", "name": "filter", "required": True, "content": {"application/json": {"schema": OBJECT_SCHEMA}}}
     )
-    assert_generates(raw_schema, ({"filter": JSONString('{"r":100, "g": 200, "b": 150}')},), "query")
+    assert_generates(testdir, raw_schema, ({"filter": JSONString('{"r":100, "g": 200, "b": 150}')},), "query")
 
 
 def make_array_schema(location, style):
@@ -397,10 +452,10 @@ def make_array_schema(location, style):
         ),
     ),
 )
-def test_non_string_serialization(parameter, expected):
+def test_non_string_serialization(testdir, parameter, expected):
     # GH: #651
     raw_schema = make_openapi_schema(parameter)
-    assert_generates(raw_schema, expected, parameter["in"])
+    assert_generates(testdir, raw_schema, expected, parameter["in"])
 
 
 @pytest.mark.parametrize(
