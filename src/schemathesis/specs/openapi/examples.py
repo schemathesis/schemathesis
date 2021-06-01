@@ -125,9 +125,11 @@ def get_static_parameters_from_properties(operation: APIOperation) -> Dict[str, 
 def get_strategies_from_examples(
     operation: APIOperation, examples_field: str = "examples"
 ) -> List[SearchStrategy[Case]]:
-    maps = {
-        container: operation.get_parameter_serializer(location) for location, container in LOCATION_TO_CONTAINER.items()
-    }
+    maps = {}
+    for location, container in LOCATION_TO_CONTAINER.items():
+        serializer = operation.get_parameter_serializer(location)
+        if serializer is not None:
+            maps[container] = serializer
 
     def serialize_components(case: Case) -> Case:
         """Applies special serialization rules for case components.
@@ -135,9 +137,8 @@ def get_strategies_from_examples(
         For example, here, query parameters will be rendered in the `deepObject` style if needed.
         """
         for container, map_func in maps.items():
-            if map_func is not None:
-                value = getattr(case, container)
-                setattr(case, container, map_func(value))
+            value = getattr(case, container)
+            setattr(case, container, map_func(value))
         return case
 
     strategies = [
