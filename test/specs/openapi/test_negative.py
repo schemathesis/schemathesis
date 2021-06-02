@@ -184,7 +184,7 @@ def test_successful_mutations(data, mutation, schema):
         {
             "type": "object",
             "properties": {
-                "foo": {"type": "string", "format": "date"},
+                "foo": {"type": "string", "minLength": 5},
             },
             "required": [
                 "foo",
@@ -194,6 +194,7 @@ def test_successful_mutations(data, mutation, schema):
     ),
 )
 @given(data=st.data())
+@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
 def test_path_parameters_are_string(data, schema):
     validator = Draft4Validator(schema)
     new_schema = deepcopy(schema)
