@@ -4,6 +4,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
+from hypothesis_jsonschema._canonicalise import FALSEY, canonicalish
 from jsonschema import Draft4Validator
 
 from schemathesis.specs.openapi._hypothesis import STRING_FORMATS, is_valid_header
@@ -16,7 +17,6 @@ from schemathesis.specs.openapi.negative.mutations import (
     change_properties,
     change_type,
     negate_constraints,
-    negate_schema,
     remove_required_property,
 )
 from schemathesis.specs.openapi.utils import is_header_location
@@ -63,10 +63,20 @@ def validate_schema(schema):
 @given(data=st.data())
 @settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
 def test_top_level_strategy(data, location, schema):
+    if location != "body" and schema.get("type") == "object":
+        # It always comes this way from Schemathesis
+        schema["additionalProperties"] = False
     validate_schema(schema)
     validator = Draft4Validator(schema)
+    schema = deepcopy(schema)
     instance = data.draw(
-        negative_schema(schema, operation_name="GET /users/", location=location, custom_formats=STRING_FORMATS)
+        negative_schema(
+            schema,
+            operation_name="GET /users/",
+            location=location,
+            media_type="application/json",
+            custom_formats=STRING_FORMATS,
+        )
     )
     assert not validator.is_valid(instance)
     if is_header_location(location):
@@ -78,10 +88,6 @@ def test_top_level_strategy(data, location, schema):
     (
         # No constraints besides `type`
         (negate_constraints, {"type": "integer"}),
-        # Accept-everything schema
-        (negate_schema, {}),
-        # Equivalent to accept-everything schema
-        (negate_schema, {"uniqueItems": False}),
         # Missing type (i.e all types are possible)
         (change_type, {}),
         # All types explicitly
@@ -110,7 +116,7 @@ def test_failing_mutations(data, mutation, schema):
     original_schema = deepcopy(schema)
     # When mutation can't be applied
     # Then it returns "failure"
-    assert mutation(MutationContext(schema, "body"), data.draw, schema) == MutationResult.FAILURE
+    assert mutation(MutationContext(schema, "body", "application/json"), data.draw, schema) == MutationResult.FAILURE
     # And doesn't mutate the input schema
     assert schema == original_schema
 
@@ -120,7 +126,6 @@ def test_failing_mutations(data, mutation, schema):
     (
         (negate_constraints, {"type": "integer", "minimum": 42}),
         (negate_constraints, {"minimum": 42}),
-        (negate_schema, {"type": "object"}),
         (change_type, {"type": "object"}),
         (change_type, {"type": ["object", "array"]}),
         (remove_required_property, {"properties": {"foo": {}}, "required": ["foo"]}),
@@ -155,7 +160,7 @@ def test_successful_mutations(data, mutation, schema):
     schema = deepcopy(schema)
     # When mutation can be applied
     # Then it returns "success"
-    assert mutation(MutationContext(schema, "body"), data.draw, schema) == MutationResult.SUCCESS
+    assert mutation(MutationContext(schema, "body", "application/json"), data.draw, schema) == MutationResult.SUCCESS
     # And the mutated schema is a valid JSON Schema
     validate_schema(schema)
     # And instances valid for this schema are not valid for the original one
@@ -193,7 +198,7 @@ def test_path_parameters_are_string(data, schema):
     validator = Draft4Validator(schema)
     new_schema = deepcopy(schema)
     # When path parameters are mutated
-    new_schema = data.draw(mutated(new_schema, "path"))
+    new_schema = data.draw(mutated(new_schema, "path", None))
     assert new_schema["type"] == "object"
     # Then mutated schema is a valid JSON Schema
     validate_schema(new_schema)
@@ -204,20 +209,6 @@ def test_path_parameters_are_string(data, schema):
     assert len(new_instance) == 1
     # And instances valid for this schema are not valid for the original one
     assert not validator.is_valid(new_instance)
-
-
-@given(data=st.data())
-@settings(suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow])
-def test_headers_are_valid(data):
-    # When headers are mutated
-    schema = {
-        "type": "object",
-        "properties": {"X-Foo": {"type": "string", "maxLength": 5}},
-        "additionalProperties": False,
-    }
-    instance = data.draw(negative_schema(schema, "GET /users/", "header", custom_formats=STRING_FORMATS))
-    # Then they still should be valid headers
-    assert is_valid_header(instance)
 
 
 @pytest.mark.parametrize("key", ("components", "description"))
@@ -231,7 +222,7 @@ def test_custom_fields_are_intact(data, key):
         key: {},
     }
     # Then they should not be negated
-    new_schema = data.draw(mutated(schema, "body"))
+    new_schema = data.draw(mutated(schema, "body", "application/json"))
     assert key in new_schema
 
 
@@ -262,7 +253,14 @@ def test_mutation_result_success(left, right, expected):
 def test_negate_constraints_keep_dependencies(data, schema):
     # When `negate_constraints` is used
     schema = deepcopy(schema)
-    negate_constraints(MutationContext(schema, "body"), data.draw, schema)
+    negate_constraints(MutationContext(schema, "body", "application/json"), data.draw, schema)
     # Then it should always produce valid schemas
     validate_schema(schema)
     # E.g. `exclusiveMaximum` / `exclusiveMinimum` only work when `maximum` / `minimum` are present in the same schema
+
+
+@given(data=st.data())
+def test_no_unsatisfiable_schemas(data):
+    schema = {"type": "object", "required": ["foo"]}
+    mutated_schema = data.draw(mutated(schema, location="body", media_type="application/json"))
+    assert canonicalish(mutated_schema) != FALSEY

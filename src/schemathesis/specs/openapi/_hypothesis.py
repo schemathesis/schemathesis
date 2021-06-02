@@ -22,7 +22,7 @@ from ...utils import NOT_SET
 from .constants import LOCATION_TO_CONTAINER
 from .negative import negative_schema
 from .parameters import OpenAPIBody, parameters_to_json_schema
-from .utils import is_header_location, set_keyword_on_properties
+from .utils import is_header_location
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
 SLASH = "/"
@@ -297,7 +297,9 @@ def make_positive_strategy(
         # We try to enforce the right header values via "format"
         # This way, only allowed values will be used during data generation, which reduces the amount of filtering later
         # If a property schema contains `pattern` it leads to heavy filtering and worse performance - therefore, skip it
-        set_keyword_on_properties(schema, format="_header_value", lambda s: len(s) == 1 and "type" in s)
+        for sub_schema in schema.get("properties", {}).values():
+            if len(sub_schema) == 1 and "type" in sub_schema:
+                sub_schema.setdefault("format", "_header_value")
     return from_schema(schema, custom_formats=STRING_FORMATS)
 
 
