@@ -175,9 +175,13 @@ class MutationContext:
                 # any headers that are not defined. This change adds the possibility of generating valid extra headers
                 new_schema["additionalProperties"] = {"type": "string", "format": "_header_value"}
         # Empty array or objects may match the original schema
-        if "array" in get_type(new_schema) and "minItems" not in new_schema.get("not", {}):
+        if "array" in get_type(new_schema) and new_schema.get("items") and "minItems" not in new_schema.get("not", {}):
             new_schema.setdefault("minItems", 1)
-        if "object" in get_type(new_schema) and "minProperties" not in new_schema.get("not", {}):
+        if (
+            "object" in get_type(new_schema)
+            and new_schema.get("properties")
+            and "minProperties" not in new_schema.get("not", {})
+        ):
             new_schema.setdefault("minProperties", 1)
         return new_schema
 
