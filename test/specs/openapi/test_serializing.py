@@ -486,6 +486,45 @@ def test_nullable_parameters(
     assert func("foo", **kwargs)({"foo": None}) == {"foo": ""}
 
 
+def test_security_definition_parameter(testdir, empty_open_api_2_schema):
+    # When the API contains an example for one of its parameters
+    empty_open_api_2_schema["paths"] = {
+        "/test": {
+            "post": {
+                "parameters": [
+                    {
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "type": "object",
+                            "example": {"foo": "bar"},
+                        },
+                    },
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    # And a security definition that is used for data generation
+    empty_open_api_2_schema["securityDefinitions"] = {
+        "token": {"type": "apiKey", "name": "Authorization", "in": "header"}
+    }
+    empty_open_api_2_schema["security"] = [{"token": []}]
+    testdir.make_test(
+        f"""
+@schema.parametrize()
+@settings(phases=[Phase.explicit])
+def test_(case):
+    pass
+        """,
+        schema=empty_open_api_2_schema,
+    )
+    result = testdir.runpytest("-v")
+    # Then it should work as expected
+    # And existing Open API serialization styles should not affect it
+    result.assert_outcomes(passed=1)
+
+
 @pytest.mark.parametrize(
     "type_name",
     # `null` is not a valid Open API type, but it is possible to have `None` with custom hooks, therefore it is here

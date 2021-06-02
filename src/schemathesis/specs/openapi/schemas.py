@@ -259,6 +259,7 @@ class BaseOpenAPISchema(BaseSchema):
         security_parameters = self.security.get_security_definitions_as_parameters(
             self.raw_schema, operation, self.resolver, location
         )
+        security_parameters = [item for item in security_parameters if item["in"] == location]
         if security_parameters:
             definitions.extend(security_parameters)
         if definitions:

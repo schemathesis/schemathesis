@@ -165,7 +165,7 @@ serialize_swagger2_parameters = make_serializer(_serialize_swagger2)
 def conversion(func: Callable[..., None]) -> Callable:
     def _wrapper(name: str, **kwargs: Any) -> MapFunction:
         def _map(item: Generated) -> Generated:
-            if name in item:
+            if name in (item or {}):
                 func(item, name, **kwargs)
             return item
 
