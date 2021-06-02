@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Open API ``style`` & ``explode`` for parameters derived from security definitions.
+
 `3.7.7`_ - 2021-06-01
 ---------------------
 
