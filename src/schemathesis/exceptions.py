@@ -1,6 +1,6 @@
 from hashlib import sha1
 from json import JSONDecodeError
-from typing import Any, Callable, Dict, NoReturn, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, NoReturn, Optional, Type, Union
 
 import attr
 import hypothesis.errors
@@ -9,7 +9,9 @@ from jsonschema import ValidationError
 
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE
 from .failures import FailureContext
-from .utils import GenericResponse
+
+if TYPE_CHECKING:
+    from .utils import GenericResponse
 
 
 class CheckFailed(AssertionError):
@@ -179,7 +181,7 @@ class InvalidRegularExpression(Exception):
 
 @attr.s  # pragma: no mutate
 class HTTPError(Exception):
-    response: GenericResponse = attr.ib()  # pragma: no mutate
+    response: "GenericResponse" = attr.ib()  # pragma: no mutate
     url: str = attr.ib()  # pragma: no mutate
 
     @classmethod
@@ -195,3 +197,7 @@ class HTTPError(Exception):
         # E.g. it will be handled in CLI - a proper error message will be shown
         if 400 <= response.status_code < 600:
             raise cls(response=response, url=schema_path)
+
+
+class UsageError(Exception):
+    """Incorrect usage of Schemathesis functions."""

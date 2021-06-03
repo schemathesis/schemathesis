@@ -8,7 +8,21 @@ They give only static definitions of paths.
 """
 from collections.abc import Mapping
 from difflib import get_close_matches
-from typing import Any, Callable, Dict, Generator, Iterable, Iterator, List, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    Iterable,
+    Iterator,
+    List,
+    NoReturn,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 import attr
@@ -18,12 +32,12 @@ from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import create_test
 from .constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
-from .exceptions import InvalidSchema
+from .exceptions import InvalidSchema, UsageError
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import APIOperation, Case
 from .stateful import APIStateMachine, Stateful, StatefulTest
 from .types import Filter, FormData, GenericTest, NotSet
-from .utils import NOT_SET, Err, GenericResponse, GivenInput, Ok, Result, given_proxy
+from .utils import NOT_SET, PARAMETRIZE_MARKER, Err, GenericResponse, GivenInput, Ok, Result, given_proxy
 
 
 class MethodsDict(CaseInsensitiveDict):
@@ -187,8 +201,18 @@ class BaseSchema(Mapping):
         )
 
         def wrapper(func: GenericTest) -> GenericTest:
+            if hasattr(func, PARAMETRIZE_MARKER):
+
+                def wrapped_test(*_: Any, **__: Any) -> NoReturn:
+                    raise UsageError(
+                        f"You have applied `parametrize` to the `{func.__name__}` test more than once, which "
+                        "overrides the previous decorator. "
+                        "The `parametrize` decorator could be applied to the same function at most once."
+                    )
+
+                return wrapped_test
             HookDispatcher.add_dispatcher(func)
-            func._schemathesis_test = self.clone(  # type: ignore
+            cloned = self.clone(
                 test_function=func,
                 method=method,
                 endpoint=endpoint,
@@ -199,6 +223,7 @@ class BaseSchema(Mapping):
                 data_generation_methods=data_generation_methods,
                 code_sample_style=_code_sample_style,  # type: ignore
             )
+            setattr(func, PARAMETRIZE_MARKER, cloned)
             return func
 
         return wrapper
