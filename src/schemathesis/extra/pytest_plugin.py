@@ -17,6 +17,7 @@ from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from ..exceptions import InvalidSchema
 from ..models import APIOperation
 from ..utils import (
+    PARAMETRIZE_MARKER,
     Ok,
     Result,
     get_given_args,
@@ -81,7 +82,7 @@ class SchemathesisCase(PyCollector):
                 _init_with_valid_test(test_function, given_args, given_kwargs)
         else:
             _init_with_valid_test(test_function, given_args, given_kwargs)
-        self.schemathesis_case = test_function._schemathesis_test  # type: ignore
+        self.schemathesis_case = getattr(test_function, PARAMETRIZE_MARKER)
         super().__init__(*args, **kwargs)
 
     def _get_test_name(self, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:

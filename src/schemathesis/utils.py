@@ -38,6 +38,7 @@ from werkzeug.wrappers import Response as BaseResponse
 from werkzeug.wrappers.json import JSONMixin
 
 from .constants import USER_AGENT
+from .exceptions import UsageError
 from .types import Filter, GenericTest, NotSet, RawAuth
 
 try:
@@ -84,7 +85,7 @@ def is_schemathesis_test(func: Callable) -> bool:
     try:
         from .schemas import BaseSchema  # pylint: disable=import-outside-toplevel
 
-        item = getattr(func, "_schemathesis_test", None)
+        item = getattr(func, PARAMETRIZE_MARKER, None)
         # Comparison is needed to avoid false-positives when mocks are collected by pytest
         return isinstance(item, BaseSchema)
     except Exception:
@@ -351,6 +352,7 @@ class Err(Generic[E]):
 
 Result = Union[Ok[T], Err[E]]
 GivenInput = Union[SearchStrategy, InferType]
+PARAMETRIZE_MARKER = "_schemathesis_test"
 GIVEN_ARGS_MARKER = "_schemathesis_given_args"
 GIVEN_KWARGS_MARKER = "_schemathesis_given_kwargs"
 
@@ -371,6 +373,16 @@ def given_proxy(*args: GivenInput, **kwargs: GivenInput) -> Callable[[GenericTes
     """Proxy Hypothesis strategies to ``hypothesis.given``."""
 
     def wrapper(func: GenericTest) -> GenericTest:
+        if hasattr(func, GIVEN_ARGS_MARKER):
+
+            def wrapped_test(*_: Any, **__: Any) -> NoReturn:
+                raise UsageError(
+                    f"You have applied `given` to the `{func.__name__}` test more than once, which "
+                    "overrides the previous decorator. You need to pass all arguments to the same `given` call."
+                )
+
+            return wrapped_test
+
         setattr(func, GIVEN_ARGS_MARKER, args)
         setattr(func, GIVEN_KWARGS_MARKER, kwargs)
         return func

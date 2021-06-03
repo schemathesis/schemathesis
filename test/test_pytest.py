@@ -178,8 +178,8 @@ def teardown_module(module):
     result.assert_outcomes(passed=2)
 
 
-def test_invalid_given_usage(testdir):
-    # When `schema.given` is used incorrectly (e.g. called without arguments)
+def test_given_no_arguments(testdir):
+    # When `schema.given` is used without arguments
     testdir.make_test(
         """
 @schema.parametrize()
@@ -192,6 +192,39 @@ def test(case):
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
     result.stdout.re_match_lines([".+given must be called with at least one argument"])
+
+
+def test_given_no_override(testdir):
+    # When `schema.given` is used multiple times on the same test
+    testdir.make_test(
+        """
+@schema.parametrize()
+@schema.given(st.booleans())
+@schema.given(st.booleans())
+def test(case):
+    pass
+        """,
+    )
+    # Then the wrapped test should fail with an error
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    result.stdout.re_match_lines([".+You have applied `given` to the `test` test more than"])
+
+
+def test_parametrize_no_override(testdir):
+    # When `schema.parametrize` is used multiple times on the same test
+    testdir.make_test(
+        """
+@schema.parametrize()
+@schema.parametrize()
+def test(case):
+    pass
+        """,
+    )
+    # Then the wrapped test should fail with an error
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    result.stdout.re_match_lines([".+You have applied `parametrize` to the `test` test more than"])
 
 
 def test_invalid_test(testdir):
