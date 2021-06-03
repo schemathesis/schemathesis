@@ -15,6 +15,7 @@ Changelog
 - Python values of ``True``, ``False`` and ``None`` are converted to their JSON equivalents when generated for path parameters or query. `#1166`_
 - Bump ``hypothesis-jsonschema`` version. It allows the end-user to override known string formats.
 - Bump ``hypothesis`` version.
+- ``APIOperation.make_case`` behavior. If no ``media_type`` is passed along with ``body``, then it tries to infer the proper media type and raises an error if it is not possible. `#1094`_
 
 **Fixed**
 
@@ -2032,6 +2033,7 @@ Deprecated
 .. _#1121: https://github.com/schemathesis/schemathesis/issues/1121
 .. _#1100: https://github.com/schemathesis/schemathesis/issues/1100
 .. _#1097: https://github.com/schemathesis/schemathesis/issues/1097
+.. _#1094: https://github.com/schemathesis/schemathesis/issues/1094
 .. _#1093: https://github.com/schemathesis/schemathesis/issues/1093
 .. _#1073: https://github.com/schemathesis/schemathesis/issues/1073
 .. _#1069: https://github.com/schemathesis/schemathesis/issues/1069

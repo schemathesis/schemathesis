@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 import base64
 import datetime
 import http
@@ -48,6 +49,7 @@ from .exceptions import (
     FailureContext,
     InvalidSchema,
     SerializationNotPossible,
+    UsageError,
     get_grouped_exception,
     get_timeout_error,
 )
@@ -640,7 +642,23 @@ class APIOperation(Generic[P, C]):
         body: Union[Body, NotSet] = NOT_SET,
         media_type: Optional[str] = None,
     ) -> C:
-        """Create a new example for this API operation."""
+        """Create a new example for this API operation.
+
+        The main use case is constructing Case instances completely manually, without data generation.
+        """
+        if body is not NOT_SET and media_type is None:
+            # If the user wants to send payload, then there should be a media type, otherwise the payload is ignored
+            media_types = self.get_request_payload_content_types()
+            if len(media_types) == 1:
+                # The only available option
+                media_type = media_types[0]
+            else:
+                media_types_repr = ", ".join(media_types)
+                raise UsageError(
+                    "Can not detect appropriate media type. "
+                    "You can either specify one of the defined media types "
+                    f"or pass any other media type available for serialization. Defined media types: {media_types_repr}"
+                )
         return self.case_cls(
             operation=self,
             path_parameters=path_parameters,
