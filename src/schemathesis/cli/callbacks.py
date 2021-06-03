@@ -1,7 +1,7 @@
 import os
 import re
 from contextlib import contextmanager
-from typing import Dict, Generator, Optional, Tuple, Union
+from typing import Dict, Generator, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import click
@@ -9,7 +9,7 @@ import hypothesis
 from requests import PreparedRequest, RequestException
 
 from .. import utils
-from ..constants import CodeSampleStyle
+from ..constants import CodeSampleStyle, DataGenerationMethod
 from ..stateful import Stateful
 from .constants import DEFAULT_WORKERS
 
@@ -138,6 +138,12 @@ def convert_stateful(ctx: click.core.Context, param: click.core.Parameter, value
 
 def convert_code_sample_style(ctx: click.core.Context, param: click.core.Parameter, value: str) -> CodeSampleStyle:
     return CodeSampleStyle.from_str(value)
+
+
+def convert_data_generation_method(
+    ctx: click.core.Context, param: click.core.Parameter, value: str
+) -> List[DataGenerationMethod]:
+    return [DataGenerationMethod[value]]
 
 
 def convert_request_tls_verify(ctx: click.core.Context, param: click.core.Parameter, value: str) -> Union[str, bool]:

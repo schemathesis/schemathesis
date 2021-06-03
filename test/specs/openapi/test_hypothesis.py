@@ -134,7 +134,9 @@ def test_valid_headers(keywords):
             "required": ["X-Foo"],
             "additionalProperties": False,
         },
+        "GET /users/",
         "header",
+        None,
     )
 
     @given(strategy)
@@ -156,7 +158,9 @@ def test_no_much_filtering_in_headers():
             "required": ["X-Foo"],
             "additionalProperties": False,
         },
+        "GET /users/",
         "header",
+        None,
     )
 
     @given(strategy)
