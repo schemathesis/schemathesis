@@ -3,6 +3,7 @@ from hypothesis import strategies as st
 from requests.structures import CaseInsensitiveDict
 
 import schemathesis
+from schemathesis import DataGenerationMethod
 from schemathesis.models import APIOperation, Case
 from schemathesis.schemas import operations_to_dict
 
@@ -45,7 +46,7 @@ def test_as_strategy(swagger_20):
     operation = swagger_20["/users"]["GET"]
     strategy = operation.as_strategy()
     assert isinstance(strategy, st.SearchStrategy)
-    assert strategy.example() == Case(operation)
+    assert strategy.example() == Case(operation, data_generation_method=DataGenerationMethod.positive)
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")

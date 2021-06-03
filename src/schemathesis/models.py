@@ -94,6 +94,8 @@ class Case:  # pylint: disable=too-many-public-methods
     source: Optional[CaseSource] = attr.ib(default=None)  # pragma: no mutate
     # The media type for cases with a payload. For example, "application/json"
     media_type: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    # The way the case was generated (None for manually crafted ones)
+    data_generation_method: Optional[DataGenerationMethod] = attr.ib(default=None)  # pragma: no mutate
 
     def __repr__(self) -> str:
         parts = [f"{self.__class__.__name__}("]
@@ -449,6 +451,7 @@ class Case:  # pylint: disable=too-many-public-methods
     def partial_deepcopy(self) -> "Case":
         return self.__class__(
             operation=self.operation.partial_deepcopy(),
+            data_generation_method=self.data_generation_method,
             path_parameters=deepcopy(self.path_parameters),
             headers=deepcopy(self.headers),
             cookies=deepcopy(self.cookies),

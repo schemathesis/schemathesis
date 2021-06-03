@@ -159,6 +159,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
         cookies=cookies,
         query=query,
         body=body,
+        data_generation_method=data_generation_method,
     )
 
 

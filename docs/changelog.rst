@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Negative testing. `#65`_
+- ``Case.data_generation_method`` attribute that provides the information of the underlying data generation method (e.g. positive or negative)
 
 **Changed**
 

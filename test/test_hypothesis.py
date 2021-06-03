@@ -6,7 +6,7 @@ from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis import Case, register_string_format
+from schemathesis import Case, DataGenerationMethod, register_string_format
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import APIOperation, OperationDefinition
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
@@ -62,7 +62,9 @@ def test_get_examples(name, swagger_20):
     )
     strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
-    assert strategies[0].example() == Case(operation, media_type=media_type, **{name: expected})
+    assert strategies[0].example() == Case(
+        operation, data_generation_method=DataGenerationMethod.positive, media_type=media_type, **{name: expected}
+    )
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")

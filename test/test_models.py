@@ -6,7 +6,7 @@ import requests
 from hypothesis import given, settings
 
 import schemathesis
-from schemathesis.constants import USER_AGENT
+from schemathesis.constants import USER_AGENT, DataGenerationMethod
 from schemathesis.exceptions import CheckFailed
 from schemathesis.models import APIOperation, Case, Request, Response
 
@@ -321,3 +321,29 @@ def test_deprecated_attribute(swagger_20):
     assert str(records[0].message) == (
         "Property `endpoint` is deprecated and will be removed in Schemathesis 4.0. Use `operation` instead."
     )
+
+
+@pytest.mark.parametrize("method", (DataGenerationMethod.positive, DataGenerationMethod.negative))
+def test_data_generation_method_is_available(method, empty_open_api_3_schema):
+    # When a new case is generated
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {"text/plain": {"schema": {"type": "string"}}},
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+
+    api_schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    @given(case=api_schema["/data"]["POST"].as_strategy(data_generation_method=method))
+    @settings(max_examples=1)
+    def test(case):
+        # Then its data generation method should be available
+        assert case.data_generation_method == method
+
+    test()
