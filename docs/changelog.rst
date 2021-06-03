@@ -13,6 +13,7 @@ Changelog
 
 - Raise ``UsageError` if ``schema.parametrize`` or ``schema.given`` are applied to the same function more than once. `#1194`_
 - Python values of ``True``, ``False`` and ``None`` are converted to their JSON equivalents when generated for path parameters or query. `#1166`_
+- Bump ``hypothesis-jsonschema`` version. It allows the end-user to override known string formats.
 
 `3.7.8`_ - 2021-06-02
 ---------------------
