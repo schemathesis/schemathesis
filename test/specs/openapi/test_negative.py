@@ -61,7 +61,7 @@ def validate_schema(schema):
     ],
 )
 @given(data=st.data())
-@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
+@settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
 def test_top_level_strategy(data, location, schema):
     if location != "body" and schema.get("type") == "object":
         # It always comes this way from Schemathesis
@@ -111,6 +111,7 @@ def test_top_level_strategy(data, location, schema):
     ),
 )
 @given(data=st.data())
+@settings(deadline=None)
 def test_failing_mutations(data, mutation, schema):
     validate_schema(schema)
     original_schema = deepcopy(schema)
@@ -214,6 +215,7 @@ def test_path_parameters_are_string(data, schema):
 
 @pytest.mark.parametrize("key", ("components", "description"))
 @given(data=st.data())
+@settings(deadline=None)
 def test_custom_fields_are_intact(data, key):
     # When the schema contains some non-JSON Schema keywords (e.g. components from Open API)
     schema = {
@@ -251,6 +253,7 @@ def test_mutation_result_success(left, right, expected):
     ),
 )
 @given(data=st.data())
+@settings(deadline=None)
 def test_negate_constraints_keep_dependencies(data, schema):
     # When `negate_constraints` is used
     schema = deepcopy(schema)
@@ -261,6 +264,7 @@ def test_negate_constraints_keep_dependencies(data, schema):
 
 
 @given(data=st.data())
+@settings(deadline=None)
 def test_no_unsatisfiable_schemas(data):
     schema = {"type": "object", "required": ["foo"]}
     mutated_schema = data.draw(mutated(schema, location="body", media_type="application/json"))
