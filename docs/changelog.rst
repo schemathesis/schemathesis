@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.8.0`_ - 2021-06-03
+---------------------
+
 **Added**
 
 - Negative testing. `#65`_
@@ -1858,7 +1861,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.7.8...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.8.0...HEAD
+.. _3.8.0: https://github.com/schemathesis/schemathesis/compare/v3.7.8...v3.8.0
 .. _3.7.8: https://github.com/schemathesis/schemathesis/compare/v3.7.7...v3.7.8
 .. _3.7.7: https://github.com/schemathesis/schemathesis/compare/v3.7.6...v3.7.7
 .. _3.7.6: https://github.com/schemathesis/schemathesis/compare/v3.7.5...v3.7.6
