@@ -117,7 +117,7 @@ def test_inlined_definitions(deeply_nested_schema):
     @settings(max_examples=1)
     def test(case):
         # Then the referenced schema should be properly transformed to the JSON Schema form
-        assume(case.query["key"] is None)
+        assume(case.query["key"] == "null")
 
     test()
 

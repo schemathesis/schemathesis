@@ -1,20 +1,12 @@
-import functools
 import json
 from typing import Any, Callable, Dict, Generator, List, Optional
+
+from ...utils import compose
 
 Generated = Dict[str, Any]
 Definition = Dict[str, Any]
 DefinitionList = List[Definition]
 MapFunction = Callable[[Generated], Generated]
-
-
-def compose(*functions: Callable) -> Callable:
-    """Compose multiple functions into a single one."""
-
-    def noop(x: Any) -> Any:
-        return x
-
-    return functools.reduce(lambda f, g: lambda x: f(g(x)), functions, noop)
 
 
 def make_serializer(

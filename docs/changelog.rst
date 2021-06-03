@@ -12,6 +12,7 @@ Changelog
 **Changed**
 
 - Raise ``UsageError` if ``schema.parametrize`` or ``schema.given`` are applied to the same function more than once. `#1194`_
+- Python values of ``True``, ``False`` and ``None`` are converted to their JSON equivalents when generated for path parameters or query. `#1166`_
 
 `3.7.8`_ - 2021-06-02
 ---------------------
@@ -2015,6 +2016,7 @@ Deprecated
 .. _#1190: https://github.com/schemathesis/schemathesis/issues/1190
 .. _#1189: https://github.com/schemathesis/schemathesis/issues/1189
 .. _#1167: https://github.com/schemathesis/schemathesis/issues/1167
+.. _#1166: https://github.com/schemathesis/schemathesis/issues/1166
 .. _#1164: https://github.com/schemathesis/schemathesis/issues/1164
 .. _#1162: https://github.com/schemathesis/schemathesis/issues/1162
 .. _#1160: https://github.com/schemathesis/schemathesis/issues/1160

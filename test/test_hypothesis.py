@@ -374,6 +374,41 @@ def test_path_parameters_quotation(value, expected):
     assert quote_all({"foo": value})["foo"] == expected
 
 
+@pytest.mark.parametrize("expected", ("null", "true", "false"))
+def test_parameters_jsonified(empty_open_api_3_schema, expected):
+    # See GH-1166
+    # When `None` or `True` / `False` are generated in path or query
+    empty_open_api_3_schema["paths"] = {
+        "/foo/{param_path}": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": f"param_{location}",
+                        "in": location,
+                        "required": True,
+                        "schema": {"type": "boolean", "nullable": True},
+                    }
+                    for location in ("path", "query")
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    strategy = schema["/foo/{param_path}"]["GET"].as_strategy()
+
+    @given(case=strategy)
+    @settings(deadline=None, max_examples=1)
+    def test(case):
+        # Then they should be converted to their JSON equivalents
+        assume(case.path_parameters["param_path"] == expected)
+        assume(case.query["param_query"] == expected)
+
+    test()
+
+
 @pytest.mark.hypothesis_nested
 def test_is_valid_query_strategy():
     strategy = st.sampled_from([{"key": "1"}, {"key": "\udcff"}]).filter(is_valid_query)
