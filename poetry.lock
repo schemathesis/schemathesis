@@ -270,7 +270,7 @@ resolved_reference = "e8f3a89a64d75e8668f5f4762b87d34a1840d926"
 
 [[package]]
 name = "hypothesis"
-version = "6.13.11"
+version = "6.13.12"
 description = "A library for property-based testing"
 category = "main"
 optional = false
@@ -842,7 +842,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=1.2.3)", "pytest-flake8", "pyt
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6"
-content-hash = "d7675ced092b2b9f0904e9de7d933d35d55bfb4c5695004a0524bec35284bd5b"
+content-hash = "b3b67b3d5c2e76072aecedeeb465d6c4d02a9931e002d34e0d4e0e0ffe95c489"
 
 [metadata.files]
 aiohttp = [
@@ -1019,8 +1019,8 @@ graphql-relay = [
 ]
 graphql-server-core = []
 hypothesis = [
-    {file = "hypothesis-6.13.11-py3-none-any.whl", hash = "sha256:a4b1dbaff6ed1b2d5e5137014edf5d357e0d0c07daa7801fb7c18dbd74a36cd1"},
-    {file = "hypothesis-6.13.11.tar.gz", hash = "sha256:bc05fd13a3adcedaf73b6c1b1b1c06a92bc3f550aefb5d34432ef199f71efaaf"},
+    {file = "hypothesis-6.13.12-py3-none-any.whl", hash = "sha256:cca0e54d769214849755f7a125a2f759615e0386844eb42bd30ca2633d249b61"},
+    {file = "hypothesis-6.13.12.tar.gz", hash = "sha256:eeb8311d1477de4974ed3dba5c8e758023c17bb4c804f2e5d5cc4f9a065cbeba"},
 ]
 hypothesis-graphql = [
     {file = "hypothesis-graphql-0.5.0.tar.gz", hash = "sha256:94193989cd3282422ee2e7fa50b486db7f33631e52f258d150ea20d327f081ac"},

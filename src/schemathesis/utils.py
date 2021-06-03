@@ -405,7 +405,7 @@ def merge_given_args(func: GenericTest, args: Tuple, kwargs: Dict[str, Any]) -> 
 
 def validate_given_args(func: GenericTest, args: Tuple, kwargs: Dict[str, Any]) -> Optional[Callable]:
     argspec = getfullargspec(func)
-    return is_invalid_test(func.__name__, argspec, args, kwargs)  # type: ignore
+    return is_invalid_test(func, argspec, args, kwargs)  # type: ignore
 
 
 def compose(*functions: Callable) -> Callable:
