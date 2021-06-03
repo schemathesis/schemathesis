@@ -3,6 +3,7 @@ from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis.hooks import HookContext, HookDispatcher, HookScope
+from schemathesis.utils import PARAMETRIZE_MARKER
 
 
 @pytest.fixture(autouse=True)
@@ -224,7 +225,7 @@ def test_save_test_function(schema):
     def test(case):
         pass
 
-    assert test._schemathesis_test.test_function is test
+    assert getattr(test, PARAMETRIZE_MARKER).test_function is test
 
 
 @pytest.mark.parametrize("apply_first", (True, False))
@@ -259,8 +260,8 @@ def test_local_dispatcher(schema, apply_first):
     assert test._schemathesis_hooks.get_all_by_name("before_generate_cookies") == [local_hook]
     assert test._schemathesis_hooks.get_all_by_name("before_generate_query") == []
     # And the schema-level dispatcher still contains only schema-level hooks
-    assert test._schemathesis_test.hooks.get_all_by_name("before_generate_query") == [schema_hook]
-    assert test._schemathesis_test.hooks.get_all_by_name("before_generate_cookies") == []
+    assert getattr(test, PARAMETRIZE_MARKER).hooks.get_all_by_name("before_generate_query") == [schema_hook]
+    assert getattr(test, PARAMETRIZE_MARKER).hooks.get_all_by_name("before_generate_cookies") == []
 
 
 @pytest.mark.hypothesis_nested
