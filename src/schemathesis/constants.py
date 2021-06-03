@@ -31,6 +31,8 @@ class DataGenerationMethod(str, Enum):
 
     # Generate data, that fits the API schema
     positive = "positive"
+    # Doesn't fit the API schema
+    negative = "negative"
 
     @classmethod
     def default(cls) -> "DataGenerationMethod":
@@ -39,6 +41,7 @@ class DataGenerationMethod(str, Enum):
     def as_short_name(self) -> str:
         return {
             DataGenerationMethod.positive: "P",
+            DataGenerationMethod.negative: "N",
         }[self]
 
 

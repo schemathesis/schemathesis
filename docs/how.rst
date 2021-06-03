@@ -12,6 +12,36 @@ Schemathesis converts Open API schemas to compatible JSON Schemas and passes the
     There are many tradeoffs in this process, and Hypothesis tries to give reasonable defaults for a typical case
     and not be too slow for pathological cases.
 
+Negative testing
+----------------
+
+By default, Schemathesis generates data that matches the input schema. Alternatively it can generate the contrary - examples that do not match the input schema.
+
+CLI:
+
+.. code:: text
+
+    $ schemathesis run -D negative http://example.com/swagger.json
+
+Python:
+
+.. code:: python
+
+    import schemathesis
+    from schemathesis import DataGenerationMethod
+
+    schema = schemathesis.from_uri(
+        "http://example.com/swagger.json",
+        data_generation_methods=[DataGenerationMethod.negative],
+    )
+
+
+    @schema.parametrize()
+    def test_api(case):
+        case.call_and_validate()
+
+.. note:: At this moment, negative testing is significantly slower than positive testing.
+
 Payload serialization
 ---------------------
 
