@@ -18,7 +18,7 @@ from ...exceptions import InvalidSchema
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import APIOperation, Case
 from ...types import NotSet
-from ...utils import NOT_SET
+from ...utils import NOT_SET, compose
 from .constants import LOCATION_TO_CONTAINER
 from .negative import negative_schema
 from .parameters import OpenAPIBody, parameters_to_json_schema
@@ -281,13 +281,37 @@ def get_parameters_strategy(
             "query": is_valid_query,
         }[location]
         strategy = strategy.filter(filter_func)
-        map_func = {"path": quote_all}.get(location)
+        # Path & query parameters will be cast to string anyway, but having their JSON equivalents for
+        # `True` / `False` / `None` improves chances of them passing validation in apps that expect boolean / null types
+        # and not aware of Python-specific representation of those types
+        map_func = {
+            "path": compose(quote_all, jsonify_python_specific_types),
+            "query": jsonify_python_specific_types,
+        }.get(location)
         if map_func:
-            strategy = strategy.map(map_func)
+            strategy = strategy.map(map_func)  # type: ignore
         _PARAMETER_STRATEGIES_CACHE.setdefault(operation, {})[nested_cache_key] = strategy
         return strategy
     # No parameters defined for this location
     return st.none()
+
+
+def _jsonify_leaves(value: Any) -> Any:
+    if isinstance(value, dict):
+        for key, sub_item in value.items():
+            value[key] = _jsonify_leaves(sub_item)
+    elif isinstance(value, list):
+        value = [_jsonify_leaves(sub_item) for sub_item in value]
+    elif isinstance(value, bool):
+        return "true" if value else "false"
+    elif value is None:
+        return "null"
+    return value
+
+
+def jsonify_python_specific_types(value: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert Python-specific values to their JSON equivalents."""
+    return _jsonify_leaves(value)
 
 
 def make_positive_strategy(
