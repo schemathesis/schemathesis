@@ -183,8 +183,9 @@ class GroupedOption(click.Option):
     "-D",
     "data_generation_methods",
     help="Defines how Schemathesis generates data for tests.",
-    type=CSVOption(DataGenerationMethod),
+    type=click.Choice([item.name for item in DataGenerationMethod]),
     default=DataGenerationMethod.default(),
+    callback=callbacks.convert_data_generation_method,
     show_default=True,
 )
 @click.option(
