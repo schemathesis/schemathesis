@@ -352,11 +352,10 @@ def test_nullable_parameters(request, testdir, spec_version, extra):
 @schema.parametrize()
 @settings(max_examples=1)
 def test_(request, case):
-    assume(case.query["id"] is None)
+    assume(case.query["id"] == "null")
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/users"
     assert case.method == "GET"
-    assert case.query["id"] is None
 """,
         schema=schema,
     )
@@ -477,7 +476,7 @@ def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/users"
     assert case.method == "GET"
-    assert case.query["id"] is None
+    assert case.query["id"] == "null"
 """,
         **as_param(integer(name="id", required=True, enum=[1, 2], **{"x-nullable": True})),
     )

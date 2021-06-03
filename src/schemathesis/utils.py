@@ -1,4 +1,5 @@
 import cgi
+import functools
 import pathlib
 import re
 import sys
@@ -405,3 +406,12 @@ def merge_given_args(func: GenericTest, args: Tuple, kwargs: Dict[str, Any]) -> 
 def validate_given_args(func: GenericTest, args: Tuple, kwargs: Dict[str, Any]) -> Optional[Callable]:
     argspec = getfullargspec(func)
     return is_invalid_test(func.__name__, argspec, args, kwargs)  # type: ignore
+
+
+def compose(*functions: Callable) -> Callable:
+    """Compose multiple functions into a single one."""
+
+    def noop(x: Any) -> Any:
+        return x
+
+    return functools.reduce(lambda f, g: lambda x: f(g(x)), functions, noop)
