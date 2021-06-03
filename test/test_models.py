@@ -7,8 +7,63 @@ from hypothesis import given, settings
 
 import schemathesis
 from schemathesis.constants import USER_AGENT, DataGenerationMethod
-from schemathesis.exceptions import CheckFailed
+from schemathesis.exceptions import CheckFailed, UsageError
 from schemathesis.models import APIOperation, Case, Request, Response
+
+
+@pytest.fixture
+def schema_with_payload(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {"text/plain": {"schema": {"type": "string"}}},
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    return schemathesis.from_dict(empty_open_api_3_schema)
+
+
+def test_make_case_explicit_media_type(schema_with_payload):
+    # When there is only one possible media type
+    # And the `media_type` argument is passed to `make_case` explicitly
+    case = schema_with_payload["/data"]["POST"].make_case(body="<foo></foo>", media_type="text/xml")
+    # Then this explicit media type should be in `case`
+    assert case.media_type == "text/xml"
+
+
+def test_make_case_automatic_media_type(schema_with_payload):
+    # When there is only one possible media type
+    # And the `media_type` argument is not passed to `make_case`
+    case = schema_with_payload["/data"]["POST"].make_case(body="foo")
+    # Then it should be chosen automatically
+    assert case.media_type == "text/plain"
+
+
+def test_make_case_missing_media_type(empty_open_api_3_schema):
+    # When there are multiple available media types
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "text/plain": {"schema": {"type": "string"}},
+                        "application/json": {"schema": {"type": "array"}},
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    # And the `media_type` argument is not passed to `make_case`
+    # Then there should be a usage error
+    with pytest.raises(UsageError):
+        schema["/data"]["POST"].make_case(body="foo")
 
 
 def test_path(swagger_20):

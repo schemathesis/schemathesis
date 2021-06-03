@@ -129,8 +129,8 @@ class Direction:
 def _print_case(case: Case) -> str:
     operation = f"state.schema['{case.operation.path}']['{case.operation.method.upper()}']"
     data = [
-        f"{name}={getattr(case, name)}"
-        for name in ("path_parameters", "headers", "cookies", "query", "body")
+        f"{name}={repr(getattr(case, name))}"
+        for name in ("path_parameters", "headers", "cookies", "query", "body", "media_type")
         if getattr(case, name) not in (None, NOT_SET)
     ]
     return f"{operation}.make_case({', '.join(data)})"
