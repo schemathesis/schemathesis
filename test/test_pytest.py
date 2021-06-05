@@ -314,3 +314,13 @@ def test(case):
     # Then it should work
     result.assert_outcomes(passed=1)
     assert "CHECKING!" in result.stdout.str()
+
+
+def test_no_collect_warnings(testdir):
+    testdir.make_test(
+        f"""
+from schemathesis.models import *
+    """,
+    )
+    result = testdir.runpytest()
+    assert "cannot collect test class" not in result.stdout.str()
