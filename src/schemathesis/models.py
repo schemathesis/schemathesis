@@ -862,6 +862,8 @@ class Interaction:
 class TestResult:
     """Result of a single test."""
 
+    __test__ = False
+
     method: str = attr.ib()  # pragma: no mutate
     path: str = attr.ib()  # pragma: no mutate
     data_generation_method: DataGenerationMethod = attr.ib()  # pragma: no mutate
@@ -941,6 +943,8 @@ class TestResult:
 @attr.s(slots=True, repr=False)  # pragma: no mutate
 class TestResultSet:
     """Set of multiple test results."""
+
+    __test__ = False
 
     results: List[TestResult] = attr.ib(factory=list)  # pragma: no mutate
     generic_errors: List[InvalidSchema] = attr.ib(factory=list)  # pragma: no mutate
