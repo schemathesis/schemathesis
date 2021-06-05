@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Avoid ``pytest`` warnings when internal Schemathesis classes are in the test module scope.
+
 `3.8.0`_ - 2021-06-03
 ---------------------
 
