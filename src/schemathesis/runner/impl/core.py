@@ -161,6 +161,11 @@ class EventStream:
         """
         self.stop_event.set()
 
+    def finish(self) -> events.ExecutionEvent:
+        """Stop the event stream & return the last event."""
+        self.stop()
+        return next(self)
+
 
 def handle_schema_error(
     error: InvalidSchema, results: TestResultSet, data_generation_method: DataGenerationMethod, recursion_level: int
