@@ -1,5 +1,6 @@
 # pylint: disable=too-many-statements,too-many-branches
 import logging
+import threading
 import time
 import uuid
 from contextlib import contextmanager
@@ -60,23 +61,35 @@ class BaseRunner:
     stateful_recursion_limit: int = attr.ib(default=DEFAULT_STATEFUL_RECURSION_LIMIT)  # pragma: no mutate
     count_operations: bool = attr.ib(default=True)  # pragma: no mutate
 
-    def execute(self) -> Generator[events.ExecutionEvent, None, None]:
+    def execute(self) -> "EventStream":
         """Common logic for all runners."""
+        event = threading.Event()
+        return EventStream(self._generate_events(event), event)
+
+    def _generate_events(self, stop_event: threading.Event) -> Generator[events.ExecutionEvent, None, None]:
         results = TestResultSet()
 
         initialized = events.Initialized.from_schema(schema=self.schema, count_operations=self.count_operations)
+
+        def _finish() -> events.Finished:
+            return events.Finished.from_results(results=results, running_time=time.monotonic() - initialized.start_time)
+
         yield initialized
+
+        if stop_event.is_set():
+            yield _finish()
+            return
 
         for event in self._execute(results):
             yield event
-            if (
+            if stop_event.is_set() or (
                 self.exit_first
                 and isinstance(event, events.AfterExecution)
                 and event.status in (Status.error, Status.failure)
             ):
                 break
 
-        yield events.Finished.from_results(results=results, running_time=time.monotonic() - initialized.start_time)
+        yield _finish()
 
     def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         raise NotImplementedError
@@ -123,6 +136,30 @@ class BaseRunner:
             else:
                 # Schema errors
                 yield from handle_schema_error(result.err(), results, data_generation_method, recursion_level)
+
+
+@attr.s(slots=True)  # pragma: no mutate
+class EventStream:
+    """Schemathesis event stream.
+
+    Provides an API to control the execution flow.
+    """
+
+    generator: Generator[events.ExecutionEvent, None, None] = attr.ib()  # pragma: no mutate
+    stop_event: threading.Event = attr.ib()  # pragma: no mutate
+
+    def __next__(self) -> events.ExecutionEvent:
+        return next(self.generator)
+
+    def __iter__(self) -> Generator[events.ExecutionEvent, None, None]:
+        return self.generator
+
+    def stop(self) -> None:
+        """Stop the event stream.
+
+        Its next value will be the last one (Finished).
+        """
+        self.stop_event.set()
 
 
 def handle_schema_error(
