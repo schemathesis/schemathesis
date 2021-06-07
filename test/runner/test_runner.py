@@ -846,3 +846,26 @@ def test_graphql(graphql_url):
     )
     assert initialized.operations_count == 2
     assert finished.passed_count == 2
+
+
+@pytest.fixture
+def runner(swagger_20):
+    return from_schema(swagger_20)
+
+
+@pytest.fixture
+def event_stream(runner):
+    return runner.execute()
+
+
+def test_stop_event_stream(event_stream):
+    assert isinstance(next(event_stream), events.Initialized)
+    event_stream.stop()
+    assert isinstance(next(event_stream), events.Finished)
+
+
+def test_stop_event_stream_after_second_event(event_stream):
+    next(event_stream)
+    assert isinstance(next(event_stream), events.BeforeExecution)
+    event_stream.stop()
+    assert isinstance(next(event_stream), events.Finished)

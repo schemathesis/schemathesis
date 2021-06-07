@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - GraphQL support in CLI. `#746`_
+- A way to stop the Schemathesis runner's event stream manually via ``events.stop()``. `#1202`_
 
 **Changed**
 
@@ -2031,6 +2032,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1202: https://github.com/schemathesis/schemathesis/issues/1202
 .. _#1194: https://github.com/schemathesis/schemathesis/issues/1194
 .. _#1190: https://github.com/schemathesis/schemathesis/issues/1190
 .. _#1189: https://github.com/schemathesis/schemathesis/issues/1189
