@@ -21,4 +21,4 @@ We support the following API specifications:
 
 - Swagger 2.0. Python tests + CLI
 - Open API 3.0.x. Python tests + CLI
-- GraphQL June 2018. Python tests
+- GraphQL June 2018. Python tests + CLI
