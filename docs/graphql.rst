@@ -2,7 +2,6 @@ GraphQL
 =======
 
 Schemathesis provides capabilities for testing GraphQL-based applications.
-The current support is limited to Python tests - CLI support is in the works.
 
 Usage
 ~~~~~
@@ -22,12 +21,17 @@ Usage
 
 This test will load GraphQL schema from ``https://bahnql.herokuapp.com/graphql``, generate queries for it, send them to the server, and verify responses.
 
+Or via CLI:
+
+.. code:: text
+
+    schemathesis run --hypothesis-deadline=None https://bahnql.herokuapp.com/graphql
+
 Limitations
 ~~~~~~~~~~~
 
 Current GraphQL support does **NOT** include the following:
 
-- CLI integration;
 - Custom scalar types as required arguments (it will produce an error);
 - Mutations;
 - Filters;
