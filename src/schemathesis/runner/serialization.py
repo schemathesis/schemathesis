@@ -21,6 +21,7 @@ class SerializedCase:
     path_template: str = attr.ib()
     path_parameters: Optional[Dict[str, Any]] = attr.ib()
     query: Optional[Dict[str, Any]] = attr.ib()
+    cookies: Optional[Dict[str, Any]] = attr.ib()
     verbose_name: str = attr.ib()
     media_type: Optional[str] = attr.ib()
 
@@ -33,6 +34,7 @@ class SerializedCase:
             path_template=case.path,
             path_parameters=case.path_parameters,
             query=case.query,
+            cookies=case.cookies,
             verbose_name=case.operation.verbose_name,
             media_type=case.media_type,
         )
