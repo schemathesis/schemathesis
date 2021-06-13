@@ -7,6 +7,7 @@ Changelog
 **Changed**
 
 - ``ExecutionEvent.asdict`` adds the ``event_type`` field which is the event class name.
+- Add API schema to the ``Initialized`` event.
 
 `3.9.0`_ - 2021-06-07
 ---------------------
