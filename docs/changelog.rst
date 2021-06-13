@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- ``ExecutionEvent.asdict`` adds the ``event_type`` field which is the event class name.
+
 `3.9.0`_ - 2021-06-07
 ---------------------
 

@@ -1,6 +1,6 @@
 import threading
 import time
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import attr
 from requests import exceptions
@@ -16,7 +16,11 @@ from .serialization import SerializedError, SerializedTestResult
 class ExecutionEvent:
     """Generic execution event."""
 
-    asdict = attr.asdict
+    def asdict(self, **kwargs: Any) -> Dict[str, Any]:
+        data = attr.asdict(self, **kwargs)
+        # An internal tag for simpler type identification
+        data["event_type"] = self.__class__.__name__
+        return data
 
 
 @attr.s(slots=True)  # pragma: no mutate
