@@ -8,6 +8,7 @@ Changelog
 
 - ``ExecutionEvent.asdict`` adds the ``event_type`` field which is the event class name.
 - Add API schema to the ``Initialized`` event.
+- **Internal**: Add ``SerializedCase.cookies``
 
 `3.9.0`_ - 2021-06-07
 ---------------------
