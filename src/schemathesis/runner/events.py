@@ -27,6 +27,7 @@ class ExecutionEvent:
 class Initialized(ExecutionEvent):
     """Runner is initialized, settings are prepared, requests session is ready."""
 
+    schema: Dict[str, Any] = attr.ib()  # pragma: no mutate
     # Total number of operations in the schema
     operations_count: Optional[int] = attr.ib()  # pragma: no mutate
     # The place, where the API schema is located
@@ -43,6 +44,7 @@ class Initialized(ExecutionEvent):
     def from_schema(cls, *, schema: BaseSchema, count_operations: bool = True) -> "Initialized":
         """Computes all needed data from a schema instance."""
         return cls(
+            schema=schema.raw_schema,
             operations_count=schema.operations_count if count_operations else None,
             location=schema.location,
             base_url=schema.get_base_url(),
