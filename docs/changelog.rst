@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.9.1`_ - 2021-06-13
+---------------------
+
 **Changed**
 
 - ``ExecutionEvent.asdict`` adds the ``event_type`` field which is the event class name.
@@ -1880,7 +1883,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.9.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.9.1...HEAD
+.. _3.9.1: https://github.com/schemathesis/schemathesis/compare/v3.9.0...v3.9.1
 .. _3.9.0: https://github.com/schemathesis/schemathesis/compare/v3.8.0...v3.9.0
 .. _3.8.0: https://github.com/schemathesis/schemathesis/compare/v3.7.8...v3.8.0
 .. _3.7.8: https://github.com/schemathesis/schemathesis/compare/v3.7.7...v3.7.8
