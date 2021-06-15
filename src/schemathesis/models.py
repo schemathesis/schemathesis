@@ -438,9 +438,10 @@ class Case:  # pylint: disable=too-many-public-methods
         checks: Tuple["CheckFunction", ...] = (),
         code_sample_style: Optional[str] = None,
         **kwargs: Any,
-    ) -> None:
+    ) -> requests.Response:
         response = self.call(base_url, session, headers, **kwargs)
         self.validate_response(response, checks, code_sample_style=code_sample_style)
+        return response
 
     def get_full_url(self) -> str:
         """Make a full URL to the current API operation, including query parameters."""

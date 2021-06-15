@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Return ``response`` from ``Case.call_and_validate``.
+
 `3.9.1`_ - 2021-06-13
 ---------------------
 
