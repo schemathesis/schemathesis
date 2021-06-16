@@ -2,24 +2,29 @@ import base64
 import os
 import platform
 import shutil
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+import time
+from queue import Queue
+from typing import Any, Dict, Generator, List, Optional, Tuple, Union, cast
 
 import click
 from hypothesis import settings
 
+from ... import service
 from ..._compat import metadata
 from ...constants import CodeSampleStyle, __version__
 from ...models import Response, Status
 from ...runner import events
-from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult
+from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult, deduplicate_failures
+from ...utils import format_exception
 from ..context import ExecutionContext
-from ..handlers import EventHandler, get_unique_failures
+from ..handlers import EventHandler
 
 DISABLE_SCHEMA_VALIDATION_MESSAGE = (
     "\nYou can disable input schema validation with --validate-schema=false "
     "command-line option\nIn this case, Schemathesis cannot guarantee proper"
     " behavior during the test run"
 )
+SPINNER_REPETITION_NUMBER = 10
 
 
 def get_terminal_width() -> int:
@@ -180,7 +185,7 @@ def display_failures(context: ExecutionContext, event: events.Finished) -> None:
 def display_failures_for_single_test(context: ExecutionContext, result: SerializedTestResult) -> None:
     """Display a failure for a single method / path."""
     display_subsection(result)
-    checks = get_unique_failures(result.checks)
+    checks = deduplicate_failures(result.checks)
     for idx, check in enumerate(checks, 1):
         message: Optional[str]
         if check.message:
@@ -254,16 +259,64 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
     if total:
         display_checks_statistics(total)
 
-    if context.cassette_file_name or context.junit_xml_file:
-        click.echo()
-
     if context.cassette_file_name:
+        click.echo()
         category = click.style("Network log", bold=True)
         click.secho(f"{category}: {context.cassette_file_name}")
 
     if context.junit_xml_file:
+        click.echo()
         category = click.style("JUnit XML file", bold=True)
         click.secho(f"{category}: {context.junit_xml_file}")
+
+    handle_service_integration(context)
+
+
+def handle_service_integration(context: ExecutionContext) -> None:
+    """If Schemathesis.io integration is enabled, wait for the handler & print the resulting status."""
+    if context.service:
+        click.echo()
+        title = click.style("Schemathesis.io", bold=True)
+        event = wait_for_service_handler(context.service.queue, title)
+        color = {
+            service.Success: "green",
+            service.Error: "red",
+            service.Timeout: "red",
+        }[event.__class__]
+        status = click.style(event.name, fg=color, bold=True)
+        click.echo(f"{title}: {status}\r", nl=False)
+        click.echo()
+        if isinstance(event, service.Error):
+            click.echo()
+            if context.show_errors_tracebacks:
+                message = format_exception(event.exception, include_traceback=True)
+            else:
+                message = format_exception(event.exception)
+            click.secho(f"An error happened during uploading reports to Schemathesis.io\n\n{message.strip()}", fg="red")
+
+
+def wait_for_service_handler(queue: Queue, title: str) -> service.Event:
+    """Wait for the Schemathesis.io handler to finish its job."""
+    start = time.monotonic()
+    spinner = create_spinner(SPINNER_REPETITION_NUMBER)
+    # The testing process it done and we need to wait for the Schemathesis.io handler to finish
+    # It might still have some data to send
+    while queue.empty():
+        if time.monotonic() - start >= service.WORKER_FINISH_TIMEOUT:
+            return service.Timeout()
+        click.echo(f"{title}: {next(spinner)}\r", nl=False)
+        time.sleep(service.WORKER_CHECK_PERIOD)
+    return queue.get()
+
+
+def create_spinner(repetitions: int) -> Generator[str, None, None]:
+    """A simple spinner that yields its individual characters."""
+    assert repetitions > 0, "The number of repetitions should be greater than zero"
+    while True:
+        for ch in "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏":
+            # Skip branch coverage, as it is not possible because of the assertion above
+            for _ in range(repetitions):  # pragma: no branch
+                yield ch
 
 
 def display_checks_statistics(total: Dict[str, Dict[Union[str, Status], int]]) -> None:
@@ -330,6 +383,8 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     click.echo(f"Specification version: {event.specification_name}")
     click.echo(f"Workers: {context.workers_num}")
     click.secho(f"Collected API operations: {context.operations_count}", bold=True)
+    if context.service is not None:
+        click.secho("Schemathesis.io: ENABLED", bold=True)
     if context.operations_count >= 1:
         click.echo()
 

@@ -1,11 +1,18 @@
 import os
 import shutil
+from queue import Queue
 from typing import List, Optional
 
 import attr
 
 from ..constants import CodeSampleStyle
 from ..runner.serialization import SerializedTestResult
+
+
+@attr.s(slots=True)  # pragma: no mutate
+class ServiceContext:
+    url: str = attr.ib()  # pragma: no mutate
+    queue: Queue = attr.ib()  # pragma: no mutate
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -26,3 +33,4 @@ class ExecutionContext:
     junit_xml_file: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     verbosity: int = attr.ib(default=0)  # pragma: no mutate
     code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate
+    service: Optional[ServiceContext] = attr.ib(default=None)  # pragma: no mutate
