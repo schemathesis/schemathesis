@@ -94,6 +94,11 @@ def create_app(
         values = dict(request.headers)
         return Response(json.dumps(values), content_type="application/json", headers=values)
 
+    @app.route("/api/conformance", methods=["GET"])
+    def conformance():
+        # The schema expects `value` to be "foo", but it is different every time
+        return jsonify({"value": uuid4().hex})
+
     @app.route("/api/failure", methods=["GET"])
     def failure():
         raise InternalServerError

@@ -26,6 +26,11 @@ async def success(request: web.Request) -> web.Response:
     return web.json_response({"success": True})
 
 
+async def conformance(request: web.Request) -> web.Response:
+    # The schema expects `value` to be "foo", but it is different every time
+    return web.json_response({"value": uuid4().hex})
+
+
 async def basic(request: web.Request) -> web.Response:
     if "Authorization" in request.headers and request.headers["Authorization"] == "Basic dGVzdDp0ZXN0":
         return web.json_response({"secret": 42})

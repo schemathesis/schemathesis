@@ -1917,6 +1917,17 @@ def test_response_payload_encoding(cli, cli_args):
     assert "Response payload: `Тест`" in result.stdout.splitlines()
 
 
+@pytest.mark.operations("conformance")
+def test_response_schema_conformance_deduplication(cli, cli_args):
+    # See GH-907
+    # When the "response_schema_conformance" check is present
+    # And the app return different error messages caused by the same validator
+    result = cli.run(*cli_args, "--checks=response_schema_conformance")
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # Then the errors should be deduplicated
+    assert result.stdout.count("Response payload: ") == 1
+
+
 @pytest.mark.parametrize("kind", ("env_var", "arg"))
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 @pytest.mark.operations("success")

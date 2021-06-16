@@ -27,6 +27,7 @@ class Operation(Enum):
     teapot = ("POST", "/api/teapot")
     text = ("GET", "/api/text")
     cp866 = ("GET", "/api/cp866")
+    conformance = ("GET", "/api/conformance")
     plain_text_body = ("POST", "/api/text")
     csv_payload = ("POST", "/api/csv")
     malformed_json = ("GET", "/api/malformed_json")
@@ -245,6 +246,20 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
                         "schema": {"type": "object", "properties": {"secret": {"type": "integer"}}},
                     },
                     # 401 is not described on purpose to cause a testing error
+                },
+            }
+        elif name == "conformance":
+            schema = {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "properties": {"value": {"enum": ["foo"]}},
+                            "required": ["value"],
+                            "additionalProperties": False,
+                        },
+                    },
                 },
             }
         elif name == "create_user":
@@ -573,6 +588,24 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                         },
                     },
                     # 401 is not described on purpose to cause a testing error
+                },
+            }
+        elif name == "conformance":
+            schema = {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"value": {"enum": ["foo"]}},
+                                    "required": ["value"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
                 },
             }
         elif name == "create_user":

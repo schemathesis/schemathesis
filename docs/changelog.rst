@@ -8,6 +8,10 @@ Changelog
 
 - Return ``response`` from ``Case.call_and_validate``.
 
+**Fixed**
+
+- Incorrect deduplication applied to response schema conformance failures that happen to have the same failing validator but different input values. `#907`_
+
 `3.9.1`_ - 2021-06-13
 ---------------------
 
@@ -2111,6 +2115,7 @@ Deprecated
 .. _#914: https://github.com/schemathesis/schemathesis/issues/914
 .. _#911: https://github.com/schemathesis/schemathesis/issues/911
 .. _#908: https://github.com/schemathesis/schemathesis/issues/908
+.. _#907: https://github.com/schemathesis/schemathesis/issues/907
 .. _#905: https://github.com/schemathesis/schemathesis/issues/905
 .. _#904: https://github.com/schemathesis/schemathesis/issues/904
 .. _#897: https://github.com/schemathesis/schemathesis/issues/897
