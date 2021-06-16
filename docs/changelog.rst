@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.9.2`_ - 2021-06-16
+---------------------
+
 **Changed**
 
 - Return ``response`` from ``Case.call_and_validate``.
@@ -1891,7 +1894,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.9.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.9.2...HEAD
+.. _3.9.2: https://github.com/schemathesis/schemathesis/compare/v3.9.1...v3.9.2
 .. _3.9.1: https://github.com/schemathesis/schemathesis/compare/v3.9.0...v3.9.1
 .. _3.9.0: https://github.com/schemathesis/schemathesis/compare/v3.8.0...v3.9.0
 .. _3.8.0: https://github.com/schemathesis/schemathesis/compare/v3.7.8...v3.8.0
