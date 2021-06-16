@@ -45,6 +45,7 @@ def pytest_collection_modifyitems(session, config, items):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "operations(*names): add only specified API operations to the test application.")
+    config.addinivalue_line("markers", "service(**kwargs): Setup mock server for Schemathesis.io.")
     config.addinivalue_line("markers", "hypothesis_nested: mark tests with nested Hypothesis tests.")
 
 

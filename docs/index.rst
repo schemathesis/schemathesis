@@ -54,6 +54,7 @@ User's Guide
    cli
    python
    stateful
+   service
    how
    compatibility
    examples
