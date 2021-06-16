@@ -3,12 +3,13 @@
 They all consist of primitive types and don't have references to schemas, app, etc.
 """
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import attr
 import requests
 
 from ..exceptions import FailureContext, InternalError
+from ..failures import ValidationErrorContext
 from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
 from ..utils import WSGIResponse, format_exception
 
@@ -155,3 +156,24 @@ class SerializedTestResult:
             errors=[SerializedError.from_error(*error, headers=result.overridden_headers) for error in result.errors],
             interactions=[SerializedInteraction.from_interaction(interaction) for interaction in result.interactions],
         )
+
+
+def deduplicate_failures(checks: List[SerializedCheck]) -> List[SerializedCheck]:
+    """Return only unique checks that should be displayed in the output."""
+    seen: Set[Tuple[str, Optional[str]]] = set()
+    unique_checks = []
+    for check in reversed(checks):
+        # There are also could be checks that didn't fail
+        if check.value == Status.failure:
+            key = get_failure_key(check)
+            if (check.name, key) not in seen:
+                unique_checks.append(check)
+                seen.add((check.name, key))
+    return unique_checks
+
+
+def get_failure_key(check: SerializedCheck) -> Optional[str]:
+    if isinstance(check.context, ValidationErrorContext):
+        # Deduplicate by JSON Schema path. All errors that happened on this sub-schema will be deduplicated
+        return "/".join(map(str, check.context.schema_path))
+    return check.message

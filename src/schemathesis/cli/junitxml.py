@@ -7,7 +7,8 @@ from junit_xml import TestCase, TestSuite, to_xml_report_file
 
 from ..models import Status
 from ..runner import events
-from .handlers import EventHandler, ExecutionContext, get_unique_failures
+from ..runner.serialization import deduplicate_failures
+from .handlers import EventHandler, ExecutionContext
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -26,7 +27,7 @@ class JunitXMLHandler(EventHandler):
                 allow_multiple_subelements=True,
             )
             if event.status == Status.failure:
-                checks = get_unique_failures(event.result.checks)
+                checks = deduplicate_failures(event.result.checks)
                 for idx, check in enumerate(checks, 1):
                     # `check.message` is always not empty for events with `failure` status
                     test_case.add_failure_info(message=f"{idx}. {check.message}")

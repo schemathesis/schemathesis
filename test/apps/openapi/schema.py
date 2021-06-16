@@ -48,6 +48,9 @@ class OpenAPIVersion(Enum):
     _2 = "2.0"
     _3 = "3.0"
 
+    def __str__(self):
+        return f"Open API {self.value}"
+
     @property
     def is_openapi_2(self):
         return self.value == "2.0"

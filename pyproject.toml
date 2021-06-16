@@ -62,6 +62,7 @@ typing_extensions = "^3.7"
 flask = "^1.1"
 fastapi = ">=0.62.0"
 sphinx = "^3.5.3"
+pytest-httpserver = "^1.0.0"
 
 [tool.poetry.plugins]
 pytest11 = {schemathesis = "schemathesis.extra.pytest_plugin"}
