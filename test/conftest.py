@@ -13,7 +13,7 @@ from schemathesis.specs.openapi import loaders as oas_loaders
 from .apps import _graphql as graphql
 from .apps import openapi
 from .apps.openapi.schema import OpenAPIVersion, Operation
-from .utils import SIMPLE_PATH, get_schema_path, make_schema
+from .utils import get_schema_path, make_schema
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
 
@@ -45,6 +45,7 @@ def pytest_collection_modifyitems(session, config, items):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "operations(*names): add only specified API operations to the test application.")
+    config.addinivalue_line("markers", "saas(**kwargs): Setup mock server for SaaS.")
     config.addinivalue_line("markers", "hypothesis_nested: mark tests with nested Hypothesis tests.")
 
 

@@ -2,18 +2,20 @@ import base64
 import os
 import platform
 import shutil
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+import time
+from typing import Any, Dict, Generator, List, Optional, Tuple, Union, cast
 
 import click
 from hypothesis import settings
 
+from ... import saas
 from ..._compat import metadata
 from ...constants import CodeSampleStyle, __version__
 from ...models import Response, Status
 from ...runner import events
-from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult
+from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult, deduplicate_failures
 from ..context import ExecutionContext
-from ..handlers import EventHandler, get_unique_failures
+from ..handlers import EventHandler
 
 DISABLE_SCHEMA_VALIDATION_MESSAGE = (
     "\nYou can disable input schema validation with --validate-schema=false "
@@ -181,7 +183,7 @@ def display_failures(context: ExecutionContext, event: events.Finished) -> None:
 def display_failures_for_single_test(context: ExecutionContext, result: SerializedTestResult) -> None:
     """Display a failure for a single method / path."""
     display_subsection(result)
-    checks = get_unique_failures(result.checks)
+    checks = deduplicate_failures(result.checks)
     for idx, check in enumerate(checks, 1):
         message: Optional[str]
         if check.message:
@@ -255,16 +257,48 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
     if total:
         display_checks_statistics(total)
 
-    if context.cassette_file_name or context.junit_xml_file:
-        click.echo()
-
     if context.cassette_file_name:
+        click.echo()
         category = click.style("Network log", bold=True)
         click.secho(f"{category}: {context.cassette_file_name}")
 
     if context.junit_xml_file:
+        click.echo()
         category = click.style("JUnit XML file", bold=True)
         click.secho(f"{category}: {context.junit_xml_file}")
+
+    handle_saas_integration(context)
+
+
+def handle_saas_integration(context: ExecutionContext) -> None:
+    if context.saas:
+        click.echo()
+        category = click.style("SaaS status", bold=True)
+        start = time.time()
+        spinner = create_spinner(10)
+        while context.saas.queue.empty():
+            if time.time() - start >= saas.THREAD_WAIT_TIMEOUT:
+                saas_event = saas.Timeout()
+                break
+            click.echo(f"{category}: {next(spinner)}\r", nl=False)
+            time.sleep(saas.CHECK_PERIOD_DURATION)
+        else:
+            saas_event = context.saas.queue.get()
+        color = {
+            saas.Success: "green",
+            saas.Error: "red",
+            saas.Timeout: "red",
+        }[saas_event.__class__]
+        status = click.style(saas_event.name, fg=color, bold=True)
+        click.echo(f"{category}: {status}\r", nl=False)
+        click.echo()
+
+
+def create_spinner(repetitions: int) -> Generator[str, None, None]:
+    while True:
+        for ch in "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏":
+            for _ in range(repetitions):
+                yield ch
 
 
 def display_checks_statistics(total: Dict[str, Dict[Union[str, Status], int]]) -> None:
@@ -331,6 +365,8 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     click.echo(f"Specification version: {event.specification_name}")
     click.echo(f"Workers: {context.workers_num}")
     click.secho(f"Collected API operations: {context.operations_count}", bold=True)
+    if context.saas is not None:
+        click.secho(f"SaaS integration: {context.saas.url}", bold=True)
     if context.operations_count >= 1:
         click.echo()
 

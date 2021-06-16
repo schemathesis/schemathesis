@@ -4,6 +4,7 @@ import sys
 import traceback
 from collections import defaultdict
 from enum import Enum
+from queue import Queue
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
@@ -14,7 +15,7 @@ import yaml
 
 from .. import checks as checks_module
 from .. import fixups as _fixups
-from .. import runner
+from .. import runner, saas
 from .. import targets as targets_module
 from ..constants import (
     DEFAULT_DATA_GENERATION_METHODS,
@@ -38,7 +39,7 @@ from ..types import Filter
 from ..utils import file_exists, get_requests_auth, import_app
 from . import callbacks, cassettes, output
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
-from .context import ExecutionContext
+from .context import ExecutionContext, SaaSContext
 from .debug import DebugOutputHandler
 from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
@@ -458,6 +459,17 @@ class GroupedOption(click.Option):
     group=ParameterGroup.hypothesis,
 )
 @click.option("--no-color", help="Disable ANSI color escape codes.", type=bool, is_flag=True)
+@click.option(
+    "--saas-token",
+    help="SaaS authentication token. If present, test run results will be uploaded to Schemathesis.io",
+    type=str,
+)
+@click.option(
+    "--saas-url",
+    help="SaaS base URL.",
+    default=saas.DEFAULT_URL,
+    type=str,
+)
 @click.option("--verbosity", "-v", help="Reduce verbosity of error output.", count=True)
 @click.pass_context
 def run(
@@ -502,6 +514,8 @@ def run(
     hypothesis_verbosity: Optional[hypothesis.Verbosity] = None,
     verbosity: int = 0,
     no_color: bool = False,
+    saas_token: Optional[str] = None,
+    saas_url: str = saas.DEFAULT_URL,
 ) -> None:
     """Perform schemathesis test against an API specified by SCHEMA.
 
@@ -570,6 +584,8 @@ def run(
         verbosity,
         code_sample_style,
         debug_output_file,
+        saas_token,
+        saas_url,
     )
 
 
@@ -820,6 +836,8 @@ def execute(
     verbosity: int,
     code_sample_style: CodeSampleStyle,
     debug_output_file: Optional[click.utils.LazyFile],
+    saas_token: Optional[str],
+    saas_url: str,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handlers: List[EventHandler] = []
@@ -827,6 +845,11 @@ def execute(
         handlers.append(JunitXMLHandler(junit_xml))
     if debug_output_file is not None:
         handlers.append(DebugOutputHandler(debug_output_file))
+    saas_context = None
+    if saas_token is not None:
+        saas_queue: Queue = Queue()
+        saas_context = SaaSContext(url=saas_url, queue=saas_queue)
+        handlers.append(saas.SaaSReporter(saas_queue, saas_token, saas_url))
     if store_network_log is not None:
         # This handler should be first to have logs writing completed when the output handler will display statistic
         handlers.append(cassettes.CassetteWriter(store_network_log))
@@ -839,6 +862,7 @@ def execute(
         junit_xml_file=junit_xml.name if junit_xml is not None else None,
         verbosity=verbosity,
         code_sample_style=code_sample_style,
+        saas=saas_context,
     )
 
     def shutdown() -> None:

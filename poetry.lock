@@ -561,6 +561,21 @@ py = "*"
 pytest = ">=3.10"
 
 [[package]]
+name = "pytest-httpserver"
+version = "1.0.0"
+description = "pytest-httpserver is a httpserver for pytest"
+category = "dev"
+optional = false
+python-versions = ">=3.4"
+
+[package.dependencies]
+werkzeug = "*"
+
+[package.extras]
+dev = ["autopep8", "coverage", "flake8", "ipdb", "pytest", "pytest-cov", "reno", "requests", "sphinx", "sphinx-rtd-theme", "wheel"]
+test = ["coverage", "pytest", "pytest-cov", "requests"]
+
+[[package]]
 name = "pytest-mock"
 version = "1.13.0"
 description = "Thin-wrapper around the mock package for easier use with py.test"
@@ -842,7 +857,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=1.2.3)", "pytest-flake8", "pyt
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6"
-content-hash = "b3b67b3d5c2e76072aecedeeb465d6c4d02a9931e002d34e0d4e0e0ffe95c489"
+content-hash = "30dcfa75a462c1f6ae00a230fce9edae869a25ee2dcdf2dbe3f845b516c0f09f"
 
 [metadata.files]
 aiohttp = [
@@ -1197,6 +1212,10 @@ pytest-asyncio = [
 pytest-forked = [
     {file = "pytest-forked-1.3.0.tar.gz", hash = "sha256:6aa9ac7e00ad1a539c41bec6d21011332de671e938c7637378ec9710204e37ca"},
     {file = "pytest_forked-1.3.0-py2.py3-none-any.whl", hash = "sha256:dc4147784048e70ef5d437951728825a131b81714b398d5d52f17c7c144d8815"},
+]
+pytest-httpserver = [
+    {file = "pytest_httpserver-1.0.0-py3-none-any.whl", hash = "sha256:32cb2befbc519eb2b5907b772809600b470ef83a20e6d78613210debec4b0ba0"},
+    {file = "pytest_httpserver-1.0.0.tar.gz", hash = "sha256:ae3095d134d40602e95721140e222139da4a579956123990af85825324d0746d"},
 ]
 pytest-mock = [
     {file = "pytest-mock-1.13.0.tar.gz", hash = "sha256:e24a911ec96773022ebcc7030059b57cd3480b56d4f5d19b7c370ec635e6aed5"},

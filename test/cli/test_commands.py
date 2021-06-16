@@ -14,7 +14,7 @@ import yaml
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
 
-from schemathesis import Case, DataGenerationMethod, fixups
+from schemathesis import Case, DataGenerationMethod, fixups, saas
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.cli import LoaderConfig, execute, get_exit_code, reset_checks
 from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT, CodeSampleStyle
@@ -278,6 +278,11 @@ def test_commands_run_help(cli):
         "                                  with the specified spec version.",
         "",
         "  --no-color                      Disable ANSI color escape codes.",
+        "  --saas-token TEXT               SaaS authentication token. If present, test",
+        "                                  run results will be uploaded to",
+        "                                  Schemathesis.io",
+        "",
+        "  --saas-url TEXT                 SaaS base URL.",
         "  -v, --verbosity                 Reduce verbosity of error output.",
         "  -h, --help                      Show this message and exit.",
     ]
@@ -1972,6 +1977,8 @@ def assert_exit_code(event_stream, code):
             verbosity=0,
             code_sample_style=CodeSampleStyle.default(),
             debug_output_file=None,
+            saas_token=None,
+            saas_url=saas.DEFAULT_URL,
         )
     assert exc.value.code == code
 
