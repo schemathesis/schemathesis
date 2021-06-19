@@ -864,6 +864,11 @@ def test_stop_event_stream(event_stream):
     assert isinstance(next(event_stream), events.Finished)
 
 
+def test_stop_event_stream_immediately(event_stream):
+    event_stream.stop()
+    assert isinstance(next(event_stream), events.Finished)
+
+
 def test_stop_event_stream_after_second_event(event_stream):
     next(event_stream)
     assert isinstance(next(event_stream), events.BeforeExecution)

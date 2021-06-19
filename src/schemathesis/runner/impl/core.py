@@ -74,6 +74,10 @@ class BaseRunner:
         def _finish() -> events.Finished:
             return events.Finished.from_results(results=results, running_time=time.monotonic() - initialized.start_time)
 
+        if stop_event.is_set():
+            yield _finish()
+            return
+
         yield initialized
 
         if stop_event.is_set():
