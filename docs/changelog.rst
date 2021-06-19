@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- When ``EventStream.stop`` is called, the next event always is the last one.
+
 `3.9.2`_ - 2021-06-16
 ---------------------
 
