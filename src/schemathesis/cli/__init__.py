@@ -811,7 +811,7 @@ class OutputStyle(Enum):
 
 
 def execute(
-    prepared_runner: Generator[events.ExecutionEvent, None, None],
+    event_stream: Generator[events.ExecutionEvent, None, None],
     workers_num: int,
     show_errors_tracebacks: bool,
     validate_schema: bool,
@@ -846,23 +846,34 @@ def execute(
             _handler.shutdown()
 
     GLOBAL_HOOK_DISPATCHER.dispatch("after_init_cli_run_handlers", HookContext(), handlers, execution_context)
+    event = None
     try:
-        for event in prepared_runner:
+        for event in event_stream:
             for handler in handlers:
                 handler.handle_event(execution_context, event)
-            if isinstance(event, events.Finished):
-                if event.has_failures or event.has_errors:
-                    exit_code = 1
-                else:
-                    exit_code = 0
-                shutdown()
-                sys.exit(exit_code)
     except Exception as exc:
-        shutdown()
         if isinstance(exc, click.Abort):
             # To avoid showing "Aborted!" message, which is the default behavior in Click
             sys.exit(1)
         raise
+    finally:
+        shutdown()
+    if event is not None and event.is_terminal:
+        exit_code = get_exit_code(event)
+        sys.exit(exit_code)
+    # Event stream did not finish with a terminal event. Only possible if the handler is broken
+    click.secho("Unexpected error", fg="red")
+    sys.exit(1)
+
+
+def get_exit_code(event: events.ExecutionEvent) -> int:
+    if isinstance(event, events.Finished):
+        if event.has_failures or event.has_errors:
+            return 1
+        return 0
+    # Practically not possible. May occur only if the output handler is broken - in this case we still will have the
+    # right exit code.
+    return 1
 
 
 @schemathesis.command(short_help="Replay requests from a saved cassette.")
