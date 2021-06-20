@@ -16,11 +16,11 @@ from hypothesis import HealthCheck, Phase, Verbosity
 
 from schemathesis import Case, DataGenerationMethod, fixups
 from schemathesis.checks import ALL_CHECKS
-from schemathesis.cli import LoaderConfig, reset_checks
-from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT
+from schemathesis.cli import LoaderConfig, execute, get_exit_code, reset_checks
+from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT, CodeSampleStyle
 from schemathesis.hooks import unregister_all
 from schemathesis.models import APIOperation
-from schemathesis.runner import DEFAULT_CHECKS
+from schemathesis.runner import DEFAULT_CHECKS, from_schema
 from schemathesis.targets import DEFAULT_TARGETS
 
 PHASES = ", ".join(map(lambda x: x.name, Phase))
@@ -343,7 +343,6 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "max_response_time": None,
         **expected,
     }
-    assert result.exit_code == ExitCode.OK, result.stdout
     hypothesis_settings = expected.pop("hypothesis_settings", None)
     call_kwargs = execute.call_args[1]
     executed_hypothesis_settings = call_kwargs.pop("hypothesis_settings", None)
@@ -397,7 +396,6 @@ def test_load_schema_arguments(cli, mocker, args, expected):
         },
     )
 
-    assert result.exit_code == ExitCode.OK, result.stdout
     assert load_schema.call_args[0][0] == expected
 
 
@@ -420,7 +418,6 @@ def test_all_checks(cli, mocker, swagger_20):
     mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
     result = cli.run(SCHEMA_URI, "--checks=all")
-    assert result.exit_code == ExitCode.OK, result.stdout
     assert execute.call_args[1]["checks"] == ALL_CHECKS
 
 
@@ -1961,3 +1958,34 @@ def assert_graphql(result):
     assert "Specification version: GraphQL" in result.stdout
     assert "getBooks . " in result.stdout
     assert "getAuthors . " in result.stdout
+
+
+def assert_exit_code(event_stream, code):
+    with pytest.raises(SystemExit) as exc:
+        execute(
+            event_stream,
+            workers_num=1,
+            show_errors_tracebacks=False,
+            validate_schema=False,
+            store_network_log=None,
+            junit_xml=None,
+            verbosity=0,
+            code_sample_style=CodeSampleStyle.default(),
+            debug_output_file=None,
+        )
+    assert exc.value.code == code
+
+
+def test_cli_execute(swagger_20, capsys):
+    event_stream = from_schema(swagger_20).execute()
+    for _ in event_stream:
+        pass
+    assert_exit_code(event_stream, 1)
+    assert capsys.readouterr().out.strip() == "Unexpected error"
+
+
+def test_get_exit_code(swagger_20, capsys):
+    event_stream = from_schema(swagger_20).execute()
+    next(event_stream)
+    event = next(event_stream)
+    assert get_exit_code(event) == 1
