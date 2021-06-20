@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- ``ExecutionEvent.is_terminal`` attribute that indicates whether an event is the last one in the stream.
+
 **Fixed**
 
 - When ``EventStream.stop`` is called, the next event always is the last one.
