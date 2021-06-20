@@ -16,6 +16,9 @@ from .serialization import SerializedError, SerializedTestResult
 class ExecutionEvent:
     """Generic execution event."""
 
+    # Whether this event is expected to be the last one in the event stream
+    is_terminal = False
+
     def asdict(self, **kwargs: Any) -> Dict[str, Any]:
         data = attr.asdict(self, **kwargs)
         # An internal tag for simpler type identification
@@ -146,6 +149,8 @@ class Interrupted(ExecutionEvent):
 class InternalError(ExecutionEvent):
     """An error that happened inside the runner."""
 
+    is_terminal = True
+
     message: str = attr.ib()  # pragma: no mutate
     exception_type: str = attr.ib()  # pragma: no mutate
     exception: Optional[str] = attr.ib(default=None)  # pragma: no mutate
@@ -181,6 +186,8 @@ class Finished(ExecutionEvent):
 
     No more events after this point.
     """
+
+    is_terminal = True
 
     passed_count: int = attr.ib()  # pragma: no mutate
     failed_count: int = attr.ib()  # pragma: no mutate
