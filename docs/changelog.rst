@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.9.3`_ - 2021-06-22
+---------------------
+
 **Added**
 
 - ``ExecutionEvent.is_terminal`` attribute that indicates whether an event is the last one in the stream.
@@ -1902,7 +1905,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.9.2...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.9.3...HEAD
+.. _3.9.3: https://github.com/schemathesis/schemathesis/compare/v3.9.2...v3.9.3
 .. _3.9.2: https://github.com/schemathesis/schemathesis/compare/v3.9.1...v3.9.2
 .. _3.9.1: https://github.com/schemathesis/schemathesis/compare/v3.9.0...v3.9.1
 .. _3.9.0: https://github.com/schemathesis/schemathesis/compare/v3.8.0...v3.9.0
