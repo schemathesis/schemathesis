@@ -36,8 +36,7 @@ def display_section_name(title: str, separator: str = "=", extra: str = "", **kw
 
 
 def display_subsection(result: SerializedTestResult, color: Optional[str] = "red") -> None:
-    section_name = f"{result.method} {result.path}" if result.verbose_name is None else result.verbose_name
-    display_section_name(section_name, "_", result.data_generation_method, fg=color)
+    display_section_name(result.verbose_name, "_", result.data_generation_method, fg=color)
 
 
 def get_percentage(position: int, length: int) -> str:
