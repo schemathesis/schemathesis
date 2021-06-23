@@ -72,7 +72,7 @@ class SerializedCheck:
         else:
             response = None
         headers = {key: value[0] for key, value in request.headers.items()}
-        return SerializedCheck(
+        return cls(
             name=check.name,
             value=check.value,
             example=SerializedCase.from_case(check.example, headers),
@@ -140,7 +140,7 @@ class SerializedTestResult:
     @classmethod
     def from_test_result(cls, result: TestResult) -> "SerializedTestResult":
         formatter = logging.Formatter("[%(asctime)s] %(levelname)s in %(module)s: %(message)s")
-        return SerializedTestResult(
+        return cls(
             method=result.method,
             path=result.path,
             verbose_name=result.verbose_name,
