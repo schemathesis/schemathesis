@@ -629,7 +629,8 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         scopes, definition = self.resolver.resolve_in_scope(deepcopy(definition), scope)
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
-        if option:
+        # "schema" is an optional key in the `MediaType` object
+        if option and "schema" in option:
             # Extra conversion to JSON Schema is needed here if there was one $ref in the input
             # because it is not converted
             return scopes, to_json_schema_recursive(option["schema"], self.nullable_name)

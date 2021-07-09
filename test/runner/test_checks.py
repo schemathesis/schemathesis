@@ -453,6 +453,24 @@ def test_response_schema_conformance_invalid_openapi(openapi_30, media_type, con
     assert not case.operation.is_response_valid(response)
 
 
+def test_no_schema(openapi_30):
+    # See GH-1220
+    # When the response definition has no "schema" key
+    response = make_response(b"{}", "application/json")
+    definition = {
+        "responses": {
+            "default": {
+                "description": "text",
+                "content": {"application/problem": {"examples": {"test": {}}}},
+            }
+        }
+    }
+    case = make_case(openapi_30, definition)
+    # Then the check should be ignored
+    response_schema_conformance(response, case)
+    assert case.operation.is_response_valid(response)
+
+
 @pytest.mark.hypothesis_nested
 def test_response_schema_conformance_references_invalid(complex_schema):
     schema = schemathesis.from_path(complex_schema)
