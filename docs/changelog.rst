@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- ``KeyError`` when the ``response_schema_conformance`` check is executed against responses without schema definition. `#1220`_
+
 `3.9.3`_ - 2021-06-22
 ---------------------
 
@@ -2071,6 +2075,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1220: https://github.com/schemathesis/schemathesis/issues/1220
 .. _#1202: https://github.com/schemathesis/schemathesis/issues/1202
 .. _#1194: https://github.com/schemathesis/schemathesis/issues/1194
 .. _#1190: https://github.com/schemathesis/schemathesis/issues/1190
