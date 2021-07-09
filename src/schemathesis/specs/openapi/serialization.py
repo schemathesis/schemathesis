@@ -1,5 +1,5 @@
 import json
-from typing import Any, Callable, Dict, Generator, List, Optional
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 from ...utils import compose
 
@@ -167,7 +167,27 @@ def conversion(func: Callable[..., None]) -> Callable:
 
 
 def make_delimited(data: Optional[Dict[str, Any]], delimiter: str = ",") -> str:
-    return delimiter.join(f"{key}={value}" for key, value in (data or {}).items())
+    return delimiter.join(f"{key}={value}" for key, value in force_dict(data or {}).items())
+
+
+def force_iterable(value: Any) -> Union[List, Tuple]:
+    """Converts the value to a list or a tuple.
+
+    Only relevant for negative test scenarios where the original types might be changed.
+    """
+    if isinstance(value, (tuple, list)):
+        return value
+    return [value]
+
+
+def force_dict(value: Any) -> Dict:
+    """Converts the value to a dictionary.
+
+    Only relevant for negative test scenarios where the original types might be changed.
+    """
+    if isinstance(value, dict):
+        return value
+    return {"": value}
 
 
 @conversion
@@ -178,7 +198,7 @@ def to_json(item: Generated, name: str) -> None:
 
 @conversion
 def delimited(item: Generated, name: str, delimiter: str) -> None:
-    item[name] = delimiter.join(map(str, item[name] or ()))
+    item[name] = delimiter.join(map(str, force_iterable(item[name] or ())))
 
 
 @conversion
@@ -189,14 +209,14 @@ def deep_object(item: Generated, name: str) -> None:
     """
     generated = item.pop(name)
     if generated:
-        item.update({f"{name}[{key}]": value for key, value in generated.items()})
+        item.update({f"{name}[{key}]": value for key, value in force_dict(generated).items()})
     else:
         item[name] = ""
 
 
 @conversion
 def comma_delimited_object(item: Generated, name: str) -> None:
-    item[name] = ",".join(map(str, sum((item[name] or {}).items(), ())))
+    item[name] = ",".join(map(str, sum((force_dict(item[name] or {})).items(), ())))
 
 
 @conversion
@@ -243,7 +263,7 @@ def label_array(item: Generated, name: str, explode: Optional[bool]) -> None:
         delimiter = "."
     else:
         delimiter = ","
-    new = delimiter.join(map(str, item[name] or ()))
+    new = delimiter.join(map(str, force_iterable(item[name] or ())))
     if new:
         item[name] = f".{new}"
     else:
@@ -265,7 +285,7 @@ def label_object(item: Generated, name: str, explode: Optional[bool]) -> None:
     if explode:
         new = make_delimited(item[name], ".")
     else:
-        object_items = map(str, sum((item[name] or {}).items(), ()))
+        object_items = map(str, sum(force_dict(item[name] or {}).items(), ()))
         new = ",".join(object_items)
     if new:
         item[name] = f".{new}"
@@ -299,9 +319,9 @@ def matrix_array(item: Generated, name: str, explode: Optional[bool]) -> None:
         id=[3, 4, 5] => ";id=3,4,5"
     """
     if explode:
-        new = ";".join(f"{name}={value}" for value in item[name] or ())
+        new = ";".join(f"{name}={value}" for value in force_iterable(item[name] or ()))
     else:
-        new = ",".join(map(str, item[name] or ()))
+        new = ",".join(map(str, force_iterable(item[name] or ())))
     if new:
         item[name] = f";{new}"
     else:
@@ -323,7 +343,7 @@ def matrix_object(item: Generated, name: str, explode: Optional[bool]) -> None:
     if explode:
         new = make_delimited(item[name], ";")
     else:
-        object_items = map(str, sum((item[name] or {}).items(), ()))
+        object_items = map(str, sum(force_dict(item[name] or {}).items(), ()))
         new = ",".join(object_items)
     if new:
         item[name] = f";{new}"

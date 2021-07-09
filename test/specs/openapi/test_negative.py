@@ -1,4 +1,5 @@
 from copy import deepcopy
+from test.utils import assert_requests_call
 
 import pytest
 from hypothesis import HealthCheck, given, settings
@@ -7,6 +8,8 @@ from hypothesis_jsonschema import from_schema
 from hypothesis_jsonschema._canonicalise import FALSEY, canonicalish
 from jsonschema import Draft4Validator
 
+import schemathesis
+from schemathesis import DataGenerationMethod
 from schemathesis.specs.openapi._hypothesis import STRING_FORMATS, is_valid_header
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.specs.openapi.negative import mutated, negative_schema
@@ -269,3 +272,46 @@ def test_no_unsatisfiable_schemas(data):
     schema = {"type": "object", "required": ["foo"]}
     mutated_schema = data.draw(mutated(schema, location="body", media_type="application/json"))
     assert canonicalish(mutated_schema) != FALSEY
+
+
+ARRAY_PARAMETER = {"type": "array", "minItems": 1, "items": {"type": "string", "format": "ipv4"}}
+OBJECT_PARAMETER = {
+    "type": "object",
+    "minProperties": 1,
+    "properties": {"foo": {"type": "string", "format": "ipv4"}, "bar": {"type": "string", "format": "ipv4"}},
+    "additionalProperties": False,
+}
+
+
+@pytest.mark.parametrize("explode", (True, False))
+@pytest.mark.parametrize(
+    "location, schema, style",
+    [("query", ARRAY_PARAMETER, style) for style in ("pipeDelimited", "spaceDelimited")]
+    + [("query", OBJECT_PARAMETER, "deepObject")]
+    + [
+        ("path", parameter, style)
+        for parameter in [OBJECT_PARAMETER, ARRAY_PARAMETER]
+        for style in ("simple", "label", "matrix")
+    ],
+)
+@pytest.mark.hypothesis_nested
+def test_non_default_styles(empty_open_api_3_schema, location, schema, style, explode):
+    # See GH-1208
+    # When the schema contains a parameter with a not-default "style"
+    empty_open_api_3_schema["paths"]["/bug"] = {
+        "get": {
+            "parameters": [
+                {"name": "key", "in": location, "required": True, "style": style, "explode": explode, "schema": schema},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        }
+    }
+
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    @given(case=schema["/bug"]["get"].as_strategy(data_generation_method=DataGenerationMethod.negative))
+    @settings(deadline=None, max_examples=10, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
+    def test(case):
+        assert_requests_call(case)
+
+    test()
