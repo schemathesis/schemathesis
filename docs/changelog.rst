@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Preserve non-body parameter types in requests during Open API runtime expression evaluation.
+
 `3.9.4`_ - 2021-07-09
 ---------------------
 

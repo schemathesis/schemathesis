@@ -82,7 +82,7 @@ class NonBodyRequest(Node):
         }[self.location] or {}
         if self.location == "header":
             container = CaseInsensitiveDict(container)
-        return str(container[self.parameter])
+        return container[self.parameter]
 
 
 @attr.s(slots=True)  # pragma: no mutate
