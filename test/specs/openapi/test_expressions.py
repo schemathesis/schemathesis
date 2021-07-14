@@ -62,6 +62,7 @@ def context(case, response):
         ("spam_{$request.path.user_id}", "spam_5"),
         ("spam_{$request.header.X-Token}", "spam_secret"),
         ("spam_{$request.header.x-token}", "spam_secret"),
+        ("$request.path.user_id", 5),
         ("$request.body", {"a": 1}),
         ("$request.body#/a", 1),
         ("spam_{$response.header.X-Response}", "spam_Y"),
