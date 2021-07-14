@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.9.5`_ - 2021-07-14
+---------------------
+
 **Fixed**
 
 - Preserve non-body parameter types in requests during Open API runtime expression evaluation.
@@ -1917,7 +1920,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.9.4...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.9.5...HEAD
+.. _3.9.5: https://github.com/schemathesis/schemathesis/compare/v3.9.4...v3.9.5
 .. _3.9.4: https://github.com/schemathesis/schemathesis/compare/v3.9.3...v3.9.4
 .. _3.9.3: https://github.com/schemathesis/schemathesis/compare/v3.9.2...v3.9.3
 .. _3.9.2: https://github.com/schemathesis/schemathesis/compare/v3.9.1...v3.9.2
