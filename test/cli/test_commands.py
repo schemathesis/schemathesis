@@ -439,26 +439,6 @@ def test_hypothesis_parameters(cli, schema_url):
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
-def pytest_generate_tests(metafunc):
-    """Generate all proper combinations for running CLI.
-
-    It should be runnable by single/multiple workers and running instance/WSGI app.
-    """
-    if "app_type" in metafunc.fixturenames:
-        metafunc.parametrize("app_type", ["wsgi", "real"])
-
-
-@pytest.fixture
-def cli_args(openapi_version, request, app_type):
-    if app_type == "real":
-        schema_url = request.getfixturevalue("schema_url")
-        args = (schema_url,)
-    else:
-        app_path = request.getfixturevalue("loadable_flask_app")
-        args = (f"--app={app_path}", "/schema.yaml")
-    return args
-
-
 @pytest.mark.operations("success")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_cli_run_output_success(cli, cli_args, workers):

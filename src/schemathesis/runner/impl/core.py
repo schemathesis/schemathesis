@@ -16,7 +16,7 @@ from hypothesis.errors import HypothesisException, InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
-from ... import failures
+from ... import failures, hooks
 from ...constants import (
     DEFAULT_STATEFUL_RECURSION_LIMIT,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
@@ -525,7 +525,10 @@ def _network_test(
 ) -> requests.Response:
     check_results: List[Check] = []
     try:
+        hook_context = HookContext(operation=case.operation)
+        hooks.dispatch("before_call", hook_context, case)
         response = case.call(session=session, headers=headers, timeout=timeout, verify=request_tls_verify)
+        hooks.dispatch("after_call", hook_context, case, response)
     except CheckFailed as exc:
         check_name = "request_timeout"
         requests_kwargs = case.as_requests_kwargs(base_url=case.get_full_base_url(), headers=headers)
@@ -613,7 +616,10 @@ def _wsgi_test(
 ) -> WSGIResponse:
     with catching_logs(LogCaptureHandler(), level=logging.DEBUG) as recorded:
         start = time.monotonic()
+        hook_context = HookContext(operation=case.operation)
+        hooks.dispatch("before_call", hook_context, case)
         response = case.call_wsgi(headers=headers)
+        hooks.dispatch("after_call", hook_context, case, response)
         elapsed = time.monotonic() - start
     context = TargetContext(case=case, response=response, response_time=elapsed)
     run_targets(targets, context)
@@ -696,7 +702,10 @@ def _asgi_test(
     feedback: Feedback,
     max_response_time: Optional[int],
 ) -> requests.Response:
+    hook_context = HookContext(operation=case.operation)
+    hooks.dispatch("before_call", hook_context, case)
     response = case.call_asgi(headers=headers)
+    hooks.dispatch("after_call", hook_context, case, response)
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
     status = Status.success

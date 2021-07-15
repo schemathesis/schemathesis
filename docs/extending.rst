@@ -247,7 +247,7 @@ behavior in the API by changing the duplicate request's specific details.
         case.headers["Content-Type"] = "application/json"
         return case
 
-.. note:: The ``add_case`` hook works only in CLI.
+.. important:: The ``add_case`` hook works only in CLI.
 
 If you only want to create another case conditionally, you may return None, and no additional test will be created. For example, you may only want to create
 an additional test case if the original case received a successful response from the server.
@@ -271,6 +271,43 @@ an additional test case if the original case received a successful response from
 
 Note: A partial deep copy of the ``Case`` object is passed to each ``add_case`` hook. ``Case.operation.app`` is a reference to the original ``app``,
 and ``Case.operation.schema`` is a shallow copy, so changes to these fields will be reflected in other tests.
+
+``before_call``
+~~~~~~~~~~~~~~~
+
+Called right before any test request during CLI runs. With this hook, you can modify generated cases in-place:
+
+.. code:: python
+
+    import schemathesis
+
+
+    @schemathesis.hooks.register
+    def before_call(context, case):
+        case.query = {"q": "42"}
+
+.. important:: The ``before_call`` hook works only in CLI.
+
+``after_call``
+~~~~~~~~~~~~~~
+
+Called right after any successful test request during CLI runs. With this hook, you can inspect (and modify in-place if you want) the received responses and their source cases:
+
+.. code:: python
+
+    import json
+    import schemathesis
+
+
+    @schemathesis.hooks.register
+    def after_call(context, case, response):
+        parsed = response.json()
+        response._content = json.dumps({"my-wrapper": parsed}).encode()
+
+.. important:: The ``after_call`` hook works only in CLI. Won't be called if request times-out.
+
+Depending on whether you use your Python app in-process, you might get different types for the ``response`` argument.
+For the WSGI case, it will be ``schemathesis.utils.WSGIResponse``.
 
 Custom string strategies
 ------------------------
