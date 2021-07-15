@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.9.6`_ - 2021-07-15
+---------------------
+
 **Added**
 
 - New ``before_call`` and ``after_call`` CLI hooks. `#1224`_, `#700`_
@@ -1924,7 +1927,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.9.5...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.9.6...HEAD
+.. _3.9.6: https://github.com/schemathesis/schemathesis/compare/v3.9.5...v3.9.6
 .. _3.9.5: https://github.com/schemathesis/schemathesis/compare/v3.9.4...v3.9.5
 .. _3.9.4: https://github.com/schemathesis/schemathesis/compare/v3.9.3...v3.9.4
 .. _3.9.3: https://github.com/schemathesis/schemathesis/compare/v3.9.2...v3.9.3
