@@ -152,6 +152,8 @@ def get_links(response: GenericResponse, operation: APIOperation, field: str) ->
     responses = operation.definition.resolved["responses"]
     if str(response.status_code) in responses:
         response_definition = responses[str(response.status_code)]
+    elif response.status_code in responses:
+        response_definition = responses[response.status_code]
     else:
         response_definition = responses.get("default", {})
     links = response_definition.get(field, {})

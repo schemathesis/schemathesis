@@ -7,7 +7,7 @@ import requests
 import schemathesis
 from schemathesis.models import APIOperation, Case, OperationDefinition
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
-from schemathesis.specs.openapi.links import Link, get_container
+from schemathesis.specs.openapi.links import Link, get_container, get_links
 from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI30Body, OpenAPI30Parameter
 from schemathesis.stateful import ParsedData, Stateful
 
@@ -321,3 +321,26 @@ def test_get_container_invalid_location():
     case = operation.make_case()
     with pytest.raises(ValueError, match="Parameter `unknown` is not defined in API operation `GET /users/{user_id}`"):
         get_container(case, None, "unknown")
+
+
+@pytest.mark.parametrize(
+    "status_code, expected",
+    (
+        (200, ["Foo"]),
+        (201, ["Bar"]),
+    ),
+)
+def test_get_links_numeric_response_codes(status_code, openapi_30, expected):
+    # See GH-1226
+    # When API definition contains response statuses as integers
+    operation = openapi_30["/users"]["GET"]
+    link_definition = {"operationRef": "#/paths/~1users/get"}
+    operation.definition.resolved["responses"] = {
+        "200": {"description": "OK", "links": {"Foo": link_definition}},
+        # Could be here due to YAML parsing + disabled schema validation
+        201: {"description": "OK", "links": {"Bar": link_definition}},
+    }
+    response = requests.Response()
+    response.status_code = status_code
+    # Then they still should be checked, even that is not compliant with the spec
+    assert [link.name for link in get_links(response, operation, "links")] == expected
