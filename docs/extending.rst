@@ -309,6 +309,25 @@ Called right after any successful test request during CLI runs. With this hook, 
 Depending on whether you use your Python app in-process, you might get different types for the ``response`` argument.
 For the WSGI case, it will be ``schemathesis.utils.WSGIResponse``.
 
+``process_call_kwargs``
+~~~~~~~~~~~~~~~~~~~~~~~
+
+If you want to modify what keyword arguments will be given to ``case.call`` / ``case.call_wsgi`` / ``case.call_asgi`` in CLI, then you can use this hook:
+
+.. code:: python
+
+    import schemathesis
+
+
+    @schemathesis.hooks.register
+    def process_call_kwargs(context, case, kwargs):
+        kwargs["allow_redirects"] = False
+
+.. important:: The ``process_call_kwargs`` hook works only in CLI.
+
+If you test your app via the real network, then the hook above will disable resolving redirects during network calls.
+For WSGI integration, the keywords are different. See the documentation for ``werkzeug.Client.open``.
+
 Custom string strategies
 ------------------------
 
