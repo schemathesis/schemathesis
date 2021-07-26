@@ -949,3 +949,12 @@ def after_call(context: HookContext, case: Case, response: GenericResponse) -> N
      - Response post-processing, like modifying its payload.
      - Logging
     """
+
+
+@HookDispatcher.register_spec([HookScope.GLOBAL])
+def process_call_kwargs(context: HookContext, case: Case, kwargs: Dict[str, Any]) -> None:
+    """Called before every network call in CLI tests.
+
+    Aims to modify the argument passed to `case.call` / `case.call_wsgi` / `case.call_asgi`.
+    Note that you need to modify `kwargs` in-place.
+    """

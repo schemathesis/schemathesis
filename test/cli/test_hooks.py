@@ -4,6 +4,7 @@ import pytest
 from _pytest.main import ExitCode
 
 import schemathesis
+from schemathesis import models
 
 
 @pytest.fixture(autouse=True)
@@ -91,3 +92,33 @@ def after_call(context, case, response):
     # Then the tests should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert 'Response payload: `{"wrong": 42}`' in result.stdout.splitlines()
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("success")
+def test_process_call_kwargs(testdir, cli, cli_args, mocker, app_type):
+    # When the `process_call_kwargs` hook is registered
+    # And it modifies `kwargs` by adding a new key there
+    module = testdir.make_importable_pyfile(
+        hook="""
+import schemathesis
+import requests
+
+@schemathesis.hooks.register
+def process_call_kwargs(context, case, kwargs):
+    if case.app is not None:
+        kwargs["follow_redirects"] = False
+    else:
+        kwargs["allow_redirects"] = False
+        """
+    )
+    if app_type == "real":
+        spy = mocker.spy(models.Case, "call")
+    else:
+        spy = mocker.spy(models.Case, "call_wsgi")
+    result = cli.main("--pre-run", module.purebasename, "run", *cli_args)
+    assert result.exit_code == ExitCode.OK, result.stdout
+    if app_type == "real":
+        assert spy.call_args[1]["allow_redirects"] is False
+    else:
+        assert spy.call_args[1]["follow_redirects"] is False
