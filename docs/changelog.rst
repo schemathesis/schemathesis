@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.9.7`_ - 2021-07-26
+---------------------
+
 **Added**
 
 - New ``process_call_kwargs`` CLI hook. `#1233`_
@@ -1935,7 +1938,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.9.6...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.9.7...HEAD
+.. _3.9.7: https://github.com/schemathesis/schemathesis/compare/v3.9.6...v3.9.7
 .. _3.9.6: https://github.com/schemathesis/schemathesis/compare/v3.9.5...v3.9.6
 .. _3.9.5: https://github.com/schemathesis/schemathesis/compare/v3.9.4...v3.9.5
 .. _3.9.4: https://github.com/schemathesis/schemathesis/compare/v3.9.3...v3.9.4
