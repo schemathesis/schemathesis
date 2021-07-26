@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- New ``process_call_kwargs`` CLI hook. `#1233`_
+
 **Changed**
 
 - Check non-string response status codes when Open API links are collected. `#1226`_
@@ -2100,6 +2104,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1233: https://github.com/schemathesis/schemathesis/issues/1233
 .. _#1226: https://github.com/schemathesis/schemathesis/issues/1226
 .. _#1224: https://github.com/schemathesis/schemathesis/issues/1224
 .. _#1220: https://github.com/schemathesis/schemathesis/issues/1220

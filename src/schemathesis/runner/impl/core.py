@@ -527,7 +527,14 @@ def _network_test(
     try:
         hook_context = HookContext(operation=case.operation)
         hooks.dispatch("before_call", hook_context, case)
-        response = case.call(session=session, headers=headers, timeout=timeout, verify=request_tls_verify)
+        kwargs: Dict[str, Any] = {
+            "session": session,
+            "headers": headers,
+            "timeout": timeout,
+            "verify": request_tls_verify,
+        }
+        hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
+        response = case.call(**kwargs)
         hooks.dispatch("after_call", hook_context, case, response)
     except CheckFailed as exc:
         check_name = "request_timeout"
@@ -618,7 +625,9 @@ def _wsgi_test(
         start = time.monotonic()
         hook_context = HookContext(operation=case.operation)
         hooks.dispatch("before_call", hook_context, case)
-        response = case.call_wsgi(headers=headers)
+        kwargs = {"headers": headers}
+        hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
+        response = case.call_wsgi(**kwargs)
         hooks.dispatch("after_call", hook_context, case, response)
         elapsed = time.monotonic() - start
     context = TargetContext(case=case, response=response, response_time=elapsed)
@@ -704,7 +713,9 @@ def _asgi_test(
 ) -> requests.Response:
     hook_context = HookContext(operation=case.operation)
     hooks.dispatch("before_call", hook_context, case)
-    response = case.call_asgi(headers=headers)
+    kwargs: Dict[str, Any] = {"headers": headers}
+    hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
+    response = case.call_asgi(**kwargs)
     hooks.dispatch("after_call", hook_context, case, response)
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
