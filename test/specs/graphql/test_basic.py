@@ -52,5 +52,7 @@ def test_custom_base_url(graphql_url, kwargs, base_path, expected):
     assert case.as_requests_kwargs()["url"] == expected
 
 
-def test_make_case(graphql_schema):
-    assert isinstance(graphql_schema["/graphql"]["POST"].make_case(), GraphQLCase)
+@pytest.mark.parametrize("kwargs", ({}, {"body": "SomeQuery"}))
+def test_make_case(graphql_schema, kwargs):
+    case = graphql_schema["/graphql"]["POST"].make_case(**kwargs)
+    assert isinstance(case, GraphQLCase)

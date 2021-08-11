@@ -21,6 +21,7 @@ from typing import (
     Sequence,
     Tuple,
     Type,
+    TypeVar,
     Union,
 )
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
@@ -36,7 +37,7 @@ from .exceptions import InvalidSchema, UsageError
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import APIOperation, Case
 from .stateful import APIStateMachine, Stateful, StatefulTest
-from .types import Filter, FormData, GenericTest, NotSet
+from .types import Body, Cookies, Filter, FormData, GenericTest, Headers, NotSet, PathParameters, Query
 from .utils import NOT_SET, PARAMETRIZE_MARKER, Err, GenericResponse, GivenInput, Ok, Result, given_proxy
 
 
@@ -53,6 +54,9 @@ class MethodsDict(CaseInsensitiveDict):
             available_methods = ", ".join(map(str.upper, self))
             message = f"Method `{item}` not found. Available methods: {available_methods}"
             raise KeyError(message) from exc
+
+
+C = TypeVar("C", bound=Case)
 
 
 @attr.s(eq=False)  # pragma: no mutate
@@ -314,6 +318,20 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def get_request_payload_content_types(self, operation: APIOperation) -> List[str]:
+        raise NotImplementedError
+
+    def make_case(
+        self,
+        *,
+        case_cls: Type[C],
+        operation: APIOperation,
+        path_parameters: Optional[PathParameters] = None,
+        headers: Optional[Headers] = None,
+        cookies: Optional[Cookies] = None,
+        query: Optional[Query] = None,
+        body: Union[Body, NotSet] = NOT_SET,
+        media_type: Optional[str] = None,
+    ) -> C:
         raise NotImplementedError
 
     def get_case_strategy(

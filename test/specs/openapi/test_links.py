@@ -301,11 +301,11 @@ def test_make_operation_invalid_location(parameter):
         LINK.make_operation([ParsedData({parameter: 4})])
 
 
-def test_get_container_invalid_location():
+def test_get_container_invalid_location(swagger_20):
     operation = APIOperation(
         path="/users/{user_id}",
         method="get",
-        schema=None,
+        schema=swagger_20,
         verbose_name="GET /users/{user_id}",
         definition=OperationDefinition(
             raw={},
