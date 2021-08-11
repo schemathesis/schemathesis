@@ -27,7 +27,16 @@ class GraphQLCase(Case):
     ) -> Dict[str, Any]:
         final_headers = self._get_headers(headers)
         base_url = self._get_base_url(base_url)
-        return {"method": self.method, "url": base_url, "json": {"query": self.body}, "headers": final_headers}
+        kwargs: Dict[str, Any] = {"method": self.method, "url": base_url, "headers": final_headers}
+        # There is no direct way to have bytes here, but it is a useful pattern to support.
+        # It also unifies GraphQLCase with its Open API counterpart where bytes may come from external examples
+        if isinstance(self.body, bytes):
+            kwargs["data"] = self.body
+            # Assume that the payload is JSON, not raw GraphQL queries
+            kwargs["headers"].setdefault("Content-Type", "application/json")
+        else:
+            kwargs["json"] = {"query": self.body}
+        return kwargs
 
     def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         final_headers = self._get_headers(headers)

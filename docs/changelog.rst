@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Internal error in ``make_case`` calls for GraphQL schemas.
+- ``TypeError`` on ``case.call`` with bytes data on GraphQL schemas.
 
 `3.9.7`_ - 2021-07-26
 ---------------------
