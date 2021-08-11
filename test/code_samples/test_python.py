@@ -66,8 +66,8 @@ def test_graphql_code_sample(graphql_url, graphql_schema, graphql_strategy):
     case = graphql_strategy.example()
     assert (
         case.get_code_to_reproduce() == f"requests.post('{graphql_url}', "
-        f"json={{'query': {repr(case.body)}}}, "
-        f"headers={{'User-Agent': '{USER_AGENT}'}})"
+        f"headers={{'User-Agent': '{USER_AGENT}'}}, "
+        f"json={{'query': {repr(case.body)}}})"
     )
 
 
