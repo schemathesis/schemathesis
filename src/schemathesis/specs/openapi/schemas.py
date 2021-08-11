@@ -5,7 +5,21 @@ from contextlib import ExitStack, contextmanager
 from copy import deepcopy
 from difflib import get_close_matches
 from json import JSONDecodeError
-from typing import Any, Callable, ClassVar, Dict, Generator, Iterable, List, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 from urllib.parse import urlsplit
 
 import jsonschema
@@ -16,6 +30,7 @@ from ... import failures
 from ...constants import DataGenerationMethod
 from ...exceptions import (
     InvalidSchema,
+    UsageError,
     get_missing_content_type_error,
     get_response_parsing_error,
     get_schema_validation_error,
@@ -24,8 +39,8 @@ from ...hooks import HookContext, HookDispatcher
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import BaseSchema
 from ...stateful import APIStateMachine, Stateful, StatefulTest
-from ...types import FormData
-from ...utils import Err, GenericResponse, Ok, Result, get_response_payload, is_json_media_type
+from ...types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
+from ...utils import NOT_SET, Err, GenericResponse, Ok, Result, get_response_payload, is_json_media_type
 from . import links, serialization
 from ._hypothesis import get_case_strategy
 from .converter import to_json_schema_recursive
@@ -451,6 +466,7 @@ def in_scopes(resolver: jsonschema.RefResolver, scopes: List[str]) -> Generator[
 
 OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE = "application/json"
 OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE = "multipart/form-data"
+C = TypeVar("C", bound=Case)
 
 
 class SwaggerV20(BaseOpenAPISchema):
@@ -572,6 +588,41 @@ class SwaggerV20(BaseOpenAPISchema):
 
     def get_request_payload_content_types(self, operation: APIOperation) -> List[str]:
         return self._get_consumes_for_operation(operation.definition.resolved)
+
+    def make_case(
+        self,
+        *,
+        case_cls: Type[C],
+        operation: APIOperation,
+        path_parameters: Optional[PathParameters] = None,
+        headers: Optional[Headers] = None,
+        cookies: Optional[Cookies] = None,
+        query: Optional[Query] = None,
+        body: Union[Body, NotSet] = NOT_SET,
+        media_type: Optional[str] = None,
+    ) -> C:
+        if body is not NOT_SET and media_type is None:
+            # If the user wants to send payload, then there should be a media type, otherwise the payload is ignored
+            media_types = operation.get_request_payload_content_types()
+            if len(media_types) == 1:
+                # The only available option
+                media_type = media_types[0]
+            else:
+                media_types_repr = ", ".join(media_types)
+                raise UsageError(
+                    "Can not detect appropriate media type. "
+                    "You can either specify one of the defined media types "
+                    f"or pass any other media type available for serialization. Defined media types: {media_types_repr}"
+                )
+        return case_cls(
+            operation=operation,
+            path_parameters=path_parameters,
+            headers=headers,
+            cookies=cookies,
+            query=query,
+            body=body,
+            media_type=media_type,
+        )
 
     def _get_consumes_for_operation(self, definition: Dict[str, Any]) -> List[str]:
         """Get the `consumes` value for the given API operation.

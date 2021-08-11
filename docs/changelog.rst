@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Internal error in ``make_case`` calls for GraphQL schemas.
+
 `3.9.7`_ - 2021-07-26
 ---------------------
 
