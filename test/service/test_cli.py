@@ -23,7 +23,7 @@ def test_no_failures(cli, schema_url, service, service_token):
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then it should receive requests
-    assert len(service.server.log) == 5
+    assert len(service.server.log) == 5, service.server.log
     # Create job
     service.assert_call(0, "/jobs/", 201)
     for idx, event_type in enumerate(("Initialized", "BeforeExecution", "AfterExecution", "Finished"), 1):
@@ -51,12 +51,12 @@ def test_server_error(cli, schema_url, service, service_token, show_tracebacks):
     service.assert_call(0, "/jobs/", 500)
     # And it should be noted in the output
     lines = [strip_style_win32(line) for line in result.stdout.splitlines()]
-    assert lines[18].endswith("Schemathesis.io: ERROR")
-    assert lines[20] == "An error happened during uploading reports to Schemathesis.io"
+    assert "Schemathesis.io: ERROR" in lines
+    assert "An error happened during uploading reports to Schemathesis.io" in lines
     if show_tracebacks:
-        assert lines[22] == "Traceback (most recent call last):"
+        assert "Traceback (most recent call last):" in lines
     else:
-        assert lines[22].startswith("requests.exceptions.HTTPError: 500 Server Error: INTERNAL SERVER ERROR")
+        assert lines[-3].startswith("requests.exceptions.HTTPError: 500 Server Error: INTERNAL SERVER ERROR")
 
 
 @pytest.mark.operations("success")
