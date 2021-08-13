@@ -205,12 +205,12 @@ class ThreadPoolRunner(BaseRunner):
                 is_finished = all(not worker.is_alive() for worker in workers)
                 while not events_queue.empty():
                     event = events_queue.get()
-                    yield event
                     if isinstance(event, events.Interrupted):
                         # Thread received SIGINT
                         # We could still have events in the queue, but ignore them to keep the logic simple
                         # for now, could be improved in the future to show more info in such corner cases
-                        raise ThreadInterrupted
+                        stop_workers()
+                    yield event
         except ThreadInterrupted:
             stop_workers()
         except KeyboardInterrupt:
