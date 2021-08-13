@@ -5,6 +5,12 @@ Changelog
 -------------------
 
 **Fixed**
+- Worker threads may not be immediately stopped on SIGINT. `#1066`_
+
+`3.9.5`_ - 2021-08-13
+---------------------
+
+**Fixed**
 
 - Internal error in ``make_case`` calls for GraphQL schemas.
 - ``TypeError`` on ``case.call`` with bytes data on GraphQL schemas.
