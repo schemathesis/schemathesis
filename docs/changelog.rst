@@ -2141,6 +2141,7 @@ Deprecated
 .. _#1073: https://github.com/schemathesis/schemathesis/issues/1073
 .. _#1069: https://github.com/schemathesis/schemathesis/issues/1069
 .. _#1068: https://github.com/schemathesis/schemathesis/issues/1068
+.. _#1066: https://github.com/schemathesis/schemathesis/issues/1066
 .. _#1067: https://github.com/schemathesis/schemathesis/issues/1067
 .. _#1059: https://github.com/schemathesis/schemathesis/issues/1059
 .. _#1050: https://github.com/schemathesis/schemathesis/issues/1050
