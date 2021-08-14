@@ -73,7 +73,6 @@ class BaseOpenAPISchema(BaseSchema):
     links_field: str
     allowed_http_methods: Tuple[str, ...]
     security: BaseSecurityProcessor
-    parameter_cls: Type[OpenAPIParameter]
     component_locations: ClassVar[Tuple[str, ...]] = ()
     _operations_by_id: Dict[str, APIOperation]
 
@@ -474,7 +473,6 @@ class SwaggerV20(BaseOpenAPISchema):
     example_field = "x-example"
     examples_field = "x-examples"
     allowed_http_methods: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
-    parameter_cls: Type[OpenAPIParameter] = OpenAPI20Parameter
     security = SwaggerSecurityProcessor()
     component_locations: ClassVar[Tuple[str, ...]] = ("definitions", "parameters", "responses")
     links_field = "x-links"
@@ -644,7 +642,6 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     examples_field = "examples"
     allowed_http_methods = SwaggerV20.allowed_http_methods + ("trace",)
     security = OpenAPISecurityProcessor()
-    parameter_cls = OpenAPI30Parameter
     component_locations = ("components",)
     links_field = "links"
 
