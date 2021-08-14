@@ -235,7 +235,6 @@ class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
         "$ref",
         "format",
         "multipleOf",
-        "multipleOf",
         "maximum",
         "exclusiveMaximum",
         "minimum",
