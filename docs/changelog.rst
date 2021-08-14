@@ -8,12 +8,15 @@ Changelog
 
 - **INTERNAL**. ``description`` attribute for all parsed parameters inside ``APIOperation``.
 
+**Changed**
+
+- Pin ``werkzeug`` to ``>=0.16.0``.
+
 **Fixed**
 
 - Internal error in ``make_case`` calls for GraphQL schemas.
 - ``TypeError`` on ``case.call`` with bytes data on GraphQL schemas.
 - Worker threads may not be immediately stopped on SIGINT. `#1066`_ 
-
 
 `3.9.7`_ - 2021-07-26
 ---------------------
