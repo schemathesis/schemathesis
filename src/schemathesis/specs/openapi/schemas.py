@@ -669,8 +669,11 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         collected: List[OpenAPIParameter] = [OpenAPI30Parameter(definition=parameter) for parameter in parameters]
         if "requestBody" in definition:
             required = definition["requestBody"].get("required", False)
+            description = definition["requestBody"].get("description")
             for media_type, content in definition["requestBody"]["content"].items():
-                collected.append(OpenAPI30Body(content, media_type=media_type, required=required))
+                collected.append(
+                    OpenAPI30Body(content, description=description, media_type=media_type, required=required)
+                )
         return collected
 
     def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:

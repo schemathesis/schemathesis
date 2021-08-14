@@ -1,5 +1,5 @@
 import json
-from typing import Any, ClassVar, Dict, Iterable, List, Tuple
+from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple
 
 import attr
 
@@ -15,6 +15,11 @@ class OpenAPIParameter(Parameter):
     examples_field: ClassVar[str]
     nullable_field: ClassVar[str]
     supported_jsonschema_keywords: ClassVar[Tuple[str, ...]]
+
+    @property
+    def description(self) -> Optional[str]:
+        """A brief parameter description."""
+        return self.definition.get("description")
 
     @property
     def example(self) -> Any:
@@ -284,6 +289,7 @@ class OpenAPI30Body(OpenAPIBody, OpenAPI30Parameter):
     # The `required` keyword is located above the schema for concrete media-type;
     # Therefore, it is passed here explicitly
     required: bool = attr.ib(default=False)
+    description: Optional[str] = attr.ib(default=None)
 
     def as_json_schema(self) -> Dict[str, Any]:
         """Convert body definition to JSON Schema."""
@@ -319,6 +325,10 @@ class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
             definition=[OpenAPI20Parameter(parameter) for parameter in parameters],
             media_type=media_type,
         )
+
+    @property
+    def description(self) -> Optional[str]:
+        return None
 
     @property
     def is_required(self) -> bool:

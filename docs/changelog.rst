@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- **INTERNAL**. ``description`` attribute for all parsed parameters inside ``APIOperation``.
 
 **Fixed**
 
