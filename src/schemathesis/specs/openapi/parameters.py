@@ -317,7 +317,7 @@ class OpenAPI30Body(OpenAPIBody, OpenAPI30Parameter):
 class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
     """A special container to abstract over multiple `formData` parameters."""
 
-    definition: List[OpenAPIParameter] = attr.ib()
+    definition: List[OpenAPI20Parameter] = attr.ib()
 
     @classmethod
     def from_parameters(cls, *parameters: Dict[str, Any], media_type: str) -> "OpenAPI20CompositeBody":
