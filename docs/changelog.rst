@@ -11,6 +11,7 @@ Changelog
 **Changed**
 
 - Pin ``werkzeug`` to ``>=0.16.0``.
+- **INTERNAL**. ``OpenAPI20CompositeBody.definition`` type to ``List[OpenAPI20Parameter]``.
 
 **Fixed**
 
