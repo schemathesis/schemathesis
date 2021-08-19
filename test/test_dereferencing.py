@@ -565,3 +565,56 @@ def test_remote_reference_to_yaml(swagger_20, schema_url):
     scope, resolved = swagger_20.resolver.resolve(f"{schema_url}#/info/title")
     assert scope.endswith("#/info/title")
     assert resolved == "Example API"
+
+
+def assert_unique_objects(item):
+    seen = set()
+
+    def check_seen(it):
+        if id(it) in seen:
+            raise ValueError(f"Seen: {it!r}")
+        seen.add(id(it))
+
+    def traverse(it):
+        if isinstance(it, dict):
+            check_seen(it)
+            for value in it.values():
+                traverse(value)
+        if isinstance(it, list):
+            check_seen(it)
+            for value in it:
+                traverse(value)
+
+    traverse(item)
+
+
+def test_unique_objects_after_inlining(empty_open_api_3_schema):
+    # When the schema contains deep references
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "requestBody": {
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/step5"}}},
+                },
+                "responses": {"default": {"description": "Success"}},
+            }
+        }
+    }
+    empty_open_api_3_schema["components"] = {
+        "schemas": {
+            "final": {"type": "object"},
+            "step1": {"$ref": "#/components/schemas/final"},
+            "step2": {"$ref": "#/components/schemas/step1"},
+            "step3": {"$ref": "#/components/schemas/step2"},
+            "step4": {"$ref": "#/components/schemas/step3"},
+            "step5": {
+                "properties": {
+                    "first": {"$ref": "#/components/schemas/step4"},
+                    "second": {"$ref": "#/components/schemas/step4"},
+                }
+            },
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    # Then inlined objects should be unique
+    assert_unique_objects(schema["/test"]["post"].body[0].definition)
