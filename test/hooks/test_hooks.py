@@ -369,3 +369,20 @@ def test_deprecated_attribute():
     assert str(records[0].message) == (
         "Property `endpoint` is deprecated and will be removed in Schemathesis 4.0. Use `operation` instead."
     )
+
+
+def test_before_init_operation(testdir, simple_openapi):
+    testdir.make_test(
+        """
+@schema.hooks.register
+def before_init_operation(context, operation):
+    operation.query[0].definition["schema"] = {"enum": [42]}
+
+@schema.parametrize()
+def test_a(case):
+    assert case.query == {"id": 42}
+    """,
+        schema=simple_openapi,
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)

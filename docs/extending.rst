@@ -167,6 +167,23 @@ Called just before schema instance is created. Takes a raw schema representation
 
 This hook allows you to modify schema before loading.
 
+``before_init_operation``
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Allows you to modify just initialized API operation:
+
+.. code:: python
+
+    import schemathesis
+    from schemathesis.models import APIOperation
+
+
+    def before_init_operation(
+        context: schemathesis.hooks.HookContext, operation: APIOperation
+    ) -> None:
+        # Overrides the existing schema
+        operation.query[0].definition["schema"] = {"enum": [42]}
+
 ``before_add_examples``
 ~~~~~~~~~~~~~~~~~~~~~~~
 
