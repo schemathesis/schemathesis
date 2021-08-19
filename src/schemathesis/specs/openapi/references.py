@@ -66,7 +66,7 @@ class InliningResolver(jsonschema.RefResolver):
             ref = item.get("$ref")
             if ref is not None and isinstance(ref, str):
                 with self.resolving(ref) as resolved:
-                    return self.resolve_all(resolved, recursion_level + 1)
+                    return self.resolve_all(deepcopy(resolved), recursion_level + 1)
             item = deepcopy(item)
             for key, sub_item in item.items():
                 item[key] = self.resolve_all(sub_item, recursion_level)

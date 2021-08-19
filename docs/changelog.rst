@@ -17,7 +17,8 @@ Changelog
 
 - Internal error in ``make_case`` calls for GraphQL schemas.
 - ``TypeError`` on ``case.call`` with bytes data on GraphQL schemas.
-- Worker threads may not be immediately stopped on SIGINT. `#1066`_ 
+- Worker threads may not be immediately stopped on SIGINT. `#1066`_
+- Re-used referenced objects during inlining. Now they are independent.
 
 `3.9.7`_ - 2021-07-26
 ---------------------
