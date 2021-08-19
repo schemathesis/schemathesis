@@ -235,6 +235,11 @@ def before_add_examples(context: HookContext, examples: List["Case"]) -> None:
     """
 
 
+@all_scopes
+def before_init_operation(context: HookContext, operation: "APIOperation") -> None:
+    """Allows you to customize a newly created API operation."""
+
+
 @HookDispatcher.register_spec([HookScope.GLOBAL])
 def add_case(context: HookContext, case: "Case", response: GenericResponse) -> Optional["Case"]:
     """Creates an additional test per API operation. If this hook returns None, no additional test created.
