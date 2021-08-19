@@ -6,6 +6,7 @@ Changelog
 
 **Added**
 
+- New ``before_init_operation`` hook.
 - **INTERNAL**. ``description`` attribute for all parsed parameters inside ``APIOperation``.
 
 **Changed**

@@ -200,6 +200,7 @@ class BaseOpenAPISchema(BaseSchema):
         for parameter in parameters:
             operation.add_parameter(parameter)
         self.security.process_definitions(self.raw_schema, operation, self.resolver)
+        self.dispatch_hook("before_init_operation", HookContext(operation=operation), operation)
         return operation
 
     @property
