@@ -236,7 +236,7 @@ def test_commands_run_help(cli):
         "  -A, --auth-type [basic|digest]  The authentication mechanism to be used.",
         "                                  Defaults to 'basic'.  [default: basic]",
         "",
-        "  -H, --header TEXT               Custom header in a that will be used in all",
+        "  -H, --header TEXT               Custom header that will be used in all",
         "                                  requests to the server. Example:",
         r"                                  Authorization: Bearer\ 123",
         "",

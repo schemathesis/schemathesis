@@ -242,7 +242,7 @@ class GroupedOption(click.Option):
     "--header",
     "-H",
     "headers",
-    help=r"Custom header in a that will be used in all requests to the server. Example: Authorization: Bearer\ 123",
+    help=r"Custom header that will be used in all requests to the server. Example: Authorization: Bearer\ 123",
     multiple=True,
     type=str,
     callback=callbacks.validate_headers,
