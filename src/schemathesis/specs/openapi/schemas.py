@@ -88,14 +88,14 @@ class BaseOpenAPISchema(BaseSchema):
     security: BaseSecurityProcessor
     component_locations: ClassVar[Tuple[str, ...]] = ()
     _operations_by_id: Dict[str, APIOperation]
-    _remote_reference_cache: Dict[str, Any]
-    # Remote references cache can be populated from multiple threads, therefore we need some synchronisation to avoid
+    _inline_reference_cache: Dict[str, Any]
+    # Inline references cache can be populated from multiple threads, therefore we need some synchronisation to avoid
     # excessive resolving
-    _remote_reference_cache_lock: RLock
+    _inline_reference_cache_lock: RLock
 
     def __attrs_post_init__(self) -> None:
-        self._remote_reference_cache = {}
-        self._remote_reference_cache_lock = RLock()
+        self._inline_reference_cache = {}
+        self._inline_reference_cache_lock = RLock()
 
     @property  # pragma: no mutate
     def spec_version(self) -> str:
@@ -464,11 +464,11 @@ class BaseOpenAPISchema(BaseSchema):
         Inlining components helps `hypothesis-jsonschema` generate data that involves non-resolved references.
         """
         schema = deepcopy(schema)
-        schema = traverse_schema(schema, lambda s: self._rewrite_remote_references(s, self.resolver))
+        schema = traverse_schema(schema, lambda s: self._rewrite_references(s, self.resolver))
 
         def callback(_schema: Dict[str, Any], nullable_name: str) -> Dict[str, Any]:
             _schema = to_json_schema(_schema, nullable_name)
-            return self._rewrite_remote_references(_schema, self.resolver)
+            return self._rewrite_references(_schema, self.resolver)
 
         # Different spec versions allow different keywords to store possible reference targets
         for key in self.component_locations:
@@ -476,28 +476,29 @@ class BaseOpenAPISchema(BaseSchema):
                 schema[key] = traverse_schema(self.raw_schema[key], callback, self.nullable_name)
         # If there are any cached references - add them to the resulting schema.
         # Note that not all of them might be used for data generation, but at this point it is the simplest way to go
-        if self._remote_reference_cache:
-            schema[REMOTE_SCHEMAS_STORAGE_KEY] = self._remote_reference_cache
+        if self._inline_reference_cache:
+            schema[INLINED_REFERENCES_KEY] = self._inline_reference_cache
         return schema
 
-    def _rewrite_remote_references(self, schema: Dict[str, Any], resolver: InliningResolver) -> Dict[str, Any]:
-        """Inline non-local references present in the schema.
+    def _rewrite_references(self, schema: Dict[str, Any], resolver: InliningResolver) -> Dict[str, Any]:
+        """Rewrite references present in the schema.
 
-        The idea is to resolve remote references, cache the result and replace these references with new ones
+        The idea is to resolve references, cache the result and replace these references with new ones
         that point to a local path which is populated from this cache later on.
         """
         reference = schema.get("$ref")
-        # If `$ref` is not a property name and is not a local reference
+        # If `$ref` is not a property name and should be processed
         if reference is not None and isinstance(reference, str) and not reference.startswith("#/"):
             key = _make_reference_key(resolver._scopes_stack, reference)
-            with self._remote_reference_cache_lock:
-                if key not in self._remote_reference_cache:
+            with self._inline_reference_cache_lock:
+                if key not in self._inline_reference_cache:
                     with resolver.resolving(reference) as resolved:
-                        # Resolved object also may have non-local references
-                        self._remote_reference_cache[key] = traverse_schema(
-                            resolved, lambda s: self._rewrite_remote_references(s, self.resolver)
+                        # Resolved object also may have references
+                        self._inline_reference_cache[key] = traverse_schema(
+                            resolved, lambda s: self._rewrite_references(s, resolver)
                         )
-            schema["$ref"] = f"#/{REMOTE_SCHEMAS_STORAGE_KEY}/{key}"
+            # Rewrite the reference with the new location
+            schema["$ref"] = f"#/{INLINED_REFERENCES_KEY}/{key}"
         return schema
 
 
@@ -514,7 +515,7 @@ def _make_reference_key(scopes: List[str], reference: str) -> str:
     return digest.hexdigest()
 
 
-REMOTE_SCHEMAS_STORAGE_KEY = "x-inlined"
+INLINED_REFERENCES_KEY = "x-inlined"
 
 
 @contextmanager
