@@ -208,8 +208,8 @@ def _colliding_remote_schema(testdir):
     testdir.makefile(".json", c='{"d": {"type": "string"}}')
 
 
-def _recursive_remote_schema(testdir):
-    # Remote reference (1) contains a remote reference (2) that points back to the 1
+def _back_reference_remote_schema(testdir):
+    # Remote reference (1) contains a remote reference (2) that points back to 1
     testdir.makefile(".json", bar='{"bar": {"$ref": "spam.json#/spam"}, "baz": {"type": "integer"}}')
     testdir.makefile(".json", spam='{"spam": {"$ref": "bar.json#/baz"}}')
 
@@ -232,7 +232,7 @@ def _scoped_remote_schema(testdir):
         (_nested_remote_schema, lambda v: isinstance(v, int)),
         (_deep_nested_remote_schema, lambda v: isinstance(v["a"], int)),
         (_colliding_remote_schema, lambda v: isinstance(v["a"], int) and isinstance(v["b"], str)),
-        (_recursive_remote_schema, lambda v: isinstance(v, int)),
+        (_back_reference_remote_schema, lambda v: isinstance(v, int)),
         (_scoped_remote_schema, lambda v: isinstance(v, int)),
     ),
 )
