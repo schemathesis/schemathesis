@@ -310,3 +310,15 @@ def test_header_filtration_needed(empty_open_api_3_schema, mocker):
 
     # Then header filter should be used
     mocked.assert_called()
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    (
+        ("foo", True),
+        ("тест", False),
+        ("\n", False),
+    ),
+)
+def test_is_valid_header(value, expected):
+    assert is_valid_header({"foo": value}) is expected
