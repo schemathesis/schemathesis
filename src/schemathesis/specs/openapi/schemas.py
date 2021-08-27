@@ -464,11 +464,13 @@ class BaseOpenAPISchema(BaseSchema):
         Inlining components helps `hypothesis-jsonschema` generate data that involves non-resolved references.
         """
         schema = deepcopy(schema)
-        schema = traverse_schema(schema, lambda s: self._rewrite_references(s, self.resolver))
+        schema = traverse_schema(schema, lambda s: self._rewrite_references(s, self.resolver, True, set()))
+
+        seen = set()
 
         def callback(_schema: Dict[str, Any], nullable_name: str) -> Dict[str, Any]:
             _schema = to_json_schema(_schema, nullable_name)
-            return self._rewrite_references(_schema, self.resolver)
+            return self._rewrite_references(_schema, self.resolver, True, seen)
 
         # Different spec versions allow different keywords to store possible reference targets
         for key in self.component_locations:
@@ -480,22 +482,31 @@ class BaseOpenAPISchema(BaseSchema):
             schema[INLINED_REFERENCES_KEY] = self._inline_reference_cache
         return schema
 
-    def _rewrite_references(self, schema: Dict[str, Any], resolver: InliningResolver) -> Dict[str, Any]:
+    def _rewrite_references(
+        self, schema: Dict[str, Any], resolver: InliningResolver, only_remote: bool, seen
+    ) -> Dict[str, Any]:
         """Rewrite references present in the schema.
 
         The idea is to resolve references, cache the result and replace these references with new ones
         that point to a local path which is populated from this cache later on.
+
+        It is used for moving remote schemas & components to the root schema to avoid passing unresolvable references
+        to `hypothesis-jsonschema`.
         """
+        schema_id = id(schema)
+        if schema_id in seen:
+            return schema
+        seen.add(schema_id)
         reference = schema.get("$ref")
         # If `$ref` is not a property name and should be processed
-        if reference is not None and isinstance(reference, str) and not reference.startswith("#/"):
+        if reference is not None and isinstance(reference, str) and not (only_remote and reference.startswith("#/")):
             key = _make_reference_key(resolver._scopes_stack, reference)
             with self._inline_reference_cache_lock:
                 if key not in self._inline_reference_cache:
                     with resolver.resolving(reference) as resolved:
                         # Resolved object also may have references
                         self._inline_reference_cache[key] = traverse_schema(
-                            resolved, lambda s: self._rewrite_references(s, resolver)
+                            resolved, lambda s: self._rewrite_references(s, resolver, False, seen)
                         )
             # Rewrite the reference with the new location
             schema["$ref"] = f"#/{INLINED_REFERENCES_KEY}/{key}"

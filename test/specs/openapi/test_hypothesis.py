@@ -2,6 +2,7 @@ import json
 
 import pytest
 from hypothesis import assume, given, settings
+from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
 import schemathesis
 from schemathesis.specs.openapi._hypothesis import get_case_strategy, is_valid_header, make_positive_strategy
@@ -208,6 +209,16 @@ def _colliding_remote_schema(testdir):
     testdir.makefile(".json", c='{"d": {"type": "string"}}')
 
 
+def _remote_with_local_schema(testdir):
+    # Remote reference contains a local reference
+    testdir.makefile(".json", bar='{"bar": {"$ref": "#/spam"}, "spam": {"type": "integer"}}')
+
+
+def _remote_with_recursive_local_schema(testdir):
+    # Remote reference contains a local reference
+    testdir.makefile(".json", bar='{"bar": {"$ref": "#/spam"}, "spam": {"items": {"$ref": "#/spam"}}}')
+
+
 def _back_reference_remote_schema(testdir):
     # Remote reference (1) contains a remote reference (2) that points back to 1
     testdir.makefile(".json", bar='{"bar": {"$ref": "spam.json#/spam"}, "baz": {"type": "integer"}}')
@@ -230,6 +241,7 @@ def _scoped_remote_schema(testdir):
     (
         (_remote_schema, lambda v: isinstance(v, int)),
         (_nested_remote_schema, lambda v: isinstance(v, int)),
+        (_remote_with_local_schema, lambda v: isinstance(v, int)),
         (_deep_nested_remote_schema, lambda v: isinstance(v["a"], int)),
         (_colliding_remote_schema, lambda v: isinstance(v["a"], int) and isinstance(v["b"], str)),
         (_back_reference_remote_schema, lambda v: isinstance(v, int)),
@@ -255,3 +267,63 @@ def test_inline_remote_refs(testdir, deeply_nested_schema, setup, check):
 
     # And the original schema is not mutated
     assert json.dumps(deeply_nested_schema, sort_keys=True, ensure_ascii=True) == original
+
+
+@pytest.mark.usefixtures("clear_caches")
+@pytest.mark.parametrize(
+    "setup",
+    (_remote_with_recursive_local_schema,),
+)
+def test_inline_recursive_refs(testdir, deeply_nested_schema, setup):
+    # When a remote schema contains a recursive reference
+    setup(testdir)
+    deeply_nested_schema["components"]["schemas"]["foo6"] = {"$ref": "bar.json#/bar"}
+
+    schema = schemathesis.from_dict(deeply_nested_schema)
+
+    # Then it should not cause internal errors
+    @given(schema["/data"]["GET"].as_strategy())
+    @settings(max_examples=1)
+    def test(_):
+        pass
+
+    # And `hypothesis-jsonschema` should indicate the issue
+    with pytest.raises(HypothesisRefResolutionError):
+        test()
+
+
+def test_inline_xx(testdir, empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": "foo",
+                        "in": "query",
+                        "schema": {"$ref": "./commons.json#/Foo"},
+                    },
+                ],
+                "responses": {
+                    "default": {"description": "OK"},
+                },
+            },
+        }
+    }
+    common = {
+        "Foo": {"$ref": "#/Bar"},
+        "Bar": {"$ref": "#/Foo"},
+    }
+    schema_path = testdir.makefile(".json", root=json.dumps(empty_open_api_3_schema))
+    testdir.makefile(".json", commons=json.dumps(common))
+
+    schema = schemathesis.from_path(schema_path)
+
+    # Then it should not cause internal errors
+    @given(schema["/data"]["GET"].as_strategy())
+    @settings(max_examples=1)
+    def test(_):
+        pass
+
+    # And `hypothesis-jsonschema` should indicate the issue
+    with pytest.raises(HypothesisRefResolutionError):
+        test()
