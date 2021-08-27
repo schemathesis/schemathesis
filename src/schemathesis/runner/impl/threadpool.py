@@ -181,7 +181,9 @@ class ThreadPoolRunner(BaseRunner):
     workers_num: int = attr.ib(default=2)  # pragma: no mutate
     request_tls_verify: Union[bool, str] = attr.ib(default=True)  # pragma: no mutate
 
-    def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
+    def _execute(
+        self, results: TestResultSet, stop_event: threading.Event
+    ) -> Generator[events.ExecutionEvent, None, None]:
         """All events come from a queue where different workers push their events."""
         tasks_queue = self._get_tasks_queue()
         # Events are pushed by workers via a separate queue
@@ -205,14 +207,15 @@ class ThreadPoolRunner(BaseRunner):
                 is_finished = all(not worker.is_alive() for worker in workers)
                 while not events_queue.empty():
                     event = events_queue.get()
-                    if isinstance(event, events.Interrupted):
-                        # Thread received SIGINT
+                    if stop_event.is_set() or isinstance(event, events.Interrupted) or self._should_stop(event):
                         # We could still have events in the queue, but ignore them to keep the logic simple
                         # for now, could be improved in the future to show more info in such corner cases
                         stop_workers()
+                        is_finished = True
+                        if stop_event.is_set():
+                            # Discard the event. The invariant is: the next event after `stream.stop()` is `Finished`
+                            break
                     yield event
-        except ThreadInterrupted:
-            stop_workers()
         except KeyboardInterrupt:
             stop_workers()
             yield events.Interrupted()
@@ -318,7 +321,3 @@ class ThreadPoolASGIRunner(ThreadPoolRunner):
                 "dry_run": self.dry_run,
             },
         }
-
-
-class ThreadInterrupted(Exception):
-    """Special exception when worker thread received SIGINT."""

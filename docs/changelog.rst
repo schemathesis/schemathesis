@@ -21,6 +21,7 @@ Changelog
 - Worker threads may not be immediately stopped on SIGINT. `#1066`_
 - Re-used referenced objects during inlining. Now they are independent.
 - Rewrite not resolved remote references to local ones. `#986`_
+- Stop worker threads on failures with ``exit_first`` enabled. `#1204`_
 
 `3.9.7`_ - 2021-07-26
 ---------------------
@@ -2131,6 +2132,7 @@ Deprecated
 .. _#1224: https://github.com/schemathesis/schemathesis/issues/1224
 .. _#1220: https://github.com/schemathesis/schemathesis/issues/1220
 .. _#1208: https://github.com/schemathesis/schemathesis/issues/1208
+.. _#1204: https://github.com/schemathesis/schemathesis/issues/1204
 .. _#1202: https://github.com/schemathesis/schemathesis/issues/1202
 .. _#1194: https://github.com/schemathesis/schemathesis/issues/1194
 .. _#1190: https://github.com/schemathesis/schemathesis/issues/1190

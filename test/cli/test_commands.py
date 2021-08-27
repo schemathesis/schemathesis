@@ -21,6 +21,7 @@ from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT, CodeSam
 from schemathesis.hooks import unregister_all
 from schemathesis.models import APIOperation
 from schemathesis.runner import DEFAULT_CHECKS, from_schema
+from schemathesis.runner.impl import threadpool
 from schemathesis.targets import DEFAULT_TARGETS
 
 PHASES = ", ".join(map(lambda x: x.name, Phase))
@@ -1656,26 +1657,31 @@ def test_auth_and_authorization_header_are_disallowed(cli, schema_url, header, o
     )
 
 
+@pytest.mark.parametrize("workers_num", (1, 2))
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 @pytest.mark.operations("failure", "success")
-def test_exit_first(cli, schema_url, openapi_version):
+def test_exit_first(cli, schema_url, openapi_version, workers_num, mocker):
     # When the `--exit-first` CLI option is passed
     # And a failure occurs
-    result = cli.run(schema_url, "--exitfirst")
+    stop_worker = mocker.spy(threadpool, "stop_worker")
+    result = cli.run(schema_url, "--exitfirst", "-w", str(workers_num))
     # Then tests are failed
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    lines = result.stdout.split("\n")
-    # And the execution should stop on the first failure
-    for idx, line in enumerate(lines):
-        if line.startswith("GET /api/failure F"):
-            assert line.endswith("[ 50%]")
-            break
+    if workers_num == 1:
+        lines = result.stdout.split("\n")
+        # And the execution should stop on the first failure
+        for idx, line in enumerate(lines):
+            if line.startswith("GET /api/failure F"):
+                assert line.endswith("[ 50%]")
+                break
+        else:
+            pytest.fail("Line is not found")
+        # the "FAILURES" sections goes after a new line, rather then continuing to the next operation
+        next_line = lines[idx + 1]
+        assert next_line == ""
+        assert "FAILURES" in lines[idx + 2]
     else:
-        pytest.fail("Line is not found")
-    # the "FAILURES" sections goes after a new line, rather then continuing to the next operation
-    next_line = lines[idx + 1]
-    assert next_line == ""
-    assert "FAILURES" in lines[idx + 2]
+        stop_worker.assert_called()
 
 
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
