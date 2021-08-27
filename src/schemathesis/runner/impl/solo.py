@@ -1,4 +1,5 @@
 # weird mypy bug with imports
+import threading
 from typing import Any, Dict, Generator, Union  # pylint: disable=unused-import
 
 import attr
@@ -15,7 +16,15 @@ class SingleThreadRunner(BaseRunner):
 
     request_tls_verify: Union[bool, str] = attr.ib(default=True)  # pragma: no mutate
 
-    def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
+    def _execute(
+        self, results: TestResultSet, stop_event: threading.Event
+    ) -> Generator[events.ExecutionEvent, None, None]:
+        for event in self._execute_impl(results):
+            yield event
+            if stop_event.is_set() or self._should_stop(event):
+                break
+
+    def _execute_impl(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         auth = get_requests_auth(self.auth, self.auth_type)
         with get_session(auth) as session:
             yield from self._run_tests(
@@ -38,7 +47,7 @@ class SingleThreadRunner(BaseRunner):
 
 @attr.s(slots=True)  # pragma: no mutate
 class SingleThreadWSGIRunner(SingleThreadRunner):
-    def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
+    def _execute_impl(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         yield from self._run_tests(
             self.schema.get_all_tests,
             wsgi_test,
@@ -58,7 +67,7 @@ class SingleThreadWSGIRunner(SingleThreadRunner):
 
 @attr.s(slots=True)  # pragma: no mutate
 class SingleThreadASGIRunner(SingleThreadRunner):
-    def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
+    def _execute_impl(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         yield from self._run_tests(
             self.schema.get_all_tests,
             asgi_test,

@@ -18,6 +18,7 @@ from schemathesis.checks import content_type_conformance, response_schema_confor
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
 from schemathesis.models import Status
 from schemathesis.runner import ThreadPoolRunner, events, from_schema, get_requests_auth
+from schemathesis.runner.impl import threadpool
 from schemathesis.runner.impl.core import get_wsgi_auth, reraise
 from schemathesis.specs.graphql import loaders as gql_loaders
 from schemathesis.specs.openapi import loaders as oas_loaders
@@ -848,9 +849,19 @@ def test_graphql(graphql_url):
     assert finished.passed_count == 2
 
 
+@pytest.fixture(params=[1, 2], ids=["single-worker", "multi-worker"])
+def workers_num(request):
+    return request.param
+
+
 @pytest.fixture
-def runner(swagger_20):
-    return from_schema(swagger_20)
+def stop_worker(mocker):
+    return mocker.spy(threadpool, "stop_worker")
+
+
+@pytest.fixture
+def runner(workers_num, swagger_20):
+    return from_schema(swagger_20, workers_num=workers_num)
 
 
 @pytest.fixture
@@ -869,11 +880,13 @@ def test_stop_event_stream_immediately(event_stream):
     assert isinstance(next(event_stream), events.Finished)
 
 
-def test_stop_event_stream_after_second_event(event_stream):
+def test_stop_event_stream_after_second_event(event_stream, workers_num, stop_worker):
     next(event_stream)
     assert isinstance(next(event_stream), events.BeforeExecution)
     event_stream.stop()
     assert isinstance(next(event_stream), events.Finished)
+    if workers_num > 1:
+        stop_worker.assert_called()
 
 
 def test_finish(event_stream):
