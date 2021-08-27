@@ -23,6 +23,10 @@ Changelog
 - Rewrite not resolved remote references to local ones. `#986`_
 - Stop worker threads on failures with ``exit_first`` enabled. `#1204`_
 
+**Performance**
+
+- Avoid using filters for header values when is not necessary.
+
 `3.9.7`_ - 2021-07-26
 ---------------------
 
