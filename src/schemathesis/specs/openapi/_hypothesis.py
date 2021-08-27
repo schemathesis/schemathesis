@@ -24,6 +24,7 @@ from .negative import negative_schema
 from .parameters import OpenAPIBody, parameters_to_json_schema
 from .utils import is_header_location
 
+HEADER_FORMAT = "_header_value"
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
 SLASH = "/"
 STRING_FORMATS = {}
@@ -62,7 +63,7 @@ def init_default_strategies() -> None:
     # Define valid characters here to avoid filtering them out in `is_valid_header` later
     header_value = st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255, blacklist_characters="\n\r"))
     # Header values with leading non-visible chars can't be sent with `requests`
-    register_string_format("_header_value", header_value.map(str.lstrip))
+    register_string_format(HEADER_FORMAT, header_value.map(str.lstrip))
     register_string_format("_basic_auth", st.tuples(latin1_text, latin1_text).map(make_basic_auth_str))  # type: ignore
     register_string_format(
         "_bearer_auth",
@@ -280,7 +281,9 @@ def get_parameters_strategy(
             "cookie": is_valid_header,
             "query": is_valid_query,
         }[location]
-        strategy = strategy.filter(filter_func)
+        # Headers with special format do not need filtration
+        if not (is_header_location(location) and _has_header_format(schema)):
+            strategy = strategy.filter(filter_func)
         # Path & query parameters will be cast to string anyway, but having their JSON equivalents for
         # `True` / `False` / `None` improves chances of them passing validation in apps that expect boolean / null types
         # and not aware of Python-specific representation of those types
@@ -323,9 +326,16 @@ def make_positive_strategy(
         # This way, only allowed values will be used during data generation, which reduces the amount of filtering later
         # If a property schema contains `pattern` it leads to heavy filtering and worse performance - therefore, skip it
         for sub_schema in schema.get("properties", {}).values():
-            if len(sub_schema) == 1 and "type" in sub_schema:
-                sub_schema.setdefault("format", "_header_value")
+            if list(sub_schema) == ["type"]:
+                sub_schema.setdefault("format", HEADER_FORMAT)
     return from_schema(schema, custom_formats=STRING_FORMATS)
+
+
+def _has_header_format(schema: Dict[str, Any]) -> bool:
+    for sub_schema in schema.get("properties", {}).values():
+        if sub_schema.get("format") == HEADER_FORMAT:
+            return True
+    return False
 
 
 def make_negative_strategy(
