@@ -84,18 +84,21 @@ class BaseRunner:
             yield _finish()
             return
 
-        for event in self._execute(results):
+        for event in self._execute(results, stop_event):
             yield event
-            if stop_event.is_set() or (
-                self.exit_first
-                and isinstance(event, events.AfterExecution)
-                and event.status in (Status.error, Status.failure)
-            ):
-                break
 
         yield _finish()
 
-    def _execute(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
+    def _should_stop(self, event: events.ExecutionEvent) -> bool:
+        return (
+            self.exit_first
+            and isinstance(event, events.AfterExecution)
+            and event.status in (Status.error, Status.failure)
+        )
+
+    def _execute(
+        self, results: TestResultSet, stop_event: threading.Event
+    ) -> Generator[events.ExecutionEvent, None, None]:
         raise NotImplementedError
 
     def _run_tests(
