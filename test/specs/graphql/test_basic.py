@@ -2,7 +2,7 @@ from test.utils import assert_requests_call
 
 import pytest
 import requests
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis.constants import USER_AGENT
@@ -17,7 +17,7 @@ def test_raw_schema(graphql_schema):
 @pytest.mark.hypothesis_nested
 def test_query_strategy(graphql_strategy):
     @given(case=graphql_strategy)
-    @settings(max_examples=10)
+    @settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
     def test(case):
         response = case.call()
         assert response.status_code < 500
