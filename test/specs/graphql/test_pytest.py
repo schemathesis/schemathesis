@@ -4,7 +4,7 @@ def test_basic_pytest_graphql(testdir, graphql_path, graphql_url):
 schema = schemathesis.graphql.from_url('{graphql_url}')
 
 @schema.parametrize()
-@settings(max_examples=10)
+@settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "{graphql_path}"
@@ -34,7 +34,7 @@ from test.apps._graphql._flask.app import app
 schema = schemathesis.graphql.from_wsgi("{graphql_path}", app=app)
 
 @schema.parametrize()
-@settings(max_examples=10)
+@settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "{graphql_path}"
