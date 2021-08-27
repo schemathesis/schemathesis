@@ -4,6 +4,7 @@ import pytest
 from hypothesis import assume, given, settings
 
 import schemathesis
+from schemathesis.specs.openapi import _hypothesis
 from schemathesis.specs.openapi._hypothesis import get_case_strategy, is_valid_header, make_positive_strategy
 from schemathesis.specs.openapi.references import load_file
 
@@ -255,3 +256,57 @@ def test_inline_remote_refs(testdir, deeply_nested_schema, setup, check):
 
     # And the original schema is not mutated
     assert json.dumps(deeply_nested_schema, sort_keys=True, ensure_ascii=True) == original
+
+
+def make_header_param(schema, **kwargs):
+    schema["paths"] = {
+        "/data": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "header",
+                        "required": True,
+                        "schema": {"type": "string", **kwargs},
+                    }
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+
+
+def test_header_filtration_not_needed(empty_open_api_3_schema, mocker):
+    # When schema contains a simple header
+    mocked = mocker.spy(_hypothesis, "is_valid_header")
+    make_header_param(empty_open_api_3_schema)
+
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    @given(schema["/data"]["GET"].as_strategy())
+    @settings(max_examples=1)
+    def test(_):
+        pass
+
+    test()
+
+    # Then header filter should not be used
+    mocked.assert_not_called()
+
+
+def test_header_filtration_needed(empty_open_api_3_schema, mocker):
+    # When schema contains a header with a custom format
+    mocked = mocker.spy(_hypothesis, "is_valid_header")
+    make_header_param(empty_open_api_3_schema, format="date")
+
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    @given(schema["/data"]["GET"].as_strategy())
+    @settings(max_examples=1)
+    def test(_):
+        pass
+
+    test()
+
+    # Then header filter should be used
+    mocked.assert_called()
