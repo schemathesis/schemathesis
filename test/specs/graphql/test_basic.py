@@ -1,10 +1,12 @@
 from test.utils import assert_requests_call
 
 import pytest
+import requests
 from hypothesis import given, settings
 
 import schemathesis
 from schemathesis.constants import USER_AGENT
+from schemathesis.specs.graphql.loaders import INTROSPECTION_QUERY
 from schemathesis.specs.graphql.schemas import GraphQLCase
 
 
@@ -59,3 +61,14 @@ def test_make_case(graphql_schema, kwargs):
     case = graphql_schema["/graphql"]["POST"].make_case(**kwargs)
     assert isinstance(case, GraphQLCase)
     assert_requests_call(case)
+
+
+def test_no_query(graphql_url):
+    # When GraphQL schema does not contain the `Query` type
+    response = requests.post(graphql_url, json={"query": INTROSPECTION_QUERY})
+    decoded = response.json()
+    raw_schema = decoded["data"]
+    raw_schema["__schema"]["queryType"] = None
+    schema = schemathesis.graphql.from_dict(raw_schema)
+    # Then no operations should be collected
+    assert list(schema.get_all_operations()) == []

@@ -873,11 +873,13 @@ def test_stop_event_stream(event_stream):
     assert isinstance(next(event_stream), events.Initialized)
     event_stream.stop()
     assert isinstance(next(event_stream), events.Finished)
+    assert next(event_stream, None) is None
 
 
 def test_stop_event_stream_immediately(event_stream):
     event_stream.stop()
     assert isinstance(next(event_stream), events.Finished)
+    assert next(event_stream, None) is None
 
 
 def test_stop_event_stream_after_second_event(event_stream, workers_num, stop_worker):
@@ -885,6 +887,7 @@ def test_stop_event_stream_after_second_event(event_stream, workers_num, stop_wo
     assert isinstance(next(event_stream), events.BeforeExecution)
     event_stream.stop()
     assert isinstance(next(event_stream), events.Finished)
+    assert next(event_stream, None) is None
     if workers_num > 1:
         stop_worker.assert_called()
 
@@ -893,3 +896,4 @@ def test_finish(event_stream):
     assert isinstance(next(event_stream), events.Initialized)
     event = event_stream.finish()
     assert isinstance(event, events.Finished)
+    assert next(event_stream, None) is None
