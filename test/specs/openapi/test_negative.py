@@ -20,6 +20,7 @@ from schemathesis.specs.openapi.negative.mutations import (
     change_properties,
     change_type,
     negate_constraints,
+    prevent_unsatisfiable_schema,
     remove_required_property,
 )
 from schemathesis.specs.openapi.utils import is_header_location
@@ -87,40 +88,55 @@ def test_top_level_strategy(data, location, schema):
 
 
 @pytest.mark.parametrize(
-    "mutation, schema",
+    "mutation, schema, validate",
     (
         # No constraints besides `type`
-        (negate_constraints, {"type": "integer"}),
+        (negate_constraints, {"type": "integer"}, True),
         # Missing type (i.e all types are possible)
-        (change_type, {}),
+        (change_type, {}, True),
         # All types explicitly
-        (change_type, {"type": ["string", "integer", "number", "object", "array", "boolean", "null"]}),
+        (change_type, {"type": ["string", "integer", "number", "object", "array", "boolean", "null"]}, True),
         # No properties to remove
-        (remove_required_property, {}),
+        (remove_required_property, {}, True),
         # Non-"object" type
-        (remove_required_property, {"type": "array"}),
+        (remove_required_property, {"type": "array"}, True),
         # No properties at all
-        (change_properties, {}),
+        (change_properties, {}, True),
         # No properties that can be mutated
-        (change_properties, {"properties": {"foo": {}}}),
+        (change_properties, {"properties": {"foo": {}}}, True),
         # No items
-        (change_items, {"type": "array"}),
+        (change_items, {"type": "array"}, True),
         # `items` accept everything
-        (change_items, {"type": "array", "items": {}}),
+        (change_items, {"type": "array", "items": {}}, True),
+        (change_items, {"type": "array", "items": True}, False),
         # `items` is equivalent to accept-everything schema
-        (change_items, {"type": "array", "items": {"uniqueItems": False}}),
+        (change_items, {"type": "array", "items": {"uniqueItems": False}}, True),
         # The first element could be anything
-        (change_items, {"type": "array", "items": [{}]}),
+        (change_items, {"type": "array", "items": [{}]}, True),
     ),
 )
 @given(data=st.data())
 @settings(deadline=None)
-def test_failing_mutations(data, mutation, schema):
-    validate_schema(schema)
+def test_failing_mutations(data, mutation, schema, validate):
+    if validate:
+        validate_schema(schema)
     original_schema = deepcopy(schema)
     # When mutation can't be applied
     # Then it returns "failure"
     assert mutation(MutationContext(schema, "body", "application/json"), data.draw, schema) == MutationResult.FAILURE
+    # And doesn't mutate the input schema
+    assert schema == original_schema
+
+
+@given(data=st.data())
+@settings(deadline=None)
+def test_change_type_urlencoded(data):
+    # When `application/x-www-form-urlencoded` media type is passed to `change_type`
+    schema = {"type": "object"}
+    original_schema = deepcopy(schema)
+    context = MutationContext(schema, "body", "application/x-www-form-urlencoded")
+    # Then it should not be mutated
+    assert change_type(context, data.draw, schema) == MutationResult.FAILURE
     # And doesn't mutate the input schema
     assert schema == original_schema
 
@@ -132,6 +148,7 @@ def test_failing_mutations(data, mutation, schema):
         (negate_constraints, {"minimum": 42}),
         (change_type, {"type": "object"}),
         (change_type, {"type": ["object", "array"]}),
+        (change_type, {"type": ["string", "integer", "number", "object", "array", "boolean"]}),
         (remove_required_property, {"properties": {"foo": {}}, "required": ["foo"]}),
         (remove_required_property, {"properties": {"foo": {}, "bar": {}}, "required": ["foo"]}),
         (remove_required_property, {"required": ["foo"]}),
@@ -272,6 +289,18 @@ def test_no_unsatisfiable_schemas(data):
     schema = {"type": "object", "required": ["foo"]}
     mutated_schema = data.draw(mutated(schema, location="body", media_type="application/json"))
     assert canonicalish(mutated_schema) != FALSEY
+
+
+@pytest.mark.parametrize(
+    "schema, new_type",
+    (
+        ({"type": "object", "required": ["a"]}, "string"),
+        ({"required": ["a"], "not": {"maxLength": 5}}, "string"),
+    ),
+)
+def test_prevent_unsatisfiable_schema(schema, new_type):
+    prevent_unsatisfiable_schema(schema, new_type)
+    assert canonicalish(schema) != FALSEY
 
 
 ARRAY_PARAMETER = {"type": "array", "minItems": 1, "items": {"type": "string", "format": "ipv4"}}
