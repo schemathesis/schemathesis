@@ -22,6 +22,7 @@ Changelog
 - Re-used referenced objects during inlining. Now they are independent.
 - Rewrite not resolved remote references to local ones. `#986`_
 - Stop worker threads on failures with ``exit_first`` enabled. `#1204`_
+- Properly report all failures when custom checks are passed to ``case.validate_response``.
 
 **Performance**
 

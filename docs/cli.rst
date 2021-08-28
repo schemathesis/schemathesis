@@ -462,7 +462,11 @@ response code is ``200``.
             # check not relevant to this response, skip test
             return True
 
-See more information about customization in the "Customization" page.
+Skipped check calls will not be reported in the run summary.
+
+.. note::
+
+    Learn more about writing custom checks :ref:`here <writing-custom-checks>`.
 
 Debugging
 ---------

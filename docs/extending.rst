@@ -345,6 +345,39 @@ If you want to modify what keyword arguments will be given to ``case.call`` / ``
 If you test your app via the real network, then the hook above will disable resolving redirects during network calls.
 For WSGI integration, the keywords are different. See the documentation for ``werkzeug.Client.open``.
 
+.. _writing-custom-checks:
+
+Checks
+------
+
+Schemathesis provides a way to check app responses via user-defined functions called "checks".
+Each check is a function that accepts two arguments:
+
+.. code-block:: python
+
+    def my_check(response, case):
+        ...
+
+The first one is the app response, which is ``requests.Response`` or ``schemathesis.utils.WSGIResponse``, depending on
+whether you used the WSGI integration or not. The second one is the :class:`~schemathesis.Case` instance that was used to
+send data to the tested application.
+
+To indicate a failure, you need to raise ``AssertionError`` explicitly:
+
+.. code-block:: python
+
+    def my_check(response, case):
+        if response.text == "I am a teapot":
+            raise AssertionError("It is a teapot!")
+
+If the assertion fails, you'll see the assertion message in Schemathesis output. In the case of missing
+assertion message, Schemathesis will report "Check `my_check` failed".
+
+.. note::
+
+    If you use the ``assert`` statement and ``pytest`` as the test runner, then ``pytest`` may rewrite assertions which
+    affects error messages.
+
 Custom string strategies
 ------------------------
 
