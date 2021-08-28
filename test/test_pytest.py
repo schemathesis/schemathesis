@@ -316,6 +316,40 @@ def test(case):
     assert "CHECKING!" in result.stdout.str()
 
 
+@pytest.mark.parametrize(
+    "body, expected",
+    (
+        ("raise AssertionError", "1. Check 'my_check' failed"),
+        ("raise AssertionError('My message')", "1. My message"),
+    ),
+)
+def test_failing_custom_check(testdir, openapi3_base_url, body, expected):
+    # When the user passes a custom check that fails
+    testdir.make_test(
+        f"""
+schema.base_url = "{openapi3_base_url}"
+
+def my_check(response, case):
+    {body}
+
+def another_check(response, case):
+    raise AssertionError("Another check")
+
+@schema.parametrize()
+def test(case):
+    response = case.call()
+    case.validate_response(response, checks=(my_check, another_check))
+""",
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(failed=1)
+    # Then the failure message should be displayed
+    stdout = result.stdout.str()
+    assert expected in stdout
+    # And other failing checks are not ignored
+    assert "Another check" in stdout
+
+
 def test_no_collect_warnings(testdir):
     testdir.make_test(
         f"""

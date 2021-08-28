@@ -56,7 +56,14 @@ from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .serializers import Serializer, SerializerContext
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
-from .utils import NOT_SET, GenericResponse, WSGIResponse, deprecated_property, get_response_payload
+from .utils import (
+    NOT_SET,
+    GenericResponse,
+    WSGIResponse,
+    deprecated_property,
+    get_response_payload,
+    maybe_set_assertion_message,
+)
 
 if TYPE_CHECKING:
     from .schemas import BaseSchema
@@ -404,7 +411,8 @@ class Case:  # pylint: disable=too-many-public-methods
         for check in chain(checks, additional_checks):
             try:
                 check(response, self)
-            except CheckFailed as exc:
+            except AssertionError as exc:
+                maybe_set_assertion_message(exc, check.__name__)
                 errors.append(exc)
         if errors:
             exception_cls = get_grouped_exception(self.operation.verbose_name, *errors)
