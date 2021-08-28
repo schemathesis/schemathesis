@@ -42,8 +42,6 @@ class MutationResult(enum.Enum):
 
     def __or__(self, other: Any) -> "MutationResult":
         # Syntactic sugar to simplify handling of multiple results
-        if not isinstance(other, MutationResult):
-            return NotImplemented
         if self.is_success:
             return self
         return other
