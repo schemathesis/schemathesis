@@ -299,6 +299,10 @@ The code above will run only the ``not_a_server_error`` check. Or a tuple of add
         response = case.call()
         case.validate_response(response, additional_checks=(my_check,))
 
+.. note::
+
+    Learn more about writing custom checks :ref:`here <writing-custom-checks>`.
+
 If you don't use Schemathesis for data generation, you can still utilize response validation:
 
 .. code-block:: python

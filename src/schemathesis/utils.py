@@ -415,3 +415,11 @@ def compose(*functions: Callable) -> Callable:
         return x
 
     return functools.reduce(lambda f, g: lambda x: f(g(x)), functions, noop)
+
+
+def maybe_set_assertion_message(exc: AssertionError, check_name: str) -> str:
+    message = str(exc)
+    if not message:
+        message = f"Check '{check_name}' failed"
+        exc.args = (message,)
+    return message

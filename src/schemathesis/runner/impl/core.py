@@ -38,7 +38,14 @@ from ...schemas import BaseSchema
 from ...stateful import Feedback, Stateful
 from ...targets import Target, TargetContext
 from ...types import RawAuth
-from ...utils import GenericResponse, Ok, WSGIResponse, capture_hypothesis_output, format_exception
+from ...utils import (
+    GenericResponse,
+    Ok,
+    WSGIResponse,
+    capture_hypothesis_output,
+    format_exception,
+    maybe_set_assertion_message,
+)
 from ..serialization import SerializedTestResult
 
 
@@ -377,10 +384,7 @@ def run_checks(
                 check_result = result.add_success(check_name, case, response, elapsed_time)
                 check_results.append(check_result)
         except AssertionError as exc:
-            message = str(exc)
-            if not message:
-                message = f"Check '{check_name}' failed"
-                exc.args = (message,)
+            message = maybe_set_assertion_message(exc, check_name)
             errors.append(exc)
             if isinstance(exc, CheckFailed):
                 context = exc.context
