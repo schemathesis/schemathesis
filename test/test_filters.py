@@ -1,5 +1,7 @@
 import pytest
 
+from schemathesis.filters import Exclude, FilterResult, Include, evaluate_filters
+
 from .utils import integer
 
 
@@ -190,3 +192,31 @@ def test_(request, case):
 
     result.stdout.re_match_lines([r"test_operation_id_list_filter.py::test_[GET /v1/foo][P] PASSED"])
     result.stdout.re_match_lines([r"test_operation_id_list_filter.py::test_[POST /v1/foo][P] PASSED"])
+
+
+def predicate(x):
+    return "foo" in x
+
+
+@pytest.mark.parametrize(
+    "filters, expected",
+    (
+        ([], FilterResult.INCLUDED),
+        ([Include(predicate)], FilterResult.INCLUDED),
+        ([Include(predicate), Include(predicate)], FilterResult.INCLUDED),
+        ([Exclude(predicate)], FilterResult.EXCLUDED),
+        ([Exclude(predicate), Include(predicate)], FilterResult.EXCLUDED),
+        ([Include(predicate), Exclude(predicate)], FilterResult.EXCLUDED),
+    ),
+)
+def test_evaluate_filters(filters, expected):
+    assert evaluate_filters(filters, {"foo": 42}) == expected
+
+
+def test_evaluate_filters_scoped():
+    # When filters are evaluated in some particular scope
+    # Then filters not matching the scope should be ignored
+    assert (
+        evaluate_filters([Exclude(predicate), Include(lambda x: x.startswith("f"), scope="path")], "foo", "path")
+        == FilterResult.INCLUDED
+    )

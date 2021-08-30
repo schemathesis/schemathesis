@@ -31,7 +31,7 @@ from .impl import (
 )
 
 
-@deprecated(removed_in="4.0", replacement="schemathesis.runner.from_schema")
+@deprecated(removed_in="4.0", replacement="`schemathesis.runner.from_schema`")
 def prepare(
     schema_uri: Union[str, Dict[str, Any]],
     *,

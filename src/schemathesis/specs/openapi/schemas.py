@@ -21,6 +21,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 from urllib.parse import urlsplit
 
@@ -38,11 +39,12 @@ from ...exceptions import (
     get_response_parsing_error,
     get_schema_validation_error,
 )
+from ...filters import BaseFilter, Exclude, Include, is_excluded
 from ...hooks import HookContext, HookDispatcher
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import BaseSchema
 from ...stateful import APIStateMachine, Stateful, StatefulTest
-from ...types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
+from ...types import Body, Cookies, Filter, FormData, Headers, NotSet, PathParameters, Query
 from ...utils import (
     NOT_SET,
     Err,
@@ -78,6 +80,7 @@ from .stateful import create_state_machine
 
 SCHEMA_ERROR_MESSAGE = "Schema parsing failed. Please check your schema."
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError)
+S = TypeVar("S", bound="BaseOpenAPISchema")
 
 
 @attr.s(eq=False, repr=False)
@@ -112,6 +115,54 @@ class BaseOpenAPISchema(BaseSchema):
         info = self.raw_schema["info"]
         return f"{self.__class__.__name__} for {info['title']} ({info['version']})"
 
+    def include(
+        self,
+        method: Optional[Filter] = None,
+        path: Optional[Filter] = None,
+        tag: Optional[Filter] = None,
+        operation_id: Optional[Filter] = None,
+    ) -> S:
+        predicates = self._construct_filters(method, path, tag, operation_id, None, Include)
+        return self._filter_by(*predicates)
+
+    def exclude(
+        self,
+        method: Optional[Filter] = None,
+        path: Optional[Filter] = None,
+        tag: Optional[Filter] = None,
+        operation_id: Optional[Filter] = None,
+    ) -> S:
+        predicates = self._construct_filters(method, path, tag, operation_id, None, Exclude)
+        return self._filter_by(*predicates)
+
+    def _construct_filters(
+        self,
+        method: Optional[Filter],
+        path: Optional[Filter],
+        tag: Optional[Filter],
+        operation_id: Optional[Filter],
+        skip_deprecated_operations: Optional[bool],
+        cls: Type[BaseFilter],
+    ) -> List[BaseFilter]:
+        predicates: List[BaseFilter] = []
+        if path is not None:
+            predicates.append(cls(lambda i: not should_skip_endpoint(i[0], path), "path"))
+        if method is not None:
+            predicates.append(cls(lambda i: not should_skip_method(i[1], method)))
+        if tag is not None:
+            predicates.append(cls(lambda i: not should_skip_by_tag(i[2].get("tags"), tag)))
+        if operation_id is not None:
+            predicates.append(cls(lambda i: not should_skip_by_operation_id(i[2].get("operationId"), operation_id)))
+        if skip_deprecated_operations is not None:
+            predicates.append(
+                cls(
+                    lambda i: not should_skip_deprecated(
+                        i[2].get("deprecated", False), cast(bool, skip_deprecated_operations)
+                    )
+                )
+            )
+        return predicates
+
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         """Iterate over all operations defined in the API.
 
@@ -139,7 +190,7 @@ class BaseOpenAPISchema(BaseSchema):
             method = None
             try:
                 full_path = self.get_full_path(path)  # Should be available for later use
-                if should_skip_endpoint(full_path, self.endpoint):
+                if is_excluded(self.filters, (full_path, None, None), "path"):
                     continue
                 self.dispatch_hook("before_process_path", context, path, methods)
                 scope, raw_methods = self._resolve_methods(methods)
@@ -150,15 +201,8 @@ class BaseOpenAPISchema(BaseSchema):
                         # too much but decreases the number of cases when Schemathesis stuck on this step.
                         with self.resolver.in_scope(scope):
                             resolved_definition = self.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 5)
-                        # Only method definitions are parsed
-                        if (
-                            method not in self.allowed_http_methods
-                            or should_skip_method(method, self.method)
-                            or should_skip_deprecated(
-                                resolved_definition.get("deprecated", False), self.skip_deprecated_operations
-                            )
-                            or should_skip_by_tag(resolved_definition.get("tags"), self.tag)
-                            or should_skip_by_operation_id(resolved_definition.get("operationId"), self.operation_id)
+                        if method not in self.allowed_http_methods or is_excluded(
+                            self.filters, (full_path, method, resolved_definition)
                         ):
                             continue
                         parameters = self.collect_parameters(

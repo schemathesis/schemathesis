@@ -16,6 +16,8 @@ Changelog
 **Added**
 
 - ``DataGenerationMethod.all`` shortcut to get all possible enum variants.
+- A flexible way to select API operations for testing. It is now possible to exclude or include them by arbitrary
+  predicates. `#703`_, `#819`_, `#1006`_
 
 **Fixed**
 
@@ -2204,6 +2206,7 @@ Deprecated
 .. _#1013: https://github.com/schemathesis/schemathesis/issues/1013
 .. _#1010: https://github.com/schemathesis/schemathesis/issues/1010
 .. _#1007: https://github.com/schemathesis/schemathesis/issues/1007
+.. _#1006: https://github.com/schemathesis/schemathesis/issues/1006
 .. _#1003: https://github.com/schemathesis/schemathesis/issues/1003
 .. _#999: https://github.com/schemathesis/schemathesis/issues/999
 .. _#994: https://github.com/schemathesis/schemathesis/issues/994
@@ -2259,6 +2262,7 @@ Deprecated
 .. _#830: https://github.com/schemathesis/schemathesis/issues/830
 .. _#824: https://github.com/schemathesis/schemathesis/issues/824
 .. _#822: https://github.com/schemathesis/schemathesis/issues/822
+.. _#819: https://github.com/schemathesis/schemathesis/issues/819
 .. _#816: https://github.com/schemathesis/schemathesis/issues/816
 .. _#814: https://github.com/schemathesis/schemathesis/issues/814
 .. _#812: https://github.com/schemathesis/schemathesis/issues/812
@@ -2285,6 +2289,7 @@ Deprecated
 .. _#708: https://github.com/schemathesis/schemathesis/issues/708
 .. _#706: https://github.com/schemathesis/schemathesis/issues/706
 .. _#705: https://github.com/schemathesis/schemathesis/issues/705
+.. _#703: https://github.com/schemathesis/schemathesis/issues/703
 .. _#702: https://github.com/schemathesis/schemathesis/issues/702
 .. _#700: https://github.com/schemathesis/schemathesis/issues/700
 .. _#695: https://github.com/schemathesis/schemathesis/issues/695

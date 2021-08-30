@@ -22,6 +22,7 @@ from .utils import (
     is_given_applied,
     merge_given_args,
     validate_given_args,
+    warn_filtration_arguments,
 )
 
 
@@ -51,6 +52,11 @@ class LazySchema:
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
         code_sample_style: Union[str, NotSet] = NOT_SET,
     ) -> Callable:
+        # pylint: disable=too-many-statements
+        for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
+            value = locals()[name]
+            if value is not NOT_SET:
+                warn_filtration_arguments(name)
         if method is NOT_SET:
             method = self.method
         if endpoint is NOT_SET:

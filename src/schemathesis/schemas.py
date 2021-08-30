@@ -23,6 +23,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
@@ -34,11 +35,22 @@ from requests.structures import CaseInsensitiveDict
 from ._hypothesis import create_test
 from .constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
 from .exceptions import InvalidSchema, UsageError
+from .filters import BaseFilter, Exclude, Include
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import APIOperation, Case
 from .stateful import APIStateMachine, Stateful, StatefulTest
 from .types import Body, Cookies, Filter, FormData, GenericTest, Headers, NotSet, PathParameters, Query
-from .utils import NOT_SET, PARAMETRIZE_MARKER, Err, GenericResponse, GivenInput, Ok, Result, given_proxy
+from .utils import (
+    NOT_SET,
+    PARAMETRIZE_MARKER,
+    Err,
+    GenericResponse,
+    GivenInput,
+    Ok,
+    Result,
+    given_proxy,
+    warn_filtration_arguments,
+)
 
 
 class MethodsDict(CaseInsensitiveDict):
@@ -57,6 +69,7 @@ class MethodsDict(CaseInsensitiveDict):
 
 
 C = TypeVar("C", bound=Case)
+S = TypeVar("S", bound="BaseSchema")
 
 
 @attr.s(eq=False)  # pragma: no mutate
@@ -77,6 +90,7 @@ class BaseSchema(Mapping):
         default=DEFAULT_DATA_GENERATION_METHODS
     )  # pragma: no mutate
     code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate
+    filters: List[BaseFilter] = attr.ib(factory=list)
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.operations)
@@ -203,6 +217,10 @@ class BaseSchema(Mapping):
         _code_sample_style = (
             CodeSampleStyle.from_str(code_sample_style) if isinstance(code_sample_style, str) else code_sample_style
         )
+        for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
+            value = locals()[name]
+            if value is not NOT_SET:
+                warn_filtration_arguments(name)
 
         def wrapper(func: GenericTest) -> GenericTest:
             if hasattr(func, PARAMETRIZE_MARKER):
@@ -216,7 +234,7 @@ class BaseSchema(Mapping):
 
                 return wrapped_test
             HookDispatcher.add_dispatcher(func)
-            cloned = self.clone(
+            cloned: BaseSchema = self.clone(
                 test_function=func,
                 method=method,
                 endpoint=endpoint,
@@ -251,7 +269,8 @@ class BaseSchema(Mapping):
         skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
         code_sample_style: Union[CodeSampleStyle, NotSet] = NOT_SET,
-    ) -> "BaseSchema":
+        filters: Union[List[BaseFilter], NotSet] = NOT_SET,
+    ) -> S:
         if base_url is NOT_SET:
             base_url = self.base_url
         if method is NOT_SET:
@@ -274,8 +293,13 @@ class BaseSchema(Mapping):
             data_generation_methods = self.data_generation_methods
         if code_sample_style is NOT_SET:
             code_sample_style = self.code_sample_style
+        new_filters = self._construct_filters(
+            method, endpoint, tag, operation_id, cast(bool, skip_deprecated_operations), Include
+        )
+        if filters is not NOT_SET:
+            new_filters += cast(List[BaseFilter], filters)
 
-        return self.__class__(
+        return self.__class__(  # type: ignore
             self.raw_schema,
             location=self.location,
             base_url=base_url,  # type: ignore
@@ -290,7 +314,19 @@ class BaseSchema(Mapping):
             skip_deprecated_operations=skip_deprecated_operations,  # type: ignore
             data_generation_methods=data_generation_methods,  # type: ignore
             code_sample_style=code_sample_style,  # type: ignore
+            filters=new_filters,
         )
+
+    def _construct_filters(
+        self,
+        method: Optional[Filter],
+        path: Optional[Filter],
+        tag: Optional[Filter],
+        operation_id: Optional[Filter],
+        skip_deprecated_operations: Optional[bool],
+        cls: Type[BaseFilter],
+    ) -> List[BaseFilter]:
+        return []
 
     def get_local_hook_dispatcher(self) -> Optional[HookDispatcher]:
         """Get a HookDispatcher instance bound to the test if present."""
@@ -357,6 +393,18 @@ class BaseSchema(Mapping):
 
     def prepare_schema(self, schema: Any) -> Any:
         raise NotImplementedError
+
+    def include_by(self, predicate: Callable) -> "BaseSchema":
+        """Get a new schema that includes API operations that pass the given predicate."""
+        return self._filter_by(Include(predicate))
+
+    def exclude_by(self, predicate: Callable) -> "BaseSchema":
+        """Get a new schema that excludes API operations that pass the given predicate."""
+        return self._filter_by(Exclude(predicate))
+
+    def _filter_by(self, *predicates: BaseFilter) -> S:
+        filters = self.filters + list(predicates)
+        return self.clone(filters=filters)
 
 
 def operations_to_dict(

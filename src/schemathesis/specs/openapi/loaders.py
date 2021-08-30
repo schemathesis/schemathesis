@@ -18,7 +18,14 @@ from ...exceptions import HTTPError, SchemaLoadingError
 from ...hooks import HookContext, dispatch
 from ...lazy import LazySchema
 from ...types import Filter, NotSet, PathLike
-from ...utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, require_relative_url, setup_headers
+from ...utils import (
+    NOT_SET,
+    StringDatesYAMLLoader,
+    WSGIResponse,
+    require_relative_url,
+    setup_headers,
+    warn_filtration_arguments,
+)
 from . import definitions, validation
 from .schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
 
@@ -181,12 +188,18 @@ def from_dict(
 
     :param dict raw_schema: A schema to load.
     """
+    for name in ("method", "endpoint", "tag", "operation_id"):
+        value = locals()[name]
+        if value is not None:
+            warn_filtration_arguments(name)
+    if skip_deprecated_operations is True:
+        warn_filtration_arguments("skip_deprecated_operations")
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     dispatch("before_load_schema", HookContext(), raw_schema)
 
     def init_openapi_2() -> SwaggerV20:
         _maybe_validate_schema(raw_schema, definitions.SWAGGER_20_VALIDATOR, validate_schema)
-        return SwaggerV20(
+        schema = SwaggerV20(
             raw_schema,
             app=app,
             base_url=base_url,
@@ -200,10 +213,11 @@ def from_dict(
             code_sample_style=_code_sample_style,
             location=location,
         )
+        return schema.include(method, endpoint)
 
     def init_openapi_3() -> OpenApi30:
         _maybe_validate_schema(raw_schema, definitions.OPENAPI_30_VALIDATOR, validate_schema)
-        return OpenApi30(
+        schema = OpenApi30(
             raw_schema,
             app=app,
             base_url=base_url,
@@ -217,6 +231,7 @@ def from_dict(
             code_sample_style=_code_sample_style,
             location=location,
         )
+        return schema.include(method, endpoint)
 
     if force_schema_version == "20":
         return init_openapi_2()
