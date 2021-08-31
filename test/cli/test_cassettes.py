@@ -233,7 +233,7 @@ async def test_headers_serialization(cli, openapi2_schema_url, hypothesis_max_ex
 
 def test_multiple_cookies(base_url):
     headers = {"User-Agent": USER_AGENT}
-    response = requests.get(f"{base_url}/success", cookies={"foo": "bar", "baz": "spam"}, headers=headers)
+    response = requests.get(f"{base_url}/success", cookies={"foo": "bar", "baz": "spam"}, headers=headers, timeout=1)
     request = Request.from_prepared_request(response.request)
     serialized = {
         "uri": request.uri,

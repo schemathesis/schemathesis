@@ -5,6 +5,7 @@ from typing import Any, Dict, Generator, List
 import requests
 from hypothesis.strategies import SearchStrategy
 
+from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...models import APIOperation, Case
 from ._hypothesis import PARAMETERS, get_case_strategy
 from .constants import LOCATION_TO_CONTAINER
@@ -21,7 +22,7 @@ def get_object_example_from_properties(object_schema: Dict[str, Any]) -> Dict[st
 @lru_cache()
 def load_external_example(url: str) -> bytes:
     """Load examples the `externalValue` keyword."""
-    response = requests.get(url)
+    response = requests.get(url, timeout=DEFAULT_RESPONSE_TIMEOUT / 1000)
     response.raise_for_status()
     return response.content
 

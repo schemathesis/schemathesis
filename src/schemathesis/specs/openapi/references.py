@@ -7,6 +7,7 @@ import jsonschema
 import requests
 import yaml
 
+from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...utils import StringDatesYAMLLoader
 from .converter import to_json_schema_recursive
 
@@ -34,7 +35,7 @@ def load_file_uri(location: str) -> Dict[str, Any]:
 
 def load_remote_uri(uri: str) -> Any:
     """Load the resource and parse it as YAML / JSON."""
-    response = requests.get(uri)
+    response = requests.get(uri, timeout=DEFAULT_RESPONSE_TIMEOUT / 1000)
     return yaml.load(response.content, StringDatesYAMLLoader)
 
 
