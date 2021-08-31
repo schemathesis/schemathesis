@@ -85,7 +85,7 @@ def response():
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_get_links(openapi3_base_url, schema_url, url, expected):
     schema = schemathesis.from_uri(schema_url)
-    response = requests.post(f"{openapi3_base_url}{url}", json={"first_name": "TEST", "last_name": "TEST"})
+    response = requests.post(f"{openapi3_base_url}{url}", json={"first_name": "TEST", "last_name": "TEST"}, timeout=1)
     tests = schema["/users/"]["POST"].get_stateful_tests(response, Stateful.links)
     assert len(tests) == len(expected)
     for test, value in zip(tests, expected):

@@ -65,7 +65,7 @@ def test_make_case(graphql_schema, kwargs):
 
 def test_no_query(graphql_url):
     # When GraphQL schema does not contain the `Query` type
-    response = requests.post(graphql_url, json={"query": INTROSPECTION_QUERY})
+    response = requests.post(graphql_url, json={"query": INTROSPECTION_QUERY}, timeout=1)
     decoded = response.json()
     raw_schema = decoded["data"]
     raw_schema["__schema"]["queryType"] = None
