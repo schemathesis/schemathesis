@@ -4,11 +4,12 @@ COPY requirements.txt ./
 
 RUN apt-get update \
     # Can't find wheels for asyncpg for some reason :(
-    && apt-get install -y libpq-dev gcc \
+    && apt-get install --no-install-recommends -y libpq-dev gcc \
     && pip install -r requirements.txt \
     && apt remove -y libpq-dev gcc \
     && apt -y autoremove \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 COPY app/ /example/app/
 COPY test/ /example/test/
