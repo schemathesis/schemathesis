@@ -328,7 +328,7 @@ def test_validate_response_schema_path(
 
 @pytest.mark.operations()
 def test_response_from_requests(base_url):
-    response = requests.get(f"{base_url}/cookies")
+    response = requests.get(f"{base_url}/cookies", timeout=1)
     serialized = Response.from_requests(response)
     assert serialized.status_code == 200
     assert serialized.http_version == "1.1"
