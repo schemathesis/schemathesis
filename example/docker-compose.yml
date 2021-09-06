@@ -11,7 +11,7 @@ services:
       - db
     working_dir: /example
     volumes:
-      - ./app:/app/
+      - ./app:/example/app/
   db:
     image: postgres
     environment:

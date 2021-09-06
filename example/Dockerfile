@@ -11,7 +11,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-COPY app/ /example/app/
 COPY test/ /example/test/
 COPY main.py /example
 
