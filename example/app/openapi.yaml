@@ -30,7 +30,7 @@ paths:
           description: OK
           links:
             GetBookingById:
-              operationId: app.views.get_bookings
+              operationId: app.views.get_booking_by_id
               parameters:
                 booking_id: '$response.body#/id'
       requestBody:
