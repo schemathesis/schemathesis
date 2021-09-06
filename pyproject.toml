@@ -28,6 +28,11 @@ homepage = "https://github.com/schemathesis/schemathesis"
 license = "MIT"
 include = ["src/schemathesis/py.typed"]
 
+[tool.poetry.urls]
+"Source Code" = "https://github.com/schemathesis/schemathesis"
+"Change Log" = "https://github.com/schemathesis/schemathesis/blob/master/docs/changelog.rst"
+"Funding" = "https://github.com/sponsors/Stranger6667"
+
 [tool.poetry.dependencies]
 python = "^3.6"
 attrs = ">=19.2"
