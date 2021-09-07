@@ -104,6 +104,10 @@ Additional content:
 - `Schemathesis tutorial <https://appdev.consulting.redhat.com/tracks/contract-first/automated-testing-with-schemathesis.html>`_  with an accompanying `video <https://www.youtube.com/watch?v=4r7OC-lBKMg>`_ by Red Hat
 - `Using Hypothesis and Schemathesis to Test FastAPI <https://testdriven.io/blog/fastapi-hypothesis/>`_ by **@amalshaji**
 
+Non-English content:
+
+- `A tutorial <https://habr.com/ru/company/oleg-bunin/blog/576496/>`_ (RUS) about Schemathesis by **@Stranger6667**
+
 License
 -------
 
