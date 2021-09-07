@@ -5,6 +5,8 @@ A simple web app, built with `connexion <https://github.com/zalando/connexion>`_
 `aiohttp <https://github.com/aio-libs/aiohttp>`_, `attrs <https://github.com/python-attrs/attrs>`_ and `asyncpg <https://github.com/MagicStack/asyncpg>`_.
 It contains many intentional errors, which should be found by running Schemathesis.
 
+There is also `a tutorial <https://habr.com/ru/company/oleg-bunin/blog/576496/>`_ in Russian that follows this example project.
+
 Setup
 -----
 
