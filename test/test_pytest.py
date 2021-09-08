@@ -352,9 +352,27 @@ def test(case):
 
 def test_no_collect_warnings(testdir):
     testdir.make_test(
-        f"""
+        """
 from schemathesis.models import *
     """,
     )
     result = testdir.runpytest()
     assert "cannot collect test class" not in result.stdout.str()
+
+
+def test_single_data_generation_method_passed_to_loader(testdir):
+    # See GH-1260
+    # When `data_generation_methods` receives a single `DataGenerationMethod` value
+    testdir.make_test(
+        """
+schema = schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.negative)
+
+@schema.parametrize()
+def test(case):
+    pass
+        """,
+    )
+    result = testdir.runpytest()
+    # Then it should not fail
+    # And should generate proper tests
+    result.assert_outcomes(passed=1)
