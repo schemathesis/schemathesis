@@ -1,5 +1,5 @@
 import pathlib
-from typing import IO, Any, Callable, Dict, Iterable, Optional, Union
+from typing import IO, Any, Callable, Dict, Iterable, List, Optional, Union
 from urllib.parse import urljoin
 
 import jsonschema
@@ -20,6 +20,8 @@ from ...utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, require_relat
 from . import definitions
 from .schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
 
+DataGenerationMethodInput = Union[DataGenerationMethod, Iterable[DataGenerationMethod]]
+
 
 def from_path(
     path: PathLike,
@@ -33,7 +35,7 @@ def from_path(
     skip_deprecated_operations: bool = False,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     encoding: str = "utf8",
 ) -> BaseOpenAPISchema:
@@ -73,7 +75,7 @@ def from_uri(
     skip_deprecated_operations: bool = False,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
@@ -115,7 +117,7 @@ def from_file(
     skip_deprecated_operations: bool = False,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     location: Optional[str] = None,
     **kwargs: Any,  # needed in the runner to have compatible API across all loaders
@@ -154,7 +156,7 @@ def from_dict(
     skip_deprecated_operations: bool = False,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     location: Optional[str] = None,
 ) -> BaseOpenAPISchema:
@@ -177,7 +179,7 @@ def from_dict(
             operation_id=operation_id,
             skip_deprecated_operations=skip_deprecated_operations,
             validate_schema=validate_schema,
-            data_generation_methods=data_generation_methods,
+            data_generation_methods=_prepare_data_generation_methods(data_generation_methods),
             code_sample_style=_code_sample_style,
             location=location,
         )
@@ -194,7 +196,7 @@ def from_dict(
             operation_id=operation_id,
             skip_deprecated_operations=skip_deprecated_operations,
             validate_schema=validate_schema,
-            data_generation_methods=data_generation_methods,
+            data_generation_methods=_prepare_data_generation_methods(data_generation_methods),
             code_sample_style=_code_sample_style,
             location=location,
         )
@@ -208,6 +210,12 @@ def from_dict(
     if "openapi" in raw_schema:
         return init_openapi_3()
     raise ValueError("Unsupported schema type")
+
+
+def _prepare_data_generation_methods(data_generation_methods: DataGenerationMethodInput) -> List[DataGenerationMethod]:
+    if isinstance(data_generation_methods, DataGenerationMethod):
+        return [data_generation_methods]
+    return list(data_generation_methods)
 
 
 def _maybe_validate_schema(
@@ -231,7 +239,7 @@ def from_pytest_fixture(
     operation_id: Optional[Filter] = NOT_SET,
     skip_deprecated_operations: bool = False,
     validate_schema: bool = True,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
 ) -> LazySchema:
     """Load schema from a ``pytest`` fixture.
@@ -254,7 +262,7 @@ def from_pytest_fixture(
         operation_id=operation_id,
         skip_deprecated_operations=skip_deprecated_operations,
         validate_schema=validate_schema,
-        data_generation_methods=data_generation_methods,
+        data_generation_methods=_prepare_data_generation_methods(data_generation_methods),
         code_sample_style=_code_sample_style,
     )
 
@@ -271,7 +279,7 @@ def from_wsgi(
     skip_deprecated_operations: bool = False,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
@@ -322,7 +330,7 @@ def from_aiohttp(
     skip_deprecated_operations: bool = False,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
@@ -364,7 +372,7 @@ def from_asgi(
     skip_deprecated_operations: bool = False,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:

@@ -14,6 +14,7 @@ Changelog
 
 - Pin ``werkzeug`` to ``>=0.16.0``.
 - **INTERNAL**. ``OpenAPI20CompositeBody.definition`` type to ``List[OpenAPI20Parameter]``.
+- Open API schema loaders now accept single ``DataGenerationMethod`` instances for the ``data_generation_methods`` argument. `#1260`_
 
 **Fixed**
 
@@ -2133,6 +2134,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1260: https://github.com/schemathesis/schemathesis/issues/1260
 .. _#1233: https://github.com/schemathesis/schemathesis/issues/1233
 .. _#1226: https://github.com/schemathesis/schemathesis/issues/1226
 .. _#1224: https://github.com/schemathesis/schemathesis/issues/1224
