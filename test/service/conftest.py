@@ -70,7 +70,9 @@ def create_event_url(setup_server, job_id):
 
 @pytest.fixture
 def start_job_url(setup_server, job_id):
-    return setup_server(lambda h: h.respond_with_json({"job_id": job_id}, status=201), "POST", "/jobs/")
+    return setup_server(
+        lambda h: h.respond_with_json({"job_id": job_id, "short_url": "http://127.0.0.1"}, status=201), "POST", "/jobs/"
+    )
 
 
 @pytest.fixture

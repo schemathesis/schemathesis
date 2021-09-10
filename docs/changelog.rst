@@ -6,6 +6,7 @@ Changelog
 
 **Added**
 
+- Optional integration with Schemathesis.io.
 - New ``before_init_operation`` hook.
 - **INTERNAL**. ``description`` attribute for all parsed parameters inside ``APIOperation``.
 - Timeouts when loading external schema components or external examples.
