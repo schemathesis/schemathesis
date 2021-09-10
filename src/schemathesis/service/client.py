@@ -5,6 +5,7 @@ import requests
 from requests.adapters import HTTPAdapter, Retry
 
 from .constants import REQUEST_TIMEOUT
+from .models import TestJob
 
 
 class ServiceClient(requests.Session):
@@ -27,10 +28,11 @@ class ServiceClient(requests.Session):
         url = urljoin(self.base_url, url)
         return super().request(method, url, *args, **kwargs)
 
-    def create_test_job(self) -> str:
+    def create_test_job(self) -> TestJob:
         """Create a new test job on the Schemathesis.io side."""
         response = self.post("/jobs/")
-        return response.json()["job_id"]
+        data = response.json()
+        return TestJob(job_id=data["job_id"], short_url=data["short_url"])
 
     def finish_test_job(self, job_id: str) -> None:
         """Finish a test job on the Schemathesis.io side.

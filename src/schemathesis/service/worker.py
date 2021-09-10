@@ -10,12 +10,12 @@ def start(url: str, token: str, in_queue: Queue, out_queue: Queue) -> None:
     """Initialize a new job and start consuming events."""
     try:
         client = ServiceClient(url, token)
-        job_id = client.create_test_job()
-        consume_events(client, in_queue, job_id)
+        response = client.create_test_job()
+        consume_events(client, in_queue, response.job_id)
         # Reached a terminal event or a stop marker.
         # In the case of stop marker, it is still a successful result for the handler itself as the error happened in
         # a different handler
-        out_queue.put(events.Success())
+        out_queue.put(events.Success(short_url=response.short_url))
     except Exception as exc:
         out_queue.put(events.Error(exc))
 
