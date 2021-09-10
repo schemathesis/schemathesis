@@ -24,6 +24,10 @@ DISABLE_SCHEMA_VALIDATION_MESSAGE = (
     "command-line option\nIn this case, Schemathesis cannot guarantee proper"
     " behavior during the test run"
 )
+ISSUE_TRACKER_URL = (
+    "https://github.com/schemathesis/schemathesis/issues/new?"
+    "labels=Status%3A+Review+Needed%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D"
+)
 SPINNER_REPETITION_NUMBER = 10
 
 
@@ -295,7 +299,12 @@ def handle_service_integration(context: ExecutionContext) -> None:
                 message = format_exception(event.exception, include_traceback=True)
             else:
                 message = format_exception(event.exception)
-            click.secho(f"An error happened during uploading reports to Schemathesis.io\n\n{message.strip()}", fg="red")
+            click.secho(
+                f"An error happened during uploading reports to Schemathesis.io\n"
+                f"Please, consider reporting it to our issue tracker: {ISSUE_TRACKER_URL}\n\n"
+                f"{message.strip()}",
+                fg="red",
+            )
 
 
 def wait_for_service_handler(queue: Queue, title: str) -> service.Event:
