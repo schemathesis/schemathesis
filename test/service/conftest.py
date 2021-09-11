@@ -52,7 +52,7 @@ def job_id():
 @pytest.fixture
 def service_setup(request, setup_server):
     for marker in request.node.iter_markers("service"):
-        data = (marker.kwargs["data"],)
+        data = marker.kwargs["data"]
         status = marker.kwargs["status"]
         method = marker.kwargs["method"]
         path = marker.kwargs["path"]
