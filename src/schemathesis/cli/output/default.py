@@ -7,6 +7,7 @@ from queue import Queue
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union, cast
 
 import click
+import requests
 from hypothesis import settings
 
 from ... import service
@@ -15,7 +16,6 @@ from ...constants import CodeSampleStyle, __version__
 from ...models import Response, Status
 from ...runner import events
 from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult, deduplicate_failures
-from ...utils import format_exception
 from ..context import ExecutionContext
 from ..handlers import EventHandler
 
@@ -294,17 +294,59 @@ def handle_service_integration(context: ExecutionContext) -> None:
             report_title = click.style("Report", bold=True)
             click.echo(f"{report_title}: {event.short_url}")
         if isinstance(event, service.Error):
-            click.echo()
-            if context.show_errors_tracebacks:
-                message = format_exception(event.exception, include_traceback=True)
-            else:
-                message = format_exception(event.exception)
+            display_service_error(event, context)
+
+
+def display_service_error(event: service.Error, context: ExecutionContext) -> None:
+    """Show information about an error during communication with Schemathesis.io."""
+    click.echo()
+    if isinstance(event.exception, requests.HTTPError):
+        status_code = event.exception.response.status_code
+        click.secho(f"Schemathesis.io responded with HTTP {status_code}", fg="red")
+        if 500 <= status_code <= 599:
+            # Server error, should be resolved soon
             click.secho(
-                f"An error happened during uploading reports to Schemathesis.io\n"
-                f"Please, consider reporting it to our issue tracker: {ISSUE_TRACKER_URL}\n\n"
-                f"{message.strip()}",
+                "It is likely that we are already notified about the issue and working on a fix\n"
+                "Please, try again in 30 minutes",
                 fg="red",
             )
+        elif status_code == 401:
+            # Likely an invalid token
+            click.secho(
+                "Please, check that you use the proper CLI upload token\n"
+                "See https://schemathesis.readthedocs.io/en/stable/service.html for more details",
+                fg="red",
+            )
+        else:
+            # Other client-side errors are likely caused by a bug on the CLI side
+            ask_to_report(event, context)
+    elif isinstance(event.exception, requests.RequestException):
+        ask_to_report(event, context, report_to_issues=False)
+    else:
+        ask_to_report(event, context)
+
+
+def ask_to_report(
+    event: service.Error, context: ExecutionContext, report_to_issues: bool = True, extra: str = ""
+) -> None:
+    # Likely an internal Schemathesis error
+    message = event.get_message(context.show_errors_tracebacks)
+    if isinstance(event.exception, requests.RequestException) and event.exception.response is not None:
+        response = f"Response: {event.exception.response.text}"
+    else:
+        response = ""
+    if report_to_issues:
+        ask = f"Please, consider reporting it to our issue tracker: {ISSUE_TRACKER_URL}\n"
+    else:
+        ask = ""
+    click.secho(
+        f"An error happened during uploading reports to Schemathesis.io:\n"
+        f"{extra}"
+        f"{ask}"
+        f"{response}"
+        f"\n    {message.strip()}",
+        fg="red",
+    )
 
 
 def wait_for_service_handler(queue: Queue, title: str) -> service.Event:

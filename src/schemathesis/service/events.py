@@ -1,5 +1,7 @@
 import attr
 
+from ..utils import format_exception
+
 
 class Event:
     """Signalling events coming from the Schemathesis.io worker.
@@ -24,6 +26,9 @@ class Error(Event):
     """Internal error inside the Schemathesis.io handler."""
 
     exception: Exception = attr.ib()
+
+    def get_message(self, include_traceback: bool = False) -> str:
+        return format_exception(self.exception, include_traceback=include_traceback)
 
 
 @attr.s(slots=True)
