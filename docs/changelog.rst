@@ -15,7 +15,7 @@ Changelog
 
 - Pin ``werkzeug`` to ``>=0.16.0``.
 - **INTERNAL**. ``OpenAPI20CompositeBody.definition`` type to ``List[OpenAPI20Parameter]``.
-- Open API schema loaders now accept single ``DataGenerationMethod`` instances for the ``data_generation_methods`` argument. `#1260`_
+- Open API schema loaders now also accept single ``DataGenerationMethod`` instances for the ``data_generation_methods`` argument. `#1260`_
 
 **Fixed**
 
