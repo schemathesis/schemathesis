@@ -2,8 +2,11 @@
 import json
 
 import pytest
+from flask import Response
 
+import schemathesis
 from schemathesis.specs.openapi import loaders
+from schemathesis.specs.openapi.loaders import YAML_LOADING_ERROR
 from schemathesis.specs.openapi.schemas import OpenApi30, SwaggerV20
 
 
@@ -77,3 +80,32 @@ def test_unsupported_type():
     with pytest.raises(ValueError, match="^Unsupported schema type$"):
         # Then it raises an error
         loaders.from_dict({})
+
+
+@pytest.mark.parametrize("without_content_type", (True, False))
+def test_invalid_content_type(httpserver, without_content_type):
+    # When the user tries to load an HTML as a schema
+    content = """
+<html>
+<style>
+  html {
+    margin: 0;
+    background: #fafafa;
+  }
+</style>
+<html>
+    """
+    response = Response(response=content)
+    if without_content_type:
+        del response.headers["Content-Type"]
+    path = "/openapi/"
+    handler = httpserver.expect_request(path)
+    handler.respond_with_response(response)
+    schema_url = httpserver.url_for(path)
+    # And loading cause an error
+    # Then it should be suggested to the user that they should provide JSON or YAML
+    with pytest.raises(ValueError, match=YAML_LOADING_ERROR) as exc:
+        schemathesis.from_uri(schema_url)
+    if not without_content_type:
+        # And list the actual response content type
+        assert "The actual response has `text/html; charset=utf-8` Content-Type" in exc.value.args[0]

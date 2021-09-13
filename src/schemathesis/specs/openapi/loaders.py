@@ -12,7 +12,7 @@ from werkzeug.test import Client
 from yarl import URL
 
 from ...constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
-from ...exceptions import HTTPError
+from ...exceptions import HTTPError, SchemaLoadingError
 from ...hooks import HookContext, dispatch
 from ...lazy import LazySchema
 from ...types import Filter, NotSet, PathLike
@@ -88,21 +88,33 @@ def from_uri(
         base_url = str(URL(uri).with_port(port))
     response = requests.get(uri, **kwargs)
     HTTPError.raise_for_status(response)
-    return from_file(
-        response.text,
-        app=app,
-        base_url=base_url,
-        method=method,
-        endpoint=endpoint,
-        tag=tag,
-        operation_id=operation_id,
-        skip_deprecated_operations=skip_deprecated_operations,
-        validate_schema=validate_schema,
-        force_schema_version=force_schema_version,
-        data_generation_methods=data_generation_methods,
-        code_sample_style=code_sample_style,
-        location=uri,
-    )
+    try:
+        return from_file(
+            response.text,
+            app=app,
+            base_url=base_url,
+            method=method,
+            endpoint=endpoint,
+            tag=tag,
+            operation_id=operation_id,
+            skip_deprecated_operations=skip_deprecated_operations,
+            validate_schema=validate_schema,
+            force_schema_version=force_schema_version,
+            data_generation_methods=data_generation_methods,
+            code_sample_style=code_sample_style,
+            location=uri,
+        )
+    except SchemaLoadingError as exc:
+        content_type = response.headers.get("Content-Type")
+        if content_type is not None:
+            raise SchemaLoadingError(f"{exc.args[0]}. The actual response has `{content_type}` Content-Type") from exc
+        raise
+
+
+YAML_LOADING_ERROR = (
+    "It seems like the schema you are trying to load is malformed. "
+    "Schemathesis expects API schemas in JSON or YAML formats"
+)
 
 
 def from_file(
@@ -126,22 +138,25 @@ def from_file(
 
     :param file: Could be a file descriptor, string or bytes.
     """
-    raw = yaml.load(file, StringDatesYAMLLoader)
-    return from_dict(
-        raw,
-        app=app,
-        base_url=base_url,
-        method=method,
-        endpoint=endpoint,
-        tag=tag,
-        operation_id=operation_id,
-        skip_deprecated_operations=skip_deprecated_operations,
-        validate_schema=validate_schema,
-        force_schema_version=force_schema_version,
-        data_generation_methods=data_generation_methods,
-        code_sample_style=code_sample_style,
-        location=location,
-    )
+    try:
+        raw = yaml.load(file, StringDatesYAMLLoader)
+        return from_dict(
+            raw,
+            app=app,
+            base_url=base_url,
+            method=method,
+            endpoint=endpoint,
+            tag=tag,
+            operation_id=operation_id,
+            skip_deprecated_operations=skip_deprecated_operations,
+            validate_schema=validate_schema,
+            force_schema_version=force_schema_version,
+            data_generation_methods=data_generation_methods,
+            code_sample_style=code_sample_style,
+            location=location,
+        )
+    except yaml.YAMLError as exc:
+        raise SchemaLoadingError(YAML_LOADING_ERROR) from exc
 
 
 def from_dict(
@@ -209,7 +224,7 @@ def from_dict(
         return init_openapi_2()
     if "openapi" in raw_schema:
         return init_openapi_3()
-    raise ValueError("Unsupported schema type")
+    raise SchemaLoadingError("Unsupported schema type")
 
 
 def _prepare_data_generation_methods(data_generation_methods: DataGenerationMethodInput) -> List[DataGenerationMethod]:

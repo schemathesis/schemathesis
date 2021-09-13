@@ -140,8 +140,8 @@ class DeadlineExceeded(Exception):
         )
 
 
-class UnsupportedSpecification(ValueError):
-    """The API specification is not supported."""
+class SchemaLoadingError(ValueError):
+    """Failed to load an API schema."""
 
 
 class NonCheckError(Exception):
