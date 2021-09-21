@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- ``DataGenerationMethod.all`` shortcut to get all possible enum variants.
+
 `3.10.0`_ - 2021-09-13
 ----------------------
 

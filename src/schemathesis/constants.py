@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import List
 
 from ._compat import metadata
 
@@ -37,6 +38,10 @@ class DataGenerationMethod(str, Enum):
     @classmethod
     def default(cls) -> "DataGenerationMethod":
         return cls.positive
+
+    @classmethod
+    def all(cls) -> List["DataGenerationMethod"]:
+        return list(DataGenerationMethod)
 
     def as_short_name(self) -> str:
         return {
