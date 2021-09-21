@@ -378,7 +378,7 @@ def test_deprecated_attribute(swagger_20):
     )
 
 
-@pytest.mark.parametrize("method", (DataGenerationMethod.positive, DataGenerationMethod.negative))
+@pytest.mark.parametrize("method", DataGenerationMethod.all())
 def test_data_generation_method_is_available(method, empty_open_api_3_schema):
     # When a new case is generated
     empty_open_api_3_schema["paths"] = {
