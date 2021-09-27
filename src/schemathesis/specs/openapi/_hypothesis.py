@@ -120,10 +120,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     The primary purpose of this behavior is to prevent sending incomplete explicit examples by generating missing parts
     as it works with `body`.
     """
-    to_strategy = {
-        DataGenerationMethod.positive: make_positive_strategy,
-        DataGenerationMethod.negative: make_negative_strategy,
-    }[data_generation_method]
+    to_strategy = DATA_GENERATION_METHOD_TO_STRATEGY_FACTORY[data_generation_method]
 
     context = HookContext(operation)
 
@@ -344,6 +341,12 @@ def make_negative_strategy(
     return negative_schema(
         schema, operation_name=operation_name, location=location, media_type=media_type, custom_formats=STRING_FORMATS
     )
+
+
+DATA_GENERATION_METHOD_TO_STRATEGY_FACTORY = {
+    DataGenerationMethod.positive: make_positive_strategy,
+    DataGenerationMethod.negative: make_negative_strategy,
+}
 
 
 def is_valid_path(parameters: Dict[str, Any]) -> bool:
