@@ -21,7 +21,7 @@ jobs:
 
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends sqlite3
 
-      - run: pip install poetry mutmut
+      - run: pip install "poetry<1.1.9" "poetry-core<1.0.5" mutmut
 
       - name: Cache Poetry virtualenv
         uses: actions/cache@v2
@@ -71,7 +71,7 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install poetry
+      - run: pip install "poetry<1.1.9" "poetry-core<1.0.5"
       - run: poetry install
       - run: poetry run pytest -m hypothesis -m hypothesis_nested --hypothesis-profile CI test
 
@@ -88,7 +88,7 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install poetry
+      - run: pip install "poetry<1.1.9" "poetry-core<1.0.5"
       - run: poetry install
       # Azure.com APIs take >50% of all APIs in the test corpus
       - run: poetry run pytest test-corpus -k 'azure.com'
@@ -106,7 +106,7 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install poetry
+      - run: pip install "poetry<1.1.9" "poetry-core<1.0.5"
       - run: poetry install
       # It matches 'microsoft.com/graph/1.0.1/openapi.yaml' that has >5000 API operations.
       # Running tests only for this API takes a lot of time and worth having a separate job due to the max time limit
@@ -125,7 +125,7 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install poetry
+      - run: pip install "poetry<1.1.9" "poetry-core<1.0.5"
       - run: poetry install
       # It matches all Amazon APIs
       - run: poetry run pytest test-corpus -k 'amazonaws.com'
@@ -143,7 +143,7 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install poetry
+      - run: pip install "poetry<1.1.9" "poetry-core<1.0.5"
       - run: poetry install
       # It matches all Google APIs
       - run: poetry run pytest test-corpus -k 'googleapis.com'
@@ -161,7 +161,7 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install poetry
+      - run: pip install "poetry<1.1.9" "poetry-core<1.0.5"
       - run: poetry install
       # It matches everything except that large MS API and all Azure.com | Amazon | Google APIs
       - run: poetry run pytest test-corpus -k 'not (microsoft.com and graph) and not azure.com and not amazonaws.com and not googleapis.com'
