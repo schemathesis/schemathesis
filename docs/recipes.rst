@@ -105,3 +105,14 @@ Token-based authentication via a separate ``pytest`` fixture:
         case.headers["Authorization"] = f"Bearer {token}"
         # Run the usual testing code below
         case.call_and_validate()
+
+Using an HTTP(S) proxy
+----------------------
+
+Sometimes you need to send your traffic to some other tools. You could set up a proxy via the following env variables:
+
+.. code-block:: bash
+
+    $ export HTTP_PROXY="http://10.10.1.10:3128"
+    $ export HTTPS_PROXY="http://10.10.1.10:1080"
+    $ schemathesis run http://localhost/schema.json

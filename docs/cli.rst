@@ -1,8 +1,11 @@
 Command Line Interface
 ======================
 
-Installing Schemathesis installs the ``schemathesis`` script to your virtualenv.
-The ``--help`` option will give more information about any commands and options.
+Installing Schemathesis installs the ``schemathesis`` script to your virtualenv, which you can use to test your APIs
+
+.. note::
+
+    To see the full list of CLI options & commands use the ``--help`` option or check the `Full list of CLI options`_.
 
 Basic usage
 -----------
@@ -492,3 +495,11 @@ To run it against the localhost server, add ``--network=host`` parameter:
 
     docker run --network="host" schemathesis/schemathesis:stable \
         run http://127.0.0.1/schema.json
+
+Full list of CLI options
+------------------------
+
+.. click:: schemathesis.cli:schemathesis
+   :prog: schemathesis
+   :commands: run
+   :nested: full

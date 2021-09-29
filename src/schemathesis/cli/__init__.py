@@ -128,7 +128,7 @@ class DeprecatedOption(click.Option):
 @click.option("--pre-run", help="A module to execute before the running the tests.", type=str)
 @click.version_option()
 def schemathesis(pre_run: Optional[str] = None) -> None:
-    """Command line tool for testing your web application built with Open API / Swagger specifications."""
+    """Command line tool for testing your web application built with Open API / GraphQL specifications."""
     if pre_run:
         load_hook(pre_run)
 
@@ -519,7 +519,7 @@ def run(
 ) -> None:
     """Perform schemathesis test against an API specified by SCHEMA.
 
-    SCHEMA must be a valid URL or file path pointing to an Open API / Swagger specification.
+    SCHEMA must be a valid URL or file path pointing to an Open API / GraphQL specification.
     """
     # pylint: disable=too-many-locals
     maybe_disable_color(ctx, no_color)
