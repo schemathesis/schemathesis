@@ -338,9 +338,9 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set, ve
     # And operation with a failure is displayed as a subsection
     assert " GET /v1/api/failure " in out
     assert "Message" in out
-    assert "Run this Python code to reproduce this failure: " in out
-    headers = f"{{'User-Agent': '{USER_AGENT}', 'Content-Type': 'application/json', 'Content-Length': '0'}}"
-    assert f"requests.get('http://127.0.0.1:8080/api/failure', headers={headers})" in out
+    assert "Run this cURL command to reproduce this failure:" in out
+    headers = f"-H 'Content-Length: 0' -H 'Content-Type: application/json' -H 'User-Agent: {USER_AGENT}'"
+    assert f"curl -X GET {headers} http://127.0.0.1:8080/api/failure" in out
 
 
 @pytest.mark.parametrize("show_errors_tracebacks", (True, False))

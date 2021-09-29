@@ -33,6 +33,8 @@ def make_response(
     response.status_code = status_code
     if content_type:
         response.headers["Content-Type"] = content_type
+    request = requests.Request(method="POST", url="http://127.0.0.1", headers={})
+    response.request = request.prepare()
     return response
 
 

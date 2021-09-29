@@ -61,7 +61,7 @@ class CodeSampleStyle(str, Enum):
 
     @classmethod
     def default(cls) -> "CodeSampleStyle":
-        return cls.python
+        return cls.curl
 
     @classmethod
     def from_str(cls, value: str) -> "CodeSampleStyle":
