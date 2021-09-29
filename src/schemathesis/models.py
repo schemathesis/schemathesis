@@ -456,7 +456,7 @@ class Case:  # pylint: disable=too-many-public-methods
         kwargs = self.as_requests_kwargs(base_url)
         request = requests.Request(**kwargs)
         prepared = requests.Session().prepare_request(request)  # type: ignore
-        return prepared.url
+        return cast(str, prepared.url)
 
     def partial_deepcopy(self) -> "Case":
         return self.__class__(
