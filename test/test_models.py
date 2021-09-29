@@ -234,13 +234,15 @@ def test_case_partial_deepcopy(swagger_20):
 def test_validate_response(testdir):
     testdir.make_test(
         fr"""
-from requests import Response
+from requests import Response, Request
 
 @schema.parametrize()
 def test_(case):
     response = Response()
     response.headers["Content-Type"] = "application/json"
     response.status_code = 418
+    request = Request(method="GET", url="http://localhost/v1/users", headers={{}})
+    response.request = request.prepare()
     try:
         case.validate_response(response)
     except AssertionError as exc:
@@ -255,9 +257,9 @@ def test_(case):
           "",
           "Response payload: ``",
           "",
-          "Run this Python code to reproduce this response: ",
+          "Run this cURL command to reproduce this response: ",
           "",
-          "    requests.get('http://localhost/v1/users', headers={{'User-Agent': '{USER_AGENT}'}})",
+          "    curl -X GET -H 'User-Agent: {USER_AGENT}' http://localhost/v1/users",
           "",
     ]
 """

@@ -109,7 +109,7 @@ TestStateful.settings = settings(
     # Then it should be able to find a hidden error:
     result.assert_outcomes(failed=1)
     # And there should be Python code to reproduce the error in the GET call
-    result.stdout.re_match_lines([rf"E +requests\.get\('{openapi3_base_url}/users/\w+.+"])
+    result.stdout.re_match_lines([rf"E +curl -X GET .+ '{openapi3_base_url}/users/\w+.+"])
     # And the reproducing example should work
     first = result.outlines.index("Falsifying example:") + 1
     last = result.outlines.index("state.teardown()") + 1
