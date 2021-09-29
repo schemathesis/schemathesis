@@ -186,6 +186,11 @@ At present, the core developers are:
 
 - Dmitry Dygalo (`@Stranger6667`_)
 
+Preferred communication language
+--------------------------------
+
+We prefer to keep all communications in English.
+
 Thanks!
 
 .. _@Stranger6667: https://github.com/Stranger6667
