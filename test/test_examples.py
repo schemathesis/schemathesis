@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import given
+from hypothesis import given, settings
 
 import schemathesis
 from schemathesis.specs.openapi.examples import get_strategies_from_examples
@@ -33,6 +33,7 @@ def test_examples_validity(schema, openapi3_base_url):
     strategy = get_strategies_from_examples(operation, "examples")[0]
 
     @given(case=strategy)
+    @settings(deadline=None)
     def test(case):
         # Generated examples should have valid parameters
         # E.g. headers should be latin-1 encodable
