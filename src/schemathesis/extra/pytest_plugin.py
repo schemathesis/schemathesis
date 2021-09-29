@@ -141,7 +141,7 @@ class SchemathesisCase(PyCollector):
                 data_generation_method=data_generation_method,
             )
         else:
-            fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)
+            fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)  # type: ignore[arg-type]
             fixtureinfo.prune_dependency_tree()
             for callspec in metafunc._calls:
                 subname = f"{name}[{callspec.id}]"

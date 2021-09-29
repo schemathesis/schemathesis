@@ -427,9 +427,10 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     )
     click.echo(versions)
     click.echo(f"rootdir: {os.getcwd()}")
+    current_profile = settings._current_profile  # type: ignore[attr-defined]
     click.echo(
-        f"hypothesis profile '{settings._current_profile}' "  # type: ignore
-        f"-> {settings.get_profile(settings._current_profile).show_changed()}"
+        f"hypothesis profile '{current_profile}' "  # type: ignore
+        f"-> {settings.get_profile(current_profile).show_changed()}"
     )
     if event.location is not None:
         click.echo(f"Schema location: {event.location}")

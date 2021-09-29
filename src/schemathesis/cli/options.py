@@ -22,7 +22,7 @@ class CSVOption(click.Choice):
         self.enum = choices
         super().__init__(tuple(choices.__members__))
 
-    def convert(
+    def convert(  # type: ignore[return]
         self, value: str, param: Optional[click.core.Parameter], ctx: Optional[click.core.Context]
     ) -> List[Enum]:
         items = [item for item in value.split(",") if item]
