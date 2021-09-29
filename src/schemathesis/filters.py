@@ -34,16 +34,23 @@ class FilterResult(enum.Enum):
         return self
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, repr=False)
 class BaseFilter:
     func: Callable[..., bool] = attr.ib()
+    # A short description of a filter. Primarily exists for debugging purposes
+    label: str = attr.ib(default="custom")
+    # This ID denotes a filter group that is used to override filters for the same locations
+    group_id: Optional[int] = attr.ib(default=None)
     scope: Optional[str] = attr.ib(default=DEFAULT_SCOPE)
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}: {self.label}>"
 
     def apply(self, item: Any) -> FilterResult:
         raise NotImplementedError
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, repr=False)
 class Include(BaseFilter):
     def apply(self, item: Any) -> FilterResult:
         if self.func(item):
@@ -51,7 +58,7 @@ class Include(BaseFilter):
         return FilterResult.EXCLUDED
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, repr=False)
 class Exclude(BaseFilter):
     def apply(self, item: Any) -> FilterResult:
         if self.func(item):

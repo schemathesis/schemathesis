@@ -121,8 +121,9 @@ class BaseOpenAPISchema(BaseSchema):
         path: Optional[Filter] = None,
         tag: Optional[Filter] = None,
         operation_id: Optional[Filter] = None,
+        deprecated_operations: Optional[bool] = None,
     ) -> S:
-        predicates = self._construct_filters(method, path, tag, operation_id, None, Include)
+        predicates = self._construct_filters(method, path, tag, operation_id, deprecated_operations, Include)
         return self._filter_by(*predicates)
 
     def exclude(
@@ -131,8 +132,9 @@ class BaseOpenAPISchema(BaseSchema):
         path: Optional[Filter] = None,
         tag: Optional[Filter] = None,
         operation_id: Optional[Filter] = None,
+        deprecated_operations: Optional[bool] = None,
     ) -> S:
-        predicates = self._construct_filters(method, path, tag, operation_id, None, Exclude)
+        predicates = self._construct_filters(method, path, tag, operation_id, deprecated_operations, Exclude)
         return self._filter_by(*predicates)
 
     def _construct_filters(
@@ -141,24 +143,36 @@ class BaseOpenAPISchema(BaseSchema):
         path: Optional[Filter],
         tag: Optional[Filter],
         operation_id: Optional[Filter],
-        skip_deprecated_operations: Optional[bool],
+        deprecated_operations: Optional[bool],
         cls: Type[BaseFilter],
     ) -> List[BaseFilter]:
         predicates: List[BaseFilter] = []
         if path is not None:
-            predicates.append(cls(lambda i: not should_skip_endpoint(i[0], path), "path"))
+            predicates.append(
+                cls(lambda i: not should_skip_endpoint(i[0], path), label=f"path={path}", group_id=1, scope="path")
+            )
         if method is not None:
-            predicates.append(cls(lambda i: not should_skip_method(i[1], method)))
+            predicates.append(cls(lambda i: not should_skip_method(i[1], method), label=f"method={method}", group_id=2))
         if tag is not None:
-            predicates.append(cls(lambda i: not should_skip_by_tag(i[2].get("tags"), tag)))
+            predicates.append(
+                cls(lambda i: not should_skip_by_tag(i[2].get("tags"), tag), label=f"tag={tag}", group_id=3)
+            )
         if operation_id is not None:
-            predicates.append(cls(lambda i: not should_skip_by_operation_id(i[2].get("operationId"), operation_id)))
-        if skip_deprecated_operations is not None:
+            predicates.append(
+                cls(
+                    lambda i: not should_skip_by_operation_id(i[2].get("operationId"), operation_id),
+                    label=f"operation_id={operation_id}",
+                    group_id=4,
+                )
+            )
+        if deprecated_operations not in (None, False):
             predicates.append(
                 cls(
                     lambda i: not should_skip_deprecated(
-                        i[2].get("deprecated", False), cast(bool, skip_deprecated_operations)
-                    )
+                        i[2].get("deprecated", False), cast(bool, deprecated_operations)
+                    ),
+                    label=f"deprecated_operations={deprecated_operations}",
+                    group_id=5,
                 )
             )
         return predicates
@@ -190,6 +204,7 @@ class BaseOpenAPISchema(BaseSchema):
             method = None
             try:
                 full_path = self.get_full_path(path)  # Should be available for later use
+                # TODO. remove obsolete attributes
                 if is_excluded(self.filters, (full_path, None, None), "path"):
                     continue
                 self.dispatch_hook("before_process_path", context, path, methods)

@@ -5,20 +5,22 @@ from schemathesis.filters import Exclude, FilterResult, Include, evaluate_filter
 from .utils import integer
 
 
-@pytest.mark.parametrize("endpoint", ("'/foo'", "'/v1/foo'", ["/foo"], "'/.*oo'"))
-def test_endpoint_filter(testdir, endpoint):
-    # When `endpoint` is specified
+@pytest.mark.parametrize("path", ("'/foo'", "'/v1/foo'", ["/foo"], "'/.*oo'"))
+def test_endpoint_filter(testdir, path):
+    # When `path` is specified
     parameters = {"parameters": [integer(name="id", required=True)], "responses": {"200": {"description": "OK"}}}
     testdir.make_test(
         """
-@schema.parametrize(endpoint={})
+s1 = schema.include(path={})
+
+@s1.parametrize()
 @settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.full_path == "/v1/foo"
     assert case.method == "GET"
 """.format(
-            endpoint
+            path
         ),
         paths={"/foo": {"get": parameters}, "/bar": {"get": parameters}},
     )
@@ -101,7 +103,7 @@ def test_(request, case):
             },
         },
         method="POST",
-        endpoint="/v1/foo",
+        path="/v1/foo",
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
@@ -135,7 +137,7 @@ def test_b(request, case):
             }
         },
         method="POST",
-        endpoint="/v1/foo",
+        path="/v1/foo",
         tag="foo",
     )
     result = testdir.runpytest("-v", "-s")
@@ -198,15 +200,27 @@ def predicate(x):
     return "foo" in x
 
 
+FILTER_LABEL = "test=True"
+
+
 @pytest.mark.parametrize(
     "filters, expected",
     (
         ([], FilterResult.INCLUDED),
-        ([Include(predicate)], FilterResult.INCLUDED),
-        ([Include(predicate), Include(predicate)], FilterResult.INCLUDED),
-        ([Exclude(predicate)], FilterResult.EXCLUDED),
-        ([Exclude(predicate), Include(predicate)], FilterResult.EXCLUDED),
-        ([Include(predicate), Exclude(predicate)], FilterResult.EXCLUDED),
+        ([Include(predicate, label=FILTER_LABEL, group_id=1)], FilterResult.INCLUDED),
+        (
+            [Include(predicate, label=FILTER_LABEL, group_id=1), Include(predicate, label=FILTER_LABEL, group_id=1)],
+            FilterResult.INCLUDED,
+        ),
+        ([Exclude(predicate, label=FILTER_LABEL, group_id=1)], FilterResult.EXCLUDED),
+        (
+            [Exclude(predicate, label=FILTER_LABEL, group_id=1), Include(predicate, label=FILTER_LABEL, group_id=1)],
+            FilterResult.EXCLUDED,
+        ),
+        (
+            [Include(predicate, label=FILTER_LABEL, group_id=1), Exclude(predicate, label=FILTER_LABEL, group_id=1)],
+            FilterResult.EXCLUDED,
+        ),
     ),
 )
 def test_evaluate_filters(filters, expected):
@@ -217,6 +231,21 @@ def test_evaluate_filters_scoped():
     # When filters are evaluated in some particular scope
     # Then filters not matching the scope should be ignored
     assert (
-        evaluate_filters([Exclude(predicate), Include(lambda x: x.startswith("f"), scope="path")], "foo", "path")
+        evaluate_filters(
+            [
+                Exclude(predicate, label=FILTER_LABEL, group_id=1),
+                Include(lambda x: x.startswith("f"), label=FILTER_LABEL, group_id=1, scope="path"),
+            ],
+            "foo",
+            "path",
+        )
         == FilterResult.INCLUDED
     )
+
+
+def test_no_duplicated_filters(swagger_20):
+    # When filtration is used
+    schema = swagger_20.include(path="/foo")
+    # Then there should be no duplicated filters
+    assert len(schema.filters) == 1
+    assert schema.filters[0].label == "path=/foo"

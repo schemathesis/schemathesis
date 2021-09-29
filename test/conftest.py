@@ -510,7 +510,7 @@ def testdir(testdir):
     def maker(
         content,
         method=None,
-        endpoint=None,
+        path=None,
         tag=None,
         pytest_plugins=("aiohttp.pytest_plugin",),
         validate_schema=True,
@@ -535,11 +535,13 @@ def testdir(testdir):
         def simple_schema():
             return schema
 
-        schema = schemathesis.from_dict(raw_schema, method={method}, endpoint={endpoint}, tag={tag}, validate_schema={validate_schema})
+        schema = schemathesis.from_dict(raw_schema, validate_schema={validate_schema}).include(
+            method={method}, path={path}, tag={tag}
+        )
         """.format(
                 schema=schema,
                 method=repr(method),
-                endpoint=repr(endpoint),
+                path=repr(path),
                 tag=repr(tag),
                 validate_schema=repr(validate_schema),
             )

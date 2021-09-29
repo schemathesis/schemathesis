@@ -177,7 +177,7 @@ def from_dict(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -188,12 +188,10 @@ def from_dict(
 
     :param dict raw_schema: A schema to load.
     """
-    for name in ("method", "endpoint", "tag", "operation_id"):
+    for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
         value = locals()[name]
         if value is not None:
             warn_filtration_arguments(name)
-    if skip_deprecated_operations is True:
-        warn_filtration_arguments("skip_deprecated_operations")
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     dispatch("before_load_schema", HookContext(), raw_schema)
 
@@ -203,17 +201,12 @@ def from_dict(
             raw_schema,
             app=app,
             base_url=base_url,
-            method=method,
-            endpoint=endpoint,
-            tag=tag,
-            operation_id=operation_id,
-            skip_deprecated_operations=skip_deprecated_operations,
             validate_schema=validate_schema,
             data_generation_methods=_prepare_data_generation_methods(data_generation_methods),
             code_sample_style=_code_sample_style,
             location=location,
         )
-        return schema.include(method, endpoint)
+        return schema.include(method, endpoint, tag, operation_id, skip_deprecated_operations)
 
     def init_openapi_3() -> OpenApi30:
         _maybe_validate_schema(raw_schema, definitions.OPENAPI_30_VALIDATOR, validate_schema)
@@ -221,17 +214,12 @@ def from_dict(
             raw_schema,
             app=app,
             base_url=base_url,
-            method=method,
-            endpoint=endpoint,
-            tag=tag,
-            operation_id=operation_id,
-            skip_deprecated_operations=skip_deprecated_operations,
             validate_schema=validate_schema,
             data_generation_methods=_prepare_data_generation_methods(data_generation_methods),
             code_sample_style=_code_sample_style,
             location=location,
         )
-        return schema.include(method, endpoint)
+        return schema.include(method, endpoint, tag, operation_id, skip_deprecated_operations)
 
     if force_schema_version == "20":
         return init_openapi_2()

@@ -266,11 +266,12 @@ class BaseSchema(Mapping):
         app: Any = NOT_SET,
         hooks: Union[HookDispatcher, NotSet] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
-        skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
+        skip_deprecated_operations: Union[Optional[bool], NotSet] = NOT_SET,
         data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
         code_sample_style: Union[CodeSampleStyle, NotSet] = NOT_SET,
         filters: Union[List[BaseFilter], NotSet] = NOT_SET,
     ) -> S:
+        # pylint: disable=too-many-branches
         if base_url is NOT_SET:
             base_url = self.base_url
         if method is NOT_SET:
@@ -293,9 +294,26 @@ class BaseSchema(Mapping):
             data_generation_methods = self.data_generation_methods
         if code_sample_style is NOT_SET:
             code_sample_style = self.code_sample_style
-        new_filters = self._construct_filters(
-            method, endpoint, tag, operation_id, cast(bool, skip_deprecated_operations), Include
-        )
+        unique_filters = {
+            filter_.group_id: filter_
+            for filter_ in self._construct_filters(
+                method, endpoint, tag, operation_id, cast(bool, skip_deprecated_operations), Include
+            )
+        }
+        for filter_ in self.filters:
+            unique_filters.setdefault(filter_.group_id, filter_)
+        # TODO. should it be on None? `None` could come from `self` attribute
+        if endpoint is None:
+            unique_filters.pop(1, None)
+        if method is None:
+            unique_filters.pop(2, None)
+        if tag is None:
+            unique_filters.pop(3, None)
+        if operation_id is None:
+            unique_filters.pop(4, None)
+        if skip_deprecated_operations is None:
+            unique_filters.pop(5, None)
+        new_filters = list(unique_filters.values())
         if filters is not NOT_SET:
             new_filters += cast(List[BaseFilter], filters)
 
@@ -323,7 +341,7 @@ class BaseSchema(Mapping):
         path: Optional[Filter],
         tag: Optional[Filter],
         operation_id: Optional[Filter],
-        skip_deprecated_operations: Optional[bool],
+        deprecated_operations: Optional[bool],
         cls: Type[BaseFilter],
     ) -> List[BaseFilter]:
         return []
