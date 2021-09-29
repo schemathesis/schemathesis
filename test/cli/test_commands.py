@@ -153,7 +153,7 @@ def test_commands_run_help(cli):
         "",
         "  Perform schemathesis test against an API specified by SCHEMA.",
         "",
-        "  SCHEMA must be a valid URL or file path pointing to an Open API / Swagger",
+        "  SCHEMA must be a valid URL or file path pointing to an Open API / GraphQL",
         "  specification.",
         "",
         "Filtering options:",
