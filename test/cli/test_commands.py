@@ -1847,9 +1847,8 @@ def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra):
     )
     # And code sample as well
     assert (
-        lines[26] == f"    requests.get('{base_url}/basic', headers={{'Authorization': 'Basic J3Rlc3Q6d3Jvbmcn', "
-        f"'User-Agent': '{USER_AGENT}', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', "
-        f"'Connection': 'keep-alive'}})"
+        lines[26]
+        == f"    curl -X GET -H 'Accept: */*' -H 'Accept-Encoding: gzip, deflate' -H 'Authorization: Basic J3Rlc3Q6d3Jvbmcn' -H 'Connection: keep-alive' -H 'User-Agent: {USER_AGENT}' {base_url}/basic"
     )
 
 
@@ -1866,8 +1865,7 @@ def test_explicit_headers_in_output_on_errors(cli, base_url, schema_url, openapi
     assert lines[17] == f"Headers         : {{'Authorization': '{auth}', 'User-Agent': '{USER_AGENT}'}}"
     # And code sample as well
     assert lines[22].startswith(
-        f"    requests.get('{base_url}/flaky', headers={{'User-Agent': '{USER_AGENT}', "
-        f"'Authorization': '{auth}'}}, params={{'id': "
+        f"    curl -X GET -H 'Authorization: {auth}' -H 'User-Agent: {USER_AGENT}' '{base_url}/flaky?id=0'"
     )
 
 
