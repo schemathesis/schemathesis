@@ -37,7 +37,7 @@ class LazySchema:
     app: Any = attr.ib(default=NOT_SET)  # pragma: no mutate
     hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
-    skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
+    skip_deprecated_operations: Optional[bool] = attr.ib(default=None)  # pragma: no mutate
     data_generation_methods: Iterable[DataGenerationMethod] = attr.ib(default=DEFAULT_DATA_GENERATION_METHODS)
     code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate
 
@@ -57,6 +57,7 @@ class LazySchema:
             value = locals()[name]
             if value is not NOT_SET:
                 warn_filtration_arguments(name)
+                # TODO. create filters
         if method is NOT_SET:
             method = self.method
         if endpoint is NOT_SET:

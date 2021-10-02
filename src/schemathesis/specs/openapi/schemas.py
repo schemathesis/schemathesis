@@ -137,6 +137,40 @@ class BaseOpenAPISchema(BaseSchema):
         predicates = self._construct_filters(method, path, tag, operation_id, deprecated_operations, Exclude)
         return self._filter_by(*predicates)
 
+    def _get_filter_group_id(self, name: str) -> int:
+        return {
+            "path": 1,
+            "endpoint": 1,  # Deprecated
+            "method": 2,
+            "tag": 3,
+            "operation_id": 4,
+            "deprecated_operations": 5,
+            "skip_deprecated_operations": 5,  # Deprecated
+        }[name]
+
+    def _construct_filter(self, name: str, value: Any, cls: Type[BaseFilter]) -> BaseFilter:
+        label = f"{name}={value}"
+        group_id = self._get_filter_group_id(name)
+        if name in ("path", "endpoint"):
+            return cls(lambda i: not should_skip_endpoint(i[0], value), label=label, group_id=group_id, scope="path")
+        if name == "method":
+            return cls(lambda i: not should_skip_method(i[1], value), label=label, group_id=group_id)
+        if name == "tag":
+            return cls(lambda i: not should_skip_by_tag(i[2].get("tags"), value), label=label, group_id=group_id)
+        if name == "operation_id":
+            return cls(
+                lambda i: not should_skip_by_operation_id(i[2].get("operationId"), value),
+                label=label,
+                group_id=group_id,
+            )
+        if name in ("deprecated_operations", "skip_deprecated_operations"):
+            return cls(
+                lambda i: not should_skip_deprecated(i[2].get("deprecated", False), cast(bool, value)),
+                label=label,
+                group_id=group_id,
+            )
+        raise NotImplementedError
+
     def _construct_filters(
         self,
         method: Optional[Filter],
@@ -148,33 +182,15 @@ class BaseOpenAPISchema(BaseSchema):
     ) -> List[BaseFilter]:
         predicates: List[BaseFilter] = []
         if path is not None:
-            predicates.append(
-                cls(lambda i: not should_skip_endpoint(i[0], path), label=f"path={path}", group_id=1, scope="path")
-            )
+            predicates.append(self._construct_filter("path", path, cls))
         if method is not None:
-            predicates.append(cls(lambda i: not should_skip_method(i[1], method), label=f"method={method}", group_id=2))
+            predicates.append(self._construct_filter("method", method, cls))
         if tag is not None:
-            predicates.append(
-                cls(lambda i: not should_skip_by_tag(i[2].get("tags"), tag), label=f"tag={tag}", group_id=3)
-            )
+            predicates.append(self._construct_filter("tag", tag, cls))
         if operation_id is not None:
-            predicates.append(
-                cls(
-                    lambda i: not should_skip_by_operation_id(i[2].get("operationId"), operation_id),
-                    label=f"operation_id={operation_id}",
-                    group_id=4,
-                )
-            )
+            predicates.append(self._construct_filter("operation_id", operation_id, cls))
         if deprecated_operations not in (None, False):
-            predicates.append(
-                cls(
-                    lambda i: not should_skip_deprecated(
-                        i[2].get("deprecated", False), cast(bool, deprecated_operations)
-                    ),
-                    label=f"deprecated_operations={deprecated_operations}",
-                    group_id=5,
-                )
-            )
+            predicates.append(self._construct_filter("deprecated_operations", deprecated_operations, cls))
         return predicates
 
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
@@ -204,7 +220,6 @@ class BaseOpenAPISchema(BaseSchema):
             method = None
             try:
                 full_path = self.get_full_path(path)  # Should be available for later use
-                # TODO. remove obsolete attributes
                 if is_excluded(self.filters, (full_path, None, None), "path"):
                     continue
                 self.dispatch_hook("before_process_path", context, path, methods)

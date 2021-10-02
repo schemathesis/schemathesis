@@ -77,15 +77,10 @@ class BaseSchema(Mapping):
     raw_schema: Dict[str, Any] = attr.ib()  # pragma: no mutate
     location: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
-    method: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
-    endpoint: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
-    tag: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
-    operation_id: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
     test_function: Optional[GenericTest] = attr.ib(default=None)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
-    skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
     data_generation_methods: Iterable[DataGenerationMethod] = attr.ib(
         default=DEFAULT_DATA_GENERATION_METHODS
     )  # pragma: no mutate
@@ -202,6 +197,12 @@ class BaseSchema(Mapping):
                 else:
                     yield result, data_generation_method
 
+    def _get_filter_group_id(self, name: str) -> int:
+        raise NotImplementedError
+
+    def _construct_filter(self, name: str, value: Any, cls: Type[BaseFilter]) -> BaseFilter:
+        raise NotImplementedError
+
     def parametrize(
         self,
         method: Optional[Filter] = NOT_SET,
@@ -217,10 +218,17 @@ class BaseSchema(Mapping):
         _code_sample_style = (
             CodeSampleStyle.from_str(code_sample_style) if isinstance(code_sample_style, str) else code_sample_style
         )
+        new_filters = {filter_.group_id: filter_ for filter_ in self.filters}
         for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
             value = locals()[name]
             if value is not NOT_SET:
                 warn_filtration_arguments(name)
+                group_id = self._get_filter_group_id(name)
+                if value is None:
+                    new_filters.pop(group_id, None)
+                else:
+                    new_filters[group_id] = self._construct_filter(name, value, Include)
+        filters = list(new_filters.values())
 
         def wrapper(func: GenericTest) -> GenericTest:
             if hasattr(func, PARAMETRIZE_MARKER):
@@ -236,14 +244,10 @@ class BaseSchema(Mapping):
             HookDispatcher.add_dispatcher(func)
             cloned: BaseSchema = self.clone(
                 test_function=func,
-                method=method,
-                endpoint=endpoint,
-                tag=tag,
-                operation_id=operation_id,
                 validate_schema=validate_schema,
-                skip_deprecated_operations=skip_deprecated_operations,
                 data_generation_methods=data_generation_methods,
                 code_sample_style=_code_sample_style,  # type: ignore
+                filters=filters,
             )
             setattr(func, PARAMETRIZE_MARKER, cloned)
             return func
@@ -271,68 +275,31 @@ class BaseSchema(Mapping):
         code_sample_style: Union[CodeSampleStyle, NotSet] = NOT_SET,
         filters: Union[List[BaseFilter], NotSet] = NOT_SET,
     ) -> S:
-        # pylint: disable=too-many-branches
         if base_url is NOT_SET:
             base_url = self.base_url
-        if method is NOT_SET:
-            method = self.method
-        if endpoint is NOT_SET:
-            endpoint = self.endpoint
-        if tag is NOT_SET:
-            tag = self.tag
-        if operation_id is NOT_SET:
-            operation_id = self.operation_id
         if app is NOT_SET:
             app = self.app
         if validate_schema is NOT_SET:
             validate_schema = self.validate_schema
-        if skip_deprecated_operations is NOT_SET:
-            skip_deprecated_operations = self.skip_deprecated_operations
         if hooks is NOT_SET:
             hooks = self.hooks
         if data_generation_methods is NOT_SET:
             data_generation_methods = self.data_generation_methods
         if code_sample_style is NOT_SET:
             code_sample_style = self.code_sample_style
-        unique_filters = {
-            filter_.group_id: filter_
-            for filter_ in self._construct_filters(
-                method, endpoint, tag, operation_id, cast(bool, skip_deprecated_operations), Include
-            )
-        }
-        for filter_ in self.filters:
-            unique_filters.setdefault(filter_.group_id, filter_)
-        # TODO. should it be on None? `None` could come from `self` attribute
-        if endpoint is None:
-            unique_filters.pop(1, None)
-        if method is None:
-            unique_filters.pop(2, None)
-        if tag is None:
-            unique_filters.pop(3, None)
-        if operation_id is None:
-            unique_filters.pop(4, None)
-        if skip_deprecated_operations is None:
-            unique_filters.pop(5, None)
-        new_filters = list(unique_filters.values())
-        if filters is not NOT_SET:
-            new_filters += cast(List[BaseFilter], filters)
-
+        if filters is NOT_SET:
+            filters = cast(List[BaseFilter], self.filters)
         return self.__class__(  # type: ignore
             self.raw_schema,
             location=self.location,
             base_url=base_url,  # type: ignore
-            method=method,
-            endpoint=endpoint,
-            tag=tag,
-            operation_id=operation_id,
             app=app,
             hooks=hooks,  # type: ignore
             test_function=test_function,
             validate_schema=validate_schema,  # type: ignore
-            skip_deprecated_operations=skip_deprecated_operations,  # type: ignore
             data_generation_methods=data_generation_methods,  # type: ignore
             code_sample_style=code_sample_style,  # type: ignore
-            filters=new_filters,
+            filters=filters,  # type: ignore
         )
 
     def _construct_filters(

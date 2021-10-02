@@ -41,7 +41,7 @@ def from_path(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -81,7 +81,7 @@ def from_uri(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -135,7 +135,7 @@ def from_file(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -288,7 +288,7 @@ def from_pytest_fixture(
     endpoint: Optional[Filter] = NOT_SET,
     tag: Optional[Filter] = NOT_SET,
     operation_id: Optional[Filter] = NOT_SET,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
@@ -303,6 +303,10 @@ def from_pytest_fixture(
     :param str fixture_name: The name of a fixture to load.
     """
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
+    for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
+        value = locals()[name]
+        if value is not None:
+            warn_filtration_arguments(name)
     return LazySchema(
         fixture_name,
         app=app,
@@ -327,7 +331,7 @@ def from_wsgi(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -378,7 +382,7 @@ def from_aiohttp(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -420,7 +424,7 @@ def from_asgi(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
