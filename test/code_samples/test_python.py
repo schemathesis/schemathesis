@@ -42,7 +42,7 @@ def get_full_code(kwargs_repr=""):
         ({}, ""),
         ({"query": {"a": 1}}, "params={'a': 1}"),
     ),
-    indirect=["openapi_case"],
+    indirect=["openapi_case"]
 )
 def test_open_api_code_sample(openapi_case, kwargs_repr):
     # Custom request parts should be correctly displayed
