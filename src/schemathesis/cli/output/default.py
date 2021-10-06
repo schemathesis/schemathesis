@@ -408,7 +408,7 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
             f"Error: {message}\n"
             f"Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks"
         )
-        if event.exception_type == "jsonschema.exceptions.ValidationError":
+        if event.exception_type == "schemathesis.exceptions.SchemaLoadingError":
             message += "\n" + DISABLE_SCHEMA_VALIDATION_MESSAGE
         click.secho(message, fg="red")
 

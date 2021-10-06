@@ -7,6 +7,7 @@ Changelog
 **Changed**
 
 - Show ``cURL`` code samples by default instead of Python. `#1269`_
+- Improve reporting of ``jsonschema`` errors which are caused by non-string object keys.
 
 `3.10.1`_ - 2021-10-04
 ----------------------
