@@ -4,13 +4,16 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
-**Added**
-
-- ``DataGenerationMethod.all`` shortcut to get all possible enum variants.
-
 **Changed**
 
 - Show ``cURL`` code samples by default instead of Python. `#1269`_
+
+`3.10.1`_ - 2021-10-04
+----------------------
+
+**Added**
+
+- ``DataGenerationMethod.all`` shortcut to get all possible enum variants.
 
 **Fixed**
 
@@ -1981,7 +1984,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.10.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.10.1...HEAD
+.. _3.10.1: https://github.com/schemathesis/schemathesis/compare/v3.10.0...v3.10.1
 .. _3.10.0: https://github.com/schemathesis/schemathesis/compare/v3.9.7...v3.10.0
 .. _3.9.7: https://github.com/schemathesis/schemathesis/compare/v3.9.6...v3.9.7
 .. _3.9.6: https://github.com/schemathesis/schemathesis/compare/v3.9.5...v3.9.6
