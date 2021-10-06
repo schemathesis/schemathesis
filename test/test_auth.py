@@ -54,3 +54,14 @@ def test_register_auth_provider_on_expiration(auth_token, monkeypatch):
     new_auth_token = get_current_auth_token()
     assert new_auth_token != auth_token
     assert new_auth_token.timestamp == DatetimeMock.current_timestamp
+
+
+def test_auto_refresh_token(auth_token, monkeypatch):
+    monkeypatch.setattr(requests, "request", auth_api_response_mock)
+    monkeypatch.setattr(auth, "datetime", DatetimeMock)
+
+    @auth.register_auth_provider(AuthStorage, auth_token=auth_token)
+    def get_current_auth_token() -> auth.AuthToken:
+        return AuthStorage.auth_token
+
+    assert get_current_auth_token() != auth_token
