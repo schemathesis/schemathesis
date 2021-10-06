@@ -2,7 +2,7 @@ import pytest
 from jsonschema import ValidationError
 
 import schemathesis
-from schemathesis.exceptions import InvalidSchema
+from schemathesis.exceptions import InvalidSchema, SchemaLoadingError
 from schemathesis.specs.openapi.parameters import OpenAPI20Body
 from schemathesis.specs.openapi.schemas import InliningResolver
 from schemathesis.utils import Err, Ok
@@ -126,7 +126,7 @@ def test_schema_parsing_error(simple_schema):
     assert oks[0].method == "post"
 
 
-@pytest.mark.parametrize("validate_schema, expected_exception", ((False, InvalidSchema), (True, ValidationError)))
+@pytest.mark.parametrize("validate_schema, expected_exception", ((False, InvalidSchema), (True, SchemaLoadingError)))
 def test_not_recoverable_schema_error(simple_schema, validate_schema, expected_exception):
     # When there is an error in the API schema that leads to inability to generate any tests
     del simple_schema["paths"]
@@ -140,7 +140,7 @@ def test_schema_error_on_path(simple_schema):
     # When there is an error that affects only a subset of paths
     simple_schema["paths"] = {None: "", "/foo": {"post": RESPONSES}}
     # Then it should be rejected during loading if schema validation is enabled
-    with pytest.raises(ValidationError):
+    with pytest.raises(SchemaLoadingError):
         schemathesis.from_dict(simple_schema)
     # And should produce an `Err` instance on operation parsing
     schema = schemathesis.from_dict(simple_schema, validate_schema=False)

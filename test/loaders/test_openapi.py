@@ -5,8 +5,9 @@ import pytest
 from flask import Response
 
 import schemathesis
+from schemathesis.exceptions import SchemaLoadingError
 from schemathesis.specs.openapi import loaders
-from schemathesis.specs.openapi.loaders import YAML_LOADING_ERROR
+from schemathesis.specs.openapi.loaders import NON_STRING_OBJECT_KEY, NUMERIC_STATUS_CODES_MESSAGE, YAML_LOADING_ERROR
 from schemathesis.specs.openapi.schemas import OpenApi30, SwaggerV20
 
 
@@ -109,3 +110,32 @@ def test_invalid_content_type(httpserver, without_content_type):
     if not without_content_type:
         # And list the actual response content type
         assert "The actual response has `text/html; charset=utf-8` Content-Type" in exc.value.args[0]
+
+
+def test_numeric_status_codes(empty_open_api_3_schema):
+    # When the API schema contains a numeric status code, which is not allowed by the spec
+    empty_open_api_3_schema["paths"] = {
+        "/foo": {
+            "get": {
+                "responses": {200: {"description": "OK"}},
+            },
+            "post": {
+                "responses": {201: {"description": "OK"}},
+            },
+        },
+    }
+    # And schema validation is enabled
+    # Then Schemathesis reports an error about numeric status codes
+    with pytest.raises(SchemaLoadingError, match=NUMERIC_STATUS_CODES_MESSAGE) as exc:
+        schemathesis.from_dict(empty_open_api_3_schema)
+    # And shows all locations of these keys
+    assert " - 200 at schema['paths']['/foo']['get']['responses']" in exc.value.args[0]
+    assert " - 201 at schema['paths']['/foo']['post']['responses']" in exc.value.args[0]
+
+
+def test_non_string_keys(empty_open_api_3_schema):
+    # If API schema contains a non-string key
+    empty_open_api_3_schema[True] = 42
+    # Then it should be reported with a proper message
+    with pytest.raises(SchemaLoadingError, match=NON_STRING_OBJECT_KEY):
+        schemathesis.from_dict(empty_open_api_3_schema)

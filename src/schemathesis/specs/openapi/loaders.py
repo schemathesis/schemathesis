@@ -1,5 +1,7 @@
+import io
 import pathlib
-from typing import IO, Any, Callable, Dict, Iterable, List, Optional, Union
+from contextlib import suppress
+from typing import IO, Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 from urllib.parse import urljoin
 
 import jsonschema
@@ -17,7 +19,7 @@ from ...hooks import HookContext, dispatch
 from ...lazy import LazySchema
 from ...types import Filter, NotSet, PathLike
 from ...utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, require_relative_url, setup_headers
-from . import definitions
+from . import definitions, validation
 from .schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
 
 DataGenerationMethodInput = Union[DataGenerationMethod, Iterable[DataGenerationMethod]]
@@ -233,6 +235,26 @@ def _prepare_data_generation_methods(data_generation_methods: DataGenerationMeth
     return list(data_generation_methods)
 
 
+# It is a common case when API schemas are stored in the YAML format and HTTP status codes are numbers
+# The Open API spec requires HTTP status codes as strings
+DOC_ENTRY = "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#patterned-fields-1"
+NUMERIC_STATUS_CODES_MESSAGE = f"""The input schema contains HTTP status codes as numbers.
+The Open API spec requires them to be strings:
+{DOC_ENTRY}
+Please, stringify the following status codes:"""
+NON_STRING_OBJECT_KEY = "The input schema contains non-string keys in sub-schemas"
+
+
+def _format_status_codes(status_codes: List[Tuple[int, List[Union[str, int]]]]) -> str:
+    buffer = io.StringIO()
+    for status_code, path in status_codes:
+        buffer.write(f" - {status_code} at schema['paths']")
+        for chunk in path:
+            buffer.write(f"[{repr(chunk)}]")
+        buffer.write("['responses']\n")
+    return buffer.getvalue().rstrip()
+
+
 def _maybe_validate_schema(
     instance: Dict[str, Any], validator: jsonschema.validators.Draft4Validator, validate_schema: bool
 ) -> None:
@@ -240,7 +262,18 @@ def _maybe_validate_schema(
         try:
             validator.validate(instance)
         except TypeError as exc:
-            raise ValidationError("Invalid schema") from exc
+            if validation.is_pattern_error(exc):
+                # Ignore errors for completely invalid schemas - it will be covered by the re-raising after this block
+                with suppress(AttributeError):
+                    status_codes = validation.find_numeric_http_status_codes(instance)
+                    if status_codes:
+                        message = _format_status_codes(status_codes)
+                        raise SchemaLoadingError(f"{NUMERIC_STATUS_CODES_MESSAGE}\n{message}") from exc
+                    # Some other pattern error
+                    raise SchemaLoadingError(NON_STRING_OBJECT_KEY) from exc
+            raise SchemaLoadingError("Invalid schema") from exc
+        except ValidationError as exc:
+            raise SchemaLoadingError("The input schema is not a valid Open API schema") from exc
 
 
 def from_pytest_fixture(
