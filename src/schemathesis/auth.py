@@ -1,7 +1,6 @@
 import requests
 from datetime import datetime
 from typing import Optional, Any, Callable, Dict
-from functools import partial
 from requests.auth import HTTPBasicAuth
 
 
@@ -10,12 +9,14 @@ PASSWORD: str = ""      # TODO: get value from global state
 
 
 class AuthToken:
+    # Note: Python 3.8 and higher supports dataclasses which could be a little bit nicer here
     def __init__(self, token_value: str, timestamp: Optional[datetime] = None):
         self.value = token_value    # TODO: Map this reference to initialy set token value
         self.timestamp = timestamp if timestamp else datetime.now()
 
 
-def perform_api_authentication(url: str, payload: Dict["str", "str"]) -> requests.Response:
+# TODO: fix *args problem for tests
+def perform_api_authentication(*args, url: str, payload: Dict["str", "str"]) -> requests.Response:
     response = requests.request(
         method="POST",
         url=url,
@@ -36,47 +37,44 @@ class APITokenAuth:
 
     def get_token(self) -> str:
         payload = {"username": self._username, "password": self._password}
-        auth_response = self.perform_authentication(url=self.login_url, payload=payload)
+        perform_auth_method = self.perform_authentication
+        auth_response = perform_auth_method(url=self.login_url, payload=payload)
         response_data = auth_response.json()
         return response_data[self.token_kwarg_name]
 
 
-class AuthStorage(APITokenAuth):
-    auth_token: Optional[AuthToken] = None  # Warning: this has a singleton like effect. If this is override,
-                                            # it will be overriden global for all references
+class BaseAuthStorage(APITokenAuth):
+    auth_token: Optional[AuthToken] = None
 
-    def __init__(self, **configs):
+    def __init__(self, auth_token: Optional[AuthToken] = None, **configs):
+        if auth_token:
+            BaseAuthStorage.auth_token = auth_token  # Warning: this has a singleton like effect. If this is override,
+                                                     # it will be overriden global for all references
         super().__init__(**configs)
 
     def override_token(self):
         token = self.get_token()
-        self.auth = AuthToken(token_value=token)
+        BaseAuthStorage.auth_token = AuthToken(token_value=token)
 
 
 def register_auth_provider(
-        auth_storage: AuthStorage,
+        auth_storage: BaseAuthStorage,
+        *,
         auto_refresh: bool = True,
         refresh_interval: Optional[int] = None,
-        *args,
+        auth_token: Optional[AuthToken] = None,
         **kwargs
 ):
-    """
-    Programflow:
-    1. Check if refresh interval is set - if yes, check if auth is expired
-    2. Check if auto refresh is set. If Yes: authenticate user per request
-    """
-    # TODO: Pass arguments in AuthStorage
-    auth = AuthStorage()
-    if auto_refresh:
-        auth.override_token()
-    if refresh_interval:
-        time_diff = datetime.now() - auth.auth_token.timestamp
-        if time_diff.total_seconds() > refresh_interval:
-            auth.override_token()
+    auth = auth_storage(auth_token=auth_token)
     def decorator(func):
         def wrapper(*args, **kwargs):
-            r = func(*args, **kwargs)
+            if auto_refresh:
+                auth.override_token()
+            if refresh_interval:
+                time_diff = datetime.now() - auth.auth_token.timestamp
+                if time_diff.total_seconds() > refresh_interval:
+                    auth.override_token()
+
+            return func(*args, **kwargs)
         return wrapper
     return decorator
-
-
