@@ -81,19 +81,24 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
     relative_path: str = attr.ib()  # pragma: no mutate
     # The current level of recursion during stateful testing
     recursion_level: int = attr.ib()  # pragma: no mutate
+    # The way data will be generated
+    data_generation_method: str = attr.ib()  # pragma: no mutate
     # An unique ID which connects events that happen during testing of the same API operation
     # It may be useful when multiple threads are involved where incoming events are not ordered
     correlation_id: str = attr.ib()  # pragma: no mutate
     thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
 
     @classmethod
-    def from_operation(cls, operation: APIOperation, recursion_level: int, correlation_id: str) -> "BeforeExecution":
+    def from_operation(
+        cls, operation: APIOperation, recursion_level: int, data_generation_method: str, correlation_id: str
+    ) -> "BeforeExecution":
         return cls(
             method=operation.method.upper(),
             path=operation.full_path,
             verbose_name=operation.verbose_name,
             relative_path=operation.path,
             recursion_level=recursion_level,
+            data_generation_method=data_generation_method,
             correlation_id=correlation_id,
         )
 
