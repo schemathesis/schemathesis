@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Union
 import attr
 from requests import exceptions
 
+from ..constants import DataGenerationMethod
 from ..exceptions import HTTPError
 from ..models import APIOperation, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
@@ -82,7 +83,7 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
     # The current level of recursion during stateful testing
     recursion_level: int = attr.ib()  # pragma: no mutate
     # The way data will be generated
-    data_generation_method: str = attr.ib()  # pragma: no mutate
+    data_generation_method: DataGenerationMethod = attr.ib()  # pragma: no mutate
     # An unique ID which connects events that happen during testing of the same API operation
     # It may be useful when multiple threads are involved where incoming events are not ordered
     correlation_id: str = attr.ib()  # pragma: no mutate
@@ -90,7 +91,11 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
 
     @classmethod
     def from_operation(
-        cls, operation: APIOperation, recursion_level: int, data_generation_method: str, correlation_id: str
+        cls,
+        operation: APIOperation,
+        recursion_level: int,
+        data_generation_method: DataGenerationMethod,
+        correlation_id: str,
     ) -> "BeforeExecution":
         return cls(
             method=operation.method.upper(),
