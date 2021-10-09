@@ -203,6 +203,7 @@ def handle_schema_error(
             verbose_name=verbose_name,
             relative_path=error.path,
             recursion_level=recursion_level,
+            data_generation_method=data_generation_method,
             correlation_id=correlation_id,
         )
         yield events.AfterExecution(
@@ -244,7 +245,10 @@ def run_test(  # pylint: disable=too-many-locals
     # To simplify connecting `before` and `after` events in external systems
     correlation_id = uuid.uuid4().hex
     yield events.BeforeExecution.from_operation(
-        operation=operation, recursion_level=recursion_level, correlation_id=correlation_id
+        operation=operation,
+        recursion_level=recursion_level,
+        data_generation_method=data_generation_method,
+        correlation_id=correlation_id,
     )
     hypothesis_output: List[str] = []
     errors: List[Exception] = []
