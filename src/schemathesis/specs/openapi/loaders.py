@@ -18,7 +18,14 @@ from ...exceptions import HTTPError, SchemaLoadingError
 from ...hooks import HookContext, dispatch
 from ...lazy import LazySchema
 from ...types import Filter, NotSet, PathLike
-from ...utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, require_relative_url, setup_headers
+from ...utils import (
+    NOT_SET,
+    StringDatesYAMLLoader,
+    WSGIResponse,
+    require_relative_url,
+    setup_headers,
+    warn_filtration_arguments,
+)
 from . import definitions, validation
 from .schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
 
@@ -34,7 +41,7 @@ def from_path(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -74,7 +81,7 @@ def from_uri(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -128,7 +135,7 @@ def from_file(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -170,7 +177,7 @@ def from_dict(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -181,42 +188,38 @@ def from_dict(
 
     :param dict raw_schema: A schema to load.
     """
+    for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
+        value = locals()[name]
+        if value is not None:
+            warn_filtration_arguments(name)
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     dispatch("before_load_schema", HookContext(), raw_schema)
 
     def init_openapi_2() -> SwaggerV20:
         _maybe_validate_schema(raw_schema, definitions.SWAGGER_20_VALIDATOR, validate_schema)
-        return SwaggerV20(
+        schema = SwaggerV20(
             raw_schema,
             app=app,
             base_url=base_url,
-            method=method,
-            endpoint=endpoint,
-            tag=tag,
-            operation_id=operation_id,
-            skip_deprecated_operations=skip_deprecated_operations,
             validate_schema=validate_schema,
             data_generation_methods=_prepare_data_generation_methods(data_generation_methods),
             code_sample_style=_code_sample_style,
             location=location,
         )
+        return schema.include(method, endpoint, tag, operation_id, skip_deprecated_operations)
 
     def init_openapi_3() -> OpenApi30:
         _maybe_validate_schema(raw_schema, definitions.OPENAPI_30_VALIDATOR, validate_schema)
-        return OpenApi30(
+        schema = OpenApi30(
             raw_schema,
             app=app,
             base_url=base_url,
-            method=method,
-            endpoint=endpoint,
-            tag=tag,
-            operation_id=operation_id,
-            skip_deprecated_operations=skip_deprecated_operations,
             validate_schema=validate_schema,
             data_generation_methods=_prepare_data_generation_methods(data_generation_methods),
             code_sample_style=_code_sample_style,
             location=location,
         )
+        return schema.include(method, endpoint, tag, operation_id, skip_deprecated_operations)
 
     if force_schema_version == "20":
         return init_openapi_2()
@@ -285,7 +288,7 @@ def from_pytest_fixture(
     endpoint: Optional[Filter] = NOT_SET,
     tag: Optional[Filter] = NOT_SET,
     operation_id: Optional[Filter] = NOT_SET,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
@@ -300,6 +303,10 @@ def from_pytest_fixture(
     :param str fixture_name: The name of a fixture to load.
     """
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
+    for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
+        value = locals()[name]
+        if value is not None:
+            warn_filtration_arguments(name)
     return LazySchema(
         fixture_name,
         app=app,
@@ -324,7 +331,7 @@ def from_wsgi(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -375,7 +382,7 @@ def from_aiohttp(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -417,7 +424,7 @@ def from_asgi(
     endpoint: Optional[Filter] = None,
     tag: Optional[Filter] = None,
     operation_id: Optional[Filter] = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: Optional[bool] = None,
     validate_schema: bool = True,
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,

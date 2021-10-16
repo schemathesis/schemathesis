@@ -118,7 +118,7 @@ class Case:  # pylint: disable=too-many-public-methods
                 parts.extend((name, "=", repr(value)))
         return "".join(parts) + ")"
 
-    @deprecated_property(removed_in="4.0", replacement="operation")
+    @deprecated_property(removed_in="4.0", replacement="`operation`")
     def endpoint(self) -> "APIOperation":
         return self.operation
 

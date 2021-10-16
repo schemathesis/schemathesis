@@ -53,6 +53,7 @@ User's Guide
    introduction
    cli
    python
+   what_to_test
    stateful
    service
    how

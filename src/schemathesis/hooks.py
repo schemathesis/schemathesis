@@ -36,7 +36,7 @@ class HookContext:
 
     operation: Optional["APIOperation"] = attr.ib(default=None)  # pragma: no mutate
 
-    @deprecated_property(removed_in="4.0", replacement="operation")
+    @deprecated_property(removed_in="4.0", replacement="`operation`")
     def endpoint(self) -> Optional["APIOperation"]:
         return self.operation
 

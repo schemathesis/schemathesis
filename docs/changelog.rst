@@ -4,11 +4,67 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- A flexible way to select API operations for testing. It is now possible to exclude or include them by commonly
+  used fields like ``method`` or ``tag``, and by arbitrary predicates as well. `#703`_, `#819`_, `#1006`_
+
 **Changed**
 
 - Show ``cURL`` code samples by default instead of Python. `#1269`_
 - Improve reporting of ``jsonschema`` errors which are caused by non-string object keys.
 - Store ``data_generation_method`` in ```BeforeExecution``.
+
+**Deprecated**
+
+``method``, ``endpoint``, ``tag``, ``operation_id`` and ``skip_deprecated_operations`` arguments to all Open API
+loaders (e.g. ``schemathesis.from_dict``) and the ``parametrize`` method. They were used to select what API operations
+should be tested. From this release, you need to use ``include`` / ``exclude`` methods instead.
+
+Before:
+
+.. code:: python
+
+    schema = schemathesis.from_uri("...", method="GET")
+
+
+    @schema.parametrize(endpoint="/users/")
+    def test(case):
+        ...
+
+After:
+
+.. code:: python
+
+    schema = schemathesis.from_uri("...").include(method="GET")
+
+    # Python 3.9+
+    @schema.include(path="/users/").parametrize()
+    def test(case):
+        ...
+
+
+    # Python <=3.8
+    users_schema = schema.include(path="/users/")
+
+
+    @users_schema.parametrize()
+    def test(case):
+        ...
+
+The new approach is not that ergonomic on Python <=3.8, as it doesn't support complex expressions as decorators.
+However, it brings much more flexibility into the ways you could select what is going to be tested.
+
+Similarly, some CLI options are deprecated too:
+- ``--endpoint``. Replaced with ``--include-path``.
+- ``--method``. Replaced with ``--include-method``.
+- ``--tag``. Replaced with ``--include-tag``.
+- ``--operation-id``. Replaced with ``--include-operation-id``.
+- ``--skip-deprecated-operations``. Replaced with ``--exclude-deprecated-operations``.
+
+Each ``--include`` prefixed option has its ``--exclude`` counterpart.
+
+See full description of new possibilities in the :ref:`Selecting API operations to test <selecting-api-operations-to-test>` chapter of the documentation.
 
 `3.10.1`_ - 2021-10-04
 ----------------------
@@ -2204,6 +2260,7 @@ Deprecated
 .. _#1013: https://github.com/schemathesis/schemathesis/issues/1013
 .. _#1010: https://github.com/schemathesis/schemathesis/issues/1010
 .. _#1007: https://github.com/schemathesis/schemathesis/issues/1007
+.. _#1006: https://github.com/schemathesis/schemathesis/issues/1006
 .. _#1003: https://github.com/schemathesis/schemathesis/issues/1003
 .. _#999: https://github.com/schemathesis/schemathesis/issues/999
 .. _#994: https://github.com/schemathesis/schemathesis/issues/994
@@ -2259,6 +2316,7 @@ Deprecated
 .. _#830: https://github.com/schemathesis/schemathesis/issues/830
 .. _#824: https://github.com/schemathesis/schemathesis/issues/824
 .. _#822: https://github.com/schemathesis/schemathesis/issues/822
+.. _#819: https://github.com/schemathesis/schemathesis/issues/819
 .. _#816: https://github.com/schemathesis/schemathesis/issues/816
 .. _#814: https://github.com/schemathesis/schemathesis/issues/814
 .. _#812: https://github.com/schemathesis/schemathesis/issues/812
@@ -2285,6 +2343,7 @@ Deprecated
 .. _#708: https://github.com/schemathesis/schemathesis/issues/708
 .. _#706: https://github.com/schemathesis/schemathesis/issues/706
 .. _#705: https://github.com/schemathesis/schemathesis/issues/705
+.. _#703: https://github.com/schemathesis/schemathesis/issues/703
 .. _#702: https://github.com/schemathesis/schemathesis/issues/702
 .. _#700: https://github.com/schemathesis/schemathesis/issues/700
 .. _#695: https://github.com/schemathesis/schemathesis/issues/695
