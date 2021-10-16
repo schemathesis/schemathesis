@@ -482,7 +482,7 @@ Additionally you can dump all internal events to a JSON Lines file with the ``--
 Running CLI via Docker
 ----------------------
 
-Schemathesis CLI is also available as a docker image:
+Schemathesis CLI is also available as a Docker image:
 
 .. code-block:: bash
 
@@ -495,6 +495,18 @@ To run it against the localhost server, add ``--network=host`` parameter:
 
     docker run --network="host" schemathesis/schemathesis:stable \
         run http://127.0.0.1/schema.json
+
+If your API spec is stored in a file, you could use it too by specifying a Docker volume:
+
+.. code-block:: bash
+
+    docker run -v $(pwd):/mnt schemathesis/schemathesis:stable \
+        run /mnt/spec.json
+
+In the example above, the ``spec.json`` file from the current working directory is shared with the Schemathesis container.
+Note, that ``$(pwd)`` is shell-specific and works in ``sh`` / ``bash`` / ``zsh``, but could be different in e.g. ``PowerShell``.
+
+.. note:: See Docker volumes `documentation <https://docs.docker.com/storage/volumes/>`_ for more information.
 
 Full list of CLI options
 ------------------------
