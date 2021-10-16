@@ -7,6 +7,11 @@ assignees: Stranger6667
 
 ---
 
+**Checklist**
+
+- [ ] I checked the [FAQ section](https://schemathesis.readthedocs.io/en/stable/faq.html#frequently-asked-questions) of the documentation
+- [ ] I looked for similar issues in the [issue tracker](https://github.com/schemathesis/schemathesis/issues)
+
 **Describe the bug**
 A clear and concise description of what the bug is.
 
