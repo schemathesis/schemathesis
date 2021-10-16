@@ -152,6 +152,87 @@ contradicts the definition of the ``oneOf`` keyword behavior, where the value sh
 
 To solve this problem, you can use ``anyOf`` or make your sub-schemas less permissive.
 
+Schemathesis reports conformance issue for schemas with the ``oneOf`` keyword. Why?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``oneOf`` keyword is a tricky one and the validation results might look counterintuitive at first glance.
+Let's take a look at an example:
+
+.. code:: yaml
+
+    paths:
+      /pets:
+        patch:
+          requestBody:
+            content:
+              application/json:
+                schema:
+                  oneOf:
+                    - $ref: '#/components/schemas/Cat'
+                    - $ref: '#/components/schemas/Dog'
+          responses:
+            '200':
+              description: Updated
+    components:
+      schemas:
+        Dog:
+          type: object
+          properties:
+            bark:
+              type: boolean
+            breed:
+              type: string
+              enum: [Dingo, Husky, Retriever, Shepherd]
+        Cat:
+          type: object
+          properties:
+            hunts:
+              type: boolean
+            age:
+              type: integer
+
+Here we have two possible payload options - ``Dog`` and ``Cat``. The following JSON object is valid against the ``Dog`` schema:
+
+.. code:: json
+
+    {
+      "bark": true,
+      "breed": "Dingo"
+    }
+
+Though, ``oneOf`` requires that the input should be valid against **exactly one** sub-schema!
+At first glance it looks like the case, but it is **actually not**. It happens because the ``Cat`` schema does not restrict what properties should always be present and what should not.
+If the input object does not have the ``hunts`` or ``age`` properties, then it will be validated as a ``Cat`` instance.
+To prevent this situation you might use ``required`` and ``additionalProperties`` keywords:
+
+.. code:: yaml
+
+    components:
+      schemas:
+        Dog:
+          type: object
+          properties:
+            bark:
+              type: boolean
+            breed:
+              type: string
+              enum: [Dingo, Husky, Retriever, Shepherd]
+          required: [bark, breed]      # List all the required properties
+          additionalProperties: false  # And forbid any others
+        Cat:
+          type: object
+          properties:
+            hunts:
+              type: boolean
+            age:
+              type: integer
+          required: [hunts, age]       # List all the required properties
+          additionalProperties: false  # And forbid any others
+
+By adding these keywords, any ``Cat`` instance will always require the ``hunts`` and ``age`` properties to be present.
+
+As an alternative, you could use the ``anyOf`` keyword instead.
+
 Working with API schemas
 ------------------------
 
