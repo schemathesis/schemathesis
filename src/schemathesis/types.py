@@ -1,9 +1,10 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Set, Tuple, Union
 
 from hypothesis.strategies import SearchStrategy
 
 if TYPE_CHECKING:
+    from . import DataGenerationMethod
     from .hooks import HookContext
 
 PathLike = Union[Path, str]  # pragma: no mutate
@@ -31,3 +32,4 @@ Hook = Union[
 RawAuth = Tuple[str, str]  # pragma: no mutate
 # Generic test with any arguments and no return
 GenericTest = Callable[..., None]  # pragma: no mutate
+DataGenerationMethodInput = Union["DataGenerationMethod", Iterable["DataGenerationMethod"]]

@@ -38,9 +38,9 @@ from requests.utils import check_header_validity  # type: ignore
 from werkzeug.wrappers import Response as BaseResponse
 from werkzeug.wrappers.json import JSONMixin
 
-from .constants import USER_AGENT
+from .constants import USER_AGENT, DataGenerationMethod
 from .exceptions import UsageError
-from .types import Filter, GenericTest, NotSet, RawAuth
+from .types import DataGenerationMethodInput, Filter, GenericTest, NotSet, RawAuth
 
 try:
     from yaml import CSafeLoader as SafeLoader
@@ -423,3 +423,9 @@ def maybe_set_assertion_message(exc: AssertionError, check_name: str) -> str:
         message = f"Check '{check_name}' failed"
         exc.args = (message,)
     return message
+
+
+def prepare_data_generation_methods(data_generation_methods: DataGenerationMethodInput) -> List[DataGenerationMethod]:
+    if isinstance(data_generation_methods, DataGenerationMethod):
+        return [data_generation_methods]
+    return list(data_generation_methods)
