@@ -38,7 +38,7 @@ Once all events are uploaded to Schemathesis.io you'll see a message at the end 
 
 .. code:: text
 
-    Schemathesis.io: SUCCESS
+    Schemathesis.io: COMPLETED
     Report URL: https://app.schemathesis.io/r/mF9ke/
 
 To observe the test run results, follow the link from the output.
