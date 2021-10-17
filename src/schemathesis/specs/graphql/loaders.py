@@ -1,5 +1,5 @@
 import pathlib
-from typing import IO, Any, Callable, Dict, Iterable, Optional, Union, cast
+from typing import IO, Any, Callable, Dict, Optional, Union, cast
 
 import graphql
 import requests
@@ -9,11 +9,11 @@ from starlette.testclient import TestClient as ASGIClient
 from werkzeug import Client
 from yarl import URL
 
-from ...constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
+from ...constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle
 from ...exceptions import HTTPError
 from ...hooks import HookContext, dispatch
-from ...types import PathLike
-from ...utils import WSGIResponse, require_relative_url, setup_headers
+from ...types import DataGenerationMethodInput, PathLike
+from ...utils import WSGIResponse, prepare_data_generation_methods, require_relative_url, setup_headers
 from .schemas import GraphQLSchema
 
 INTROSPECTION_QUERY = graphql.get_introspection_query()
@@ -25,7 +25,7 @@ def from_path(
     *,
     app: Any = None,
     base_url: Optional[str] = None,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     encoding: str = "utf8",
 ) -> GraphQLSchema:
@@ -51,7 +51,7 @@ def from_url(
     app: Any = None,
     base_url: Optional[str] = None,
     port: Optional[int] = None,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> GraphQLSchema:
@@ -86,7 +86,7 @@ def from_file(
     *,
     app: Any = None,
     base_url: Optional[str] = None,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     location: Optional[str] = None,
 ) -> GraphQLSchema:
@@ -123,7 +123,7 @@ def from_dict(
     app: Any = None,
     base_url: Optional[str] = None,
     location: Optional[str] = None,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
 ) -> GraphQLSchema:
     """Load GraphQL schema from a Python dictionary.
@@ -141,7 +141,7 @@ def from_dict(
         location=location,
         base_url=base_url,
         app=app,
-        data_generation_methods=data_generation_methods,
+        data_generation_methods=prepare_data_generation_methods(data_generation_methods),
         code_sample_style=_code_sample_style,
     )  # type: ignore
 
@@ -151,7 +151,7 @@ def from_wsgi(
     app: Any,
     *,
     base_url: Optional[str] = None,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> GraphQLSchema:
@@ -183,7 +183,7 @@ def from_asgi(
     app: Any,
     *,
     base_url: Optional[str] = None,
-    data_generation_methods: Iterable[DataGenerationMethod] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     **kwargs: Any,
 ) -> GraphQLSchema:

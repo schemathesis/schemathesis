@@ -1,7 +1,7 @@
 import io
 import pathlib
 from contextlib import suppress
-from typing import IO, Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import urljoin
 
 import jsonschema
@@ -13,16 +13,21 @@ from starlette.testclient import TestClient as ASGIClient
 from werkzeug.test import Client
 from yarl import URL
 
-from ...constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
+from ...constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle
 from ...exceptions import HTTPError, SchemaLoadingError
 from ...hooks import HookContext, dispatch
 from ...lazy import LazySchema
-from ...types import Filter, NotSet, PathLike
-from ...utils import NOT_SET, StringDatesYAMLLoader, WSGIResponse, require_relative_url, setup_headers
+from ...types import DataGenerationMethodInput, Filter, NotSet, PathLike
+from ...utils import (
+    NOT_SET,
+    StringDatesYAMLLoader,
+    WSGIResponse,
+    prepare_data_generation_methods,
+    require_relative_url,
+    setup_headers,
+)
 from . import definitions, validation
 from .schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
-
-DataGenerationMethodInput = Union[DataGenerationMethod, Iterable[DataGenerationMethod]]
 
 
 def from_path(
@@ -196,7 +201,7 @@ def from_dict(
             operation_id=operation_id,
             skip_deprecated_operations=skip_deprecated_operations,
             validate_schema=validate_schema,
-            data_generation_methods=_prepare_data_generation_methods(data_generation_methods),
+            data_generation_methods=prepare_data_generation_methods(data_generation_methods),
             code_sample_style=_code_sample_style,
             location=location,
         )
@@ -213,7 +218,7 @@ def from_dict(
             operation_id=operation_id,
             skip_deprecated_operations=skip_deprecated_operations,
             validate_schema=validate_schema,
-            data_generation_methods=_prepare_data_generation_methods(data_generation_methods),
+            data_generation_methods=prepare_data_generation_methods(data_generation_methods),
             code_sample_style=_code_sample_style,
             location=location,
         )
@@ -227,12 +232,6 @@ def from_dict(
     if "openapi" in raw_schema:
         return init_openapi_3()
     raise SchemaLoadingError("Unsupported schema type")
-
-
-def _prepare_data_generation_methods(data_generation_methods: DataGenerationMethodInput) -> List[DataGenerationMethod]:
-    if isinstance(data_generation_methods, DataGenerationMethod):
-        return [data_generation_methods]
-    return list(data_generation_methods)
 
 
 # It is a common case when API schemas are stored in the YAML format and HTTP status codes are numbers
@@ -310,7 +309,7 @@ def from_pytest_fixture(
         operation_id=operation_id,
         skip_deprecated_operations=skip_deprecated_operations,
         validate_schema=validate_schema,
-        data_generation_methods=_prepare_data_generation_methods(data_generation_methods),
+        data_generation_methods=prepare_data_generation_methods(data_generation_methods),
         code_sample_style=_code_sample_style,
     )
 
