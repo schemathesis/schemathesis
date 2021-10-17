@@ -15,7 +15,7 @@ class Event:
 
 
 @attr.s(slots=True)
-class Success(Event):
+class Completed(Event):
     """The handler finished successfully."""
 
     short_url: str = attr.ib()
