@@ -10,6 +10,10 @@ Changelog
 - Improve reporting of ``jsonschema`` errors which are caused by non-string object keys.
 - Store ``data_generation_method`` in ```BeforeExecution``.
 
+**Fixed**
+
+- Pass ``data_generation_method`` to ``Case`` for GraphQL schemas.
+
 `3.10.1`_ - 2021-10-04
 ----------------------
 

@@ -119,7 +119,7 @@ class GraphQLSchema(BaseSchema):
         hooks: Optional[HookDispatcher] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
-        constructor = partial(GraphQLCase, operation=operation)
+        constructor = partial(GraphQLCase, operation=operation, data_generation_method=data_generation_method)
         return st.builds(constructor, body=gql_st.query(self.client_schema, fields=[operation.verbose_name]))
 
     def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
