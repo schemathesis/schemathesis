@@ -210,6 +210,7 @@ def handle_schema_error(
             method=method,
             path=error.full_path,
             relative_path=error.path,
+            verbose_name=verbose_name,
             status=Status.error,
             result=SerializedTestResult.from_test_result(result),
             elapsed_time=0.0,
