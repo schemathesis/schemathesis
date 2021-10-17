@@ -37,7 +37,7 @@ def test_no_failures(cli, schema_url, service, service_token):
     lines = get_stdout_lines(result.stdout)
     # This output contains all temporary lines with a spinner - regular terminals handle `\r` and display everything
     # properly. For this test case, just check one line
-    assert "Schemathesis.io: SUCCESS" in lines
+    assert "Schemathesis.io: COMPLETED" in lines
     assert "Report: http://127.0.0.1" in lines
 
 

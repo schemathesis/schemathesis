@@ -283,14 +283,14 @@ def handle_service_integration(context: ExecutionContext) -> None:
         title = click.style("Schemathesis.io", bold=True)
         event = wait_for_service_handler(context.service.queue, title)
         color = {
-            service.Success: "green",
+            service.Completed: "green",
             service.Error: "red",
             service.Timeout: "red",
         }[event.__class__]
         status = click.style(event.name, fg=color, bold=True)
         click.echo(f"{title}: {status}\r", nl=False)
         click.echo()
-        if isinstance(event, service.Success):
+        if isinstance(event, service.Completed):
             report_title = click.style("Report", bold=True)
             click.echo(f"{report_title}: {event.short_url}")
         if isinstance(event, service.Error):

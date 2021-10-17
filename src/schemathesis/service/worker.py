@@ -15,7 +15,7 @@ def start(url: str, token: str, in_queue: Queue, out_queue: Queue) -> None:
         # Reached a terminal event or a stop marker.
         # In the case of stop marker, it is still a successful result for the handler itself as the error happened in
         # a different handler
-        out_queue.put(events.Success(short_url=response.short_url))
+        out_queue.put(events.Completed(short_url=response.short_url))
     except Exception as exc:
         out_queue.put(events.Error(exc))
 

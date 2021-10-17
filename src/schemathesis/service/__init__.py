@@ -1,3 +1,3 @@
 from .constants import DEFAULT_URL, WORKER_CHECK_PERIOD, WORKER_FINISH_TIMEOUT
-from .events import Error, Event, Success, Timeout
+from .events import Completed, Error, Event, Timeout
 from .handler import ServiceReporter
