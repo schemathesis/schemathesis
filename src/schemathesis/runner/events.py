@@ -115,6 +115,8 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
     method: str = attr.ib()  # pragma: no mutate
     path: str = attr.ib()  # pragma: no mutate
     relative_path: str = attr.ib()  # pragma: no mutate
+    # Specification-specific operation name
+    verbose_name: str = attr.ib()  # pragma: no mutate
 
     # APIOperation test status - success / failure / error
     status: Status = attr.ib()  # pragma: no mutate
@@ -140,6 +142,7 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
             method=operation.method.upper(),
             path=operation.full_path,
             relative_path=operation.path,
+            verbose_name=operation.verbose_name,
             result=SerializedTestResult.from_test_result(result),
             status=status,
             elapsed_time=elapsed_time,
