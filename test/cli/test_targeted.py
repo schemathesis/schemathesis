@@ -15,6 +15,7 @@ def new_target(testdir, cli):
             @schemathesis.register_target
             def new_target(context) -> float:
                 click.echo("NEW TARGET IS CALLED")
+                assert context.case.data_generation_method is not None, "Empty data_generation_method"
                 return float(len(context.response.content))
             """
     )
@@ -28,10 +29,22 @@ def new_target(testdir, cli):
 
 @pytest.mark.usefixtures("new_target")
 @pytest.mark.operations("success")
-def test_custom_target(testdir, cli, new_target, openapi3_schema_url):
+def test_custom_target(cli, new_target, openapi3_schema_url):
     # When `--pre-run` hook is passed to the CLI call
     # And it contains registering a new target
     result = cli.main("--pre-run", new_target.purebasename, "run", "-t", "new_target", openapi3_schema_url)
+    # Then the test run should be successful
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # And the specified target is called
+    assert "NEW TARGET IS CALLED" in result.stdout
+
+
+@pytest.mark.usefixtures("new_target")
+@pytest.mark.operations("success")
+def test_custom_target_graphql(cli, new_target, graphql_url):
+    # When `--pre-run` hook is passed to the CLI call
+    # And it contains registering a new target
+    result = cli.main("--pre-run", new_target.purebasename, "run", "-t", "new_target", graphql_url)
     # Then the test run should be successful
     assert result.exit_code == ExitCode.OK, result.stdout
     # And the specified target is called
