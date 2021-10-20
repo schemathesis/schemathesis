@@ -67,7 +67,6 @@ This group of six hooks shares the same purpose - adjust data generation for spe
 - ``before_generate_cookies``
 - ``before_generate_query``
 - ``before_generate_body``
-- ``before_generate_form_data``
 - ``before_generate_case``
 
 They have the same signature that looks like this:
