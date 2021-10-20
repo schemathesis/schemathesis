@@ -9,7 +9,7 @@ Usage & Configuration
 What kind of data does Schemathesis generate?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Schemathesis generates random test data that conforms to the given API schema.
+Schemathesis generates random test data that conforms to the given API schema as well as not-conforming data, depending on the supplied data generation method config value.
 This data consists of all possible data types from the JSON schema specification in various combinations and different nesting levels.
 
 We can't guarantee that the generated data will always be accepted by the application under test since there could be validation rules not covered by the API schema.
