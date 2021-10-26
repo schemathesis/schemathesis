@@ -6,7 +6,7 @@ def make_inner(get_response):
     # Minimal smoke test to check whether `call_*` methods work successfully
     def inner(strategy):
         @given(case=strategy)
-        @settings(max_examples=1)
+        @settings(max_examples=1, deadline=None)
         def test(case):
             response = get_response(case)
             assert response.status_code == 200
