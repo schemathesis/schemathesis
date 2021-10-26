@@ -284,9 +284,8 @@ def test_header_filtration_not_needed(empty_open_api_3_schema, mocker):
     schema = schemathesis.from_dict(empty_open_api_3_schema)
 
     @given(schema["/data"]["GET"].as_strategy())
-    @settings(max_examples=1)
-    def test(_):
-        pass
+    def test(case):
+        assert is_valid_header(case.headers)
 
     test()
 
@@ -305,6 +304,45 @@ def test_header_filtration_needed(empty_open_api_3_schema, mocker):
     @settings(max_examples=1)
     def test(_):
         pass
+
+    test()
+
+    # Then header filter should be used
+    mocked.assert_called()
+
+
+def test_missing_header_filter(empty_open_api_3_schema, mocker):
+    # Regression. See GH-1142
+    mocked = mocker.spy(_hypothesis, "is_valid_header")
+    # When some header parameters have the `format` keyword
+    # And some don't
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": "key1",
+                        "in": "header",
+                        "required": True,
+                        "schema": {"type": "string", "format": "uuid"},
+                    },
+                    {
+                        "name": "key2",
+                        "in": "header",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    },
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    @given(schema["/data"]["GET"].as_strategy())
+    def test(case):
+        assert is_valid_header(case.headers)
 
     test()
 
