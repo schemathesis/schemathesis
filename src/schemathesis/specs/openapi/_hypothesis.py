@@ -279,7 +279,7 @@ def get_parameters_strategy(
             "query": is_valid_query,
         }[location]
         # Headers with special format do not need filtration
-        if not (is_header_location(location) and _has_header_format(schema)):
+        if not (is_header_location(location) and _can_skip_header_filter(schema)):
             strategy = strategy.filter(filter_func)
         # Path & query parameters will be cast to string anyway, but having their JSON equivalents for
         # `True` / `False` / `None` improves chances of them passing validation in apps that expect boolean / null types
@@ -328,11 +328,9 @@ def make_positive_strategy(
     return from_schema(schema, custom_formats=STRING_FORMATS)
 
 
-def _has_header_format(schema: Dict[str, Any]) -> bool:
-    for sub_schema in schema.get("properties", {}).values():
-        if sub_schema.get("format") == HEADER_FORMAT:
-            return True
-    return False
+def _can_skip_header_filter(schema: Dict[str, Any]) -> bool:
+    # All headers should contain HEADER_FORMAT in order to avoid header filter
+    return all(sub_schema.get("format") == HEADER_FORMAT for sub_schema in schema.get("properties", {}).values())
 
 
 def make_negative_strategy(
