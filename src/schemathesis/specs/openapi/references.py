@@ -39,6 +39,9 @@ def load_remote_uri(uri: str) -> Any:
     return yaml.load(response.content, StringDatesYAMLLoader)
 
 
+JSONType = Union[None, bool, float, str, list, Dict[str, Any]]
+
+
 class InliningResolver(jsonschema.RefResolver):
     """Inlines resolved schemas."""
 
@@ -59,7 +62,7 @@ class InliningResolver(jsonschema.RefResolver):
         pass
 
     # pylint: disable=function-redefined
-    def resolve_all(self, item: Union[Dict[str, Any], List], recursion_level: int = 0) -> Union[Dict[str, Any], List]:
+    def resolve_all(self, item: JSONType, recursion_level: int = 0) -> JSONType:
         """Recursively resolve all references in the given object."""
         if recursion_level > RECURSION_DEPTH_LIMIT:
             return item
@@ -67,12 +70,15 @@ class InliningResolver(jsonschema.RefResolver):
             ref = item.get("$ref")
             if ref is not None and isinstance(ref, str):
                 with self.resolving(ref) as resolved:
-                    return self.resolve_all(deepcopy(resolved), recursion_level + 1)
-            item = deepcopy(item)
-            for key, sub_item in item.items():
-                item[key] = self.resolve_all(sub_item, recursion_level)
-        elif isinstance(item, list):
-            item = [self.resolve_all(sub_item, recursion_level) for sub_item in deepcopy(item)]
+                    # If the next level of recursion exceeds the limit, then we need to copy it explicitly
+                    # In other cases, this method create new objects for mutable types (dict & list)
+                    next_recursion_level = recursion_level + 1
+                    if next_recursion_level > RECURSION_DEPTH_LIMIT:
+                        resolved = deepcopy(resolved)
+                    return self.resolve_all(resolved, next_recursion_level)
+            return {key: self.resolve_all(sub_item, recursion_level) for key, sub_item in item.items()}
+        if isinstance(item, list):
+            return [self.resolve_all(sub_item, recursion_level) for sub_item in item]
         return item
 
     def resolve_in_scope(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Dict[str, Any]]:
