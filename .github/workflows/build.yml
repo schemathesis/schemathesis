@@ -130,7 +130,7 @@ jobs:
 
     - uses: actions/setup-python@v2
       with:
-        python-version: 3.x
+        python-version: 3.7
 
     - run: pip install tox coverage "poetry<1.1.9" "poetry-core<1.0.5"
 
