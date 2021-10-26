@@ -13,6 +13,7 @@ Changelog
 **Fixed**
 
 - Pass ``data_generation_method`` to ``Case`` for GraphQL schemas.
+- Generation of invalid headers in some cases. `#1142`_
 
 `3.10.1`_ - 2021-10-04
 ----------------------
@@ -2183,6 +2184,7 @@ Deprecated
 .. _#1160: https://github.com/schemathesis/schemathesis/issues/1160
 .. _#1153: https://github.com/schemathesis/schemathesis/issues/1153
 .. _#1152: https://github.com/schemathesis/schemathesis/issues/1152
+.. _#1142: https://github.com/schemathesis/schemathesis/issues/1142
 .. _#1134: https://github.com/schemathesis/schemathesis/issues/1134
 .. _#1121: https://github.com/schemathesis/schemathesis/issues/1121
 .. _#1100: https://github.com/schemathesis/schemathesis/issues/1100
