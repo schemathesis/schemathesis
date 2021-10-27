@@ -38,7 +38,7 @@ from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import APIOperation, Case
 from .stateful import APIStateMachine, Stateful, StatefulTest
 from .types import Body, Cookies, Filter, FormData, GenericTest, Headers, NotSet, PathParameters, Query
-from .utils import NOT_SET, PARAMETRIZE_MARKER, Err, GenericResponse, GivenInput, Ok, Result, given_proxy
+from .utils import NOT_SET, PARAMETRIZE_MARKER, GenericResponse, GivenInput, Ok, Result, given_proxy
 
 
 class MethodsDict(CaseInsensitiveDict):
@@ -139,14 +139,7 @@ class BaseSchema(Mapping):
 
     @property
     def operations_count(self) -> int:
-        total = 0
-        # Avoid creating a list of all operation - for large schemas it consumes too much memory
-        for result in self.get_all_operations():
-            if isinstance(result, Ok) or (isinstance(result, Err) and result.err().method is not None):
-                total += 1
-            # In the `Err` case without `method` we don't know how many operations are there.
-            # it happens when all operations are behind an unresolvable reference
-        return total
+        raise NotImplementedError
 
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         raise NotImplementedError

@@ -15,6 +15,10 @@ Changelog
 - Pass ``data_generation_method`` to ``Case`` for GraphQL schemas.
 - Generation of invalid headers in some cases. `#1142`_
 
+**Performance**
+
+- Dramatically improve CLI startup performance for large API schemas.
+
 `3.10.1`_ - 2021-10-04
 ----------------------
 

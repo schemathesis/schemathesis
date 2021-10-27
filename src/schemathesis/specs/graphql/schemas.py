@@ -94,6 +94,17 @@ class GraphQLSchema(BaseSchema):
     def _get_base_path(self) -> str:
         return cast(str, urlsplit(self.location).path)
 
+    @property
+    def operations_count(self) -> int:
+        raw_schema = self.raw_schema["__schema"]
+        if "queryType" not in raw_schema:
+            return 0
+        query_type_name = raw_schema["queryType"]["name"]
+        for type_def in raw_schema.get("types", []):
+            if type_def["name"] == query_type_name:
+                return len(type_def["fields"])
+        return 0
+
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         schema = self.client_schema
         if schema.query_type is None:
