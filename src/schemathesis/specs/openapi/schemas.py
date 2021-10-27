@@ -17,6 +17,7 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Set,
     Tuple,
     Type,
     TypeVar,
@@ -84,7 +85,7 @@ SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefReso
 class BaseOpenAPISchema(BaseSchema):
     nullable_name: str
     links_field: str
-    allowed_http_methods: Tuple[str, ...]
+    allowed_http_methods: Set[str]
     security: BaseSecurityProcessor
     component_locations: ClassVar[Tuple[str, ...]] = ()
     _operations_by_id: Dict[str, APIOperation]
@@ -111,6 +112,42 @@ class BaseOpenAPISchema(BaseSchema):
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
         return f"{self.__class__.__name__} for {info['title']} ({info['version']})"
+
+    def _should_skip(self, method: str, definition: Dict[str, Any]) -> bool:
+        return (
+            method not in self.allowed_http_methods
+            or should_skip_method(method, self.method)
+            or should_skip_deprecated(definition.get("deprecated", False), self.skip_deprecated_operations)
+            or should_skip_by_tag(definition.get("tags"), self.tag)
+            or should_skip_by_operation_id(definition.get("operationId"), self.operation_id)
+        )
+
+    @property
+    def operations_count(self) -> int:
+        try:
+            paths = self.raw_schema["paths"]
+        except KeyError:
+            return 0
+        total = 0
+        resolve = self.resolver.resolve
+        for path, methods in paths.items():
+            full_path = self.get_full_path(path)
+            if should_skip_endpoint(full_path, self.endpoint):
+                continue
+            try:
+                if "$ref" in methods:
+                    _, resolved_methods = resolve(methods["$ref"])
+                else:
+                    resolved_methods = methods
+                # Straightforward iteration is faster than converting to a set & calculating length.
+                for method, definition in resolved_methods.items():
+                    if self._should_skip(method, definition):
+                        continue
+                    total += 1
+            except SCHEMA_PARSING_ERRORS:
+                # Ignore errors
+                continue
+        return total
 
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         """Iterate over all operations defined in the API.
@@ -151,15 +188,7 @@ class BaseOpenAPISchema(BaseSchema):
                         with self.resolver.in_scope(scope):
                             resolved_definition = self.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 5)
                         # Only method definitions are parsed
-                        if (
-                            method not in self.allowed_http_methods
-                            or should_skip_method(method, self.method)
-                            or should_skip_deprecated(
-                                resolved_definition.get("deprecated", False), self.skip_deprecated_operations
-                            )
-                            or should_skip_by_tag(resolved_definition.get("tags"), self.tag)
-                            or should_skip_by_operation_id(resolved_definition.get("operationId"), self.operation_id)
-                        ):
+                        if self._should_skip(method, resolved_definition):
                             continue
                         parameters = self.collect_parameters(
                             itertools.chain(resolved_definition.get("parameters", ()), common_parameters),
@@ -550,7 +579,7 @@ class SwaggerV20(BaseOpenAPISchema):
     nullable_name = "x-nullable"
     example_field = "x-example"
     examples_field = "x-examples"
-    allowed_http_methods: Tuple[str, ...] = ("get", "put", "post", "delete", "options", "head", "patch")
+    allowed_http_methods: Set[str] = {"get", "put", "post", "delete", "options", "head", "patch"}
     security = SwaggerSecurityProcessor()
     component_locations: ClassVar[Tuple[str, ...]] = ("definitions", "parameters", "responses")
     links_field = "x-links"
@@ -718,7 +747,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     nullable_name = "nullable"
     example_field = "example"
     examples_field = "examples"
-    allowed_http_methods = SwaggerV20.allowed_http_methods + ("trace",)
+    allowed_http_methods = SwaggerV20.allowed_http_methods | {"trace"}
     security = OpenAPISecurityProcessor()
     component_locations = ("components",)
     links_field = "links"
