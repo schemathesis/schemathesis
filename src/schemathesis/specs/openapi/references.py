@@ -74,7 +74,7 @@ class InliningResolver(jsonschema.RefResolver):
                     # In other cases, this method create new objects for mutable types (dict & list)
                     next_recursion_level = recursion_level + 1
                     if next_recursion_level > RECURSION_DEPTH_LIMIT:
-                        resolved = deepcopy(resolved)
+                        return deepcopy(resolved)
                     return self.resolve_all(resolved, next_recursion_level)
             return {key: self.resolve_all(sub_item, recursion_level) for key, sub_item in item.items()}
         if isinstance(item, list):
