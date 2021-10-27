@@ -458,22 +458,31 @@ class BaseOpenAPISchema(BaseSchema):
                 ) from exc
         return None  # explicitly return None for mypy
 
+    @property
+    def _rewritten_components(self) -> Dict[str, Any]:
+        if not hasattr(self, "__rewritten_components"):
+
+            def callback(_schema: Dict[str, Any], nullable_name: str) -> Dict[str, Any]:
+                _schema = to_json_schema(_schema, nullable_name)
+                return self._rewrite_references(_schema, self.resolver)
+
+            # pylint: disable=attribute-defined-outside-init
+            # Different spec versions allow different keywords to store possible reference targets
+            self.__rewritten_components = {
+                key: traverse_schema(deepcopy(self.raw_schema[key]), callback, self.nullable_name)
+                for key in self.component_locations
+                if key in self.raw_schema
+            }
+        return self.__rewritten_components
+
     def prepare_schema(self, schema: Any) -> Any:
         """Inline Open API definitions.
 
         Inlining components helps `hypothesis-jsonschema` generate data that involves non-resolved references.
         """
         schema = deepcopy(schema)
-        schema = traverse_schema(schema, lambda s: self._rewrite_references(s, self.resolver))
-
-        def callback(_schema: Dict[str, Any], nullable_name: str) -> Dict[str, Any]:
-            _schema = to_json_schema(_schema, nullable_name)
-            return self._rewrite_references(_schema, self.resolver)
-
-        # Different spec versions allow different keywords to store possible reference targets
-        for key in self.component_locations:
-            if key in self.raw_schema:
-                schema[key] = traverse_schema(self.raw_schema[key], callback, self.nullable_name)
+        schema = traverse_schema(schema, self._rewrite_references, self.resolver)
+        schema.update(self._rewritten_components)
         # If there are any cached references - add them to the resulting schema.
         # Note that not all of them might be used for data generation, but at this point it is the simplest way to go
         if self._inline_reference_cache:
