@@ -48,7 +48,7 @@ class MutationResult(enum.Enum):
 
 
 Mutation = Callable[["MutationContext", Draw, Schema], MutationResult]
-ALL_KEYWORDS = (
+ALL_KEYWORDS = {
     "additionalItems",
     "additionalProperties",
     "allOf",
@@ -85,8 +85,8 @@ ALL_KEYWORDS = (
     "then",
     "type",
     "uniqueItems",
-)
-ANY_TYPE_KEYS = ("$ref", "allOf", "anyOf", "const", "else", "enum", "if", "not", "oneOf", "then", "type")
+}
+ANY_TYPE_KEYS = {"$ref", "allOf", "anyOf", "const", "else", "enum", "if", "not", "oneOf", "then", "type"}
 TYPE_SPECIFIC_KEYS = {
     "number": ("multipleOf", "maximum", "exclusiveMaximum", "minimum", "exclusiveMinimum"),
     "integer": ("multipleOf", "maximum", "exclusiveMaximum", "minimum", "exclusiveMinimum"),
