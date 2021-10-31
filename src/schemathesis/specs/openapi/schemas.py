@@ -488,8 +488,8 @@ class BaseOpenAPISchema(BaseSchema):
         return None  # explicitly return None for mypy
 
     @property
-    def _rewritten_components(self) -> Dict[str, Any]:
-        if not hasattr(self, "__rewritten_components"):
+    def rewritten_components(self) -> Dict[str, Any]:
+        if not hasattr(self, "_rewritten_components"):
 
             def callback(_schema: Dict[str, Any], nullable_name: str) -> Dict[str, Any]:
                 _schema = to_json_schema(_schema, nullable_name=nullable_name, copy=False)
@@ -509,8 +509,8 @@ class BaseOpenAPISchema(BaseSchema):
                         break
                 else:
                     target.update(traverse_schema(deepcopy(schema), callback, self.nullable_name))
-            self.__rewritten_components = components
-        return self.__rewritten_components
+            self._rewritten_components = components
+        return self._rewritten_components
 
     def prepare_schema(self, schema: Any) -> Any:
         """Inline Open API definitions.
@@ -519,7 +519,7 @@ class BaseOpenAPISchema(BaseSchema):
         """
         schema = deepcopy(schema)
         schema = traverse_schema(schema, self._rewrite_references, self.resolver)
-        schema.update(self._rewritten_components)
+        schema.update(self.rewritten_components)
         # If there are any cached references - add them to the resulting schema.
         # Note that not all of them might be used for data generation, but at this point it is the simplest way to go
         if self._inline_reference_cache:
