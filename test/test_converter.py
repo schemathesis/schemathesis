@@ -36,4 +36,4 @@ from schemathesis.utils import traverse_schema
     ),
 )
 def test_to_jsonschema_recursive(schema, expected):
-    assert traverse_schema(schema, converter.to_json_schema, "x-nullable") == expected
+    assert traverse_schema(schema, converter.to_json_schema, nullable_name="x-nullable") == expected
