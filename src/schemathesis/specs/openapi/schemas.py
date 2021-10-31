@@ -492,7 +492,7 @@ class BaseOpenAPISchema(BaseSchema):
         if not hasattr(self, "__rewritten_components"):
 
             def callback(_schema: Dict[str, Any], nullable_name: str) -> Dict[str, Any]:
-                _schema = to_json_schema(_schema, nullable_name)
+                _schema = to_json_schema(_schema, nullable_name=nullable_name, copy=False)
                 return self._rewrite_references(_schema, self.resolver)
 
             # pylint: disable=attribute-defined-outside-init
