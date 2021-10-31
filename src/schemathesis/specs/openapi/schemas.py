@@ -87,7 +87,7 @@ class BaseOpenAPISchema(BaseSchema):
     links_field: str
     allowed_http_methods: Set[str]
     security: BaseSecurityProcessor
-    component_locations: ClassVar[Tuple[str, ...]] = ()
+    component_locations: ClassVar[Tuple[Tuple[str, ...], ...]] = ()
     _operations_by_id: Dict[str, APIOperation]
     _inline_reference_cache: Dict[str, Any]
     # Inline references cache can be populated from multiple threads, therefore we need some synchronisation to avoid
@@ -497,11 +497,19 @@ class BaseOpenAPISchema(BaseSchema):
 
             # pylint: disable=attribute-defined-outside-init
             # Different spec versions allow different keywords to store possible reference targets
-            self.__rewritten_components = {
-                key: traverse_schema(deepcopy(self.raw_schema[key]), callback, self.nullable_name)
-                for key in self.component_locations
-                if key in self.raw_schema
-            }
+            components: Dict[str, Any] = {}
+            for path in self.component_locations:
+                schema = self.raw_schema
+                target = components
+                for chunk in path:
+                    if chunk in schema:
+                        schema = schema[chunk]
+                        target = target.setdefault(chunk, {})
+                    else:
+                        break
+                else:
+                    target.update(traverse_schema(deepcopy(schema), callback, self.nullable_name))
+            self.__rewritten_components = components
         return self.__rewritten_components
 
     def prepare_schema(self, schema: Any) -> Any:
@@ -581,7 +589,7 @@ class SwaggerV20(BaseOpenAPISchema):
     examples_field = "x-examples"
     allowed_http_methods: Set[str] = {"get", "put", "post", "delete", "options", "head", "patch"}
     security = SwaggerSecurityProcessor()
-    component_locations: ClassVar[Tuple[str, ...]] = ("definitions", "parameters", "responses")
+    component_locations: ClassVar[Tuple[Tuple[str, ...], ...]] = (("definitions",),)
     links_field = "x-links"
 
     @property
@@ -749,7 +757,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     examples_field = "examples"
     allowed_http_methods = SwaggerV20.allowed_http_methods | {"trace"}
     security = OpenAPISecurityProcessor()
-    component_locations = ("components",)
+    component_locations = (("components", "schemas"),)
     links_field = "links"
 
     @property
