@@ -18,6 +18,7 @@ Changelog
 **Performance**
 
 - Dramatically improve CLI startup performance for large API schemas.
+- Open API 3: Inline only ``components/schemas`` before passing schemas to ``hypothesis-jsonschema``.
 
 `3.10.1`_ - 2021-10-04
 ----------------------
