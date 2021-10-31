@@ -8,7 +8,7 @@ Changelog
 
 - Show ``cURL`` code samples by default instead of Python. `#1269`_
 - Improve reporting of ``jsonschema`` errors which are caused by non-string object keys.
-- Store ``data_generation_method`` in ```BeforeExecution``.
+- Store ``data_generation_method`` in ``BeforeExecution``.
 
 **Fixed**
 
