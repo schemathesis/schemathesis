@@ -8,6 +8,7 @@ They give only static definitions of paths.
 """
 from collections.abc import Mapping
 from difflib import get_close_matches
+from functools import lru_cache
 from typing import (
     Any,
     Callable,
@@ -59,6 +60,11 @@ class MethodsDict(CaseInsensitiveDict):
 C = TypeVar("C", bound=Case)
 
 
+@lru_cache()
+def get_full_path(base_path: str, path: str) -> str:
+    return unquote(urljoin(base_path, quote(path.lstrip("/"))))  # pragma: no mutate
+
+
 @attr.s(eq=False)  # pragma: no mutate
 class BaseSchema(Mapping):
     raw_schema: Dict[str, Any] = attr.ib()  # pragma: no mutate
@@ -100,7 +106,7 @@ class BaseSchema(Mapping):
 
     def get_full_path(self, path: str) -> str:
         """Compute full path for the given path."""
-        return unquote(urljoin(self.base_path, quote(path.lstrip("/"))))  # pragma: no mutate
+        return get_full_path(self.base_path, path)
 
     @property
     def base_path(self) -> str:
