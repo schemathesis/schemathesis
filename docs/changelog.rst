@@ -19,6 +19,7 @@ Changelog
 
 - Dramatically improve CLI startup performance for large API schemas.
 - Open API 3: Inline only ``components/schemas`` before passing schemas to ``hypothesis-jsonschema``.
+- Generate tests on demand when multiple workers are used during CLI runs. `#1287`_
 
 `3.10.1`_ - 2021-10-04
 ----------------------
@@ -2169,6 +2170,7 @@ Deprecated
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#1290: https://github.com/schemathesis/schemathesis/issues/1290
+.. _#1287: https://github.com/schemathesis/schemathesis/issues/1287
 .. _#1269: https://github.com/schemathesis/schemathesis/issues/1269
 .. _#1262: https://github.com/schemathesis/schemathesis/issues/1262
 .. _#1260: https://github.com/schemathesis/schemathesis/issues/1260
