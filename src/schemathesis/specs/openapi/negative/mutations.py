@@ -29,20 +29,12 @@ class MutationResult(enum.Enum):
     SUCCESS = 1
     FAILURE = 2
 
-    @property
-    def is_success(self) -> bool:
-        return self == MutationResult.SUCCESS
-
-    @property
-    def is_failure(self) -> bool:
-        return self == MutationResult.FAILURE
-
     def __ior__(self, other: Any) -> "MutationResult":
         return self | other
 
     def __or__(self, other: Any) -> "MutationResult":
         # Syntactic sugar to simplify handling of multiple results
-        if self.is_success:
+        if self == MutationResult.SUCCESS:
             return self
         return other
 
@@ -119,7 +111,7 @@ class MutationContext:
         for mutation in mutations:
             if enabled_mutations.is_enabled(mutation.__name__):
                 result |= mutation(self, draw, new_schema)
-        if result.is_failure:
+        if result == MutationResult.FAILURE:
             # If we failed to apply anything, then reject the whole case
             reject()  # type: ignore
         new_schema.update(self.non_keywords)
@@ -275,7 +267,7 @@ def change_properties(context: MutationContext, draw: Draw, schema: Schema) -> M
     # one property
     ordered_properties = draw(ordered(properties, unique_by=lambda x: x[0]))
     for property_name, property_schema in ordered_properties:
-        if apply_until_success(context, draw, property_schema).is_success:
+        if apply_until_success(context, draw, property_schema) == MutationResult.SUCCESS:
             # It is still possible to generate "positive" cases, for example, when this property is optional.
             # They are filtered out on the upper level anyway, but to avoid performance penalty we adjust the schema
             # so the generated samples are less likely to be "positive"
@@ -307,7 +299,7 @@ def change_properties(context: MutationContext, draw: Draw, schema: Schema) -> M
 
 def apply_until_success(context: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
     for mutation in get_mutations(draw, schema):
-        if mutation(context, draw, schema).is_success:
+        if mutation(context, draw, schema) == MutationResult.SUCCESS:
             return MutationResult.SUCCESS
     return MutationResult.FAILURE
 
@@ -333,7 +325,7 @@ def _change_items_object(context: MutationContext, draw: Draw, schema: Schema, i
     result = MutationResult.FAILURE
     for mutation in get_mutations(draw, items):
         result |= mutation(context, draw, items)
-    if result.is_failure:
+    if result == MutationResult.FAILURE:
         return MutationResult.FAILURE
     min_items = schema.get("minItems", 0)
     schema["minItems"] = max(min_items, 1)
@@ -346,7 +338,7 @@ def _change_items_array(context: MutationContext, draw: Draw, schema: Schema, it
         result = MutationResult.FAILURE
         for mutation in get_mutations(draw, item):
             result |= mutation(context, draw, item)
-        if result.is_success:
+        if result == MutationResult.SUCCESS:
             latest_success_index = idx
     if latest_success_index is None:
         return MutationResult.FAILURE
