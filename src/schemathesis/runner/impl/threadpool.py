@@ -1,4 +1,5 @@
 import ctypes
+import queue
 import threading
 import time
 from queue import Queue
@@ -21,6 +22,7 @@ def _run_task(
     test_template: Callable,
     tasks_queue: Queue,
     events_queue: Queue,
+    generator_done: threading.Event,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
     settings: hypothesis.settings,
@@ -52,8 +54,15 @@ def _run_task(
             _run_tests(feedback.get_stateful_tests, recursion_level + 1)
 
     with capture_hypothesis_output():
-        while not tasks_queue.empty():
-            result, data_generation_method = tasks_queue.get()
+        while True:
+            try:
+                result, data_generation_method = tasks_queue.get(timeout=0.001)
+            except queue.Empty:
+                # The queue is empty & there will be no more tasks
+                if generator_done.is_set():
+                    break
+                # If there is a possibility for new tasks - try again
+                continue
             if isinstance(result, Ok):
                 operation = result.ok()
                 test_function = create_test(
@@ -78,6 +87,7 @@ def _run_task(
 def thread_task(
     tasks_queue: Queue,
     events_queue: Queue,
+    generator_done: threading.Event,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
     settings: hypothesis.settings,
@@ -100,6 +110,7 @@ def thread_task(
             network_test,
             tasks_queue,
             events_queue,
+            generator_done,
             checks,
             targets,
             settings,
@@ -116,6 +127,7 @@ def thread_task(
 def wsgi_thread_task(
     tasks_queue: Queue,
     events_queue: Queue,
+    generator_done: threading.Event,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
     settings: hypothesis.settings,
@@ -129,6 +141,7 @@ def wsgi_thread_task(
         wsgi_test,
         tasks_queue,
         events_queue,
+        generator_done,
         checks,
         targets,
         settings,
@@ -143,6 +156,7 @@ def wsgi_thread_task(
 def asgi_thread_task(
     tasks_queue: Queue,
     events_queue: Queue,
+    generator_done: threading.Event,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
     settings: hypothesis.settings,
@@ -157,6 +171,7 @@ def asgi_thread_task(
         asgi_test,
         tasks_queue,
         events_queue,
+        generator_done,
         checks,
         targets,
         settings,
@@ -185,10 +200,30 @@ class ThreadPoolRunner(BaseRunner):
         self, results: TestResultSet, stop_event: threading.Event
     ) -> Generator[events.ExecutionEvent, None, None]:
         """All events come from a queue where different workers push their events."""
-        tasks_queue = self._get_tasks_queue()
+        # Instead of generating all tests at once, we do it when there is a free worker to pick it up
+        # This is extremely important for memory consumption when testing large schemas
+        # IMPLEMENTATION NOTE:
+        # It would be better to have a separate producer thread and communicate via threading events.
+        # Though it is a bit more complex, so the current solution is suboptimal in terms of resources utilization,
+        # but good enough and easy enough to implement.
+        tasks_generator = (
+            (operation, data_generation_method)
+            for operation in self.schema.get_all_operations()
+            for data_generation_method in self.schema.data_generation_methods
+        )
+        generator_done = threading.Event()
+        tasks_queue: Queue = Queue()
+        # Add at least `workers_num` tasks first, so all workers are busy
+        for _ in range(self.workers_num):
+            try:
+                # SAFETY: Workers didn't start yet, direct modification is OK
+                tasks_queue.queue.append(next(tasks_generator))
+            except StopIteration:
+                generator_done.set()
+                break
         # Events are pushed by workers via a separate queue
         events_queue: Queue = Queue()
-        workers = self._init_workers(tasks_queue, events_queue, results)
+        workers = self._init_workers(tasks_queue, events_queue, results, generator_done)
 
         def stop_workers() -> None:
             for worker in workers:
@@ -216,28 +251,26 @@ class ThreadPoolRunner(BaseRunner):
                             # Discard the event. The invariant is: the next event after `stream.stop()` is `Finished`
                             break
                     yield event
+                    # When we know that there are more tasks, put another task to the queue.
+                    # The worker might not actually finish the current one yet, but we put the new one now, so
+                    # the worker can immediately pick it up when the current one is done
+                    if isinstance(event, events.BeforeExecution) and not generator_done.is_set():
+                        try:
+                            tasks_queue.put(next(tasks_generator))
+                        except StopIteration:
+                            generator_done.set()
         except KeyboardInterrupt:
             stop_workers()
             yield events.Interrupted()
 
-    def _get_tasks_queue(self) -> Queue:
-        """All API operations are distributed among all workers via a queue."""
-        tasks_queue: Queue = Queue()
-        tasks_queue.queue.extend(
-            [
-                (operation, data_generation_method)
-                for operation in self.schema.get_all_operations()
-                for data_generation_method in self.schema.data_generation_methods
-            ]
-        )
-        return tasks_queue
-
-    def _init_workers(self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet) -> List[threading.Thread]:
+    def _init_workers(
+        self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet, generator_done: threading.Event
+    ) -> List[threading.Thread]:
         """Initialize & start workers that will execute tests."""
         workers = [
             threading.Thread(
                 target=self._get_task(),
-                kwargs=self._get_worker_kwargs(tasks_queue, events_queue, results),
+                kwargs=self._get_worker_kwargs(tasks_queue, events_queue, results, generator_done),
                 name=f"schemathesis_{num}",
             )
             for num in range(self.workers_num)
@@ -249,10 +282,13 @@ class ThreadPoolRunner(BaseRunner):
     def _get_task(self) -> Callable:
         return thread_task
 
-    def _get_worker_kwargs(self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet) -> Dict[str, Any]:
+    def _get_worker_kwargs(
+        self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet, generator_done: threading.Event
+    ) -> Dict[str, Any]:
         return {
             "tasks_queue": tasks_queue,
             "events_queue": events_queue,
+            "generator_done": generator_done,
             "checks": self.checks,
             "targets": self.targets,
             "settings": self.hypothesis_settings,
@@ -277,10 +313,13 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
     def _get_task(self) -> Callable:
         return wsgi_thread_task
 
-    def _get_worker_kwargs(self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet) -> Dict[str, Any]:
+    def _get_worker_kwargs(
+        self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet, generator_done: threading.Event
+    ) -> Dict[str, Any]:
         return {
             "tasks_queue": tasks_queue,
             "events_queue": events_queue,
+            "generator_done": generator_done,
             "checks": self.checks,
             "targets": self.targets,
             "settings": self.hypothesis_settings,
@@ -303,10 +342,13 @@ class ThreadPoolASGIRunner(ThreadPoolRunner):
     def _get_task(self) -> Callable:
         return asgi_thread_task
 
-    def _get_worker_kwargs(self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet) -> Dict[str, Any]:
+    def _get_worker_kwargs(
+        self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet, generator_done: threading.Event
+    ) -> Dict[str, Any]:
         return {
             "tasks_queue": tasks_queue,
             "events_queue": events_queue,
+            "generator_done": generator_done,
             "checks": self.checks,
             "targets": self.targets,
             "settings": self.hypothesis_settings,
