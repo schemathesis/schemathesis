@@ -48,44 +48,6 @@ class MutationResult(enum.Enum):
 
 
 Mutation = Callable[["MutationContext", Draw, Schema], MutationResult]
-ALL_KEYWORDS = {
-    "additionalItems",
-    "additionalProperties",
-    "allOf",
-    "anyOf",
-    "const",
-    "contains",
-    "contentEncoding",
-    "contentMediaType",
-    "dependencies",
-    "enum",
-    "else",
-    "exclusiveMaximum",
-    "exclusiveMinimum",
-    "format",
-    "if",
-    "items",
-    "maxItems",
-    "maxLength",
-    "maxProperties",
-    "maximum",
-    "minItems",
-    "minLength",
-    "minProperties",
-    "minimum",
-    "multipleOf",
-    "not",
-    "oneOf",
-    "pattern",
-    "patternProperties",
-    "properties",
-    "propertyNames",
-    "$ref",
-    "required",
-    "then",
-    "type",
-    "uniqueItems",
-}
 ANY_TYPE_KEYS = {"$ref", "allOf", "anyOf", "const", "else", "enum", "if", "not", "oneOf", "then", "type"}
 TYPE_SPECIFIC_KEYS = {
     "number": ("multipleOf", "maximum", "exclusiveMaximum", "minimum", "exclusiveMinimum"),
@@ -110,7 +72,8 @@ class MutationContext:
     """Meta information about the current mutation state."""
 
     # The original schema
-    schema: Schema = attr.ib()
+    keywords: Schema = attr.ib()  # only keywords
+    non_keywords: Schema = attr.ib()  # everything else
     # Schema location within API operation (header, query, etc)
     location: str = attr.ib()
     # Payload media type, if available
@@ -148,10 +111,9 @@ class MutationContext:
             mutations = [change_properties]
         else:
             # Body can be of any type and does not have any specific type semantic.
-            mutations = draw(ordered(get_mutations(draw, self.schema)))
-        keywords, non_keywords = split_schema(self.schema)
+            mutations = draw(ordered(get_mutations(draw, self.keywords)))
         # Deep copy all keywords to avoid modifying the original schema
-        new_schema = deepcopy(keywords)
+        new_schema = deepcopy(self.keywords)
         enabled_mutations = draw(st.shared(FeatureStrategy(), key="mutations"))  # type: ignore
         result = MutationResult.FAILURE
         for mutation in mutations:
@@ -160,7 +122,7 @@ class MutationContext:
         if result.is_failure:
             # If we failed to apply anything, then reject the whole case
             reject()  # type: ignore
-        new_schema.update(non_keywords)
+        new_schema.update(self.non_keywords)
         if self.is_header_location:
             # All headers should have names that can be sent over network
             new_schema["propertyNames"] = {"type": "string", "format": "_header_name"}
@@ -182,20 +144,6 @@ class MutationContext:
         ):
             new_schema.setdefault("minProperties", 1)
         return new_schema
-
-
-def split_schema(schema: Schema) -> Tuple[Schema, Schema]:
-    """Split the schema into two parts.
-
-    The first one contains only validation JSON Schema keywords, the second one everything else.
-    """
-    keywords, non_keywords = {}, {}
-    for keyword, value in schema.items():
-        if keyword in ALL_KEYWORDS:
-            keywords[keyword] = value
-        else:
-            non_keywords[keyword] = value
-    return keywords, non_keywords
 
 
 def for_types(*allowed_types: str) -> Callable[[Mutation], Mutation]:
