@@ -25,16 +25,11 @@ class CacheKey:
         return hash((self.operation_name, self.location))
 
 
-_VALIDATORS_CACHE = {}
-
-
-def get_validator(schema: Schema, operation_name: str, location: str) -> jsonschema.Draft4Validator:
+@lru_cache()
+def get_validator(cache_key: CacheKey) -> jsonschema.Draft4Validator:
     """Get JSON Schema validator for the given schema."""
     # Each operation / location combo has only a single schema, therefore could be cached
-    key = (operation_name, location)
-    if key not in _VALIDATORS_CACHE:
-        _VALIDATORS_CACHE[key] = jsonschema.Draft4Validator(schema)
-    return _VALIDATORS_CACHE[key]
+    return jsonschema.Draft4Validator(cache_key.schema)
 
 
 ALL_KEYWORDS = {
@@ -106,8 +101,8 @@ def negative_schema(
     """
     # The mutated schema is passed to `from_schema` and guarded against producing instances valid against
     # the original schema.
-    validator = get_validator(schema, operation_name, location)
     cache_key = CacheKey(operation_name, location, schema)
+    validator = get_validator(cache_key)
     keywords, non_keywords = split_schema(cache_key)
     return mutated(keywords, non_keywords, location, media_type).flatmap(
         lambda s: from_schema(s, custom_formats=custom_formats).filter(lambda v: not validator.is_valid(v))
