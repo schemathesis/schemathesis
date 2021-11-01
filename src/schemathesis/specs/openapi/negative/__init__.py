@@ -1,11 +1,29 @@
-from typing import Any, Dict, Optional
+from functools import lru_cache
+from typing import Any, Dict, Optional, Tuple
 
+import attr
 import jsonschema
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 
 from .mutations import MutationContext
 from .types import Draw, Schema
+
+
+@attr.s(slots=True, hash=False)
+class CacheKey:
+    """A cache key for API Operation / location.
+
+    Carries the schema around but don't use it for hashing to simplify LRU cache usage.
+    """
+
+    operation_name: str = attr.ib()
+    location: str = attr.ib()
+    schema: Schema = attr.ib()
+
+    def __hash__(self) -> int:
+        return hash((self.operation_name, self.location))
+
 
 _VALIDATORS_CACHE = {}
 
@@ -17,6 +35,61 @@ def get_validator(schema: Schema, operation_name: str, location: str) -> jsonsch
     if key not in _VALIDATORS_CACHE:
         _VALIDATORS_CACHE[key] = jsonschema.Draft4Validator(schema)
     return _VALIDATORS_CACHE[key]
+
+
+ALL_KEYWORDS = {
+    "additionalItems",
+    "additionalProperties",
+    "allOf",
+    "anyOf",
+    "const",
+    "contains",
+    "contentEncoding",
+    "contentMediaType",
+    "dependencies",
+    "enum",
+    "else",
+    "exclusiveMaximum",
+    "exclusiveMinimum",
+    "format",
+    "if",
+    "items",
+    "maxItems",
+    "maxLength",
+    "maxProperties",
+    "maximum",
+    "minItems",
+    "minLength",
+    "minProperties",
+    "minimum",
+    "multipleOf",
+    "not",
+    "oneOf",
+    "pattern",
+    "patternProperties",
+    "properties",
+    "propertyNames",
+    "$ref",
+    "required",
+    "then",
+    "type",
+    "uniqueItems",
+}
+
+
+@lru_cache()
+def split_schema(cache_key: CacheKey) -> Tuple[Schema, Schema]:
+    """Split the schema in two parts.
+
+    The first one contains only validation JSON Schema keywords, the second one everything else.
+    """
+    keywords, non_keywords = {}, {}
+    for keyword, value in cache_key.schema.items():
+        if keyword in ALL_KEYWORDS:
+            keywords[keyword] = value
+        else:
+            non_keywords[keyword] = value
+    return keywords, non_keywords
 
 
 def negative_schema(
@@ -34,11 +107,15 @@ def negative_schema(
     # The mutated schema is passed to `from_schema` and guarded against producing instances valid against
     # the original schema.
     validator = get_validator(schema, operation_name, location)
-    return mutated(schema, location, media_type).flatmap(
+    cache_key = CacheKey(operation_name, location, schema)
+    keywords, non_keywords = split_schema(cache_key)
+    return mutated(keywords, non_keywords, location, media_type).flatmap(
         lambda s: from_schema(s, custom_formats=custom_formats).filter(lambda v: not validator.is_valid(v))
     )
 
 
 @st.composite  # type: ignore
-def mutated(draw: Draw, schema: Schema, location: str, media_type: Optional[str]) -> Any:
-    return MutationContext(schema=schema, location=location, media_type=media_type).mutate(draw)
+def mutated(draw: Draw, keywords: Schema, non_keywords: Schema, location: str, media_type: Optional[str]) -> Any:
+    return MutationContext(
+        keywords=keywords, non_keywords=non_keywords, location=location, media_type=media_type
+    ).mutate(draw)
