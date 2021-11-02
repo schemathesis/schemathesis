@@ -34,6 +34,7 @@ import requests
 import werkzeug
 from hypothesis import event, note, reject
 from hypothesis import strategies as st
+from requests.structures import CaseInsensitiveDict
 from starlette.testclient import TestClient as ASGIClient
 
 from . import failures, serializers
@@ -92,7 +93,7 @@ class Case:  # pylint: disable=too-many-public-methods
 
     operation: "APIOperation" = attr.ib()  # pragma: no mutate
     path_parameters: Optional[PathParameters] = attr.ib(default=None)  # pragma: no mutate
-    headers: Optional[Headers] = attr.ib(default=None)  # pragma: no mutate
+    headers: Optional[CaseInsensitiveDict] = attr.ib(default=None)  # pragma: no mutate
     cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
     query: Optional[Query] = attr.ib(default=None)  # pragma: no mutate
     # By default, there is no body, but we can't use `None` as the default value because it clashes with `null`
@@ -252,12 +253,11 @@ class Case:  # pylint: disable=too-many-public-methods
                 )
         return base_url
 
-    def _get_headers(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-        final_headers = self.headers.copy() if self.headers is not None else {}
+    def _get_headers(self, headers: Optional[Dict[str, str]] = None) -> CaseInsensitiveDict:
+        final_headers = self.headers.copy() if self.headers is not None else CaseInsensitiveDict()
         if headers:
             final_headers.update(headers)
-        if "user-agent" not in {header.lower() for header in final_headers}:
-            final_headers["User-Agent"] = USER_AGENT
+        final_headers.setdefault("User-Agent", USER_AGENT)
         return final_headers
 
     def _get_serializer(self) -> Optional[Serializer]:
@@ -295,8 +295,7 @@ class Case:  # pylint: disable=too-many-public-methods
         if additional_headers:
             # Additional headers, needed for the serializer
             for key, value in additional_headers.items():
-                if key.lower() not in {header.lower() for header in final_headers}:
-                    final_headers[key] = value
+                final_headers.setdefault(key, value)
         return {
             "method": self.method,
             "url": url,
@@ -351,7 +350,8 @@ class Case:  # pylint: disable=too-many-public-methods
         return {
             "method": self.method,
             "path": self.operation.schema.get_full_path(self.formatted_path),
-            "headers": final_headers,
+            # Convert to a regular dictionary, as we use `CaseInsensitiveDict` which is not supported by Werkzeug
+            "headers": dict(final_headers),
             "query_string": self.query,
             **extra,
         }

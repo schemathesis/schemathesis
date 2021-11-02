@@ -29,6 +29,7 @@ import attr
 import jsonschema
 import requests
 from hypothesis.strategies import SearchStrategy
+from requests.structures import CaseInsensitiveDict
 
 from ... import failures
 from ...constants import DataGenerationMethod
@@ -730,7 +731,7 @@ class SwaggerV20(BaseOpenAPISchema):
         return case_cls(
             operation=operation,
             path_parameters=path_parameters,
-            headers=headers,
+            headers=CaseInsensitiveDict(headers) if headers is not None else headers,
             cookies=cookies,
             query=query,
             body=body,

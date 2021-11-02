@@ -9,6 +9,7 @@ Changelog
 - Show ``cURL`` code samples by default instead of Python. `#1269`_
 - Improve reporting of ``jsonschema`` errors which are caused by non-string object keys.
 - Store ``data_generation_method`` in ``BeforeExecution``.
+- Use case-insensitive dictionary for ``Case.headers``. `#1280`_
 
 **Fixed**
 
@@ -2172,6 +2173,7 @@ Deprecated
 
 .. _#1290: https://github.com/schemathesis/schemathesis/issues/1290
 .. _#1287: https://github.com/schemathesis/schemathesis/issues/1287
+.. _#1280: https://github.com/schemathesis/schemathesis/issues/1280
 .. _#1269: https://github.com/schemathesis/schemathesis/issues/1269
 .. _#1262: https://github.com/schemathesis/schemathesis/issues/1262
 .. _#1260: https://github.com/schemathesis/schemathesis/issues/1260
