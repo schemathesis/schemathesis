@@ -2,7 +2,9 @@ import hypothesis
 import pytest
 import requests
 from flask import Flask
+from hypothesis import HealthCheck, given, settings
 
+import schemathesis
 from schemathesis.constants import USER_AGENT
 from schemathesis.runner import from_schema
 
@@ -59,6 +61,32 @@ def test_code_sample_from_request(openapi_case):
     # By default Schemathesis uses User-agent header, but it is possible to remove it (e.g. via hooks in CLI)
     # `Case.get_code_to_reproduce` should be able to generate a code sample for any `requests.Request`
     assert openapi_case.get_code_to_reproduce(request=request) == f"requests.get('{url}')"
+
+
+@pytest.mark.hypothesis_nested
+def test_get_code_sample_code_validity(empty_open_api_2_schema):
+    # See GH-1030
+    # When the input schema is too loose
+    empty_open_api_2_schema["paths"] = {
+        "/test/{key}": {
+            "post": {
+                "parameters": [{"name": "key", "in": "path"}],
+                "responses": {"default": {"description": "OK"}},
+            }
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_2_schema, base_url="http://127.0.0.1:1", validate_schema=False)
+    strategy = schema["/test/{key}"]["POST"].as_strategy()
+
+    @given(case=strategy)
+    @settings(max_examples=30, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much], deadline=None)
+    def test(case):
+        code = case.get_code_to_reproduce()
+        # Then generated code should always be syntactically valid
+        with pytest.raises(requests.exceptions.ConnectionError):
+            eval(code)
+
+    test()
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")

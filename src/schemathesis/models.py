@@ -220,7 +220,8 @@ class Case:  # pylint: disable=too-many-public-methods
         printed_kwargs = ", ".join(
             f"{key}={repr(value)}" for key, value in kwargs.items() if should_display(key, value)
         )
-        args_repr = f"'{kwargs['url']}'"
+        url = kwargs["url"].replace("'", "\\'")
+        args_repr = f"'{url}'"
         if printed_kwargs:
             args_repr += f", {printed_kwargs}"
         return f"requests.{method}({args_repr})"
