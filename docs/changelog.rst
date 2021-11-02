@@ -14,6 +14,7 @@ Changelog
 
 - Pass ``data_generation_method`` to ``Case`` for GraphQL schemas.
 - Generation of invalid headers in some cases. `#1142`_
+- Unescaped quotes in generated Python code samples on some schemas. `#1030`_
 
 **Performance**
 
@@ -2209,6 +2210,7 @@ Deprecated
 .. _#1039: https://github.com/schemathesis/schemathesis/issues/1039
 .. _#1036: https://github.com/schemathesis/schemathesis/issues/1036
 .. _#1033: https://github.com/schemathesis/schemathesis/issues/1033
+.. _#1030: https://github.com/schemathesis/schemathesis/issues/1030
 .. _#1028: https://github.com/schemathesis/schemathesis/issues/1028
 .. _#1022: https://github.com/schemathesis/schemathesis/issues/1022
 .. _#1020: https://github.com/schemathesis/schemathesis/issues/1020
