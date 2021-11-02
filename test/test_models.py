@@ -381,6 +381,7 @@ def test_deprecated_attribute(swagger_20):
 
 
 @pytest.mark.parametrize("method", DataGenerationMethod.all())
+@pytest.mark.hypothesis_nested
 def test_data_generation_method_is_available(method, empty_open_api_3_schema):
     # When a new case is generated
     empty_open_api_3_schema["paths"] = {
@@ -402,5 +403,37 @@ def test_data_generation_method_is_available(method, empty_open_api_3_schema):
     def test(case):
         # Then its data generation method should be available
         assert case.data_generation_method == method
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+def test_case_insensitive_headers(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "post": {
+                "parameters": [
+                    {
+                        "name": "X-id",
+                        "in": "header",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    }
+                ],
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    # When headers are generated
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    @given(case=schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        assert "X-id" in case.headers
+        # Then they are case-insensitive
+        case.headers["x-ID"] = "foo"
+        assert len(case.headers) == 1
+        assert case.headers["X-id"] == "foo"
 
     test()

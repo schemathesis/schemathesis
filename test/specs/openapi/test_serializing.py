@@ -572,6 +572,6 @@ def test_unusual_form_schema(empty_open_api_3_schema, type_name):
         # And it should be case insensitive
         headers = case.as_requests_kwargs(headers={"content-type": "text/plain"})["headers"]
         assert headers["content-type"] == "text/plain"
-        assert "Content-Type" not in headers
+        assert list(headers) == ["content-type", "User-Agent"]
 
     test()
