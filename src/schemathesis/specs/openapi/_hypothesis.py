@@ -11,6 +11,7 @@ from weakref import WeakKeyDictionary
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from requests.auth import _basic_auth_str
+from requests.structures import CaseInsensitiveDict
 
 from ... import utils
 from ...constants import DataGenerationMethod
@@ -125,10 +126,12 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     context = HookContext(operation)
 
     with detect_invalid_schema(operation):
-        path_parameters = get_parameters_value(path_parameters, "path", draw, operation, context, hooks, to_strategy)
-        headers = get_parameters_value(headers, "header", draw, operation, context, hooks, to_strategy)
-        cookies = get_parameters_value(cookies, "cookie", draw, operation, context, hooks, to_strategy)
-        query = get_parameters_value(query, "query", draw, operation, context, hooks, to_strategy)
+        path_parameters_value = get_parameters_value(
+            path_parameters, "path", draw, operation, context, hooks, to_strategy
+        )
+        headers_value = get_parameters_value(headers, "header", draw, operation, context, hooks, to_strategy)
+        cookies_value = get_parameters_value(cookies, "cookie", draw, operation, context, hooks, to_strategy)
+        query_value = get_parameters_value(query, "query", draw, operation, context, hooks, to_strategy)
 
         media_type = None
         if body is NOT_SET:
@@ -152,10 +155,10 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     return Case(
         operation=operation,
         media_type=media_type,
-        path_parameters=path_parameters,
-        headers=headers,
-        cookies=cookies,
-        query=query,
+        path_parameters=path_parameters_value,
+        headers=CaseInsensitiveDict(headers_value) if headers_value is not None else headers_value,
+        cookies=cookies_value,
+        query=query_value,
         body=body,
         data_generation_method=data_generation_method,
     )
@@ -222,7 +225,7 @@ def get_parameters_value(
     context: HookContext,
     hooks: Optional[HookDispatcher],
     to_strategy: StrategyFactory,
-) -> Dict[str, Any]:
+) -> Optional[Dict[str, Any]]:
     """Get the final value for the specified location.
 
     If the value is not set, then generate it from the relevant strategy. Otherwise, check what is missing in it and

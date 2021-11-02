@@ -8,6 +8,7 @@ import requests
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
 from hypothesis_graphql import strategies as gql_st
+from requests.structures import CaseInsensitiveDict
 
 from ...checks import not_a_server_error
 from ...constants import DataGenerationMethod
@@ -43,7 +44,8 @@ class GraphQLCase(Case):
         return {
             "method": self.method,
             "path": self.operation.schema.get_full_path(self.formatted_path),
-            "headers": final_headers,
+            # Convert to a regular dictionary, as we use `CaseInsensitiveDict` which is not supported by Werkzeug
+            "headers": dict(final_headers),
             "query_string": self.query,
             "json": {"query": self.body},
         }
@@ -156,7 +158,7 @@ class GraphQLSchema(BaseSchema):
         return case_cls(
             operation=operation,
             path_parameters=path_parameters,
-            headers=headers,
+            headers=CaseInsensitiveDict(headers) if headers is not None else headers,
             cookies=cookies,
             query=query,
             body=body,
