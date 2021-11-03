@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.11.0`_ - 2021-11-03
+----------------------
+
 **Changed**
 
 - Show ``cURL`` code samples by default instead of Python. `#1269`_
@@ -1999,7 +2002,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.10.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.11.0...HEAD
+.. _3.11.0: https://github.com/schemathesis/schemathesis/compare/v3.10.1...v3.11.0
 .. _3.10.1: https://github.com/schemathesis/schemathesis/compare/v3.10.0...v3.10.1
 .. _3.10.0: https://github.com/schemathesis/schemathesis/compare/v3.9.7...v3.10.0
 .. _3.9.7: https://github.com/schemathesis/schemathesis/compare/v3.9.6...v3.9.7
