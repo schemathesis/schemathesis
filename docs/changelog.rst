@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.11.1`_ - 2021-11-20
+----------------------
+
 - Update ``click`` and ``PyYaml`` dependency versions. `#1328`_
 
 `3.11.0`_ - 2021-11-03
@@ -2004,7 +2007,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.11.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.11.1...HEAD
+.. _3.11.1: https://github.com/schemathesis/schemathesis/compare/v3.11.0...v3.11.1
 .. _3.11.0: https://github.com/schemathesis/schemathesis/compare/v3.10.1...v3.11.0
 .. _3.10.1: https://github.com/schemathesis/schemathesis/compare/v3.10.0...v3.10.1
 .. _3.10.0: https://github.com/schemathesis/schemathesis/compare/v3.9.7...v3.10.0
