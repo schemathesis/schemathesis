@@ -4,6 +4,8 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+- Update `click` and `PyYaml` dependency versions.
+
 `3.11.0`_ - 2021-11-03
 ----------------------
 
