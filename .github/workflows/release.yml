@@ -96,6 +96,6 @@ jobs:
       uses: actions/checkout@v1
 
     - name: Release Notary Action
-      uses: docker://outillage/release-notary
+      uses: docker://aevea/release-notary
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
