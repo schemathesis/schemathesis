@@ -91,8 +91,11 @@ class BaseRunner:
             yield _finish()
             return
 
-        for event in self._execute(results, stop_event):
-            yield event
+        try:
+            for event in self._execute(results, stop_event):
+                yield event
+        except KeyboardInterrupt:
+            yield events.Interrupted()
 
         yield _finish()
 

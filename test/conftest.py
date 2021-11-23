@@ -149,6 +149,11 @@ def openapi3_schema_url(server, openapi_3_app):
     return f"http://127.0.0.1:{server['port']}/schema.yaml"
 
 
+@pytest.fixture()
+def openapi3_schema(openapi3_schema_url):
+    return oas_loaders.from_uri(openapi3_schema_url)
+
+
 @pytest.fixture
 def graphql_path():
     return "/graphql"
