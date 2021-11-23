@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Handle ``KeyboardInterrupt`` that happens outside of the main test loop inside the runner.
+  It makes interrupt handling consistent, independent at what point it happens. `#1325`_
+
 `3.11.1`_ - 2021-11-20
 ----------------------
 
@@ -2181,7 +2186,8 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
-.. _#1328: https://github.com/schemathesis/schemathesis/issues/1228
+.. _#1328: https://github.com/schemathesis/schemathesis/issues/1328
+.. _#1325: https://github.com/schemathesis/schemathesis/issues/1325
 .. _#1290: https://github.com/schemathesis/schemathesis/issues/1290
 .. _#1287: https://github.com/schemathesis/schemathesis/issues/1287
 .. _#1280: https://github.com/schemathesis/schemathesis/issues/1280

@@ -849,6 +849,31 @@ def test_graphql(graphql_url):
     assert finished.passed_count == 2
 
 
+@pytest.mark.operations("success")
+def test_interrupted_in_test(openapi3_schema):
+    # When an interrupt happens within a test body (check is called within a test body)
+    def check(response, case):
+        raise KeyboardInterrupt
+
+    *_, event, finished = from_schema(openapi3_schema, checks=(check,)).execute()
+    # Then the `Interrupted` event should be emitted
+    assert isinstance(event, events.Interrupted)
+
+
+@pytest.mark.operations("success")
+def test_interrupted_outside_test(mocker, openapi3_schema):
+    # See GH-1325
+    # When an interrupt happens outside of a test body
+    mocker.patch("schemathesis.runner.events.AfterExecution.from_result", side_effect=KeyboardInterrupt)
+
+    try:
+        *_, event, finished = from_schema(openapi3_schema).execute()
+        # Then the `Interrupted` event should be emitted
+        assert isinstance(event, events.Interrupted)
+    except KeyboardInterrupt:
+        pytest.fail("KeyboardInterrupt should be handled")
+
+
 @pytest.fixture(params=[1, 2], ids=["single-worker", "multi-worker"])
 def workers_num(request):
     return request.param
