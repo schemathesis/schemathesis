@@ -288,6 +288,8 @@ an additional test case if the original case received a successful response from
 Note: A partial deep copy of the ``Case`` object is passed to each ``add_case`` hook. ``Case.operation.app`` is a reference to the original ``app``,
 and ``Case.operation.schema`` is a shallow copy, so changes to these fields will be reflected in other tests.
 
+.. _hooks_before_call:
+
 ``before_call``
 ~~~~~~~~~~~~~~~
 

@@ -118,6 +118,24 @@ There might be multiple reasons for that, but usually, this behavior occurs when
 Please, refer to the ``Data generation`` section in the documentation for more info. If you think that it is not the case, feel
 free to `open an issue <https://github.com/schemathesis/schemathesis/issues/new?assignees=Stranger6667&labels=Status%3A+Review+Needed%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D>`_.
 
+Why Schemathesis reports "Flaky" errors?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When Schemathesis finds a failure, it tries to verify it by re-running the test again.
+If the same failure is not reproduced, then Schemathesis concludes the test as "Flaky".
+
+This situation usually happens, when the tested application state is not reset between tests.
+Let's imagine that we have an API where the user can create "orders", then the "Flaky" situation might look like this:
+
+1. Create order "A" -> 201 with payload that does not conform to the definition in the API schema;
+2. Create order "A" again to verify the failure -> 409 with conformant payload.
+
+Currently, the solution is to clean the application state between test runs.
+With CLI, it could be done via the :ref:`before_call <hooks_before_call>` hook. With Python tests you may want to write
+a context manager as `suggested <https://hypothesis.readthedocs.io/en/latest/healthchecks.html#hypothesis.HealthCheck.function_scoped_fixture>`_ by Hypothesis docs.
+
+There is an `open issue <https://github.com/schemathesis/schemathesis/issues/1081>`_ for an option to disable this behaviour completely.
+
 Does Schemathesis support Open API discriminators? Schemathesis raises an "Unsatisfiable" error.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
