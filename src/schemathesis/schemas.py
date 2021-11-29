@@ -38,7 +38,18 @@ from .exceptions import InvalidSchema, UsageError
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import APIOperation, Case
 from .stateful import APIStateMachine, Stateful, StatefulTest
-from .types import Body, Cookies, Filter, FormData, GenericTest, Headers, NotSet, PathParameters, Query
+from .types import (
+    Body,
+    Cookies,
+    DataGenerationMethodInput,
+    Filter,
+    FormData,
+    GenericTest,
+    Headers,
+    NotSet,
+    PathParameters,
+    Query,
+)
 from .utils import NOT_SET, PARAMETRIZE_MARKER, GenericResponse, GivenInput, Ok, Result, given_proxy
 
 
@@ -248,7 +259,7 @@ class BaseSchema(Mapping):
         hooks: Union[HookDispatcher, NotSet] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
         skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
-        data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
+        data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
         code_sample_style: Union[CodeSampleStyle, NotSet] = NOT_SET,
     ) -> "BaseSchema":
         if base_url is NOT_SET:
