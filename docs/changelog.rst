@@ -8,6 +8,7 @@ Changelog
 
 - Use ``name`` & ``data_generation_method`` parameters to subtest context instead of ``path`` & ``method``.
   It allows the end-user to disambiguate among subtest reports.
+- Raise an error if a test function wrapped with ``schema.parametrize`` matches no API operations. `#1336`_
 
 **Fixed**
 
@@ -2194,6 +2195,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1336: https://github.com/schemathesis/schemathesis/issues/1336
 .. _#1331: https://github.com/schemathesis/schemathesis/issues/1331
 .. _#1328: https://github.com/schemathesis/schemathesis/issues/1328
 .. _#1325: https://github.com/schemathesis/schemathesis/issues/1325
