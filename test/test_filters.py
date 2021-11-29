@@ -1,5 +1,7 @@
 import pytest
 
+from schemathesis.constants import IS_PYTEST_ABOVE_54
+
 from .utils import integer
 
 
@@ -190,3 +192,28 @@ def test_(request, case):
 
     result.stdout.re_match_lines([r"test_operation_id_list_filter.py::test_[GET /v1/foo][P] PASSED"])
     result.stdout.re_match_lines([r"test_operation_id_list_filter.py::test_[POST /v1/foo][P] PASSED"])
+
+
+def test_error_on_no_matches(testdir):
+    # When test filters don't match any operation
+    testdir.make_test(
+        """
+@schema.parametrize(operation_id=["does-not-exist"])
+@settings(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+""",
+    )
+    result = testdir.runpytest("-v")
+    # Then it should be an error
+    if IS_PYTEST_ABOVE_54:
+        key = "errors"
+    else:
+        key = "error"
+    result.assert_outcomes(**{key: 1})
+    result.stdout.re_match_lines(
+        [
+            r"E   Failed: Test function test_error_on_no_matches.py::test_ does not "
+            r"match any API operations and therefore has no effect"
+        ]
+    )
