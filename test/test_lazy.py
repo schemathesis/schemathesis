@@ -547,6 +547,27 @@ def test_(case):
     pass
 """,
     )
+    testdir.makepyfile(
+        conftest="""
+from _pytest.config import hookimpl
+
+
+@hookimpl(hookwrapper=True)
+def pytest_terminal_summary(terminalreporter) -> None:
+    reports = [
+        report
+        for report in terminalreporter.stats["passed"]
+        if hasattr(report, "context")
+    ]
+    unique = {
+        tuple(report.context.kwargs.items())
+        for report in reports
+    }
+    # SubTest reports should contain unique kwargs
+    assert len(unique) == len(reports) == 2
+    yield
+"""
+    )
     # Then it should be taken into account
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1)  # It is still a single test on the top level
@@ -568,7 +589,10 @@ def test_data_generation_methods_override(testdir):
 def api_schema():
     return schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.all())
 
-lazy_schema = schemathesis.from_pytest_fixture("api_schema", data_generation_methods=schemathesis.DataGenerationMethod.positive)
+lazy_schema = schemathesis.from_pytest_fixture(
+    "api_schema",
+    data_generation_methods=schemathesis.DataGenerationMethod.positive
+)
 
 @lazy_schema.parametrize()
 @settings(max_examples=1)
@@ -581,6 +605,6 @@ def test_(case):
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines(
         [
-            r"test_data_generation_methods_override.py::test_\[GET /v1/users\]\[P\] PASSED \[ 50%\]",
+            r"test_data_generation_methods_override.py::test_\[GET /v1/users\]\[P\] PASSED *\[ 50%\]",
         ]
     )
