@@ -13,6 +13,8 @@ Changelog
 `3.11.1`_ - 2021-11-20
 ----------------------
 
+**Changed**
+
 - Update ``click`` and ``PyYaml`` dependency versions. `#1328`_
 
 `3.11.0`_ - 2021-11-03
