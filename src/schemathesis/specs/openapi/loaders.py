@@ -1,7 +1,7 @@
 import io
 import pathlib
 from contextlib import suppress
-from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import urljoin
 
 import jsonschema
@@ -286,7 +286,7 @@ def from_pytest_fixture(
     operation_id: Optional[Filter] = NOT_SET,
     skip_deprecated_operations: bool = False,
     validate_schema: bool = True,
-    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
     code_sample_style: str = CodeSampleStyle.default().name,
 ) -> LazySchema:
     """Load schema from a ``pytest`` fixture.
@@ -299,6 +299,12 @@ def from_pytest_fixture(
     :param str fixture_name: The name of a fixture to load.
     """
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
+    _data_generation_methods: Union[DataGenerationMethodInput, NotSet]
+    if data_generation_methods is not NOT_SET:
+        data_generation_methods = cast(DataGenerationMethodInput, data_generation_methods)
+        _data_generation_methods = prepare_data_generation_methods(data_generation_methods)
+    else:
+        _data_generation_methods = data_generation_methods
     return LazySchema(
         fixture_name,
         app=app,
@@ -309,7 +315,7 @@ def from_pytest_fixture(
         operation_id=operation_id,
         skip_deprecated_operations=skip_deprecated_operations,
         validate_schema=validate_schema,
-        data_generation_methods=prepare_data_generation_methods(data_generation_methods),
+        data_generation_methods=_data_generation_methods,
         code_sample_style=_code_sample_style,
     )
 
