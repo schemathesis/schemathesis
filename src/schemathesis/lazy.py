@@ -159,7 +159,9 @@ def run_subtest(
     subtests: SubTests,
 ) -> None:
     """Run the given subtest with pytest fixtures."""
-    with subtests.test(verbose_name=operation.verbose_name, data_generation_method=data_generation_method):
+    with subtests.test(
+        verbose_name=operation.verbose_name, data_generation_method=data_generation_method.as_short_name()
+    ):
         sub_test(**fixtures)
 
 
