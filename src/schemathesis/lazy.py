@@ -1,17 +1,17 @@
 from inspect import signature
-from typing import Any, Callable, Dict, Iterable, Optional, Union
+from typing import Any, Callable, Dict, Optional, Union
 
 import attr
 import pytest
 from _pytest.fixtures import FixtureRequest
 from pytest_subtests import SubTests, nullcontext
 
-from .constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
+from .constants import CodeSampleStyle, DataGenerationMethod
 from .exceptions import InvalidSchema
 from .hooks import HookDispatcher, HookScope
 from .models import APIOperation
 from .schemas import BaseSchema
-from .types import Filter, GenericTest, NotSet
+from .types import DataGenerationMethodInput, Filter, GenericTest, NotSet
 from .utils import (
     NOT_SET,
     GivenInput,
@@ -37,7 +37,7 @@ class LazySchema:
     hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
     skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
-    data_generation_methods: Iterable[DataGenerationMethod] = attr.ib(default=DEFAULT_DATA_GENERATION_METHODS)
+    data_generation_methods: Union[DataGenerationMethodInput, NotSet] = attr.ib(default=NOT_SET)
     code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate
 
     def parametrize(
@@ -48,7 +48,7 @@ class LazySchema:
         operation_id: Optional[Filter] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
         skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
-        data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
+        data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
         code_sample_style: Union[str, NotSet] = NOT_SET,
     ) -> Callable:
         if method is NOT_SET:
@@ -185,7 +185,7 @@ def get_schema(
     hooks: HookDispatcher,
     validate_schema: Union[bool, NotSet] = NOT_SET,
     skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
-    data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
+    data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
     code_sample_style: CodeSampleStyle,
 ) -> BaseSchema:
     """Loads a schema from the fixture."""

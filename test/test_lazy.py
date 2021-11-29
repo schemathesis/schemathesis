@@ -1,5 +1,7 @@
 import pytest
 
+from schemathesis import DataGenerationMethod
+
 
 def test_default(testdir):
     # When LazySchema is used
@@ -525,5 +527,60 @@ def test_(case):
         [
             r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\]\[P\] PASSED",
             r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\]\[P\] PASSED",
+        ]
+    )
+
+
+def test_data_generation_methods(testdir):
+    # When data generation method config is specified on the schema which is wrapped by a lazy one
+    testdir.make_test(
+        f"""
+@pytest.fixture()
+def api_schema():
+    return schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.all())
+
+lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@settings(max_examples=1)
+def test_(case):
+    pass
+""",
+    )
+    # Then it should be taken into account
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=1)  # It is still a single test on the top level
+    # And each data generation method should have its own test
+    result.stdout.re_match_lines(
+        [
+            r"test_data_generation_methods.py::test_\[GET /v1/users\]\[P\] PASSED",
+            r"test_data_generation_methods.py::test_\[GET /v1/users\]\[N\] PASSED",
+        ]
+    )
+
+
+def test_data_generation_methods_override(testdir):
+    # When data generation method config is specified on the schema which is wrapped by a lazy one
+    # And then overridden on the` from_pytest_fixture` level
+    testdir.make_test(
+        f"""
+@pytest.fixture()
+def api_schema():
+    return schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.all())
+
+lazy_schema = schemathesis.from_pytest_fixture("api_schema", data_generation_methods=schemathesis.DataGenerationMethod.positive)
+
+@lazy_schema.parametrize()
+@settings(max_examples=1)
+def test_(case):
+    pass
+""",
+    )
+    # Then the overridden one should be used
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines(
+        [
+            r"test_data_generation_methods_override.py::test_\[GET /v1/users\]\[P\] PASSED \[ 50%\]",
         ]
     )
