@@ -15,6 +15,7 @@ Changelog
 - Handle ``KeyboardInterrupt`` that happens outside of the main test loop inside the runner.
   It makes interrupt handling consistent, independent at what point it happens. `#1325`_
 - Respect the ``data_generation_methods`` config option defined on a schema instance when it is loaded via ``from_pytest_fixture``. `#1331`_
+- Ignored hooks defined on a schema instance when it is loaded via ``from_pytest_fixture``. `#1340`_
 
 `3.11.1`_ - 2021-11-20
 ----------------------
@@ -2195,6 +2196,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1340: https://github.com/schemathesis/schemathesis/issues/1340
 .. _#1336: https://github.com/schemathesis/schemathesis/issues/1336
 .. _#1331: https://github.com/schemathesis/schemathesis/issues/1331
 .. _#1328: https://github.com/schemathesis/schemathesis/issues/1328

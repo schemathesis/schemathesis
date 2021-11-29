@@ -608,3 +608,56 @@ def test_(case):
             r"test_data_generation_methods_override.py::test_\[GET /v1/users\]\[P\] PASSED *\[ 50%\]",
         ]
     )
+
+
+def test_hooks_are_merged(testdir):
+    # When the wrapped schema has hooks
+    # And the lazy schema also has hooks
+    testdir.make_test(
+        """
+COUNTER = 1
+
+def before_generate_case_first(ctx, strategy):
+
+    def change(case):
+        global COUNTER
+        if case.headers is None:
+            case.headers = {}
+        case.headers["one"] = COUNTER
+        COUNTER += 1
+        return case
+
+    return strategy.map(change)
+
+@pytest.fixture()
+def api_schema():
+    loaded = schemathesis.from_dict(raw_schema)
+    loaded.hooks.register("before_generate_case")(before_generate_case_first)
+    return loaded
+
+
+lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+
+def before_generate_case_second(ctx, strategy):
+
+    def change(case):
+        global COUNTER
+        if case.headers is None:
+            case.headers = {}
+        case.headers["two"] = COUNTER
+        COUNTER += 1
+        return case
+
+    return strategy.map(change)
+
+lazy_schema.hooks.register("before_generate_case")(before_generate_case_second)
+
+@lazy_schema.parametrize()
+@settings(max_examples=1)
+def test_(case):
+    assert case.headers == {"one": 1, "two": 2}
+    """,
+    )
+    # Then all hooks should be merged
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=1)
