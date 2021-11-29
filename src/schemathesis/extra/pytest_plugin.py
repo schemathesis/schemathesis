@@ -9,11 +9,10 @@ from _pytest.nodes import Node
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from hypothesis.errors import InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
-from packaging import version
 
 from .. import DataGenerationMethod
 from .._hypothesis import create_test
-from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
+from ..constants import IS_PYTEST_ABOVE_54, RECURSIVE_REFERENCE_ERROR_MESSAGE
 from ..exceptions import InvalidSchema
 from ..models import APIOperation
 from ..utils import (
@@ -28,13 +27,11 @@ from ..utils import (
     validate_given_args,
 )
 
-USE_FROM_PARENT = version.parse(pytest.__version__) >= version.parse("5.4.0")
-
 T = TypeVar("T", bound=Node)
 
 
 def create(cls: Type[T], *args: Any, **kwargs: Any) -> T:
-    if USE_FROM_PARENT:
+    if IS_PYTEST_ABOVE_54:
         return cls.from_parent(*args, **kwargs)  # type: ignore
     return cls(*args, **kwargs)
 
@@ -180,12 +177,17 @@ class SchemathesisCase(PyCollector):
     def collect(self) -> List[Function]:  # type: ignore
         """Generate different test items for all API operations available in the given schema."""
         try:
-            return [
+            items = [
                 item
                 for data_generation_method in self.schemathesis_case.data_generation_methods
                 for operation in self.schemathesis_case.get_all_operations()
                 for item in self._gen_items(operation, data_generation_method)
             ]
+            if not items:
+                pytest.fail(
+                    f"Test function {self.nodeid} does not match any API operations and therefore has no effect"
+                )
+            return items
         except Exception:
             pytest.fail("Error during collection")
 

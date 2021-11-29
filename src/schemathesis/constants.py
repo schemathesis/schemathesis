@@ -1,6 +1,9 @@
 from enum import Enum
 from typing import List
 
+import pytest
+from packaging import version
+
 from ._compat import metadata
 
 try:
@@ -9,6 +12,7 @@ except metadata.PackageNotFoundError:
     # Local run without installation
     __version__ = "dev"
 
+IS_PYTEST_ABOVE_54 = version.parse(pytest.__version__) >= version.parse("5.4.0")
 
 USER_AGENT = f"schemathesis/{__version__}"
 # Maximum test running time
