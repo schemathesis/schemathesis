@@ -208,7 +208,7 @@ def get_schema(
         operation_id=operation_id,
         app=app,
         test_function=test_function,
-        hooks=hooks,
+        hooks=schema.hooks.merge(hooks),
         validate_schema=validate_schema,
         skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,

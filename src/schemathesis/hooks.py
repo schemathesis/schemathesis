@@ -1,5 +1,6 @@
 import inspect
 from collections import defaultdict
+from copy import deepcopy
 from enum import Enum, unique
 from typing import TYPE_CHECKING, Any, Callable, DefaultDict, Dict, List, Optional, Union, cast
 
@@ -82,6 +83,18 @@ class HookDispatcher:
 
             return decorator
         return self.register_hook_with_name(hook, hook.__name__)
+
+    def merge(self, other: "HookDispatcher") -> "HookDispatcher":
+        """Merge two dispatches together.
+
+        The resulting dispatcher will call the `self` hooks first.
+        """
+        all_hooks = deepcopy(self._hooks)
+        for name, hooks in other._hooks.items():
+            all_hooks[name].extend(hooks)
+        instance = self.__class__(scope=self.scope)
+        instance._hooks = all_hooks
+        return instance
 
     def apply(self, hook: Callable, *, name: Optional[str] = None) -> Callable[[Callable], Callable]:
         """Register hook to run only on one test function.
