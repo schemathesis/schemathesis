@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Use ``name`` & ``data_generation_method`` parameters to subtest context instead of ``path`` & ``method``.
+  It allows the end-user to disambiguate among subtest reports.
+
 **Fixed**
 
 - Handle ``KeyboardInterrupt`` that happens outside of the main test loop inside the runner.

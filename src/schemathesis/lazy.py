@@ -117,7 +117,7 @@ class LazySchema:
                     if isinstance(result, Ok):
                         operation, sub_test = result.ok()
                         subtests.item._nodeid = _get_node_name(node_id, operation, data_generation_method)
-                        run_subtest(operation, fixtures, sub_test, subtests)
+                        run_subtest(operation, data_generation_method, fixtures, sub_test, subtests)
                     else:
                         _schema_error(subtests, result.err(), node_id, data_generation_method)
                 subtests.item._nodeid = node_id
@@ -151,9 +151,15 @@ def _get_partial_node_name(node_id: str, data_generation_method: DataGenerationM
     return name
 
 
-def run_subtest(operation: APIOperation, fixtures: Dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:
+def run_subtest(
+    operation: APIOperation,
+    data_generation_method: DataGenerationMethod,
+    fixtures: Dict[str, Any],
+    sub_test: Callable,
+    subtests: SubTests,
+) -> None:
     """Run the given subtest with pytest fixtures."""
-    with subtests.test(method=operation.method.upper(), path=operation.path):
+    with subtests.test(verbose_name=operation.verbose_name, data_generation_method=data_generation_method):
         sub_test(**fixtures)
 
 
