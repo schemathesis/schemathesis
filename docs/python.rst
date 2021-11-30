@@ -58,6 +58,11 @@ By default, Schemathesis runs tests for all operations, but you can select speci
 Each argument expects a case-insensitive regex string or a list of such strings.
 Each regex will be matched with its corresponding value via Python's ``re.search`` function.
 
+.. important::
+
+    As filters are treated as regular expressions, ensure that they contain proper anchors.
+    For example, `/users/` will match `/v1/users/orders/`, but `^/users/$` will match only `/users/`.
+
 For example, the following test selects all operations which paths start with ``/api/users``:
 
 .. code:: python

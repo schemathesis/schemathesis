@@ -68,6 +68,11 @@ For example, the following command will select all operations which paths start 
 
     $ schemathesis run -E ^/api/users http://api.com/swagger.json
 
+.. important::
+
+    As filters are treated as regular expressions, ensure that they contain proper anchors.
+    For example, `/users/` will match `/v1/users/orders/`, but `^/users/$` will match only `/users/`.
+
 If your API contains deprecated operations (that have ``deprecated: true`` in their definition),
 then you can skip them by passing ``--skip-deprecated-operations``:
 
