@@ -1,7 +1,6 @@
 import io
 import pathlib
-from contextlib import suppress
-from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union, cast
+from typing import IO, Any, Callable, Dict, List, Optional, Set, Tuple, Union, cast
 from urllib.parse import urljoin
 
 import jsonschema
@@ -190,7 +189,9 @@ def from_dict(
     dispatch("before_load_schema", HookContext(), raw_schema)
 
     def init_openapi_2() -> SwaggerV20:
-        _maybe_validate_schema(raw_schema, definitions.SWAGGER_20_VALIDATOR, validate_schema)
+        _maybe_validate_schema(
+            raw_schema, definitions.SWAGGER_20_VALIDATOR, validate_schema, SwaggerV20.allowed_http_methods
+        )
         return SwaggerV20(
             raw_schema,
             app=app,
@@ -207,7 +208,9 @@ def from_dict(
         )
 
     def init_openapi_3() -> OpenApi30:
-        _maybe_validate_schema(raw_schema, definitions.OPENAPI_30_VALIDATOR, validate_schema)
+        _maybe_validate_schema(
+            raw_schema, definitions.OPENAPI_30_VALIDATOR, validate_schema, OpenApi30.allowed_http_methods
+        )
         return OpenApi30(
             raw_schema,
             app=app,
@@ -255,21 +258,22 @@ def _format_status_codes(status_codes: List[Tuple[int, List[Union[str, int]]]]) 
 
 
 def _maybe_validate_schema(
-    instance: Dict[str, Any], validator: jsonschema.validators.Draft4Validator, validate_schema: bool
+    instance: Dict[str, Any],
+    validator: jsonschema.validators.Draft4Validator,
+    validate_schema: bool,
+    allowed_http_methods: Set[str],
 ) -> None:
     if validate_schema:
         try:
             validator.validate(instance)
         except TypeError as exc:
             if validation.is_pattern_error(exc):
-                # Ignore errors for completely invalid schemas - it will be covered by the re-raising after this block
-                with suppress(AttributeError):
-                    status_codes = validation.find_numeric_http_status_codes(instance)
-                    if status_codes:
-                        message = _format_status_codes(status_codes)
-                        raise SchemaLoadingError(f"{NUMERIC_STATUS_CODES_MESSAGE}\n{message}") from exc
-                    # Some other pattern error
-                    raise SchemaLoadingError(NON_STRING_OBJECT_KEY) from exc
+                status_codes = validation.find_numeric_http_status_codes(instance, allowed_http_methods)
+                if status_codes:
+                    message = _format_status_codes(status_codes)
+                    raise SchemaLoadingError(f"{NUMERIC_STATUS_CODES_MESSAGE}\n{message}") from exc
+                # Some other pattern error
+                raise SchemaLoadingError(NON_STRING_OBJECT_KEY) from exc
             raise SchemaLoadingError("Invalid schema") from exc
         except ValidationError as exc:
             raise SchemaLoadingError("The input schema is not a valid Open API schema") from exc

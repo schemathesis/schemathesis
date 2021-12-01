@@ -116,6 +116,7 @@ def test_numeric_status_codes(empty_open_api_3_schema):
     # When the API schema contains a numeric status code, which is not allowed by the spec
     empty_open_api_3_schema["paths"] = {
         "/foo": {
+            "parameters": [],
             "get": {
                 "responses": {200: {"description": "OK"}},
             },
