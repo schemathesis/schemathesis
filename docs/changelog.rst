@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Silently failing to detect numeric status codes when the schema contains a shared ``parameters`` key. `#1343`_
+
 `3.11.2`_ - 2021-11-30
 ----------------------
 
@@ -2200,6 +2204,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1343: https://github.com/schemathesis/schemathesis/issues/1343
 .. _#1340: https://github.com/schemathesis/schemathesis/issues/1340
 .. _#1336: https://github.com/schemathesis/schemathesis/issues/1336
 .. _#1331: https://github.com/schemathesis/schemathesis/issues/1331
