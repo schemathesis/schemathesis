@@ -1,6 +1,7 @@
 import pytest
 
 from schemathesis import DataGenerationMethod
+from schemathesis.constants import IS_PYTEST_ABOVE_54
 
 
 def test_default(testdir):
@@ -661,3 +662,30 @@ def test_(case):
     # Then all hooks should be merged
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1)
+
+
+def test_error_on_no_matches(testdir):
+    # When test filters don't match any operation
+    testdir.make_test(
+        """
+@pytest.fixture()
+def api_schema():
+    return schemathesis.from_dict(raw_schema)
+
+lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+
+@lazy_schema.parametrize(operation_id=["does-not-exist"])
+@settings(max_examples=1)
+def test_(case):
+    pass
+""",
+    )
+    result = testdir.runpytest("-v")
+    # Then it should be a failure (the collection phase is done, so it can't be an error)
+    result.assert_outcomes(failed=1)
+    result.stdout.re_match_lines(
+        [
+            r"E *Failed: Test function test_error_on_no_matches.py::test_ does not "
+            r"match any API operations and therefore has no effect"
+        ]
+    )

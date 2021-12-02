@@ -16,6 +16,7 @@ from .utils import (
     NOT_SET,
     GivenInput,
     Ok,
+    fail_on_no_matches,
     get_given_args,
     get_given_kwargs,
     given_proxy,
@@ -106,6 +107,8 @@ class LazySchema:
                 node_id = request.node._nodeid
                 settings = getattr(test, "_hypothesis_internal_use_settings", None)
                 tests = list(schema.get_all_tests(func, settings, _given_kwargs=given_kwargs))
+                if not tests:
+                    fail_on_no_matches(node_id)
                 request.session.testscollected += len(tests)
                 capmam = request.node.config.pluginmanager.get_plugin("capturemanager")
                 if capmam is not None:
