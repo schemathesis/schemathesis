@@ -19,6 +19,7 @@ from ..utils import (
     PARAMETRIZE_MARKER,
     Ok,
     Result,
+    fail_on_no_matches,
     get_given_args,
     get_given_kwargs,
     is_given_applied,
@@ -184,9 +185,7 @@ class SchemathesisCase(PyCollector):
                 for item in self._gen_items(operation, data_generation_method)
             ]
             if not items:
-                pytest.fail(
-                    f"Test function {self.nodeid} does not match any API operations and therefore has no effect"
-                )
+                fail_on_no_matches(self.nodeid)
             return items
         except Exception:
             pytest.fail("Error during collection")

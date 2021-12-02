@@ -25,6 +25,7 @@ from typing import (
     overload,
 )
 
+import pytest
 import requests
 import yaml
 import yarl
@@ -91,6 +92,10 @@ def is_schemathesis_test(func: Callable) -> bool:
         return isinstance(item, BaseSchema)
     except Exception:
         return False
+
+
+def fail_on_no_matches(node_id: str) -> NoReturn:  # type: ignore
+    pytest.fail(f"Test function {node_id} does not match any API operations and therefore has no effect")
 
 
 def force_tuple(item: Filter) -> Union[List, Set, Tuple]:
