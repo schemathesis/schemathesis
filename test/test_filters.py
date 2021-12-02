@@ -213,7 +213,7 @@ def test_(request, case):
     result.assert_outcomes(**{key: 1})
     result.stdout.re_match_lines(
         [
-            r"E   Failed: Test function test_error_on_no_matches.py::test_ does not "
+            r"E *Failed: Test function test_error_on_no_matches.py::test_ does not "
             r"match any API operations and therefore has no effect"
         ]
     )
