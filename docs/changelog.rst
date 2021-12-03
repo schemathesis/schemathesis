@@ -6,6 +6,7 @@ Changelog
 
 **Changed**
 
+- Add `AfterExecution.data_generation_method`.
 - Minor changes to the Schemathesis.io integration.
 
 `3.11.3`_ - 2021-12-02
