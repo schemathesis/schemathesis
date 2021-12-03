@@ -71,6 +71,7 @@ def after_execution(results_set, operation, swagger_20):
         hypothesis_output=[],
         elapsed_time=1.0,
         operation=operation,
+        data_generation_method=DataGenerationMethod.positive,
         correlation_id="foo",
     )
 

@@ -120,6 +120,8 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
 
     # APIOperation test status - success / failure / error
     status: Status = attr.ib()  # pragma: no mutate
+    # The way data was generated
+    data_generation_method: DataGenerationMethod = attr.ib()  # pragma: no mutate
     result: SerializedTestResult = attr.ib()  # pragma: no mutate
     # Test running time
     elapsed_time: float = attr.ib()  # pragma: no mutate
@@ -136,6 +138,7 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
         elapsed_time: float,
         hypothesis_output: List[str],
         operation: APIOperation,
+        data_generation_method: DataGenerationMethod,
         correlation_id: str,
     ) -> "AfterExecution":
         return cls(
@@ -147,6 +150,7 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
             status=status,
             elapsed_time=elapsed_time,
             hypothesis_output=hypothesis_output,
+            data_generation_method=data_generation_method,
             correlation_id=correlation_id,
         )
 
