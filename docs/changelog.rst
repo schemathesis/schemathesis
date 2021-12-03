@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.11.4`_ - 2021-12-03
+----------------------
+
 **Changed**
 
 - Add `AfterExecution.data_generation_method`.
@@ -2038,7 +2041,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.11.3...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.11.4...HEAD
+.. _3.11.4: https://github.com/schemathesis/schemathesis/compare/v3.11.3...v3.11.4
 .. _3.11.3: https://github.com/schemathesis/schemathesis/compare/v3.11.2...v3.11.3
 .. _3.11.2: https://github.com/schemathesis/schemathesis/compare/v3.11.1...v3.11.2
 .. _3.11.1: https://github.com/schemathesis/schemathesis/compare/v3.11.0...v3.11.1
