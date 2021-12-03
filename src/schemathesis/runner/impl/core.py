@@ -216,6 +216,7 @@ def handle_schema_error(
             verbose_name=verbose_name,
             status=Status.error,
             result=SerializedTestResult.from_test_result(result),
+            data_generation_method=data_generation_method,
             elapsed_time=0.0,
             hypothesis_output=[],
             correlation_id=correlation_id,
@@ -325,6 +326,7 @@ def run_test(  # pylint: disable=too-many-locals
         elapsed_time=test_elapsed_time,
         hypothesis_output=hypothesis_output,
         operation=operation,
+        data_generation_method=data_generation_method,
         correlation_id=correlation_id,
     )
 
