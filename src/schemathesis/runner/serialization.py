@@ -3,7 +3,7 @@
 They all consist of primitive types and don't have references to schemas, app, etc.
 """
 import logging
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, Generator, List, Optional, Set, Tuple
 
 import attr
 import requests
@@ -165,14 +165,24 @@ def deduplicate_failures(checks: List[SerializedCheck]) -> List[SerializedCheck]
     for check in reversed(checks):
         # There are also could be checks that didn't fail
         if check.value == Status.failure:
-            key = get_failure_key(check)
+            key = get_check_key(check)
             if (check.name, key) not in seen:
                 unique_checks.append(check)
                 seen.add((check.name, key))
     return unique_checks
 
 
-def get_failure_key(check: SerializedCheck) -> Optional[str]:
+def deduplicate_checks(checks: List[SerializedCheck]) -> Generator[SerializedCheck, None, None]:
+    """Return only unique checks outcomes."""
+    seen: Set[Tuple[str, Optional[str]]] = set()
+    for check in reversed(checks):
+        key = get_check_key(check)
+        if (check.name, key) not in seen:
+            yield check
+            seen.add((check.name, key))
+
+
+def get_check_key(check: SerializedCheck) -> Optional[str]:
     if isinstance(check.context, ValidationErrorContext):
         # Deduplicate by JSON Schema path. All errors that happened on this sub-schema will be deduplicated
         return "/".join(map(str, check.context.schema_path))

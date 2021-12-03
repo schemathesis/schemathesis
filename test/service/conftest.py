@@ -92,7 +92,7 @@ class Service:
         item = self.server.log[idx]
         assert item[0].url.endswith(url)
         if event_type is not None:
-            assert json.loads(item[0].data)["event_type"] == event_type
+            assert next(iter(json.loads(item[0].data).keys())) == event_type
         assert item[1].status_code == response_status
 
 
