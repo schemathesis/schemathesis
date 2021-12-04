@@ -58,6 +58,7 @@ def serialize_after_execution(event: events.AfterExecution) -> Optional[Dict[str
                         "headers": check.response.headers,
                         "body": check.response.body,
                         "encoding": check.response.encoding,
+                        "elapsed": check.response.elapsed,
                     }
                     if check.response is not None
                     else None,
