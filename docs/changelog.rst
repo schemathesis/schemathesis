@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.11.5`_ - 2021-12-04
+----------------------
+
 **Changed**
 
 - Generate tests for API operations with the HTTP ``TRACE`` method on Open API 2.0.
@@ -2045,7 +2048,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.11.4...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.11.5...HEAD
+.. _3.11.5: https://github.com/schemathesis/schemathesis/compare/v3.11.4...v3.11.5
 .. _3.11.4: https://github.com/schemathesis/schemathesis/compare/v3.11.3...v3.11.4
 .. _3.11.3: https://github.com/schemathesis/schemathesis/compare/v3.11.2...v3.11.3
 .. _3.11.2: https://github.com/schemathesis/schemathesis/compare/v3.11.1...v3.11.2
