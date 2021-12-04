@@ -19,6 +19,7 @@ USER_AGENT = f"schemathesis/{__version__}"
 DEFAULT_DEADLINE = 15000  # pragma: no mutate
 DEFAULT_RESPONSE_TIMEOUT = 10000  # pragma: no mutate
 DEFAULT_STATEFUL_RECURSION_LIMIT = 5  # pragma: no mutate
+HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 RECURSIVE_REFERENCE_ERROR_MESSAGE = (
     "Currently, Schemathesis can't generate data for this operation due to "
     "recursive references in the operation definition. See more information in "
