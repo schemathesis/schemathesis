@@ -17,7 +17,6 @@ from typing import (
     List,
     Optional,
     Sequence,
-    Set,
     Tuple,
     Type,
     TypeVar,
@@ -32,7 +31,7 @@ from hypothesis.strategies import SearchStrategy
 from requests.structures import CaseInsensitiveDict
 
 from ... import failures
-from ...constants import DataGenerationMethod
+from ...constants import HTTP_METHODS, DataGenerationMethod
 from ...exceptions import (
     InvalidSchema,
     UsageError,
@@ -86,7 +85,6 @@ SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefReso
 class BaseOpenAPISchema(BaseSchema):
     nullable_name: str
     links_field: str
-    allowed_http_methods: Set[str]
     security: BaseSecurityProcessor
     component_locations: ClassVar[Tuple[Tuple[str, ...], ...]] = ()
     _operations_by_id: Dict[str, APIOperation]
@@ -116,7 +114,7 @@ class BaseOpenAPISchema(BaseSchema):
 
     def _should_skip(self, method: str, definition: Dict[str, Any]) -> bool:
         return (
-            method not in self.allowed_http_methods
+            method not in HTTP_METHODS
             or should_skip_method(method, self.method)
             or should_skip_deprecated(definition.get("deprecated", False), self.skip_deprecated_operations)
             or should_skip_by_tag(definition.get("tags"), self.tag)
@@ -284,7 +282,7 @@ class BaseOpenAPISchema(BaseSchema):
             scope, raw_methods = self._resolve_methods(methods)
             common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 5)
             for method, definition in methods.items():
-                if method not in self.allowed_http_methods or "operationId" not in definition:
+                if method not in HTTP_METHODS or "operationId" not in definition:
                     continue
                 with self.resolver.in_scope(scope):
                     resolved_definition = self.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 5)
@@ -588,7 +586,6 @@ class SwaggerV20(BaseOpenAPISchema):
     nullable_name = "x-nullable"
     example_field = "x-example"
     examples_field = "x-examples"
-    allowed_http_methods: Set[str] = {"get", "put", "post", "delete", "options", "head", "patch"}
     security = SwaggerSecurityProcessor()
     component_locations: ClassVar[Tuple[Tuple[str, ...], ...]] = (("definitions",),)
     links_field = "x-links"
@@ -756,7 +753,6 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     nullable_name = "nullable"
     example_field = "example"
     examples_field = "examples"
-    allowed_http_methods = SwaggerV20.allowed_http_methods | {"trace"}
     security = OpenAPISecurityProcessor()
     component_locations = (("components", "schemas"),)
     links_field = "links"

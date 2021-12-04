@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Generate tests for API operations with the HTTP ``TRACE`` method on Open API 2.0.
+
 `3.11.4`_ - 2021-12-03
 ----------------------
 
