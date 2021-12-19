@@ -5,7 +5,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from types import TracebackType
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Type, Union, cast
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Type, Union, cast, Tuple
 from warnings import WarningMessage, catch_warnings
 
 import attr
@@ -483,6 +483,8 @@ def network_test(
     session: requests.Session,
     request_timeout: Optional[int],
     request_tls_verify: bool,
+    request_cert: Optional[str],
+    request_cert_key: Optional[str],
     store_interactions: bool,
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
@@ -508,6 +510,8 @@ def network_test(
                 headers,
                 feedback,
                 request_tls_verify,
+                request_cert,
+                request_cert_key,
                 max_response_time,
             )
             add_cases(
@@ -523,6 +527,8 @@ def network_test(
                 headers,
                 feedback,
                 request_tls_verify,
+                request_cert,
+                request_cert_key,
                 max_response_time,
             )
 
@@ -538,6 +544,8 @@ def _network_test(
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
     request_tls_verify: bool,
+    request_cert: Optional[str],
+    request_cert_key: Optional[str],
     max_response_time: Optional[int],
 ) -> requests.Response:
     check_results: List[Check] = []
@@ -549,6 +557,7 @@ def _network_test(
             "headers": headers,
             "timeout": timeout,
             "verify": request_tls_verify,
+            "cert": (request_cert, request_cert_key)
         }
         hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
         response = case.call(**kwargs)

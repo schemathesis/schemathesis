@@ -3,7 +3,7 @@ import queue
 import threading
 import time
 from queue import Queue
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Union, cast
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Union, cast, Tuple
 
 import attr
 import hypothesis
@@ -195,6 +195,8 @@ class ThreadPoolRunner(BaseRunner):
 
     workers_num: int = attr.ib(default=2)  # pragma: no mutate
     request_tls_verify: Union[bool, str] = attr.ib(default=True)  # pragma: no mutate
+    request_cert: str = attr.ib(default=None)  # pragma: no mutate
+    request_cert_key: str = attr.ib(default=None)  # pragma: no mutate
 
     def _execute(
         self, results: TestResultSet, stop_event: threading.Event
@@ -302,6 +304,8 @@ class ThreadPoolRunner(BaseRunner):
             "kwargs": {
                 "request_timeout": self.request_timeout,
                 "request_tls_verify": self.request_tls_verify,
+                "request_cert": self.request_cert,
+                "request_cert_key": self.request_cert_key,
                 "store_interactions": self.store_interactions,
                 "max_response_time": self.max_response_time,
                 "dry_run": self.dry_run,

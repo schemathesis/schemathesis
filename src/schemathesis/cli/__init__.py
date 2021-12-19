@@ -328,6 +328,22 @@ class GroupedOption(click.Option):
     callback=callbacks.convert_request_tls_verify,
 )
 @click.option(
+    "--request-cert",
+    help="File path of unencrypted client certificate for authentication. "
+    "The certificate can be bundled with a private key (e.g. PEM) or the private "
+    "key can be provided with the --request-cert-key argument.",
+    type=click.File("r", encoding="utf-8"),
+    default=None,
+    show_default=False,
+)
+@click.option(
+    "--request-cert-key",
+    help="File path of the private key of the client certificate.",
+    type=click.File("r", encoding="utf-8"),
+    default=None,
+    show_default=False,
+)
+@click.option(
     "--validate-schema",
     help="Enable or disable validation of input schema.",
     type=bool,
@@ -493,6 +509,8 @@ def run(
     app: Optional[str] = None,
     request_timeout: Optional[int] = None,
     request_tls_verify: bool = True,
+    request_cert: Optional[str] = None,
+    request_cert_key: Optional[str] = None,
     validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
     junit_xml: Optional[click.utils.LazyFile] = None,
@@ -554,6 +572,8 @@ def run(
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
         request_tls_verify=request_tls_verify,
+        request_cert=request_cert,
+        request_cert_key=request_cert_key,
         auth=auth,
         auth_type=auth_type,
         headers=headers,
@@ -604,6 +624,8 @@ class LoaderConfig:
     data_generation_methods: Tuple[DataGenerationMethod, ...] = attr.ib()  # pragma: no mutate
     force_schema_version: Optional[str] = attr.ib()  # pragma: no mutate
     request_tls_verify: Union[bool, str] = attr.ib()  # pragma: no mutate
+    request_cert: Optional[str] = attr.ib()  # pragma: no mutate
+    request_cert_key: Optional[str] = attr.ib()  # pragma: no mutate
     # Network request parameters
     auth: Optional[Tuple[str, str]] = attr.ib()  # pragma: no mutate
     auth_type: Optional[str] = attr.ib()  # pragma: no mutate
@@ -625,6 +647,8 @@ def into_event_stream(
     data_generation_methods: Tuple[DataGenerationMethod, ...],
     force_schema_version: Optional[str],
     request_tls_verify: Union[bool, str],
+    request_cert: Optional[str],
+    request_cert_key: Optional[str],
     # Network request parameters
     auth: Optional[Tuple[str, str]],
     auth_type: Optional[str],
@@ -660,6 +684,8 @@ def into_event_stream(
             data_generation_methods=data_generation_methods,
             force_schema_version=force_schema_version,
             request_tls_verify=request_tls_verify,
+            request_cert=request_cert,
+            request_cert_key=request_cert_key,
             auth=auth,
             auth_type=auth_type,
             headers=headers,
@@ -676,6 +702,8 @@ def into_event_stream(
             headers=headers,
             request_timeout=request_timeout,
             request_tls_verify=request_tls_verify,
+            request_cert=request_cert,
+            request_cert_key=request_cert_key,
             seed=seed,
             exit_first=exit_first,
             dry_run=dry_run,
@@ -785,6 +813,7 @@ def get_graphql_loader_kwargs(
 
 def _add_requests_kwargs(kwargs: Dict[str, Any], config: LoaderConfig) -> None:
     kwargs["verify"] = config.request_tls_verify
+    kwargs["cert"] = (config.request_cert, config.request_cert_key)
     if config.auth is not None:
         kwargs["auth"] = get_requests_auth(config.auth, config.auth_type)
 
