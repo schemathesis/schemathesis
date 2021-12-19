@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Add support for client certificate authentication with ``--request-cert`` and ``--request-cert-key`` arguments.
+
 `3.11.5`_ - 2021-12-04
 ----------------------
 
