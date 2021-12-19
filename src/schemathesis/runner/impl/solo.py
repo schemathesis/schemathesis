@@ -1,6 +1,6 @@
 # weird mypy bug with imports
 import threading
-from typing import Any, Dict, Generator, Union, Tuple  # pylint: disable=unused-import
+from typing import Generator, Union  # pylint: disable=unused-import
 
 import attr
 
