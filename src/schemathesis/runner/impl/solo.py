@@ -1,6 +1,5 @@
-# weird mypy bug with imports
 import threading
-from typing import Generator, Union  # pylint: disable=unused-import
+from typing import Generator, Union, Optional  # pylint: disable=unused-import
 
 import attr
 
@@ -15,8 +14,8 @@ class SingleThreadRunner(BaseRunner):
     """Fast runner that runs tests sequentially in the main thread."""
 
     request_tls_verify: Union[bool, str] = attr.ib(default=True)  # pragma: no mutate
-    request_cert: str = attr.ib(default=None)  # pragma: no mutate
-    request_cert_key: str = attr.ib(default=None)  # pragma: no mutate
+    request_cert: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    request_cert_key: Optional[str] = attr.ib(default=None)  # pragma: no mutate
 
     def _execute(
         self, results: TestResultSet, stop_event: threading.Event

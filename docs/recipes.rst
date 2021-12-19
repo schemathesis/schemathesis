@@ -60,14 +60,14 @@ It is possible to authenticate with an unencrypted certificate (e.g. PEM) by usi
 
 .. code-block:: text
 
-    schemathesis run --base-url https://example.com --request-tls-verify=no --request-cert client.pem /app/open-api.yaml
+    schemathesis run --request-tls-verify=no --request-cert client.pem ...
 
 
 It is also possible to provide the certificate and the private key separately with the usage of the ``--request-cert-key /file/path/example.key`` argument.
 
 .. code-block:: text
 
-    schemathesis run --base-url https://example.com --request-tls-verify=no --request-cert client.crt --request-cert-key client.key /app/open-api.yaml
+    schemathesis run --request-tls-verify=no --request-cert client.crt --request-cert-key client.key ...
 
 
 **Python**

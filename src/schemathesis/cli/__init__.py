@@ -509,8 +509,8 @@ def run(
     app: Optional[str] = None,
     request_timeout: Optional[int] = None,
     request_tls_verify: bool = True,
-    request_cert: Optional[str] = None,
-    request_cert_key: Optional[str] = None,
+    request_cert: Optional[click.utils.LazyFile] = None,
+    request_cert_key: Optional[click.utils.LazyFile] = None,
     validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
     junit_xml: Optional[click.utils.LazyFile] = None,
@@ -624,8 +624,8 @@ class LoaderConfig:
     data_generation_methods: Tuple[DataGenerationMethod, ...] = attr.ib()  # pragma: no mutate
     force_schema_version: Optional[str] = attr.ib()  # pragma: no mutate
     request_tls_verify: Union[bool, str] = attr.ib()  # pragma: no mutate
-    request_cert: Optional[str] = attr.ib()  # pragma: no mutate
-    request_cert_key: Optional[str] = attr.ib()  # pragma: no mutate
+    request_cert: Optional[click.utils.LazyFile] = attr.ib()  # pragma: no mutate
+    request_cert_key: Optional[click.utils.LazyFile] = attr.ib()  # pragma: no mutate
     # Network request parameters
     auth: Optional[Tuple[str, str]] = attr.ib()  # pragma: no mutate
     auth_type: Optional[str] = attr.ib()  # pragma: no mutate
@@ -647,8 +647,8 @@ def into_event_stream(
     data_generation_methods: Tuple[DataGenerationMethod, ...],
     force_schema_version: Optional[str],
     request_tls_verify: Union[bool, str],
-    request_cert: Optional[str],
-    request_cert_key: Optional[str],
+    request_cert: Optional[click.utils.LazyFile],
+    request_cert_key: Optional[click.utils.LazyFile],
     # Network request parameters
     auth: Optional[Tuple[str, str]],
     auth_type: Optional[str],
