@@ -17,7 +17,7 @@ from ..specs.graphql import loaders as gql_loaders
 from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import DEFAULT_TARGETS, Target
-from ..types import Filter, NotSet, RawAuth
+from ..types import Filter, NotSet, RawAuth, RequestCert
 from ..utils import deprecated, dict_not_none_values, dict_true_values, file_exists, get_requests_auth, import_app
 from . import events
 from .impl import (
@@ -55,6 +55,7 @@ def prepare(
     headers: Optional[Dict[str, str]] = None,
     request_timeout: Optional[int] = None,
     request_tls_verify: Union[bool, str] = True,
+    request_cert: Optional[RequestCert] = None,
     endpoint: Optional[Filter] = None,
     method: Optional[Filter] = None,
     tag: Optional[Filter] = None,
@@ -116,6 +117,7 @@ def prepare(
         headers=headers,
         request_timeout=request_timeout,
         request_tls_verify=request_tls_verify,
+        request_cert=request_cert,
         store_interactions=store_interactions,
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,
@@ -170,6 +172,7 @@ def execute_from_schema(
     headers: Optional[Dict[str, Any]] = None,
     request_timeout: Optional[int] = None,
     request_tls_verify: Union[bool, str] = True,
+    request_cert: Optional[RequestCert] = None,
     seed: Optional[int] = None,
     exit_first: bool = False,
     dry_run: bool = False,
@@ -203,6 +206,7 @@ def execute_from_schema(
             data_generation_methods=data_generation_methods,
             force_schema_version=force_schema_version,
             request_tls_verify=request_tls_verify,
+            request_cert=request_cert,
         )
         yield from from_schema(
             schema,
@@ -217,6 +221,7 @@ def execute_from_schema(
             workers_num=workers_num,
             request_timeout=request_timeout,
             request_tls_verify=request_tls_verify,
+            request_cert=request_cert,
             exit_first=exit_first,
             dry_run=dry_run,
             store_interactions=store_interactions,
@@ -239,6 +244,7 @@ def load_schema(
     data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
     force_schema_version: Optional[str] = None,
     request_tls_verify: Union[bool, str] = True,
+    request_cert: Optional[RequestCert] = None,
     # Network request parameters
     auth: Optional[Tuple[str, str]] = None,
     auth_type: Optional[str] = None,
@@ -276,6 +282,7 @@ def load_schema(
         loader_options["auth"] = get_requests_auth(loader_options["auth"], loader_options.pop("auth_type", None))
     if loader in (oas_loaders.from_uri, oas_loaders.from_aiohttp):
         loader_options["verify"] = request_tls_verify
+        loader_options["cert"] = request_cert
 
     return loader(
         schema_uri,
@@ -299,6 +306,7 @@ def from_schema(
     headers: Optional[Dict[str, Any]] = None,
     request_timeout: Optional[int] = None,
     request_tls_verify: Union[bool, str] = True,
+    request_cert: Optional[RequestCert] = None,
     seed: Optional[int] = None,
     exit_first: bool = False,
     dry_run: bool = False,
@@ -323,6 +331,7 @@ def from_schema(
                 workers_num=workers_num,
                 request_timeout=request_timeout,
                 request_tls_verify=request_tls_verify,
+                request_cert=request_cert,
                 exit_first=exit_first,
                 dry_run=dry_run,
                 store_interactions=store_interactions,
@@ -379,6 +388,7 @@ def from_schema(
             seed=seed,
             request_timeout=request_timeout,
             request_tls_verify=request_tls_verify,
+            request_cert=request_cert,
             exit_first=exit_first,
             dry_run=dry_run,
             store_interactions=store_interactions,

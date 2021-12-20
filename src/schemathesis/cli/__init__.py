@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 import enum
 import os
 import sys
@@ -35,7 +36,7 @@ from ..specs.graphql.schemas import GraphQLSchema
 from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import Target
-from ..types import Filter
+from ..types import Filter, RequestCert
 from ..utils import GenericResponse, file_exists, get_requests_auth, import_app
 from . import callbacks, cassettes, output
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
@@ -328,6 +329,23 @@ class GroupedOption(click.Option):
     callback=callbacks.convert_request_tls_verify,
 )
 @click.option(
+    "--request-cert",
+    help="File path of unencrypted client certificate for authentication. "
+    "The certificate can be bundled with a private key (e.g. PEM) or the private "
+    "key can be provided with the --request-cert-key argument.",
+    type=click.Path(exists=True),
+    default=None,
+    show_default=False,
+)
+@click.option(
+    "--request-cert-key",
+    help="File path of the private key of the client certificate.",
+    type=click.Path(exists=True),
+    default=None,
+    show_default=False,
+    callback=callbacks.validate_request_cert_key,
+)
+@click.option(
     "--validate-schema",
     help="Enable or disable validation of input schema.",
     type=bool,
@@ -493,6 +511,8 @@ def run(
     app: Optional[str] = None,
     request_timeout: Optional[int] = None,
     request_tls_verify: bool = True,
+    request_cert: Optional[str] = None,
+    request_cert_key: Optional[str] = None,
     validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
     junit_xml: Optional[click.utils.LazyFile] = None,
@@ -554,6 +574,7 @@ def run(
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
         request_tls_verify=request_tls_verify,
+        request_cert=prepare_request_cert(request_cert, request_cert_key),
         auth=auth,
         auth_type=auth_type,
         headers=headers,
@@ -589,6 +610,12 @@ def run(
     )
 
 
+def prepare_request_cert(cert: Optional[str], key: Optional[str]) -> Optional[RequestCert]:
+    if cert is not None and key is not None:
+        return cert, key
+    return cert
+
+
 @attr.s(slots=True)
 class LoaderConfig:
     """Container for API loader parameters.
@@ -604,6 +631,7 @@ class LoaderConfig:
     data_generation_methods: Tuple[DataGenerationMethod, ...] = attr.ib()  # pragma: no mutate
     force_schema_version: Optional[str] = attr.ib()  # pragma: no mutate
     request_tls_verify: Union[bool, str] = attr.ib()  # pragma: no mutate
+    request_cert: Optional[RequestCert] = attr.ib()  # pragma: no mutate
     # Network request parameters
     auth: Optional[Tuple[str, str]] = attr.ib()  # pragma: no mutate
     auth_type: Optional[str] = attr.ib()  # pragma: no mutate
@@ -625,6 +653,7 @@ def into_event_stream(
     data_generation_methods: Tuple[DataGenerationMethod, ...],
     force_schema_version: Optional[str],
     request_tls_verify: Union[bool, str],
+    request_cert: Optional[RequestCert],
     # Network request parameters
     auth: Optional[Tuple[str, str]],
     auth_type: Optional[str],
@@ -660,6 +689,7 @@ def into_event_stream(
             data_generation_methods=data_generation_methods,
             force_schema_version=force_schema_version,
             request_tls_verify=request_tls_verify,
+            request_cert=request_cert,
             auth=auth,
             auth_type=auth_type,
             headers=headers,
@@ -676,6 +706,7 @@ def into_event_stream(
             headers=headers,
             request_timeout=request_timeout,
             request_tls_verify=request_tls_verify,
+            request_cert=request_cert,
             seed=seed,
             exit_first=exit_first,
             dry_run=dry_run,
@@ -785,6 +816,8 @@ def get_graphql_loader_kwargs(
 
 def _add_requests_kwargs(kwargs: Dict[str, Any], config: LoaderConfig) -> None:
     kwargs["verify"] = config.request_tls_verify
+    if config.request_cert is not None:
+        kwargs["cert"] = config.request_cert
     if config.auth is not None:
         kwargs["auth"] = get_requests_auth(config.auth, config.auth_type)
 

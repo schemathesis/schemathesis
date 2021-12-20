@@ -1,10 +1,10 @@
-# weird mypy bug with imports
 import threading
-from typing import Any, Dict, Generator, Union  # pylint: disable=unused-import
+from typing import Generator, Optional, Union
 
 import attr
 
 from ...models import TestResultSet
+from ...types import RequestCert
 from ...utils import get_requests_auth
 from .. import events
 from .core import BaseRunner, asgi_test, get_session, network_test, wsgi_test
@@ -15,6 +15,7 @@ class SingleThreadRunner(BaseRunner):
     """Fast runner that runs tests sequentially in the main thread."""
 
     request_tls_verify: Union[bool, str] = attr.ib(default=True)  # pragma: no mutate
+    request_cert: Optional[RequestCert] = attr.ib(default=None)  # pragma: no mutate
 
     def _execute(
         self, results: TestResultSet, stop_event: threading.Event
@@ -40,6 +41,7 @@ class SingleThreadRunner(BaseRunner):
                 headers=self.headers,
                 request_timeout=self.request_timeout,
                 request_tls_verify=self.request_tls_verify,
+                request_cert=self.request_cert,
                 store_interactions=self.store_interactions,
                 dry_run=self.dry_run,
             )

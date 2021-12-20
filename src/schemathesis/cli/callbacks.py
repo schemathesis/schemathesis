@@ -122,6 +122,14 @@ def validate_regex(ctx: click.core.Context, param: click.core.Parameter, raw_val
     return raw_value
 
 
+def validate_request_cert_key(
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]
+) -> Optional[str]:
+    if raw_value is not None and "request_cert" not in ctx.params:
+        raise click.UsageError('Missing argument, "--request-cert" should be specified as well.')
+    return raw_value
+
+
 def convert_verbosity(
     ctx: click.core.Context, param: click.core.Parameter, value: Optional[str]
 ) -> Optional[hypothesis.Verbosity]:

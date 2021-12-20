@@ -22,6 +22,9 @@ class NotSet:
     pass
 
 
+RequestCert = Union[str, Tuple[str, str]]
+
+
 # A filter for path / method
 Filter = Union[str, List[str], Tuple[str], Set[str], NotSet]  # pragma: no mutate
 
