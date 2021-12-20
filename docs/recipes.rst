@@ -55,6 +55,21 @@ You can also provide multiple headers by using the ``-H`` option multiple times:
 
     schemathesis run -H "Authorization: ..." -H "X-API-Key: ..."
 
+
+It is possible to authenticate with an unencrypted certificate (e.g. PEM) by using the ``--request-cert /file/path/example.pem`` argument.
+
+.. code-block:: text
+
+    schemathesis run --request-cert client.pem ...
+
+
+It is also possible to provide the certificate and the private key separately with the usage of the ``--request-cert-key /file/path/example.key`` argument.
+
+.. code-block:: text
+
+    schemathesis run --request-cert client.crt --request-cert-key client.key ...
+
+
 **Python**
 
 ``case.call`` and ``case.call_and_validate`` proxy custom keyword arguments to ``requests.Session.request``. Therefore, you can use ``auth``:

@@ -12,7 +12,7 @@ from ..._hypothesis import create_test
 from ...models import CheckFunction, TestResultSet
 from ...stateful import Feedback, Stateful
 from ...targets import Target
-from ...types import RawAuth
+from ...types import RawAuth, RequestCert
 from ...utils import Ok, capture_hypothesis_output, get_requests_auth
 from .. import events
 from .core import BaseRunner, asgi_test, get_session, handle_schema_error, network_test, run_test, wsgi_test
@@ -195,6 +195,7 @@ class ThreadPoolRunner(BaseRunner):
 
     workers_num: int = attr.ib(default=2)  # pragma: no mutate
     request_tls_verify: Union[bool, str] = attr.ib(default=True)  # pragma: no mutate
+    request_cert: Optional[RequestCert] = attr.ib(default=None)  # pragma: no mutate
 
     def _execute(
         self, results: TestResultSet, stop_event: threading.Event
@@ -302,6 +303,7 @@ class ThreadPoolRunner(BaseRunner):
             "kwargs": {
                 "request_timeout": self.request_timeout,
                 "request_tls_verify": self.request_tls_verify,
+                "request_cert": self.request_cert,
                 "store_interactions": self.store_interactions,
                 "max_response_time": self.max_response_time,
                 "dry_run": self.dry_run,
