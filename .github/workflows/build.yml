@@ -95,7 +95,7 @@ jobs:
         with:
           python-version: '${{ matrix.python }}.0-dev - ${{ matrix.python }}.X'
 
-      - run: pip install tox coverage "poetry<1.1.9" "poetry-core<1.0.5"
+      - run: pip install tox coverage poetry
 
       - name: Run ${{ matrix.python }} tox job
         run: tox -e py${TOX_JOB//.} # Strip dot from python version to match tox job
@@ -132,7 +132,7 @@ jobs:
       with:
         python-version: 3.7
 
-    - run: pip install tox coverage "poetry<1.1.9" "poetry-core<1.0.5"
+    - run: pip install tox coverage poetry
 
     - name: Run ${{ matrix.tox_job }} tox job
       run: tox -e ${{ matrix.tox_job }}
