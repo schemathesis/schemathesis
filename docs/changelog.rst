@@ -4,6 +4,8 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.11.6`_ - 2021-12-20
+
 **Added**
 
 - Support for client certificate authentication with ``--request-cert`` and ``--request-cert-key`` arguments. `#1173`_
@@ -2053,7 +2055,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.11.5...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.11.6...HEAD
+.. _3.11.6: https://github.com/schemathesis/schemathesis/compare/v3.11.5...v3.11.6
 .. _3.11.5: https://github.com/schemathesis/schemathesis/compare/v3.11.4...v3.11.5
 .. _3.11.4: https://github.com/schemathesis/schemathesis/compare/v3.11.3...v3.11.4
 .. _3.11.3: https://github.com/schemathesis/schemathesis/compare/v3.11.2...v3.11.3
