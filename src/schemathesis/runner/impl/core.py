@@ -5,7 +5,7 @@ import time
 import uuid
 from contextlib import contextmanager
 from types import TracebackType
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Type, Union, cast, Tuple
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Type, Union, cast
 from warnings import WarningMessage, catch_warnings
 
 import attr
@@ -37,7 +37,7 @@ from ...runner import events
 from ...schemas import BaseSchema
 from ...stateful import Feedback, Stateful
 from ...targets import Target, TargetContext
-from ...types import RawAuth
+from ...types import RawAuth, RequestCert
 from ...utils import (
     GenericResponse,
     Ok,
@@ -483,8 +483,7 @@ def network_test(
     session: requests.Session,
     request_timeout: Optional[int],
     request_tls_verify: bool,
-    request_cert: Optional[str],
-    request_cert_key: Optional[str],
+    request_cert: Optional[RequestCert],
     store_interactions: bool,
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
@@ -511,7 +510,6 @@ def network_test(
                 feedback,
                 request_tls_verify,
                 request_cert,
-                request_cert_key,
                 max_response_time,
             )
             add_cases(
@@ -528,7 +526,6 @@ def network_test(
                 feedback,
                 request_tls_verify,
                 request_cert,
-                request_cert_key,
                 max_response_time,
             )
 
@@ -544,8 +541,7 @@ def _network_test(
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
     request_tls_verify: bool,
-    request_cert: Optional[str],
-    request_cert_key: Optional[str],
+    request_cert: Optional[RequestCert],
     max_response_time: Optional[int],
 ) -> requests.Response:
     check_results: List[Check] = []
@@ -557,7 +553,7 @@ def _network_test(
             "headers": headers,
             "timeout": timeout,
             "verify": request_tls_verify,
-            "cert": (request_cert, request_cert_key)
+            "cert": request_cert,
         }
         hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
         response = case.call(**kwargs)

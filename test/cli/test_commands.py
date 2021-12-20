@@ -10,6 +10,8 @@ from urllib.parse import urljoin
 
 import hypothesis
 import pytest
+import requests
+import trustme
 import yaml
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
@@ -144,6 +146,33 @@ def test_commands_run_errors(cli, args, error):
     assert result.stdout.strip().split("\n")[-1] == error
 
 
+def test_certificate_only_key(cli, tmp_path):
+    # When cert key is passed without cert itself
+    result = cli.main("run", "http://127.0.0.1", f"--request-cert-key={tmp_path}")
+
+    # Then an appropriate error should be displayed
+    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
+    assert (
+        result.stdout.strip().split("\n")[-1]
+        == 'Error: Missing argument, "--request-cert" should be specified as well.'
+    )
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("success")
+def test_certificates(cli, schema_url, mocker):
+    request = mocker.spy(requests.Session, "request")
+    # When a cert is passed via CLI args
+    ca = trustme.CA()
+    cert = ca.issue_cert("test.org")
+    with cert.private_key_pem.tempfile() as cert_path:
+        result = cli.run(schema_url, f"--request-cert={cert_path}")
+        assert result.exit_code == ExitCode.OK, result.stdout
+        # Then both schema & test network calls should use this cert
+        assert len(request.call_args_list) == 2
+        assert request.call_args_list[0].kwargs["cert"] == request.call_args_list[1].kwargs["cert"] == str(cert_path)
+
+
 def test_commands_run_help(cli):
     result_help = cli.main("run", "--help")
 
@@ -238,12 +267,12 @@ def test_commands_run_help(cli):
         "                                  server's TLS certificate. You can also pass",
         "                                  the path to a CA_BUNDLE file for private",
         "                                  certs.  [default: true]",
-        "  --request-cert FILENAME         File path of unencrypted client certificate",
+        "  --request-cert PATH             File path of unencrypted client certificate",
         "                                  for authentication. The certificate can be",
         "                                  bundled with a private key (e.g. PEM) or the",
         "                                  private key can be provided with the",
         "                                  --request-cert-key argument.",
-        "  --request-cert-key FILENAME     File path of the private key of the client",
+        "  --request-cert-key PATH         File path of the private key of the client",
         "                                  certificate.",
         "  --junit-xml FILENAME            Create junit-xml style report file at given",
         "                                  path.",
@@ -328,7 +357,6 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "request_timeout": DEFAULT_RESPONSE_TIMEOUT,
         "request_tls_verify": True,
         "request_cert": None,
-        "request_cert_key": None,
         "store_interactions": False,
         "seed": None,
         "max_response_time": None,
@@ -363,7 +391,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
     mocker.patch("schemathesis.runner.SingleThreadRunner.execute", autospec=True)
     load_schema = mocker.patch("schemathesis.cli.load_schema", autospec=True)
 
-    result = cli.run(SCHEMA_URI, *args)
+    cli.run(SCHEMA_URI, *args)
     expected = LoaderConfig(
         SCHEMA_URI,
         **{
@@ -383,7 +411,6 @@ def test_load_schema_arguments(cli, mocker, args, expected):
                 "force_schema_version": None,
                 "request_tls_verify": True,
                 "request_cert": None,
-                "request_cert_key": None,
             },
             **expected,
         },
