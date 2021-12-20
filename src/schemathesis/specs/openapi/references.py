@@ -99,11 +99,14 @@ class ConvertingResolver(InliningResolver):
     This approach is the simplest one, since this logic isolated in a single place.
     """
 
-    def __init__(self, *args: Any, nullable_name: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, nullable_name: Any, is_response_schema: bool = False, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.nullable_name = nullable_name
+        self.is_response_schema = is_response_schema
 
     def resolve(self, ref: str) -> Tuple[str, Any]:
         url, document = super().resolve(ref)
-        document = to_json_schema_recursive(document, nullable_name=self.nullable_name)
+        document = to_json_schema_recursive(
+            document, nullable_name=self.nullable_name, is_response_schema=self.is_response_schema
+        )
         return url, document
