@@ -4,9 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
-**Changed**
+**Added**
 
-- Add support for client certificate authentication with ``--request-cert`` and ``--request-cert-key`` arguments.
+- Support for client certificate authentication with ``--request-cert`` and ``--request-cert-key`` arguments. `#1173`_
 
 `3.11.5`_ - 2021-12-04
 ----------------------
@@ -2253,6 +2253,7 @@ Deprecated
 .. _#1194: https://github.com/schemathesis/schemathesis/issues/1194
 .. _#1190: https://github.com/schemathesis/schemathesis/issues/1190
 .. _#1189: https://github.com/schemathesis/schemathesis/issues/1189
+.. _#1173: https://github.com/schemathesis/schemathesis/issues/1173
 .. _#1167: https://github.com/schemathesis/schemathesis/issues/1167
 .. _#1166: https://github.com/schemathesis/schemathesis/issues/1166
 .. _#1164: https://github.com/schemathesis/schemathesis/issues/1164
