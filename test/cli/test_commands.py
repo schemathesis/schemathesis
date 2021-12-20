@@ -170,7 +170,7 @@ def test_certificates(cli, schema_url, mocker):
         assert result.exit_code == ExitCode.OK, result.stdout
         # Then both schema & test network calls should use this cert
         assert len(request.call_args_list) == 2
-        assert request.call_args_list[0].kwargs["cert"] == request.call_args_list[1].kwargs["cert"] == str(cert_path)
+        assert request.call_args_list[0][1]["cert"] == request.call_args_list[1][1]["cert"] == str(cert_path)
 
 
 def test_commands_run_help(cli):
