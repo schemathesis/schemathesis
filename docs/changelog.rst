@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Support for client certificate authentication with ``--request-cert`` and ``--request-cert-key`` arguments. `#1173`_
+- Support for ``readOnly`` and ``writeOnly`` Open API keywords. `#741`_
 
 `3.11.5`_ - 2021-12-04
 ----------------------
@@ -2356,6 +2357,7 @@ Deprecated
 .. _#748: https://github.com/schemathesis/schemathesis/issues/748
 .. _#746: https://github.com/schemathesis/schemathesis/issues/746
 .. _#742: https://github.com/schemathesis/schemathesis/issues/742
+.. _#741: https://github.com/schemathesis/schemathesis/issues/741
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
 .. _#737: https://github.com/schemathesis/schemathesis/issues/737
 .. _#734: https://github.com/schemathesis/schemathesis/issues/734

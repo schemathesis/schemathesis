@@ -541,7 +541,7 @@ def api_schema(request, openapi_version):
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("payload")
-def test_null_body(testdir, api_schema):
+def test_null_body(api_schema):
     # When API operation expects `null` as payload
 
     @given(case=api_schema["/payload"]["POST"].as_strategy())
@@ -558,7 +558,42 @@ def test_null_body(testdir, api_schema):
             data = response.content
         else:
             data = response.data.strip()
-        # And the application should return what was send (`/payload` behaves this way)
+        # And the application should return what was sent (`/payload` behaves this way)
         assert data == b"null"
+
+    test()
+
+
+@pytest.mark.operations("read_only")
+def test_read_only(schema_url):
+    # When API operation has `readOnly` properties
+    schema = schemathesis.from_uri(schema_url)
+
+    @given(case=schema["/read_only"]["GET"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        # Then `writeOnly` should not affect the response schema
+        response = case.call()
+        assert "write" not in response.json()
+        case.validate_response(response)
+
+    test()
+
+
+@pytest.mark.operations("write_only")
+def test_write_only(schema_url):
+    # When API operation has `writeOnly` properties
+    schema = schemathesis.from_uri(schema_url)
+
+    @given(case=schema["/write_only"]["POST"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        # Then `writeOnly` should be used only in requests
+        assert "write" in case.body
+        assert "read" not in case.body
+        # And `readOnly` should only occur in responses
+        response = case.call()
+        assert "write" not in response.json()
+        case.validate_response(response)
 
     test()

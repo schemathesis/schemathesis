@@ -468,7 +468,9 @@ class BaseOpenAPISchema(BaseSchema):
                     validation_message=exc.msg, document=exc.doc, position=exc.pos, lineno=exc.lineno, colno=exc.colno
                 ),
             ) from exc
-        resolver = ConvertingResolver(self.location or "", self.raw_schema, nullable_name=self.nullable_name)
+        resolver = ConvertingResolver(
+            self.location or "", self.raw_schema, nullable_name=self.nullable_name, is_response_schema=True
+        )
         with in_scopes(resolver, scopes):
             try:
                 jsonschema.validate(data, schema, cls=jsonschema.Draft4Validator, resolver=resolver)
@@ -650,7 +652,7 @@ class SwaggerV20(BaseOpenAPISchema):
             return scopes, None
         # Extra conversion to JSON Schema is needed here if there was one $ref in the input
         # because it is not converted
-        return scopes, to_json_schema_recursive(schema, self.nullable_name)
+        return scopes, to_json_schema_recursive(schema, self.nullable_name, is_response_schema=True)
 
     def get_content_types(self, operation: APIOperation, response: GenericResponse) -> List[str]:
         produces = operation.definition.raw.get("produces", None)
@@ -796,7 +798,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
         if option and "schema" in option:
             # Extra conversion to JSON Schema is needed here if there was one $ref in the input
             # because it is not converted
-            return scopes, to_json_schema_recursive(option["schema"], self.nullable_name)
+            return scopes, to_json_schema_recursive(option["schema"], self.nullable_name, is_response_schema=True)
         return scopes, None
 
     def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:

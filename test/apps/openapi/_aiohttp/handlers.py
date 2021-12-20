@@ -177,6 +177,20 @@ async def multipart(request: web.Request) -> web.Response:
     return web.json_response(data)
 
 
+SUCCESS_RESPONSE = {"read": "success!"}
+
+
+async def read_only(request: web.Request) -> web.Response:
+    return web.json_response(SUCCESS_RESPONSE)
+
+
+async def write_only(request: web.Request) -> web.Response:
+    data = await request.json()
+    if len(data) == 1 and isinstance(data["write"], int):
+        return web.json_response(SUCCESS_RESPONSE)
+    raise web.HTTPInternalServerError
+
+
 async def upload_file(request: web.Request) -> web.Response:
     if not request.headers.get("Content-Type", "").startswith("multipart/"):
         raise web.HTTPBadRequest(text="Not a multipart request!")
