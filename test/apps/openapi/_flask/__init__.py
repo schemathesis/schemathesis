@@ -12,6 +12,8 @@ from werkzeug.exceptions import BadRequest, GatewayTimeout, InternalServerError
 
 from ..schema import PAYLOAD_VALIDATOR, OpenAPIVersion, make_openapi_schema
 
+SUCCESS_RESPONSE = {"read": "success!"}
+
 
 def expect_content_type(value: str):
     content_type = request.headers["Content-Type"]
@@ -185,6 +187,17 @@ def create_app(
     @app.route("/api/teapot", methods=["POST"])
     def teapot():
         return jsonify({"success": True}), 418
+
+    @app.route("/api/read_only", methods=["GET"])
+    def read_only():
+        return jsonify(SUCCESS_RESPONSE)
+
+    @app.route("/api/write_only", methods=["POST"])
+    def write_only():
+        data = request.get_json()
+        if len(data) == 1 and isinstance(data["write"], int):
+            return jsonify(SUCCESS_RESPONSE)
+        raise InternalServerError
 
     @app.route("/api/text", methods=["GET"])
     def text():

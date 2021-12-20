@@ -37,6 +37,8 @@ class Operation(Enum):
     missing_path_parameter = ("GET", "/api/missing_path_parameter/{id}")
     headers = ("GET", "/api/headers")
     reserved = ("GET", "/api/foo:bar")
+    read_only = ("GET", "/api/read_only")
+    write_only = ("POST", "/api/write_only")
 
     create_user = ("POST", "/api/users/")
     get_user = ("GET", "/api/users/{user_id}")
@@ -129,6 +131,22 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
         components = template.setdefault("x-components", {})
         links = components.setdefault("x-links", {})
         links.setdefault(name, definition)
+
+    def add_read_write_only():
+        template.setdefault("definitions", {})
+        template["definitions"]["ReadWrite"] = {
+            "type": "object",
+            "properties": {
+                "read": {
+                    "type": "string",
+                    "readOnly": True,
+                },
+                "write": {"type": "integer", "x-writeOnly": True},
+            },
+            # Open API 2.0 forbids `readOnly` properties in `required`, but we follow the Open API 3 semantics here
+            "required": ["read", "write"],
+            "additionalProperties": False,
+        }
 
     for name in operations:
         method, path = Operation[name].value
@@ -381,6 +399,34 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
                 "consumes": ["text/csv"],
                 "responses": {"200": {"description": "OK"}},
             }
+        elif name == "read_only":
+            schema = {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {"$ref": "#/definitions/ReadWrite"},
+                    }
+                },
+            }
+            add_read_write_only()
+        elif name == "write_only":
+            schema = {
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "payload",
+                        "required": True,
+                        "schema": {"$ref": "#/definitions/ReadWrite"},
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {"$ref": "#/definitions/ReadWrite"},
+                    }
+                },
+            }
+            add_read_write_only()
         else:
             schema = {
                 "responses": {
@@ -415,6 +461,27 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
         },
     }
     base_path = f"/{_base_path}"
+
+    def add_read_write_only():
+        template["components"]["schemas"] = {
+            "ReadWrite": {
+                "type": "object",
+                "properties": {
+                    "read": {
+                        "type": "string",
+                        "readOnly": True,
+                    },
+                    "write": {
+                        "type": "integer",
+                        "writeOnly": True,
+                    },
+                },
+                # If a readOnly or writeOnly property is included in the required list,
+                # required affects just the relevant scope – responses only or requests only
+                "required": ["read", "write"],
+                "additionalProperties": False,
+            }
+        }
 
     def add_link(name, definition):
         links = template["components"].setdefault("links", {})
@@ -726,6 +793,30 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                 },
                 "responses": {"200": {"description": "OK"}},
             }
+        elif name == "read_only":
+            schema = {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReadWrite"}}},
+                    }
+                },
+            }
+            add_read_write_only()
+        elif name == "write_only":
+            schema = {
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReadWrite"}}},
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReadWrite"}}},
+                    }
+                },
+            }
+            add_read_write_only()
         else:
             schema = {
                 "responses": {

@@ -133,6 +133,8 @@ By default, the server will generate an API schema with the following API operat
 - ``GET /api/users/{user_id}`` (``get_user``) - returns a user stored in memory
 - ``PATCH /api/users/{user_id}`` (``update_user``) - updates a user stored in memory
 - ``GET /api/foo:bar`` (``reserved``) - contains ``:`` in its path
+- ``GET /api/read_only`` - includes `readOnly` properties in its schema
+- ``POST /api/write_only`` - includes `writeOnly` properties in its schema
 
 You can find the complete schema at ``http://127.0.0.1:8081/schema.yaml`` (replace 8081 with the port you chose in the start server command).
 
