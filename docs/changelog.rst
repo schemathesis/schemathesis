@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Support for Python 3.10. `#1292`_
+
 `3.11.6`_ - 2021-12-20
 
 **Added**
@@ -2241,6 +2245,7 @@ Deprecated
 .. _#1331: https://github.com/schemathesis/schemathesis/issues/1331
 .. _#1328: https://github.com/schemathesis/schemathesis/issues/1328
 .. _#1325: https://github.com/schemathesis/schemathesis/issues/1325
+.. _#1292: https://github.com/schemathesis/schemathesis/issues/1292
 .. _#1290: https://github.com/schemathesis/schemathesis/issues/1290
 .. _#1287: https://github.com/schemathesis/schemathesis/issues/1287
 .. _#1280: https://github.com/schemathesis/schemathesis/issues/1280
