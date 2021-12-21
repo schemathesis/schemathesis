@@ -28,7 +28,7 @@ from .utils import is_header_location
 HEADER_FORMAT = "_header_value"
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
 SLASH = "/"
-STRING_FORMATS = {}
+STRING_FORMATS: Dict[str, st.SearchStrategy] = {}
 StrategyFactory = Callable[[Dict[str, Any], str, str, Optional[str]], st.SearchStrategy]
 
 
