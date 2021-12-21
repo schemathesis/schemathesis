@@ -33,7 +33,7 @@ def test_pet(testdir):
     testdir.make_petstore_test(
         """
 @schema.parametrize(endpoint="/pet$")
-@settings(max_examples=5, deadline=None)
+@settings(max_examples=5, deadline=None, suppress_health_check=HealthCheck.all())
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert_str(case.body["name"])
