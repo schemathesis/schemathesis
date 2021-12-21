@@ -9,11 +9,17 @@ The application under test could be written in any language; the only thing you 
 
 Simple to use and yet powerful to uncover hard-to-find errors thanks to the property-based testing approach backed by state-of-the-art `Hypothesis <http://hypothesis.works/>`_ library.
 
-You can use Schemathesis in the command line:
+You can use Schemathesis in the command line directly:
 
 .. code:: bash
 
   schemathesis run http://example.com/swagger.json
+
+Or via Docker:
+
+.. code:: bash
+
+  docker run schemathesis/schemathesis:stable run http://example.com/swagger.json
 
 Or in your Python tests:
 
