@@ -20,7 +20,7 @@ except ImportError:
     from yaml import SafeDumper  # type: ignore
 
 
-SERIALIZERS = {}
+SERIALIZERS: Dict[str, Type["Serializer"]] = {}
 
 
 @attr.s(slots=True)  # pragma: no mutate

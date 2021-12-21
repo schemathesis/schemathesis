@@ -534,7 +534,7 @@ class APIOperation(Generic[P, C]):
     cookies: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
     query: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
     body: PayloadAlternatives[P] = attr.ib(factory=PayloadAlternatives)  # pragma: no mutate
-    case_cls: Type[C] = attr.ib(default=Case)
+    case_cls: Type[C] = attr.ib(default=Case)  # type: ignore
 
     @verbose_name.default
     def _verbose_name_default(self) -> str:
