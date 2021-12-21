@@ -53,14 +53,14 @@ dev = ["black", "coverage", "isort", "pre-commit", "pyenchant", "pylint"]
 
 [[package]]
 name = "async-timeout"
-version = "4.0.1"
+version = "4.0.2"
 description = "Timeout context manager for asyncio programs"
 category = "dev"
 optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
-typing-extensions = ">=3.6.5"
+typing-extensions = {version = ">=3.6.5", markers = "python_version < \"3.8\""}
 
 [[package]]
 name = "asynctest"
@@ -124,7 +124,7 @@ pycparser = "*"
 
 [[package]]
 name = "charset-normalizer"
-version = "2.0.7"
+version = "2.0.9"
 description = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
 category = "main"
 optional = false
@@ -285,7 +285,7 @@ test = ["pytest (>=5.3,<6)", "pytest-benchmark (>=3.2,<4)", "pytest-cov (>=2.8,<
 
 [[package]]
 name = "graphql-core"
-version = "3.1.6"
+version = "3.1.7"
 description = "GraphQL implementation for Python, a port of GraphQL.js, the JavaScript reference implementation for GraphQL."
 category = "main"
 optional = false
@@ -304,13 +304,12 @@ graphql-core = ">=3.1"
 typing-extensions = {version = ">=3.7,<4", markers = "python_version < \"3.8\""}
 
 [[package]]
-name = "graphql-server-core"
-version = "2.0.0"
+name = "graphql-server"
+version = "3.0.0b4"
 description = "GraphQL Server tools for powering your server"
 category = "dev"
 optional = false
 python-versions = "*"
-develop = false
 
 [package.dependencies]
 graphql-core = ">=3.1.0,<4"
@@ -318,22 +317,17 @@ typing-extensions = ">=3.7.4,<4"
 
 [package.extras]
 aiohttp = ["aiohttp (>=3.5.0,<4)"]
-all = ["graphql-core (>=3.1.0,<4)", "typing-extensions (>=3.7.4,<4)", "flask (>=0.7.0)", "sanic (>=19.9.0,<20)", "webob (>=1.8.6,<2)", "aiohttp (>=3.5.0,<4)"]
-dev = ["graphql-core (>=3.1.0,<4)", "typing-extensions (>=3.7.4,<4)", "flask (>=0.7.0)", "sanic (>=19.9.0,<20)", "webob (>=1.8.6,<2)", "aiohttp (>=3.5.0,<4)", "flake8 (>=3.7,<4)", "isort (>=4,<5)", "black (==19.10b0)", "mypy (>=0.761,<0.770)", "check-manifest (>=0.40,<1)", "pytest (>=5.4,<5.5)", "pytest-asyncio (>=0.11.0)", "pytest-cov (>=2.8,<3)", "Jinja2 (>=2.10.1,<3)"]
+all = ["graphql-core (>=3.1.0,<4)", "typing-extensions (>=3.7.4,<4)", "flask (>=0.7.0)", "sanic (>=20.3.0,<21)", "webob (>=1.8.6,<2)", "aiohttp (>=3.5.0,<4)", "quart (>=0.6.15,<1)"]
+dev = ["graphql-core (>=3.1.0,<4)", "typing-extensions (>=3.7.4,<4)", "flask (>=0.7.0)", "sanic (>=20.3.0,<21)", "webob (>=1.8.6,<2)", "aiohttp (>=3.5.0,<4)", "quart (>=0.6.15,<1)", "flake8 (>=3.7,<4)", "isort (>=4,<5)", "black (==19.10b0)", "mypy (>=0.761,<0.770)", "check-manifest (>=0.40,<1)", "pytest (>=5.4,<5.5)", "pytest-asyncio (>=0.11.0)", "pytest-cov (>=2.8,<3)", "aiohttp (>=3.5.0,<4)", "Jinja2 (>=2.10.1,<3)"]
 flask = ["flask (>=0.7.0)"]
-sanic = ["sanic (>=19.9.0,<20)"]
-test = ["graphql-core (>=3.1.0,<4)", "typing-extensions (>=3.7.4,<4)", "flask (>=0.7.0)", "sanic (>=19.9.0,<20)", "webob (>=1.8.6,<2)", "aiohttp (>=3.5.0,<4)", "pytest (>=5.4,<5.5)", "pytest-asyncio (>=0.11.0)", "pytest-cov (>=2.8,<3)", "Jinja2 (>=2.10.1,<3)"]
+quart = ["quart (>=0.6.15,<1)"]
+sanic = ["sanic (>=20.3.0,<21)"]
+test = ["graphql-core (>=3.1.0,<4)", "typing-extensions (>=3.7.4,<4)", "flask (>=0.7.0)", "sanic (>=20.3.0,<21)", "webob (>=1.8.6,<2)", "aiohttp (>=3.5.0,<4)", "quart (>=0.6.15,<1)", "pytest (>=5.4,<5.5)", "pytest-asyncio (>=0.11.0)", "pytest-cov (>=2.8,<3)", "aiohttp (>=3.5.0,<4)", "Jinja2 (>=2.10.1,<3)"]
 webob = ["webob (>=1.8.6,<2)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/graphql-python/graphql-server-core.git"
-reference = "e8f3a89a64d75e8668f5f4762b87d34a1840d926"
-resolved_reference = "e8f3a89a64d75e8668f5f4762b87d34a1840d926"
 
 [[package]]
 name = "hypothesis"
-version = "6.25.0"
+version = "6.31.6"
 description = "A library for property-based testing"
 category = "main"
 optional = false
@@ -344,11 +338,11 @@ attrs = ">=19.2.0"
 sortedcontainers = ">=2.1.0,<3.0.0"
 
 [package.extras]
-all = ["black (>=19.10b0)", "click (>=7.0)", "django (>=2.2)", "dpcontracts (>=0.4)", "lark-parser (>=0.6.5)", "libcst (>=0.3.16)", "numpy (>=1.9.0)", "pandas (>=0.25)", "pytest (>=4.6)", "python-dateutil (>=1.4)", "pytz (>=2014.1)", "redis (>=3.0.0)", "rich (>=9.0.0)", "importlib-resources (>=3.3.0)", "importlib-metadata (>=3.6)", "backports.zoneinfo (>=0.2.1)", "tzdata (>=2020.4)"]
+all = ["black (>=19.10b0)", "click (>=7.0)", "django (>=2.2)", "dpcontracts (>=0.4)", "lark-parser (>=0.6.5)", "libcst (>=0.3.16)", "numpy (>=1.9.0)", "pandas (>=0.25)", "pytest (>=4.6)", "python-dateutil (>=1.4)", "pytz (>=2014.1)", "redis (>=3.0.0)", "rich (>=9.0.0)", "importlib-resources (>=3.3.0)", "importlib-metadata (>=3.6)", "backports.zoneinfo (>=0.2.1)", "tzdata (>=2021.5)"]
 cli = ["click (>=7.0)", "black (>=19.10b0)", "rich (>=9.0.0)"]
 codemods = ["libcst (>=0.3.16)"]
 dateutil = ["python-dateutil (>=1.4)"]
-django = ["pytz (>=2014.1)", "django (>=2.2)"]
+django = ["django (>=2.2)"]
 dpcontracts = ["dpcontracts (>=0.4)"]
 ghostwriter = ["black (>=19.10b0)"]
 lark = ["lark-parser (>=0.6.5)"]
@@ -357,7 +351,7 @@ pandas = ["pandas (>=0.25)"]
 pytest = ["pytest (>=4.6)"]
 pytz = ["pytz (>=2014.1)"]
 redis = ["redis (>=3.0.0)"]
-zoneinfo = ["importlib-resources (>=3.3.0)", "backports.zoneinfo (>=0.2.1)", "tzdata (>=2020.4)"]
+zoneinfo = ["importlib-resources (>=3.3.0)", "backports.zoneinfo (>=0.2.1)", "tzdata (>=2021.5)"]
 
 [[package]]
 name = "hypothesis-graphql"
@@ -413,7 +407,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
 name = "importlib-metadata"
-version = "4.8.2"
+version = "4.8.3"
 description = "Read metadata from Python packages"
 category = "main"
 optional = false
@@ -626,11 +620,11 @@ testing = ["async-generator (>=1.3)", "coverage", "hypothesis (>=5.7.1)"]
 
 [[package]]
 name = "pytest-forked"
-version = "1.3.0"
+version = "1.4.0"
 description = "run tests in isolated forked subprocesses"
 category = "dev"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+python-versions = ">=3.6"
 
 [package.dependencies]
 py = "*"
@@ -638,18 +632,19 @@ pytest = ">=3.10"
 
 [[package]]
 name = "pytest-httpserver"
-version = "1.0.2"
+version = "1.0.3"
 description = "pytest-httpserver is a httpserver for pytest"
 category = "dev"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.6,<4.0"
 
 [package.dependencies]
-werkzeug = "*"
+Werkzeug = ">=2.0.0"
 
 [package.extras]
-dev = ["flake8", "wheel", "pytest", "pytest-cov", "coverage", "ipdb", "requests", "sphinx", "sphinx-rtd-theme", "reno", "autopep8", "mypy"]
-test = ["pytest", "pytest-cov", "coverage", "requests"]
+dev = ["autopep8", "coverage", "flake8", "ipdb", "mypy", "pytest-cov", "pytest", "reno", "requests", "sphinx", "sphinx-rtd-theme", "types-requests"]
+test = ["coverage", "flake8", "mypy", "pytest-cov", "pytest", "requests", "types-requests"]
+doc = ["reno", "sphinx", "sphinx-rtd-theme"]
 
 [[package]]
 name = "pytest-mock"
@@ -947,7 +942,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6"
-content-hash = "442705a9625928eb3df2adaf97f22707a9406ef91f36fe3115b279b729de9864"
+content-hash = "8c45dd8f1b2bf388a1c2779c04369f62eea98f82de515d18b305b5aca9629bfb"
 
 [metadata.files]
 aiohttp = [
@@ -1037,8 +1032,8 @@ aniso8601 = [
     {file = "aniso8601-9.0.1.tar.gz", hash = "sha256:72e3117667eedf66951bb2d93f4296a56b94b078a8a95905a052611fb3f1b973"},
 ]
 async-timeout = [
-    {file = "async-timeout-4.0.1.tar.gz", hash = "sha256:b930cb161a39042f9222f6efb7301399c87eeab394727ec5437924a36d6eef51"},
-    {file = "async_timeout-4.0.1-py3-none-any.whl", hash = "sha256:a22c0b311af23337eb05fcf05a8b51c3ea53729d46fb5460af62bee033cec690"},
+    {file = "async-timeout-4.0.2.tar.gz", hash = "sha256:2163e1640ddb52b7a8c80d0a67a08587e5d245cc9c553a74a847056bc2976b15"},
+    {file = "async_timeout-4.0.2-py3-none-any.whl", hash = "sha256:8ca1e4fcf50d07413d66d1a5e416e42cfdf5851c981d679a09851a6853383b3c"},
 ]
 asynctest = [
     {file = "asynctest-0.13.0-py3-none-any.whl", hash = "sha256:5da6118a7e6d6b54d83a8f7197769d046922a44d2a99c21382f0a6e4fadae676"},
@@ -1113,8 +1108,8 @@ cffi = [
     {file = "cffi-1.15.0.tar.gz", hash = "sha256:920f0d66a896c2d99f0adbb391f990a84091179542c205fa53ce5787aff87954"},
 ]
 charset-normalizer = [
-    {file = "charset-normalizer-2.0.7.tar.gz", hash = "sha256:e019de665e2bcf9c2b64e2e5aa025fa991da8720daa3c1138cadd2fd1856aed0"},
-    {file = "charset_normalizer-2.0.7-py3-none-any.whl", hash = "sha256:f7af805c321bfa1ce6714c51f254e0d5bb5e5834039bc17db7ebe3a4cec9492b"},
+    {file = "charset-normalizer-2.0.9.tar.gz", hash = "sha256:b0b883e8e874edfdece9c28f314e3dd5badf067342e42fb162203335ae61aa2c"},
+    {file = "charset_normalizer-2.0.9-py3-none-any.whl", hash = "sha256:1eecaa09422db5be9e29d7fc65664e6c33bd06f9ced7838578ba40d58bdf3721"},
 ]
 click = [
     {file = "click-8.0.3-py3-none-any.whl", hash = "sha256:353f466495adaeb40b6b5f592f9f91cb22372351c84caeb068132442a4518ef3"},
@@ -1302,17 +1297,19 @@ graphene = [
     {file = "graphene-3.0.tar.gz", hash = "sha256:af48066e152200a071aac1e0b703954c717ec7268720ba190a0c91d9bcb0a122"},
 ]
 graphql-core = [
-    {file = "graphql-core-3.1.6.tar.gz", hash = "sha256:e65975b6a13878f9113a1fa5320760585b522d139944e005936b1b8358d0651a"},
-    {file = "graphql_core-3.1.6-py3-none-any.whl", hash = "sha256:c78d09596d347e1cffd266c5384abfedf43ed1eae08729773bebb3d527fe5a14"},
+    {file = "graphql-core-3.1.7.tar.gz", hash = "sha256:62ec192150ccecd9a18cfb79e3e72eb7d1fd68fb594ef19c40099b6deec8ef0c"},
+    {file = "graphql_core-3.1.7-py3-none-any.whl", hash = "sha256:9b460f60320be01c7f3b1766cf3e406933003008055079b9d983b8f3988f4400"},
 ]
 graphql-relay = [
     {file = "graphql-relay-3.1.0.tar.gz", hash = "sha256:70d5a7ee5995ea7c2a9a37e51227663b1a464f1f40e98fdde950be5415dfe0b4"},
     {file = "graphql_relay-3.1.0-py3-none-any.whl", hash = "sha256:2cda0ac0199dd56c28ca4f6e0381cdcf5787809c06d1507df3c2a738f9ad846f"},
 ]
-graphql-server-core = []
+graphql-server = [
+    {file = "graphql-server-3.0.0b4.tar.gz", hash = "sha256:e8feb9473968013e3aaeaa34367d96f7ff78c8215b2dcf4c0af6794709a10a14"},
+]
 hypothesis = [
-    {file = "hypothesis-6.25.0-py3-none-any.whl", hash = "sha256:60b5b03de4219d0ead26d481e4029941024b9cbeb4ef99cc285c5fafa920e908"},
-    {file = "hypothesis-6.25.0.tar.gz", hash = "sha256:8e126f2f59d81f32a5c6866df2558b119938515ed9cd6c9a044ef6a74e649ee5"},
+    {file = "hypothesis-6.31.6-py3-none-any.whl", hash = "sha256:fbd31da5174f3da8d062017302071967b239a1b397d0e3181a44d43346bc6def"},
+    {file = "hypothesis-6.31.6.tar.gz", hash = "sha256:d54be6a80b160ad5ea4209b01a0d72e31d910510ed7142fa9907861911800771"},
 ]
 hypothesis-graphql = [
     {file = "hypothesis-graphql-0.5.1.tar.gz", hash = "sha256:ba878305dae2f6df99d2fb390f49028695976a28114e4860c1a7d8e37f417222"},
@@ -1334,8 +1331,8 @@ imagesize = [
     {file = "imagesize-1.3.0.tar.gz", hash = "sha256:cd1750d452385ca327479d45b64d9c7729ecf0b3969a58148298c77092261f9d"},
 ]
 importlib-metadata = [
-    {file = "importlib_metadata-4.8.2-py3-none-any.whl", hash = "sha256:53ccfd5c134223e497627b9815d5030edf77d2ed573922f7a0b8f8bb81a1c100"},
-    {file = "importlib_metadata-4.8.2.tar.gz", hash = "sha256:75bdec14c397f528724c1bfd9709d660b33a4d2e77387a3358f20b848bb5e5fb"},
+    {file = "importlib_metadata-4.8.3-py3-none-any.whl", hash = "sha256:65a9576a5b2d58ca44d133c42a241905cc45e34d2c06fd5ba2bafa221e5d7b5e"},
+    {file = "importlib_metadata-4.8.3.tar.gz", hash = "sha256:766abffff765960fcc18003801f7044eb6755ffae4521c8e8ce8e83b9c9b0668"},
 ]
 iniconfig = [
     {file = "iniconfig-1.1.1-py2.py3-none-any.whl", hash = "sha256:011e24c64b7f47f6ebd835bb12a743f2fbe9a26d4cecaa7f53bc4f35ee9da8b3"},
@@ -1581,12 +1578,12 @@ pytest-asyncio = [
     {file = "pytest_asyncio-0.11.0-py3-none-any.whl", hash = "sha256:6096d101a1ae350d971df05e25f4a8b4d3cd13ffb1b32e42d902ac49670d2bfa"},
 ]
 pytest-forked = [
-    {file = "pytest-forked-1.3.0.tar.gz", hash = "sha256:6aa9ac7e00ad1a539c41bec6d21011332de671e938c7637378ec9710204e37ca"},
-    {file = "pytest_forked-1.3.0-py2.py3-none-any.whl", hash = "sha256:dc4147784048e70ef5d437951728825a131b81714b398d5d52f17c7c144d8815"},
+    {file = "pytest-forked-1.4.0.tar.gz", hash = "sha256:8b67587c8f98cbbadfdd804539ed5455b6ed03802203485dd2f53c1422d7440e"},
+    {file = "pytest_forked-1.4.0-py3-none-any.whl", hash = "sha256:bbbb6717efc886b9d64537b41fb1497cfaf3c9601276be8da2cccfea5a3c8ad8"},
 ]
 pytest-httpserver = [
-    {file = "pytest_httpserver-1.0.2-py3-none-any.whl", hash = "sha256:6d2be45b784125d5e1788689bc2239426b59ff9896cad7fa826d2c3912416f4b"},
-    {file = "pytest_httpserver-1.0.2.tar.gz", hash = "sha256:2701fd1d9814d58551f9d1044db335c6ba9873169366c58349523a58cf74ed40"},
+    {file = "pytest_httpserver-1.0.3-py3-none-any.whl", hash = "sha256:f613b4dbb18cb2b2d78a8f6a66f22c4fea92167684d9ae355e33776759794827"},
+    {file = "pytest_httpserver-1.0.3.tar.gz", hash = "sha256:87561c4fa6a7bc306d76d1979a3eb9d54eb26bfb2f3f51f1643bf3c090ce629d"},
 ]
 pytest-mock = [
     {file = "pytest-mock-1.13.0.tar.gz", hash = "sha256:e24a911ec96773022ebcc7030059b57cd3480b56d4f5d19b7c370ec635e6aed5"},
