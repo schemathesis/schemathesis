@@ -36,14 +36,23 @@ To install Schemathesis via ``pip`` run the following command:
 
     pip install schemathesis
 
+You can also use our Docker image without installing Schemathesis as a Python package.
+
 Usage
 -----
 
-You can use Schemathesis in the command line:
+You can use Schemathesis in the command line directly:
 
 .. code:: bash
 
   schemathesis run --stateful=links --checks all http://0.0.0.0:8081/schema.yaml
+
+Or via Docker:
+
+.. code:: bash
+
+  docker run schemathesis/schemathesis:stable run \
+      --stateful=links --checks all http://0.0.0.0:8081/schema.yaml
 
 .. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/schemathesis.gif
 
