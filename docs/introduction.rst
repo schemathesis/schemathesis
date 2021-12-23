@@ -6,7 +6,7 @@ Schemathesis is a tool for testing your web applications built with Open API or 
 Installation
 ------------
 
-We recommend using the latest version of Python. Schemathesis supports Python 3.6 and newer.
+We recommend using the latest version of Python. Schemathesis supports Python 3.7 and newer.
 
 Install the most recent Schemathesis version using ``pip``:
 

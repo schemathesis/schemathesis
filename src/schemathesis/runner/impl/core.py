@@ -456,7 +456,7 @@ class ErrorCollector:
         return self
 
     # Typing: The return type suggested by mypy is `Literal[False]`, but I don't want to introduce dependency on the
-    # `typing_extensions` package for Python 3.6
+    # `typing_extensions` package for Python 3.7
     def __exit__(
         self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]
     ) -> Any:
