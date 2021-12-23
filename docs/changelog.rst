@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.11.7`_ - 2021-12-23
+----------------------
+
 **Added**
 
 - Support for Python 3.10. `#1292`_
@@ -2060,7 +2063,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.11.6...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.11.7...HEAD
+.. _3.11.7: https://github.com/schemathesis/schemathesis/compare/v3.11.6...v3.11.7
 .. _3.11.6: https://github.com/schemathesis/schemathesis/compare/v3.11.5...v3.11.6
 .. _3.11.5: https://github.com/schemathesis/schemathesis/compare/v3.11.4...v3.11.5
 .. _3.11.4: https://github.com/schemathesis/schemathesis/compare/v3.11.3...v3.11.4
