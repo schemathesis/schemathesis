@@ -4,13 +4,6 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
-`3.11.7`_ - 2021-12-23
-----------------------
-
-**Added**
-
-- Support for Python 3.10. `#1292`_
-
 **Changed**
 
 - Upgrade ``jsonschema`` to ``^4.3.2``.
@@ -19,6 +12,17 @@ Changelog
 **Fixed**
 
 - Generating values not compliant with the ECMAScript regex syntax. `#1350`_, `#1241`_.
+
+**Removed**
+
+- Support for Python 3.6.
+
+`3.11.7`_ - 2021-12-23
+----------------------
+
+**Added**
+
+- Support for Python 3.10. `#1292`_
 
 `3.11.6`_ - 2021-12-20
 ----------------------

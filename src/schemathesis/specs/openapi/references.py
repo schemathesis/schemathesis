@@ -86,8 +86,11 @@ class InliningResolver(jsonschema.RefResolver):
         # if there is `$ref` then we have a scope change that should be used during validation later to
         # resolve nested references correctly
         if "$ref" in definition:
-            with self.in_scope(scope):
+            self.push_scope(scope)
+            try:
                 new_scope, definition = deepcopy(self.resolve(definition["$ref"]))
+            finally:
+                self.pop_scope()
             scopes.append(new_scope)
         return scopes, definition
 

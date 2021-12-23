@@ -184,8 +184,11 @@ class BaseOpenAPISchema(BaseSchema):
                     try:
                         # Setting a low recursion limit doesn't solve the problem with recursive references & inlining
                         # too much but decreases the number of cases when Schemathesis stuck on this step.
-                        with self.resolver.in_scope(scope):
+                        self.resolver.push_scope(scope)
+                        try:
                             resolved_definition = self.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 5)
+                        finally:
+                            self.resolver.pop_scope()
                         # Only method definitions are parsed
                         if self._should_skip(method, resolved_definition):
                             continue
@@ -284,8 +287,11 @@ class BaseOpenAPISchema(BaseSchema):
             for method, definition in methods.items():
                 if method not in HTTP_METHODS or "operationId" not in definition:
                     continue
-                with self.resolver.in_scope(scope):
+                self.resolver.push_scope(scope)
+                try:
                     resolved_definition = self.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 5)
+                finally:
+                    self.resolver.pop_scope()
                 parameters = self.collect_parameters(
                     itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
                 )
@@ -566,6 +572,15 @@ INLINED_REFERENCES_KEY = "x-inlined"
 
 
 @contextmanager
+def in_scope(resolver: jsonschema.RefResolver, scope: str) -> Generator[None, None, None]:
+    resolver.push_scope(scope)
+    try:
+        yield
+    finally:
+        resolver.pop_scope()
+
+
+@contextmanager
 def in_scopes(resolver: jsonschema.RefResolver, scopes: List[str]) -> Generator[None, None, None]:
     """Push all available scopes into the resolver.
 
@@ -575,7 +590,7 @@ def in_scopes(resolver: jsonschema.RefResolver, scopes: List[str]) -> Generator[
     """
     with ExitStack() as stack:
         for scope in scopes:
-            stack.enter_context(resolver.in_scope(scope))
+            stack.enter_context(in_scope(resolver, scope))
         yield
 
 

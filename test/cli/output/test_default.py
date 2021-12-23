@@ -303,15 +303,7 @@ def test_display_single_error(capsys, swagger_20, operation, execution_context, 
     lines = capsys.readouterr().out.strip().split("\n")
     # Then it should be correctly formatted and displayed in red color
     if sys.version_info >= (3, 10):
-        if platform.system() == "Windows":
-            expected = (
-                '  File "<string>", line 1\n    some invalid code\n         ^^^^^^^^^^^^\n'
-                "SyntaxError: invalid syntax. Perhaps you forgot a comma?\n"
-            )
-        else:
-            expected = (
-                '  File "<string>", line 1\n    some invalid code\n         ^^^^^^^\nSyntaxError: invalid syntax\n'
-            )
+        expected = '  File "<string>", line 1\n    some invalid code\n         ^^^^^^^\nSyntaxError: invalid syntax\n'
     elif sys.version_info <= (3, 8):
         expected = '  File "<string>", line 1\n    some invalid code\n               ^\nSyntaxError: invalid syntax\n'
     else:
