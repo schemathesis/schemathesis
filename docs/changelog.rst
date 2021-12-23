@@ -11,6 +11,15 @@ Changelog
 
 - Support for Python 3.10. `#1292`_
 
+**Changed**
+
+- Upgrade ``jsonschema`` to ``^4.3.2``.
+- Upgrade ``hypothesis-jsonschema`` to ``>=0.22.0``.
+
+**Fixed**
+
+- Generating values not compliant with the ECMAScript regex syntax. `#1350`_, `#1241`_.
+
 `3.11.6`_ - 2021-12-20
 ----------------------
 
@@ -2243,6 +2252,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1350: https://github.com/schemathesis/schemathesis/issues/1350
 .. _#1343: https://github.com/schemathesis/schemathesis/issues/1343
 .. _#1342: https://github.com/schemathesis/schemathesis/issues/1342
 .. _#1340: https://github.com/schemathesis/schemathesis/issues/1340
@@ -2257,6 +2267,7 @@ Deprecated
 .. _#1269: https://github.com/schemathesis/schemathesis/issues/1269
 .. _#1262: https://github.com/schemathesis/schemathesis/issues/1262
 .. _#1260: https://github.com/schemathesis/schemathesis/issues/1260
+.. _#1241: https://github.com/schemathesis/schemathesis/issues/1241
 .. _#1233: https://github.com/schemathesis/schemathesis/issues/1233
 .. _#1226: https://github.com/schemathesis/schemathesis/issues/1226
 .. _#1224: https://github.com/schemathesis/schemathesis/issues/1224
