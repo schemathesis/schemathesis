@@ -82,7 +82,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python: ["3.6", "3.7", "3.8", "3.9", "3.10"]
+        python: ["3.7", "3.8", "3.9", "3.10"]
 
     name: ${{ matrix.os }}/tests_${{ matrix.python }}
     runs-on: ${{ matrix.os }}
@@ -147,4 +147,4 @@ jobs:
         token: ${{secrets.CODECOV_TOKEN}}
         file: ./coverage.xml
         flags: unittests
-        name: codecov-py36-legacy-pytest
+        name: codecov-py37-legacy-pytest
