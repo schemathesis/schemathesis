@@ -6,6 +6,7 @@ Changelog
 
 **Changed**
 
+- Upgrade ``typing-extensions`` to ``>=3.7,<5``.
 - Upgrade ``jsonschema`` to ``^4.3.2``.
 - Upgrade ``hypothesis-jsonschema`` to ``>=0.22.0``.
 
