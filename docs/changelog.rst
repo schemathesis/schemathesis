@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Improper handling of ``base_url`` in ``call_asgi``, when the base URL has a non-empty base path. `#1366`_
+
 `3.12.0`_ - 2021-12-29
 ----------------------
 
@@ -2261,6 +2265,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1366: https://github.com/schemathesis/schemathesis/issues/1366
 .. _#1350: https://github.com/schemathesis/schemathesis/issues/1350
 .. _#1343: https://github.com/schemathesis/schemathesis/issues/1343
 .. _#1342: https://github.com/schemathesis/schemathesis/issues/1342
