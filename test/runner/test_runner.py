@@ -172,7 +172,7 @@ def test_asgi_interactions(fastapi_app):
     init, *ev, finished = from_schema(schema, store_interactions=True).execute()
     interaction = ev[1].result.interactions[0]
     assert interaction.status == Status.success
-    assert interaction.request.uri == "http://testserver/users"
+    assert interaction.request.uri == "http://localhost/users"
 
 
 @pytest.mark.operations("empty")
