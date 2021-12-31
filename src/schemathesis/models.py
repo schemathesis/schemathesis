@@ -374,7 +374,7 @@ class Case:  # pylint: disable=too-many-public-methods
     def call_asgi(
         self,
         app: Any = None,
-        base_url: Optional[str] = "http://testserver",
+        base_url: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         **kwargs: Any,
     ) -> requests.Response:
@@ -384,6 +384,8 @@ class Case:  # pylint: disable=too-many-public-methods
                 "ASGI application instance is required. "
                 "Please, set `app` argument in the schema constructor or pass it to `call_asgi`"
             )
+        if base_url is None:
+            base_url = self.get_full_base_url()
         client = ASGIClient(application)
 
         return self.call(base_url=base_url, session=client, headers=headers, **kwargs)
