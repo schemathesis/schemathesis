@@ -6,7 +6,8 @@ from collections import Counter
 from contextlib import contextmanager
 from copy import deepcopy
 from enum import Enum
-from itertools import chain
+from io import StringIO
+from itertools import chain, zip_longest
 from logging import LogRecord
 from typing import (
     TYPE_CHECKING,
@@ -221,7 +222,7 @@ class Case:  # pylint: disable=too-many-public-methods
         printed_kwargs = ", ".join(
             f"{key}={repr(value)}" for key, value in kwargs.items() if should_display(key, value)
         )
-        url = kwargs["url"].replace("'", "\\'")
+        url = _escape_single_quotes(kwargs["url"])
         args_repr = f"'{url}'"
         if printed_kwargs:
             args_repr += f", {printed_kwargs}"
@@ -471,6 +472,37 @@ class Case:  # pylint: disable=too-many-public-methods
             query=deepcopy(self.query),
             body=deepcopy(self.body),
         )
+
+
+BACKSLASH = "\\"
+SINGLE_QUOTE = "'"
+ESCAPED_SINGLE_QUOTE = "\\'"
+
+
+def _escape_single_quotes(url: str) -> str:
+    """Escape single quotes in a string, so it is usable as in generated Python code.
+
+    The usual ``str.replace`` is not suitable as it may convert already escaped quotes to not-escaped.
+    """
+    output = StringIO()
+    url_chars = zip_longest(url, url[1:])
+    for pair in url_chars:
+        if pair == (BACKSLASH, BACKSLASH):
+            # Escaped backslash
+            output.write(BACKSLASH)
+            output.write(BACKSLASH)
+            next(url_chars)
+        elif pair == (BACKSLASH, SINGLE_QUOTE):
+            # Already escaped quote - write it and skip one char to avoid double-escaping
+            output.write(ESCAPED_SINGLE_QUOTE)
+            next(url_chars)
+        elif pair[0] == SINGLE_QUOTE:
+            # Escape single quote on first occurrence. It can't be already escaped one as it is handled above
+            output.write(ESCAPED_SINGLE_QUOTE)
+        else:
+            # Default case
+            output.write(pair[0])
+    return output.getvalue()
 
 
 @contextmanager
