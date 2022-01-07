@@ -6,6 +6,7 @@ from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis.constants import USER_AGENT
+from schemathesis.models import _escape_single_quotes
 from schemathesis.runner import from_schema
 
 
@@ -87,6 +88,22 @@ def test_get_code_sample_code_validity(empty_open_api_2_schema):
             eval(code)
 
     test()
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    (
+        ("http://example.com", "http://example.com"),
+        ("http://example.com'", "http://example.com\\'"),
+        ("http://example.com\\'", "http://example.com\\'"),
+        ("http://example.com\\'", "http://example.com\\'"),
+        ("http://example.com\\\\'", "http://example.com\\\\\\'"),
+    ),
+)
+def test_escape_single_quotes(value, expected):
+    escaped = _escape_single_quotes(value)
+    assert escaped == expected
+    eval(f"'{escaped}'")
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
