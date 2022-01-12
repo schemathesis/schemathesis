@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.12.2`_ - 2022-01-12
+----------------------
+
 **Fixed**
 
 - Not-escaped single quotes in generated Python code samples. `#1359`_
@@ -2091,7 +2094,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.12.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.12.2...HEAD
+.. _3.12.2: https://github.com/schemathesis/schemathesis/compare/v3.12.1...v3.12.2
 .. _3.12.1: https://github.com/schemathesis/schemathesis/compare/v3.12.0...v3.12.1
 .. _3.12.0: https://github.com/schemathesis/schemathesis/compare/v3.11.7...v3.12.0
 .. _3.11.7: https://github.com/schemathesis/schemathesis/compare/v3.11.6...v3.11.7
