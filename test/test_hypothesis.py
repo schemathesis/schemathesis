@@ -358,7 +358,10 @@ def test_optional_form_data(openapi3_base_url, empty_open_api_3_schema):
     inner()
 
 
-@pytest.mark.parametrize("value, expected", (({"key": "1"}, True), ({"key": 1}, True), ({"key": "\udcff"}, False)))
+@pytest.mark.parametrize(
+    "value, expected",
+    (({"key": "1"}, True), ({"key": 1}, True), ({"key": "\udcff"}, False), ({"key": ["1", "abc", "\udcff"]}, False)),
+)
 def test_is_valid_query(value, expected):
     assert is_valid_query(value) == expected
 
