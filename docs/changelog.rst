@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Generating illegal unicode surrogates in queries. `#1370`_
+
 `3.12.2`_ - 2022-01-12
 ----------------------
 
