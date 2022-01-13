@@ -7,6 +7,7 @@ disable =
   missing-docstring,
   line-too-long,
   invalid-name,
+  duplicate-code,
   no-value-for-parameter,
   no-member,
   unused-argument,
