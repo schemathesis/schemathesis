@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.12.3`_ - 2022-01-13
+----------------------
+
 **Fixed**
 
 - Generating illegal unicode surrogates in queries. `#1370`_
@@ -2098,7 +2101,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.12.2...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.12.3...HEAD
+.. _3.12.3: https://github.com/schemathesis/schemathesis/compare/v3.12.2...v3.12.3
 .. _3.12.2: https://github.com/schemathesis/schemathesis/compare/v3.12.1...v3.12.2
 .. _3.12.1: https://github.com/schemathesis/schemathesis/compare/v3.12.0...v3.12.1
 .. _3.12.0: https://github.com/schemathesis/schemathesis/compare/v3.11.7...v3.12.0
