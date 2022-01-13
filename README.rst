@@ -89,12 +89,7 @@ provided to this project during its early days and for the opportunity to evolve
 
 In order to grow the community of contributors and users, and allow me to devote more time to this project, please `donate today <https://github.com/sponsors/Stranger6667>`_.
 
-Also, I occasionally write posts about Schemathesis in `my blog <https://dygalo.dev/>`_ and offer consulting services for businesses.
-
-Commercial support
-------------------
-
-If you are interested in the effective integration of Schemathesis to your private project, you can contact me via email or `Twitter <https://twitter.com/Stranger6667>`_ and I will help you do that.
+Also, I occasionally write posts about Schemathesis in `my blog <https://dygalo.dev/>`_.
 
 Links
 -----
@@ -107,7 +102,7 @@ Links
 
 Additional content:
 
-- Research paper: `Deriving Semantics-Aware Fuzzers from Web API Schemas <https://arxiv.org/abs/2112.10328>`_ by **Zac-HD** and **@Stranger6667**
+- Research paper: `Deriving Semantics-Aware Fuzzers from Web API Schemas <https://arxiv.org/abs/2112.10328>`_ by **@Zac-HD** and **@Stranger6667**
 - `An article <https://dygalo.dev/blog/schemathesis-property-based-testing-for-api-schemas/>`_ about Schemathesis by **@Stranger6667**
 - `Effective API schemas testing <https://youtu.be/VVLZ25JgjD4>`_ from DevConf.cz by **@Stranger6667**
 - `A video <https://www.youtube.com/watch?v=9FHRwrv-xuQ>`_ from EuroPython 2020 by **@hultner**
