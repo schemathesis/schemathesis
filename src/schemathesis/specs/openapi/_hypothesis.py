@@ -83,7 +83,12 @@ def is_valid_header(headers: Dict[str, Any]) -> bool:
 
 
 def is_illegal_surrogate(item: Any) -> bool:
-    return isinstance(item, str) and bool(re.search(r"[\ud800-\udfff]", item))
+    def check(value: Any) -> bool:
+        return isinstance(value, str) and bool(re.search(r"[\ud800-\udfff]", value))
+
+    if isinstance(item, list):
+        return any([check(item_) for item_ in item])
+    return check(item)
 
 
 def is_valid_query(query: Dict[str, Any]) -> bool:
