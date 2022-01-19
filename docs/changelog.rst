@@ -7,6 +7,7 @@ Changelog
 **Changed**
 
 - Use Schemathesis default User-Agent when communicating with SaaS.
+- Relax dependencies on ``pyyaml`` and ``click``.
 
 **Fixed**
 
