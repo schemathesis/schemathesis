@@ -11,8 +11,6 @@ The application under test could be written in any language; the only thing you 
 
 Simple to use and yet powerful to uncover hard-to-find errors thanks to the property-based testing approach backed by state-of-the-art `Hypothesis <http://hypothesis.works/>`_ library.
 
-📣 **Please fill out our** `quick survey <https://forms.gle/dv4s5SXAYWzvuwFWA>`_ so that we can learn how satisfied you are with Schemathesis, and what improvements we should make. Thank you!
-
 Features
 --------
 
@@ -27,6 +25,15 @@ Features
 - Ready-to-go Docker image;
 - Configurable with user-defined checks, string formats, hooks, and targets.
 
+📣 Schemathesis as a Service 📣
+-------------------------------
+
+Schemathesis will be available as `SaaS <https://schemathesis.io/?utm_source=github>`_ soon!
+
+It is freemium with much better visuals for debugging, more checks, and static analysis :)
+
+`Signup <http://eepurl.com/hN-0H1>`_ to get notified when it is ready!
+
 Installation
 ------------
 
@@ -37,6 +44,8 @@ To install Schemathesis via ``pip`` run the following command:
     pip install schemathesis
 
 You can also use our Docker image without installing Schemathesis as a Python package.
+
+📣 **Please fill out our** `quick survey <https://forms.gle/dv4s5SXAYWzvuwFWA>`_ so that we can learn how satisfied you are with Schemathesis, and what improvements we should make. Thank you!
 
 Usage
 -----
