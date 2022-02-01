@@ -570,7 +570,7 @@ def test_read_only(schema_url):
     schema = schemathesis.from_uri(schema_url)
 
     @given(case=schema["/read_only"]["GET"].as_strategy())
-    @settings(max_examples=1)
+    @settings(max_examples=1, deadline=None)
     def test(case):
         # Then `writeOnly` should not affect the response schema
         response = case.call()
