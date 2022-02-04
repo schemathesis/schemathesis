@@ -19,7 +19,7 @@ services:
     entrypoint: python /example/main.py
 
   db:
-    image: postgres
+    image: postgres:14
     environment:
       POSTGRES_PASSWORD: test
       POSTGRES_USER: test
