@@ -3,7 +3,7 @@ from hypothesis import settings
 
 import schemathesis
 
-schema = schemathesis.from_uri("http://0.0.0.0:5000/api/openapi.json")
+schema = schemathesis.from_uri("http://127.0.0.1:5000/api/openapi.json")
 
 
 @pytest.fixture

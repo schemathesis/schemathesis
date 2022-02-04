@@ -18,7 +18,7 @@ Start the application via `docker-compose`:
 
     docker-compose up
 
-It will spin up a web server available at ``http://0.0.0.0:5000``. You can take a look at API documentation at ``http://0.0.0.0:5000/api/ui/``.
+It will spin up a web server available at ``http://127.0.0.1:5000``. You can take a look at API documentation at ``http://127.0.0.1:5000/api/ui/``.
 Note, the app will run in the current terminal.
 
 Install ``schemathesis`` via ``pip`` to a virtual environment:
@@ -57,7 +57,7 @@ Here are examples of how you can run Schemathesis CLI:
 
 .. code:: bash
 
-    export SCHEMA_URL="http://0.0.0.0:5000/api/openapi.json"
+    export SCHEMA_URL="http://127.0.0.1:5000/api/openapi.json"
     export PYTHONPATH=$(pwd)
 
     # Default config. Runs unit tests for all API operations with `not_a_server_error` check
