@@ -14,7 +14,10 @@ services:
       - db
     working_dir: /example
     volumes:
-      - ./app:/example/app/
+      - ./app/:/example/app/
+      - ./main.py:/example/main.py
+    entrypoint: python /example/main.py
+
   db:
     image: postgres
     environment:

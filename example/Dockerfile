@@ -10,8 +10,3 @@ RUN apt-get update \
     && apt -y autoremove \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
-
-COPY test/ /example/test/
-COPY main.py /example
-
-CMD [ "python", "/example/main.py" ]
