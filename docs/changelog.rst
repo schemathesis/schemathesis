@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Update integration with Schemathesis.io.
+- Always show traceback for errors in Schemathesis.io integration.
+
 `3.12.3`_ - 2022-01-13
 ----------------------
 
