@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.13.0`_ - 2022-02-09
+----------------------
+
 **Changed**
 
 - Update integration with Schemathesis.io.
@@ -2106,7 +2109,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.12.3...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.0...HEAD
+.. _3.13.0: https://github.com/schemathesis/schemathesis/compare/v3.13.0...v3.13.0
 .. _3.12.3: https://github.com/schemathesis/schemathesis/compare/v3.12.2...v3.12.3
 .. _3.12.2: https://github.com/schemathesis/schemathesis/compare/v3.12.1...v3.12.2
 .. _3.12.1: https://github.com/schemathesis/schemathesis/compare/v3.12.0...v3.12.1
