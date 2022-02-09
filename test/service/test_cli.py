@@ -29,8 +29,8 @@ def test_no_failures(cli, schema_url, service, service_token):
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then it should receive requests
     assert len(service.server.log) == 5, service.server.log
-    # Create job
-    service.assert_call(0, "/jobs/", 201)
+    # Create test run
+    service.assert_call(0, "/runs/", 201)
     for idx, event_type in enumerate(("Initialized", "BeforeExecution", "AfterExecution", "Finished"), 1):
         service.assert_call(idx, "/events/", 201, event_type)
     # And it should be noted in the output
@@ -42,7 +42,7 @@ def test_no_failures(cli, schema_url, service, service_token):
 
 
 @pytest.mark.operations("success")
-@pytest.mark.service(data={"detail": "Internal Server Error"}, status=500, method="POST", path="/jobs/")
+@pytest.mark.service(data={"detail": "Internal Server Error"}, status=500, method="POST", path="/runs/")
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 def test_server_error(cli, schema_url, service, service_token):
     # When Schemathesis.io is enabled but returns 500 on the first call
@@ -51,7 +51,7 @@ def test_server_error(cli, schema_url, service, service_token):
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then there is only one request to Schemathesis.io
     assert len(service.server.log) == 1
-    service.assert_call(0, "/jobs/", 500)
+    service.assert_call(0, "/runs/", 500)
     # And it should be noted in the output
     lines = get_stdout_lines(result.stdout)
     assert "Schemathesis.io: ERROR" in lines
@@ -94,7 +94,7 @@ def test_error_in_another_handler(testdir, cli, schema_url, service, service_tok
     # And all handlers are shutdown forcefully
     # And the run fails
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # Then the Schemathesis.io handler should still try to finish the started job
+    # Then the Schemathesis.io handler should still try to finish the started test run
     service.assert_call(2, "/finish/", 204)
 
 
@@ -109,7 +109,7 @@ def test_error_in_service_handler(testdir, cli, schema_url, service, service_tok
     # And all handlers are shutdown forcefully
     # And the run is still successful
     assert result.exit_code == ExitCode.OK, result.stdout
-    # Then the Schemathesis.io handler should still try to finish the started job
+    # Then the Schemathesis.io handler should still try to finish the started test run
     service.assert_call(1, "/finish/", 204)
 
 
@@ -132,7 +132,7 @@ def test_server_timeout(cli, schema_url, service, service_token, mocker):
     data={"title": "Unauthorized", "status": 401, "detail": "Could not validate credentials"},
     status=401,
     method="POST",
-    path="/jobs/",
+    path="/runs/",
 )
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 def test_unauthorized(cli, schema_url, service):
@@ -145,7 +145,7 @@ def test_unauthorized(cli, schema_url, service):
 
 
 @pytest.mark.service(
-    data={"title": "Bad request", "status": 400, "detail": "Something wrong"}, status=400, method="POST", path="/jobs/"
+    data={"title": "Bad request", "status": 400, "detail": "Something wrong"}, status=400, method="POST", path="/runs/"
 )
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 def test_invalid_payload(cli, schema_url, service, service_token):
