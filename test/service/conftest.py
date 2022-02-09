@@ -45,7 +45,7 @@ def setup_server(httpserver: PluginHTTPServer):
 
 
 @pytest.fixture
-def job_id():
+def run_id():
     return uuid.uuid4().hex
 
 
@@ -60,33 +60,33 @@ def service_setup(request, setup_server):
 
 
 @pytest.fixture
-def create_event_url(setup_server, job_id):
+def create_event_url(setup_server, run_id):
     return setup_server(
         lambda h: h.respond_with_json({"message": "Event processed successfully"}, status=201),
         "POST",
-        f"/jobs/{job_id}/events/",
+        f"/runs/{run_id}/events/",
     )
 
 
 @pytest.fixture
-def start_job_url(setup_server, job_id):
+def start_run_url(setup_server, run_id):
     return setup_server(
-        lambda h: h.respond_with_json({"job_id": job_id, "short_url": "http://127.0.0.1"}, status=201), "POST", "/jobs/"
+        lambda h: h.respond_with_json({"run_id": run_id, "short_url": "http://127.0.0.1"}, status=201), "POST", "/runs/"
     )
 
 
 @pytest.fixture
-def finish_job_url(setup_server, job_id):
-    return setup_server(lambda h: h.respond_with_response(Response(status=204)), "POST", f"/jobs/{job_id}/finish/")
+def finish_run_url(setup_server, run_id):
+    return setup_server(lambda h: h.respond_with_response(Response(status=204)), "POST", f"/runs/{run_id}/finish/")
 
 
 @attr.s()
 class Service:
     server = attr.ib()
     base_url = attr.ib()
-    start_job_url = attr.ib()
+    start_run_url = attr.ib()
     create_event_url = attr.ib()
-    finish_job_url = attr.ib()
+    finish_run_url = attr.ib()
 
     def assert_call(self, idx, url, response_status, event_type=None):
         item = self.server.log[idx]
@@ -97,11 +97,11 @@ class Service:
 
 
 @pytest.fixture
-def service(httpserver, service_setup, start_job_url, create_event_url, finish_job_url):
+def service(httpserver, service_setup, start_run_url, create_event_url, finish_run_url):
     return Service(
         server=httpserver,
         base_url=f"http://{httpserver.host}:{httpserver.port}",
-        start_job_url=start_job_url,
+        start_run_url=start_run_url,
         create_event_url=create_event_url,
-        finish_job_url=finish_job_url,
+        finish_run_url=finish_run_url,
     )
