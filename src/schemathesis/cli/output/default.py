@@ -319,24 +319,22 @@ def display_service_error(event: service.Error, context: ExecutionContext) -> No
             )
         else:
             # Other client-side errors are likely caused by a bug on the CLI side
-            ask_to_report(event, context)
+            ask_to_report(event)
     elif isinstance(event.exception, requests.RequestException):
-        ask_to_report(event, context, report_to_issues=False)
+        ask_to_report(event, report_to_issues=False)
     else:
-        ask_to_report(event, context)
+        ask_to_report(event)
 
 
-def ask_to_report(
-    event: service.Error, context: ExecutionContext, report_to_issues: bool = True, extra: str = ""
-) -> None:
+def ask_to_report(event: service.Error, report_to_issues: bool = True, extra: str = "") -> None:
     # Likely an internal Schemathesis error
-    message = event.get_message(context.show_errors_tracebacks)
+    message = event.get_message(True)
     if isinstance(event.exception, requests.RequestException) and event.exception.response is not None:
         response = f"Response: {event.exception.response.text}"
     else:
         response = ""
     if report_to_issues:
-        ask = f"Please, consider reporting it to our issue tracker: {ISSUE_TRACKER_URL}\n"
+        ask = f"Please, consider reporting the traceback below it to our issue tracker: {ISSUE_TRACKER_URL}\n"
     else:
         ask = ""
     click.secho(
