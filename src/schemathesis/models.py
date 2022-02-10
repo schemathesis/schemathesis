@@ -582,6 +582,10 @@ class APIOperation(Generic[P, C]):
     def links(self) -> Dict[str, Dict[str, Any]]:
         return self.schema.get_links(self)
 
+    def iter_parameters(self) -> Iterator[P]:
+        """Iterate over all operation's parameters."""
+        return chain(self.path_parameters, self.headers, self.cookies, self.query)
+
     def add_parameter(self, parameter: P) -> None:
         """Add a new processed parameter to an API operation.
 

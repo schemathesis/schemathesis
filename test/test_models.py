@@ -437,3 +437,32 @@ def test_case_insensitive_headers(empty_open_api_3_schema):
         assert case.headers["X-id"] == "foo"
 
     test()
+
+
+def test_iter_parameters(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "post": {
+                "parameters": [
+                    {
+                        "name": "X-id",
+                        "in": "header",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    },
+                ],
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    params = list(schema["/data"]["POST"].iter_parameters())
+    assert len(params) == 2
+    assert params[0].name == "X-id"
+    assert params[1].name == "q"
