@@ -1994,3 +1994,22 @@ def test_get_exit_code(swagger_20, capsys):
     next(event_stream)
     event = next(event_stream)
     assert get_exit_code(event) == 1
+
+
+@pytest.mark.parametrize("location", ("path", "query", "header", "cookie"))
+def test_missing_content_and_schema(cli, testdir, empty_open_api_3_schema, location):
+    # When an Open API 3 parameter is missing `schema` & `content`
+    empty_open_api_3_schema["paths"] = {
+        "/foo": {"get": {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}}
+    }
+    schema_file = testdir.makefile(".json", schema=json.dumps(empty_open_api_3_schema))
+    result = cli.run(str(schema_file), "--dry-run", "--validate-schema=false", "--hypothesis-max-examples=1")
+    lines = result.stdout.split("\n")
+    # Then CLI should show that this API operation errored
+    assert lines[10].startswith("GET /foo E")
+    # And show the proper message under its "ERRORS" section
+    assert "_ GET /foo [P] _" in lines[13]
+    assert (
+        lines[14] == f'InvalidSchema: Can not generate data for {location} parameter "X-Foo"! '
+        "It should have either `schema` or `content` keywords defined"
+    )

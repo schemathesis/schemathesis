@@ -128,28 +128,42 @@ class BaseRunner:
             if isinstance(result, Ok):
                 operation, test = result.ok()
                 feedback = Feedback(self.stateful, operation)
-                for event in run_test(
-                    operation,
-                    test,
-                    results=results,
-                    feedback=feedback,
-                    recursion_level=recursion_level,
-                    data_generation_method=data_generation_method,
-                    **kwargs,
-                ):
-                    yield event
-                    if isinstance(event, events.Interrupted):
-                        return
-                # Additional tests, generated via the `feedback` instance
-                yield from self._run_tests(
-                    feedback.get_stateful_tests,
-                    template,
-                    settings,
-                    seed,
-                    recursion_level=recursion_level + 1,
-                    results=results,
-                    **kwargs,
-                )
+                # Track whether `BeforeExecution` was already emitted.
+                # Schema error may happen before / after `BeforeExecution`, but it should be emitted only once
+                before_execution_emitted = False
+                try:
+                    for event in run_test(
+                        operation,
+                        test,
+                        results=results,
+                        feedback=feedback,
+                        recursion_level=recursion_level,
+                        data_generation_method=data_generation_method,
+                        **kwargs,
+                    ):
+                        yield event
+                        if isinstance(event, events.BeforeExecution):
+                            before_execution_emitted = True
+                        if isinstance(event, events.Interrupted):
+                            return
+                    # Additional tests, generated via the `feedback` instance
+                    yield from self._run_tests(
+                        feedback.get_stateful_tests,
+                        template,
+                        settings,
+                        seed,
+                        recursion_level=recursion_level + 1,
+                        results=results,
+                        **kwargs,
+                    )
+                except InvalidSchema as exc:
+                    yield from handle_schema_error(
+                        exc,
+                        results,
+                        data_generation_method,
+                        recursion_level,
+                        emit_before_execution=not before_execution_emitted,
+                    )
             else:
                 # Schema errors
                 yield from handle_schema_error(result.err(), results, data_generation_method, recursion_level)
@@ -185,7 +199,12 @@ class EventStream:
 
 
 def handle_schema_error(
-    error: InvalidSchema, results: TestResultSet, data_generation_method: DataGenerationMethod, recursion_level: int
+    error: InvalidSchema,
+    results: TestResultSet,
+    data_generation_method: DataGenerationMethod,
+    recursion_level: int,
+    *,
+    emit_before_execution: bool = True,
 ) -> Generator[events.ExecutionEvent, None, None]:
     if error.method is not None:
         assert error.path is not None
@@ -200,15 +219,17 @@ def handle_schema_error(
         )
         result.add_error(error)
         correlation_id = uuid.uuid4().hex
-        yield events.BeforeExecution(
-            method=method,
-            path=error.full_path,
-            verbose_name=verbose_name,
-            relative_path=error.path,
-            recursion_level=recursion_level,
-            data_generation_method=data_generation_method,
-            correlation_id=correlation_id,
-        )
+        # It might be already emitted
+        if emit_before_execution:
+            yield events.BeforeExecution(
+                method=method,
+                path=error.full_path,
+                verbose_name=verbose_name,
+                relative_path=error.path,
+                recursion_level=recursion_level,
+                data_generation_method=data_generation_method,
+                correlation_id=correlation_id,
+            )
         yield events.AfterExecution(
             method=method,
             path=error.full_path,
@@ -340,7 +361,7 @@ def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> No
     # we use all API operation parameters in the digest.
     extra = operation.verbose_name.encode("utf8")
     for parameter in operation.definition.parameters:
-        extra += parameter.serialize().encode("utf8")
+        extra += parameter.serialize(operation).encode("utf8")
     test.hypothesis.inner_test._hypothesis_internal_add_digest = extra  # type: ignore
 
 
