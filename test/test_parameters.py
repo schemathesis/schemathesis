@@ -7,7 +7,9 @@ from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis.errors import NoSuchExample
 
 import schemathesis
+from schemathesis.exceptions import InvalidSchema
 from schemathesis.specs.openapi._hypothesis import STRING_FORMATS, is_valid_header
+from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
 from .utils import as_param
 
@@ -597,3 +599,25 @@ def test_write_only(schema_url):
         case.validate_response(response)
 
     test()
+
+
+@pytest.mark.parametrize("location", ("path", "query", "header", "cookie"))
+def test_missing_content_and_schema(empty_open_api_3_schema, location):
+    # When an Open API 3 parameter is missing `schema` & `content`
+    empty_open_api_3_schema["paths"] = {
+        "/foo": {"get": {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}}
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=False)
+
+    @given(schema["/foo"]["GET"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        pass
+
+    # Then the proper error should be shown
+    with pytest.raises(
+        InvalidSchema,
+        match=f'Can not generate data for {location} parameter "X-Foo"! '
+        "It should have either `schema` or `content` keywords defined",
+    ):
+        test()
