@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- ``APIOperation.iter_parameters`` helper to iterate over all parameters.
+
 `3.13.0`_ - 2022-02-09
 ----------------------
 
