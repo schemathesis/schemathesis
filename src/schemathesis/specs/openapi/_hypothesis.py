@@ -213,7 +213,7 @@ def _get_body_strategy(
     # Note, the parent schema is not included as each parameter belong only to one schema
     if parameter in _BODY_STRATEGIES_CACHE and to_strategy in _BODY_STRATEGIES_CACHE[parameter]:
         return _BODY_STRATEGIES_CACHE[parameter][to_strategy]
-    schema = parameter.as_json_schema()
+    schema = parameter.as_json_schema(operation)
     schema = operation.schema.prepare_schema(schema)
     strategy = to_strategy(schema, operation.verbose_name, "body", parameter.media_type)
     if not parameter.is_required:
@@ -263,7 +263,7 @@ def get_parameters_strategy(
         nested_cache_key = (to_strategy, location, tuple(sorted(exclude)))
         if operation in _PARAMETER_STRATEGIES_CACHE and nested_cache_key in _PARAMETER_STRATEGIES_CACHE[operation]:
             return _PARAMETER_STRATEGIES_CACHE[operation][nested_cache_key]
-        schema = parameters_to_json_schema(parameters)
+        schema = parameters_to_json_schema(operation, parameters)
         if not operation.schema.validate_schema and location == "path":
             # If schema validation is disabled, we try to generate data even if the parameter definition
             # contains errors.

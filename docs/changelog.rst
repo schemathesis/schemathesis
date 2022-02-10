@@ -8,6 +8,10 @@ Changelog
 
 - ``APIOperation.iter_parameters`` helper to iterate over all parameters.
 
+**Fixed**
+
+- Properly handle error if Open API parameter doesn't have ``content`` or ``schema`` keywords.
+
 `3.13.0`_ - 2022-02-09
 ----------------------
 

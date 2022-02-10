@@ -2,9 +2,12 @@
 
 These are basic entities that describe what data could be sent to the API.
 """
-from typing import Any, Dict, Generator, Generic, List, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, Generator, Generic, List, TypeVar
 
 import attr
+
+if TYPE_CHECKING:
+    from .models import APIOperation
 
 
 @attr.s(slots=True, eq=False)  # pragma: no mutate
@@ -41,7 +44,7 @@ class Parameter:
         """Parameter example."""
         raise NotImplementedError
 
-    def serialize(self) -> str:
+    def serialize(self, operation: "APIOperation") -> str:
         """Get parameter's string representation."""
         raise NotImplementedError
 
