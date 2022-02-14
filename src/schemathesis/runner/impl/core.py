@@ -130,7 +130,8 @@ class BaseRunner:
                 feedback = Feedback(self.stateful, operation)
                 # Track whether `BeforeExecution` was already emitted.
                 # Schema error may happen before / after `BeforeExecution`, but it should be emitted only once
-                before_execution_emitted = False
+                # and the `AfterExecution` event should have the same correlation id as previous `BeforeExecution`
+                before_execution_correlation_id = None
                 try:
                     for event in run_test(
                         operation,
@@ -143,7 +144,7 @@ class BaseRunner:
                     ):
                         yield event
                         if isinstance(event, events.BeforeExecution):
-                            before_execution_emitted = True
+                            before_execution_correlation_id = event.correlation_id
                         if isinstance(event, events.Interrupted):
                             return
                     # Additional tests, generated via the `feedback` instance
@@ -162,7 +163,7 @@ class BaseRunner:
                         results,
                         data_generation_method,
                         recursion_level,
-                        emit_before_execution=not before_execution_emitted,
+                        before_execution_correlation_id=before_execution_correlation_id,
                     )
             else:
                 # Schema errors
@@ -204,7 +205,7 @@ def handle_schema_error(
     data_generation_method: DataGenerationMethod,
     recursion_level: int,
     *,
-    emit_before_execution: bool = True,
+    before_execution_correlation_id: Optional[str] = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     if error.method is not None:
         assert error.path is not None
@@ -218,9 +219,11 @@ def handle_schema_error(
             data_generation_method=data_generation_method,
         )
         result.add_error(error)
-        correlation_id = uuid.uuid4().hex
-        # It might be already emitted
-        if emit_before_execution:
+        # It might be already emitted - reuse its correlation id
+        if before_execution_correlation_id is not None:
+            correlation_id = before_execution_correlation_id
+        else:
+            correlation_id = uuid.uuid4().hex
             yield events.BeforeExecution(
                 method=method,
                 path=error.full_path,
@@ -244,7 +247,7 @@ def handle_schema_error(
         )
         results.append(result)
     else:
-        # When there is no `method`, then the schema error may cover multiple operations and we can't display it in
+        # When there is no `method`, then the schema error may cover multiple operations, and we can't display it in
         # the progress bar
         results.generic_errors.append(error)
 

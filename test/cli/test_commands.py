@@ -1997,13 +1997,20 @@ def test_get_exit_code(swagger_20, capsys):
 
 
 @pytest.mark.parametrize("location", ("path", "query", "header", "cookie"))
-def test_missing_content_and_schema(cli, testdir, empty_open_api_3_schema, location):
+def test_missing_content_and_schema(cli, tmp_path, testdir, empty_open_api_3_schema, location):
+    debug_file = tmp_path / "debug.jsonl"
     # When an Open API 3 parameter is missing `schema` & `content`
     empty_open_api_3_schema["paths"] = {
         "/foo": {"get": {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}}
     }
     schema_file = testdir.makefile(".json", schema=json.dumps(empty_open_api_3_schema))
-    result = cli.run(str(schema_file), "--dry-run", "--validate-schema=false", "--hypothesis-max-examples=1")
+    result = cli.run(
+        str(schema_file),
+        f"--debug-output-file={debug_file}",
+        "--dry-run",
+        "--validate-schema=false",
+        "--hypothesis-max-examples=1",
+    )
     lines = result.stdout.split("\n")
     # Then CLI should show that this API operation errored
     assert lines[10].startswith("GET /foo E")
@@ -2013,3 +2020,7 @@ def test_missing_content_and_schema(cli, testdir, empty_open_api_3_schema, locat
         lines[14] == f'InvalidSchema: Can not generate data for {location} parameter "X-Foo"! '
         "It should have either `schema` or `content` keywords defined"
     )
+    # And emitted Before / After event pairs have the same correlation ids
+    with debug_file.open(encoding="utf-8") as fd:
+        events = [json.loads(line) for line in fd]
+    assert events[1]["correlation_id"] == events[2]["correlation_id"]
