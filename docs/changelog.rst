@@ -12,6 +12,7 @@ Changelog
 
 - Use the same ``correlation_id`` in ``BeforeExecution`` and ``AfterExecution`` events if the API schema contains an error that
   causes an ``InvalidSchema`` exception during test execution.
+- Use ``full_path`` in error messages in recoverable schema-level errors. It makes events generated in such cases consistent with usual events.
 
 `3.13.1`_ - 2022-02-10
 ----------------------

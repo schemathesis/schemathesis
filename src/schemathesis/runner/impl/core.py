@@ -211,7 +211,7 @@ def handle_schema_error(
         assert error.path is not None
         assert error.full_path is not None
         method = error.method.upper()
-        verbose_name = f"{method} {error.path}"
+        verbose_name = f"{method} {error.full_path}"
         result = TestResult(
             method=method,
             path=error.full_path,
