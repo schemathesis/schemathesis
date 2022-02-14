@@ -1996,26 +1996,33 @@ def test_get_exit_code(swagger_20, capsys):
     assert get_exit_code(event) == 1
 
 
+@pytest.mark.parametrize("base_url", (None, "http://127.0.0.1/apiv2"))
 @pytest.mark.parametrize("location", ("path", "query", "header", "cookie"))
-def test_missing_content_and_schema(cli, tmp_path, testdir, empty_open_api_3_schema, location):
+def test_missing_content_and_schema(cli, base_url, tmp_path, testdir, empty_open_api_3_schema, location):
     debug_file = tmp_path / "debug.jsonl"
     # When an Open API 3 parameter is missing `schema` & `content`
     empty_open_api_3_schema["paths"] = {
         "/foo": {"get": {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}}
     }
     schema_file = testdir.makefile(".json", schema=json.dumps(empty_open_api_3_schema))
-    result = cli.run(
+    args = [
         str(schema_file),
         f"--debug-output-file={debug_file}",
         "--dry-run",
         "--validate-schema=false",
         "--hypothesis-max-examples=1",
-    )
+    ]
+    if base_url is not None:
+        args.append(f"--base-url={base_url}")
+    result = cli.run(*args)
     lines = result.stdout.split("\n")
     # Then CLI should show that this API operation errored
-    assert lines[10].startswith("GET /foo E")
     # And show the proper message under its "ERRORS" section
-    assert "_ GET /foo [P] _" in lines[13]
+    if base_url is None:
+        assert lines[10].startswith("GET /foo E")
+    else:
+        assert lines[10].startswith("GET /apiv2/foo E")
+        assert "_ GET /apiv2/foo [P] _" in lines[13]
     assert (
         lines[14] == f'InvalidSchema: Can not generate data for {location} parameter "X-Foo"! '
         "It should have either `schema` or `content` keywords defined"
@@ -2024,3 +2031,5 @@ def test_missing_content_and_schema(cli, tmp_path, testdir, empty_open_api_3_sch
     with debug_file.open(encoding="utf-8") as fd:
         events = [json.loads(line) for line in fd]
     assert events[1]["correlation_id"] == events[2]["correlation_id"]
+    # And they should have the same "verbose_name"
+    assert events[1]["verbose_name"] == events[2]["verbose_name"]
