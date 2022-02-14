@@ -4,6 +4,7 @@ from urllib.parse import urljoin
 import requests
 from requests.adapters import HTTPAdapter, Retry
 
+from ..constants import USER_AGENT
 from .constants import REQUEST_TIMEOUT
 from .models import TestRun
 
@@ -15,7 +16,7 @@ class ServiceClient(requests.Session):
         super().__init__()
         self.timeout = timeout
         self.base_url = base_url
-        self.headers["Authorization"] = f"Bearer {token}"
+        self.headers.update({"Authorization": f"Bearer {token}", "User-Agent": USER_AGENT})
         # Automatically check responses for 4XX and 5XX
         self.hooks["response"] = [lambda response, *args, **kwargs: response.raise_for_status()]
         adapter = HTTPAdapter(max_retries=Retry(5))
