@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Use the same ``correlation_id`` in ``BeforeExecution`` and ``AfterExecution`` events if the API schema contains an error that
+  causes an ``InvalidSchema`` exception during test execution.
+
 `3.13.1`_ - 2022-02-10
 ----------------------
 
