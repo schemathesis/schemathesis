@@ -5,6 +5,7 @@ from _pytest.main import ExitCode
 from requests import Timeout
 
 import schemathesis
+from schemathesis.constants import USER_AGENT
 
 from ..utils import strip_style_win32
 
@@ -29,6 +30,9 @@ def test_no_failures(cli, schema_url, service, service_token):
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then it should receive requests
     assert len(service.server.log) == 5, service.server.log
+    # And all requests should have the proper User-Agent
+    for (request, _) in service.server.log:
+        assert request.headers["User-Agent"] == USER_AGENT
     # Create test run
     service.assert_call(0, "/runs/", 201)
     for idx, event_type in enumerate(("Initialized", "BeforeExecution", "AfterExecution", "Finished"), 1):

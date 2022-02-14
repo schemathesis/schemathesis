@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Use Schemathesis default User-Agent when communicating with SaaS.
+
 **Fixed**
 
 - Use the same ``correlation_id`` in ``BeforeExecution`` and ``AfterExecution`` events if the API schema contains an error that
