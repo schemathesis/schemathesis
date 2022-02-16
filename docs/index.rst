@@ -36,6 +36,10 @@ Or in your Python tests:
 
 Both examples above will run hundreds of requests against the API under test and report all found failures and inconsistencies along with instructions to reproduce them.
 
+.. note::
+
+  You can also use our `SaaS <https://app.schemathesis.io/auth/sign-up/?utm_source=oss_docs&utm_content=index_note>`_ to run more comprehensive tests and visualise the outcomes!
+
 Features
 --------
 
