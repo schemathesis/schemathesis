@@ -46,7 +46,7 @@ Step 1: Add the API schema
 1. Open `Schemathesis.io dashboard <https://app.schemathesis.io/apis/>`_
 2. Click on the **Add API** button to get to the API schema submission form
 
-.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/docs/img/service_no_apis_yet.png
+.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_no_apis_yet.png
 
 3. Enter your API name, so you can easily identify it later (for example, "Example API")
 4. Fill **https://example-openapi3.schemathesis.io/openapi.json** into the "API Schema" field
@@ -54,7 +54,7 @@ Step 1: Add the API schema
 6. **Optional**. If your API is available on a different domain than your API schema, fill the proper base URL into the "Base URL" field
 7. Save the API schema entry by clicking "Add"
 
-.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/docs/img/service_api_form.png
+.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_api_form.png
 
 .. warning::
 
@@ -65,7 +65,7 @@ Step 2: Run API tests
 
 At this point, you can start testing your API! The simplest option is to use our test runners by clicking the "Test now!" button.
 
-.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/docs/img/service_api_created.png
+.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_api_created.png
 
 **Optional**. If you'd like to run tests on your side and upload the results to Schemathesis.io feel free to use one of the provided code samples:
 
@@ -92,17 +92,17 @@ Step 3: Observe the results
 
 As the tests are running you will see failures appear in the UI:
 
-.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/docs/img/service_run_results.png
+.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_run_results.png
 
 Each entry in the **Failures** list is clickable, and you can check its details. The failure below shows that the application
 response does not conform to its API schema and shows what part of the schema was violated.
 
-.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/docs/img/service_non_conforming_response.png
+.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_non_conforming_response.png
 
 In this case, the schema requires the "success" property to be present but it is absent in the response.
 
 Each failure is accompanied by a cURL snippet you can use to reproduce the issue.
 
-.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/docs/img/service_server_error.png
+.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_server_error.png
 
 Alternatively, you can use the **Replay** button on the failure page.
