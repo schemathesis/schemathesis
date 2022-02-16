@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.13.2`_ - 2022-02-16
+----------------------
+
 **Changed**
 
 - Use Schemathesis default User-Agent when communicating with SaaS.
@@ -2130,7 +2133,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.2...HEAD
+.. _3.13.2: https://github.com/schemathesis/schemathesis/compare/v3.13.1...v3.13.2
 .. _3.13.1: https://github.com/schemathesis/schemathesis/compare/v3.13.0...v3.13.1
 .. _3.13.0: https://github.com/schemathesis/schemathesis/compare/v3.12.3...v3.13.0
 .. _3.12.3: https://github.com/schemathesis/schemathesis/compare/v3.12.2...v3.12.3
