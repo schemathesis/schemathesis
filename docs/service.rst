@@ -1,7 +1,7 @@
 Schemathesis as a Service
 =========================
 
-`Schemathesis.io <https://app.schemathesis.io/auth/sign-up/>`_ is a platform that runs property-based API tests and visualises their outcomes for you. It also may store
+`Schemathesis.io <https://app.schemathesis.io/auth/sign-up/?utm_source=oss_docs&utm_content=saas_docs_top>`_ is a platform that runs property-based API tests and visualises their outcomes for you. It also may store
 your CLI test results and run additional analysis on them.
 
 On top of the usual Schemathesis benefits, the platform gives you:
@@ -38,7 +38,7 @@ Alternatively, you can follow this guide as a reference and run tests against yo
 Prerequisites
 ~~~~~~~~~~~~~
 
-- A Schemathesis.io `account <https://app.schemathesis.io/auth/sign-up/>`_
+- A Schemathesis.io `account <https://app.schemathesis.io/auth/sign-up/?utm_source=oss_docs&utm_content=saas_docs_prerequisites>`_
 
 Step 1: Add the API schema
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
