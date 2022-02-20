@@ -4,6 +4,12 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- ``--request-tls-verify`` CLI option for the ``replay`` command. It that controls whether Schemathesis verifies the server's TLS certificate.
+  You can also pass the path to a CA_BUNDLE file for private certs. `#1395`_
+- Support for client certificate authentication with ``--request-cert`` and ``--request-cert-key`` arguments for the ``replay`` command.
+
 `3.13.2`_ - 2022-02-16
 ----------------------
 
@@ -2320,6 +2326,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1395: https://github.com/schemathesis/schemathesis/issues/1395
 .. _#1370: https://github.com/schemathesis/schemathesis/issues/1370
 .. _#1366: https://github.com/schemathesis/schemathesis/issues/1366
 .. _#1359: https://github.com/schemathesis/schemathesis/issues/1359

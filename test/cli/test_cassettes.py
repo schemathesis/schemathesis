@@ -1,4 +1,5 @@
 import base64
+from test.apps.openapi.schema import OpenAPIVersion
 from urllib.parse import parse_qsl, quote_plus, unquote_plus, urlencode, urlparse, urlunparse
 
 import pytest
@@ -209,6 +210,43 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
             if "body" in serialized:
                 assert content == base64.b64decode(serialized["body"]["base64_string"])
                 compare_headers(request, serialized["headers"])
+
+
+@pytest.fixture(params=["tls-verify", "cert", "cert-and-key"])
+def request_args(request, tmp_path):
+    if request.param == "tls-verify":
+        return ["--request-tls-verify=false"], "verify", False
+    else:
+        cert = tmp_path / "cert.tmp"
+        cert.touch()
+        if request.param == "cert":
+            return [f"--request-cert={cert}"], "cert", str(cert)
+        if request.param == "cert-and-key":
+            key = tmp_path / "key.tmp"
+            key.touch()
+            return [f"--request-cert={cert}", f"--request-cert-key={key}"], "cert", (str(cert), str(key))
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+def test_replay_cert_options(cli, schema_url, cassette_path, request_args, mocker):
+    # Record a cassette
+    cli.run(
+        schema_url,
+        f"--store-network-log={cassette_path}",
+        "--hypothesis-max-examples=1",
+        "--hypothesis-seed=1",
+        "--validate-schema=false",
+        "--checks=all",
+    )
+    send = mocker.spy(requests.adapters.HTTPAdapter, "send")
+    # When parameters for `requests` are passed via command line
+    args, key, expected = request_args
+    result = cli.replay(str(cassette_path), *args)
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # Then they should properly setup replayed requests
+    assert len(send.call_args_list) == 3
+    for _, kwargs in send.call_args_list:
+        assert kwargs[key] == expected
 
 
 @pytest.mark.operations("headers")
