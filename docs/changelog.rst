@@ -6,7 +6,7 @@ Changelog
 
 **Added**
 
-- ``--request-tls-verify`` CLI option for the ``replay`` command. It that controls whether Schemathesis verifies the server's TLS certificate.
+- ``--request-tls-verify`` CLI option for the ``replay`` command. It controls whether Schemathesis verifies the server's TLS certificate.
   You can also pass the path to a CA_BUNDLE file for private certs. `#1395`_
 - Support for client certificate authentication with ``--request-cert`` and ``--request-cert-key`` arguments for the ``replay`` command.
 
