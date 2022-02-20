@@ -16,6 +16,7 @@ from .. import constants
 from ..models import Request, Response
 from ..runner import events
 from ..runner.serialization import SerializedCheck, SerializedInteraction
+from ..types import RequestCert
 from .context import ExecutionContext
 from .handlers import EventHandler
 
@@ -185,9 +186,13 @@ def replay(
     status: Optional[str] = None,
     uri: Optional[str] = None,
     method: Optional[str] = None,
+    request_tls_verify: bool = True,
+    request_cert: Optional[RequestCert] = None,
 ) -> Generator[Replayed, None, None]:
     """Replay saved interactions."""
     session = requests.Session()
+    session.verify = request_tls_verify
+    session.cert = request_cert
     for interaction in filter_cassette(cassette["http_interactions"], id_, status, uri, method):
         request = get_prepared_request(interaction["request"])
         response = session.send(request)  # type: ignore
