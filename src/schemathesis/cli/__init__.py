@@ -171,6 +171,34 @@ class GroupedOption(click.Option):
         self.group = group
 
 
+with_request_tls_verify = click.option(
+    "--request-tls-verify",
+    help="Controls whether Schemathesis verifies the server's TLS certificate. "
+    "You can also pass the path to a CA_BUNDLE file for private certs.",
+    type=str,
+    default="true",
+    show_default=True,
+    callback=callbacks.convert_request_tls_verify,
+)
+with_request_cert = click.option(
+    "--request-cert",
+    help="File path of unencrypted client certificate for authentication. "
+    "The certificate can be bundled with a private key (e.g. PEM) or the private "
+    "key can be provided with the --request-cert-key argument.",
+    type=click.Path(exists=True),
+    default=None,
+    show_default=False,
+)
+with_request_cert_key = click.option(
+    "--request-cert-key",
+    help="File path of the private key of the client certificate.",
+    type=click.Path(exists=True),
+    default=None,
+    show_default=False,
+    callback=callbacks.validate_request_cert_key,
+)
+
+
 @schemathesis.command(short_help="Perform schemathesis test.", cls=CommandWithCustomHelp)
 @click.argument("schema", type=str, callback=callbacks.validate_schema)
 @click.option(
@@ -319,32 +347,9 @@ class GroupedOption(click.Option):
     type=click.IntRange(1),
     default=DEFAULT_RESPONSE_TIMEOUT,
 )
-@click.option(
-    "--request-tls-verify",
-    help="Controls whether Schemathesis verifies the server's TLS certificate. "
-    "You can also pass the path to a CA_BUNDLE file for private certs.",
-    type=str,
-    default="true",
-    show_default=True,
-    callback=callbacks.convert_request_tls_verify,
-)
-@click.option(
-    "--request-cert",
-    help="File path of unencrypted client certificate for authentication. "
-    "The certificate can be bundled with a private key (e.g. PEM) or the private "
-    "key can be provided with the --request-cert-key argument.",
-    type=click.Path(exists=True),
-    default=None,
-    show_default=False,
-)
-@click.option(
-    "--request-cert-key",
-    help="File path of the private key of the client certificate.",
-    type=click.Path(exists=True),
-    default=None,
-    show_default=False,
-    callback=callbacks.validate_request_cert_key,
-)
+@with_request_tls_verify
+@with_request_cert
+@with_request_cert_key
 @click.option(
     "--validate-schema",
     help="Enable or disable validation of input schema.",
@@ -940,6 +945,9 @@ def get_exit_code(event: events.ExecutionEvent) -> int:
 @click.option("--uri", help="A regexp that filters interactions by their request URI.", type=str)
 @click.option("--method", help="A regexp that filters interactions by their request method.", type=str)
 @click.option("--no-color", help="Disable ANSI color escape codes.", type=bool, is_flag=True)
+@with_request_tls_verify
+@with_request_cert
+@with_request_cert_key
 @click.pass_context
 def replay(
     ctx: click.Context,
@@ -949,6 +957,9 @@ def replay(
     uri: Optional[str] = None,
     method: Optional[str] = None,
     no_color: bool = False,
+    request_tls_verify: bool = True,
+    request_cert: Optional[str] = None,
+    request_cert_key: Optional[str] = None,
 ) -> None:
     """Replay a cassette.
 
@@ -960,7 +971,15 @@ def replay(
     with open(cassette_path) as fd:
         cassette = yaml.load(fd, Loader=SafeLoader)
     click.secho(f"{bold('Total interactions')}: {len(cassette['http_interactions'])}\n")
-    for replayed in cassettes.replay(cassette, id_=id_, status=status, uri=uri, method=method):
+    for replayed in cassettes.replay(
+        cassette,
+        id_=id_,
+        status=status,
+        uri=uri,
+        method=method,
+        request_tls_verify=request_tls_verify,
+        request_cert=prepare_request_cert(request_cert, request_cert_key),
+    ):
         click.secho(f"  {bold('ID')}              : {replayed.interaction['id']}")
         click.secho(f"  {bold('URI')}             : {replayed.interaction['request']['uri']}")
         click.secho(f"  {bold('Old status code')} : {replayed.interaction['response']['status']['code']}")
