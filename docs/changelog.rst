@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.13.3`_ - 2022-02-20
+----------------------
+
 **Added**
 
 - ``--request-tls-verify`` CLI option for the ``replay`` command. It controls whether Schemathesis verifies the server's TLS certificate.
@@ -2139,7 +2142,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.2...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.3...HEAD
+.. _3.13.3: https://github.com/schemathesis/schemathesis/compare/v3.13.2...v3.13.3
 .. _3.13.2: https://github.com/schemathesis/schemathesis/compare/v3.13.1...v3.13.2
 .. _3.13.1: https://github.com/schemathesis/schemathesis/compare/v3.13.0...v3.13.1
 .. _3.13.0: https://github.com/schemathesis/schemathesis/compare/v3.12.3...v3.13.0
