@@ -35,26 +35,26 @@ repos:
       - id: relint
 
   - repo: https://github.com/ambv/black
-    rev: 21.12b0
+    rev: 22.1.0
     hooks:
       - id: black
         types: [python]
 
   - repo: https://github.com/asottile/blacken-docs
-    rev: v1.12.0
+    rev: v1.12.1
     hooks:
       - id: blacken-docs
-        additional_dependencies: [ black==21.12b0 ]
+        additional_dependencies: [ black==22.1.0 ]
 
   - repo: https://github.com/pre-commit/mirrors-isort
-    rev: v5.9.3
+    rev: v5.10.1
     hooks:
       - id: isort
         exclude: ^example/.*$
         additional_dependencies: ["isort[pyproject]"]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v0.930
+    rev: v0.931
     hooks:
       - id: mypy
         exclude: ^(docs/|test/|test-corpus/|example/).*$

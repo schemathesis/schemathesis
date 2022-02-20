@@ -233,7 +233,7 @@ def test_case_partial_deepcopy(swagger_20):
 
 def test_validate_response(testdir):
     testdir.make_test(
-        fr"""
+        rf"""
 from requests import Response, Request
 
 @schema.parametrize()
