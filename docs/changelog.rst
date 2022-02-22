@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Validate ``requests`` kwargs to catch cases when the ASGI integration is used, but the proper ASGI client is not supplied. `#1335`_
+
 `3.13.3`_ - 2022-02-20
 ----------------------
 
@@ -2339,6 +2343,7 @@ Deprecated
 .. _#1342: https://github.com/schemathesis/schemathesis/issues/1342
 .. _#1340: https://github.com/schemathesis/schemathesis/issues/1340
 .. _#1336: https://github.com/schemathesis/schemathesis/issues/1336
+.. _#1335: https://github.com/schemathesis/schemathesis/issues/1335
 .. _#1331: https://github.com/schemathesis/schemathesis/issues/1331
 .. _#1328: https://github.com/schemathesis/schemathesis/issues/1328
 .. _#1325: https://github.com/schemathesis/schemathesis/issues/1325

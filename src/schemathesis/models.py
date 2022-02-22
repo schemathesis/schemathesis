@@ -27,7 +27,7 @@ from typing import (
     Union,
     cast,
 )
-from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
 import attr
 import curlify
@@ -314,14 +314,15 @@ class Case:  # pylint: disable=too-many-public-methods
         **kwargs: Any,
     ) -> requests.Response:
         """Make a network call with `requests`."""
+        data = self.as_requests_kwargs(base_url, headers)
+        data.update(kwargs)
+        data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
         if session is None:
+            validate_vanilla_requests_kwargs(data)
             session = requests.Session()
             close_session = True
         else:
             close_session = False
-        data = self.as_requests_kwargs(base_url, headers)
-        data.update(kwargs)
-        data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
         try:
             response = session.request(**data)  # type: ignore
         except requests.Timeout as exc:
@@ -471,6 +472,21 @@ class Case:  # pylint: disable=too-many-public-methods
             cookies=deepcopy(self.cookies),
             query=deepcopy(self.query),
             body=deepcopy(self.body),
+        )
+
+
+def validate_vanilla_requests_kwargs(data: Dict[str, Any]) -> None:
+    """Check arguments for `requests.Session.request`.
+
+    Some arguments can be valid for cases like ASGI integration, but at the same time they won't work for the regular
+    `requests` calls. In such cases we need to avoid an obscure error message, that comes from `requests`.
+    """
+    url = data["url"]
+    if not urlparse(url).netloc:
+        raise RuntimeError(
+            "The URL should be absolute, so Schemathesis knows where to send the data. \n"
+            f"If you use the ASGI integration, please supply your test client "
+            f"as the `session` argument to `call`.\nURL: {url}"
         )
 
 
