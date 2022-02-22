@@ -401,6 +401,24 @@ in this case, the test execution will go much faster.
         response = case.call_wsgi()
         case.validate_response(response)
 
+If you don't supply the ``app`` argument to the loader, make sure you pass your test client when running tests:
+
+.. code-block:: python
+
+    @pytest.fixture()
+    def app_schema(client):
+        openapi = client.app.openapi()
+        return schemathesis.from_dict(openapi)
+
+
+    schema = schemathesis.from_pytest_fixture("app_schema")
+
+
+    @schema.parametrize()
+    def test_api(case, client):
+        # The `session` argument must be supplied.
+        case.call_and_validate(session=client)
+
 Unittest support
 ----------------
 

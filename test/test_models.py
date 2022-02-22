@@ -204,6 +204,19 @@ def test_call_and_validate(openapi3_schema_url):
     test()
 
 
+@pytest.mark.operations("success")
+def test_call_asgi_and_validate(fastapi_app):
+    api_schema = schemathesis.from_dict(fastapi_app.openapi())
+
+    @given(case=api_schema["/users"]["GET"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        with pytest.raises(RuntimeError, match="The URL should be absolute"):
+            case.call_and_validate()
+
+    test()
+
+
 def test_case_partial_deepcopy(swagger_20):
     operation = APIOperation("/example/path", "GET", {}, swagger_20)
     original_case = Case(
