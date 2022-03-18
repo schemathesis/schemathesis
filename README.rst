@@ -43,6 +43,8 @@ To install Schemathesis via ``pip`` run the following command:
 
     pip install schemathesis
 
+This command installs the ``schemathesis`` entrypoint + ``st`` as its alias.
+
 You can also use our Docker image without installing Schemathesis as a Python package.
 
 📣 **Please fill out our** `quick survey <https://forms.gle/dv4s5SXAYWzvuwFWA>`_ so that we can learn how satisfied you are with Schemathesis, and what improvements we should make. Thank you!
