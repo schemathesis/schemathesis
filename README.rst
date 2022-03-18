@@ -54,14 +54,14 @@ You can use Schemathesis in the command line directly (``st`` is an alias to ``s
 
 .. code:: bash
 
-  st run --stateful=links --checks all http://0.0.0.0:8081/schema.yaml
+  st run --checks all http://0.0.0.0:8081/schema.yaml
 
 Or via Docker:
 
 .. code:: bash
 
-  docker run schemathesis/schemathesis:stable run \
-      --stateful=links --checks all http://0.0.0.0:8081/schema.yaml
+  docker run schemathesis/schemathesis:stable \
+      run --checks all http://0.0.0.0:8081/schema.yaml
 
 .. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/schemathesis.gif
 

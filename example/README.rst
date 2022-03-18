@@ -87,4 +87,4 @@ Here are examples of how you can run Schemathesis CLI:
     schemathesis replay cassette.yaml
 
     # Integration tests
-    st run --stateful=links $SCHEMA_URL
+    st run $SCHEMA_URL
