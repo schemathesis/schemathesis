@@ -17,8 +17,10 @@ if TYPE_CHECKING:
     from .schemas import BaseSchema
 
 
+@enum.unique
 class Stateful(enum.Enum):
-    links = 1
+    none = 1
+    links = 2
 
 
 @attr.s(slots=True, hash=False)  # pragma: no mutate

@@ -138,9 +138,9 @@ def convert_verbosity(
     return hypothesis.Verbosity[value]
 
 
-def convert_stateful(ctx: click.core.Context, param: click.core.Parameter, value: Optional[str]) -> Optional[Stateful]:
-    if value is None:
-        return value
+def convert_stateful(ctx: click.core.Context, param: click.core.Parameter, value: str) -> Optional[Stateful]:
+    if value == "none":
+        return None
     return Stateful[value]
 
 

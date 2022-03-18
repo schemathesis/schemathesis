@@ -24,6 +24,7 @@ from schemathesis.hooks import unregister_all
 from schemathesis.models import APIOperation
 from schemathesis.runner import DEFAULT_CHECKS, from_schema
 from schemathesis.runner.impl import threadpool
+from schemathesis.stateful import Stateful
 from schemathesis.targets import DEFAULT_TARGETS
 
 PHASES = ", ".join(map(lambda x: x.name, Phase))
@@ -285,7 +286,7 @@ def test_commands_run_help(cli):
         "                                  reproduction.",
         "  --store-network-log FILENAME    Store requests and responses into a file.",
         "  --fixups [fast_api|all]         Install specified compatibility fixups.",
-        "  --stateful [links]              Utilize stateful testing capabilities.",
+        "  --stateful [none|links]         Utilize stateful testing capabilities.",
         "  --stateful-recursion-limit INTEGER RANGE",
         "                                  Limit recursion depth for stateful testing.",
         "                                  [default: 5; 1<=x<=100]",
@@ -349,7 +350,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "workers_num": 1,
         "exit_first": False,
         "dry_run": False,
-        "stateful": None,
+        "stateful": Stateful.links,
         "stateful_recursion_limit": 5,
         "auth": None,
         "auth_type": "basic",
@@ -1578,7 +1579,6 @@ def test_openapi_links(cli, cli_args, schema_url, hypothesis_max_examples):
         "--hypothesis-derandomize",
         "--hypothesis-deadline=None",
         "--show-errors-tracebacks",
-        "--stateful=links",
     )
     lines = result.stdout.splitlines()
     # Note, it might fail if it uncovers the placed bug, which this version of stateful testing should not uncover
@@ -1596,6 +1596,26 @@ def test_openapi_links(cli, cli_args, schema_url, hypothesis_max_examples):
     assert lines[13].endswith("[ 66%]")
 
 
+@pytest.mark.operations("create_user", "get_user", "update_user")
+def test_openapi_links_disabled(cli, schema_url, hypothesis_max_examples):
+    # When the user disabled Open API links usage
+    result = cli.run(
+        schema_url,
+        f"--hypothesis-max-examples={hypothesis_max_examples or 2}",
+        "--hypothesis-seed=1",
+        "--hypothesis-derandomize",
+        "--hypothesis-deadline=None",
+        "--show-errors-tracebacks",
+        "--stateful=none",
+    )
+    lines = result.stdout.splitlines()
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # Then the links should not be traversed
+    assert lines[10].startswith("POST /api/users/ .")
+    assert lines[11].startswith("GET /api/users/{user_id} .")
+    assert lines[12].startswith("PATCH /api/users/{user_id} .")
+
+
 @pytest.mark.parametrize("recursion_limit, expected", ((1, "....."), (5, "......")))
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_limit, hypothesis_max_examples, expected):
@@ -1609,7 +1629,6 @@ def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_lim
         "--hypothesis-deadline=None",
         "--hypothesis-suppress-health-check=too_slow,filter_too_much",
         "--show-errors-tracebacks",
-        "--stateful=links",
         f"--stateful-recursion-limit={recursion_limit}",
         "--workers=2",
     )

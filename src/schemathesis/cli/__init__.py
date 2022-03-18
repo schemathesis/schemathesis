@@ -405,6 +405,7 @@ with_request_cert_key = click.option(
     "--stateful",
     help="Utilize stateful testing capabilities.",
     type=click.Choice([item.name for item in Stateful]),
+    default=Stateful.links.name,
     callback=callbacks.convert_stateful,
 )
 @click.option(

@@ -11,6 +11,7 @@ Changelog
 **Changed**
 
 - Validate ``requests`` kwargs to catch cases when the ASGI integration is used, but the proper ASGI client is not supplied. `#1335`_
+- Enable Open API links traversal by default. To disable it, use ``--stateful=none``.
 
 `3.13.3`_ - 2022-02-20
 ----------------------

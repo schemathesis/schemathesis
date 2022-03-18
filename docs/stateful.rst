@@ -460,12 +460,12 @@ so we can confirm the root cause.
 Command Line Interface
 ----------------------
 
-By default, stateful testing is disabled. You can add it via the ``--stateful=links`` CLI option.
+By default, stateful testing is enabled. You can disable it via the ``--stateful=none`` CLI option.
 Please, note that we plan to implement more different algorithms for stateful testing in the future.
 
 .. code:: bash
 
-    st run --stateful=links http://0.0.0.0/schema.yaml
+    st run http://0.0.0.0/schema.yaml
 
     ...
 
