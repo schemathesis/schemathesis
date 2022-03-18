@@ -465,7 +465,7 @@ Please, note that we plan to implement more different algorithms for stateful te
 
 .. code:: bash
 
-    schemathesis run --stateful=links http://0.0.0.0/schema.yaml
+    st run --stateful=links http://0.0.0.0/schema.yaml
 
     ...
 

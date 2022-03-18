@@ -75,6 +75,7 @@ pytest11 = {schemathesis = "schemathesis.extra.pytest_plugin"}
 
 [tool.poetry.scripts]
 schemathesis = "schemathesis.cli:schemathesis"
+st = "schemathesis.cli:schemathesis"
 
 [tool.black]
 line-length = 120
