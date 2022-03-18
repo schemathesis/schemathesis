@@ -964,7 +964,7 @@ def replay(
     """Replay a cassette.
 
     Cassettes in VCR-compatible format can be replayed.
-    For example, ones that are recorded with ``store-network-log`` option of `schemathesis run` command.
+    For example, ones that are recorded with ``store-network-log`` option of `st run` command.
     """
     maybe_disable_color(ctx, no_color)
     click.secho(f"{bold('Replaying cassette')}: {cassette_path}")

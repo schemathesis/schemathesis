@@ -129,7 +129,7 @@ def test_get_command_representation_unknown():
 
 def test_get_command_representation(mocker):
     mocker.patch("schemathesis.cli.cassettes.sys.argv", ["schemathesis", "run", "http://example.com/schema.yaml"])
-    assert get_command_representation() == "schemathesis run http://example.com/schema.yaml"
+    assert get_command_representation() == "st run http://example.com/schema.yaml"
 
 
 @pytest.mark.operations("success")
@@ -146,7 +146,7 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) == 1
     command = (
-        f"schemathesis run --store-network-log={cassette_path} "
+        f"st run --store-network-log={cassette_path} "
         f"--hypothesis-max-examples={hypothesis_max_examples or 2} {schema_url}"
     )
     assert cassette["command"] == command

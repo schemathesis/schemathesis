@@ -50,11 +50,11 @@ You can also use our Docker image without installing Schemathesis as a Python pa
 Usage
 -----
 
-You can use Schemathesis in the command line directly:
+You can use Schemathesis in the command line directly (``st`` is an alias to ``schemathesis``):
 
 .. code:: bash
 
-  schemathesis run --stateful=links --checks all http://0.0.0.0:8081/schema.yaml
+  st run --stateful=links --checks all http://0.0.0.0:8081/schema.yaml
 
 Or via Docker:
 

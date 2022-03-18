@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- ``st`` as an alias to the ``schemathesis`` command line entrypoint.
+
 **Changed**
 
 - Validate ``requests`` kwargs to catch cases when the ASGI integration is used, but the proper ASGI client is not supplied. `#1335`_

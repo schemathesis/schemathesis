@@ -13,7 +13,7 @@ You can use Schemathesis in the command line directly:
 
 .. code:: bash
 
-  schemathesis run http://example.com/swagger.json
+  st run http://example.com/swagger.json
 
 Or via Docker:
 

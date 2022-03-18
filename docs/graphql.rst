@@ -25,7 +25,7 @@ Or via CLI:
 
 .. code:: text
 
-    schemathesis run --hypothesis-deadline=None https://bahnql.herokuapp.com/graphql
+    st run --hypothesis-deadline=None https://bahnql.herokuapp.com/graphql
 
 Limitations
 ~~~~~~~~~~~

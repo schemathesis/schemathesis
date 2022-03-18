@@ -10,7 +10,7 @@ Sometimes, during testing, it is needed to disable TLS verification of the servi
 
 .. code-block:: text
 
-    schemathesis run http://localhost/schema.json --request-tls-verify
+    st run http://localhost/schema.json --request-tls-verify
 
 **Python**
 
@@ -39,13 +39,13 @@ Schemathesis CLI accepts ``--auth`` option for Basic Auth:
 
 .. code:: text
 
-    schemathesis run --auth username:$PASSWORD ...
+    st run --auth username:$PASSWORD ...
 
 Alternatively, use ``--header`` to set the ``Authorization`` header directly:
 
 .. code:: text
 
-    schemathesis run -H "Authorization: Bearer TOKEN" ...
+    st run -H "Authorization: Bearer TOKEN" ...
 
 
 It is possible to specify more custom headers to be sent with each request. Each header value should be in the ``KEY: VALUE`` format.
@@ -53,21 +53,21 @@ You can also provide multiple headers by using the ``-H`` option multiple times:
 
 .. code:: text
 
-    schemathesis run -H "Authorization: ..." -H "X-API-Key: ..."
+    st run -H "Authorization: ..." -H "X-API-Key: ..."
 
 
 It is possible to authenticate with an unencrypted certificate (e.g. PEM) by using the ``--request-cert /file/path/example.pem`` argument.
 
 .. code-block:: text
 
-    schemathesis run --request-cert client.pem ...
+    st run --request-cert client.pem ...
 
 
 It is also possible to provide the certificate and the private key separately with the usage of the ``--request-cert-key /file/path/example.key`` argument.
 
 .. code-block:: text
 
-    schemathesis run --request-cert client.crt --request-cert-key client.key ...
+    st run --request-cert client.crt --request-cert-key client.key ...
 
 
 **Python**
@@ -130,7 +130,7 @@ Sometimes you need to send your traffic to some other tools. You could set up a 
 
     $ export HTTP_PROXY="http://10.10.1.10:3128"
     $ export HTTPS_PROXY="http://10.10.1.10:1080"
-    $ schemathesis run http://localhost/schema.json
+    $ st run http://localhost/schema.json
 
 Per-route request timeouts
 --------------------------

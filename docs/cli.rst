@@ -10,11 +10,11 @@ Installing Schemathesis installs the ``schemathesis`` script to your virtualenv,
 Basic usage
 -----------
 
-To execute tests, use the ``schemathesis run`` command:
+To execute tests, use the ``st run`` command:
 
 .. code:: text
 
-    $ schemathesis run http://example.com/swagger.json
+    $ st run http://example.com/swagger.json
 
 With this command, Schemathesis will load the schema from ``http://example.com/swagger.json`` and generate separate
 test sets for each operation in this schema. Each test set includes up to 100 test cases by default, depending on the operation definition.
@@ -66,7 +66,7 @@ For example, the following command will select all operations which paths start 
 
 .. code:: text
 
-    $ schemathesis run -E ^/api/users http://api.com/swagger.json
+    $ st run -E ^/api/users http://api.com/swagger.json
 
 .. important::
 
@@ -78,7 +78,7 @@ then you can skip them by passing ``--skip-deprecated-operations``:
 
 .. code:: bash
 
-    $ schemathesis run --skip-deprecated-operations ...
+    $ st run --skip-deprecated-operations ...
 
 Tests configuration
 -------------------
@@ -92,7 +92,7 @@ All of them are prefixed with ``--hypothesis-`` and underscores are replaced wit
 - ``--hypothesis-phases=explicit``. Run only examples, specified explicitly in the API schema;
 - ``--hypothesis-suppress-health-check=too_slow``. Disables the ``too_slow`` health check and makes Schemathesis continue testing even if it is considered too slow.
 
-See the whole list of available options via the ``schemathesis run --help`` command and in the `Hypothesis documentation <https://hypothesis.readthedocs.io/en/latest/settings.html#available-settings>`_.
+See the whole list of available options via the ``st run --help`` command and in the `Hypothesis documentation <https://hypothesis.readthedocs.io/en/latest/settings.html#available-settings>`_.
 
 How are responses checked?
 --------------------------
@@ -112,7 +112,7 @@ To make Schemathesis perform all built-in checks use ``--checks all`` CLI option
 
 .. code:: text
 
-    $ schemathesis run --checks all http://api.com/swagger.json
+    $ st run --checks all http://api.com/swagger.json
     ================ Schemathesis test session starts ===============
     platform Linux -- Python 3.8.5, schemathesis-2.5.0, ...
     rootdir: /
@@ -142,7 +142,7 @@ If any response will take longer than the provided value (in milliseconds) than 
 
 .. code:: text
 
-    $ schemathesis run --max-response-time=50 ...
+    $ st run --max-response-time=50 ...
     ================ Schemathesis test session starts ===============
     platform Linux -- Python 3.8.5, schemathesis-2.5.0, ...
     rootdir: /
@@ -180,7 +180,7 @@ In some cases, you can speed up the testing process by distributing all tests am
 
 .. code:: bash
 
-    schemathesis run --workers 8 https://example.com/api/swagger.json
+    st run --workers 8 https://example.com/api/swagger.json
 
 In the example above, all tests will be distributed among eight worker threads.
 Note that it is not guaranteed to improve performance because it depends on your application behavior.
@@ -218,13 +218,13 @@ For example:
 
 .. code:: bash
 
-    schemathesis run --app=src.wsgi:app /swagger.json
+    st run --app=src.wsgi:app /swagger.json
 
 **NOTE**. Depending on your setup, you might need to run this command with a custom ``PYTHONPATH`` environment variable like this:
 
 .. code:: bash
 
-    $ PYTHONPATH=$(pwd) schemathesis run --app=src.wsgi:app /swagger.json
+    $ PYTHONPATH=$(pwd) st run --app=src.wsgi:app /swagger.json
 
 Storing and replaying test cases
 --------------------------------
@@ -234,14 +234,14 @@ Schemathesis allows you to do this with ``-store-network-log`` command-line opti
 
 .. code:: bash
 
-    $ schemathesis run --store-network-log=cassette.yaml http://127.0.0.1/schema.yaml
+    $ st run --store-network-log=cassette.yaml http://127.0.0.1/schema.yaml
 
 This command will create a new YAML file that will network interactions in `VCR format <https://relishapp.com/vcr/vcr/v/5-1-0/docs/cassettes/cassette-format>`_.
 It might look like this:
 
 .. code:: yaml
 
-    command: 'schemathesis run --store-network-log=cassette.yaml http://127.0.0.1/schema.yaml'
+    command: 'st run --store-network-log=cassette.yaml http://127.0.0.1/schema.yaml'
     recorded_with: 'Schemathesis 1.2.0'
     http_interactions:
     - id: '0'
@@ -334,7 +334,7 @@ It is possible to export test results to format, acceptable by such tools as Jen
 
 .. code:: bash
 
-    $ schemathesis run --junit-xml=/path/junit.xml http://127.0.0.1/schema.yaml
+    $ st run --junit-xml=/path/junit.xml http://127.0.0.1/schema.yaml
 
 This command will create an XML at a given path, as in the example below.
 
@@ -387,7 +387,7 @@ or provide ``base_url`` argument to a loader/runner if you use Schemathesis in y
 
 .. code:: bash
 
-    schemathesis run --base-url=http://127.0.0.1:8080/api/v2 http://production.com/api/openapi.json
+    st run --base-url=http://127.0.0.1:8080/api/v2 http://production.com/api/openapi.json
 
 And if your schema defines ``servers`` like this:
 
@@ -405,7 +405,7 @@ The ``--base-url`` argument is also used if you wish to load the OpenAPI specifi
 
 .. code:: bash
 
-    schemathesis run --base-url=http://127.0.0.1:8080/api/v1 path/to/openapi.json
+    st run --base-url=http://127.0.0.1:8080/api/v1 path/to/openapi.json
 
 Extending CLI
 -------------

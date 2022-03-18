@@ -61,30 +61,30 @@ Here are examples of how you can run Schemathesis CLI:
     export PYTHONPATH=$(pwd)
 
     # Default config. Runs unit tests for all API operations with `not_a_server_error` check
-    schemathesis run $SCHEMA_URL
+    st run $SCHEMA_URL
 
     # Select what to test. Only `POST` operations that have `booking` in their path
-    schemathesis run -E booking -M POST $SCHEMA_URL
+    st run -E booking -M POST $SCHEMA_URL
 
     # What checks to run
-    schemathesis run -c status_code_conformance $SCHEMA_URL
+    st run -c status_code_conformance $SCHEMA_URL
 
     # Include your own checks. They should be registered in the `test/hooks.py` module
     schemathesis --pre-run test.hooks run $SCHEMA_URL
 
     # Provide custom headers
-    schemathesis run -H "Authorization: Bearer <token>" $SCHEMA_URL
+    st run -H "Authorization: Bearer <token>" $SCHEMA_URL
 
     # Configure hypothesis parameters. Run up to 1000 examples per tested operation
-    schemathesis run --hypothesis-max-examples 1000 $SCHEMA_URL
+    st run --hypothesis-max-examples 1000 $SCHEMA_URL
 
     # Run in multiple threads
-    schemathesis run -w 8 $SCHEMA_URL
+    st run -w 8 $SCHEMA_URL
 
     # Store network log to a file
-    schemathesis run --store-network-log=cassette.yaml $SCHEMA_URL
+    st run --store-network-log=cassette.yaml $SCHEMA_URL
     # Replay requests from the log
     schemathesis replay cassette.yaml
 
     # Integration tests
-    schemathesis run --stateful=links $SCHEMA_URL
+    st run --stateful=links $SCHEMA_URL
