@@ -73,8 +73,7 @@ At this point, you can start testing your API! The simplest option is to use our
 
     docker run schemathesis/schemathesis:stable \
       run https://example-openapi3.schemathesis.io/openapi.json
-      -c all \
-      --stateful=links \
+      --checks all \
       --validate-schema=false \
       --schemathesis-io-token=8adf6693017d454eb4f9519acf89a5e9
 
