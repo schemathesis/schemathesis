@@ -118,7 +118,9 @@ To do so, you need to create the state machine inside a ``pytest`` fixture and r
     def state_machine():
         # You may use any schema loader here
         # or use any pytest fixtures
-        schema = schemathesis.from_uri("http://0.0.0.0:8081/schema.yaml")
+        schema = schemathesis.from_uri(
+            "https://example-openapi3.schemathesis.io/openapi.json"
+        )
         return schema.as_state_machine()
 
 
@@ -181,7 +183,9 @@ If you load your schema lazily, you can extend the state machine inside the ``py
 
     @pytest.fixture
     def state_machine():
-        schema = schemathesis.from_uri("http://0.0.0.0:8081/schema.yaml")
+        schema = schemathesis.from_uri(
+            "https://example-openapi3.schemathesis.io/openapi.json"
+        )
 
         class APIWorkflow(schema.as_state_machine()):
             def setup(self):
