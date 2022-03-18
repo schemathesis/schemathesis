@@ -159,7 +159,7 @@ Then you could use CLI against this server:
 
 .. code::
 
-    schemathesis run http://127.0.0.1:8081/schema.yaml
+    st run http://127.0.0.1:8081/schema.yaml
     =========================================== Schemathesis test session starts ==========================================
     platform Linux -- Python 3.8.5, schemathesis-2.5.0, hypothesis-5.23.0, hypothesis_jsonschema-0.17.3, jsonschema-3.2.0
     rootdir: /

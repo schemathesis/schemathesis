@@ -30,7 +30,7 @@ Let's take a look if Schemathesis can discover this issue and how much time it w
 
 .. code:: bash
 
-    $  schemathesis run --hypothesis-max-examples=100000 http://127.0.0.1:8081/schema.yaml
+    $  st run --hypothesis-max-examples=100000 http://127.0.0.1:8081/schema.yaml
     ...
     1. Received a response with 5xx status code: 500
 
@@ -53,7 +53,7 @@ And with targeted testing (``.hypothesis`` directory was removed between these t
 
 .. code:: bash
 
-    $  schemathesis run --target=response_time --hypothesis-max-examples=100000 http://127.0.0.1:8081/schema.yaml
+    $  st run --target=response_time --hypothesis-max-examples=100000 http://127.0.0.1:8081/schema.yaml
     ...
     1. Received a response with 5xx status code: 500
 

@@ -21,7 +21,7 @@ CLI:
 
 .. code:: text
 
-    $ schemathesis run -D negative http://example.com/swagger.json
+    $ st run -D negative http://example.com/swagger.json
 
 Python:
 

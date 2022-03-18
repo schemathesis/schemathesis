@@ -86,10 +86,10 @@ class Finalize:
 def get_command_representation() -> str:
     """Get how Schemathesis was run."""
     # It is supposed to be executed from Schemathesis CLI, not via Click's `command.invoke`
-    if not sys.argv[0].endswith("schemathesis"):
+    if not sys.argv[0].endswith(("schemathesis", "st")):
         return "<unknown entrypoint>"
     args = " ".join(sys.argv[1:])
-    return f"schemathesis {args}"
+    return f"st {args}"
 
 
 def worker(file_handle: click.utils.LazyFile, queue: Queue) -> None:
