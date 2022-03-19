@@ -69,12 +69,18 @@ At this point, you can start testing your API! The simplest option is to use our
 
 **Optional**. If you'd like to run tests on your side and upload the results to Schemathesis.io feel free to use one of the provided code samples:
 
+Authenticate with Schemathesis.io first:
+
 .. code::
 
-    docker run schemathesis/schemathesis:stable \
-      run https://example-openapi3.schemathesis.io/openapi.json
-      --checks all \
-      --schemathesis-io-token=8adf6693017d454eb4f9519acf89a5e9
+    # Replace `8adf6693017d454eb4f9519acf89a5e9` with your token
+    st auth login 8adf6693017d454eb4f9519acf89a5e9
+
+And then run the tests:
+
+.. code::
+
+    st run --checks all https://example-openapi3.schemathesis.io/openapi.json
 
 Once all events are uploaded to Schemathesis.io you'll see a message at the end of the CLI output:
 

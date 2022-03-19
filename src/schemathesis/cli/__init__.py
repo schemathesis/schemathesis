@@ -1,4 +1,4 @@
-# pylint: disable=too-many-lines
+# pylint: disable=too-many-lines,redefined-outer-name
 import enum
 import os
 import sys
@@ -985,6 +985,37 @@ def replay(
         click.secho(f"  {bold('URI')}             : {replayed.interaction['request']['uri']}")
         click.secho(f"  {bold('Old status code')} : {replayed.interaction['response']['status']['code']}")
         click.secho(f"  {bold('New status code')} : {replayed.response.status_code}\n")
+
+
+@schemathesis.group(short_help="Authenticate Schemathesis.io.")
+def auth() -> None:
+    pass
+
+
+@auth.command(short_help="Authenticate with a Schemathesis.io host.")
+@click.argument("token", type=str, envvar=service.TOKEN_ENV_VAR)
+@click.option(
+    "--hostname",
+    help="The hostname of the Schemathesis.io instance to authenticate with",
+    type=str,
+    default=service.DEFAULT_HOSTNAME,
+    envvar=service.HOSTNAME_ENV_VAR,
+)
+@click.option(
+    "--hosts-file",
+    help="Path to a file to store the auth configuration",
+    type=click.Path(dir_okay=False, writable=True),
+    default=service.DEFAULT_HOSTS_PATH,
+    envvar=service.HOSTS_PATH_ENV_VAR,
+)
+def login(token: str, hostname: str, hosts_file: str) -> None:
+    """Authenticate with a schemathesis.io host.
+
+    Example:
+        st auth login MY_TOKEN
+
+    """
+    service.hosts.store(token, hostname, hosts_file)
 
 
 def bold(message: str) -> str:

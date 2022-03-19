@@ -1,3 +1,13 @@
-from .constants import DEFAULT_URL, WORKER_CHECK_PERIOD, WORKER_FINISH_TIMEOUT
+from . import hosts
+from .constants import (
+    DEFAULT_HOSTNAME,
+    DEFAULT_HOSTS_PATH,
+    DEFAULT_URL,
+    HOSTNAME_ENV_VAR,
+    HOSTS_PATH_ENV_VAR,
+    TOKEN_ENV_VAR,
+    WORKER_CHECK_PERIOD,
+    WORKER_FINISH_TIMEOUT,
+)
 from .events import Completed, Error, Event, Timeout
 from .handler import ServiceReporter
