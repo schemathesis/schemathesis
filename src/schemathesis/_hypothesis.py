@@ -85,7 +85,7 @@ def add_examples(test: Callable, operation: APIOperation, hook_dispatcher: Optio
         # Unsatisfiable:
         # The underlying schema is not satisfiable and test will raise an error for the same reason.
         # Skipping this exception here allows us to continue the testing process for other operations.
-        # Still, we allow to run user-defined hooks
+        # Still, we allow running user-defined hooks
         examples = []
     context = HookContext(operation)  # context should be passed here instead
     GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, examples)

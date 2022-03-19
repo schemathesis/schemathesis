@@ -47,7 +47,7 @@ For example, if your API schema has three operations, then you will see a simila
 The output style is inspired by `pytest <https://docs.pytest.org/en/stable/>`_ and provides necessary information about the
 loaded API schema, processed operations, found errors, and used checks.
 
-By default, Schemathesis refuses to work with schemas that do not conform to the Open API spec, but you can disable this behavior with ``--validate-schema=false``.
+By default, Schemathesis works with schemas that do not conform to the Open API spec, but you can enable schema validation with ``--validate-schema=true``.
 
 .. note:: Schemathesis supports colorless output via the `NO_COLOR <https://no-color.org/>` environment variable or the ``--no-color`` CLI option.
 

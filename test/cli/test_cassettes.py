@@ -161,6 +161,7 @@ def test_main_process_error(cli, schema_url, hypothesis_max_examples, cassette_p
         f"--store-network-log={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         "--hypothesis-seed=1",
+        "--validate-schema=true",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then there should be no hanging threads
