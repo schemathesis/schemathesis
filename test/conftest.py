@@ -206,6 +206,15 @@ def cli():
         def main(*args, **kwargs):
             return cli_runner.invoke(schemathesis.cli.schemathesis, args, **kwargs)
 
+        @property
+        def auth(self):
+            return Auth()
+
+    class Auth:
+        @staticmethod
+        def login(*args, **kwargs):
+            return cli_runner.invoke(schemathesis.cli.login, args, **kwargs)
+
     return Runner()
 
 

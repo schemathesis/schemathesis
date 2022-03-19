@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - ``st`` as an alias to the ``schemathesis`` command line entrypoint.
+- ``st auth login`` to authenticate with Schemathesis.io.
 
 **Changed**
 
