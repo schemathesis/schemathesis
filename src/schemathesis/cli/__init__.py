@@ -354,7 +354,7 @@ with_request_cert_key = click.option(
     "--validate-schema",
     help="Enable or disable validation of input schema.",
     type=bool,
-    default=True,
+    default=False,
     show_default=True,
     cls=GroupedOption,
     group=ParameterGroup.validation,
