@@ -6,6 +6,7 @@ from .constants import (
     HOSTNAME_ENV_VAR,
     HOSTS_PATH_ENV_VAR,
     TOKEN_ENV_VAR,
+    URL_ENV_VAR,
     WORKER_CHECK_PERIOD,
     WORKER_FINISH_TIMEOUT,
 )
