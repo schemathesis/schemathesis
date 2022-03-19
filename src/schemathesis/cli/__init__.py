@@ -487,6 +487,7 @@ with_request_cert_key = click.option(
     "--schemathesis-io-token",
     help="Schemathesis.io authentication token. If present, test run results will be uploaded to Schemathesis.io",
     type=str,
+    envvar=service.TOKEN_ENV_VAR,
 )
 @click.option(
     "--schemathesis-io-url",
