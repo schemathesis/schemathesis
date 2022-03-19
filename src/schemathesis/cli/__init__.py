@@ -494,6 +494,7 @@ with_request_cert_key = click.option(
     help="Schemathesis.io base URL.",
     default=service.DEFAULT_URL,
     type=str,
+    envvar=service.URL_ENV_VAR,
 )
 @click.option("--verbosity", "-v", help="Reduce verbosity of error output.", count=True)
 @click.pass_context
