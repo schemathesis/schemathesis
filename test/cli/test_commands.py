@@ -212,7 +212,7 @@ def test_commands_run_help(cli):
         "                                  time is greater than the specified one in",
         "                                  milliseconds.  [x>=1]",
         "  --validate-schema BOOLEAN       Enable or disable validation of input schema.",
-        "                                  [default: True]",
+        "                                  [default: False]",
         "",
         "Hypothesis options:",
         "",
@@ -407,7 +407,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
                 "method": None,
                 "tag": None,
                 "operation_id": None,
-                "validate_schema": True,
+                "validate_schema": False,
                 "skip_deprecated_operations": False,
                 "force_schema_version": None,
                 "request_tls_verify": True,
@@ -709,7 +709,7 @@ def test_invalid_operation(cli, cli_args, workers):
 @pytest.mark.operations("invalid")
 def test_invalid_operation_suggestion(cli, cli_args):
     # When the app's schema contains errors
-    result = cli.run(*cli_args)
+    result = cli.run(*cli_args, "--validate-schema=true")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And there should be a suggestion to disable schema validation
@@ -1496,6 +1496,7 @@ def test_chained_internal_exception(testdir, cli, hypothesis_max_examples, opena
         f"--base-url={openapi3_base_url}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         "--show-errors-tracebacks",
+        "--validate-schema=true",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
@@ -1644,6 +1645,7 @@ def test_get_request_with_body(testdir, cli, base_url, hypothesis_max_examples, 
         f"--base-url={base_url}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         "--show-errors-tracebacks",
+        "--validate-schema=true",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
