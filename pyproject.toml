@@ -53,6 +53,8 @@ yarl = "^1.5"
 curlify = "^2.2.1"
 typing-extensions = ">=3.7,<5"
 colorama = "^0.4"
+tomli = "^2.0.1"
+tomli-w = "^1.0.0"
 
 [tool.poetry.dev-dependencies]
 coverage = "^5"
