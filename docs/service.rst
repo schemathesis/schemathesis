@@ -71,7 +71,7 @@ At this point, you can start testing your API! The simplest option is to use our
 
 Authenticate with Schemathesis.io first:
 
-.. code::
+.. code:: text
 
     # Replace `8adf6693017d454eb4f9519acf89a5e9` with your token
     st auth login 8adf6693017d454eb4f9519acf89a5e9
