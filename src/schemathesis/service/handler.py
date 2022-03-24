@@ -16,6 +16,7 @@ class ServiceReporter(EventHandler):
 
     out_queue: Queue = attr.ib()  # pragma: no mutate
     token: str = attr.ib()  # pragma: no mutate
+    api_slug: str = attr.ib()  # pragma: no mutate
     url: str = attr.ib(default=DEFAULT_URL)  # pragma: no mutate
     in_queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
     worker: threading.Thread = attr.ib(init=False)  # pragma: no mutate
@@ -24,7 +25,13 @@ class ServiceReporter(EventHandler):
         # A worker thread, that does all the work concurrently
         self.worker = threading.Thread(
             target=worker.start,
-            kwargs={"token": self.token, "url": self.url, "in_queue": self.in_queue, "out_queue": self.out_queue},
+            kwargs={
+                "url": self.url,
+                "token": self.token,
+                "api_slug": self.api_slug,
+                "in_queue": self.in_queue,
+                "out_queue": self.out_queue,
+            },
         )
         self.worker.start()
 

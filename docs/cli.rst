@@ -14,9 +14,9 @@ To execute tests, use the ``st run`` command:
 
 .. code:: text
 
-    $ st run http://example.com/swagger.json
+    $ st run https://example.schemathesis.io/openapi.json
 
-With this command, Schemathesis will load the schema from ``http://example.com/swagger.json`` and generate separate
+With this command, Schemathesis will load the schema from ``https://example.schemathesis.io/openapi.json`` and generate separate
 test sets for each operation in this schema. Each test set includes up to 100 test cases by default, depending on the operation definition.
 
 For example, if your API schema has three operations, then you will see a similar output:

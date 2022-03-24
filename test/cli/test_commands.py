@@ -180,12 +180,14 @@ def test_commands_run_help(cli):
 
     assert result_help.exit_code == ExitCode.OK, result_help.stdout
     assert result_help.stdout.strip().split("\n") == [
-        "Usage: schemathesis run [OPTIONS] SCHEMA",
+        "Usage: schemathesis run [OPTIONS] SCHEMA [API_SLUG]",
         "",
         "  Perform schemathesis test against an API specified by SCHEMA.",
         "",
         "  SCHEMA must be a valid URL or file path pointing to an Open API / GraphQL",
         "  specification.",
+        "",
+        "  API_SLUG is an API identifier to upload data to Schemathesis.io.",
         "",
         "Filtering options:",
         "",
@@ -294,16 +296,16 @@ def test_commands_run_help(cli):
         "  --force-schema-version [20|30]  Force Schemathesis to parse the input schema",
         "                                  with the specified spec version.",
         "  --no-color                      Disable ANSI color escape codes.",
-        "  --schemathesis-io-token TEXT    Schemathesis.io authentication token. If",
-        "                                  present, test run results will be uploaded to",
-        "                                  Schemathesis.io",
+        "  --schemathesis-io-token TEXT    Schemathesis.io authentication token.",
         "  --schemathesis-io-url TEXT      Schemathesis.io base URL.",
+        "  --hosts-file FILE               Path to a file to store the Schemathesis.io",
+        "                                  auth configuration.",
         "  -v, --verbosity                 Reduce verbosity of error output.",
         "  -h, --help                      Show this message and exit.",
     ]
 
 
-SCHEMA_URI = "https://example.com/swagger.json"
+SCHEMA_URI = "https://example.schemathesis.io/openapi.json"
 
 
 @pytest.mark.parametrize(
@@ -1999,6 +2001,7 @@ def assert_exit_code(event_stream, code):
             debug_output_file=None,
             schemathesis_io_token=None,
             schemathesis_io_url=service.DEFAULT_URL,
+            api_slug=None,
         )
     assert exc.value.code == code
 

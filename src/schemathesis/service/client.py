@@ -29,9 +29,9 @@ class ServiceClient(requests.Session):
         url = urljoin(self.base_url, url)
         return super().request(method, url, *args, **kwargs)
 
-    def create_test_run(self) -> TestRun:
+    def create_test_run(self, api_slug: str) -> TestRun:
         """Create a new test run on the Schemathesis.io side."""
-        response = self.post("/runs/")
+        response = self.post("/runs/", json={"api_slug": api_slug})
         data = response.json()
         return TestRun(run_id=data["run_id"], short_url=data["short_url"])
 

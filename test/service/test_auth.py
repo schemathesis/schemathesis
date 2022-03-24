@@ -4,11 +4,6 @@ from schemathesis.service import TOKEN_ENV_VAR
 from schemathesis.service.hosts import get_token
 
 
-@pytest.fixture
-def hosts_file(tmp_path):
-    return tmp_path / "hosts.toml"
-
-
 def malform_hosts(path):
     with open(path, "w") as fd:
         fd.write("[[wrong]")

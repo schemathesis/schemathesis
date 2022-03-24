@@ -13,7 +13,7 @@ The following test will load the API schema from ``http://0.0.0.0:8080/swagger.j
 
     import schemathesis
 
-    schema = schemathesis.from_uri("http://example.com/swagger.json")
+    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
 
 
     @schema.parametrize()
@@ -41,7 +41,7 @@ We recommend running your tests with the latest `pytest <https://docs.pytest.org
 
     ======================= 3 passed in 1.55s =======================
 
-Running these tests requires your app running at ``http://0.0.0.0:8080/`` and a valid Open API schema available at ``http://example.com/swagger.json``.
+Running these tests requires your app running at ``http://0.0.0.0:8080/`` and a valid Open API schema available at ``https://example.schemathesis.io/openapi.json``.
 
 By default, Schemathesis refuses to work with schemas that do not conform to the Open API spec, but you can disable this behavior by passing the ``validate_schema=False`` argument to the ``from_uri`` function.
 
@@ -80,7 +80,7 @@ then you can skip them by passing ``skip_deprecated_operations=True`` to loaders
 .. code:: python
 
     schema = schemathesis.from_uri(
-        "http://example.com/swagger.json", skip_deprecated_operations=True
+        "https://example.schemathesis.io/openapi.json", skip_deprecated_operations=True
     )
 
 Tests configuration
@@ -450,7 +450,7 @@ seamlessly combines your API schema with ``pytest``-style parametrization and pr
 
     import schemathesis
 
-    schema = schemathesis.from_uri("http://example.com/swagger.json")
+    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
 
 
     @schema.parametrize()
