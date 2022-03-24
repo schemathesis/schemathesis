@@ -69,7 +69,7 @@ At this point, you can start testing your API! The simplest option is to use our
 
 **Optional**. If you'd like to run tests on your side and upload the results to Schemathesis.io feel free to use one of the provided code samples:
 
-.. code::
+.. code:: text
 
     docker run schemathesis/schemathesis:stable \
       run https://example-openapi3.schemathesis.io/openapi.json
