@@ -13,13 +13,13 @@ You can use Schemathesis in the command line directly:
 
 .. code:: bash
 
-  st run http://example.com/swagger.json
+  st run https://example.schemathesis.io/openapi.json
 
 Or via Docker:
 
 .. code:: bash
 
-  docker run schemathesis/schemathesis:stable run http://example.com/swagger.json
+  docker run schemathesis/schemathesis:stable run https://example.schemathesis.io/openapi.json
 
 Or in your Python tests:
 
@@ -27,7 +27,7 @@ Or in your Python tests:
 
     import schemathesis
 
-    schema = schemathesis.from_uri("http://example.com/swagger.json")
+    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
 
 
     @schema.parametrize()

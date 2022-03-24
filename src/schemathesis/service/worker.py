@@ -6,11 +6,11 @@ from .constants import STOP_MARKER
 from .serialization import serialize_event
 
 
-def start(url: str, token: str, in_queue: Queue, out_queue: Queue) -> None:
+def start(url: str, token: str, api_slug: str, in_queue: Queue, out_queue: Queue) -> None:
     """Initialize a new run and start consuming events."""
     try:
         client = ServiceClient(url, token)
-        response = client.create_test_run()
+        response = client.create_test_run(api_slug)
         consume_events(client, in_queue, response.run_id)
         # Reached a terminal event or a stop marker.
         # In the case of stop marker, it is still a successful result for the handler itself as the error happened in

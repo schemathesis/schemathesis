@@ -25,7 +25,7 @@ def get_stdout_lines(stdout):
 def test_no_failures(cli, schema_url, service, service_token):
     # When Schemathesis.io is enabled and there are no errors
     result = cli.run(
-        schema_url, f"--schemathesis-io-token={service_token}", f"--schemathesis-io-url={service.base_url}"
+        schema_url, "my-api", f"--schemathesis-io-token={service_token}", f"--schemathesis-io-url={service.base_url}"
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then it should receive requests
@@ -50,7 +50,12 @@ def test_no_failures(cli, schema_url, service, service_token):
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 def test_server_error(cli, schema_url, service, service_token):
     # When Schemathesis.io is enabled but returns 500 on the first call
-    args = [schema_url, f"--schemathesis-io-token={service_token}", f"--schemathesis-io-url={service.base_url}"]
+    args = [
+        schema_url,
+        "my-api",
+        f"--schemathesis-io-token={service_token}",
+        f"--schemathesis-io-url={service.base_url}",
+    ]
     result = cli.run(*args)
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then there is only one request to Schemathesis.io
@@ -92,6 +97,7 @@ def test_error_in_another_handler(testdir, cli, schema_url, service, service_tok
         module.purebasename,
         "run",
         schema_url,
+        "my-api",
         f"--schemathesis-io-token={service_token}",
         f"--schemathesis-io-url={service.base_url}",
     )
@@ -108,7 +114,7 @@ def test_error_in_service_handler(testdir, cli, schema_url, service, service_tok
     # When a Schemathesis.io handler fails
     mocker.patch("schemathesis.service.worker.serialize_event", side_effect=ValueError("Some internal issue"))
     result = cli.run(
-        schema_url, f"--schemathesis-io-token={service_token}", f"--schemathesis-io-url={service.base_url}"
+        schema_url, "my-api", f"--schemathesis-io-token={service_token}", f"--schemathesis-io-url={service.base_url}"
     )
     # And all handlers are shutdown forcefully
     # And the run is still successful
@@ -124,7 +130,7 @@ def test_server_timeout(cli, schema_url, service, service_token, mocker):
     mocker.patch("schemathesis.service.WORKER_FINISH_TIMEOUT", 0)
     # And the waiting is more than allowed
     result = cli.run(
-        schema_url, f"--schemathesis-io-token={service_token}", f"--schemathesis-io-url={service.base_url}"
+        schema_url, "my-api", f"--schemathesis-io-token={service_token}", f"--schemathesis-io-url={service.base_url}"
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then the output indicates timeout
@@ -141,7 +147,9 @@ def test_server_timeout(cli, schema_url, service, service_token, mocker):
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 def test_unauthorized(cli, schema_url, service):
     # When there is no token or invalid token
-    result = cli.run(schema_url, "--schemathesis-io-token=invalid", f"--schemathesis-io-url={service.base_url}")
+    result = cli.run(
+        schema_url, "my-api", "--schemathesis-io-token=invalid", f"--schemathesis-io-url={service.base_url}"
+    )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then a proper error message should be displayed
     lines = get_stdout_lines(result.stdout)
@@ -155,7 +163,7 @@ def test_unauthorized(cli, schema_url, service):
 def test_invalid_payload(cli, schema_url, service, service_token):
     # When there is no token or invalid token
     result = cli.run(
-        schema_url, f"--schemathesis-io-token={service_token}", f"--schemathesis-io-url={service.base_url}"
+        schema_url, "my-api", f"--schemathesis-io-token={service_token}", f"--schemathesis-io-url={service.base_url}"
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then a proper error message should be displayed
@@ -171,7 +179,7 @@ def test_connection_issue(cli, schema_url, service, service_token, mocker):
     # When there is a connection issue
     mocker.patch("schemathesis.service.worker.serialize_event", side_effect=Timeout)
     result = cli.run(
-        schema_url, f"--schemathesis-io-token={service_token}", f"--schemathesis-io-url={service.base_url}"
+        schema_url, "my-api", f"--schemathesis-io-token={service_token}", f"--schemathesis-io-url={service.base_url}"
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then a proper error message should be displayed
@@ -179,3 +187,13 @@ def test_connection_issue(cli, schema_url, service, service_token, mocker):
     assert "An error happened during uploading reports to Schemathesis.io:" in lines
     assert "Please, consider" not in result.stdout
     assert "Timeout" in result.stdout
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+def test_api_id_no_token(cli, schema_url, hosts_file):
+    # When there is API ID
+    # And there is no token
+    result = cli.run(schema_url, "my-api", f"--hosts-file={hosts_file}")
+    # Then it should be an error
+    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
+    assert "CLI appears to be not authenticated" in result.stdout

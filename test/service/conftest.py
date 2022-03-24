@@ -105,3 +105,8 @@ def service(httpserver, service_setup, start_run_url, create_event_url, finish_r
         create_event_url=create_event_url,
         finish_run_url=finish_run_url,
     )
+
+
+@pytest.fixture
+def hosts_file(tmp_path):
+    return tmp_path / "hosts.toml"
