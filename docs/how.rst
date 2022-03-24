@@ -21,7 +21,7 @@ CLI:
 
 .. code:: text
 
-    $ st run -D negative http://example.com/swagger.json
+    $ st run -D negative https://example.schemathesis.io/openapi.json
 
 Python:
 
@@ -31,7 +31,7 @@ Python:
     from schemathesis import DataGenerationMethod
 
     schema = schemathesis.from_uri(
-        "http://example.com/swagger.json",
+        "https://example.schemathesis.io/openapi.json",
         data_generation_methods=[DataGenerationMethod.negative],
     )
 

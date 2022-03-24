@@ -36,7 +36,7 @@ from ..specs.graphql.schemas import GraphQLSchema
 from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import Target
-from ..types import Filter, RequestCert
+from ..types import Filter, PathLike, RequestCert
 from ..utils import GenericResponse, file_exists, get_requests_auth, import_app
 from . import callbacks, cassettes, output
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
@@ -197,10 +197,18 @@ with_request_cert_key = click.option(
     show_default=False,
     callback=callbacks.validate_request_cert_key,
 )
+with_hosts_file = click.option(
+    "--hosts-file",
+    help="Path to a file to store the Schemathesis.io auth configuration.",
+    type=click.Path(dir_okay=False, writable=True),
+    default=service.DEFAULT_HOSTS_PATH,
+    envvar=service.HOSTS_PATH_ENV_VAR,
+)
 
 
 @schemathesis.command(short_help="Perform schemathesis test.", cls=CommandWithCustomHelp)
 @click.argument("schema", type=str, callback=callbacks.validate_schema)
+@click.argument("api_slug", type=str, required=False)
 @click.option(
     "--checks",
     "-c",
@@ -485,7 +493,7 @@ with_request_cert_key = click.option(
 @click.option("--no-color", help="Disable ANSI color escape codes.", type=bool, is_flag=True)
 @click.option(
     "--schemathesis-io-token",
-    help="Schemathesis.io authentication token. If present, test run results will be uploaded to Schemathesis.io",
+    help="Schemathesis.io authentication token.",
     type=str,
     envvar=service.TOKEN_ENV_VAR,
 )
@@ -496,11 +504,13 @@ with_request_cert_key = click.option(
     type=str,
     envvar=service.URL_ENV_VAR,
 )
+@with_hosts_file
 @click.option("--verbosity", "-v", help="Reduce verbosity of error output.", count=True)
 @click.pass_context
 def run(
     ctx: click.Context,
     schema: str,
+    api_slug: Optional[str],
     auth: Optional[Tuple[str, str]],
     auth_type: str,
     headers: Dict[str, str],
@@ -544,15 +554,20 @@ def run(
     no_color: bool = False,
     schemathesis_io_token: Optional[str] = None,
     schemathesis_io_url: str = service.DEFAULT_URL,
+    hosts_file: PathLike = service.DEFAULT_HOSTS_PATH,
 ) -> None:
     """Perform schemathesis test against an API specified by SCHEMA.
 
     SCHEMA must be a valid URL or file path pointing to an Open API / GraphQL specification.
+
+    API_SLUG is an API identifier to upload data to Schemathesis.io.
     """
     # pylint: disable=too-many-locals
     maybe_disable_color(ctx, no_color)
     check_auth(auth, headers)
     selected_targets = tuple(target for target in targets_module.ALL_TARGETS if target.__name__ in targets)
+
+    token = get_service_token(api_slug, schemathesis_io_url, hosts_file, schemathesis_io_token)
 
     if "all" in checks:
         selected_checks = checks_module.ALL_CHECKS
@@ -613,8 +628,9 @@ def run(
         verbosity,
         code_sample_style,
         debug_output_file,
-        schemathesis_io_token,
+        token,
         schemathesis_io_url,
+        api_slug,
     )
 
 
@@ -840,6 +856,24 @@ def check_auth(auth: Optional[Tuple[str, str]], headers: Dict[str, str]) -> None
         raise click.BadParameter("Passing `--auth` together with `--header` that sets `Authorization` is not allowed.")
 
 
+def get_service_token(api_slug: Optional[str], url: str, hosts_file: PathLike, token: Optional[str]) -> Optional[str]:
+    """Extract Schemathesis.io token if API ID is specified."""
+    if api_slug is not None:
+        hostname = urlparse(url).netloc
+        token = token or service.hosts.get_token(hostname=hostname, hosts_file=hosts_file)
+        if token is None:
+            raise click.UsageError(
+                "\n\n"
+                "You are trying to upload data to Schemathesis.io, but your CLI appears to be not authenticated.\n\n"
+                "To authenticate, grab your token from `app.schemathesis.io` and run `st auth login <TOKEN>`\n"
+                "Alternatively, you can pass the token explicitly via the `--schemathesis-io-token` option / "
+                f"`{service.TOKEN_ENV_VAR}` environment variable\n\n"
+                "See https://schemathesis.readthedocs.io/en/stable/service.html for more details"
+            )
+        return token
+    return None
+
+
 def get_output_handler(workers_num: int) -> EventHandler:
     if workers_num > 1:
         output_style = OutputStyle.short
@@ -879,6 +913,7 @@ def execute(
     debug_output_file: Optional[click.utils.LazyFile],
     schemathesis_io_token: Optional[str],
     schemathesis_io_url: str,
+    api_slug: Optional[str],
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handlers: List[EventHandler] = []
@@ -887,10 +922,14 @@ def execute(
     if debug_output_file is not None:
         handlers.append(DebugOutputHandler(debug_output_file))
     service_context = None
-    if schemathesis_io_token is not None:
+    if schemathesis_io_token is not None and api_slug is not None:
         service_queue: Queue = Queue()
         service_context = ServiceContext(url=schemathesis_io_url, queue=service_queue)
-        handlers.append(service.ServiceReporter(service_queue, schemathesis_io_token, schemathesis_io_url))
+        handlers.append(
+            service.ServiceReporter(
+                out_queue=service_queue, token=schemathesis_io_token, api_slug=api_slug, url=schemathesis_io_url
+            )
+        )
     if store_network_log is not None:
         # This handler should be first to have logs writing completed when the output handler will display statistic
         handlers.append(cassettes.CassetteWriter(store_network_log))
@@ -1003,13 +1042,7 @@ def auth() -> None:
     default=service.DEFAULT_HOSTNAME,
     envvar=service.HOSTNAME_ENV_VAR,
 )
-@click.option(
-    "--hosts-file",
-    help="Path to a file to store the auth configuration",
-    type=click.Path(dir_okay=False, writable=True),
-    default=service.DEFAULT_HOSTS_PATH,
-    envvar=service.HOSTS_PATH_ENV_VAR,
-)
+@with_hosts_file
 def login(token: str, hostname: str, hosts_file: str) -> None:
     """Authenticate with a schemathesis.io host.
 

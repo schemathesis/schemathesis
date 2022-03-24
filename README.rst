@@ -56,14 +56,14 @@ You can use Schemathesis in the command line directly (``st`` is an alias to ``s
 
 .. code:: bash
 
-  st run --checks all https://example-openapi3.schemathesis.io/openapi.json
+  st run --checks all https://example.schemathesis.io/openapi.json
 
 Or via Docker:
 
 .. code:: bash
 
   docker run schemathesis/schemathesis:stable \
-      run --checks all https://example-openapi3.schemathesis.io/openapi.json
+      run --checks all https://example.schemathesis.io/openapi.json
 
 .. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/schemathesis.gif
 
@@ -73,7 +73,7 @@ Or in your Python tests:
 
     import schemathesis
 
-    schema = schemathesis.from_uri("https://example-openapi3.schemathesis.io/openapi.json")
+    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
 
 
     @schema.parametrize()

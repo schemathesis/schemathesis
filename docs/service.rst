@@ -49,7 +49,7 @@ Step 1: Add the API schema
 .. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_no_apis_yet.png
 
 3. Enter your API name, so you can easily identify it later (for example, "Example API")
-4. Fill **https://example-openapi3.schemathesis.io/openapi.json** into the "API Schema" field
+4. Fill **https://example.schemathesis.io/openapi.json** into the "API Schema" field
 5. **Optional**. If your API requires authentication, choose the appropriate authentication type (HTTP Basic & Header are available at the moment) and fill in its details
 6. **Optional**. If your API is available on a different domain than your API schema, fill the proper base URL into the "Base URL" field
 7. Save the API schema entry by clicking "Add"
@@ -80,7 +80,11 @@ And then run the tests:
 
 .. code::
 
-    st run --checks all https://example-openapi3.schemathesis.io/openapi.json
+    st run https://example.schemathesis.io/openapi.json example-api --checks all
+
+.. note::
+
+    Replace `example-api` with the appropriate API ID shown in the SaaS code sample
 
 Once all events are uploaded to Schemathesis.io you'll see a message at the end of the CLI output:
 

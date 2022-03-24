@@ -14,6 +14,7 @@ Changelog
 - Validate ``requests`` kwargs to catch cases when the ASGI integration is used, but the proper ASGI client is not supplied. `#1335`_
 - Enable Open API links traversal by default. To disable it, use ``--stateful=none``.
 - Do not validate API schema by default. To enable it back, use `--validate-schema=true`.
+- Add the ``api_slug`` CLI argument to upload data to Schemathesis.io.
 
 `3.13.3`_ - 2022-02-20
 ----------------------
