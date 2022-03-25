@@ -27,7 +27,7 @@ def load(path: PathLike) -> Dict[str, Any]:
             return tomli.load(fd)
     except FileNotFoundError:
         # Try to create the parent dir - it could be the first run, when the config dir doesn't exist yet
-        Path(path).parent.mkdir(mode=0o755, exist_ok=True)
+        Path(path).parent.mkdir(mode=0o755, parents=True, exist_ok=True)
         return {}
     except tomli.TOMLDecodeError:
         return {}
