@@ -66,7 +66,7 @@ For example, the following command will select all operations which paths start 
 
 .. code:: text
 
-    $ st run -E ^/api/users http://api.com/swagger.json
+    $ st run -E ^/api/users https://example.schemathesis.io/openapi.json
 
 .. important::
 
@@ -112,12 +112,12 @@ To make Schemathesis perform all built-in checks use ``--checks all`` CLI option
 
 .. code:: text
 
-    $ st run --checks all http://api.com/swagger.json
+    $ st run --checks all https://example.schemathesis.io/openapi.json
     ================ Schemathesis test session starts ===============
     platform Linux -- Python 3.8.5, schemathesis-2.5.0, ...
     rootdir: /
     hypothesis profile 'default' -> ...
-    Schema location: http://api.com/swagger.json
+    Schema location: https://example.schemathesis.io/openapi.json
     Base URL: http://api.com/
     Specification version: Swagger 2.0
     Workers: 1
@@ -147,8 +147,8 @@ If any response will take longer than the provided value (in milliseconds) than 
     platform Linux -- Python 3.8.5, schemathesis-2.5.0, ...
     rootdir: /
     hypothesis profile 'default' -> ...
-    Schema location: http://api.com/swagger.json
-    Base URL: http://api.com/
+    Schema location: https://example.schemathesis.io/openapi.json
+    Base URL: https://example.schemathesis.io/api
     Specification version: Swagger 2.0
     Workers: 1
     Collected API operations: 1
