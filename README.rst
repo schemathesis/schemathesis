@@ -11,6 +11,13 @@ The application under test could be written in any language; the only thing you 
 
 Simple to use and yet powerful to uncover hard-to-find errors thanks to the property-based testing approach backed by state-of-the-art `Hypothesis <http://hypothesis.works/>`_ library.
 
+🚀 Schemathesis is available as a `service <https://schemathesis.io/?utm_source=github>`_, standalone CLI, or a Python library 🚀
+
+The service enables you to verify your API schema in a few clicks, CLI gives more control.
+Schemathesis.io has a free tier, so you can combine the CLI flexibility with rich visuals by uploading your test results there.
+
+`Signup to reveal all issues on a dashboard <https://app.schemathesis.io/auth/sign-up/?utm_source=oss_readme>`_.
+
 Features
 --------
 
@@ -25,17 +32,8 @@ Features
 - Ready-to-go Docker image;
 - Configurable with user-defined checks, string formats, hooks, and targets.
 
-📣 Schemathesis as a Service 📣
--------------------------------
-
-Schemathesis will be available as `SaaS <https://schemathesis.io/?utm_source=github>`_ soon!
-
-It is freemium with much better visuals for debugging, more checks, and static analysis :)
-
-`Signup <http://eepurl.com/hN-0H1>`_ to get notified when it is ready!
-
-Installation
-------------
+CLI installation
+----------------
 
 To install Schemathesis via ``pip`` run the following command:
 
@@ -46,8 +44,6 @@ To install Schemathesis via ``pip`` run the following command:
 This command installs the ``schemathesis`` entrypoint + ``st`` as its alias.
 
 You can also use our Docker image without installing Schemathesis as a Python package.
-
-📣 **Please fill out our** `quick survey <https://forms.gle/dv4s5SXAYWzvuwFWA>`_ so that we can learn how satisfied you are with Schemathesis, and what improvements we should make. Thank you!
 
 Usage
 -----
