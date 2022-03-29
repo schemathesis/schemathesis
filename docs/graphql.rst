@@ -11,9 +11,8 @@ Usage
 
     import schemathesis
 
-    schema = schemathesis.graphql.from_url(
-        "https://bahnql.herokuapp.com/graphql"
-    )
+    schema = schemathesis.graphql.from_url("https://bahnql.herokuapp.com/graphql")
+
 
     @schema.parametrize()
     @settings(deadline=None)

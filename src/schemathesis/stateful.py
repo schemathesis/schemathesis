@@ -211,7 +211,6 @@ class APIStateMachine(RuleBasedStateMachine):
         .. code-block:: python
 
             class APIWorkflow(schema.as_state_machine()):
-
                 def before_call(self, case):
                     case.query = case.query or {}
                     case.query["test"] = "true"
@@ -221,7 +220,6 @@ class APIStateMachine(RuleBasedStateMachine):
         .. code-block:: python
 
             class APIWorkflow(schema.as_state_machine()):
-
                 def before_call(self, case):
                     if case.method == "PUT" and case.path == "/items":
                         case.body["is_fake"] = True
@@ -242,8 +240,8 @@ class APIStateMachine(RuleBasedStateMachine):
             logger = logging.getLogger(__file__)
             logger.setLevel(logging.INFO)
 
-            class APIWorkflow(schema.as_state_machine()):
 
+            class APIWorkflow(schema.as_state_machine()):
                 def after_call(self, response, case):
                     logger.info(
                         "%s %s -> %d",
@@ -251,6 +249,7 @@ class APIStateMachine(RuleBasedStateMachine):
                         case.path,
                         response.status_code,
                     )
+
 
             # POST /users/ -> 201
             # GET /users/{user_id} -> 200
@@ -285,7 +284,6 @@ class APIStateMachine(RuleBasedStateMachine):
         .. code-block:: python
 
             class APIWorkflow(schema.as_state_machine()):
-
                 def get_call_kwargs(self, case):
                     return {"verify": True}
 
@@ -316,14 +314,12 @@ class APIStateMachine(RuleBasedStateMachine):
 
             def my_check(response, case):
                 # some assertions
+                pass
+
 
             class APIWorkflow(schema.as_state_machine()):
-
                 def validate_response(self, response, case):
-                    case.validate_response(
-                        response,
-                        checks=(my_check, )
-                    )
+                    case.validate_response(response, checks=(my_check,))
 
         The state machine from the example above will execute only the ``my_check`` check instead of all
         available checks.

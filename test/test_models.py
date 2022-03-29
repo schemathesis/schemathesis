@@ -197,7 +197,7 @@ def test_code_to_reproduce():
 
 def test_validate_response(testdir):
     testdir.make_test(
-        fr"""
+        rf"""
 from requests import Response
 
 @schema.parametrize()

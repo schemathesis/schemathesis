@@ -24,7 +24,7 @@ server error:
 
 Let's take a look if Schemathesis can discover this issue and how much time it will take:
 
-.. code:: bash
+.. code::
 
     $  schemathesis run --hypothesis-max-examples=100000 http://127.0.0.1:8081/schema.yaml
     ...
@@ -81,6 +81,7 @@ You can register your own targets with the ``schemathesis.register_target`` deco
 .. code:: python
 
     import schemathesis
+
 
     @schemathesis.register_target
     def new_target(context) -> float:

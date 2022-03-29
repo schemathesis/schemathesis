@@ -111,14 +111,14 @@ To do so, you need to create the state machine inside a ``pytest`` fixture and r
 
     from hypothesis.stateful import run_state_machine_as_test
 
+
     @pytest.fixture
     def state_machine():
         # You may use any schema loader here
         # or use any pytest fixtures
-        schema = schemathesis.from_uri(
-            "http://0.0.0.0:8081/schema.yaml"
-        )
+        schema = schemathesis.from_uri("http://0.0.0.0:8081/schema.yaml")
         return schema.as_state_machine()
+
 
     def test_statefully(state_machine):
         run_state_machine_as_test(
@@ -176,12 +176,9 @@ If you load your schema lazily, you can extend the state machine inside the ``py
 
     @pytest.fixture
     def state_machine():
-        schema = schemathesis.from_uri(
-            "http://0.0.0.0:8081/schema.yaml"
-        )
+        schema = schemathesis.from_uri("http://0.0.0.0:8081/schema.yaml")
 
         class APIWorkflow(schema.as_state_machine()):
-
             def setup(self):
                 # your scenario setup
                 ...
@@ -197,13 +194,15 @@ In case if you need to customize the whole test run, then you can extend the tes
 
     APIWorkflow = schema.as_state_machine()
 
-    class TestAPI(APIWorkflow.TestCase):
 
+    class TestAPI(APIWorkflow.TestCase):
         def setUp(self):
             # create a database
+            pass
 
         def tearDown(self):
             # drop the database
+            pass
 
 Or with explicit fixtures:
 
@@ -213,11 +212,13 @@ Or with explicit fixtures:
 
     APIWorkflow = schema.as_state_machine()
 
+
     @pytest.fixture()
     def database():
         # create tables & data
         yield
         # drop tables
+
 
     @pytest.mark.usefixtures("database")
     class TestAPI(APIWorkflow.TestCase):
@@ -236,9 +237,7 @@ Hypothesis settings can be changed via the settings object on the ``TestCase`` c
     from hypothesis import settings
 
     TestCase = schema.as_state_machine().TestCase
-    TestCase.settings = settings(
-        max_examples=200, stateful_step_count=5
-    )
+    TestCase.settings = settings(max_examples=200, stateful_step_count=5)
 
 If you load your schema lazily:
 
@@ -247,9 +246,11 @@ If you load your schema lazily:
     from hypothesis.stateful import run_state_machine_as_test
     from hypothesis import settings
 
+
     @pytest.fixture
     def state_machine():
         ...
+
 
     def test_statefully(state_machine):
         run_state_machine_as_test(
@@ -257,7 +258,7 @@ If you load your schema lazily:
             settings=settings(
                 max_examples=200,
                 stateful_step_count=5,
-            )
+            ),
         )
 
 With this configuration, there will be twice more test cases with a maximum of five steps in each one.
@@ -277,8 +278,8 @@ The best way to do so is by using the Hypothesis's ``initialize`` decorator:
 
     BaseAPIWorkflow = schema.as_state_machine()
 
-    class APIWorkflow(BaseAPIWorkflow):
 
+    class APIWorkflow(BaseAPIWorkflow):
         @initialize(
             target=BaseAPIWorkflow.bundles["/users/"]["POST"],
             case=schema["/users/"]["POST"].as_strategy(),
@@ -303,15 +304,13 @@ the generated case manually or by creating a new one via the :func:`Endpoint.mak
 
     BaseAPIWorkflow = schema.as_state_machine()
 
-    class APIWorkflow(BaseAPIWorkflow):
 
+    class APIWorkflow(BaseAPIWorkflow):
         @initialize(
             target=BaseAPIWorkflow.bundles["/users/"]["POST"],
         )
         def init_user(self):
-            case = schema["/users/"]["POST"].make_case(
-                body={"username": "Test"}
-            )
+            case = schema["/users/"]["POST"].make_case(body={"username": "Test"})
             return self.step(case)
 
 Loading multiple entries of the same type is more verbose but still possible:
@@ -327,8 +326,8 @@ Loading multiple entries of the same type is more verbose but still possible:
         {"is_admin": False, "username": "Customer"},
     ]
 
-    class APIWorkflow(BaseAPIWorkflow):
 
+    class APIWorkflow(BaseAPIWorkflow):
         @initialize(
             target=BaseAPIWorkflow.bundles["/users/"]["POST"],
         )
@@ -336,9 +335,7 @@ Loading multiple entries of the same type is more verbose but still possible:
             result = []
             # Create each user via the API
             for user in USERS:
-                case = schema["/users/"]["POST"].make_case(
-                    body=user
-                )
+                case = schema["/users/"]["POST"].make_case(body=user)
                 result.append(self.step(case))
             # Store them in the `POST /users/` bundle
             return multiple(*result)
@@ -357,23 +354,18 @@ Login to an app and use its API token with each call:
 
     import requests
 
+
     class APIWorkflow(schema.as_state_machine()):
         headers: dict
 
         def setup(self):
             # Make a login request
             response = requests.post(
-                "http://0.0.0.0/api/login",
-                json={
-                    "login": "test",
-                    "password": "password"
-                }
+                "http://0.0.0.0/api/login", json={"login": "test", "password": "password"}
             )
             # Parse the response and store the token in headers
             token = response.json()["auth_token"]
-            self.headers = {
-                "Authorization": f"Bearer {token}"
-            }
+            self.headers = {"Authorization": f"Bearer {token}"}
 
         def get_call_kwargs(self, case):
             # Use stored headers
@@ -404,15 +396,11 @@ Run different checks, depending on the result of the previous call:
                 if case.source.response.status_code == 400:
                     assert value == "REJECTED"
 
-    class APIWorkflow(schema.as_state_machine()):
 
+    class APIWorkflow(schema.as_state_machine()):
         def validate_response(self, response, case):
             # Run all default checks together with the new one
-            super().validate_response(
-                response,
-                case,
-                additional_checks=(check_condition, )
-            )
+            super().validate_response(response, case, additional_checks=(check_condition,))
 
 Reproducing failures
 --------------------
@@ -424,9 +412,7 @@ It might look like this:
 
     state = APIWorkflow()
     v1 = state.step(
-        case=state.schema["/users/"]["POST"].make_case(
-            body={"username": "000"}
-        ),
+        case=state.schema["/users/"]["POST"].make_case(body={"username": "000"}),
         previous=None,
     )
     state.step(
@@ -512,15 +498,16 @@ After:
         if case.path == "/items":
             assert "X-Item-Id" in response.headers
 
-    class APIWorkflow(schema.as_state_machine()):
 
+    class APIWorkflow(schema.as_state_machine()):
         def validate_response(self, response, case):
             super().validate_response(
                 response,
                 case,
                 # Run it together with default checks
-                additional_checks=(check_header, )
+                additional_checks=(check_header,),
             )
+
 
     TestCase = APIWorkflow.TestCase
 

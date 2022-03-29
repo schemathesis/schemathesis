@@ -17,7 +17,7 @@ from ...stateful import Feedback
 
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body", "form_data"))
 SLASH = "/"
-STRING_FORMATS = {}
+STRING_FORMATS: Dict[str, st.SearchStrategy] = {}
 
 
 def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
