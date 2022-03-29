@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`2.8.6`_ - 2022-03-29
+---------------------
+
 **Added**
 
 - Support for Werkzeug>=2.1.0. `#1410`_
@@ -1469,7 +1472,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.8.5...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v2.8.6...HEAD
+.. _2.8.6: https://github.com/schemathesis/schemathesis/compare/v2.8.5...v2.8.6
 .. _2.8.5: https://github.com/schemathesis/schemathesis/compare/v2.8.4...v2.8.5
 .. _2.8.4: https://github.com/schemathesis/schemathesis/compare/v2.8.3...v2.8.4
 .. _2.8.3: https://github.com/schemathesis/schemathesis/compare/v2.8.2...v2.8.3
