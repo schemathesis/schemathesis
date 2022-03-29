@@ -37,8 +37,8 @@ from requests.auth import HTTPDigestAuth
 from requests.exceptions import InvalidHeader  # type: ignore
 from requests.utils import check_header_validity  # type: ignore
 from werkzeug.wrappers import Response as BaseResponse
-from werkzeug.wrappers.json import JSONMixin
 
+from ._compat import JSONMixin
 from .constants import USER_AGENT, DataGenerationMethod
 from .exceptions import UsageError
 from .types import DataGenerationMethodInput, Filter, GenericTest, NotSet, RawAuth

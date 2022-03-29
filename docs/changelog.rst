@@ -6,6 +6,7 @@ Changelog
 
 **Added**
 
+- Support for ``Werkzeug>=2.1.0``. `#1410`_
 - ``st`` as an alias to the ``schemathesis`` command line entrypoint.
 - ``st auth login`` to authenticate with Schemathesis.io.
 
@@ -2342,6 +2343,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1410: https://github.com/schemathesis/schemathesis/issues/1410
 .. _#1395: https://github.com/schemathesis/schemathesis/issues/1395
 .. _#1370: https://github.com/schemathesis/schemathesis/issues/1370
 .. _#1366: https://github.com/schemathesis/schemathesis/issues/1366

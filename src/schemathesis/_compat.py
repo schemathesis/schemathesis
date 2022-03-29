@@ -1,7 +1,9 @@
 import hypothesis_jsonschema._from_schema
 import jsonschema
+import werkzeug
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument
+from packaging import version
 
 # pylint: disable=unused-import
 
@@ -9,6 +11,13 @@ try:
     from importlib import metadata
 except ImportError:
     import importlib_metadata as metadata  # type: ignore
+
+if version.parse(werkzeug.__version__) < version.parse("2.1.0"):
+    from werkzeug.wrappers.json import JSONMixin
+else:
+
+    class JSONMixin:  # type: ignore
+        pass
 
 
 def _get_format_filter(
