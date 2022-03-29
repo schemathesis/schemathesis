@@ -32,7 +32,7 @@ include = ["src/schemathesis/py.typed"]
 python = "^3.6"
 attrs = ">=19.2"
 hypothesis = ">=5.15,<6.0"
-hypothesis_jsonschema = ">=0.17.0,<1.0"
+hypothesis_jsonschema = ">=0.20.1,<1.0"
 hypothesis_graphql = ">=0.3"
 jsonschema = "^3.0.0"
 pytest = ">4.6.4"
