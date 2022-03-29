@@ -602,14 +602,14 @@ dev = ["pre-commit", "tox"]
 
 [[package]]
 name = "pytest-subtests"
-version = "0.6.0"
+version = "0.5.0"
 description = "unittest subTest() support and subtests fixture"
 category = "main"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.5"
 
 [package.dependencies]
-pytest = ">=6.0"
+pytest = ">=5.3.0"
 
 [[package]]
 name = "pytest-xdist"
@@ -868,7 +868,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6"
-content-hash = "07d87744ba28cfa601e23aecdc760a4fe45e262e5e34df93b5af4b6a0fde3cff"
+content-hash = "5abf0c7da1adad7d9736db7794bd8fcd9dca5c4d27573f609bfb11988e65bb16"
 
 [metadata.files]
 aiohttp = [
@@ -1434,8 +1434,8 @@ pytest-mock = [
     {file = "pytest_mock-1.13.0-py2.py3-none-any.whl", hash = "sha256:67e414b3caef7bff6fc6bd83b22b5bc39147e4493f483c2679bc9d4dc485a94d"},
 ]
 pytest-subtests = [
-    {file = "pytest-subtests-0.6.0.tar.gz", hash = "sha256:3ebd306a8dcf75133f1742f288c82f36426ebcf8a132d4ee89782d20e84fc13a"},
-    {file = "pytest_subtests-0.6.0-py3-none-any.whl", hash = "sha256:fb2fe6f95a80003c70055226077c784f40bc31f1994c3e2a99d5668f16730db6"},
+    {file = "pytest-subtests-0.5.0.tar.gz", hash = "sha256:5bd1e4bf0eda4c89a6cd42b0ee28e1d2ca0848de3fd67ad8cdd6d559ed00f120"},
+    {file = "pytest_subtests-0.5.0-py3-none-any.whl", hash = "sha256:ae0e920b76f23acf28fb6265d5a83aa39b688af1cf30b2b402ac7094ccbc6bdf"},
 ]
 pytest-xdist = [
     {file = "pytest-xdist-1.34.0.tar.gz", hash = "sha256:340e8e83e2a4c0d861bdd8d05c5d7b7143f6eea0aba902997db15c2a86be04ee"},

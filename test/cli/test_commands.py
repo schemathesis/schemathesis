@@ -15,7 +15,6 @@ from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
 
 from schemathesis import Case, DataGenerationMethod, fixups
-from schemathesis._compat import metadata
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.cli import reset_checks
 from schemathesis.hooks import unregister_all
@@ -24,14 +23,8 @@ from schemathesis.models import Endpoint
 from schemathesis.runner import DEFAULT_CHECKS
 from schemathesis.targets import DEFAULT_TARGETS
 
-PHASES = "explicit, reuse, generate, target, shrink"
-if metadata.version("hypothesis") < "4.5":
-    PHASES = "explicit, reuse, generate, shrink"
-HEALTH_CHECKS = "data_too_large|filter_too_much|too_slow|return_value|large_base_example|not_a_test_method"
-if metadata.version("hypothesis") < "5.0":
-    HEALTH_CHECKS = (
-        "data_too_large|filter_too_much|too_slow|return_value|hung_test|large_base_example|not_a_test_method"
-    )
+PHASES = ", ".join(map(lambda x: x.name, Phase))
+HEALTH_CHECKS = "|".join(map(lambda x: x.name, HealthCheck))
 
 
 def test_commands_help(cli):
