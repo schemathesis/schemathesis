@@ -1,3 +1,8 @@
+from ._compat import _install_hypothesis_jsonschema_compatibility_shim
+
+_install_hypothesis_jsonschema_compatibility_shim()
+
+del _install_hypothesis_jsonschema_compatibility_shim
 from . import fixups, hooks, targets
 from .cli import register_check, register_target
 from .constants import DataGenerationMethod, __version__
