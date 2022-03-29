@@ -402,7 +402,7 @@ def test_response_conformance_malformed_json(args):
     message = others[1].result.checks[-1].message
     assert "The received response is not valid JSON:" in message
     assert "{malformed}" in message
-    assert "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)" in message
+    assert "Expecting property name enclosed in double quotes" in message
 
 
 @pytest.fixture()
@@ -437,28 +437,6 @@ def test_path_parameters_encoding(schema_url):
 def test_exceptions(schema_url, app, options):
     results = prepare(schema_url, **options)
     assert any([event.status == Status.error for event in results if isinstance(event, events.AfterExecution)])
-
-
-@pytest.mark.endpoints("multipart")
-def test_flaky_exceptions(args, mocker):
-    app, kwargs = args
-    # GH: #236
-    error_idx = 0
-
-    def flaky(*args, **kwargs):
-        nonlocal error_idx
-        exception_class = [ValueError, TypeError, ZeroDivisionError, KeyError][error_idx % 4]
-        error_idx += 1
-        raise exception_class
-
-    # When there are many exceptions during the test
-    # And Hypothesis consider this test as a flaky one
-    mocker.patch("schemathesis.Case.call", side_effect=flaky)
-    mocker.patch("schemathesis.Case.call_wsgi", side_effect=flaky)
-    init, *others, finished = prepare(**kwargs, hypothesis_max_examples=3, hypothesis_derandomize=True)
-    # Then the execution result should indicate errors
-    assert finished.has_errors
-    assert "Tests on this endpoint produce unreliable results:" in others[1].result.errors[0].exception
 
 
 @pytest.mark.endpoints("payload")
