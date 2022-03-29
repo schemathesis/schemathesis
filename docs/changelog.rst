@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Support for Werkzeug>=2.1.0. `#1410`_
+
 `2.8.5`_ - 2020-12-15
 ---------------------
 
@@ -1580,6 +1584,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1410: https://github.com/schemathesis/schemathesis/issues/1410
 .. _#917: https://github.com/schemathesis/schemathesis/issues/917
 .. _#897: https://github.com/schemathesis/schemathesis/issues/897
 .. _#895: https://github.com/schemathesis/schemathesis/issues/895
