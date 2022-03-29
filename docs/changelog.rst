@@ -6,16 +6,25 @@ Changelog
 
 **Added**
 
-- Support for ``Werkzeug>=2.1.0``. `#1410`_
 - ``st`` as an alias to the ``schemathesis`` command line entrypoint.
 - ``st auth login`` to authenticate with Schemathesis.io.
 
 **Changed**
 
-- Validate ``requests`` kwargs to catch cases when the ASGI integration is used, but the proper ASGI client is not supplied. `#1335`_
 - Enable Open API links traversal by default. To disable it, use ``--stateful=none``.
 - Do not validate API schema by default. To enable it back, use `--validate-schema=true`.
 - Add the ``api_slug`` CLI argument to upload data to Schemathesis.io.
+
+`3.13.4`_ - 2022-03-29
+----------------------
+
+**Added**
+
+- Support for ``Werkzeug>=2.1.0``. `#1410`_
+
+**Changed**
+
+- Validate ``requests`` kwargs to catch cases when the ASGI integration is used, but the proper ASGI client is not supplied. `#1335`_
 
 `3.13.3`_ - 2022-02-20
 ----------------------
@@ -2155,7 +2164,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.3...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.4...HEAD
+.. _3.13.4: https://github.com/schemathesis/schemathesis/compare/v3.13.3...v3.13.4
 .. _3.13.3: https://github.com/schemathesis/schemathesis/compare/v3.13.2...v3.13.3
 .. _3.13.2: https://github.com/schemathesis/schemathesis/compare/v3.13.1...v3.13.2
 .. _3.13.1: https://github.com/schemathesis/schemathesis/compare/v3.13.0...v3.13.1
