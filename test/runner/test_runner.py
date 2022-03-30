@@ -922,3 +922,22 @@ def test_finish(event_stream):
     event = event_stream.finish()
     assert isinstance(event, events.Finished)
     assert next(event_stream, None) is None
+
+
+@pytest.mark.operations("success")
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+def test_case_mutation(real_app_schema):
+    # When two checks mutate the case
+
+    def check1(response, case):
+        case.headers = {"Foo": "BAR"}
+        raise AssertionError("Bar!")
+
+    def check2(response, case):
+        case.headers = {"Foo": "BAZ"}
+        raise AssertionError("Baz!")
+
+    _, _, event, _ = from_schema(real_app_schema, checks=[check1, check2]).execute()
+    # Then these mutations should not interfere
+    assert "Foo: BAR" in event.result.checks[0].example.curl_code
+    assert "Foo: BAZ" in event.result.checks[1].example.curl_code

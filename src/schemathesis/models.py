@@ -188,7 +188,7 @@ class Case:  # pylint: disable=too-many-public-methods
 
         def should_display(key: str, value: Any) -> bool:
             if key == "Body":
-                return value is not NOT_SET
+                return not isinstance(value, NotSet)
             return value is not None
 
         return [template.format(key, value) for key, value in output.items() if should_display(key, value)]
