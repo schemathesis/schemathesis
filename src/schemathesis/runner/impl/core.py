@@ -412,10 +412,11 @@ def run_checks(
 
     for check in checks:
         check_name = check.__name__
+        copied_case = case.partial_deepcopy()
         try:
-            skip_check = check(response, case)
+            skip_check = check(response, copied_case)
             if not skip_check:
-                check_result = result.add_success(check_name, case, response, elapsed_time)
+                check_result = result.add_success(check_name, copied_case, response, elapsed_time)
                 check_results.append(check_result)
         except AssertionError as exc:
             message = maybe_set_assertion_message(exc, check_name)
@@ -424,7 +425,7 @@ def run_checks(
                 context = exc.context
             else:
                 context = None
-            check_result = result.add_failure(check_name, case, response, elapsed_time, message, context)
+            check_result = result.add_failure(check_name, copied_case, response, elapsed_time, message, context)
             check_results.append(check_result)
 
     if max_response_time:
