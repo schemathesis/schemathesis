@@ -4,6 +4,7 @@ import threading
 import time
 import uuid
 from contextlib import contextmanager
+from copy import copy, deepcopy
 from types import TracebackType
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Type, Union, cast
 from warnings import WarningMessage, catch_warnings
@@ -399,6 +400,18 @@ def deduplicate_errors(errors: List[Exception]) -> Generator[Exception, None, No
         yield error
 
 
+def _copy_response(response: GenericResponse) -> GenericResponse:
+    if isinstance(response, requests.Response):
+        copied_response = deepcopy(response)
+        setattr(copied_response, "raw", response.raw)
+        return copied_response
+    # Can't deepcopy WSGI response due to generators inside (`response.freeze` doesn't completely help)
+    response.freeze()
+    copied_response = copy(response)
+    copied_response.request = deepcopy(response.request)
+    return copied_response
+
+
 def run_checks(
     case: Case,
     checks: Iterable[CheckFunction],
@@ -413,10 +426,11 @@ def run_checks(
     for check in checks:
         check_name = check.__name__
         copied_case = case.partial_deepcopy()
+        copied_response = _copy_response(response)
         try:
-            skip_check = check(response, copied_case)
+            skip_check = check(copied_response, copied_case)
             if not skip_check:
-                check_result = result.add_success(check_name, copied_case, response, elapsed_time)
+                check_result = result.add_success(check_name, copied_case, copied_response, elapsed_time)
                 check_results.append(check_result)
         except AssertionError as exc:
             message = maybe_set_assertion_message(exc, check_name)
@@ -425,7 +439,7 @@ def run_checks(
                 context = exc.context
             else:
                 context = None
-            check_result = result.add_failure(check_name, copied_case, response, elapsed_time, message, context)
+            check_result = result.add_failure(check_name, copied_case, copied_response, elapsed_time, message, context)
             check_results.append(check_result)
 
     if max_response_time:
