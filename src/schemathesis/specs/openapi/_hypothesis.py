@@ -323,7 +323,11 @@ def jsonify_python_specific_types(value: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def make_positive_strategy(
-    schema: Dict[str, Any], operation_name: str, location: str, media_type: Optional[str]
+    schema: Dict[str, Any],
+    operation_name: str,
+    location: str,
+    media_type: Optional[str],
+    custom_formats: Optional[Dict[str, st.SearchStrategy]] = None,
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
     if is_header_location(location):
@@ -333,7 +337,7 @@ def make_positive_strategy(
         for sub_schema in schema.get("properties", {}).values():
             if list(sub_schema) == ["type"]:
                 sub_schema.setdefault("format", HEADER_FORMAT)
-    return from_schema(schema, custom_formats=STRING_FORMATS)
+    return from_schema(schema, custom_formats={**STRING_FORMATS, **(custom_formats or {})})
 
 
 def _can_skip_header_filter(schema: Dict[str, Any]) -> bool:
@@ -342,10 +346,18 @@ def _can_skip_header_filter(schema: Dict[str, Any]) -> bool:
 
 
 def make_negative_strategy(
-    schema: Dict[str, Any], operation_name: str, location: str, media_type: Optional[str]
+    schema: Dict[str, Any],
+    operation_name: str,
+    location: str,
+    media_type: Optional[str],
+    custom_formats: Optional[Dict[str, st.SearchStrategy]] = None,
 ) -> st.SearchStrategy:
     return negative_schema(
-        schema, operation_name=operation_name, location=location, media_type=media_type, custom_formats=STRING_FORMATS
+        schema,
+        operation_name=operation_name,
+        location=location,
+        media_type=media_type,
+        custom_formats={**STRING_FORMATS, **(custom_formats or {})},
     )
 
 
