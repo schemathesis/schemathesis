@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.13.5`_ - 2022-03-31
+----------------------
+
 **Changed**
 
 - Deep-clone ``Case`` instances before passing to check functions.
@@ -2157,7 +2160,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.4...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.5...HEAD
+.. _3.13.5: https://github.com/schemathesis/schemathesis/compare/v3.13.4...v3.13.5
 .. _3.13.4: https://github.com/schemathesis/schemathesis/compare/v3.13.3...v3.13.4
 .. _3.13.3: https://github.com/schemathesis/schemathesis/compare/v3.13.2...v3.13.3
 .. _3.13.2: https://github.com/schemathesis/schemathesis/compare/v3.13.1...v3.13.2
