@@ -14,6 +14,12 @@ Changelog
 - Enable Open API links traversal by default. To disable it, use ``--stateful=none``.
 - Do not validate API schema by default. To enable it back, use `--validate-schema=true`.
 - Add the ``api_slug`` CLI argument to upload data to Schemathesis.io.
+
+`3.13.6`_ - 2022-03-31
+----------------------
+
+**Changed**
+
 - Deep-clone ``Response`` instances before passing to check functions.
 
 `3.13.5`_ - 2022-03-31
@@ -2172,7 +2178,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.5...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.6...HEAD
+.. _3.13.6: https://github.com/schemathesis/schemathesis/compare/v3.13.5...v3.13.6
 .. _3.13.5: https://github.com/schemathesis/schemathesis/compare/v3.13.4...v3.13.5
 .. _3.13.4: https://github.com/schemathesis/schemathesis/compare/v3.13.3...v3.13.4
 .. _3.13.3: https://github.com/schemathesis/schemathesis/compare/v3.13.2...v3.13.3
