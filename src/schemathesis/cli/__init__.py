@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 import attr
 import click
 import hypothesis
+import requests
 import yaml
 
 from .. import checks as checks_module
@@ -1042,15 +1043,29 @@ def auth() -> None:
     default=service.DEFAULT_HOSTNAME,
     envvar=service.HOSTNAME_ENV_VAR,
 )
+@click.option(
+    "--protocol",
+    type=click.Choice(["https", "http"]),
+    default=service.DEFAULT_PROTOCOL,
+    envvar=service.PROTOCOL_ENV_VAR,
+)
+@with_request_tls_verify
 @with_hosts_file
-def login(token: str, hostname: str, hosts_file: str) -> None:
+def login(token: str, hostname: str, hosts_file: str, protocol: str, request_tls_verify: bool = True) -> None:
     """Authenticate with a schemathesis.io host.
 
     Example:
         st auth login MY_TOKEN
 
     """
-    service.hosts.store(token, hostname, hosts_file)
+    try:
+        username = service.auth.login(token, hostname, protocol, request_tls_verify)
+        service.hosts.store(token, hostname, hosts_file)
+        click.secho(click.style("✔️", fg="green") + f" Logged in into {hostname} as " + bold(username))
+    except requests.HTTPError as exc:
+        detail = exc.response.json()["detail"]
+        click.secho(f"❌ Failed to login into {hostname}: " + bold(detail))
+        sys.exit(1)
 
 
 def bold(message: str) -> str:

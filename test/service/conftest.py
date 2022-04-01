@@ -97,10 +97,15 @@ class Service:
 
 
 @pytest.fixture
-def service(httpserver, service_setup, start_run_url, create_event_url, finish_run_url):
+def hostname(httpserver):
+    return f"{httpserver.host}:{httpserver.port}"
+
+
+@pytest.fixture
+def service(httpserver, hostname, service_setup, start_run_url, create_event_url, finish_run_url):
     return Service(
         server=httpserver,
-        base_url=f"http://{httpserver.host}:{httpserver.port}",
+        base_url=f"http://{hostname}",
         start_run_url=start_run_url,
         create_event_url=create_event_url,
         finish_run_url=finish_run_url,
