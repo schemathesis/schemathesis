@@ -3,6 +3,7 @@ import pathlib
 DEFAULT_HOSTNAME = "api.schemathesis.io"
 # The main Schemathesis.io API address
 DEFAULT_URL = f"https://{DEFAULT_HOSTNAME}/"
+DEFAULT_PROTOCOL = "https"
 # A sentinel to signal the worker thread to stop
 STOP_MARKER = object()
 # Timeout for each API call
@@ -19,5 +20,6 @@ HOSTS_FORMAT_VERSION = "0.1"
 DEFAULT_HOSTS_PATH = pathlib.Path.home() / ".config/schemathesis/hosts.toml"
 TOKEN_ENV_VAR = "SCHEMATHESIS_TOKEN"
 HOSTNAME_ENV_VAR = "SCHEMATHESIS_HOSTNAME"
+PROTOCOL_ENV_VAR = "SCHEMATHESIS_PROTOCOL"
 HOSTS_PATH_ENV_VAR = "SCHEMATHESIS_HOSTS_PATH"
 URL_ENV_VAR = "SCHEMATHESIS_URL"

@@ -6,15 +6,16 @@ from requests.adapters import HTTPAdapter, Retry
 
 from ..constants import USER_AGENT
 from .constants import REQUEST_TIMEOUT
-from .models import TestRun
+from .models import AuthResponse, TestRun
 
 
 class ServiceClient(requests.Session):
     """A more convenient session to send requests to Schemathesis.io."""
 
-    def __init__(self, base_url: str, token: str, timeout: int = REQUEST_TIMEOUT):
+    def __init__(self, base_url: str, token: str, *, timeout: int = REQUEST_TIMEOUT, verify: bool = True):
         super().__init__()
         self.timeout = timeout
+        self.verify = verify
         self.base_url = base_url
         self.headers.update({"Authorization": f"Bearer {token}", "User-Agent": USER_AGENT})
         # Automatically check responses for 4XX and 5XX
@@ -25,6 +26,7 @@ class ServiceClient(requests.Session):
 
     def request(self, method: str, url: str, *args: Any, **kwargs: Any) -> requests.Response:  # type: ignore
         kwargs.setdefault("timeout", self.timeout)
+        kwargs.setdefault("verify", self.verify)
         # All requests will be done against the base url
         url = urljoin(self.base_url, url)
         return super().request(method, url, *args, **kwargs)
@@ -45,3 +47,9 @@ class ServiceClient(requests.Session):
     def send_event(self, run_id: str, data: Dict[str, Any]) -> None:
         """Send a single event to Schemathesis.io."""
         self.post(f"/runs/{run_id}/events/", json=data)
+
+    def cli_login(self, payload: Dict[str, Any]) -> AuthResponse:
+        """Send a login request."""
+        response = self.post("/auth/cli/login/", json=payload)
+        data = response.json()
+        return AuthResponse(username=data["username"])

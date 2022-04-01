@@ -1,10 +1,12 @@
-from . import hosts
+from . import auth, hosts
 from .constants import (
     DEFAULT_HOSTNAME,
     DEFAULT_HOSTS_PATH,
+    DEFAULT_PROTOCOL,
     DEFAULT_URL,
     HOSTNAME_ENV_VAR,
     HOSTS_PATH_ENV_VAR,
+    PROTOCOL_ENV_VAR,
     TOKEN_ENV_VAR,
     URL_ENV_VAR,
     WORKER_CHECK_PERIOD,
