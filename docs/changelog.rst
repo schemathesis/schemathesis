@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.13.7`_ - 2022-04-02
+----------------------
+
 **Added**
 
 - Support for ``Hypothesis>=6.41.0``. `#1425`_
@@ -2171,7 +2174,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.6...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.7...HEAD
+.. _3.13.7: https://github.com/schemathesis/schemathesis/compare/v3.13.6...v3.13.7
 .. _3.13.6: https://github.com/schemathesis/schemathesis/compare/v3.13.5...v3.13.6
 .. _3.13.5: https://github.com/schemathesis/schemathesis/compare/v3.13.4...v3.13.5
 .. _3.13.4: https://github.com/schemathesis/schemathesis/compare/v3.13.3...v3.13.4
