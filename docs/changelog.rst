@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Support for ``Hypothesis>=6.41.0``. `#1425`_
+
 `3.13.6`_ - 2022-03-31
 ----------------------
 
@@ -2358,6 +2362,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1425: https://github.com/schemathesis/schemathesis/issues/1425
 .. _#1410: https://github.com/schemathesis/schemathesis/issues/1410
 .. _#1395: https://github.com/schemathesis/schemathesis/issues/1395
 .. _#1370: https://github.com/schemathesis/schemathesis/issues/1370

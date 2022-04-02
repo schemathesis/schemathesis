@@ -32,13 +32,12 @@ import yarl
 from hypothesis.core import is_invalid_test
 from hypothesis.reporting import with_reporter
 from hypothesis.strategies import SearchStrategy
-from hypothesis.utils.conventions import InferType
 from requests.auth import HTTPDigestAuth
 from requests.exceptions import InvalidHeader  # type: ignore
 from requests.utils import check_header_validity  # type: ignore
 from werkzeug.wrappers import Response as BaseResponse
 
-from ._compat import JSONMixin
+from ._compat import InferType, JSONMixin
 from .constants import USER_AGENT, DataGenerationMethod
 from .exceptions import UsageError
 from .types import DataGenerationMethodInput, Filter, GenericTest, NotSet, RawAuth

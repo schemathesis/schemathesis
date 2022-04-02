@@ -1,3 +1,4 @@
+# pylint: disable=ungrouped-imports
 import hypothesis_jsonschema._from_schema
 import jsonschema
 import werkzeug
@@ -18,6 +19,12 @@ else:
 
     class JSONMixin:  # type: ignore
         pass
+
+
+try:
+    from hypothesis.utils.conventions import InferType
+except ImportError:
+    InferType = type(...)
 
 
 def _get_format_filter(
