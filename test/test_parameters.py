@@ -547,7 +547,7 @@ def test_null_body(api_schema):
     # When API operation expects `null` as payload
 
     @given(case=api_schema["/payload"]["POST"].as_strategy())
-    @settings(max_examples=5)
+    @settings(max_examples=5, deadline=None)
     def test(case):
         assume(case.body is None)
         # Then it should be possible to send `null`
