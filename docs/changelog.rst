@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Missing ``media_type`` in the ``Case.partial_deepcopy`` implementation. It led to missing payload in failure reproduction code samples.
+
 `3.13.7`_ - 2022-04-02
 ----------------------
 
