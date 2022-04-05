@@ -16,6 +16,10 @@ Changelog
 - Do not validate API schema by default. To enable it back, use `--validate-schema=true`.
 - Add the ``api_slug`` CLI argument to upload data to Schemathesis.io.
 
+**Fixed**
+
+- Missing ``media_type`` in the ``Case.partial_deepcopy`` implementation. It led to missing payload in failure reproduction code samples.
+
 `3.13.6`_ - 2022-03-31
 ----------------------
 

@@ -112,7 +112,7 @@ class Case:  # pylint: disable=too-many-public-methods
         first = True
         for name in ("path_parameters", "headers", "cookies", "query", "body"):
             value = getattr(self, name)
-            if value not in (None, NOT_SET):
+            if value is not None and not isinstance(value, NotSet):
                 if first:
                     first = False
                 else:
@@ -278,7 +278,7 @@ class Case:  # pylint: disable=too-many-public-methods
     ) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by requests."""
         final_headers = self._get_headers(headers)
-        if self.media_type and self.media_type != "multipart/form-data" and self.body is not NOT_SET:
+        if self.media_type and self.media_type != "multipart/form-data" and not isinstance(self.body, NotSet):
             # `requests` will handle multipart form headers with the proper `boundary` value.
             if "content-type" not in {header.lower() for header in final_headers}:
                 final_headers["Content-Type"] = self.media_type
@@ -287,7 +287,7 @@ class Case:  # pylint: disable=too-many-public-methods
         url = unquote(urljoin(base_url + "/", quote(formatted_path)))
         extra: Dict[str, Any]
         serializer = self._get_serializer()
-        if serializer is not None and self.body is not NOT_SET:
+        if serializer is not None and not isinstance(self.body, NotSet):
             context = SerializerContext(case=self)
             extra = serializer.as_requests(context, self.body)
         else:
@@ -339,12 +339,12 @@ class Case:  # pylint: disable=too-many-public-methods
     def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
         final_headers = self._get_headers(headers)
-        if self.media_type and self.body is not NOT_SET:
+        if self.media_type and not isinstance(self.body, NotSet):
             # If we need to send a payload, then the Content-Type header should be set
             final_headers["Content-Type"] = self.media_type
         extra: Dict[str, Any]
         serializer = self._get_serializer()
-        if serializer is not None and self.body is not NOT_SET:
+        if serializer is not None and not isinstance(self.body, NotSet):
             context = SerializerContext(case=self)
             extra = serializer.as_werkzeug(context, self.body)
         else:
@@ -467,6 +467,7 @@ class Case:  # pylint: disable=too-many-public-methods
         return self.__class__(
             operation=self.operation.partial_deepcopy(),
             data_generation_method=self.data_generation_method,
+            media_type=self.media_type,
             path_parameters=deepcopy(self.path_parameters),
             headers=deepcopy(self.headers),
             cookies=deepcopy(self.cookies),

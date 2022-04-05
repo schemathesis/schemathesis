@@ -219,8 +219,10 @@ def test_call_asgi_and_validate(fastapi_app):
 
 def test_case_partial_deepcopy(swagger_20):
     operation = APIOperation("/example/path", "GET", {}, swagger_20)
+    media_type = "application/json"
     original_case = Case(
         operation=operation,
+        media_type=media_type,
         path_parameters={"test": "test"},
         headers={"Content-Type": "application/json"},
         cookies={"TOKEN": "secret"},
@@ -235,6 +237,7 @@ def test_case_partial_deepcopy(swagger_20):
     copied_case.cookies["TOKEN"] = "overwritten"
     copied_case.query["a"] = "overwritten"
     copied_case.body["b"] = "overwritten"
+    assert copied_case.media_type == media_type
 
     assert original_case.operation.path == "/example/path"
     assert original_case.path_parameters["test"] == "test"
@@ -242,6 +245,20 @@ def test_case_partial_deepcopy(swagger_20):
     assert original_case.cookies["TOKEN"] == "secret"
     assert original_case.query["a"] == 1
     assert original_case.body["b"] == 1
+
+
+def test_case_partial_deepcopy_same_generated_code(swagger_20):
+    operation = APIOperation("/example/path", "GET", {}, swagger_20)
+    original_case = Case(
+        operation=operation,
+        media_type="application/json",
+        path_parameters={"test": "test"},
+        headers={"Content-Type": "application/json"},
+        cookies={"TOKEN": "secret"},
+        query={"a": 1},
+        body={"b": 1},
+    )
+    assert original_case.as_curl_command() == original_case.partial_deepcopy().as_curl_command()
 
 
 def test_validate_response(testdir):
