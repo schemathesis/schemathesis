@@ -8,7 +8,6 @@ Changelog
 
 - ``st`` as an alias to the ``schemathesis`` command line entrypoint.
 - ``st auth login`` to authenticate with Schemathesis.io.
-- Support for ``Hypothesis>=6.41.0``. `#1425`_
 
 **Changed**
 
@@ -16,9 +15,19 @@ Changelog
 - Do not validate API schema by default. To enable it back, use `--validate-schema=true`.
 - Add the ``api_slug`` CLI argument to upload data to Schemathesis.io.
 
+`3.13.8`_ - 2022-04-05
+----------------------
+
 **Fixed**
 
 - Missing ``media_type`` in the ``Case.partial_deepcopy`` implementation. It led to missing payload in failure reproduction code samples.
+
+`3.13.7`_ - 2022-04-02
+----------------------
+
+**Added**
+
+- Support for ``Hypothesis>=6.41.0``. `#1425`_
 
 `3.13.6`_ - 2022-03-31
 ----------------------
@@ -2183,7 +2192,9 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.6...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.8...HEAD
+.. _3.13.8: https://github.com/schemathesis/schemathesis/compare/v3.13.7...v3.13.8
+.. _3.13.7: https://github.com/schemathesis/schemathesis/compare/v3.13.6...v3.13.7
 .. _3.13.6: https://github.com/schemathesis/schemathesis/compare/v3.13.5...v3.13.6
 .. _3.13.5: https://github.com/schemathesis/schemathesis/compare/v3.13.4...v3.13.5
 .. _3.13.4: https://github.com/schemathesis/schemathesis/compare/v3.13.3...v3.13.4
