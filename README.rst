@@ -105,7 +105,7 @@ Links
 - **Releases**: https://pypi.org/project/schemathesis/
 - **Code**: https://github.com/schemathesis/schemathesis
 - **Issue tracker**: https://github.com/schemathesis/schemathesis/issues
-- **Chat**: https://gitter.im/schemathesis/schemathesis
+- **Chat**: https://discord.gg/R9ASRAmHnA
 
 Additional content:
 
@@ -137,9 +137,9 @@ By contributing to Schemathesis, you agree that your contributions will be licen
    :target: https://pypi.org/project/schemathesis/
 .. |License| image:: https://img.shields.io/pypi/l/schemathesis.svg
    :target: https://opensource.org/licenses/MIT
-.. |Chat| image:: https://img.shields.io/gitter/room/schemathesis/schemathesis.svg
-   :target: https://gitter.im/schemathesis/schemathesis
-   :alt: Gitter
+.. |Chat| image:: https://img.shields.io/discord/938139740912369755
+   :target: https://discord.gg/R9ASRAmHnA
+   :alt: Discord
 .. |Docs| image:: https://readthedocs.org/projects/schemathesis/badge/?version=stable
    :target: https://schemathesis.readthedocs.io/en/stable/?badge=stable
    :alt: Documentation Status
