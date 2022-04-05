@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.13.8`_ - 2022-04-05
+----------------------
+
 **Fixed**
 
 - Missing ``media_type`` in the ``Case.partial_deepcopy`` implementation. It led to missing payload in failure reproduction code samples.
@@ -2178,7 +2181,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.7...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.8...HEAD
+.. _3.13.8: https://github.com/schemathesis/schemathesis/compare/v3.13.7...v3.13.8
 .. _3.13.7: https://github.com/schemathesis/schemathesis/compare/v3.13.6...v3.13.7
 .. _3.13.6: https://github.com/schemathesis/schemathesis/compare/v3.13.5...v3.13.6
 .. _3.13.5: https://github.com/schemathesis/schemathesis/compare/v3.13.4...v3.13.5
