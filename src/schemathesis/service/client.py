@@ -48,8 +48,8 @@ class ServiceClient(requests.Session):
         """Send a single event to Schemathesis.io."""
         self.post(f"/runs/{run_id}/events/", json=data)
 
-    def cli_login(self, payload: Dict[str, Any]) -> AuthResponse:
+    def cli_login(self, metadata: Dict[str, Any]) -> AuthResponse:
         """Send a login request."""
-        response = self.post("/auth/cli/login/", json=payload)
+        response = self.post("/auth/cli/login/", json={"metadata": metadata})
         data = response.json()
         return AuthResponse(username=data["username"])
