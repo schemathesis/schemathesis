@@ -215,6 +215,10 @@ def cli():
         def login(*args, **kwargs):
             return cli_runner.invoke(schemathesis.cli.login, args, **kwargs)
 
+        @staticmethod
+        def logout(*args, **kwargs):
+            return cli_runner.invoke(schemathesis.cli.logout, args, **kwargs)
+
     return Runner()
 
 
