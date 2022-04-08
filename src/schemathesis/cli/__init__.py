@@ -68,6 +68,8 @@ DEFAULT_TARGETS_NAMES = _get_callable_names(targets_module.DEFAULT_TARGETS)
 ALL_TARGETS_NAMES = _get_callable_names(targets_module.ALL_TARGETS)
 TARGETS_TYPE = click.Choice((*ALL_TARGETS_NAMES, "all"))
 
+DATA_GENERATION_METHOD_TYPE = click.Choice([item.name for item in DataGenerationMethod])
+
 
 def register_target(function: Target) -> Target:
     """Register a new testing target for schemathesis CLI.
@@ -226,7 +228,7 @@ with_hosts_file = click.option(
     "-D",
     "data_generation_methods",
     help="Defines how Schemathesis generates data for tests.",
-    type=click.Choice([item.name for item in DataGenerationMethod]),
+    type=DATA_GENERATION_METHOD_TYPE,
     default=DataGenerationMethod.default(),
     callback=callbacks.convert_data_generation_method,
     show_default=True,
