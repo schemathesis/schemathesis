@@ -153,7 +153,7 @@ def test_unauthorized(cli, schema_url, service):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then a proper error message should be displayed
     lines = get_stdout_lines(result.stdout)
-    assert "Please, check that you use the proper CLI upload token" in lines
+    assert "Please, check that you use the proper CLI access token" in lines
 
 
 @pytest.mark.service(

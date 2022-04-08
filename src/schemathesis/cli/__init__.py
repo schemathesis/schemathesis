@@ -863,9 +863,10 @@ def get_service_token(api_slug: Optional[str], url: str, hosts_file: PathLike, t
         hostname = urlparse(url).netloc
         token = token or service.hosts.get_token(hostname=hostname, hosts_file=hosts_file)
         if token is None:
+            hostname = "Schemathesis.io" if hostname == service.DEFAULT_HOSTNAME else hostname
             raise click.UsageError(
                 "\n\n"
-                "You are trying to upload data to Schemathesis.io, but your CLI appears to be not authenticated.\n\n"
+                f"You are trying to upload data to {hostname}, but your CLI appears to be not authenticated.\n\n"
                 "To authenticate, grab your token from `app.schemathesis.io` and run `st auth login <TOKEN>`\n"
                 "Alternatively, you can pass the token explicitly via the `--schemathesis-io-token` option / "
                 f"`{service.TOKEN_ENV_VAR}` environment variable\n\n"
