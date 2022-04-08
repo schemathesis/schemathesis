@@ -1,11 +1,13 @@
 from typing import Any, Dict
 from urllib.parse import urljoin
 
+import attr
 import requests
 from requests.adapters import HTTPAdapter, Retry
 
 from ..constants import USER_AGENT
 from .constants import REQUEST_TIMEOUT
+from .metadata import Metadata
 from .models import AuthResponse, TestRun
 
 
@@ -48,8 +50,8 @@ class ServiceClient(requests.Session):
         """Send a single event to Schemathesis.io."""
         self.post(f"/runs/{run_id}/events/", json=data)
 
-    def cli_login(self, metadata: Dict[str, Any]) -> AuthResponse:
+    def cli_login(self, metadata: Metadata) -> AuthResponse:
         """Send a login request."""
-        response = self.post("/auth/cli/login/", json={"metadata": metadata})
+        response = self.post("/auth/cli/login/", json={"metadata": attr.asdict(metadata)})
         data = response.json()
         return AuthResponse(username=data["username"])
