@@ -1350,9 +1350,9 @@ def test_wsgi_app_internal_exception(testdir, cli):
     result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--hypothesis-derandomize")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
-    assert "== APPLICATION LOGS ==" in lines[48], result.stdout.strip()
-    assert "ERROR in app: Exception on /api/success [GET]" in lines[50]
-    assert lines[66] == "ZeroDivisionError: division by zero"
+    assert "== APPLICATION LOGS ==" in lines[50], result.stdout.strip()
+    assert "ERROR in app: Exception on /api/success [GET]" in lines[52]
+    assert lines[68] == "ZeroDivisionError: division by zero"
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
@@ -1885,7 +1885,7 @@ def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra):
     )
     # And code sample as well
     assert (
-        lines[26]
+        lines[27]
         == f"    curl -X GET -H 'Accept: */*' -H 'Accept-Encoding: gzip, deflate' -H 'Authorization: Basic J3Rlc3Q6d3Jvbmcn' -H 'Connection: keep-alive' -H 'User-Agent: {USER_AGENT}' {base_url}/basic"
     )
 

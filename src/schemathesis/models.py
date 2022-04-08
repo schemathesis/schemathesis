@@ -430,7 +430,7 @@ class Case:  # pylint: disable=too-many-public-methods
             code_message = self._get_code_message(code_sample_style, response.request)
             payload = get_response_payload(response)
             raise exception_cls(
-                f"\n\n{formatted_errors}\n\n----------\n\nResponse payload: `{payload}`\n\n{code_message}"
+                f"\n\n{formatted_errors}\n\n----------\n\nResponse status: {response.status_code}\nResponse payload: `{payload}`\n\n{code_message}"
             )
 
     def _get_code_message(self, code_sample_style: CodeSampleStyle, request: requests.PreparedRequest) -> str:
