@@ -285,6 +285,7 @@ def test_(case):
           "",
           "----------",
           "",
+          "Response status: 418",
           "Response payload: ``",
           "",
           "Run this cURL command to reproduce this response: ",
