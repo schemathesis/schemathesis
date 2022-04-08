@@ -62,6 +62,7 @@ from .utils import (
     NOT_SET,
     GenericResponse,
     WSGIResponse,
+    copy_response,
     deprecated_property,
     get_response_payload,
     maybe_set_assertion_message,
@@ -78,6 +79,9 @@ class CaseSource:
 
     case: "Case" = attr.ib()  # pragma: no mutate
     response: GenericResponse = attr.ib()  # pragma: no mutate
+
+    def partial_deepcopy(self) -> "CaseSource":
+        return self.__class__(case=self.case.partial_deepcopy(), response=copy_response(self.response))
 
 
 def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
@@ -468,6 +472,7 @@ class Case:  # pylint: disable=too-many-public-methods
             operation=self.operation.partial_deepcopy(),
             data_generation_method=self.data_generation_method,
             media_type=self.media_type,
+            source=self.source if self.source is None else self.source.partial_deepcopy(),
             path_parameters=deepcopy(self.path_parameters),
             headers=deepcopy(self.headers),
             cookies=deepcopy(self.cookies),

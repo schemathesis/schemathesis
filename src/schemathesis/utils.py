@@ -6,6 +6,7 @@ import sys
 import traceback
 import warnings
 from contextlib import contextmanager
+from copy import copy, deepcopy
 from inspect import getfullargspec
 from json import JSONDecodeError
 from typing import (
@@ -236,6 +237,19 @@ def get_requests_auth(auth: Optional[RawAuth], auth_type: Optional[str]) -> Opti
 
 
 GenericResponse = Union[requests.Response, WSGIResponse]  # pragma: no mutate
+
+
+def copy_response(response: GenericResponse) -> GenericResponse:
+    """Create a copy of the given response as far as it makes sense."""
+    if isinstance(response, requests.Response):
+        copied_response = deepcopy(response)
+        setattr(copied_response, "raw", response.raw)
+        return copied_response
+    # Can't deepcopy WSGI response due to generators inside (`response.freeze` doesn't completely help)
+    response.freeze()
+    copied_response = copy(response)
+    copied_response.request = deepcopy(response.request)
+    return copied_response
 
 
 def get_response_payload(response: GenericResponse) -> str:
