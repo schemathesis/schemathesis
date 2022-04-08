@@ -73,8 +73,8 @@ Authenticate with Schemathesis.io first:
 
 .. code:: text
 
-    # Replace `8adf6693017d454eb4f9519acf89a5e9` with your token
-    st auth login 8adf6693017d454eb4f9519acf89a5e9
+    # Replace `LOmOZoBh3V12aP3rRkvqYYKGGGV6Ag` with your token
+    st auth login LOmOZoBh3V12aP3rRkvqYYKGGGV6Ag
 
 And then run the tests:
 
@@ -114,3 +114,11 @@ Each failure is accompanied by a cURL snippet you can use to reproduce the issue
 .. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_server_error.png
 
 Alternatively, you can use the **Replay** button on the failure page.
+
+What data is sent?
+------------------
+
+CLI sends info to Schemathesis.io in the following cases:
+
+- Authentication. Metadata about your host machine, that helps us to understand our users better. We collect your Python interpreter version, implementation, system/OS name and release. For more information look at ``service/metadata.py``
+- Test runs. Most of Schemathesis runner's events, including all generated data and explicitly passed headers. For more information look at ``service/serialization.py``

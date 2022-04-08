@@ -313,7 +313,7 @@ def display_service_error(event: service.Error, context: ExecutionContext) -> No
         elif status_code == 401:
             # Likely an invalid token
             click.secho(
-                "Please, check that you use the proper CLI upload token\n"
+                "Please, check that you use the proper CLI access token\n"
                 "See https://schemathesis.readthedocs.io/en/stable/service.html for more details",
                 fg="red",
             )

@@ -1,7 +1,6 @@
 import pytest
 
-from schemathesis.service import TOKEN_ENV_VAR
-from schemathesis.service.hosts import get_token
+from schemathesis.service import TOKEN_ENV_VAR, hosts
 
 
 def malform_hosts(path):
@@ -13,7 +12,7 @@ def assert_token(hostname, hosts_file, token):
     # And a new file is created
     assert hosts_file.exists()
     # And token could be loaded
-    assert get_token(hostname=hostname, hosts_file=hosts_file) == token
+    assert hosts.get_token(hostname=hostname, hosts_file=hosts_file) == token
 
 
 USERNAME = "TestUser"
@@ -75,4 +74,46 @@ def test_invalid_auth(cli, hosts_file, hostname, service, tmp_path):
     assert result.stdout.strip() == f"❌ Failed to login into {hostname}: {ERROR_MESSAGE}"
     # And the token should not be saved
     assert not hosts_file.exists()
-    assert get_token(hostname=hostname, hosts_file=hosts_file) is None
+    assert hosts.get_token(hostname=hostname, hosts_file=hosts_file) is None
+
+
+def test_logout_success(cli, hosts_file):
+    # When CLI is logged in
+    hostname = "127.0.0.1"
+    hosts.store("foo", hostname=hostname, hosts_file=hosts_file)
+    result = cli.auth.logout(f"--hosts-file={hosts_file}", f"--hostname={hostname}")
+    # Then it should be a success message
+    assert result.exit_code == 0, result.stdout
+    assert result.stdout.strip() == f"✔️ Logged out of {hostname} account"
+    # And the auth info should be removed from the hosts file
+    data = hosts.load(hosts_file)
+    assert hostname not in data
+
+
+def test_logout_no_hosts_info(cli, hosts_file):
+    # When there is no hosts info
+    result = cli.auth.logout(f"--hosts-file={hosts_file}")
+    # Then it should be an error on logout
+    assert result.exit_code == 1, result.stdout
+    assert result.stdout.strip() == "🟡️ Not logged in to any hosts"
+    # And the hosts file should not be created
+    assert not hosts_file.exists()
+
+
+def test_logout_no_specific_host_info(cli, hosts_file):
+    # When there is no hosts info
+    hostname = "127.0.0.1"
+    hosts.store("foo", hostname="127.0.0.2", hosts_file=hosts_file)
+    result = cli.auth.logout(f"--hosts-file={hosts_file}", f"--hostname={hostname}")
+    # Then it should be an error on logout
+    assert result.exit_code == 1, result.stdout
+    assert result.stdout.strip() == "🟡️ Not logged in to 127.0.0.1"
+
+
+def test_logout_malformed_hosts_file(cli, hosts_file):
+    # When the hosts file is malformed
+    malform_hosts(hosts_file)
+    result = cli.auth.logout(f"--hosts-file={hosts_file}")
+    # Then it should be an error on logout
+    assert result.exit_code == 1, result.stdout
+    assert result.stdout.strip() == f"❌ Failed to read the hosts file. Try to remove {hosts_file}"
