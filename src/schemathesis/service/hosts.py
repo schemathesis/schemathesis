@@ -1,4 +1,5 @@
 """Work with stored auth data."""
+import enum
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -31,6 +32,31 @@ def load(path: PathLike) -> Dict[str, Any]:
         return {}
     except tomli.TOMLDecodeError:
         return {}
+
+
+@enum.unique
+class RemoveAuth(enum.Enum):
+    success = 1
+    no_match = 2
+    no_hosts = 3
+    error = 4
+
+
+def remove(hostname: str = DEFAULT_HOSTNAME, hosts_file: PathLike = DEFAULT_HOSTS_PATH) -> RemoveAuth:
+    """Remove authentication for a Schemathesis.io host."""
+    try:
+        with open(hosts_file, "rb") as fd:
+            hosts = tomli.load(fd)
+        try:
+            hosts.pop(hostname)
+            _dump_hosts(hosts_file, hosts)
+            return RemoveAuth.success
+        except KeyError:
+            return RemoveAuth.no_match
+    except FileNotFoundError:
+        return RemoveAuth.no_hosts
+    except tomli.TOMLDecodeError:
+        return RemoveAuth.error
 
 
 def get_token(hostname: str = DEFAULT_HOSTNAME, hosts_file: PathLike = DEFAULT_HOSTS_PATH) -> Optional[str]:

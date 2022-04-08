@@ -865,9 +865,10 @@ def get_service_token(api_slug: Optional[str], url: str, hosts_file: PathLike, t
         hostname = urlparse(url).netloc
         token = token or service.hosts.get_token(hostname=hostname, hosts_file=hosts_file)
         if token is None:
+            hostname = "Schemathesis.io" if hostname == service.DEFAULT_HOSTNAME else hostname
             raise click.UsageError(
                 "\n\n"
-                "You are trying to upload data to Schemathesis.io, but your CLI appears to be not authenticated.\n\n"
+                f"You are trying to upload data to {hostname}, but your CLI appears to be not authenticated.\n\n"
                 "To authenticate, grab your token from `app.schemathesis.io` and run `st auth login <TOKEN>`\n"
                 "Alternatively, you can pass the token explicitly via the `--schemathesis-io-token` option / "
                 f"`{service.TOKEN_ENV_VAR}` environment variable\n\n"
@@ -1054,7 +1055,7 @@ def auth() -> None:
 @with_request_tls_verify
 @with_hosts_file
 def login(token: str, hostname: str, hosts_file: str, protocol: str, request_tls_verify: bool = True) -> None:
-    """Authenticate with a schemathesis.io host.
+    """Authenticate with a Schemathesis.io host.
 
     Example:
         st auth login MY_TOKEN
@@ -1063,11 +1064,47 @@ def login(token: str, hostname: str, hosts_file: str, protocol: str, request_tls
     try:
         username = service.auth.login(token, hostname, protocol, request_tls_verify)
         service.hosts.store(token, hostname, hosts_file)
-        click.secho(click.style("✔️", fg="green") + f" Logged in into {hostname} as " + bold(username))
+        success_message(f"Logged in into {hostname} as " + bold(username))
     except requests.HTTPError as exc:
         detail = exc.response.json()["detail"]
-        click.secho(f"❌ Failed to login into {hostname}: " + bold(detail))
+        error_message(f"Failed to login into {hostname}: " + bold(detail))
         sys.exit(1)
+
+
+@auth.command(short_help="Remove authentication for a Schemathesis.io host.")
+@click.option(
+    "--hostname",
+    help="The hostname of the Schemathesis.io instance to authenticate with",
+    type=str,
+    default=service.DEFAULT_HOSTNAME,
+    envvar=service.HOSTNAME_ENV_VAR,
+)
+@with_hosts_file
+def logout(hostname: str, hosts_file: str) -> None:
+    """Remove authentication for a Schemathesis.io host."""
+    result = service.hosts.remove(hostname, hosts_file)
+    if result == service.hosts.RemoveAuth.success:
+        success_message(f"Logged out of {hostname} account")
+    else:
+        if result == service.hosts.RemoveAuth.no_match:
+            warning_message(f"Not logged in to {hostname}")
+        if result == service.hosts.RemoveAuth.no_hosts:
+            warning_message("Not logged in to any hosts")
+        if result == service.hosts.RemoveAuth.error:
+            error_message(f"Failed to read the hosts file. Try to remove {hosts_file}")
+        sys.exit(1)
+
+
+def success_message(message: str) -> None:
+    click.secho(click.style("✔️", fg="green") + f" {message}")
+
+
+def warning_message(message: str) -> None:
+    click.secho(click.style("🟡️", fg="yellow") + f" {message}")
+
+
+def error_message(message: str) -> None:
+    click.secho(f"❌ {message}")
 
 
 def bold(message: str) -> str:
