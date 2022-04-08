@@ -8,7 +8,7 @@ from hypothesis import given, settings
 import schemathesis
 from schemathesis.constants import USER_AGENT, DataGenerationMethod
 from schemathesis.exceptions import CheckFailed, UsageError
-from schemathesis.models import APIOperation, Case, Request, Response
+from schemathesis.models import APIOperation, Case, CaseSource, Request, Response
 
 
 @pytest.fixture
@@ -259,6 +259,17 @@ def test_case_partial_deepcopy_same_generated_code(swagger_20):
         body={"b": 1},
     )
     assert original_case.as_curl_command() == original_case.partial_deepcopy().as_curl_command()
+
+
+def test_case_partial_deepcopy_source(swagger_20):
+    operation = APIOperation("/example/path", "GET", {}, swagger_20)
+    original_case = Case(operation=operation)
+    response = requests.Response()
+    response.status_code = 500
+    original_case.source = CaseSource(case=Case(operation=operation, query={"first": 1}), response=response)
+    copied_case = original_case.partial_deepcopy()
+    assert copied_case.source.case.query == original_case.source.case.query
+    assert copied_case.source.response.status_code == original_case.source.response.status_code
 
 
 def test_validate_response(testdir):
