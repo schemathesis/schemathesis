@@ -1,5 +1,5 @@
 from inspect import signature
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Generator, Optional, Union
 
 import attr
 import pytest
@@ -110,11 +110,7 @@ class LazySchema:
                 if not tests:
                     fail_on_no_matches(node_id)
                 request.session.testscollected += len(tests)
-                capmam = request.node.config.pluginmanager.get_plugin("capturemanager")
-                if capmam is not None:
-                    suspend_capture_ctx = capmam.global_and_fixture_disabled
-                else:
-                    suspend_capture_ctx = nullcontext
+                suspend_capture_ctx = _get_capturemanager(request)
                 subtests = SubTests(request.node.ihook, suspend_capture_ctx, request)
                 for result, data_generation_method in tests:
                     if isinstance(result, Ok):
@@ -126,6 +122,7 @@ class LazySchema:
                 subtests.item._nodeid = node_id
 
             test = pytest.mark.usefixtures(self.fixture_name)(test)
+            _copy_marks(func, test)
 
             # Needed to prevent a failure when settings are applied to the test function
             test.is_hypothesis_test = True  # type: ignore
@@ -136,6 +133,19 @@ class LazySchema:
 
     def given(self, *args: GivenInput, **kwargs: GivenInput) -> Callable:
         return given_proxy(*args, **kwargs)
+
+
+def _copy_marks(source: Callable, target: Callable) -> None:
+    marks = getattr(source, "pytestmark", [])
+    # Pytest adds this attribute in `usefixtures`
+    target.pytestmark.extend(marks)  # type: ignore
+
+
+def _get_capturemanager(request: FixtureRequest) -> Generator:
+    capturemanager = request.node.config.pluginmanager.get_plugin("capturemanager")
+    if capturemanager is not None:
+        return capturemanager.global_and_fixture_disabled
+    return nullcontext
 
 
 def _get_node_name(node_id: str, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:

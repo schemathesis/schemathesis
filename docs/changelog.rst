@@ -21,9 +21,10 @@ Changelog
 
 **Fixed**
 
-- Missing ``source`` attribute in the ``Case.partial_deepcopy`` implementation. `#1429`
+- Missing ``source`` attribute in the ``Case.partial_deepcopy`` implementation. `#1429`_
 - Duplicated failure message from ``content_type_conformance`` and ``response_schema_conformance`` checks when the checked response has no ``Content-Type`` header. `#1394`_
 - Not copied ``case`` & ``response`` inside ``Case.validate_response``.
+- Ignored ``pytest.mark`` decorators when they are applied before ``schema.parametrize`` if the schema is created via ``from_pytest_fixture``. `#1378`_
 
 `3.13.8`_ - 2022-04-05
 ----------------------
@@ -2400,6 +2401,7 @@ Deprecated
 .. _#1410: https://github.com/schemathesis/schemathesis/issues/1410
 .. _#1395: https://github.com/schemathesis/schemathesis/issues/1395
 .. _#1394: https://github.com/schemathesis/schemathesis/issues/1394
+.. _#1378: https://github.com/schemathesis/schemathesis/issues/1378
 .. _#1372: https://github.com/schemathesis/schemathesis/issues/1372
 .. _#1370: https://github.com/schemathesis/schemathesis/issues/1370
 .. _#1366: https://github.com/schemathesis/schemathesis/issues/1366

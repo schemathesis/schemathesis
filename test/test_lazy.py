@@ -1,8 +1,5 @@
 import pytest
 
-from schemathesis import DataGenerationMethod
-from schemathesis.constants import IS_PYTEST_ABOVE_54
-
 
 def test_default(testdir):
     # When LazySchema is used
@@ -689,3 +686,33 @@ def test_(case):
             r"match any API operations and therefore has no effect"
         ]
     )
+
+
+@pytest.mark.parametrize(
+    "decorators",
+    (
+        """@schema.parametrize()
+@pytest.mark.acceptance""",
+        """@pytest.mark.acceptance
+@schema.parametrize()""",
+    ),
+)
+def test_marks_transfer(testdir, decorators):
+    # See GH-1378
+    # When a pytest mark decorator is applied
+    testdir.make_test(
+        f"""
+@pytest.fixture
+def web_app():
+    1 / 0
+
+schema = schemathesis.from_pytest_fixture("web_app")
+
+{decorators}
+def test_schema(case):
+    1 / 0
+    """
+    )
+    result = testdir.runpytest("-m", "not acceptance")
+    # Then deselecting by a mark should work
+    result.assert_outcomes()
