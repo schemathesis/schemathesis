@@ -17,6 +17,7 @@ Changelog
 - Do not validate API schema by default. To enable it back, use `--validate-schema=true`.
 - Add the ``api_slug`` CLI argument to upload data to Schemathesis.io.
 - Show response status code on failing checks output in CLI.
+- Improve error message on malformed Open API path templates (like ``/foo}/``). `#1372`_
 
 **Fixed**
 
@@ -2399,6 +2400,7 @@ Deprecated
 .. _#1410: https://github.com/schemathesis/schemathesis/issues/1410
 .. _#1395: https://github.com/schemathesis/schemathesis/issues/1395
 .. _#1394: https://github.com/schemathesis/schemathesis/issues/1394
+.. _#1372: https://github.com/schemathesis/schemathesis/issues/1372
 .. _#1370: https://github.com/schemathesis/schemathesis/issues/1370
 .. _#1366: https://github.com/schemathesis/schemathesis/issues/1366
 .. _#1359: https://github.com/schemathesis/schemathesis/issues/1359

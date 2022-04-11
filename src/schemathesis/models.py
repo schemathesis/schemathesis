@@ -166,6 +166,9 @@ class Case:  # pylint: disable=too-many-public-methods
             # in the parameters list.
             # When `exc` is formatted, it is the missing key name in quotes. E.g. 'id'
             raise InvalidSchema(f"Path parameter {exc} is not defined") from exc
+        except ValueError as exc:
+            # A single unmatched `}` inside the path template may cause this
+            raise InvalidSchema(f"Malformed path template: `{self.path}`\n\n  {exc}") from exc
 
     def get_full_base_url(self) -> Optional[str]:
         """Create a full base url, adding "localhost" for WSGI apps."""
