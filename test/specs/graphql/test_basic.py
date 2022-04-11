@@ -1,11 +1,12 @@
 from test.utils import assert_requests_call
+from unittest.mock import ANY
 
 import pytest
 import requests
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
-from schemathesis.constants import USER_AGENT
+from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.specs.graphql.loaders import INTROSPECTION_QUERY
 from schemathesis.specs.graphql.schemas import GraphQLCase
 
@@ -33,7 +34,7 @@ def test_as_werkzeug_kwargs(graphql_strategy):
         "path": "/graphql",
         "query_string": None,
         "json": {"query": case.body},
-        "headers": {"User-Agent": USER_AGENT},
+        "headers": {"User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY},
     }
 
 

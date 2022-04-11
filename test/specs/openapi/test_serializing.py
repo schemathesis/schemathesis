@@ -8,6 +8,7 @@ import pytest
 from hypothesis import given, settings
 
 import schemathesis
+from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.specs.openapi.serialization import (
     comma_delimited_object,
     conversion,
@@ -572,6 +573,6 @@ def test_unusual_form_schema(empty_open_api_3_schema, type_name):
         # And it should be case insensitive
         headers = case.as_requests_kwargs(headers={"content-type": "text/plain"})["headers"]
         assert headers["content-type"] == "text/plain"
-        assert list(headers) == ["content-type", "User-Agent"]
+        assert list(headers) == ["content-type", "User-Agent", SCHEMATHESIS_TEST_CASE_HEADER]
 
     test()

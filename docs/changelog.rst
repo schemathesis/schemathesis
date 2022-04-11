@@ -8,6 +8,7 @@ Changelog
 
 - ``st`` as an alias to the ``schemathesis`` command line entrypoint.
 - ``st auth login`` / ``st auth logout`` to authenticate with Schemathesis.io.
+- ``X-Schemathesis-TestCaseId`` header to help to distinguish test cases on the application side.
 
 **Changed**
 

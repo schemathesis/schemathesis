@@ -28,6 +28,7 @@ from typing import (
     cast,
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
+from uuid import uuid4
 
 import attr
 import curlify
@@ -41,6 +42,7 @@ from starlette.testclient import TestClient as ASGIClient
 from . import failures, serializers
 from .constants import (
     DEFAULT_RESPONSE_TIMEOUT,
+    SCHEMATHESIS_TEST_CASE_HEADER,
     SERIALIZERS_SUGGESTION_MESSAGE,
     USER_AGENT,
     CodeSampleStyle,
@@ -110,6 +112,8 @@ class Case:  # pylint: disable=too-many-public-methods
     media_type: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     # The way the case was generated (None for manually crafted ones)
     data_generation_method: Optional[DataGenerationMethod] = attr.ib(default=None)  # pragma: no mutate
+    # Unique test case identifier
+    id: str = attr.ib(factory=lambda: uuid4().hex, eq=False)  # pragma: no mutate
 
     def __repr__(self) -> str:
         parts = [f"{self.__class__.__name__}("]
@@ -263,6 +267,7 @@ class Case:  # pylint: disable=too-many-public-methods
         if headers:
             final_headers.update(headers)
         final_headers.setdefault("User-Agent", USER_AGENT)
+        final_headers.setdefault(SCHEMATHESIS_TEST_CASE_HEADER, self.id)
         return final_headers
 
     def _get_serializer(self) -> Optional[Serializer]:
