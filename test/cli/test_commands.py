@@ -19,7 +19,7 @@ from hypothesis import HealthCheck, Phase, Verbosity
 from schemathesis import Case, DataGenerationMethod, fixups, service
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.cli import LoaderConfig, execute, get_exit_code, reset_checks
-from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT, CodeSampleStyle
+from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT, CodeSampleStyle
 from schemathesis.hooks import unregister_all
 from schemathesis.models import APIOperation
 from schemathesis.runner import DEFAULT_CHECKS, from_schema
@@ -1870,7 +1870,7 @@ def test_unsupported_regex(testdir, cli, empty_open_api_3_schema):
 
 @pytest.mark.parametrize("extra", ("--auth='test:wrong'", "-H Authorization: Basic J3Rlc3Q6d3Jvbmcn"))
 @pytest.mark.operations("basic")
-def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra):
+def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra, mock_case_id):
     # See GH-792
     # When the tested API operation has basic auth
     # And the auth is overridden (directly or via headers)
@@ -1881,18 +1881,21 @@ def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra):
     # Then request representation in the output should have the overridden value
     assert (
         lines[18] == f"Headers         : {{'Authorization': 'Basic J3Rlc3Q6d3Jvbmcn', 'User-Agent': '{USER_AGENT}',"
-        f" 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive'}}"
+        f" 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', "
+        f"'{SCHEMATHESIS_TEST_CASE_HEADER}': '{mock_case_id.hex}'}}"
     )
     # And code sample as well
     assert (
-        lines[27]
-        == f"    curl -X GET -H 'Accept: */*' -H 'Accept-Encoding: gzip, deflate' -H 'Authorization: Basic J3Rlc3Q6d3Jvbmcn' -H 'Connection: keep-alive' -H 'User-Agent: {USER_AGENT}' {base_url}/basic"
+        lines[27] == f"    curl -X GET -H 'Accept: */*' -H 'Accept-Encoding: gzip, deflate' "
+        f"-H 'Authorization: Basic J3Rlc3Q6d3Jvbmcn' -H 'Connection: keep-alive' "
+        f"-H 'User-Agent: {USER_AGENT}' -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}' "
+        f"{base_url}/basic"
     )
 
 
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 @pytest.mark.operations("flaky")
-def test_explicit_headers_in_output_on_errors(cli, base_url, schema_url, openapi_version):
+def test_explicit_headers_in_output_on_errors(cli, base_url, schema_url, openapi_version, mock_case_id):
     # When there is a non-fatal error during testing (e.g. flakiness)
     # And custom headers were passed explicitly
     auth = "Basic J3Rlc3Q6d3Jvbmcn"
@@ -1903,7 +1906,8 @@ def test_explicit_headers_in_output_on_errors(cli, base_url, schema_url, openapi
     assert lines[17] == f"Headers         : {{'Authorization': '{auth}', 'User-Agent': '{USER_AGENT}'}}"
     # And code sample as well
     assert lines[22].startswith(
-        f"    curl -X GET -H 'Authorization: {auth}' -H 'User-Agent: {USER_AGENT}' '{base_url}/flaky?id=0'"
+        f"    curl -X GET -H 'Authorization: {auth}' -H 'User-Agent: {USER_AGENT}' "
+        f"-H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}' '{base_url}/flaky?id=0'"
     )
 
 
