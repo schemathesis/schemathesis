@@ -30,7 +30,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v3.1.0
         with:
           python-version: 3.9
 
@@ -45,7 +45,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v3.1.0
         with:
           python-version: 3.9
 
@@ -60,7 +60,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v3.1.0
         with:
           python-version: 3.9
 
@@ -91,7 +91,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v3.1.0
         with:
           python-version: '${{ matrix.python }}'
 
@@ -128,7 +128,7 @@ jobs:
       with:
         fetch-depth: 1
 
-    - uses: actions/setup-python@v2
+    - uses: actions/setup-python@v3.1.0
       with:
         python-version: 3.7
 
