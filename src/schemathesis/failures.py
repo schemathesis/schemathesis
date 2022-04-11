@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import attr
 
@@ -13,6 +13,10 @@ class FailureContext:
     message: str
     type: str
 
+    def unique_by_key(self, check_message: Optional[str]) -> Tuple[str, ...]:
+        """A key to distinguish different failure contexts."""
+        return (check_message or self.message,)
+
 
 @attr.s(slots=True, repr=False)
 class ValidationErrorContext(FailureContext):
@@ -26,6 +30,10 @@ class ValidationErrorContext(FailureContext):
     title: str = attr.ib(default="Non-conforming response payload")
     message: str = attr.ib(default="Response does not conform to the defined schema")
     type: str = attr.ib(default="json_schema")
+
+    def unique_by_key(self, check_message: Optional[str]) -> Tuple[str, ...]:
+        # Deduplicate by JSON Schema path. All errors that happened on this sub-schema will be deduplicated
+        return ("/".join(map(str, self.schema_path)),)
 
 
 @attr.s(slots=True, repr=False)

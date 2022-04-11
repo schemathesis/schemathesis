@@ -56,8 +56,10 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> Optiona
         return None
     content_type = response.headers.get("Content-Type")
     if not content_type:
+        formatted_media_types = "\n    ".join(defined_content_types)
         raise get_missing_content_type_error()(
-            "Response is missing the `Content-Type` header",
+            "The response is missing the `Content-Type` header. The schema defines the following media types:\n\n"
+            f"    {formatted_media_types}",
             context=failures.MissingContentType(defined_content_types),
         )
     for option in defined_content_types:

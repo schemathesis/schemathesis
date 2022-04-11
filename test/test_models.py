@@ -10,6 +10,7 @@ import schemathesis
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT, DataGenerationMethod
 from schemathesis.exceptions import CheckFailed, UsageError
 from schemathesis.models import APIOperation, Case, CaseSource, Request, Response
+from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 
 
 @pytest.fixture
@@ -513,3 +514,27 @@ def test_iter_parameters(empty_open_api_3_schema):
     assert len(params) == 2
     assert params[0].name == "X-id"
     assert params[1].name == "q"
+
+
+def test_checks_errors_deduplication(empty_open_api_3_schema):
+    # See GH-1394
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "get": {
+                "responses": {
+                    "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "integer"}}}}
+                },
+            },
+        },
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    case = schema["/data"]["GET"].make_case()
+    response = requests.Response()
+    response.status_code = 200
+    response.request = requests.PreparedRequest()
+    response.request.prepare(method="GET", url="http://example.com")
+    # When there are two checks that raise the same failure
+    with pytest.raises(CheckFailed, match="The response is missing the `Content-Type` header") as exc:
+        case.validate_response(response, checks=(content_type_conformance, response_schema_conformance))
+    # Then the resulting output should be deduplicated
+    assert "2. " not in str(exc.value)
