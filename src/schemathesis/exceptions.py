@@ -1,6 +1,6 @@
 from hashlib import sha1
 from json import JSONDecodeError
-from typing import TYPE_CHECKING, Any, Callable, Dict, NoReturn, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, NoReturn, Optional, Tuple, Type, Union
 
 import attr
 import hypothesis.errors
@@ -23,6 +23,35 @@ class CheckFailed(AssertionError):
     def __init__(self, *args: Any, context: Optional[FailureContext] = None):
         super().__init__(*args)
         self.context = context
+
+
+def make_unique_by_key(
+    check_name: str, check_message: Optional[str], context: Optional[FailureContext]
+) -> Tuple[Optional[str], ...]:
+    """A key to distinguish different failed checks.
+
+    It is not only based on `FailureContext`, because the end-user may raise plain `AssertionError` in their custom
+    checks, and those won't have any context attached.
+    """
+    if context is not None:
+        return context.unique_by_key(check_message)
+    return check_name, check_message
+
+
+def deduplicate_failed_checks(
+    checks: List[Union[CheckFailed, AssertionError]]
+) -> Generator[Union[CheckFailed, AssertionError], None, None]:
+    """Keep only unique failed checks."""
+    seen = set()
+    for check in checks:
+        check_message = check.args[0]
+        if isinstance(check, CheckFailed) and check.context is not None:
+            key = check.context.unique_by_key(check_message)
+        else:
+            key = check_message
+        if key not in seen:
+            yield check
+            seen.add(key)
 
 
 CACHE: Dict[Union[str, int], Type[CheckFailed]] = {}

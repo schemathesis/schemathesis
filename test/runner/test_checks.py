@@ -6,7 +6,7 @@ import requests
 from hypothesis import given, settings
 
 import schemathesis
-from schemathesis import models
+from schemathesis import DataGenerationMethod, models
 from schemathesis.checks import (
     content_type_conformance,
     not_a_server_error,
@@ -14,7 +14,9 @@ from schemathesis.checks import (
     status_code_conformance,
 )
 from schemathesis.exceptions import CheckFailed, InvalidSchema
-from schemathesis.models import OperationDefinition
+from schemathesis.models import OperationDefinition, TestResult
+from schemathesis.runner.impl.core import run_checks
+from schemathesis.runner.serialization import deduplicate_failures
 from schemathesis.schemas import BaseSchema
 
 
@@ -266,7 +268,7 @@ def test_missing_content_type_header(case):
     # When the response has no `Content-Type` header
     response = make_response(content_type=None)
     # Then an error should be risen
-    with pytest.raises(CheckFailed, match="Response is missing the `Content-Type` header"):
+    with pytest.raises(CheckFailed, match="The response is missing the `Content-Type` header"):
         content_type_conformance(response, case)
 
 
@@ -500,3 +502,35 @@ def test_response_schema_conformance_references_valid(complex_schema, value):
         case.validate_response(response)
 
     test()
+
+
+def test_deduplication(empty_open_api_3_schema):
+    # See GH-1394
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "get": {
+                "responses": {
+                    "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "integer"}}}}
+                },
+            },
+        },
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    operation = schema["/data"]["GET"]
+    case = operation.make_case()
+    response = requests.Response()
+    response.status_code = 200
+    response.request = requests.PreparedRequest()
+    response.request.prepare(method="GET", url="http://example.com")
+    result = TestResult(
+        method=operation.method.upper(),
+        path=operation.full_path,
+        verbose_name=operation.verbose_name,
+        data_generation_method=DataGenerationMethod.positive,
+    )
+    failures = []
+    # When there are two checks that raise the same failure
+    with pytest.raises(CheckFailed):
+        run_checks(case, (content_type_conformance, response_schema_conformance), failures, result, response, 0)
+    # Then the resulting output should be deduplicated
+    assert len(deduplicate_failures(failures)) == 1
