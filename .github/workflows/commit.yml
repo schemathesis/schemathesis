@@ -15,4 +15,4 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3.0.0
       - name: Run commitsar
-        uses: docker://commitsar/commitsar
+        uses: aevea/commitsar@v0.18.0
