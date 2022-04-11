@@ -368,6 +368,7 @@ class BaseOpenAPISchema(BaseSchema):
         status_code: Union[str, int],
         parameters: Optional[Dict[str, str]] = None,
         request_body: Any = None,
+        name: Optional[str] = None,
     ) -> None:
         """Add a new Open API link to the schema definition.
 
@@ -380,6 +381,7 @@ class BaseOpenAPISchema(BaseSchema):
             expression string.
         :param request_body: A literal value or runtime expression to use as a request body when
             calling the target operation.
+        :param str name: Explicit link name.
 
         .. code-block:: python
 
@@ -406,7 +408,13 @@ class BaseOpenAPISchema(BaseSchema):
                     if method.upper() == source.method.upper():
                         found = True
                         links.add_link(
-                            definition["responses"], self.links_field, parameters, request_body, status_code, target
+                            responses=definition["responses"],
+                            links_field=self.links_field,
+                            parameters=parameters,
+                            request_body=request_body,
+                            status_code=status_code,
+                            target=target,
+                            name=name,
                         )
                     # If methods are behind a reference, then on the next resolving they will miss the new link
                     # Therefore we need to modify it this way

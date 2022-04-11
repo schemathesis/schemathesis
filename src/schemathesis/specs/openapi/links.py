@@ -276,6 +276,7 @@ def add_link(
     request_body: Any,
     status_code: StatusCode,
     target: Union[str, APIOperation],
+    name: Optional[str] = None,
 ) -> None:
     response = _get_response_by_status_code(responses, status_code)
     links_definition = response.setdefault(links_field, {})
@@ -285,10 +286,10 @@ def add_link(
     if request_body is not None:
         new_link["requestBody"] = request_body
     if isinstance(target, str):
-        name = target
+        name = name or target
         new_link["operationRef"] = target
     else:
-        name = f"{target.method.upper()} {target.path}"
+        name = name or f"{target.method.upper()} {target.path}"
         # operationId is a dict lookup which is more efficient than using `operationRef`, since it
         # doesn't involve reference resolving when we will look up for this target during testing.
         if "operationId" in target.definition.resolved:
