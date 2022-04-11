@@ -7,7 +7,7 @@ on:
 jobs:
   container:
     name: Container image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
       - uses: actions/checkout@v3.0.0
@@ -66,7 +66,7 @@ jobs:
 
   release_package:
     name: Build and publish package to pypi.org
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v3.0.0
       with:
@@ -90,7 +90,7 @@ jobs:
 
   release-notes:
     name: Release Notes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - name: Check out code
       uses: actions/checkout@v3.0.0

@@ -9,7 +9,7 @@ on:
 jobs:
   mutmut:
     name: mutmut
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3.0.0
         with:
@@ -61,7 +61,7 @@ jobs:
 
   hypothesis-tests:
     name: Hypothesis tests with CI profile
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3.0.0
         with:
@@ -77,7 +77,7 @@ jobs:
 
   test-corpus-part-1:
     name: Corpus tests. Part 1
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3.0.0
         with:
@@ -95,7 +95,7 @@ jobs:
 
   test-corpus-part-2:
     name: Corpus tests. Part 2
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3.0.0
         with:
@@ -114,7 +114,7 @@ jobs:
 
   test-corpus-part-3:
     name: Corpus tests. Part 3
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3.0.0
         with:
@@ -132,7 +132,7 @@ jobs:
 
   test-corpus-part-4:
     name: Corpus tests. Part 4
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3.0.0
         with:
@@ -150,7 +150,7 @@ jobs:
 
   test-corpus-part-5:
     name: Corpus tests. Part 5
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3.0.0
         with:
