@@ -4,7 +4,7 @@ import pytest
 
 import schemathesis
 from schemathesis import Case
-from schemathesis.constants import USER_AGENT
+from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 
 schema = schemathesis.from_dict(app.openapi())
 
@@ -14,7 +14,10 @@ schema = schemathesis.from_dict(app.openapi())
 def test_as_curl_command(case: Case, headers):
     command = case.as_curl_command(headers)
     expected_headers = "" if not headers else " ".join(f" -H '{name}: {value}'" for name, value in headers.items())
-    assert command == f"curl -X GET -H 'User-Agent: {USER_AGENT}'{expected_headers} http://localhost/users"
+    assert (
+        command
+        == f"curl -X GET -H 'User-Agent: {USER_AGENT}'{expected_headers} -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {case.id}' http://localhost/users"
+    )
 
 
 def test_non_utf_8_body():
@@ -22,18 +25,19 @@ def test_non_utf_8_body():
     command = case.as_curl_command()
     assert (
         command == "curl -X GET -H 'Content-Length: 3' -H 'Content-Type: application/octet-stream' "
-        f"-H 'User-Agent: {USER_AGENT}' -d '42�' http://localhost/users"
+        f"-H 'User-Agent: {USER_AGENT}' -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {case.id}' -d '42�' http://localhost/users"
     )
 
 
 @pytest.mark.operations("failure")
-def test_cli_output(cli, base_url, schema_url):
+def test_cli_output(cli, base_url, schema_url, mock_case_id):
     result = cli.run(schema_url, "--code-sample-style=curl")
     lines = result.stdout.splitlines()
     assert "Run this cURL command to reproduce this failure: " in lines
     headers = (
         f"-H 'Accept: */*' -H 'Accept-Encoding: gzip, deflate' "
         f"-H 'Connection: keep-alive' -H 'User-Agent: {USER_AGENT}'"
+        f" -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}'"
     )
     assert f"    curl -X GET {headers} {base_url}/failure" in lines
 

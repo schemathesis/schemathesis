@@ -1,3 +1,4 @@
+import uuid
 from textwrap import dedent
 
 import pytest
@@ -675,3 +676,10 @@ def loadable_graphql_fastapi_app(testdir, graphql_path):
         """
     )
     return f"{module.purebasename}:app"
+
+
+@pytest.fixture
+def mock_case_id(mocker):
+    case_id = uuid.uuid4()
+    mocker.patch("schemathesis.models.uuid4", lambda: case_id)
+    return case_id

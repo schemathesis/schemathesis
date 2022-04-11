@@ -1,12 +1,13 @@
 import json
 import re
+from unittest.mock import ANY
 
 import pytest
 import requests
 from hypothesis import given, settings
 
 import schemathesis
-from schemathesis.constants import USER_AGENT, DataGenerationMethod
+from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT, DataGenerationMethod
 from schemathesis.exceptions import CheckFailed, UsageError
 from schemathesis.models import APIOperation, Case, CaseSource, Request, Response
 
@@ -100,7 +101,7 @@ def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
         operation.base_url = base_url
         data = case.as_requests_kwargs()
     assert data == {
-        "headers": {"User-Agent": USER_AGENT},
+        "headers": {"User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY},
         "method": "GET",
         "params": None,
         "cookies": {"TOKEN": "secret"},
@@ -134,6 +135,7 @@ def test_as_requests_kwargs_override_user_agent(server, openapi2_base_url, swagg
     original_headers = headers.copy() if headers is not None else headers
     case = operation.make_case(headers=headers)
     data = case.as_requests_kwargs(headers={"X-Key": "foo"})
+    expected[SCHEMATHESIS_TEST_CASE_HEADER] = ANY
     assert data == {
         "headers": expected,
         "method": "GET",
@@ -170,7 +172,7 @@ def test_as_requests_kwargs_override_content_type(empty_open_api_3_schema, heade
         "data": b"<html></html>",
         "params": None,
         "cookies": None,
-        "headers": {header: "text/html", "User-Agent": USER_AGENT},
+        "headers": {header: "text/html", "User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY},
         "url": "/data",
     }
 
@@ -258,7 +260,10 @@ def test_case_partial_deepcopy_same_generated_code(swagger_20):
         query={"a": 1},
         body={"b": 1},
     )
-    assert original_case.as_curl_command() == original_case.partial_deepcopy().as_curl_command()
+    copied_case = original_case.partial_deepcopy()
+    assert original_case.as_curl_command().replace(
+        f" -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {original_case.id}'", ""
+    ) == copied_case.as_curl_command().replace(f" -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {copied_case.id}'", "")
 
 
 def test_case_partial_deepcopy_source(swagger_20):
@@ -301,7 +306,7 @@ def test_(case):
           "",
           "Run this cURL command to reproduce this response: ",
           "",
-          "    curl -X GET -H 'User-Agent: {USER_AGENT}' http://localhost/v1/users",
+          f"    curl -X GET -H 'User-Agent: {USER_AGENT}' -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {{case.id}}' http://localhost/v1/users",
           "",
     ]
 """

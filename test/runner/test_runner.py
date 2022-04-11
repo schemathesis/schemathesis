@@ -16,7 +16,7 @@ from requests.auth import HTTPDigestAuth
 import schemathesis
 from schemathesis._hypothesis import add_examples
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
-from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
+from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.models import Status
 from schemathesis.runner import ThreadPoolRunner, events, from_schema, get_requests_auth
 from schemathesis.runner.impl import threadpool
@@ -131,6 +131,7 @@ def test_interactions(request, any_app_schema, workers):
             "Accept-Encoding": ["gzip, deflate"],
             "Connection": ["keep-alive"],
             "User-Agent": [USER_AGENT],
+            SCHEMATHESIS_TEST_CASE_HEADER: [ANY],
         },
     }
     assert failure.response.status_code == 500
@@ -159,6 +160,7 @@ def test_interactions(request, any_app_schema, workers):
             "Accept-Encoding": ["gzip, deflate"],
             "Connection": ["keep-alive"],
             "User-Agent": [USER_AGENT],
+            SCHEMATHESIS_TEST_CASE_HEADER: [ANY],
         },
     }
     assert success.response.status_code == 200

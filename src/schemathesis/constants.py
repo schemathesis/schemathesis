@@ -15,6 +15,7 @@ except metadata.PackageNotFoundError:
 IS_PYTEST_ABOVE_54 = version.parse(pytest.__version__) >= version.parse("5.4.0")
 
 USER_AGENT = f"schemathesis/{__version__}"
+SCHEMATHESIS_TEST_CASE_HEADER = "X-Schemathesis-TestCaseId"
 # Maximum test running time
 DEFAULT_DEADLINE = 15000  # pragma: no mutate
 DEFAULT_RESPONSE_TIMEOUT = 10000  # pragma: no mutate
