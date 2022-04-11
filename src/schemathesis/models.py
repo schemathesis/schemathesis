@@ -424,8 +424,10 @@ class Case:  # pylint: disable=too-many-public-methods
         checks = checks or ALL_CHECKS
         failed_checks = []
         for check in chain(checks, additional_checks):
+            copied_case = self.partial_deepcopy()
+            copied_response = copy_response(response)
             try:
-                check(response, self)
+                check(copied_response, copied_case)
             except AssertionError as exc:
                 maybe_set_assertion_message(exc, check.__name__)
                 failed_checks.append(exc)
