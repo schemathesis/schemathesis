@@ -344,3 +344,13 @@ def test_get_links_numeric_response_codes(status_code, openapi_30, expected):
     response.status_code = status_code
     # Then they still should be checked, even that is not compliant with the spec
     assert [link.name for link in get_links(response, operation, "links")] == expected
+
+
+def test_custom_link_name(openapi_30):
+    # When `name` is used with `add_link`
+    operation = openapi_30["/users"]["GET"]
+    name = "CUSTOM_NAME"
+    openapi_30.add_link(source=operation, target=operation, status_code="200", parameters={}, name=name)
+    # Then the resulting link has that name
+    links = openapi_30.get_links(openapi_30["/users"]["GET"])
+    assert name in links["200"]

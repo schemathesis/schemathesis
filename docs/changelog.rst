@@ -6,6 +6,7 @@ Changelog
 
 **Added**
 
+- Open API link name customization via the ``name`` argument to ``schema.add_link``.
 - ``st`` as an alias to the ``schemathesis`` command line entrypoint.
 - ``st auth login`` / ``st auth logout`` to authenticate with Schemathesis.io.
 
