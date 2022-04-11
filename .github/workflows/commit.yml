@@ -14,5 +14,7 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3.0.0
+        with:
+          fetch-depth: 0
       - name: Run commitsar
         uses: aevea/commitsar@v0.18.0
