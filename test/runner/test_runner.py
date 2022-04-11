@@ -969,3 +969,18 @@ def test_response_mutation(any_app_schema):
     assert event.result.checks[0].request.headers["Foo"] == ["BAR"]
     assert "Foo: BAZ" in event.result.checks[1].example.curl_code
     assert event.result.checks[1].request.headers["Foo"] == ["BAZ"]
+
+
+def test_malformed_path_template(empty_open_api_3_schema):
+    # When schema contains a malformed path template
+    path = "/foo}/"
+    empty_open_api_3_schema["paths"] = {path: {"get": {"responses": {"200": {"description": "OK"}}}}}
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    # Then it should not cause a fatal error
+    _, _, event, _ = list(from_schema(schema).execute())
+    assert event.status == Status.error
+    # And should produce the proper error message
+    assert (
+        event.result.errors[0].exception == f"InvalidSchema: Malformed path template: `{path}`\n\n  "
+        f"Single '}}' encountered in format string\n"
+    )
