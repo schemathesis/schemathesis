@@ -10,7 +10,7 @@ on:
 jobs:
   commitsar:
     name: Verify commit messages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Check out code
         uses: actions/checkout@v3.0.0

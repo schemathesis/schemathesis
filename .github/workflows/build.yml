@@ -24,7 +24,7 @@ on:
 jobs:
   pre-commit:
     name: Generic pre-commit checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3.0.0
         with:
@@ -39,7 +39,7 @@ jobs:
 
   pylint:
     name: Pylint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3.0.0
         with:
@@ -54,7 +54,7 @@ jobs:
 
   mypy:
     name: Mypy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3.0.0
         with:
@@ -69,7 +69,7 @@ jobs:
 
   docs:
     name: Documentation check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
      - uses: actions/checkout@v3.0.0
        with:
@@ -81,7 +81,7 @@ jobs:
   tests:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-20.04, windows-2019]
         python: ["3.7", "3.8", "3.9", "3.10"]
 
     name: ${{ matrix.os }}/tests_${{ matrix.python }}
@@ -117,7 +117,7 @@ jobs:
   pytest-legacy:
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-20.04]
         tox_job:
           - py3-pytest53
 
