@@ -26,7 +26,7 @@ jobs:
     name: Generic pre-commit checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3.0.0
         with:
           fetch-depth: 1
 
@@ -41,7 +41,7 @@ jobs:
     name: Pylint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3.0.0
         with:
           fetch-depth: 1
 
@@ -56,7 +56,7 @@ jobs:
     name: Mypy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3.0.0
         with:
           fetch-depth: 1
 
@@ -71,7 +71,7 @@ jobs:
     name: Documentation check
     runs-on: ubuntu-latest
     steps:
-     - uses: actions/checkout@v2
+     - uses: actions/checkout@v3.0.0
        with:
          fetch-depth: 1
      - uses: ammaraskar/sphinx-action@master
@@ -87,7 +87,7 @@ jobs:
     name: ${{ matrix.os }}/tests_${{ matrix.python }}
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3.0.0
         with:
           fetch-depth: 1
 
@@ -124,7 +124,7 @@ jobs:
     name: ${{ matrix.os }}/tests_${{ matrix.tox_job }}
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3.0.0
       with:
         fetch-depth: 1
 

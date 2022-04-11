@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3.0.0
 
       - name: GitHub Package Registry
         uses: aevea/action-kaniko@v0.6.2
@@ -68,7 +68,7 @@ jobs:
     name: Build and publish package to pypi.org
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3.0.0
       with:
         fetch-depth: 1
 
@@ -93,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
-      uses: actions/checkout@v1
+      uses: actions/checkout@v3.0.0
 
     - name: Release Notary Action
       uses: docker://aevea/release-notary
