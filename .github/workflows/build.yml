@@ -107,12 +107,9 @@ jobs:
       - run: coverage xml -i
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1.0.7
+        uses: codecov/codecov-action@v3.0.0
         with:
-          token: ${{secrets.CODECOV_TOKEN}}
           file: ./coverage.xml
-          flags: unittests
-          name: codecov-py36
 
   pytest-legacy:
     strategy:
@@ -142,9 +139,6 @@ jobs:
     - run: coverage xml -i
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v1.0.7
+      uses: codecov/codecov-action@v3.0.0
       with:
-        token: ${{secrets.CODECOV_TOKEN}}
         file: ./coverage.xml
-        flags: unittests
-        name: codecov-py37-legacy-pytest
