@@ -22,6 +22,7 @@ Changelog
 
 - Missing ``source`` attribute in the ``Case.partial_deepcopy`` implementation. `#1429`
 - Duplicated failure message from ``content_type_conformance`` and ``response_schema_conformance`` checks when the checked response has no ``Content-Type`` header. `#1394`_
+- Not copied ``case`` & ``response`` inside ``Case.validate_response``.
 
 `3.13.8`_ - 2022-04-05
 ----------------------
