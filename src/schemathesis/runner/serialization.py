@@ -8,8 +8,7 @@ from typing import Any, Dict, Generator, List, Optional, Set, Tuple
 import attr
 import requests
 
-from ..exceptions import FailureContext, InternalError
-from ..failures import ValidationErrorContext
+from ..exceptions import FailureContext, InternalError, make_unique_by_key
 from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
 from ..utils import WSGIResponse, format_exception
 
@@ -160,30 +159,23 @@ class SerializedTestResult:
 
 def deduplicate_failures(checks: List[SerializedCheck]) -> List[SerializedCheck]:
     """Return only unique checks that should be displayed in the output."""
-    seen: Set[Tuple[str, Optional[str]]] = set()
+    seen: Set[Tuple[Optional[str], ...]] = set()
     unique_checks = []
     for check in reversed(checks):
         # There are also could be checks that didn't fail
         if check.value == Status.failure:
-            key = get_check_key(check)
-            if (check.name, key) not in seen:
+            key = make_unique_by_key(check.name, check.message, check.context)
+            if key not in seen:
                 unique_checks.append(check)
-                seen.add((check.name, key))
+                seen.add(key)
     return unique_checks
 
 
 def deduplicate_checks(checks: List[SerializedCheck]) -> Generator[SerializedCheck, None, None]:
     """Return only unique checks outcomes."""
-    seen: Set[Tuple[str, Optional[str]]] = set()
+    seen: Set[Tuple[Optional[str], ...]] = set()
     for check in reversed(checks):
-        key = get_check_key(check)
-        if (check.name, key) not in seen:
+        key = make_unique_by_key(check.name, check.message, check.context)
+        if key not in seen:
             yield check
-            seen.add((check.name, key))
-
-
-def get_check_key(check: SerializedCheck) -> Optional[str]:
-    if isinstance(check.context, ValidationErrorContext):
-        # Deduplicate by JSON Schema path. All errors that happened on this sub-schema will be deduplicated
-        return "/".join(map(str, check.context.schema_path))
-    return check.message
+            seen.add(key)

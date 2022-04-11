@@ -53,6 +53,7 @@ from .exceptions import (
     FailureContext,
     InvalidSchema,
     SerializationNotPossible,
+    deduplicate_failed_checks,
     get_grouped_exception,
     get_timeout_error,
 )
@@ -421,16 +422,17 @@ class Case:  # pylint: disable=too-many-public-methods
         from .checks import ALL_CHECKS  # pylint: disable=import-outside-toplevel
 
         checks = checks or ALL_CHECKS
-        errors = []
+        failed_checks = []
         for check in chain(checks, additional_checks):
             try:
                 check(response, self)
             except AssertionError as exc:
                 maybe_set_assertion_message(exc, check.__name__)
-                errors.append(exc)
-        if errors:
-            exception_cls = get_grouped_exception(self.operation.verbose_name, *errors)
-            formatted_errors = "\n\n".join(f"{idx}. {error.args[0]}" for idx, error in enumerate(errors, 1))
+                failed_checks.append(exc)
+        failed_checks = list(deduplicate_failed_checks(failed_checks))
+        if failed_checks:
+            exception_cls = get_grouped_exception(self.operation.verbose_name, *failed_checks)
+            formatted_failures = "\n\n".join(f"{idx}. {error.args[0]}" for idx, error in enumerate(failed_checks, 1))
             code_sample_style = (
                 CodeSampleStyle.from_str(code_sample_style)
                 if code_sample_style is not None
@@ -439,7 +441,11 @@ class Case:  # pylint: disable=too-many-public-methods
             code_message = self._get_code_message(code_sample_style, response.request)
             payload = get_response_payload(response)
             raise exception_cls(
-                f"\n\n{formatted_errors}\n\n----------\n\nResponse status: {response.status_code}\nResponse payload: `{payload}`\n\n{code_message}"
+                f"\n\n{formatted_failures}\n\n"
+                f"----------\n\n"
+                f"Response status: {response.status_code}\n"
+                f"Response payload: `{payload}`\n\n"
+                f"{code_message}"
             )
 
     def _get_code_message(self, code_sample_style: CodeSampleStyle, request: requests.PreparedRequest) -> str:

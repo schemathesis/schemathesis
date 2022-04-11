@@ -21,6 +21,7 @@ Changelog
 **Fixed**
 
 - Missing ``source`` attribute in the ``Case.partial_deepcopy`` implementation. `#1429`
+- Duplicated failure message from ``content_type_conformance`` and ``response_schema_conformance`` checks when the checked response has no ``Content-Type`` header. `#1394`_
 
 `3.13.8`_ - 2022-04-05
 ----------------------
@@ -2396,6 +2397,7 @@ Deprecated
 .. _#1425: https://github.com/schemathesis/schemathesis/issues/1425
 .. _#1410: https://github.com/schemathesis/schemathesis/issues/1410
 .. _#1395: https://github.com/schemathesis/schemathesis/issues/1395
+.. _#1394: https://github.com/schemathesis/schemathesis/issues/1394
 .. _#1370: https://github.com/schemathesis/schemathesis/issues/1370
 .. _#1366: https://github.com/schemathesis/schemathesis/issues/1366
 .. _#1359: https://github.com/schemathesis/schemathesis/issues/1359
