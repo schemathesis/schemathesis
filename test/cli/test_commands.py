@@ -463,6 +463,15 @@ def test_hypothesis_database_parsing(request, cli, mocker, swagger_20, factory, 
     assert isinstance(hypothesis_settings.database, cls)
 
 
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("success")
+def test_hypothesis_database_report(cli, schema_url):
+    result = cli.run(schema_url, "--hypothesis-database=:memory:")
+    assert result.exit_code == ExitCode.OK, result.stdout
+    lines = result.stdout.split("\n")
+    assert lines[3] == "Hypothesis: database=InMemoryExampleDatabase({}), deadline=timedelta(milliseconds=15000)"
+
+
 def test_all_checks(cli, mocker, swagger_20):
     mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
@@ -2027,6 +2036,7 @@ def assert_exit_code(event_stream, code):
     with pytest.raises(SystemExit) as exc:
         execute(
             event_stream,
+            hypothesis_settings=hypothesis.settings(),
             workers_num=1,
             show_errors_tracebacks=False,
             validate_schema=False,
