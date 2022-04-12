@@ -15,6 +15,7 @@ import trustme
 import yaml
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
+from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
 from schemathesis import Case, DataGenerationMethod, fixups, service
 from schemathesis.checks import ALL_CHECKS, not_a_server_error
@@ -222,6 +223,7 @@ def test_commands_run_help(cli):
         "",
         "  Configuration of the underlying Hypothesis engine.",
         "",
+        "  --hypothesis-database TEXT      Implementation of a Hypothesis database.",
         "  --hypothesis-deadline INTEGER RANGE",
         "                                  Duration in milliseconds that each individual",
         "                                  example with a test is not allowed to exceed.",
@@ -437,6 +439,28 @@ def test_load_schema_arguments_headers_to_loader_for_app(testdir, cli, mocker):
     cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "-H", "Authorization: Bearer 123")
 
     assert from_wsgi.call_args[1]["headers"]["Authorization"] == "Bearer 123"
+
+
+@pytest.mark.parametrize(
+    "factory, cls",
+    (
+        (lambda r: None, DirectoryBasedExampleDatabase),
+        (lambda r: "none", type(None)),
+        (lambda r: ":memory:", InMemoryExampleDatabase),
+        (lambda r: r.getfixturevalue("tmpdir"), DirectoryBasedExampleDatabase),
+    ),
+)
+def test_hypothesis_database_parsing(request, cli, mocker, swagger_20, factory, cls):
+    mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
+    execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
+    database = factory(request)
+    if database:
+        args = (f"--hypothesis-database={database}",)
+    else:
+        args = ()
+    cli.run(SCHEMA_URI, *args)
+    hypothesis_settings = execute.call_args[1]["hypothesis_settings"]
+    assert isinstance(hypothesis_settings.database, cls)
 
 
 def test_all_checks(cli, mocker, swagger_20):
