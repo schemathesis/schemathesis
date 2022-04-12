@@ -4,6 +4,7 @@ from queue import Queue
 from typing import List, Optional
 
 import attr
+import hypothesis
 
 from ..constants import CodeSampleStyle
 from ..runner.serialization import SerializedTestResult
@@ -19,6 +20,7 @@ class ServiceContext:
 class ExecutionContext:
     """Storage for the current context of the execution."""
 
+    hypothesis_settings: hypothesis.settings = attr.ib()  # pragma: no mutate
     hypothesis_output: List[str] = attr.ib(factory=list)  # pragma: no mutate
     workers_num: int = attr.ib(default=1)  # pragma: no mutate
     show_errors_tracebacks: bool = attr.ib(default=False)  # pragma: no mutate

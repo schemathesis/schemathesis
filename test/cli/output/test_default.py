@@ -4,6 +4,7 @@ import platform
 import sys
 
 import click
+import hypothesis
 import pytest
 import requests
 from hypothesis.reporting import report
@@ -31,7 +32,7 @@ def click_context():
 
 @pytest.fixture()
 def execution_context():
-    return schemathesis.cli.context.ExecutionContext([], operations_count=1)
+    return schemathesis.cli.context.ExecutionContext(hypothesis.settings(), [], operations_count=1)
 
 
 @pytest.fixture
