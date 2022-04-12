@@ -61,7 +61,7 @@ class OptionalInt(click.types.IntRange):
     def convert(  # type: ignore
         self, value: str, param: Optional[click.core.Parameter], ctx: Optional[click.core.Context]
     ) -> Union[int, NotSet]:
-        if value == "None":
+        if value.lower() == "none":
             return not_set
         try:
             int(value)
