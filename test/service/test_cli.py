@@ -2,12 +2,23 @@ from test.apps.openapi.schema import OpenAPIVersion
 
 import pytest
 from _pytest.main import ExitCode
+from pytest_httpserver import URIPattern
 from requests import Timeout
 
 import schemathesis
 from schemathesis.constants import USER_AGENT
 
 from ..utils import strip_style_win32
+
+
+class SendEventsMatch(URIPattern):
+    """Matches the `/runs/{run_id}/events/` pattern."""
+
+    def startswith(self, prefix):
+        return True
+
+    def match(self, uri: str) -> bool:
+        return uri.endswith("/events/")
 
 
 @pytest.fixture(autouse=True)
@@ -46,9 +57,9 @@ def test_no_failures(cli, schema_url, service, service_token):
 
 
 @pytest.mark.operations("success")
-@pytest.mark.service(data={"detail": "Internal Server Error"}, status=500, method="POST", path="/runs/")
+@pytest.mark.service(data={"detail": "Internal Server Error"}, status=500, method="POST", path=SendEventsMatch())
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
-def test_server_error(cli, schema_url, service, service_token):
+def test_server_error(cli, schema_url, service, service_token, run_id):
     # When Schemathesis.io is enabled but returns 500 on the first call
     args = [
         schema_url,
@@ -58,9 +69,10 @@ def test_server_error(cli, schema_url, service, service_token):
     ]
     result = cli.run(*args)
     assert result.exit_code == ExitCode.OK, result.stdout
-    # Then there is only one request to Schemathesis.io
-    assert len(service.server.log) == 1
-    service.assert_call(0, "/runs/", 500)
+    assert len(service.server.log) == 3
+    service.assert_call(0, "/runs/", 201)
+    service.assert_call(1, f"/runs/{run_id}/events/", 500)
+    service.assert_call(2, f"/runs/{run_id}/finish/", 204)
     # And it should be noted in the output
     lines = get_stdout_lines(result.stdout)
     assert "Schemathesis.io: ERROR" in lines
@@ -142,11 +154,11 @@ def test_server_timeout(cli, schema_url, service, service_token, mocker):
     data={"title": "Unauthorized", "status": 401, "detail": "Could not validate credentials"},
     status=401,
     method="POST",
-    path="/runs/",
+    path=SendEventsMatch(),
 )
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
-def test_unauthorized(cli, schema_url, service):
-    # When there is no token or invalid token
+def test_token_is_invalidated_during_the_run(cli, schema_url, service):
+    # When token is invalidated during the run
     result = cli.run(
         schema_url, "my-api", "--schemathesis-io-token=invalid", f"--schemathesis-io-url={service.base_url}"
     )
@@ -157,7 +169,28 @@ def test_unauthorized(cli, schema_url, service):
 
 
 @pytest.mark.service(
-    data={"title": "Bad request", "status": 400, "detail": "Something wrong"}, status=400, method="POST", path="/runs/"
+    data={"title": "Unauthorized", "status": 401, "detail": "Could not validate credentials"},
+    status=401,
+    method="POST",
+    path="/runs/",
+)
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+def test_unauthorized(cli, schema_url, service):
+    # When the token is invalid
+    result = cli.run(
+        schema_url, "my-api", "--schemathesis-io-token=invalid", f"--schemathesis-io-url={service.base_url}"
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # Then a proper error message should be displayed
+    lines = get_stdout_lines(result.stdout)
+    assert "Please, check that you use the proper CLI access token" in lines
+
+
+@pytest.mark.service(
+    data={"title": "Bad request", "status": 400, "detail": "Something wrong"},
+    status=400,
+    method="POST",
+    path=SendEventsMatch(),
 )
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 def test_invalid_payload(cli, schema_url, service, service_token):
@@ -197,3 +230,17 @@ def test_api_id_no_token(cli, schema_url, hosts_file):
     # Then it should be an error
     assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
     assert "CLI appears to be not authenticated" in result.stdout
+
+
+@pytest.mark.service(
+    data={"title": "Not found", "status": 404, "detail": "Resource not found"}, status=404, method="POST", path="/runs/"
+)
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+def test_invalid_api_slug(cli, schema_url, service, service_token):
+    # When API slug does not exist
+    result = cli.run(
+        schema_url, "my-api", f"--schemathesis-io-token={service_token}", f"--schemathesis-io-url={service.base_url}"
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # Then the error should be immediately visible
+    assert result.stdout.strip() == "❌ API_SLUG not found!"
