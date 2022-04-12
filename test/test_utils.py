@@ -3,7 +3,6 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from schemathesis.utils import (
-    are_content_types_equal,
     dict_true_values,
     import_app,
     is_json_media_type,
@@ -69,21 +68,6 @@ def test_is_plain_text_media_type(value, expected):
 
 
 @pytest.mark.parametrize(
-    "first, second, expected",
-    (
-        ("application/json", "application/json", True),
-        ("APPLICATION/JSON", "application/json", True),
-        ("application/json", "application/json;charset=utf-8", True),
-        ("application/json;charset=utf-8", "application/json;charset=utf-8", True),
-        ("application/json;charset=utf-8", "application/json", True),
-        ("text/plain", "application/json", False),
-    ),
-)
-def test_are_content_types_equal(first, second, expected):
-    assert are_content_types_equal(first, second) is expected
-
-
-@pytest.mark.parametrize(
     "path, exception, match",
     (
         ("", ValueError, "Empty module name"),
@@ -98,6 +82,6 @@ def test_import_app(path, exception, match):
 
 @given(st.text())
 def test_import_app_no_unexpected_exceptions(path):
-    # `import_app` should not raise nothing else but `ImportError` or `AttributeError` or `ValueError`
+    # `import_app` should not raise anything else but `ImportError` or `AttributeError` or `ValueError`
     with pytest.raises((ImportError, AttributeError, ValueError)):
         import_app(path)

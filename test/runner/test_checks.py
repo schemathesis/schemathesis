@@ -155,7 +155,14 @@ def test_content_type_conformance_default_response(content_type, is_error):
     assert_content_type_conformance(raw_schema, content_type, is_error)
 
 
-def test_malformed_content_type():
+@pytest.mark.parametrize(
+    "schema_media_type, response_media_type, expected",
+    (
+        ("application:json", "application/json", "Schema has a malformed media type: `application:json`"),
+        ("application/json", "application:json", "Response has a malformed media type: `application:json`"),
+    ),
+)
+def test_malformed_content_type(schema_media_type, response_media_type, expected):
     # When the verified content type is malformed
     raw_schema = {
         "openapi": "3.0.2",
@@ -163,13 +170,13 @@ def test_malformed_content_type():
         "paths": {
             "/users": {
                 "get": {
-                    "responses": {"default": {"description": "OK", "content": {"application:json": {"schema": {}}}}},
+                    "responses": {"default": {"description": "OK", "content": {schema_media_type: {"schema": {}}}}},
                 }
             }
         },
     }
     # Then it should raise an assertion error, rather than an internal one
-    assert_content_type_conformance(raw_schema, "application/json", True, "Malformed media type: `application:json`")
+    assert_content_type_conformance(raw_schema, response_media_type, True, expected)
 
 
 def test_content_type_conformance_another_status_code():
