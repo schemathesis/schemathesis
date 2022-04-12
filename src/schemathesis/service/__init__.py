@@ -1,4 +1,5 @@
 from . import auth, hosts
+from .client import ServiceClient
 from .constants import (
     DEFAULT_HOSTNAME,
     DEFAULT_HOSTS_PATH,
