@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, Generator, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Generator, NoReturn, Optional, Union
 
 from ... import failures
 from ...exceptions import (
@@ -8,7 +8,7 @@ from ...exceptions import (
     get_response_type_error,
     get_status_code_error,
 )
-from ...utils import GenericResponse, are_content_types_equal, parse_content_type
+from ...utils import GenericResponse, parse_content_type
 from .schemas import BaseOpenAPISchema
 from .utils import expand_status_code
 
@@ -64,14 +64,15 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> Optiona
         )
     for option in defined_content_types:
         try:
-            if are_content_types_equal(option, content_type):
-                return None
+            expected_main, expected_sub = parse_content_type(option)
         except ValueError as exc:
-            raise get_malformed_media_type_error(str(exc))(
-                str(exc), context=failures.MalformedMediaType(actual=content_type, defined=option)
-            ) from exc
-        expected_main, expected_sub = parse_content_type(option)
-        received_main, received_sub = parse_content_type(content_type)
+            _reraise_malformed_media_type(exc, "Schema", option, option)
+        try:
+            received_main, received_sub = parse_content_type(content_type)
+        except ValueError as exc:
+            _reraise_malformed_media_type(exc, "Response", content_type, option)
+        if (expected_main, expected_sub) == (received_main, received_sub):
+            return None
     exc_class = get_response_type_error(f"{expected_main}_{expected_sub}", f"{received_main}_{received_sub}")
     raise exc_class(
         f"Received a response with '{content_type}' Content-Type, "
@@ -79,6 +80,16 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> Optiona
         f"Defined content types: {', '.join(defined_content_types)}",
         context=failures.UndefinedContentType(content_type=content_type, defined_content_types=defined_content_types),
     )
+
+
+def _reraise_malformed_media_type(exc: ValueError, location: str, actual: str, defined: str) -> NoReturn:
+    message = (
+        f"{location} has a malformed media type: `{actual}`. Please, ensure that this media type conforms to "
+        f"the `type-name/subtype-name` format defined by RFC 6838."
+    )
+    raise get_malformed_media_type_error(message)(
+        message, context=failures.MalformedMediaType(actual=actual, defined=defined)
+    ) from exc
 
 
 def response_headers_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
