@@ -45,7 +45,7 @@ from .context import ExecutionContext, ServiceContext
 from .debug import DebugOutputHandler
 from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
-from .options import CSVOption, CustomHelpMessageChoice, NotSet, OptionalInt
+from .options import CsvChoice, CsvEnumChoice, CustomHelpMessageChoice, NotSet, OptionalInt
 
 try:
     from yaml import CSafeLoader as SafeLoader
@@ -62,7 +62,7 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 DEFAULT_CHECKS_NAMES = _get_callable_names(checks_module.DEFAULT_CHECKS)
 ALL_CHECKS_NAMES = _get_callable_names(checks_module.ALL_CHECKS)
-CHECKS_TYPE = click.Choice((*ALL_CHECKS_NAMES, "all"))
+CHECKS_TYPE = CsvChoice((*ALL_CHECKS_NAMES, "all"))
 
 DEFAULT_TARGETS_NAMES = _get_callable_names(targets_module.DEFAULT_TARGETS)
 ALL_TARGETS_NAMES = _get_callable_names(targets_module.ALL_TARGETS)
@@ -221,6 +221,7 @@ with_hosts_file = click.option(
     default=DEFAULT_CHECKS_NAMES,
     cls=GroupedOption,
     group=ParameterGroup.validation,
+    callback=callbacks.convert_checks,
     show_default=True,
 )
 @click.option(
@@ -460,7 +461,7 @@ with_hosts_file = click.option(
 @click.option(
     "--hypothesis-phases",
     help="Control which phases should be run.",
-    type=CSVOption(hypothesis.Phase),
+    type=CsvEnumChoice(hypothesis.Phase),
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,
 )
@@ -481,7 +482,7 @@ with_hosts_file = click.option(
 @click.option(
     "--hypothesis-suppress-health-check",
     help="Comma-separated list of health checks to disable.",
-    type=CSVOption(hypothesis.HealthCheck),
+    type=CsvEnumChoice(hypothesis.HealthCheck),
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,
 )

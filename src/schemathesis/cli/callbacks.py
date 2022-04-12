@@ -144,6 +144,10 @@ def convert_stateful(ctx: click.core.Context, param: click.core.Parameter, value
     return Stateful[value]
 
 
+def convert_checks(ctx: click.core.Context, param: click.core.Parameter, value: Tuple[List[str]]) -> List[str]:
+    return sum(value, [])
+
+
 def convert_code_sample_style(ctx: click.core.Context, param: click.core.Parameter, value: str) -> CodeSampleStyle:
     return CodeSampleStyle.from_str(value)
 
