@@ -10,6 +10,7 @@ Changelog
 - ``st`` as an alias to the ``schemathesis`` command line entrypoint.
 - ``st auth login`` / ``st auth logout`` to authenticate with Schemathesis.io.
 - ``X-Schemathesis-TestCaseId`` header to help to distinguish test cases on the application side. `#1303`_
+- Support for comma separated lists in the ``--checks`` CLI option. `#1373`_
 
 **Changed**
 
@@ -2402,6 +2403,7 @@ Deprecated
 .. _#1395: https://github.com/schemathesis/schemathesis/issues/1395
 .. _#1394: https://github.com/schemathesis/schemathesis/issues/1394
 .. _#1378: https://github.com/schemathesis/schemathesis/issues/1378
+.. _#1373: https://github.com/schemathesis/schemathesis/issues/1373
 .. _#1372: https://github.com/schemathesis/schemathesis/issues/1372
 .. _#1370: https://github.com/schemathesis/schemathesis/issues/1370
 .. _#1366: https://github.com/schemathesis/schemathesis/issues/1366

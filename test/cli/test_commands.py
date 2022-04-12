@@ -17,13 +17,14 @@ from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
 
 from schemathesis import Case, DataGenerationMethod, fixups, service
-from schemathesis.checks import ALL_CHECKS
+from schemathesis.checks import ALL_CHECKS, not_a_server_error
 from schemathesis.cli import LoaderConfig, execute, get_exit_code, reset_checks
 from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT, CodeSampleStyle
 from schemathesis.hooks import unregister_all
 from schemathesis.models import APIOperation
 from schemathesis.runner import DEFAULT_CHECKS, from_schema
 from schemathesis.runner.impl import threadpool
+from schemathesis.specs.openapi.checks import status_code_conformance
 from schemathesis.stateful import Stateful
 from schemathesis.targets import DEFAULT_TARGETS
 
@@ -441,8 +442,15 @@ def test_load_schema_arguments_headers_to_loader_for_app(testdir, cli, mocker):
 def test_all_checks(cli, mocker, swagger_20):
     mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
-    result = cli.run(SCHEMA_URI, "--checks=all")
+    cli.run(SCHEMA_URI, "--checks=all")
     assert execute.call_args[1]["checks"] == ALL_CHECKS
+
+
+def test_comma_separated_checks(cli, mocker, swagger_20):
+    mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
+    execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
+    cli.run(SCHEMA_URI, "--checks=not_a_server_error,status_code_conformance")
+    assert execute.call_args[1]["checks"] == (not_a_server_error, status_code_conformance)
 
 
 @pytest.mark.operations()

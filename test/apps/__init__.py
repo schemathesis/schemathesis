@@ -4,7 +4,7 @@ from typing import List
 import click
 from aiohttp import web
 
-from schemathesis.cli import CSVOption
+from schemathesis.cli import CsvEnumChoice
 
 try:
     from . import _graphql, openapi
@@ -20,7 +20,7 @@ except ImportError as exc:
 
 
 INVALID_OPERATIONS = ("invalid", "invalid_response", "invalid_path_parameter", "missing_path_parameter")
-AvailableOperations = CSVOption(openapi.schema.Operation)
+AvailableOperations = CsvEnumChoice(openapi.schema.Operation)
 
 
 @click.command()

@@ -5,7 +5,7 @@ import pytest
 from hypothesis import example, given
 from hypothesis import strategies as st
 
-from schemathesis.cli import CSVOption
+from schemathesis.cli import CsvEnumChoice
 
 
 class Options(Enum):
@@ -16,6 +16,6 @@ class Options(Enum):
 @given(value=st.text() | st.lists(st.text()).map(",".join))
 @example("")
 def test_csv_option(value):
-    option = CSVOption(Options)
+    option = CsvEnumChoice(Options)
     with pytest.raises(click.BadParameter):
         option.convert(value, None, None)
