@@ -2,6 +2,7 @@ from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tup
 from urllib.parse import urlparse
 
 import hypothesis.errors
+from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 from starlette.applications import Starlette
 
 from ..checks import DEFAULT_CHECKS
@@ -9,6 +10,7 @@ from ..constants import (
     DEFAULT_DATA_GENERATION_METHODS,
     DEFAULT_DEADLINE,
     DEFAULT_STATEFUL_RECURSION_LIMIT,
+    HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     DataGenerationMethod,
 )
 from ..models import CheckFunction
@@ -434,6 +436,7 @@ def from_schema(
 
 
 def prepare_hypothesis_settings(
+    database: Optional[str] = None,
     deadline: Optional[Union[int, NotSet]] = None,
     derandomize: Optional[bool] = None,
     max_examples: Optional[int] = None,
@@ -456,5 +459,12 @@ def prepare_hypothesis_settings(
             kwargs["deadline"] = None
         else:
             kwargs["deadline"] = deadline
+    if database is not None:
+        if database.lower() == "none":
+            kwargs["database"] = None
+        elif database == HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER:
+            kwargs["database"] = InMemoryExampleDatabase()
+        else:
+            kwargs["database"] = DirectoryBasedExampleDatabase(database)
     kwargs.setdefault("deadline", DEFAULT_DEADLINE)
     return hypothesis.settings(**kwargs)

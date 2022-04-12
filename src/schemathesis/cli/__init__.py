@@ -435,6 +435,13 @@ with_hosts_file = click.option(
     type=click.Choice(["20", "30"]),
 )
 @click.option(
+    "--hypothesis-database",
+    help="Implementation of a Hypothesis database.",
+    type=str,
+    cls=GroupedOption,
+    group=ParameterGroup.hypothesis,
+)
+@click.option(
     "--hypothesis-deadline",
     help="Duration in milliseconds that each individual example with a test is not allowed to exceed.",
     # max value to avoid overflow. It is the maximum amount of days in milliseconds
@@ -546,6 +553,7 @@ def run(
     stateful: Optional[Stateful] = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     force_schema_version: Optional[str] = None,
+    hypothesis_database: Optional[str] = None,
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
     hypothesis_derandomize: Optional[bool] = None,
     hypothesis_max_examples: Optional[int] = None,
@@ -584,6 +592,7 @@ def run(
         else:
             _fixups.install(fixups)
     hypothesis_settings = prepare_hypothesis_settings(
+        database=hypothesis_database,
         deadline=hypothesis_deadline,
         derandomize=hypothesis_derandomize,
         max_examples=hypothesis_max_examples,
