@@ -61,7 +61,7 @@ def test_global_body_hook(schema):
     strategy = schema["/payload"]["POST"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow])
     def test(case):
         assert len(case.body["name"]) == 5
 
