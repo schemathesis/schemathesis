@@ -251,7 +251,7 @@ def test_replay_cert_options(cli, schema_url, cassette_path, request_args, mocke
 
 
 @pytest.mark.operations("headers")
-async def test_headers_serialization(cli, openapi2_schema_url, hypothesis_max_examples, cassette_path):
+def test_headers_serialization(cli, openapi2_schema_url, hypothesis_max_examples, cassette_path):
     # See GH-783
     # When headers contain control characters that are not directly representable in YAML
     result = cli.run(

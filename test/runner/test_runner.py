@@ -584,7 +584,7 @@ async def test_explicit_example_disable(any_app, any_app_schema, mocker):
 
 
 @pytest.mark.operations("plain_text_body")
-async def test_plain_text_body(any_app, any_app_schema):
+def test_plain_text_body(any_app, any_app_schema):
     # When the expected payload is text/plain
     # Then the payload is not encoded as JSON
     def check_content(response, case):
