@@ -6,7 +6,7 @@ import traceback
 from collections import defaultdict
 from enum import Enum
 from queue import Queue
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, Iterable, List, NoReturn, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import attr
@@ -933,19 +933,21 @@ def execute(
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handlers: List[EventHandler] = []
-    if junit_xml is not None:
-        handlers.append(JunitXMLHandler(junit_xml))
-    if debug_output_file is not None:
-        handlers.append(DebugOutputHandler(debug_output_file))
     service_context = None
     if schemathesis_io_token is not None and api_slug is not None:
         service_queue: Queue = Queue()
         service_context = ServiceContext(url=schemathesis_io_url, queue=service_queue)
-        handlers.append(
-            service.ServiceReporter(
-                out_queue=service_queue, token=schemathesis_io_token, api_slug=api_slug, url=schemathesis_io_url
-            )
-        )
+        client = service.ServiceClient(base_url=schemathesis_io_url, token=schemathesis_io_token)
+        try:
+            test_run = client.create_test_run(api_slug)
+            reporter = service.ServiceReporter(client=client, test_run=test_run, out_queue=service_queue)
+            handlers.append(reporter)
+        except requests.HTTPError as exc:
+            handle_service_error(exc)
+    if junit_xml is not None:
+        handlers.append(JunitXMLHandler(junit_xml))
+    if debug_output_file is not None:
+        handlers.append(DebugOutputHandler(debug_output_file))
     if store_network_log is not None:
         # This handler should be first to have logs writing completed when the output handler will display statistic
         handlers.append(cassettes.CassetteWriter(store_network_log))
@@ -984,6 +986,14 @@ def execute(
         sys.exit(exit_code)
     # Event stream did not finish with a terminal event. Only possible if the handler is broken
     click.secho("Unexpected error", fg="red")
+    sys.exit(1)
+
+
+def handle_service_error(exc: requests.HTTPError) -> NoReturn:
+    if exc.response.status_code == 404:
+        error_message("API_SLUG not found!")
+    else:
+        output.default.display_service_error(service.Error(exc))
     sys.exit(1)
 
 

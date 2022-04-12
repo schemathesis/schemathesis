@@ -293,12 +293,12 @@ def handle_service_integration(context: ExecutionContext) -> None:
             report_title = click.style("Report", bold=True)
             click.echo(f"{report_title}: {event.short_url}")
         if isinstance(event, service.Error):
-            display_service_error(event, context)
+            click.echo()
+            display_service_error(event)
 
 
-def display_service_error(event: service.Error, context: ExecutionContext) -> None:
+def display_service_error(event: service.Error) -> None:
     """Show information about an error during communication with Schemathesis.io."""
-    click.echo()
     if isinstance(event.exception, requests.HTTPError):
         status_code = event.exception.response.status_code
         click.secho(f"Schemathesis.io responded with HTTP {status_code}", fg="red")

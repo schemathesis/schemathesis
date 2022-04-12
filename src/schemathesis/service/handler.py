@@ -7,17 +7,18 @@ from ..cli.context import ExecutionContext
 from ..cli.handlers import EventHandler
 from ..runner import events
 from . import worker
-from .constants import DEFAULT_URL, STOP_MARKER, WORKER_JOIN_TIMEOUT
+from .client import ServiceClient
+from .constants import STOP_MARKER, WORKER_JOIN_TIMEOUT
+from .models import TestRun
 
 
 @attr.s(slots=True)  # pragma: no mutate
 class ServiceReporter(EventHandler):
     """Send events to the worker that communicates with Schemathesis.io."""
 
+    client: ServiceClient = attr.ib()  # pragma: no mutate
+    test_run: TestRun = attr.ib()  # pragma: no mutate
     out_queue: Queue = attr.ib()  # pragma: no mutate
-    token: str = attr.ib()  # pragma: no mutate
-    api_slug: str = attr.ib()  # pragma: no mutate
-    url: str = attr.ib(default=DEFAULT_URL)  # pragma: no mutate
     in_queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
     worker: threading.Thread = attr.ib(init=False)  # pragma: no mutate
 
@@ -26,9 +27,8 @@ class ServiceReporter(EventHandler):
         self.worker = threading.Thread(
             target=worker.start,
             kwargs={
-                "url": self.url,
-                "token": self.token,
-                "api_slug": self.api_slug,
+                "client": self.client,
+                "test_run": self.test_run,
                 "in_queue": self.in_queue,
                 "out_queue": self.out_queue,
             },
