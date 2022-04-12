@@ -11,6 +11,7 @@ Changelog
 - ``st auth login`` / ``st auth logout`` to authenticate with Schemathesis.io.
 - ``X-Schemathesis-TestCaseId`` header to help to distinguish test cases on the application side. `#1303`_
 - Support for comma separated lists in the ``--checks`` CLI option. `#1373`_
+- Hypothesis Database configuration for CLI via the ``--hypothesis-database`` option. `#1326`_
 
 **Changed**
 
@@ -2416,6 +2417,7 @@ Deprecated
 .. _#1335: https://github.com/schemathesis/schemathesis/issues/1335
 .. _#1331: https://github.com/schemathesis/schemathesis/issues/1331
 .. _#1328: https://github.com/schemathesis/schemathesis/issues/1328
+.. _#1326: https://github.com/schemathesis/schemathesis/issues/1326
 .. _#1325: https://github.com/schemathesis/schemathesis/issues/1325
 .. _#1303: https://github.com/schemathesis/schemathesis/issues/1303
 .. _#1292: https://github.com/schemathesis/schemathesis/issues/1292
