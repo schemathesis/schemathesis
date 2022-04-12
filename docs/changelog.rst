@@ -9,7 +9,7 @@ Changelog
 - Open API link name customization via the ``name`` argument to ``schema.add_link``.
 - ``st`` as an alias to the ``schemathesis`` command line entrypoint.
 - ``st auth login`` / ``st auth logout`` to authenticate with Schemathesis.io.
-- ``X-Schemathesis-TestCaseId`` header to help to distinguish test cases on the application side.
+- ``X-Schemathesis-TestCaseId`` header to help to distinguish test cases on the application side. `#1303`_
 
 **Changed**
 
@@ -2415,6 +2415,7 @@ Deprecated
 .. _#1331: https://github.com/schemathesis/schemathesis/issues/1331
 .. _#1328: https://github.com/schemathesis/schemathesis/issues/1328
 .. _#1325: https://github.com/schemathesis/schemathesis/issues/1325
+.. _#1303: https://github.com/schemathesis/schemathesis/issues/1303
 .. _#1292: https://github.com/schemathesis/schemathesis/issues/1292
 .. _#1290: https://github.com/schemathesis/schemathesis/issues/1290
 .. _#1287: https://github.com/schemathesis/schemathesis/issues/1287
