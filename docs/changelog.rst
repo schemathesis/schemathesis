@@ -19,6 +19,7 @@ Changelog
 - Add the ``api_slug`` CLI argument to upload data to Schemathesis.io.
 - Show response status code on failing checks output in CLI.
 - Improve error message on malformed Open API path templates (like ``/foo}/``). `#1372`_
+- Improve error message on malformed media types that appear in the schema or in response headers. `#1382`_
 
 **Fixed**
 
@@ -2402,6 +2403,7 @@ Deprecated
 .. _#1410: https://github.com/schemathesis/schemathesis/issues/1410
 .. _#1395: https://github.com/schemathesis/schemathesis/issues/1395
 .. _#1394: https://github.com/schemathesis/schemathesis/issues/1394
+.. _#1382: https://github.com/schemathesis/schemathesis/issues/1382
 .. _#1378: https://github.com/schemathesis/schemathesis/issues/1378
 .. _#1373: https://github.com/schemathesis/schemathesis/issues/1373
 .. _#1372: https://github.com/schemathesis/schemathesis/issues/1372

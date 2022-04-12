@@ -186,11 +186,6 @@ def is_plain_text_media_type(value: str) -> bool:
     return parse_content_type(value) == ("text", "plain")
 
 
-def are_content_types_equal(source: str, target: str) -> bool:
-    """Check if two content types are the same excluding options."""
-    return parse_content_type(source) == parse_content_type(target)
-
-
 def make_loader(*tags_to_remove: str) -> Type[yaml.SafeLoader]:
     """Create a YAML loader, that doesn't parse specific tokens into Python objects."""
     cls: Type[yaml.SafeLoader] = type("YAMLLoader", (SafeLoader,), {})
