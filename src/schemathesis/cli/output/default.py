@@ -8,7 +8,6 @@ from typing import Any, Dict, Generator, List, Optional, Tuple, Union, cast
 
 import click
 import requests
-from hypothesis import settings
 
 from ... import service
 from ..._compat import metadata
@@ -425,11 +424,7 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     )
     click.echo(versions)
     click.echo(f"rootdir: {os.getcwd()}")
-    current_profile = settings._current_profile  # type: ignore[attr-defined]
-    click.echo(
-        f"hypothesis profile '{current_profile}' "  # type: ignore
-        f"-> {settings.get_profile(current_profile).show_changed()}"
-    )
+    click.echo(f"Hypothesis: {context.hypothesis_settings.show_changed()}")
     if event.location is not None:
         click.echo(f"Schema location: {event.location}")
     click.echo(f"Base URL: {event.base_url}")

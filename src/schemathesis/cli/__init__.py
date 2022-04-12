@@ -633,6 +633,7 @@ def run(
     )
     execute(
         event_stream,
+        hypothesis_settings,
         workers_num,
         show_errors_tracebacks,
         validate_schema,
@@ -917,6 +918,7 @@ class OutputStyle(Enum):
 
 def execute(
     event_stream: Generator[events.ExecutionEvent, None, None],
+    hypothesis_settings: hypothesis.settings,
     workers_num: int,
     show_errors_tracebacks: bool,
     validate_schema: bool,
@@ -949,6 +951,7 @@ def execute(
         handlers.append(cassettes.CassetteWriter(store_network_log))
     handlers.append(get_output_handler(workers_num))
     execution_context = ExecutionContext(
+        hypothesis_settings=hypothesis_settings,
         workers_num=workers_num,
         show_errors_tracebacks=show_errors_tracebacks,
         validate_schema=validate_schema,

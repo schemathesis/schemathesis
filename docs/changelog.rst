@@ -23,6 +23,7 @@ Changelog
 
 **Fixed**
 
+- Show the proper Hypothesis configuration in the CLI output. `#1445`_
 - Missing ``source`` attribute in the ``Case.partial_deepcopy`` implementation. `#1429`_
 - Duplicated failure message from ``content_type_conformance`` and ``response_schema_conformance`` checks when the checked response has no ``Content-Type`` header. `#1394`_
 - Not copied ``case`` & ``response`` inside ``Case.validate_response``.
@@ -2398,6 +2399,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1445: https://github.com/schemathesis/schemathesis/issues/1445
 .. _#1429: https://github.com/schemathesis/schemathesis/issues/1429
 .. _#1425: https://github.com/schemathesis/schemathesis/issues/1425
 .. _#1410: https://github.com/schemathesis/schemathesis/issues/1410
