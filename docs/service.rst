@@ -14,10 +14,6 @@ On top of the usual Schemathesis benefits, the platform gives you:
 - Tailored tips on API schema improvement (**COMING SOON**)
 - Support for gRPC, AsyncAPI, and SOAP (**COMING SOON**)
 
-.. note::
-
-    🎉 Join our `Discord <https://discord.gg/R9ASRAmHnA>`_, we'd love to hear your feedback 🎉
-
 Tutorial
 --------
 

@@ -54,6 +54,10 @@ Features
  - Ready-to-go Docker image;
  - Configurable with user-defined checks, string formats, hooks, and targets.
 
+.. note::
+
+    🎉 Join our `Discord <https://discord.gg/R9ASRAmHnA>`_, we'd love to hear your feedback 🎉
+
 User's Guide
 ------------
 

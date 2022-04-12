@@ -11,7 +11,7 @@ import requests
 
 from ... import service
 from ..._compat import metadata
-from ...constants import CodeSampleStyle, __version__
+from ...constants import DISCORD_LINK, CodeSampleStyle, __version__
 from ...models import Response, Status
 from ...runner import events
 from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult, deduplicate_failures
@@ -132,6 +132,11 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
         click.secho(
             "Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks", fg="red"
         )
+    click.secho(
+        f"\nIf you need assistance in solving this, feel free to join our Discord server and report it:\n\n"
+        f"  {DISCORD_LINK}\n",
+        fg="red",
+    )
 
 
 def display_single_error(context: ExecutionContext, result: SerializedTestResult) -> bool:
@@ -398,13 +403,15 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
     click.secho(event.message, fg="red")
     if event.exception:
         if context.show_errors_tracebacks:
-            message = event.exception_with_traceback
+            message = (
+                f"Error: {event.exception_with_traceback}\n"
+                f"Please, consider reporting the traceback below it to our issue tracker: {ISSUE_TRACKER_URL}"
+            )
         else:
-            message = event.exception
-        message = (
-            f"Error: {message}\n"
-            f"Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks"
-        )
+            message = (
+                f"Error: {event.exception}\n"
+                f"Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks\n"
+            )
         if event.exception_type == "schemathesis.exceptions.SchemaLoadingError":
             message += "\n" + DISABLE_SCHEMA_VALIDATION_MESSAGE
         click.secho(message, fg="red")
