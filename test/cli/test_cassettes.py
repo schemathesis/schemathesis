@@ -8,6 +8,7 @@ import yaml
 from _pytest.main import ExitCode
 from urllib3._collections import HTTPHeaderDict
 
+from schemathesis.cli import CASSETTES_PATH_INVALID_USAGE_MESSAGE, DEPRECATED_CASSETTE_PATH_OPTION_WARNING
 from schemathesis.cli.cassettes import filter_cassette, get_command_representation, get_prepared_request
 from schemathesis.constants import USER_AGENT
 from schemathesis.models import Request
@@ -32,7 +33,7 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples)
     hypothesis_max_examples = hypothesis_max_examples or 2
     result = cli.run(
         schema_url,
-        f"--store-network-log={cassette_path}",
+        f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples}",
         "--hypothesis-seed=1",
     )
@@ -61,7 +62,7 @@ def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, c
     # When an API operation has responses with SUCCESS and FAILURE statuses
     result = cli.run(
         openapi3_schema_url,
-        f"--store-network-log={cassette_path}",
+        f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
         "--hypothesis-seed=1",
     )
@@ -111,7 +112,7 @@ def test_encoding_error(testdir, cli, cassette_path, hypothesis_max_examples, op
         str(schema_file),
         f"--base-url={openapi3_base_url}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        f"--store-network-log={cassette_path}",
+        f"--cassette-path={cassette_path}",
     )
     # Then the test run should be successful
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -137,7 +138,7 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
     result = testdir.run(
         "schemathesis",
         "run",
-        f"--store-network-log={cassette_path}",
+        f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 2}",
         schema_url,
     )
@@ -146,7 +147,7 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) == 1
     command = (
-        f"st run --store-network-log={cassette_path} "
+        f"st run --cassette-path={cassette_path} "
         f"--hypothesis-max-examples={hypothesis_max_examples or 2} {schema_url}"
     )
     assert cassette["command"] == command
@@ -158,7 +159,7 @@ def test_main_process_error(cli, schema_url, hypothesis_max_examples, cassette_p
     # Here it is happening because the schema is not valid
     result = cli.run(
         schema_url,
-        f"--store-network-log={cassette_path}",
+        f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         "--hypothesis-seed=1",
         "--validate-schema=true",
@@ -175,7 +176,7 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
     # Record a cassette
     result = cli.run(
         schema_url,
-        f"--store-network-log={cassette_path}",
+        f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         "--hypothesis-seed=1",
         "--validate-schema=false",
@@ -233,7 +234,7 @@ def test_replay_cert_options(cli, schema_url, cassette_path, request_args, mocke
     # Record a cassette
     cli.run(
         schema_url,
-        f"--store-network-log={cassette_path}",
+        f"--cassette-path={cassette_path}",
         "--hypothesis-max-examples=1",
         "--hypothesis-seed=1",
         "--validate-schema=false",
@@ -256,7 +257,7 @@ def test_headers_serialization(cli, openapi2_schema_url, hypothesis_max_examples
     # When headers contain control characters that are not directly representable in YAML
     result = cli.run(
         openapi2_schema_url,
-        f"--store-network-log={cassette_path}",
+        f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 100}",
         "--hypothesis-seed=1",
         "--validate-schema=false",
@@ -314,3 +315,26 @@ def test_filter_cassette(filters, expected):
         {"id": "3", "status": "FAILURE", "request": {"uri": "http://127.0.0.1/api/failure", "method": "PUT"}},
     ]
     assert list(filter_cassette(cassette, **filters)) == [item for item in cassette if item["id"] in expected]
+
+
+@pytest.mark.operations("success")
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+def test_use_deprecation(cli, schema_url, cassette_path):
+    result = cli.run(
+        schema_url,
+        f"--store-network-log={cassette_path}",
+    )
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert result.stdout.splitlines()[0] == DEPRECATED_CASSETTE_PATH_OPTION_WARNING
+
+
+@pytest.mark.operations("success")
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+def test_forbid_simultaneous_use_of_deprecated_and_new_options(cli, schema_url, cassette_path):
+    result = cli.run(
+        schema_url,
+        f"--store-network-log={cassette_path}",
+        f"--cassette-path={cassette_path}",
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    assert result.stdout.splitlines()[0].endswith(CASSETTES_PATH_INVALID_USAGE_MESSAGE)

@@ -31,7 +31,7 @@ class ExecutionContext:
     current_line_length: int = attr.ib(default=0)  # pragma: no mutate
     terminal_size: os.terminal_size = attr.ib(factory=shutil.get_terminal_size)  # pragma: no mutate
     results: List[SerializedTestResult] = attr.ib(factory=list)  # pragma: no mutate
-    cassette_file_name: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    cassette_path: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     junit_xml_file: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     verbosity: int = attr.ib(default=0)  # pragma: no mutate
     code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate

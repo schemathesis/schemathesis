@@ -70,6 +70,12 @@ TARGETS_TYPE = click.Choice((*ALL_TARGETS_NAMES, "all"))
 
 DATA_GENERATION_METHOD_TYPE = click.Choice([item.name for item in DataGenerationMethod])
 
+DEPRECATED_CASSETTE_PATH_OPTION_WARNING = (
+    "Warning: Option `--store-network-log` is deprecated and will be removed in Schemathesis 4.0. "
+    "Use `--cassette-path` instead."
+)
+CASSETTES_PATH_INVALID_USAGE_MESSAGE = "Can't use `--store-network-log` and `--cassette-path` simultaneously"
+
 
 def register_target(function: Target) -> Target:
     """Register a new testing target for schemathesis CLI.
@@ -405,6 +411,9 @@ with_hosts_file = click.option(
     callback=callbacks.convert_code_sample_style,
 )
 @click.option(
+    "--cassette-path", help="Save test results as a VCR-compatible cassette.", type=click.File("w", encoding="utf-8")
+)
+@click.option(
     "--store-network-log", help="Store requests and responses into a file.", type=click.File("w", encoding="utf-8")
 )
 @click.option(
@@ -548,6 +557,7 @@ def run(
     debug_output_file: Optional[click.utils.LazyFile] = None,
     show_errors_tracebacks: bool = False,
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default(),
+    cassette_path: Optional[click.utils.LazyFile] = None,
     store_network_log: Optional[click.utils.LazyFile] = None,
     fixups: Tuple[str] = (),  # type: ignore
     stateful: Optional[Stateful] = None,
@@ -578,6 +588,13 @@ def run(
     maybe_disable_color(ctx, no_color)
     check_auth(auth, headers)
     selected_targets = tuple(target for target in targets_module.ALL_TARGETS if target.__name__ in targets)
+
+    if store_network_log and cassette_path:
+        error_message(CASSETTES_PATH_INVALID_USAGE_MESSAGE)
+        sys.exit(1)
+    if store_network_log is not None:
+        click.secho(DEPRECATED_CASSETTE_PATH_OPTION_WARNING, fg="yellow")
+        cassette_path = store_network_log
 
     token = get_service_token(api_slug, schemathesis_io_url, hosts_file, schemathesis_io_token)
 
@@ -622,7 +639,7 @@ def run(
         seed=hypothesis_seed,
         exit_first=exit_first,
         dry_run=dry_run,
-        store_interactions=store_network_log is not None,
+        store_interactions=cassette_path is not None,
         checks=selected_checks,
         max_response_time=max_response_time,
         targets=selected_targets,
@@ -637,7 +654,7 @@ def run(
         workers_num,
         show_errors_tracebacks,
         validate_schema,
-        store_network_log,
+        cassette_path,
         junit_xml,
         verbosity,
         code_sample_style,
@@ -922,7 +939,7 @@ def execute(
     workers_num: int,
     show_errors_tracebacks: bool,
     validate_schema: bool,
-    store_network_log: Optional[click.utils.LazyFile],
+    cassette_path: Optional[click.utils.LazyFile],
     junit_xml: Optional[click.utils.LazyFile],
     verbosity: int,
     code_sample_style: CodeSampleStyle,
@@ -948,16 +965,16 @@ def execute(
         handlers.append(JunitXMLHandler(junit_xml))
     if debug_output_file is not None:
         handlers.append(DebugOutputHandler(debug_output_file))
-    if store_network_log is not None:
+    if cassette_path is not None:
         # This handler should be first to have logs writing completed when the output handler will display statistic
-        handlers.append(cassettes.CassetteWriter(store_network_log))
+        handlers.append(cassettes.CassetteWriter(cassette_path))
     handlers.append(get_output_handler(workers_num))
     execution_context = ExecutionContext(
         hypothesis_settings=hypothesis_settings,
         workers_num=workers_num,
         show_errors_tracebacks=show_errors_tracebacks,
         validate_schema=validate_schema,
-        cassette_file_name=store_network_log.name if store_network_log is not None else None,
+        cassette_path=cassette_path.name if cassette_path is not None else None,
         junit_xml_file=junit_xml.name if junit_xml is not None else None,
         verbosity=verbosity,
         code_sample_style=code_sample_style,

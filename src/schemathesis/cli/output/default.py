@@ -267,10 +267,10 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
     if total:
         display_checks_statistics(total)
 
-    if context.cassette_file_name:
+    if context.cassette_path:
         click.echo()
         category = click.style("Network log", bold=True)
-        click.secho(f"{category}: {context.cassette_file_name}")
+        click.secho(f"{category}: {context.cassette_path}")
 
     if context.junit_xml_file:
         click.echo()
