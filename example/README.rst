@@ -82,7 +82,7 @@ Here are examples of how you can run Schemathesis CLI:
     st run -w 8 $SCHEMA_URL
 
     # Store network log to a file
-    st run --store-network-log=cassette.yaml $SCHEMA_URL
+    st run --cassette-path=cassette.yaml $SCHEMA_URL
     # Replay requests from the log
     schemathesis replay cassette.yaml
 

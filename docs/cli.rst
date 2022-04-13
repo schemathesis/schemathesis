@@ -234,14 +234,14 @@ Schemathesis allows you to do this with ``-store-network-log`` command-line opti
 
 .. code:: bash
 
-    $ st run --store-network-log=cassette.yaml http://127.0.0.1/schema.yaml
+    $ st run --cassette-path=cassette.yaml http://127.0.0.1/schema.yaml
 
 This command will create a new YAML file that will network interactions in `VCR format <https://relishapp.com/vcr/vcr/v/5-1-0/docs/cassettes/cassette-format>`_.
 It might look like this:
 
 .. code:: yaml
 
-    command: 'st run --store-network-log=cassette.yaml http://127.0.0.1/schema.yaml'
+    command: 'st run --cassette-path=cassette.yaml http://127.0.0.1/schema.yaml'
     recorded_with: 'Schemathesis 1.2.0'
     http_interactions:
     - id: '0'
