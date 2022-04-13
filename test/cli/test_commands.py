@@ -290,6 +290,8 @@ def test_commands_run_help(cli):
         "  --code-sample-style [python|curl]",
         "                                  Controls the style of code samples for failure",
         "                                  reproduction.",
+        "  --cassette-path FILENAME        Save test results as a VCR-compatible",
+        "                                  cassette.",
         "  --store-network-log FILENAME    Store requests and responses into a file.",
         "  --fixups [fast_api|all]         Install specified compatibility fixups.",
         "  --stateful [none|links]         Utilize stateful testing capabilities.",
@@ -1477,7 +1479,7 @@ def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_b
         f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
         "--show-errors-tracebacks",
         "--hypothesis-derandomize",
-        f"--store-network-log={cassette_path}",
+        f"--cassette-path={cassette_path}",
     )
     # Then it should be correctly sent to the server
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -1963,7 +1965,7 @@ def test_debug_output(tmp_path, cli, schema_url, openapi_version, hypothesis_max
         f"--debug-output-file={debug_file}",
         "--validate-schema=false",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        f"--store-network-log={cassette_path}",
+        f"--cassette-path={cassette_path}",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then all underlying runner events should be stored as JSONL file
@@ -2040,7 +2042,7 @@ def assert_exit_code(event_stream, code):
             workers_num=1,
             show_errors_tracebacks=False,
             validate_schema=False,
-            store_network_log=None,
+            cassette_path=None,
             junit_xml=None,
             verbosity=0,
             code_sample_style=CodeSampleStyle.default(),
