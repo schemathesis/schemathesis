@@ -1,5 +1,4 @@
 import pytest
-from jsonschema import ValidationError
 
 import schemathesis
 from schemathesis.exceptions import InvalidSchema, SchemaLoadingError

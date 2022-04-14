@@ -386,10 +386,10 @@ def test_item_is_missing(item, expected):
     # When there is no key in the data
 
     @conversion
-    def foo(data, name):
+    def convert_func(data, name):
         data[name] = "TEST"
 
-    foo("key")(item)
+    convert_func("key")(item)
 
     # Then the data should not be affected
     # And should be otherwise
@@ -512,7 +512,7 @@ def test_security_definition_parameter(testdir, empty_open_api_2_schema):
     }
     empty_open_api_2_schema["security"] = [{"token": []}]
     testdir.make_test(
-        f"""
+        """
 @schema.parametrize()
 @settings(phases=[Phase.explicit])
 def test_(case):
@@ -570,7 +570,7 @@ def test_unusual_form_schema(empty_open_api_3_schema, type_name):
         headers = case.as_requests_kwargs(headers={"Content-Type": "text/plain"})["headers"]
         # Then it should be preferred
         assert headers["Content-Type"] == "text/plain"
-        # And it should be case insensitive
+        # And it should be case-insensitive
         headers = case.as_requests_kwargs(headers={"content-type": "text/plain"})["headers"]
         assert headers["content-type"] == "text/plain"
         assert list(headers) == ["content-type", "User-Agent", SCHEMATHESIS_TEST_CASE_HEADER]

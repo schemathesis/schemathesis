@@ -48,7 +48,7 @@ def assert_schema(schema):
     assert defines_type(schema.raw_schema, "Book")
 
 
-@pytest.mark.parametrize("transform", (lambda x: x, lambda x: StringIO(x)))
+@pytest.mark.parametrize("transform", (lambda x: x, StringIO))
 def test_graphql_file_loader(transform):
     raw_schema = transform(RAW_SCHEMA)
     schema = loaders.from_file(raw_schema)
