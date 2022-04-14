@@ -350,7 +350,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
     mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
 
-    result = cli.run(SCHEMA_URI, *args)
+    cli.run(SCHEMA_URI, *args)
 
     expected = {
         "checks": DEFAULT_CHECKS,
@@ -681,7 +681,7 @@ def test_seed(cli, cli_args, workers):
 @pytest.mark.parametrize("workers", (1, 2))
 def test_unsatisfiable(cli, cli_args, workers):
     # When the app's schema contains parameters that can't be generated
-    # For example if it contains contradiction in the parameters definition - requires to be integer AND string at the
+    # For example if it contains contradiction in the parameters' definition - requires to be integer AND string at the
     # same time
     result = cli.run(*cli_args, f"--workers={workers}")
     # Then the whole Schemathesis run should fail
@@ -1757,7 +1757,7 @@ def test_exit_first(cli, schema_url, openapi_version, workers_num, mocker):
                 break
         else:
             pytest.fail("Line is not found")
-        # the "FAILURES" sections goes after a new line, rather then continuing to the next operation
+        # the "FAILURES" sections goes after a new line, rather than continuing to the next operation
         next_line = lines[idx + 1]
         assert next_line == ""
         assert "FAILURES" in lines[idx + 2]
@@ -1816,7 +1816,7 @@ def test_reserved_characters_in_operation_name(testdir, empty_open_api_3_schema)
 def test_error_during_example_generation(testdir, cli):
     # See GH-994
     # When the API schema is in YAML
-    # And contains an unquoted value, that is casted to boolean
+    # And contains an unquoted value, that is cast to boolean
     # And it is behind references
     # And there are examples of another parameter
     content = """

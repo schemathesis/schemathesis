@@ -135,7 +135,7 @@ def test_binary_data(empty_open_api_3_schema, media_type):
                     "content": {
                         media_type: {
                             "schema": {},
-                            "examples": {"answer": {"externalValue": f"http://127.0.0.1:1/answer.json"}},
+                            "examples": {"answer": {"externalValue": "http://127.0.0.1:1/answer.json"}},
                         }
                     },
                 },

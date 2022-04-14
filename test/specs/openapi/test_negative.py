@@ -92,7 +92,7 @@ def test_top_level_strategy(data, location, schema):
     (
         # No constraints besides `type`
         (negate_constraints, {"type": "integer"}, True),
-        # Missing type (i.e all types are possible)
+        # Missing type (i.e. all types are possible)
         (change_type, {}, True),
         # All types explicitly
         (change_type, {"type": ["string", "integer", "number", "object", "array", "boolean", "null"]}, True),

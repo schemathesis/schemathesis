@@ -45,7 +45,7 @@ def spec(request):
     param = getattr(request, "param", None)
     if param == "swagger":
         return request.getfixturevalue("swagger_20")
-    elif param == "openapi":
+    if param == "openapi":
         return request.getfixturevalue("openapi_30")
     return request.getfixturevalue("swagger_20")
 

@@ -378,7 +378,7 @@ def test(request, case):
     )
 
     result = testdir.runpytest("-v", "-s")
-    # Then these examples should be used in tests as a part of a single request, i.e combined
+    # Then these examples should be used in tests as a part of a single request, i.e. combined
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 

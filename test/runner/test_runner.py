@@ -109,7 +109,7 @@ def test_execute(any_app, any_app_schema):
 
 @pytest.mark.parametrize("workers", (1, 2))
 def test_interactions(request, any_app_schema, workers):
-    init, *others, finished = from_schema(any_app_schema, workers_num=workers, store_interactions=True).execute()
+    _, *others, _ = from_schema(any_app_schema, workers_num=workers, store_interactions=True).execute()
     base_url = (
         "http://localhost/api"
         if isinstance(any_app_schema.app, Flask)
@@ -176,7 +176,7 @@ def test_interactions(request, any_app_schema, workers):
 @pytest.mark.operations("root")
 def test_asgi_interactions(fastapi_app):
     schema = oas_loaders.from_asgi("/openapi.json", fastapi_app)
-    init, *ev, finished = from_schema(schema, store_interactions=True).execute()
+    _, *ev, _ = from_schema(schema, store_interactions=True).execute()
     interaction = ev[1].result.interactions[0]
     assert interaction.status == Status.success
     assert interaction.request.uri == "http://localhost/users"
@@ -185,7 +185,7 @@ def test_asgi_interactions(fastapi_app):
 @pytest.mark.operations("empty")
 def test_empty_response_interaction(any_app_schema):
     # When there is a GET request and a response that doesn't return content (e.g. 204)
-    init, *others, finished = from_schema(any_app_schema, store_interactions=True).execute()
+    _, *others, _ = from_schema(any_app_schema, store_interactions=True).execute()
     interactions = [event for event in others if isinstance(event, events.AfterExecution)][0].result.interactions
     for interaction in interactions:  # There could be multiple calls
         # Then the stored request has no body
@@ -200,7 +200,7 @@ def test_empty_response_interaction(any_app_schema):
 @pytest.mark.operations("empty_string")
 def test_empty_string_response_interaction(any_app_schema):
     # When there is a response that returns payload of length 0
-    init, *others, finished = from_schema(any_app_schema, store_interactions=True).execute()
+    _, *others, _ = from_schema(any_app_schema, store_interactions=True).execute()
     interactions = [event for event in others if isinstance(event, events.AfterExecution)][0].result.interactions
     for interaction in interactions:  # There could be multiple calls
         # Then the stored response body should be an empty string
@@ -312,7 +312,7 @@ def test_headers_override(any_app_schema):
             data = response.json()
         assert data["X-Token"] == "test"
 
-    init, *others, finished = from_schema(
+    *_, finished = from_schema(
         any_app_schema,
         checks=(check_headers,),
         headers={"X-Token": "test"},
@@ -326,7 +326,7 @@ def test_headers_override(any_app_schema):
 def test_unknown_response_code(any_app_schema):
     # When API operation returns a status code, that is not listed in "responses"
     # And "status_code_conformance" is specified
-    init, *others, finished = from_schema(
+    _, *others, finished = from_schema(
         any_app_schema,
         checks=(status_code_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
@@ -345,7 +345,7 @@ def test_unknown_response_code(any_app_schema):
 def test_unknown_response_code_with_default(any_app_schema):
     # When API operation returns a status code, that is not listed in "responses", but there is a "default" response
     # And "status_code_conformance" is specified
-    init, *others, finished = from_schema(
+    _, *others, finished = from_schema(
         any_app_schema,
         checks=(status_code_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
@@ -361,7 +361,7 @@ def test_unknown_response_code_with_default(any_app_schema):
 def test_unknown_content_type(any_app_schema):
     # When API operation returns a response with content type, not specified in "produces"
     # And "content_type_conformance" is specified
-    init, *others, finished = from_schema(
+    _, *others, finished = from_schema(
         any_app_schema,
         checks=(content_type_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
@@ -384,7 +384,7 @@ def test_known_content_type(any_app_schema):
         checks=(content_type_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
     ).execute()
-    # Then there should be no a failures
+    # Then there should be no failures
     assert not finished.has_failures
 
 
@@ -392,7 +392,7 @@ def test_known_content_type(any_app_schema):
 def test_response_conformance_invalid(any_app_schema):
     # When API operation returns a response that doesn't conform to the schema
     # And "response_schema_conformance" is specified
-    init, *others, finished = from_schema(
+    _, *others, finished = from_schema(
         any_app_schema,
         checks=(response_schema_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
@@ -462,7 +462,7 @@ def test_response_conformance_text(any_app_schema):
 def test_response_conformance_malformed_json(any_app_schema):
     # When API operation returns a response that contains a malformed JSON, but has a valid content type header
     # And "response_schema_conformance" is specified
-    init, *others, finished = from_schema(
+    _, *others, finished = from_schema(
         any_app_schema,
         checks=(response_schema_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
@@ -481,7 +481,7 @@ def test_response_conformance_malformed_json(any_app_schema):
 
 @pytest.fixture()
 def filter_path_parameters():
-    # ".." and "." strings are treated specially, but this behavior is outside of the test's scope
+    # ".." and "." strings are treated specially, but this behavior is outside the test's scope
     # "" shouldn't be allowed as a valid path parameter
 
     def before_generate_path_parameters(context, strategy):
@@ -521,7 +521,7 @@ def test_path_parameters_encoding(real_app_schema):
 def test_exceptions(schema_url, app, loader_options, from_schema_options):
     schema = oas_loaders.from_uri(schema_url, **loader_options)
     results = from_schema(schema, **from_schema_options).execute()
-    assert any([event.status == Status.error for event in results if isinstance(event, events.AfterExecution)])
+    assert any(event.status == Status.error for event in results if isinstance(event, events.AfterExecution))
 
 
 @pytest.mark.operations("multipart")
@@ -531,7 +531,7 @@ def test_internal_exceptions(any_app_schema, mocker):
     # And Hypothesis consider this test as a flaky one
     mocker.patch("schemathesis.Case.call", side_effect=ValueError)
     mocker.patch("schemathesis.Case.call_wsgi", side_effect=ValueError)
-    init, *others, finished = from_schema(
+    _, *others, finished = from_schema(
         any_app_schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)
     ).execute()
     # Then the execution result should indicate errors
@@ -606,9 +606,7 @@ def test_invalid_path_parameter(schema_url):
     # When a path parameter is marked as not required
     # And schema validation is disabled
     schema = oas_loaders.from_uri(schema_url, validate_schema=False)
-    init, *others, finished = from_schema(
-        schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)
-    ).execute()
+    *_, finished = from_schema(schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)).execute()
     # Then Schemathesis enforces all path parameters to be required
     # And there should be no errors
     assert not finished.has_errors
@@ -617,7 +615,7 @@ def test_invalid_path_parameter(schema_url):
 @pytest.mark.operations("missing_path_parameter")
 def test_missing_path_parameter(any_app_schema):
     # When a path parameter is missing
-    init, *others, finished = from_schema(
+    _, *others, finished = from_schema(
         any_app_schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)
     ).execute()
     # Then it leads to an error
@@ -678,7 +676,7 @@ def test_url_joining(request, server, get_schema_path, schema_path):
 def test_skip_operations_with_recursive_references(schema_with_recursive_references):
     # When the test schema contains recursive references
     schema = oas_loaders.from_dict(schema_with_recursive_references)
-    *_, after, finished = from_schema(schema).execute()
+    *_, after, _ = from_schema(schema).execute()
     # Then it causes an error with a proper error message
     assert after.status == Status.error
     assert RECURSIVE_REFERENCE_ERROR_MESSAGE in after.result.errors[0].exception
@@ -806,7 +804,7 @@ def test_hypothesis_errors_propagation(empty_open_api_3_schema, openapi3_base_ur
 
     max_examples = 10
     schema = oas_loaders.from_dict(empty_open_api_3_schema, base_url=openapi3_base_url)
-    initialized, before, after, finished = from_schema(
+    *_, after, finished = from_schema(
         schema, hypothesis_settings=hypothesis.settings(max_examples=max_examples, deadline=None)
     ).execute()
     # Then the test outcomes should not contain errors
@@ -839,7 +837,7 @@ def test_encoding_octet_stream(empty_open_api_3_schema, openapi3_base_url):
         }
     }
     schema = oas_loaders.from_dict(empty_open_api_3_schema, base_url=openapi3_base_url)
-    initialized, before, after, finished = from_schema(schema).execute()
+    *_, after, finished = from_schema(schema).execute()
     # Then the test outcomes should not contain errors
     # And it should not lead to encoding errors
     assert after.status == Status.success
@@ -849,7 +847,7 @@ def test_encoding_octet_stream(empty_open_api_3_schema, openapi3_base_url):
 
 def test_graphql(graphql_url):
     schema = gql_loaders.from_url(graphql_url)
-    initialized, *others, finished = list(
+    initialized, *_, finished = list(
         from_schema(schema, hypothesis_settings=hypothesis.settings(max_examples=5, deadline=None)).execute()
     )
     assert initialized.operations_count == 2
@@ -862,7 +860,7 @@ def test_interrupted_in_test(openapi3_schema):
     def check(response, case):
         raise KeyboardInterrupt
 
-    *_, event, finished = from_schema(openapi3_schema, checks=(check,)).execute()
+    *_, event, _ = from_schema(openapi3_schema, checks=(check,)).execute()
     # Then the `Interrupted` event should be emitted
     assert isinstance(event, events.Interrupted)
 
@@ -870,11 +868,11 @@ def test_interrupted_in_test(openapi3_schema):
 @pytest.mark.operations("success")
 def test_interrupted_outside_test(mocker, openapi3_schema):
     # See GH-1325
-    # When an interrupt happens outside of a test body
+    # When an interrupt happens outside a test body
     mocker.patch("schemathesis.runner.events.AfterExecution.from_result", side_effect=KeyboardInterrupt)
 
     try:
-        *_, event, finished = from_schema(openapi3_schema).execute()
+        *_, event, _ = from_schema(openapi3_schema).execute()
         # Then the `Interrupted` event should be emitted
         assert isinstance(event, events.Interrupted)
     except KeyboardInterrupt:
