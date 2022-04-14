@@ -2,6 +2,7 @@ import pytest
 
 from schemathesis.constants import (
     DEFAULT_DEADLINE,
+    IS_PYTEST_ABOVE_54,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
     SCHEMATHESIS_TEST_CASE_HEADER,
     USER_AGENT,
@@ -120,7 +121,11 @@ def test_b(case, a):
 """,
     )
     # When a test is run with treating warnings as errors
-    result = testdir.runpytest("-Werror")
+    if IS_PYTEST_ABOVE_54:
+        args = ("-Werror", "--asyncio-mode=strict")
+    else:
+        args = ("-Werror",)
+    result = testdir.runpytest(*args)
     # There should be no errors. There are no warnings from Schemathesis pytest plugin.
     result.assert_outcomes(passed=3)
 
