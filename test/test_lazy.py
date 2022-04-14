@@ -532,7 +532,7 @@ def test_(case):
 def test_data_generation_methods(testdir):
     # When data generation method config is specified on the schema which is wrapped by a lazy one
     testdir.make_test(
-        f"""
+        """
 @pytest.fixture()
 def api_schema():
     return schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.all())
@@ -582,7 +582,7 @@ def test_data_generation_methods_override(testdir):
     # When data generation method config is specified on the schema which is wrapped by a lazy one
     # And then overridden on the` from_pytest_fixture` level
     testdir.make_test(
-        f"""
+        """
 @pytest.fixture()
 def api_schema():
     return schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.all())

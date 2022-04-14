@@ -9,7 +9,6 @@ from hypothesis.errors import NoSuchExample
 import schemathesis
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.specs.openapi._hypothesis import STRING_FORMATS, is_valid_header
-from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
 from .utils import as_param
 
@@ -343,7 +342,7 @@ def test_(case):
 
 
 def test_bearer_auth_valid_header():
-    # When a HTTP Bearer Auth headers is generated
+    # When an HTTP Bearer Auth headers is generated
     # Then it should be a valid header
     # And no invalid headers should be generated
     with pytest.raises(NoSuchExample):

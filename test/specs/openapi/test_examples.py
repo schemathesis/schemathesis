@@ -165,9 +165,9 @@ def test_get_static_parameters_from_examples(operation):
     # ensure that each request body example is included at least once
     assert all(
         [
-            any("string1" == static_parameters["body"]["foo"] for static_parameters in static_parameters_list),
-            any("string2" == static_parameters["body"]["foo"] for static_parameters in static_parameters_list),
-            any("string3" == static_parameters["body"]["foo"] for static_parameters in static_parameters_list),
+            any(static_parameters["body"]["foo"] == "string1" for static_parameters in static_parameters_list),
+            any(static_parameters["body"]["foo"] == "string2" for static_parameters in static_parameters_list),
+            any(static_parameters["body"]["foo"] == "string3" for static_parameters in static_parameters_list),
         ]
     )
     # ensure that each header parameter example is included at least once
@@ -457,7 +457,7 @@ def test_external_value(empty_open_api_3_schema, server):
     # Then this example should be used
     example = get_single_example(strategy)
     assert example.body == b"42"
-    # And this data should be be OK to send
+    # And this data should be OK to send
     assert_requests_call(example)
     assert example.as_werkzeug_kwargs()["data"] == b"42"
 

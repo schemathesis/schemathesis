@@ -1,5 +1,3 @@
-from unittest.mock import ANY
-
 import hypothesis
 import pytest
 import requests
@@ -63,7 +61,7 @@ def test_open_api_code_sample(openapi_case, kwargs_repr):
 def test_code_sample_from_request(openapi_case):
     url = "http://example.com/api/success"
     request = requests.Request(method="GET", url=url).prepare()
-    # By default Schemathesis uses User-agent header, but it is possible to remove it (e.g. via hooks in CLI)
+    # By default, Schemathesis uses User-agent header, but it is possible to remove it (e.g. via hooks in CLI)
     # `Case.get_code_to_reproduce` should be able to generate a code sample for any `requests.Request`
     assert openapi_case.get_code_to_reproduce(request=request) == f"requests.get('{url}')"
 

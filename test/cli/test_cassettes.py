@@ -218,15 +218,14 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
 def request_args(request, tmp_path):
     if request.param == "tls-verify":
         return ["--request-tls-verify=false"], "verify", False
-    else:
-        cert = tmp_path / "cert.tmp"
-        cert.touch()
-        if request.param == "cert":
-            return [f"--request-cert={cert}"], "cert", str(cert)
-        if request.param == "cert-and-key":
-            key = tmp_path / "key.tmp"
-            key.touch()
-            return [f"--request-cert={cert}", f"--request-cert-key={key}"], "cert", (str(cert), str(key))
+    cert = tmp_path / "cert.tmp"
+    cert.touch()
+    if request.param == "cert":
+        return [f"--request-cert={cert}"], "cert", str(cert)
+    if request.param == "cert-and-key":
+        key = tmp_path / "key.tmp"
+        key.touch()
+        return [f"--request-cert={cert}", f"--request-cert-key={key}"], "cert", (str(cert), str(key))
 
 
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))

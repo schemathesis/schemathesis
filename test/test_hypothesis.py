@@ -323,7 +323,7 @@ def test_valid_form_data(request, raw_schema):
     def inner(case):
         case.call()
 
-    # Then these values should be casted to bytes and handled successfully
+    # Then these values should be cast to bytes and handled successfully
     inner()
 
 

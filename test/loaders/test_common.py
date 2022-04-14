@@ -167,7 +167,7 @@ def test_non_default_loader(openapi_version, request, loader, fixture):
             kwargs["app"] = request.getfixturevalue("loadable_aiohttp_app")
         kwargs["base_url"] = request.getfixturevalue("base_url")
     # Common kwargs combinations for loaders should work without errors
-    init, *others, finished = prepare(schema, loader=loader, headers={"TEST": "foo"}, **kwargs)
+    *_, finished = prepare(schema, loader=loader, headers={"TEST": "foo"}, **kwargs)
     assert not finished.has_errors
     assert not finished.has_failures
 
@@ -199,7 +199,7 @@ def test_validation(loader, schema, message):
 def test_custom_loader(swagger_20, openapi2_base_url):
     swagger_20.base_url = openapi2_base_url
     # Custom loaders are not validated
-    *others, finished = list(prepare({}, loader=lambda *args, **kwargs: swagger_20))
+    *_, finished = list(prepare({}, loader=lambda *args, **kwargs: swagger_20))
     assert not finished.has_errors
     assert not finished.has_failures
 
