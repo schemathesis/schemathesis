@@ -31,6 +31,13 @@ Changelog
 - Not copied ``case`` & ``response`` inside ``Case.validate_response``.
 - Ignored ``pytest.mark`` decorators when they are applied before ``schema.parametrize`` if the schema is created via ``from_pytest_fixture``. `#1378`_
 
+`3.13.9`_ - 2022-04-14
+----------------------
+
+**Fixed**
+
+- Compatibility with ``pytest-asyncio>=0.17.1``. `#1452`_
+
 `3.13.8`_ - 2022-04-05
 ----------------------
 
@@ -2208,7 +2215,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.8...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.9...HEAD
+.. _3.13.9: https://github.com/schemathesis/schemathesis/compare/v3.13.8...v3.13.9
 .. _3.13.8: https://github.com/schemathesis/schemathesis/compare/v3.13.7...v3.13.8
 .. _3.13.7: https://github.com/schemathesis/schemathesis/compare/v3.13.6...v3.13.7
 .. _3.13.6: https://github.com/schemathesis/schemathesis/compare/v3.13.5...v3.13.6
@@ -2401,6 +2409,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1452: https://github.com/schemathesis/schemathesis/issues/1452
 .. _#1445: https://github.com/schemathesis/schemathesis/issues/1445
 .. _#1429: https://github.com/schemathesis/schemathesis/issues/1429
 .. _#1425: https://github.com/schemathesis/schemathesis/issues/1425
