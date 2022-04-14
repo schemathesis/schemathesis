@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.13.9`_ - 2022-04-14
+----------------------
+
 **Fixed**
 
 - Compatibility with ``pytest-asyncio>=0.17.1``. `#1452`_
@@ -2185,7 +2188,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.8...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.9...HEAD
+.. _3.13.9: https://github.com/schemathesis/schemathesis/compare/v3.13.8...v3.13.9
 .. _3.13.8: https://github.com/schemathesis/schemathesis/compare/v3.13.7...v3.13.8
 .. _3.13.7: https://github.com/schemathesis/schemathesis/compare/v3.13.6...v3.13.7
 .. _3.13.6: https://github.com/schemathesis/schemathesis/compare/v3.13.5...v3.13.6
