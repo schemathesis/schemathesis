@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, Optional, Union
 import attr
 import pytest
 from _pytest.fixtures import FixtureRequest
+from hypothesis.core import HypothesisHandle
 from pytest_subtests import SubTests, nullcontext
 
 from .constants import CodeSampleStyle, DataGenerationMethod
@@ -52,6 +53,7 @@ class LazySchema:
         data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
         code_sample_style: Union[str, NotSet] = NOT_SET,
     ) -> Callable:
+        # pylint: disable=too-many-statements
         if method is NOT_SET:
             method = self.method
         if endpoint is NOT_SET:
@@ -67,25 +69,25 @@ class LazySchema:
         else:
             _code_sample_style = self.code_sample_style
 
-        def wrapper(func: Callable) -> Callable:
-            if is_given_applied(func):
+        def wrapper(test: Callable) -> Callable:
+            if is_given_applied(test):
                 # The user wrapped the test function with `@schema.given`
                 # These args & kwargs go as extra to the underlying test generator
-                given_args = get_given_args(func)
-                given_kwargs = get_given_kwargs(func)
-                test_function = validate_given_args(func, given_args, given_kwargs)
+                given_args = get_given_args(test)
+                given_kwargs = get_given_kwargs(test)
+                test_function = validate_given_args(test, given_args, given_kwargs)
                 if test_function is not None:
                     return test_function
-                given_kwargs = merge_given_args(func, given_args, given_kwargs)
+                given_kwargs = merge_given_args(test, given_args, given_kwargs)
                 del given_args
             else:
                 given_kwargs = {}
 
-            def test(request: FixtureRequest) -> None:
+            def wrapped_test(request: FixtureRequest) -> None:
                 """The actual test, which is executed by pytest."""
                 __tracebackhide__ = True  # pylint: disable=unused-variable
-                if hasattr(test, "_schemathesis_hooks"):
-                    func._schemathesis_hooks = test._schemathesis_hooks  # type: ignore
+                if hasattr(wrapped_test, "_schemathesis_hooks"):
+                    test._schemathesis_hooks = wrapped_test._schemathesis_hooks  # type: ignore
                 schema = get_schema(
                     request=request,
                     name=self.fixture_name,
@@ -95,18 +97,18 @@ class LazySchema:
                     tag=tag,
                     operation_id=operation_id,
                     hooks=self.hooks,
-                    test_function=func,
+                    test_function=test,
                     validate_schema=validate_schema,
                     skip_deprecated_operations=skip_deprecated_operations,
                     data_generation_methods=data_generation_methods,
                     code_sample_style=_code_sample_style,
                     app=self.app,
                 )
-                fixtures = get_fixtures(func, request, given_kwargs)
+                fixtures = get_fixtures(test, request, given_kwargs)
                 # Changing the node id is required for better reporting - the method and path will appear there
                 node_id = request.node._nodeid
-                settings = getattr(test, "_hypothesis_internal_use_settings", None)
-                tests = list(schema.get_all_tests(func, settings, _given_kwargs=given_kwargs))
+                settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
+                tests = list(schema.get_all_tests(test, settings, _given_kwargs=given_kwargs))
                 if not tests:
                     fail_on_no_matches(node_id)
                 request.session.testscollected += len(tests)
@@ -125,12 +127,13 @@ class LazySchema:
                         _schema_error(subtests, result.err(), node_id, data_generation_method)
                 subtests.item._nodeid = node_id
 
-            test = pytest.mark.usefixtures(self.fixture_name)(test)
+            wrapped_test = pytest.mark.usefixtures(self.fixture_name)(wrapped_test)
 
             # Needed to prevent a failure when settings are applied to the test function
-            test.is_hypothesis_test = True  # type: ignore
+            wrapped_test.is_hypothesis_test = True  # type: ignore
+            wrapped_test.hypothesis = HypothesisHandle(test, wrapped_test, given_kwargs)  # type: ignore
 
-            return test
+            return wrapped_test
 
         return wrapper
 
