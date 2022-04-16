@@ -6,6 +6,7 @@ from pytest_httpserver import URIPattern
 from requests import Timeout
 
 import schemathesis
+from schemathesis.cli.callbacks import INVALID_SCHEMA_MESSAGE
 from schemathesis.constants import USER_AGENT
 
 from ..utils import strip_style_win32
@@ -244,3 +245,32 @@ def test_invalid_api_slug(cli, schema_url, service, service_token):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then the error should be immediately visible
     assert result.stdout.strip() == "❌ API_SLUG not found!"
+
+
+def test_not_authenticated_with_slug(cli):
+    # When the user is not authenticated
+    # And uses an API slug
+    result = cli.run("my-api")
+    # Then the error message should note it
+    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
+    assert "You are trying to upload data to" in result.stdout.strip()
+
+
+def test_two_slugs(cli, service, service_token):
+    # When the user passes api slug twice
+    result = cli.run(
+        "my-api", "my-api", f"--schemathesis-io-token={service_token}", f"--schemathesis-io-url={service.base_url}"
+    )
+    # Then the error message should note it
+    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
+    assert result.stdout.strip().endswith("Got unexpected extra argument (my-api)")
+
+
+@pytest.mark.operations("success")
+def test_authenticated_with_slug(cli, service, service_token):
+    # When the user is authenticated
+    # And uses an API slug
+    result = cli.run("my-api", f"--schemathesis-io-token={service_token}", f"--schemathesis-io-url={service.base_url}")
+    # Then the schema location should be loaded
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert "1 passed" in result.stdout

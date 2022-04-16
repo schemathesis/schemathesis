@@ -8,7 +8,7 @@ from requests.adapters import HTTPAdapter, Retry
 from ..constants import USER_AGENT
 from .constants import REQUEST_TIMEOUT
 from .metadata import Metadata
-from .models import AuthResponse, TestRun
+from .models import ApiConfig, AuthResponse, TestRun
 
 
 class ServiceClient(requests.Session):
@@ -37,7 +37,12 @@ class ServiceClient(requests.Session):
         """Create a new test run on the Schemathesis.io side."""
         response = self.post("/runs/", json={"api_slug": api_slug})
         data = response.json()
-        return TestRun(run_id=data["run_id"], short_url=data["short_url"])
+        config = data["config"]
+        return TestRun(
+            run_id=data["run_id"],
+            short_url=data["short_url"],
+            config=ApiConfig(location=config["location"], base_url=config["base_url"]),
+        )
 
     def finish_test_run(self, run_id: str) -> None:
         """Finish a test run on the Schemathesis.io side.
