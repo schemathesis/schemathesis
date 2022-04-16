@@ -69,9 +69,18 @@ def create_event_url(setup_server, run_id):
 
 
 @pytest.fixture
-def start_run_url(setup_server, run_id):
+def start_run_url(setup_server, run_id, openapi3_schema_url):
     return setup_server(
-        lambda h: h.respond_with_json({"run_id": run_id, "short_url": "http://127.0.0.1"}, status=201), "POST", "/runs/"
+        lambda h: h.respond_with_json(
+            {
+                "run_id": run_id,
+                "short_url": "http://127.0.0.1",
+                "config": {"location": openapi3_schema_url, "base_url": None},
+            },
+            status=201,
+        ),
+        "POST",
+        "/runs/",
     )
 
 

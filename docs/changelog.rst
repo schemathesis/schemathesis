@@ -12,6 +12,7 @@ Changelog
 - ``X-Schemathesis-TestCaseId`` header to help to distinguish test cases on the application side. `#1303`_
 - Support for comma separated lists in the ``--checks`` CLI option. `#1373`_
 - Hypothesis Database configuration for CLI via the ``--hypothesis-database`` option. `#1326`_
+- Make the ``SCHEMA`` CLI argument accept API slugs from Schemathesis.io.
 
 **Changed**
 

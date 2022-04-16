@@ -7,22 +7,23 @@ from hypothesis import strategies as st
 
 from schemathesis import utils
 from schemathesis.cli import callbacks
+from schemathesis.cli.callbacks import SchemaInputKind
 
 from ..utils import SIMPLE_PATH
 
 
-@given(value=st.text().filter(lambda x: "//" not in x))
-@example("0" * 1000)
-@example("//test")
-@example("//ÿ[")
-def test_validate_schema(value):
+@pytest.mark.parametrize("value", ("//test", "//ÿ["))
+def test_parse_schema_kind(value):
     with pytest.raises(click.UsageError):
-        callbacks.validate_schema(SimpleNamespace(params={}), None, value)
+        kind = callbacks.parse_schema_kind(value, app=None)
+        callbacks.validate_schema(value, kind, base_url=None, dry_run=False, app=None, api_slug=None)
 
 
 def test_validate_schema_path_without_base_url():
     with pytest.raises(click.UsageError):
-        callbacks.validate_schema(SimpleNamespace(params={}), None, SIMPLE_PATH)
+        callbacks.validate_schema(
+            SIMPLE_PATH, SchemaInputKind.PATH, base_url=None, dry_run=False, app=None, api_slug=None
+        )
 
 
 @given(value=st.text().filter(lambda x: x.count(":") != 1))

@@ -15,3 +15,4 @@ from .constants import (
 )
 from .events import Completed, Error, Event, Timeout
 from .handler import ServiceReporter
+from .models import TestRun

@@ -20,6 +20,7 @@ from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDa
 from schemathesis import Case, DataGenerationMethod, fixups, service
 from schemathesis.checks import ALL_CHECKS, not_a_server_error
 from schemathesis.cli import LoaderConfig, execute, get_exit_code, reset_checks
+from schemathesis.cli.callbacks import INVALID_SCHEMA_MESSAGE
 from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT, CodeSampleStyle
 from schemathesis.hooks import unregister_all
 from schemathesis.models import APIOperation
@@ -65,7 +66,7 @@ def test_commands_version(cli):
     "args, error",
     (
         (("run",), "Error: Missing argument 'SCHEMA'."),
-        (("run", "not-url"), "Error: Invalid SCHEMA, must be a valid URL or file path."),
+        (("run", "not-url"), "See https://schemathesis.readthedocs.io/en/stable/service.html for more details"),
         (("run", SIMPLE_PATH), 'Error: Missing argument, "--base-url" is required for SCHEMA specified by file.'),
         (("run", SIMPLE_PATH, "--base-url=test"), "Error: Invalid base URL"),
         (("run", SIMPLE_PATH, "--base-url=127.0.0.1:8080"), "Error: Invalid base URL"),
@@ -134,7 +135,7 @@ def test_commands_version(cli):
             ("run", "http://127.0.0.1", "--header=test:тест"),
             "Error: Invalid value for '--header' / '-H': Header value should be latin-1 encodable",
         ),
-        (("run", "//test"), "Error: Invalid SCHEMA, must be a valid URL or file path."),
+        (("run", "//test"), f"Error: {INVALID_SCHEMA_MESSAGE}"),
         (
             ("run", "http://127.0.0.1", "--max-response-time=0"),
             "Error: Invalid value for '--max-response-time': 0 is not in the range x>=1.",
@@ -2047,9 +2048,9 @@ def assert_exit_code(event_stream, code):
             verbosity=0,
             code_sample_style=CodeSampleStyle.default(),
             debug_output_file=None,
-            schemathesis_io_token=None,
             schemathesis_io_url=service.DEFAULT_URL,
-            api_slug=None,
+            client=None,
+            test_run=None,
         )
     assert exc.value.code == code
 
