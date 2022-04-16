@@ -216,7 +216,7 @@ with_hosts_file = click.option(
 
 
 @schemathesis.command(short_help="Perform schemathesis test.", cls=CommandWithCustomHelp)
-@click.argument("schema", type=str, callback=callbacks.validate_schema)
+@click.argument("schema", type=str)
 @click.argument("api_slug", type=str, required=False)
 @click.option(
     "--checks",
@@ -596,7 +596,34 @@ def run(
         click.secho(DEPRECATED_CASSETTE_PATH_OPTION_WARNING, fg="yellow")
         cassette_path = store_network_log
 
-    token = get_service_token(api_slug, schemathesis_io_url, hosts_file, schemathesis_io_token)
+    schemathesis_io_hostname = urlparse(schemathesis_io_url).netloc
+    token = schemathesis_io_token or service.hosts.get_token(hostname=schemathesis_io_hostname, hosts_file=hosts_file)
+    schema_kind = callbacks.parse_schema_kind(schema, app)
+    callbacks.validate_schema(schema, schema_kind, base_url=base_url, dry_run=dry_run, app=app, api_slug=api_slug)
+    client = None
+    test_run = None
+    if api_slug is not None or schema_kind == callbacks.SchemaInputKind.SLUG:
+        if token is None:
+            hostname = (
+                "Schemathesis.io" if schemathesis_io_hostname == service.DEFAULT_HOSTNAME else schemathesis_io_hostname
+            )
+            raise click.UsageError(
+                "\n\n"
+                f"You are trying to upload data to {hostname}, but your CLI appears to be not authenticated.\n\n"
+                "To authenticate, grab your token from `app.schemathesis.io` and run `st auth login <TOKEN>`\n"
+                "Alternatively, you can pass the token explicitly via the `--schemathesis-io-token` option / "
+                f"`{service.TOKEN_ENV_VAR}` environment variable\n\n"
+                "See https://schemathesis.readthedocs.io/en/stable/service.html for more details"
+            )
+        client = service.ServiceClient(base_url=schemathesis_io_url, token=token)
+        try:
+            test_run = client.create_test_run(schema)
+            if schema_kind == callbacks.SchemaInputKind.SLUG:
+                # Replace config values with ones loaded from the service
+                schema = test_run.config.location
+                base_url = base_url or test_run.config.base_url
+        except requests.HTTPError as exc:
+            handle_service_error(exc)
 
     if "all" in checks:
         selected_checks = checks_module.ALL_CHECKS
@@ -659,9 +686,9 @@ def run(
         verbosity,
         code_sample_style,
         debug_output_file,
-        token,
         schemathesis_io_url,
-        api_slug,
+        client,
+        test_run,
     )
 
 
@@ -887,25 +914,6 @@ def check_auth(auth: Optional[Tuple[str, str]], headers: Dict[str, str]) -> None
         raise click.BadParameter("Passing `--auth` together with `--header` that sets `Authorization` is not allowed.")
 
 
-def get_service_token(api_slug: Optional[str], url: str, hosts_file: PathLike, token: Optional[str]) -> Optional[str]:
-    """Extract Schemathesis.io token if API ID is specified."""
-    if api_slug is not None:
-        hostname = urlparse(url).netloc
-        token = token or service.hosts.get_token(hostname=hostname, hosts_file=hosts_file)
-        if token is None:
-            hostname = "Schemathesis.io" if hostname == service.DEFAULT_HOSTNAME else hostname
-            raise click.UsageError(
-                "\n\n"
-                f"You are trying to upload data to {hostname}, but your CLI appears to be not authenticated.\n\n"
-                "To authenticate, grab your token from `app.schemathesis.io` and run `st auth login <TOKEN>`\n"
-                "Alternatively, you can pass the token explicitly via the `--schemathesis-io-token` option / "
-                f"`{service.TOKEN_ENV_VAR}` environment variable\n\n"
-                "See https://schemathesis.readthedocs.io/en/stable/service.html for more details"
-            )
-        return token
-    return None
-
-
 def get_output_handler(workers_num: int) -> EventHandler:
     if workers_num > 1:
         output_style = OutputStyle.short
@@ -944,23 +952,18 @@ def execute(
     verbosity: int,
     code_sample_style: CodeSampleStyle,
     debug_output_file: Optional[click.utils.LazyFile],
-    schemathesis_io_token: Optional[str],
     schemathesis_io_url: str,
-    api_slug: Optional[str],
+    client: Optional[service.ServiceClient],
+    test_run: Optional[service.TestRun],
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handlers: List[EventHandler] = []
     service_context = None
-    if schemathesis_io_token is not None and api_slug is not None:
+    if client is not None and test_run is not None:
         service_queue: Queue = Queue()
         service_context = ServiceContext(url=schemathesis_io_url, queue=service_queue)
-        client = service.ServiceClient(base_url=schemathesis_io_url, token=schemathesis_io_token)
-        try:
-            test_run = client.create_test_run(api_slug)
-            reporter = service.ServiceReporter(client=client, test_run=test_run, out_queue=service_queue)
-            handlers.append(reporter)
-        except requests.HTTPError as exc:
-            handle_service_error(exc)
+        reporter = service.ServiceReporter(client=client, test_run=test_run, out_queue=service_queue)
+        handlers.append(reporter)
     if junit_xml is not None:
         handlers.append(JunitXMLHandler(junit_xml))
     if debug_output_file is not None:

@@ -1,3 +1,4 @@
+import enum
 import os
 import re
 from contextlib import contextmanager
@@ -13,28 +14,66 @@ from ..constants import CodeSampleStyle, DataGenerationMethod
 from ..stateful import Stateful
 from .constants import DEFAULT_WORKERS
 
-
-def validate_schema(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
-    if "app" not in ctx.params:
-        try:
-            netloc = urlparse(raw_value).netloc
-        except ValueError as exc:
-            raise click.UsageError("Invalid SCHEMA, must be a valid URL or file path.") from exc
-        if not netloc:
-            if "\x00" in raw_value or not utils.file_exists(raw_value):
-                raise click.UsageError("Invalid SCHEMA, must be a valid URL or file path.")
-            if "base_url" not in ctx.params and not ctx.params.get("dry_run", False):
-                raise click.UsageError('Missing argument, "--base-url" is required for SCHEMA specified by file.')
-        else:
-            _validate_url(raw_value)
-    return raw_value
+INVALID_SCHEMA_MESSAGE = "Invalid SCHEMA, must be a valid URL, file path or an API slug from Schemathesis.io."
 
 
-def _validate_url(value: str) -> None:
+@enum.unique
+class SchemaInputKind(enum.Enum):
+    """Kinds of SCHEMA input."""
+
+    # Regular URL like https://example.schemathesis.io/openapi.json
+    URL = 1
+    # Local path
+    PATH = 2
+    # Relative path within a Python app
+    APP_PATH = 3
+    # A short name for API created in Schemathesis.io
+    SLUG = 4
+
+
+def parse_schema_kind(schema: str, app: Optional[str]) -> SchemaInputKind:
+    """Detect what kind the input schema is."""
+    try:
+        netloc = urlparse(schema).netloc
+    except ValueError as exc:
+        raise click.UsageError(INVALID_SCHEMA_MESSAGE) from exc
+    if netloc:
+        return SchemaInputKind.URL
+    if utils.file_exists(schema):
+        return SchemaInputKind.PATH
+    if app is not None:
+        return SchemaInputKind.APP_PATH
+    # Assume SLUG if it is not a URL or PATH or APP_PATH
+    return SchemaInputKind.SLUG
+
+
+def validate_schema(
+    schema: str,
+    kind: SchemaInputKind,
+    *,
+    base_url: Optional[str],
+    dry_run: bool,
+    app: Optional[str],
+    api_slug: Optional[str],
+) -> None:
+    if "\x00" in schema or not schema:
+        raise click.UsageError(INVALID_SCHEMA_MESSAGE)
+    if kind == SchemaInputKind.URL:
+        validate_url(schema)
+    if kind == SchemaInputKind.PATH:
+        # Base URL is required if it is not a dry run
+        if app is None and base_url is None and not dry_run:
+            raise click.UsageError('Missing argument, "--base-url" is required for SCHEMA specified by file.')
+    if kind == SchemaInputKind.SLUG:
+        if api_slug is not None:
+            raise click.UsageError(f"Got unexpected extra argument ({api_slug})")
+
+
+def validate_url(value: str) -> None:
     try:
         PreparedRequest().prepare_url(value, {})  # type: ignore
     except RequestException as exc:
-        raise click.UsageError("Invalid SCHEMA, must be a valid URL or file path.") from exc
+        raise click.UsageError(INVALID_SCHEMA_MESSAGE) from exc
 
 
 def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
