@@ -22,6 +22,7 @@ Changelog
 - Show response status code on failing checks output in CLI.
 - Improve error message on malformed Open API path templates (like ``/foo}/``). `#1372`_
 - Improve error message on malformed media types that appear in the schema or in response headers. `#1382`_
+- Relax dependencies on ``pyyaml`` and ``click``.
 - Add ``--cassette-path`` that is going to replace ``--store-network-log``. The old option is deprecated and will be removed in Schemathesis ``4.0``
 
 **Fixed**
