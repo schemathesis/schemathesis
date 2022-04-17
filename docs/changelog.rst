@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.14.0`_ - 2022-04-17
+----------------------
+
 **Added**
 
 - Open API link name customization via the ``name`` argument to ``schema.add_link``.
@@ -2217,7 +2220,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.13.9...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.14.0...HEAD
+.. _3.14.0: https://github.com/schemathesis/schemathesis/compare/v3.13.9...v3.14.0
 .. _3.13.9: https://github.com/schemathesis/schemathesis/compare/v3.13.8...v3.13.9
 .. _3.13.8: https://github.com/schemathesis/schemathesis/compare/v3.13.7...v3.13.8
 .. _3.13.7: https://github.com/schemathesis/schemathesis/compare/v3.13.6...v3.13.7
