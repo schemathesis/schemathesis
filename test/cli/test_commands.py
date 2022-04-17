@@ -1396,7 +1396,7 @@ def test_wsgi_app_internal_exception(testdir, cli):
     lines = result.stdout.strip().split("\n")
     assert "== APPLICATION LOGS ==" in lines[50], result.stdout.strip()
     assert "ERROR in app: Exception on /api/success [GET]" in lines[52]
-    assert lines[68] == "ZeroDivisionError: division by zero"
+    assert lines[64] == "ZeroDivisionError: division by zero"
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
