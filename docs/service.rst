@@ -59,13 +59,13 @@ Step 1: Add the API schema
 Step 2: Run API tests
 ~~~~~~~~~~~~~~~~~~~~~
 
-At this point, you can start testing your API! The simplest option is to use our test runners by clicking the "Test now!" button.
+At this point, you can start testing your API! The simplest option is to use our test runners on the "Cloud" tab.
 
 .. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_api_created.png
 
 **Optional**. If you'd like to run tests on your side and upload the results to Schemathesis.io feel free to use one of the provided code samples:
 
-Authenticate with Schemathesis.io first:
+Generate an access token and authenticate into Schemathesis.io first:
 
 .. code:: text
 
@@ -76,11 +76,11 @@ And then run the tests:
 
 .. code::
 
-    st run example-api --checks all
+    st run demo-1 --checks all
 
 .. note::
 
-    Replace `example-api` with the appropriate API ID shown in the SaaS code sample
+    Replace `demo-1` with the appropriate API ID shown in the SaaS code sample
 
 Once all events are uploaded to Schemathesis.io you'll see a message at the end of the CLI output:
 
