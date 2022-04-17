@@ -76,7 +76,7 @@ And then run the tests:
 
 .. code::
 
-    st run https://example.schemathesis.io/openapi.json example-api --checks all
+    st run example-api --checks all
 
 .. note::
 
