@@ -94,8 +94,10 @@ jobs:
     steps:
     - name: Check out code
       uses: actions/checkout@v3.0.0
+      with:
+        fetch-depth: 0
 
     - name: Release Notary Action
-      uses: docker://aevea/release-notary
+      uses: docker://aevea/release-notary:0.9.7
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
