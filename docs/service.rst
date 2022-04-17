@@ -80,7 +80,7 @@ And then run the tests:
 
 .. note::
 
-    Replace `demo-1` with the appropriate API ID shown in the SaaS code sample
+    Replace ``demo-1`` with the appropriate API ID shown in the SaaS code sample
 
 Once all events are uploaded to Schemathesis.io you'll see a message at the end of the CLI output:
 
