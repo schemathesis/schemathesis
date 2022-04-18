@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.14.1`_ - 2022-04-18
+----------------------
+
 **Fixed**
 
 - Using ``@schema.parametrize`` with test methods on ``pytest>=7.0``.
@@ -2224,7 +2227,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.14.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.14.1...HEAD
+.. _3.14.1: https://github.com/schemathesis/schemathesis/compare/v3.14.0...v3.14.1
 .. _3.14.0: https://github.com/schemathesis/schemathesis/compare/v3.13.9...v3.14.0
 .. _3.13.9: https://github.com/schemathesis/schemathesis/compare/v3.13.8...v3.13.9
 .. _3.13.8: https://github.com/schemathesis/schemathesis/compare/v3.13.7...v3.13.8
