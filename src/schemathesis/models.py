@@ -40,6 +40,7 @@ from requests.structures import CaseInsensitiveDict
 from starlette.testclient import TestClient as ASGIClient
 
 from . import failures, serializers
+from .auth import AuthStorage
 from .constants import (
     DEFAULT_RESPONSE_TIMEOUT,
     SCHEMATHESIS_TEST_CASE_HEADER,
@@ -648,10 +649,11 @@ class APIOperation(Generic[P, C]):
     def as_strategy(
         self,
         hooks: Optional["HookDispatcher"] = None,
+        auth_storage: Optional[AuthStorage] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> st.SearchStrategy:
         """Turn this API operation into a Hypothesis strategy."""
-        strategy = self.schema.get_case_strategy(self, hooks, data_generation_method)
+        strategy = self.schema.get_case_strategy(self, hooks, auth_storage, data_generation_method)
 
         def _apply_hooks(dispatcher: HookDispatcher, _strategy: st.SearchStrategy[Case]) -> st.SearchStrategy[Case]:
             for hook in dispatcher.get_all_by_name("before_generate_case"):

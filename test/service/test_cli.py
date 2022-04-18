@@ -6,7 +6,6 @@ from pytest_httpserver import URIPattern
 from requests import Timeout
 
 import schemathesis
-from schemathesis.cli.callbacks import INVALID_SCHEMA_MESSAGE
 from schemathesis.constants import USER_AGENT
 
 from ..utils import strip_style_win32

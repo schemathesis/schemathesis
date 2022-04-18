@@ -17,6 +17,7 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
 from ... import failures, hooks
+from ...auth import unregister as unregister_auth
 from ...constants import (
     DEFAULT_STATEFUL_RECURSION_LIMIT,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
@@ -75,6 +76,9 @@ class BaseRunner:
         return EventStream(self._generate_events(event), event)
 
     def _generate_events(self, stop_event: threading.Event) -> Generator[events.ExecutionEvent, None, None]:
+        # If auth is explicitly provided, then the global provider is ignored
+        if self.auth is not None:
+            unregister_auth()
         results = TestResultSet()
 
         initialized = events.Initialized.from_schema(schema=self.schema, count_operations=self.count_operations)
