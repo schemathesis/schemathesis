@@ -13,6 +13,7 @@ except metadata.PackageNotFoundError:
     __version__ = "dev"
 
 IS_PYTEST_ABOVE_54 = version.parse(pytest.__version__) >= version.parse("5.4.0")
+IS_PYTEST_ABOVE_7 = version.parse(pytest.__version__) >= version.parse("7.0.0")
 
 USER_AGENT = f"schemathesis/{__version__}"
 SCHEMATHESIS_TEST_CASE_HEADER = "X-Schemathesis-TestCaseId"

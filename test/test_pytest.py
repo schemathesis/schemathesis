@@ -13,6 +13,9 @@ def test_pytest_parametrize_fixture(testdir):
     # When `pytest_generate_tests` is used on a module level for fixture parametrization
     testdir.make_test(
         """
+from hypothesis import settings, HealthCheck
+
+
 def pytest_generate_tests(metafunc):
     metafunc.parametrize("inner", ("A", "B"))
 
@@ -21,6 +24,7 @@ def param(inner):
     return inner * 2
 
 @schema.parametrize()
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_(request, param, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.full_path == "/v1/users"
@@ -53,6 +57,9 @@ def test_pytest_parametrize_class_fixture(testdir):
     # When `pytest_generate_tests` is used on a class level for fixture parametrization
     testdir.make_test(
         """
+from hypothesis import settings, HealthCheck
+
+
 class TestAPI:
 
     def pytest_generate_tests(self, metafunc):
@@ -63,6 +70,7 @@ class TestAPI:
         return inner * 2
 
     @schema.parametrize()
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_(self, request, param, case):
         request.config.HYPOTHESIS_CASES += 1
         assert case.full_path == "/v1/users"

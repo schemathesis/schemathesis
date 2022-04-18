@@ -3,7 +3,17 @@ import sys
 from pathlib import Path
 
 import pytest
-from _pytest import pytester
+
+from schemathesis.constants import IS_PYTEST_ABOVE_7
+
+if IS_PYTEST_ABOVE_7:
+    from _pytest.pytester import Pytester
+
+    TimeoutExpired = Pytester.TimeoutExpired
+else:
+    from _pytest import pytester
+
+    TimeoutExpired = pytester.Testdir.TimeoutExpired
 
 HERE = Path(__file__).absolute().parent
 
@@ -27,7 +37,7 @@ def test_app(testdir, aiohttp_unused_port, framework, expected):
         timeout = 4.0
     else:
         timeout = 2.0
-    with pytest.raises(pytester.Testdir.TimeoutExpired):
+    with pytest.raises(TimeoutExpired):
         testdir.run(
             sys.executable, str(HERE / "apps/__init__.py"), str(port), f"--framework={framework}", timeout=timeout
         )

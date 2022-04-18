@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Using ``@schema.parametrize`` with test methods on ``pytest>=7.0``.
+
 `3.14.0`_ - 2022-04-17
 ----------------------
 

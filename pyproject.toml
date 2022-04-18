@@ -58,7 +58,6 @@ tomli-w = "^1.0.0"
 
 [tool.poetry.dev-dependencies]
 coverage = "^5"
-pytest = "^6.0"
 aiohttp = "^3.6"
 graphene = "^3.0b3"
 graphql-server = "^3.0.0b4"
