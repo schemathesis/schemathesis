@@ -31,6 +31,7 @@ from hypothesis.strategies import SearchStrategy
 from requests.structures import CaseInsensitiveDict
 
 from ... import failures
+from ...auth import AuthStorage
 from ...constants import HTTP_METHODS, DataGenerationMethod
 from ...exceptions import (
     InvalidSchema,
@@ -320,9 +321,12 @@ class BaseOpenAPISchema(BaseSchema):
         self,
         operation: APIOperation,
         hooks: Optional[HookDispatcher] = None,
+        auth_storage: Optional[AuthStorage] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
-        return get_case_strategy(operation=operation, hooks=hooks, data_generation_method=data_generation_method)
+        return get_case_strategy(
+            operation=operation, auth_storage=auth_storage, hooks=hooks, data_generation_method=data_generation_method
+        )
 
     def get_parameter_serializer(self, operation: APIOperation, location: str) -> Optional[Callable]:
         definitions = [item for item in operation.definition.resolved.get("parameters", []) if item["in"] == location]

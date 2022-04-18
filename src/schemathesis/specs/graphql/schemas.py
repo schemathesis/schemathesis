@@ -1,5 +1,6 @@
-from functools import partial
-from typing import Any, Dict, Generator, List, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
+# Pylint bug - `Callable` is used below
+# pylint: disable=unused-import
+from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
 from urllib.parse import urlsplit
 
 import attr
@@ -10,6 +11,8 @@ from hypothesis.strategies import SearchStrategy
 from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
+from ... import auth
+from ...auth import AuthStorage
 from ...checks import not_a_server_error
 from ...constants import DataGenerationMethod
 from ...exceptions import InvalidSchema
@@ -130,10 +133,16 @@ class GraphQLSchema(BaseSchema):
         self,
         operation: APIOperation,
         hooks: Optional[HookDispatcher] = None,
+        auth_storage: Optional[AuthStorage] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
-        constructor = partial(GraphQLCase, operation=operation, data_generation_method=data_generation_method)
-        return st.builds(constructor, body=gql_st.query(self.client_schema, fields=[operation.verbose_name]))
+        return get_case_strategy(
+            operation=operation,
+            client_schema=self.client_schema,
+            hooks=hooks,
+            auth_storage=auth_storage,
+            data_generation_method=data_generation_method,
+        )
 
     def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
         return []
@@ -164,3 +173,22 @@ class GraphQLSchema(BaseSchema):
             body=body,
             media_type=media_type,
         )
+
+
+@st.composite  # type: ignore
+def get_case_strategy(
+    draw: Callable,
+    operation: APIOperation,
+    client_schema: graphql.GraphQLSchema,
+    hooks: Optional[HookDispatcher] = None,
+    auth_storage: Optional[AuthStorage] = None,
+    data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+) -> Any:
+    body = draw(gql_st.query(client_schema, fields=[operation.verbose_name]))
+    instance = GraphQLCase(body=body, operation=operation, data_generation_method=data_generation_method)  # type: ignore
+    context = auth.AuthContext(
+        operation=operation,
+        app=operation.app,
+    )
+    auth.set_on_case(instance, context, auth_storage)
+    return instance

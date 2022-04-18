@@ -407,6 +407,8 @@ The ``--base-url`` argument is also used if you wish to load the OpenAPI specifi
 
     st run --base-url=http://127.0.0.1:8080/api/v1 path/to/openapi.json
 
+.. _extend-cli:
+
 Extending CLI
 -------------
 
