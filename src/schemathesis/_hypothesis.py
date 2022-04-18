@@ -9,6 +9,7 @@ from hypothesis.errors import Unsatisfiable
 from hypothesis.internal.reflection import proxies
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
+from .auth import get_auth_storage_from_test
 from .constants import DEFAULT_DEADLINE, DataGenerationMethod
 from .exceptions import InvalidSchema
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
@@ -28,7 +29,10 @@ def create_test(
 ) -> Callable:
     """Create a Hypothesis test."""
     hook_dispatcher = getattr(test, "_schemathesis_hooks", None)
-    strategy = operation.as_strategy(hooks=hook_dispatcher, data_generation_method=data_generation_method)
+    auth_storage = get_auth_storage_from_test(test)
+    strategy = operation.as_strategy(
+        hooks=hook_dispatcher, auth_storage=auth_storage, data_generation_method=data_generation_method
+    )
     _given_kwargs = (_given_kwargs or {}).copy()
     _given_kwargs.setdefault("case", strategy)
 

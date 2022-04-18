@@ -13,7 +13,7 @@ from hypothesis_jsonschema import from_schema
 from requests.auth import _basic_auth_str
 from requests.structures import CaseInsensitiveDict
 
-from ... import utils
+from ... import auth, utils
 from ...constants import DataGenerationMethod
 from ...exceptions import InvalidSchema
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
@@ -107,6 +107,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     draw: Callable,
     operation: APIOperation,
     hooks: Optional[HookDispatcher] = None,
+    auth_storage: Optional[auth.AuthStorage] = None,
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     path_parameters: Union[NotSet, Dict[str, Any]] = NOT_SET,
     headers: Union[NotSet, Dict[str, Any]] = NOT_SET,
@@ -128,22 +129,22 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     """
     to_strategy = DATA_GENERATION_METHOD_TO_STRATEGY_FACTORY[data_generation_method]
 
-    context = HookContext(operation)
+    hook_context = HookContext(operation)
 
     with detect_invalid_schema(operation):
         path_parameters_value = get_parameters_value(
-            path_parameters, "path", draw, operation, context, hooks, to_strategy
+            path_parameters, "path", draw, operation, hook_context, hooks, to_strategy
         )
-        headers_value = get_parameters_value(headers, "header", draw, operation, context, hooks, to_strategy)
-        cookies_value = get_parameters_value(cookies, "cookie", draw, operation, context, hooks, to_strategy)
-        query_value = get_parameters_value(query, "query", draw, operation, context, hooks, to_strategy)
+        headers_value = get_parameters_value(headers, "header", draw, operation, hook_context, hooks, to_strategy)
+        cookies_value = get_parameters_value(cookies, "cookie", draw, operation, hook_context, hooks, to_strategy)
+        query_value = get_parameters_value(query, "query", draw, operation, hook_context, hooks, to_strategy)
 
         media_type = None
         if body is NOT_SET:
             if operation.body:
                 parameter = draw(st.sampled_from(operation.body.items))
                 strategy = _get_body_strategy(parameter, to_strategy, operation)
-                strategy = apply_hooks(operation, context, hooks, strategy, "body")
+                strategy = apply_hooks(operation, hook_context, hooks, strategy, "body")
                 media_type = parameter.media_type
                 body = draw(strategy)
         else:
@@ -157,7 +158,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
 
     if operation.schema.validate_schema and operation.method.upper() == "GET" and operation.body:
         raise InvalidSchema("Body parameters are defined for GET request.")
-    return Case(
+    instance = Case(
         operation=operation,
         media_type=media_type,
         path_parameters=path_parameters_value,
@@ -167,6 +168,12 @@ def get_case_strategy(  # pylint: disable=too-many-locals
         body=body,
         data_generation_method=data_generation_method,
     )
+    auth_context = auth.AuthContext(
+        operation=operation,
+        app=operation.app,
+    )
+    auth.set_on_case(instance, auth_context, auth_storage)
+    return instance
 
 
 YAML_PARSING_ISSUE_MESSAGE = (

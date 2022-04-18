@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Support for auth customization & automatic refreshing. `#966`_
+
 `3.14.1`_ - 2022-04-18
 ----------------------
 
@@ -2512,6 +2516,7 @@ Deprecated
 .. _#980: https://github.com/schemathesis/schemathesis/issues/980
 .. _#975: https://github.com/schemathesis/schemathesis/issues/975
 .. _#970: https://github.com/schemathesis/schemathesis/issues/970
+.. _#966: https://github.com/schemathesis/schemathesis/issues/966
 .. _#965: https://github.com/schemathesis/schemathesis/issues/965
 .. _#963: https://github.com/schemathesis/schemathesis/issues/963
 .. _#951: https://github.com/schemathesis/schemathesis/issues/951

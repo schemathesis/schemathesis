@@ -33,6 +33,7 @@ from hypothesis.strategies import SearchStrategy
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import create_test
+from .auth import AuthStorage
 from .constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
 from .exceptions import InvalidSchema, UsageError
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
@@ -87,6 +88,7 @@ class BaseSchema(Mapping):
     operation_id: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
     app: Any = attr.ib(default=None)  # pragma: no mutate
     hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
+    auth: AuthStorage = attr.ib(factory=AuthStorage)  # pragma: no mutate
     test_function: Optional[GenericTest] = attr.ib(default=None)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
     skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
@@ -295,6 +297,7 @@ class BaseSchema(Mapping):
             operation_id=operation_id,
             app=app,
             hooks=hooks,  # type: ignore
+            auth=self.auth,  # type: ignore
             test_function=test_function,
             validate_schema=validate_schema,  # type: ignore
             skip_deprecated_operations=skip_deprecated_operations,  # type: ignore
@@ -348,6 +351,7 @@ class BaseSchema(Mapping):
         self,
         operation: APIOperation,
         hooks: Optional[HookDispatcher] = None,
+        auth_storage: Optional[AuthStorage] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     ) -> SearchStrategy:
         raise NotImplementedError

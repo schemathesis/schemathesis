@@ -4,7 +4,7 @@ _install_hypothesis_jsonschema_compatibility_shim()
 
 del _install_hypothesis_jsonschema_compatibility_shim
 
-from . import fixups, hooks, runner, serializers, targets
+from . import auth, fixups, hooks, runner, serializers, targets
 from .cli import register_check, register_target
 from .constants import DataGenerationMethod, __version__
 from .models import Case

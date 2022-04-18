@@ -67,6 +67,7 @@ User's Guide
    introduction
    cli
    python
+   auth
    stateful
    service
    how

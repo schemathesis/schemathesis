@@ -16,6 +16,19 @@ Fixups
 .. autofunction:: schemathesis.fixups.install
 .. autofunction:: schemathesis.fixups.uninstall
 
+Authentication
+~~~~~~~~~~~~~~
+
+.. automodule:: schemathesis.auth
+
+.. autofunction:: schemathesis.auth.register
+
+.. autoclass:: schemathesis.auth.AuthProvider
+   :members:
+
+.. autoclass:: schemathesis.auth.AuthContext
+   :members:
+
 Hooks
 ~~~~~
 
