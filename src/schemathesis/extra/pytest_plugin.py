@@ -12,7 +12,7 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
 from .. import DataGenerationMethod
 from .._hypothesis import create_test
-from ..constants import IS_PYTEST_ABOVE_54, RECURSIVE_REFERENCE_ERROR_MESSAGE
+from ..constants import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54, RECURSIVE_REFERENCE_ERROR_MESSAGE
 from ..exceptions import InvalidSchema
 from ..models import APIOperation
 from ..utils import (
@@ -51,12 +51,14 @@ class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
         self.test_name = test_name
         self.data_generation_method = data_generation_method
 
-    def _getobj(self) -> partial:
-        """Tests defined as methods require `self` as the first argument.
+    if not IS_PYTEST_ABOVE_7:
+        # On pytest 7, `self.obj` is already `partial`
+        def _getobj(self) -> partial:
+            """Tests defined as methods require `self` as the first argument.
 
-        This method is called only for this case.
-        """
-        return partial(self.obj, self.parent.obj)  # type: ignore
+            This method is called only for this case.
+            """
+            return partial(self.obj, self.parent.obj)  # type: ignore
 
 
 class SchemathesisCase(PyCollector):
@@ -127,6 +129,10 @@ class SchemathesisCase(PyCollector):
 
         metafunc = self._parametrize(cls, definition, fixtureinfo)
 
+        if isinstance(self.parent, Class):
+            # On pytest 7, Class collects the test methods directly, therefore
+            funcobj = partial(funcobj, self.parent.obj)
+
         if not metafunc._calls:
             yield create(
                 SchemathesisFunction,
@@ -165,7 +171,11 @@ class SchemathesisCase(PyCollector):
     ) -> Metafunc:
         parent = self.getparent(Module)
         module = parent.obj if parent is not None else parent
-        metafunc = Metafunc(definition, fixtureinfo, self.config, cls=cls, module=module)
+        kwargs = {"cls": cls, "module": module}
+        if IS_PYTEST_ABOVE_7:
+            # Avoiding `Metafunc` is quite problematic for now, as there are quite a lot of internals we rely on
+            kwargs["_ispytest"] = True
+        metafunc = Metafunc(definition, fixtureinfo, self.config, **kwargs)
         methods = []
         if hasattr(module, "pytest_generate_tests"):
             methods.append(module.pytest_generate_tests)
