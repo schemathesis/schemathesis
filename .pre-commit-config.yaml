@@ -75,5 +75,5 @@ repos:
     hooks:
       - id: rstcheck
         additional_dependencies:
-          - sphinx==4.4.0
+          - sphinx==4.5.0
           - sphinx-click==3.1.0
