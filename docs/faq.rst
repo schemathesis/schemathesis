@@ -118,6 +118,15 @@ There might be multiple reasons for that, but usually, this behavior occurs when
 Please, refer to the ``Data generation`` section in the documentation for more info. If you think that it is not the case, feel
 free to `open an issue <https://github.com/schemathesis/schemathesis/issues/new?assignees=Stranger6667&labels=Status%3A+Review+Needed%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D>`_.
 
+How different is ``--request-timeout`` from ``--hypothesis-deadline``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+These CLI parameters both represent some kind of limit for the duration of a certain part of a single test. However, each of them has a different scope.
+
+``--hypothesis-deadline`` counts parts of a single test case execution, including waiting for the API response, and running all checks and relevant hooks for that single test case.
+
+``--request-timeout`` is only relevant for waiting for the API response. If this duration is exceeded, the test is marked as a "Timeout".
+
 Why Schemathesis reports "Flaky" errors?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
