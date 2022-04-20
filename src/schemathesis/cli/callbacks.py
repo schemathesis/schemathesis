@@ -37,6 +37,8 @@ def parse_schema_kind(schema: str, app: Optional[str]) -> SchemaInputKind:
         netloc = urlparse(schema).netloc
     except ValueError as exc:
         raise click.UsageError(INVALID_SCHEMA_MESSAGE) from exc
+    if "\x00" in schema or not schema:
+        raise click.UsageError(INVALID_SCHEMA_MESSAGE)
     if netloc:
         return SchemaInputKind.URL
     if utils.file_exists(schema):
@@ -56,8 +58,6 @@ def validate_schema(
     app: Optional[str],
     api_slug: Optional[str],
 ) -> None:
-    if "\x00" in schema or not schema:
-        raise click.UsageError(INVALID_SCHEMA_MESSAGE)
     if kind == SchemaInputKind.URL:
         validate_url(schema)
     if kind == SchemaInputKind.PATH:
