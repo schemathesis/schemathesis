@@ -135,6 +135,7 @@ def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params
 @settings(deadline=None)
 @given(schema=urls() | paths() | st.text(), base_url=urls() | paths() | st.text() | st.none())
 @example(schema="//bla", base_url=None)
+@example(schema="/\x00", base_url=None)
 @example(schema="http://127.0.0.1/schema.yaml", base_url="//ÿ[")
 @pytest.mark.usefixtures("mocked_schema")
 def test_schema_validity(cli, schema, base_url):
