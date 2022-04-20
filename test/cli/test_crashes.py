@@ -6,7 +6,11 @@ from hypothesis import strategies as st
 from hypothesis.provisional import urls
 from requests import Response
 
-from schemathesis.cli import ALL_CHECKS_NAMES
+from schemathesis import DataGenerationMethod
+from schemathesis.cli import ALL_CHECKS_NAMES, ALL_TARGETS_NAMES
+from schemathesis.constants import CodeSampleStyle
+from schemathesis.fixups import ALL_FIXUPS
+from schemathesis.stateful import Stateful
 
 
 @pytest.fixture(scope="module")
@@ -66,9 +70,18 @@ def csv_strategy(enum):
         optional={
             "auth": delimited(),
             "auth-type": st.sampled_from(["basic", "digest", "BASIC", "DIGEST"]),
+            "data-generation-method": st.sampled_from([item.name for item in DataGenerationMethod]),
+            "target": st.sampled_from(ALL_TARGETS_NAMES + ("all",)),
+            "code-sample-style": st.sampled_from([item.name for item in CodeSampleStyle]),
+            "fixups": st.sampled_from(list(ALL_FIXUPS) + ["all"]),
+            "stateful": st.sampled_from([item.name for item in Stateful]),
+            "force-schema-version": st.sampled_from(["20", "30"]),
             "workers": st.integers(min_value=1, max_value=64),
             "request-timeout": st.integers(),
+            "stateful-recursion-limit": st.integers(),
+            "max-response-time": st.integers(),
             "validate-schema": st.booleans(),
+            "--hypothesis-database": st.text(),
             "hypothesis-deadline": st.integers() | st.none(),
             "hypothesis-max-examples": st.integers(),
             "hypothesis-report-multiple-bugs": st.booleans(),
@@ -77,7 +90,18 @@ def csv_strategy(enum):
         },
     ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
     flags=st.fixed_dictionaries(
-        {}, optional={key: st.booleans() for key in ("show-errors-tracebacks", "exitfirst", "hypothesis-derandomize")}
+        {},
+        optional={
+            key: st.booleans()
+            for key in (
+                "show-errors-tracebacks",
+                "exitfirst",
+                "hypothesis-derandomize",
+                "dry-run",
+                "skip-deprecated-operations",
+                "no-color",
+            )
+        },
     ).map(lambda flags: [f"--{flag}" for flag in flags]),
     multiple_params=st.fixed_dictionaries(
         {},
@@ -87,6 +111,7 @@ def csv_strategy(enum):
             "endpoint": st.lists(st.text(min_size=1)),
             "method": st.lists(st.text(min_size=1)),
             "tag": st.lists(st.text(min_size=1)),
+            "operation-id": st.lists(st.text(min_size=1)),
         },
     ).map(lambda params: [f"--{key}={value}" for key, values in params.items() for value in values]),
     csv_params=st.fixed_dictionaries(
