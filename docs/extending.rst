@@ -206,7 +206,7 @@ For example, you have your hooks definition in ``myproject/hooks.py``, and ``myp
 
 .. code:: bash
 
-    schemathesis --pre-run myproject.hooks run http://127.0.0.1/openapi.yaml
+    st --pre-run myproject.hooks run http://127.0.0.1/openapi.yaml
 
 ``after_init_cli_run_handlers``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

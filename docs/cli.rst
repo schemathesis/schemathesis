@@ -300,7 +300,7 @@ Check payload in requests to ``/api/upload_file``:
 
     --7d4db38ad065994d913cb02b2982e3ba--
 
-Saved cassettes can be replayed with ``schemathesis replay`` command. Additionally, you may filter what interactions to
+Saved cassettes can be replayed with ``st replay`` command. Additionally, you may filter what interactions to
 replay by these parameters:
 
 - ``id``. Specific, unique ID;
@@ -313,7 +313,7 @@ current execution:
 
 .. code:: bash
 
-    $ schemathesis replay foo.yaml --status=FAILURE
+    $ st replay foo.yaml --status=FAILURE
     Replaying cassette: foo.yaml
     Total interactions: 4005
 
@@ -417,8 +417,7 @@ Schemathesis can load your Python code via the ``--pre-run`` option:
 
 .. code:: bash
 
-    $ schemathesis --pre-run test.setup \
-          run https://example.com/api/swagger.json
+    $ st --pre-run test.setup run https://example.com/api/swagger.json
 
 **NOTE**. This option should be passed before the ``run`` subcommand.
 
@@ -426,8 +425,7 @@ Also, depending on your setup, you might need to run this command with a custom 
 
 .. code:: bash
 
-    $ PYTHONPATH=$(pwd) schemathesis --pre-run test.setup \
-          run https://example.com/api/swagger.json
+    $ PYTHONPATH=$(pwd) st --pre-run test.setup run https://example.com/api/swagger.json
 
 The passed value will be treated as an importable Python path and imported before the test run.
 
@@ -453,7 +451,7 @@ Then your checks will be available in Schemathesis CLI, and you can use them via
 
 .. code:: bash
 
-    $ schemathesis --pre-run module.with.checks run \
+    $ st --pre-run module.with.checks run \
           -c new_check https://example.com/api/swagger.json
 
 Additionally, checks may return ``True`` to skip the check under certain conditions. For example, you may only want to run checks when the
