@@ -86,18 +86,3 @@ jobs:
       env:
         PYPI_USERNAME: ${{ secrets.PYPI_USERNAME }}
         PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-
-
-  release-notes:
-    name: Release Notes
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v3.0.0
-      with:
-        fetch-depth: 0
-
-    - name: Release Notary Action
-      uses: docker://aevea/release-notary:0.9.7
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
