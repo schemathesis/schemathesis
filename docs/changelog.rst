@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.14.2`_ - 2022-04-21
+----------------------
+
 **Added**
 
 - Support for auth customization & automatic refreshing. `#966`_
@@ -2231,7 +2234,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.14.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.14.2...HEAD
+.. _3.14.2: https://github.com/schemathesis/schemathesis/compare/v3.14.1...v3.14.2
 .. _3.14.1: https://github.com/schemathesis/schemathesis/compare/v3.14.0...v3.14.1
 .. _3.14.0: https://github.com/schemathesis/schemathesis/compare/v3.13.9...v3.14.0
 .. _3.13.9: https://github.com/schemathesis/schemathesis/compare/v3.13.8...v3.13.9
