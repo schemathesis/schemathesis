@@ -434,3 +434,8 @@ def _apply_hooks(
     for hook in hooks.get_all_by_name(f"before_generate_{container}"):
         strategy = hook(context, strategy)
     return strategy
+
+
+def clear_cache() -> None:
+    _PARAMETER_STRATEGIES_CACHE.clear()
+    _BODY_STRATEGIES_CACHE.clear()
