@@ -1,4 +1,5 @@
 import base64
+import io
 from test.apps.openapi.schema import OpenAPIVersion
 from urllib.parse import parse_qsl, quote_plus, unquote_plus, urlencode, urlparse, urlunparse
 
@@ -6,10 +7,18 @@ import pytest
 import requests
 import yaml
 from _pytest.main import ExitCode
+from hypothesis import example, given
+from hypothesis import strategies as st
 from urllib3._collections import HTTPHeaderDict
 
 from schemathesis.cli import CASSETTES_PATH_INVALID_USAGE_MESSAGE, DEPRECATED_CASSETTE_PATH_OPTION_WARNING
-from schemathesis.cli.cassettes import filter_cassette, get_command_representation, get_prepared_request
+from schemathesis.cli.callbacks import MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE
+from schemathesis.cli.cassettes import (
+    filter_cassette,
+    get_command_representation,
+    get_prepared_request,
+    write_double_quoted,
+)
 from schemathesis.constants import USER_AGENT
 from schemathesis.models import Request
 
@@ -25,17 +34,22 @@ def load_cassette(path):
 
 
 def load_response_body(cassette, idx):
-    return base64.b64decode(cassette["http_interactions"][idx]["response"]["body"]["base64_string"])
+    body = cassette["http_interactions"][idx]["response"]["body"]
+    if "base64_string" in body:
+        return base64.b64decode(body["base64_string"]).decode()
+    return body["string"]
 
 
+@pytest.mark.parametrize("args", ((), ("--cassette-preserve-exact-body-bytes",)), ids=("plain", "base64"))
 @pytest.mark.operations("success", "upload_file")
-def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples):
+def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples, args):
     hypothesis_max_examples = hypothesis_max_examples or 2
     result = cli.run(
         schema_url,
         f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples}",
         "--hypothesis-seed=1",
+        *args,
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
@@ -45,7 +59,7 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples)
     assert cassette["http_interactions"][0]["status"] == "SUCCESS"
     assert cassette["http_interactions"][0]["seed"] == "1"
     assert float(cassette["http_interactions"][0]["elapsed"]) >= 0
-    assert load_response_body(cassette, 0) == b'{"success": true}'
+    assert load_response_body(cassette, 0) == '{"success": true}'
     assert all("checks" in interaction for interaction in cassette["http_interactions"])
     assert len(cassette["http_interactions"][0]["checks"]) == 1
     assert cassette["http_interactions"][0]["checks"][0] == {
@@ -73,11 +87,11 @@ def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, c
     # Then their statuses should be reflected in the "status" field
     # And it should not be overridden by the overall test status
     assert cassette["http_interactions"][0]["status"] == "FAILURE"
-    assert load_response_body(cassette, 0) == b"500: Internal Server Error"
+    assert load_response_body(cassette, 0) == "500: Internal Server Error"
     assert cassette["http_interactions"][1]["status"] == "SUCCESS"
-    assert load_response_body(cassette, 1) == b'{"result": "flaky!"}'
+    assert load_response_body(cassette, 1) == '{"result": "flaky!"}'
     assert cassette["http_interactions"][2]["status"] == "SUCCESS"
-    assert load_response_body(cassette, 2) == b'{"result": "flaky!"}'
+    assert load_response_body(cassette, 2) == '{"result": "flaky!"}'
 
 
 def test_encoding_error(testdir, cli, cassette_path, hypothesis_max_examples, openapi3_base_url):
@@ -172,7 +186,8 @@ def test_main_process_error(cli, schema_url, hypothesis_max_examples, cassette_p
 
 
 @pytest.mark.operations("__all__")
-async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette_path, hypothesis_max_examples):
+@pytest.mark.parametrize("args", ((), ("--cassette-preserve-exact-body-bytes",)), ids=("plain", "base64"))
+async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette_path, hypothesis_max_examples, args):
     # Record a cassette
     result = cli.run(
         schema_url,
@@ -181,6 +196,7 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
         "--hypothesis-seed=1",
         "--validate-schema=false",
         "--checks=all",
+        *args,
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # these requests are not needed
@@ -210,7 +226,11 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
             assert unquote_plus(url) == unquote_plus(serialized["uri"]), request.url
             content = await request.read()
             if "body" in serialized:
-                assert content == base64.b64decode(serialized["body"]["base64_string"])
+                if "base64_string" in serialized["body"]:
+                    assert content == base64.b64decode(serialized["body"]["base64_string"])
+                else:
+                    stored_content = serialized["body"]["string"].encode()
+                    assert content == stored_content or content == stored_content.strip()
                 compare_headers(request, serialized["headers"])
 
 
@@ -293,6 +313,13 @@ def compare_headers(request, serialized):
         assert request.headers[name] == headers[name]
 
 
+def test_empty_body():
+    # When `body` is an empty string
+    request = get_prepared_request({"method": "POST", "uri": "http://127.0.0.1", "body": {"string": ""}, "headers": {}})
+    # Then the resulting request will not have a body
+    assert request.body is None
+
+
 @pytest.mark.parametrize(
     "filters, expected",
     (
@@ -337,3 +364,29 @@ def test_forbid_simultaneous_use_of_deprecated_and_new_options(cli, schema_url, 
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert result.stdout.splitlines()[0].endswith(CASSETTES_PATH_INVALID_USAGE_MESSAGE)
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+def test_forbid_preserve_exact_bytes_without_cassette_path(cli, schema_url):
+    # When `--cassette-preserve-exact-body-bytes` is specified without `--cassette-path`
+    result = cli.run(
+        schema_url,
+        "--cassette-preserve-exact-body-bytes",
+    )
+    # Then it is an error
+    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
+    assert result.stdout.splitlines()[-1].endswith(MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE)
+
+
+@given(text=st.text())
+@example("Test")
+@example("\uFEFF")
+@example("\uE001")
+@example("\xA1")
+@example("\x21")
+@example("\x07")
+@example("🎉")
+def test_write_double_quoted(text):
+    stream = io.StringIO()
+    write_double_quoted(stream, text)
+    assert yaml.safe_load(stream.getvalue()) == text

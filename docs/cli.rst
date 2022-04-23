@@ -260,7 +260,7 @@ It might look like this:
           ...
         body:
           encoding: 'utf-8'
-          base64_string: ''
+          string: ''
       response:
         status:
           code: '500'
@@ -269,7 +269,7 @@ It might look like this:
           ...
         body:
           encoding: 'utf-8'
-          base64_string: 'NTAwOiBJbnRlcm5hbCBTZXJ2ZXIgRXJyb3I='
+          string: '500: Internal Server Error'
         http_version: '1.1'
 
 Schemathesis provides the following extra fields:
@@ -281,24 +281,33 @@ Schemathesis provides the following extra fields:
 - ``http_interactions.elapsed``. Time in seconds that a request took.
 - ``http_interactions.checks``. A list of executed checks and and their status.
 
+By default, payloads are converted to strings, but similar to the original Ruby's VCR, Schemathesis supports preserving exact body bytes via the ``--cassette-preserve-exact-body-bytes`` option.
+
 To work with the cassette, you could use `yq <https://github.com/mikefarah/yq>`_ or any similar tool.
 Show response body content of first failed interaction:
 
 .. code:: bash
 
-    $ yq r foo.yaml 'http_interactions.(status==FAILURE).response.body.base64_string' | head -n 1 | base64 -d
+    $ yq '.http_interactions.[] | select(.status == "FAILURE") | .response.body.string' foo.yaml | head -n 1
     500: Internal Server Error
 
 Check payload in requests to ``/api/upload_file``:
 
 .. code:: bash
 
-    $ yq r foo.yaml 'http_interactions.(request.uri==http://127.0.0.1/api/upload_file).request.body.base64_string' | base64 -d
+    $ yq '.http_interactions.[] | select(.request.uri == "http://127.0.0.1:8081/api/upload_file").request.body.string'
     --7d4db38ad065994d913cb02b2982e3ba
     Content-Disposition: form-data; name="data"; filename="data"
 
 
     --7d4db38ad065994d913cb02b2982e3ba--
+
+If you use ``--cassette-preserve-exact-body-bytes`` then you need to look for the ``base64_string`` field and decode it:
+
+.. code:: bash
+
+    $ yq '.http_interactions.[] | select(.status == "FAILURE") | .response.body.base64_string' foo.yaml | head -n 1 | base64 -d
+    500: Internal Server Error
 
 Saved cassettes can be replayed with ``st replay`` command. Additionally, you may filter what interactions to
 replay by these parameters:

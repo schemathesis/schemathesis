@@ -4,13 +4,14 @@ import re
 import sys
 import threading
 from queue import Queue
-from typing import Any, Dict, Generator, Iterator, List, Optional, cast
+from typing import IO, Any, Dict, Generator, Iterator, List, Optional, cast
 
 import attr
 import click
 import requests
 from requests.cookies import RequestsCookieJar
 from requests.structures import CaseInsensitiveDict
+from yaml.emitter import Emitter
 
 from .. import constants
 from ..models import Request, Response
@@ -33,11 +34,19 @@ class CassetteWriter(EventHandler):
     """
 
     file_handle: click.utils.LazyFile = attr.ib()  # pragma: no mutate
+    preserve_exact_body_bytes: bool = attr.ib()  # pragma: no mutate
     queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
     worker: threading.Thread = attr.ib(init=False)  # pragma: no mutate
 
     def __attrs_post_init__(self) -> None:
-        self.worker = threading.Thread(target=worker, kwargs={"file_handle": self.file_handle, "queue": self.queue})
+        self.worker = threading.Thread(
+            target=worker,
+            kwargs={
+                "file_handle": self.file_handle,
+                "preserve_exact_body_bytes": self.preserve_exact_body_bytes,
+                "queue": self.queue,
+            },
+        )
         self.worker.start()
 
     def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
@@ -92,7 +101,7 @@ def get_command_representation() -> str:
     return f"st {args}"
 
 
-def worker(file_handle: click.utils.LazyFile, queue: Queue) -> None:
+def worker(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, queue: Queue) -> None:
     """Write YAML to a file in an incremental manner.
 
     This implementation doesn't use `pyyaml` package and composes YAML manually as string due to the following reasons:
@@ -120,19 +129,46 @@ def worker(file_handle: click.utils.LazyFile, queue: Queue) -> None:
             for check in checks
         )
 
-    def format_request_body(request: Request) -> str:
-        if request.body is not None:
-            return f"""    body:
+    if preserve_exact_body_bytes:
+
+        def format_request_body(output: IO, request: Request) -> None:
+            if request.body is not None:
+                output.write(
+                    f"""    body:
       encoding: 'utf-8'
       base64_string: '{request.body}'"""
-        return ""
+                )
 
-    def format_response_body(response: Response) -> str:
-        if response.body is not None:
-            return f"""    body:
+        def format_response_body(output: IO, response: Response) -> None:
+            if response.body is not None:
+                output.write(
+                    f"""    body:
       encoding: '{response.encoding}'
       base64_string: '{response.body}'"""
-        return ""
+                )
+
+    else:
+
+        def format_request_body(output: IO, request: Request) -> None:
+            if request.body is not None:
+                string = _safe_decode(request.body, "utf8")
+                output.write(
+                    """    body:
+      encoding: 'utf-8'
+      string: """
+                )
+                write_double_quoted(output, string)
+
+        def format_response_body(output: IO, response: Response) -> None:
+            if response.body is not None:
+                encoding = response.encoding or "utf8"
+                string = _safe_decode(response.body, encoding)
+                output.write(
+                    f"""    body:
+      encoding: '{encoding}'
+      string: """
+                )
+                write_double_quoted(output, string)
 
     while True:
         item = queue.get()
@@ -145,6 +181,7 @@ http_interactions:"""
         elif isinstance(item, Process):
             for interaction in item.interactions:
                 status = interaction.status.name.upper()
+                # Body payloads are handled via separate `stream.write` calls to avoid some allocations
                 stream.write(
                     f"""\n- id: '{current_id}'
   status: '{status}'
@@ -158,20 +195,70 @@ http_interactions:"""
     method: '{interaction.request.method}'
     headers:
 {format_headers(interaction.request.headers)}
-{format_request_body(interaction.request)}
+"""
+                )
+                format_request_body(stream, interaction.request)
+                stream.write(
+                    f"""
   response:
     status:
       code: '{interaction.response.status_code}'
       message: {json.dumps(interaction.response.message)}
     headers:
 {format_headers(interaction.response.headers)}
-{format_response_body(interaction.response)}
+"""
+                )
+                format_response_body(stream, interaction.response)
+                stream.write(
+                    f"""
     http_version: '{interaction.response.http_version}'"""
                 )
                 current_id += 1
         else:
             break
     file_handle.close()
+
+
+def _safe_decode(value: str, encoding: str) -> str:
+    """Decode base64-encoded body bytes as a string."""
+    return base64.b64decode(value).decode(encoding, "replace")
+
+
+def write_double_quoted(stream: IO, text: str) -> None:
+    """Writes a valid YAML string enclosed in double quotes."""
+    # Adapted from `yaml.Emitter.write_double_quoted`:
+    #   - Doesn't split the string, therefore doesn't track the current column
+    #   - Doesn't encode the input
+    #   - Allows Unicode unconditionally
+    stream.write('"')
+    start = end = 0
+    length = len(text)
+    while end <= length:
+        ch = None
+        if end < length:
+            ch = text[end]
+        if (
+            ch is None
+            or ch in '"\\\x85\u2028\u2029\uFEFF'
+            or not ("\x20" <= ch <= "\x7E" or ("\xA0" <= ch <= "\uD7FF" or "\uE000" <= ch <= "\uFFFD"))
+        ):
+            if start < end:
+                stream.write(text[start:end])
+                start = end
+            if ch is not None:
+                # Escape character
+                if ch in Emitter.ESCAPE_REPLACEMENTS:
+                    data = "\\" + Emitter.ESCAPE_REPLACEMENTS[ch]
+                elif ch <= "\xFF":
+                    data = "\\x%02X" % ord(ch)
+                elif ch <= "\uFFFF":
+                    data = "\\u%04X" % ord(ch)
+                else:
+                    data = "\\U%08X" % ord(ch)
+                stream.write(data)
+                start = end + 1
+        end += 1
+    stream.write('"')
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -249,9 +336,15 @@ def get_prepared_request(data: Dict[str, Any]) -> requests.PreparedRequest:
     prepared.url = data["uri"]
     prepared._cookies = RequestsCookieJar()  # type: ignore
     if "body" in data:
-        encoded = data["body"]["base64_string"]
-        if encoded:
-            prepared.body = base64.b64decode(encoded)
+        body = data["body"]
+        if "base64_string" in body:
+            content = body["base64_string"]
+            if content:
+                prepared.body = base64.b64decode(content)
+        else:
+            content = body["string"]
+            if content:
+                prepared.body = content.encode("utf8")
     # There is always 1 value in a request
     headers = [(key, value[0]) for key, value in data["headers"].items()]
     prepared.headers = CaseInsensitiveDict(headers)
