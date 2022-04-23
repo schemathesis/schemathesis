@@ -290,7 +290,10 @@ def test_commands_run_help(cli):
         "                                  reproduction.",
         "  --cassette-path FILENAME        Save test results as a VCR-compatible",
         "                                  cassette.",
-        "  --store-network-log FILENAME    Store requests and responses into a file.",
+        "  --cassette-preserve-exact-body-bytes",
+        "                                  Encode payloads in cassettes as base64.",
+        "  --store-network-log FILENAME    [DEPRECATED] Store requests and responses into",
+        "                                  a file.",
         "  --fixups [fast_api|all]         Install specified compatibility fixups.",
         "  --stateful [none|links]         Utilize stateful testing capabilities.",
         "  --stateful-recursion-limit INTEGER RANGE",
@@ -1490,7 +1493,7 @@ def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_b
         request = cassette["http_interactions"][idx]["request"]
         if "body" not in request:
             return None
-        return base64.b64decode(request["body"]["base64_string"])
+        return request["body"]["string"].encode()
 
     first_decoded = decode(0)
     if first_decoded:
@@ -2041,6 +2044,7 @@ def assert_exit_code(event_stream, code):
             show_errors_tracebacks=False,
             validate_schema=False,
             cassette_path=None,
+            cassette_preserve_exact_body_bytes=False,
             junit_xml=None,
             verbosity=0,
             code_sample_style=CodeSampleStyle.default(),

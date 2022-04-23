@@ -826,7 +826,7 @@ class Request:
             uri=uri,
             method=method,
             headers={key: [value] for (key, value) in prepared.headers.items()},
-            body=base64.b64encode(body).decode() if body is not None else body,
+            body=serialize_payload(body) if body is not None else body,
         )
 
 

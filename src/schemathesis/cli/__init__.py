@@ -411,10 +411,21 @@ with_hosts_file = click.option(
     callback=callbacks.convert_code_sample_style,
 )
 @click.option(
-    "--cassette-path", help="Save test results as a VCR-compatible cassette.", type=click.File("w", encoding="utf-8")
+    "--cassette-path",
+    help="Save test results as a VCR-compatible cassette.",
+    type=click.File("w", encoding="utf-8"),
+    is_eager=True,
 )
 @click.option(
-    "--store-network-log", help="Store requests and responses into a file.", type=click.File("w", encoding="utf-8")
+    "--cassette-preserve-exact-body-bytes",
+    help="Encode payloads in cassettes as base64.",
+    is_flag=True,
+    callback=callbacks.validate_preserve_exact_body_bytes,
+)
+@click.option(
+    "--store-network-log",
+    help="[DEPRECATED] Store requests and responses into a file.",
+    type=click.File("w", encoding="utf-8"),
 )
 @click.option(
     "--fixups",
@@ -558,6 +569,7 @@ def run(
     show_errors_tracebacks: bool = False,
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default(),
     cassette_path: Optional[click.utils.LazyFile] = None,
+    cassette_preserve_exact_body_bytes: bool = False,
     store_network_log: Optional[click.utils.LazyFile] = None,
     fixups: Tuple[str] = (),  # type: ignore
     stateful: Optional[Stateful] = None,
@@ -682,6 +694,7 @@ def run(
         show_errors_tracebacks,
         validate_schema,
         cassette_path,
+        cassette_preserve_exact_body_bytes,
         junit_xml,
         verbosity,
         code_sample_style,
@@ -948,6 +961,7 @@ def execute(
     show_errors_tracebacks: bool,
     validate_schema: bool,
     cassette_path: Optional[click.utils.LazyFile],
+    cassette_preserve_exact_body_bytes: bool,
     junit_xml: Optional[click.utils.LazyFile],
     verbosity: int,
     code_sample_style: CodeSampleStyle,
@@ -970,7 +984,9 @@ def execute(
         handlers.append(DebugOutputHandler(debug_output_file))
     if cassette_path is not None:
         # This handler should be first to have logs writing completed when the output handler will display statistic
-        handlers.append(cassettes.CassetteWriter(cassette_path))
+        handlers.append(
+            cassettes.CassetteWriter(cassette_path, preserve_exact_body_bytes=cassette_preserve_exact_body_bytes)
+        )
     handlers.append(get_output_handler(workers_num))
     execution_context = ExecutionContext(
         hypothesis_settings=hypothesis_settings,
@@ -1057,7 +1073,7 @@ def replay(
     """
     maybe_disable_color(ctx, no_color)
     click.secho(f"{bold('Replaying cassette')}: {cassette_path}")
-    with open(cassette_path) as fd:
+    with open(cassette_path, "rb") as fd:
         cassette = yaml.load(fd, Loader=SafeLoader)
     click.secho(f"{bold('Total interactions')}: {len(cassette['http_interactions'])}\n")
     for replayed in cassettes.replay(
