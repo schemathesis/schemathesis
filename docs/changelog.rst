@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Do not encode payloads in cassettes as base64 by default. This change makes Schemathesis match the default Ruby's VCR behavior and
+  leads to more human-readable cassettes. Use ``--cassette-preserve-exact-body-bytes`` to restore the old behavior. `#1413`_
+
 `3.14.2`_ - 2022-04-21
 ----------------------
 
@@ -2435,6 +2440,7 @@ Deprecated
 .. _#1445: https://github.com/schemathesis/schemathesis/issues/1445
 .. _#1429: https://github.com/schemathesis/schemathesis/issues/1429
 .. _#1425: https://github.com/schemathesis/schemathesis/issues/1425
+.. _#1413: https://github.com/schemathesis/schemathesis/issues/1413
 .. _#1410: https://github.com/schemathesis/schemathesis/issues/1410
 .. _#1395: https://github.com/schemathesis/schemathesis/issues/1395
 .. _#1394: https://github.com/schemathesis/schemathesis/issues/1394

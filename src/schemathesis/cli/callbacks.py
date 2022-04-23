@@ -14,6 +14,9 @@ from ..constants import CodeSampleStyle, DataGenerationMethod
 from ..stateful import Stateful
 from .constants import DEFAULT_WORKERS
 
+MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE = (
+    'Missing argument, "--cassette-path" should be specified as well if you use "--cassette-preserve-exact-body-bytes".'
+)
 INVALID_SCHEMA_MESSAGE = "Invalid SCHEMA, must be a valid URL, file path or an API slug from Schemathesis.io."
 
 
@@ -166,6 +169,12 @@ def validate_request_cert_key(
 ) -> Optional[str]:
     if raw_value is not None and "request_cert" not in ctx.params:
         raise click.UsageError('Missing argument, "--request-cert" should be specified as well.')
+    return raw_value
+
+
+def validate_preserve_exact_body_bytes(ctx: click.core.Context, param: click.core.Parameter, raw_value: bool) -> bool:
+    if raw_value and ctx.params["cassette_path"] is None:
+        raise click.UsageError(MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE)
     return raw_value
 
 
