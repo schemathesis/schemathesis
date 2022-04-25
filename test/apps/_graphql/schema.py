@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 
 import strawberry
 
@@ -47,4 +47,36 @@ class Query:
         return list(AUTHORS.values())
 
 
-schema = strawberry.Schema(Query)
+def get_or_create_author(name: str) -> Tuple[int, Author]:
+    for author_id, author in AUTHORS.items():
+        if author.name == name:
+            break
+    else:
+        author = Author(name=name, books=[])
+        author_id = len(AUTHORS) + 1
+        AUTHORS[author_id] = author
+    return author_id, author
+
+
+@strawberry.type
+class Mutation:
+    @strawberry.mutation
+    def addBook(self, title: str, author: str) -> Book:
+        for book in BOOKS.values():
+            if book.title == title:
+                break
+        else:
+            # New book and potentially new author
+            author_id, author = get_or_create_author(author)
+            book = Book(title=title, author=author)
+            book_id = len(BOOKS) + 1
+            BOOKS[book_id] = book
+            author.books.append(book)
+        return book
+
+    @strawberry.mutation
+    def addAuthor(self, name: str) -> Author:
+        return get_or_create_author(name)[1]
+
+
+schema = strawberry.Schema(Query, Mutation)
