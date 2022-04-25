@@ -850,8 +850,8 @@ def test_graphql(graphql_url):
     initialized, *_, finished = list(
         from_schema(schema, hypothesis_settings=hypothesis.settings(max_examples=5, deadline=None)).execute()
     )
-    assert initialized.operations_count == 2
-    assert finished.passed_count == 2
+    assert initialized.operations_count == 4
+    assert finished.passed_count == 4
 
 
 @pytest.mark.operations("success")

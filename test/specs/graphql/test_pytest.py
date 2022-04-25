@@ -8,7 +8,7 @@ schema = schemathesis.graphql.from_url('{graphql_url}')
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "{graphql_path}"
-    assert case.operation.verbose_name in case.body
+    assert case.operation.definition.field_name in case.body
     response = case.call()
     assert response.status_code == 200
     case.validate_response(response)
@@ -16,12 +16,14 @@ def test_(request, case):
 """,
     )
     result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=2)
+    result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
-            r"test_basic_pytest_graphql.py::test_\[getBooks]\[P\] PASSED",
-            r"test_basic_pytest_graphql.py::test_\[getAuthors]\[P\] PASSED",
-            r"Hypothesis calls: 20",
+            r"test_basic_pytest_graphql.py::test_\[Query.getBooks]\[P\] PASSED",
+            r"test_basic_pytest_graphql.py::test_\[Query.getAuthors]\[P\] PASSED",
+            r"test_basic_pytest_graphql.py::test_\[Mutation.addBook]\[P\] PASSED",
+            r"test_basic_pytest_graphql.py::test_\[Mutation.addAuthor]\[P\] PASSED",
+            r"Hypothesis calls: 40",
         ]
     )
 
@@ -38,18 +40,20 @@ schema = schemathesis.graphql.from_wsgi("{graphql_path}", app=app)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "{graphql_path}"
-    assert case.operation.verbose_name in case.body
+    assert case.operation.definition.field_name in case.body
     response = case.call_wsgi()
     assert response.status_code == 200
     case.validate_response(response)
 """,
     )
     result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=2)
+    result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
-            r"test_from_wsgi.py::test_\[getBooks]\[P\] PASSED",
-            r"test_from_wsgi.py::test_\[getAuthors]\[P\] PASSED",
-            r"Hypothesis calls: 20",
+            r"test_from_wsgi.py::test_\[Query.getBooks]\[P\] PASSED",
+            r"test_from_wsgi.py::test_\[Query.getAuthors]\[P\] PASSED",
+            r"test_from_wsgi.py::test_\[Mutation.addBook]\[P\] PASSED",
+            r"test_from_wsgi.py::test_\[Mutation.addAuthor]\[P\] PASSED",
+            r"Hypothesis calls: 40",
         ]
     )
