@@ -19,7 +19,7 @@ Usage
     def test(case):
         case.call_and_validate()
 
-This test will load GraphQL schema from ``https://bahnql.herokuapp.com/graphql``, generate queries for it, send them to the server, and verify responses.
+This test will load GraphQL schema from ``https://bahnql.herokuapp.com/graphql``, generate queries and mutations for it, send them to the server, and verify responses.
 
 Or via CLI:
 
@@ -33,5 +33,4 @@ Limitations
 Current GraphQL support does **NOT** include the following:
 
 - Custom scalar types as required arguments (it will produce an error);
-- Mutations;
 - Filters;

@@ -70,6 +70,7 @@ def test_no_query(graphql_url):
     decoded = response.json()
     raw_schema = decoded["data"]
     raw_schema["__schema"]["queryType"] = None
+    raw_schema["__schema"]["mutationType"] = None
     schema = schemathesis.graphql.from_dict(raw_schema)
     # Then no operations should be collected
     assert list(schema.get_all_operations()) == []
@@ -81,4 +82,4 @@ def test_operations_count(graphql_url):
     decoded = response.json()
     raw_schema = decoded["data"]
     schema = schemathesis.graphql.from_dict(raw_schema)
-    assert schema.operations_count == 2
+    assert schema.operations_count == 4
