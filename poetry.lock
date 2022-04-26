@@ -40,14 +40,6 @@ optional = false
 python-versions = "*"
 
 [[package]]
-name = "aniso8601"
-version = "8.1.1"
-description = "A library for parsing ISO 8601 strings."
-category = "dev"
-optional = false
-python-versions = "*"
-
-[[package]]
 name = "anyio"
 version = "3.4.0"
 description = "High level compatibility layer for multiple asynchronous event loop implementations"
@@ -116,6 +108,14 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.dependencies]
 pytz = ">=2015.7"
+
+[[package]]
+name = "backports.cached-property"
+version = "1.0.1"
+description = "cached_property() - computed once per instance, cached as attribute"
+category = "dev"
+optional = false
+python-versions = ">=3.6.0"
 
 [[package]]
 name = "certifi"
@@ -273,62 +273,12 @@ optional = false
 python-versions = ">=3.6"
 
 [[package]]
-name = "graphene"
-version = "3.0b7"
-description = "GraphQL Framework for Python"
-category = "dev"
-optional = false
-python-versions = "*"
-
-[package.dependencies]
-aniso8601 = ">=8,<9"
-graphql-core = ">=3.1.2,<4"
-graphql-relay = ">=3.0,<4"
-
-[package.extras]
-dev = ["black (==19.10b0)", "flake8 (>=3.7,<4)", "pytest (>=5.3,<6)", "pytest-benchmark (>=3.2,<4)", "pytest-cov (>=2.8,<3)", "pytest-mock (>=2,<3)", "pytest-asyncio (>=0.10,<2)", "snapshottest (>=0.5,<1)", "coveralls (>=1.11,<2)", "promise (>=2.3,<3)", "mock (>=4.0,<5)", "pytz (==2019.3)", "iso8601 (>=0.1,<2)"]
-test = ["pytest (>=5.3,<6)", "pytest-benchmark (>=3.2,<4)", "pytest-cov (>=2.8,<3)", "pytest-mock (>=2,<3)", "pytest-asyncio (>=0.10,<2)", "snapshottest (>=0.5,<1)", "coveralls (>=1.11,<2)", "promise (>=2.3,<3)", "mock (>=4.0,<5)", "pytz (==2019.3)", "iso8601 (>=0.1,<2)"]
-
-[[package]]
 name = "graphql-core"
 version = "3.2.1"
 description = "GraphQL implementation for Python, a port of GraphQL.js, the JavaScript reference implementation for GraphQL."
 category = "main"
 optional = false
 python-versions = ">=3.6,<4"
-
-[[package]]
-name = "graphql-relay"
-version = "3.0.0"
-description = "Relay library for graphql-core-next"
-category = "dev"
-optional = false
-python-versions = ">=3.6,<4"
-
-[package.dependencies]
-graphql-core = ">=3.0.0a0"
-
-[[package]]
-name = "graphql-server"
-version = "3.0.0b5"
-description = "GraphQL Server tools for powering your server"
-category = "dev"
-optional = false
-python-versions = "*"
-
-[package.dependencies]
-graphql-core = ">=3.2,<3.3"
-typing-extensions = ">=4,<5"
-
-[package.extras]
-aiohttp = ["aiohttp (>=3.8,<4)"]
-all = ["graphql-core (>=3.2,<3.3)", "typing-extensions (>=4,<5)", "flask (>=1,<2)", "sanic (>=20.3,<21)", "webob (>=1.8.7,<2)", "aiohttp (>=3.8,<4)", "quart (>=0.6.15,<0.15)"]
-dev = ["graphql-core (>=3.2,<3.3)", "typing-extensions (>=4,<5)", "flask (>=1,<2)", "sanic (>=20.3,<21)", "webob (>=1.8.7,<2)", "aiohttp (>=3.8,<4)", "quart (>=0.6.15,<0.15)", "flake8 (>=4,<5)", "isort (>=5,<6)", "black (>=19.10b0)", "mypy (>=0.931,<1)", "check-manifest (>=0.47,<1)", "pytest (>=6.2,<6.3)", "pytest-asyncio (>=0.16,<1)", "pytest-cov (>=3,<4)", "aiohttp (>=3.8,<4)", "Jinja2 (>=2.11,<3)"]
-flask = ["flask (>=1,<2)"]
-quart = ["quart (>=0.6.15,<0.15)"]
-sanic = ["sanic (>=20.3,<21)"]
-test = ["graphql-core (>=3.2,<3.3)", "typing-extensions (>=4,<5)", "flask (>=1,<2)", "sanic (>=20.3,<21)", "webob (>=1.8.7,<2)", "aiohttp (>=3.8,<4)", "quart (>=0.6.15,<0.15)", "pytest (>=6.2,<6.3)", "pytest-asyncio (>=0.16,<1)", "pytest-cov (>=3,<4)", "aiohttp (>=3.8,<4)", "Jinja2 (>=2.11,<3)"]
-webob = ["webob (>=1.8.7,<2)"]
 
 [[package]]
 name = "hypothesis"
@@ -699,6 +649,28 @@ six = "*"
 testing = ["filelock"]
 
 [[package]]
+name = "python-dateutil"
+version = "2.8.2"
+description = "Extensions to the standard Python datetime module"
+category = "dev"
+optional = false
+python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
+
+[package.dependencies]
+six = ">=1.5"
+
+[[package]]
+name = "python-multipart"
+version = "0.0.5"
+description = "A streaming multipart parser for Python"
+category = "dev"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+six = ">=1.4.0"
+
+[[package]]
 name = "pytz"
 version = "2022.1"
 description = "World timezone definitions, modern and historical"
@@ -883,6 +855,36 @@ typing-extensions = {version = "*", markers = "python_version < \"3.8\""}
 full = ["itsdangerous", "jinja2", "python-multipart", "pyyaml", "requests", "graphene"]
 
 [[package]]
+name = "strawberry-graphql"
+version = "0.109.0"
+description = "A library for creating GraphQL APIs"
+category = "dev"
+optional = false
+python-versions = ">=3.7,<4.0"
+
+[package.dependencies]
+"backports.cached-property" = ">=1.0.1,<2.0.0"
+click = ">=7.0,<9.0"
+fastapi = {version = ">=0.65.2", optional = true, markers = "extra == \"fastapi\""}
+graphql-core = ">=3.2.0,<3.3.0"
+pygments = ">=2.3,<3.0"
+python-dateutil = ">=2.7.0,<3.0.0"
+python-multipart = ">=0.0.5,<0.0.6"
+typing_extensions = ">=3.7.4,<5.0.0"
+
+[package.extras]
+asgi = ["starlette (>=0.13.6,<0.17.0)"]
+debug-server = ["starlette (>=0.13.6,<0.17.0)", "uvicorn (>=0.11.6,<0.18.0)"]
+django = ["Django (>=3.2)", "asgiref (>=3.2,<4.0)"]
+flask = ["flask (>=1.1)"]
+opentelemetry = ["opentelemetry-api (<2)", "opentelemetry-sdk (<2)"]
+chalice = ["chalice (>=1.22,<2.0)"]
+pydantic = ["pydantic (<2)"]
+sanic = ["sanic (>=20.12.2,<22.0.0)"]
+aiohttp = ["aiohttp (>=3.7.4.post0,<4.0.0)"]
+fastapi = ["fastapi (>=0.65.2)"]
+
+[[package]]
 name = "tomli"
 version = "2.0.1"
 description = "A lil' TOML parser"
@@ -970,7 +972,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "798343a5a615157feb0f606c6083f49630d2af9b983c0aa16aa570259d2e82c5"
+content-hash = "d3802f23cbf11325030d2bf6d356937125460641726cd3b1b3f38e4977c897c7"
 
 [metadata.files]
 aiohttp = [
@@ -1055,10 +1057,6 @@ alabaster = [
     {file = "alabaster-0.7.12-py2.py3-none-any.whl", hash = "sha256:446438bdcca0e05bd45ea2de1668c1d9b032e1a9154c2c259092d77031ddd359"},
     {file = "alabaster-0.7.12.tar.gz", hash = "sha256:a661d72d58e6ea8a57f7a86e37d86716863ee5e92788398526d58b26a4e4dc02"},
 ]
-aniso8601 = [
-    {file = "aniso8601-8.1.1-py2.py3-none-any.whl", hash = "sha256:f59914762c5049ffd956cad037aa82fe0cabf8baf51900e2af24026761090b0b"},
-    {file = "aniso8601-8.1.1.tar.gz", hash = "sha256:be08b19c19ca527af722f2d4ba4dc569db292ec96f7de963746df4bb0bff9250"},
-]
 anyio = [
     {file = "anyio-3.4.0-py3-none-any.whl", hash = "sha256:2855a9423524abcdd652d942f8932fda1735210f77a6b392eafd9ff34d3fe020"},
     {file = "anyio-3.4.0.tar.gz", hash = "sha256:24adc69309fb5779bc1e06158e143e0b6d2c56b302a3ac3de3083c705a6ed39d"},
@@ -1082,6 +1080,10 @@ attrs = [
 babel = [
     {file = "Babel-2.9.1-py2.py3-none-any.whl", hash = "sha256:ab49e12b91d937cd11f0b67cb259a57ab4ad2b59ac7a3b41d6c06c0ac5b0def9"},
     {file = "Babel-2.9.1.tar.gz", hash = "sha256:bc0c176f9f6a994582230df350aa6e05ba2ebe4b3ac317eab29d9be5d2768da0"},
+]
+"backports.cached-property" = [
+    {file = "backports.cached-property-1.0.1.tar.gz", hash = "sha256:1a5ef1e750f8bc7d0204c807aae8e0f450c655be0cf4b30407a35fd4bb27186c"},
+    {file = "backports.cached_property-1.0.1-py3-none-any.whl", hash = "sha256:687b5fe14be40aadcf547cae91337a1fdb84026046a39370274e54d3fe4fb4f9"},
 ]
 certifi = [
     {file = "certifi-2021.10.8-py2.py3-none-any.whl", hash = "sha256:d62a0163eb4c2344ac042ab2bdf75399a71a2d8c7d47eac2e2ee91b9d6339569"},
@@ -1320,20 +1322,9 @@ frozenlist = [
     {file = "frozenlist-1.2.0-cp39-cp39-win_amd64.whl", hash = "sha256:735f386ec522e384f511614c01d2ef9cf799f051353876b4c6fb93ef67a6d1ee"},
     {file = "frozenlist-1.2.0.tar.gz", hash = "sha256:68201be60ac56aff972dc18085800b6ee07973c49103a8aba669dee3d71079de"},
 ]
-graphene = [
-    {file = "graphene-3.0b7-py2.py3-none-any.whl", hash = "sha256:70293cd3cd301eb8ab69f43b18bff0223bbb458ed74904bd3dffa69f802bf6ef"},
-    {file = "graphene-3.0b7.tar.gz", hash = "sha256:03e1cb640ad48669eaf5a4228be216f7dce72b6ca3e9b1dd568e429001897642"},
-]
 graphql-core = [
     {file = "graphql-core-3.2.1.tar.gz", hash = "sha256:9d1bf141427b7d54be944587c8349df791ce60ade2e3cccaf9c56368c133c201"},
     {file = "graphql_core-3.2.1-py3-none-any.whl", hash = "sha256:f83c658e4968998eed1923a2e3e3eddd347e005ac0315fbb7ca4d70ea9156323"},
-]
-graphql-relay = [
-    {file = "graphql-relay-3.0.0.tar.gz", hash = "sha256:ad3f69a8b360c310c0c5611894f1e3fd5c6a5427b84f0f2cf5aee7a588bb5556"},
-    {file = "graphql_relay-3.0.0-py3-none-any.whl", hash = "sha256:b05ca0547557874f3bb1f34e4a6dce20bc60359fe6e73daaa63bb90df85f7ba9"},
-]
-graphql-server = [
-    {file = "graphql-server-3.0.0b5.tar.gz", hash = "sha256:85c12c421e14f339883865d75fe316f626f3f875c70f8c366a93d50c5b1c8a23"},
 ]
 hypothesis = [
     {file = "hypothesis-6.32.1-py3-none-any.whl", hash = "sha256:67e4fcf1da355a8996c3e1ae3e0d4c325cf318f766638a34626bf1cb906a69df"},
@@ -1626,6 +1617,13 @@ pytest-xdist = [
     {file = "pytest-xdist-1.34.0.tar.gz", hash = "sha256:340e8e83e2a4c0d861bdd8d05c5d7b7143f6eea0aba902997db15c2a86be04ee"},
     {file = "pytest_xdist-1.34.0-py2.py3-none-any.whl", hash = "sha256:ba5d10729372d65df3ac150872f9df5d2ed004a3b0d499cc0164aafedd8c7b66"},
 ]
+python-dateutil = [
+    {file = "python-dateutil-2.8.2.tar.gz", hash = "sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86"},
+    {file = "python_dateutil-2.8.2-py2.py3-none-any.whl", hash = "sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9"},
+]
+python-multipart = [
+    {file = "python-multipart-0.0.5.tar.gz", hash = "sha256:f7bb5f611fc600d15fa47b3974c8aa16e93724513b49b5f95c81e6624c83fa43"},
+]
 pytz = [
     {file = "pytz-2022.1-py2.py3-none-any.whl", hash = "sha256:e68985985296d9a66a881eb3193b0906246245294a881e7c8afe623866ac6a5c"},
     {file = "pytz-2022.1.tar.gz", hash = "sha256:1e760e2fe6a8163bc0b3d9a19c4f84342afa0a2affebfaa84b01b978a02ecaa7"},
@@ -1716,6 +1714,10 @@ sphinxcontrib-serializinghtml = [
 starlette = [
     {file = "starlette-0.16.0-py3-none-any.whl", hash = "sha256:38eb24bf705a2c317e15868e384c1b8a12ca396e5a3c3a003db7e667c43f939f"},
     {file = "starlette-0.16.0.tar.gz", hash = "sha256:e1904b5d0007aee24bdd3c43994be9b3b729f4f58e740200de1d623f8c3a8870"},
+]
+strawberry-graphql = [
+    {file = "strawberry-graphql-0.109.0.tar.gz", hash = "sha256:2054e0c4677ed0e6610d9b6a73d56d59e9551c1b44d6489d9c583893dbe4c041"},
+    {file = "strawberry_graphql-0.109.0-py3-none-any.whl", hash = "sha256:3790b7ae1c13d445d2923167ea0d310bebe0fa5a2bc70013bba68ac074d97a86"},
 ]
 tomli = [
     {file = "tomli-2.0.1-py3-none-any.whl", hash = "sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc"},

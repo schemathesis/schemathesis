@@ -102,13 +102,15 @@ class GraphQLSchema(BaseSchema):
     @property
     def operations_count(self) -> int:
         raw_schema = self.raw_schema["__schema"]
-        if "queryType" not in raw_schema:
-            return 0
-        query_type_name = raw_schema["queryType"]["name"]
-        for type_def in raw_schema.get("types", []):
-            if type_def["name"] == query_type_name:
-                return len(type_def["fields"])
-        return 0
+        total = 0
+        for type_name in ("queryType",):
+            type_def = raw_schema.get(type_name)
+            if type_def is not None:
+                query_type_name = type_def["name"]
+                for type_def in raw_schema.get("types", []):
+                    if type_def["name"] == query_type_name:
+                        total += len(type_def["fields"])
+        return total
 
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         schema = self.client_schema
