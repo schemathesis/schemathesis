@@ -59,8 +59,6 @@ tomli-w = "^1.0.0"
 [tool.poetry.dev-dependencies]
 coverage = "^5"
 aiohttp = "^3.6"
-graphene = "^3.0b3"
-graphql-server = "^3.0.0b4"
 pytest-mock = "^1.11.0"
 pytest-asyncio = "^0.17.1"
 pytest-xdist = "^1.30"
@@ -69,6 +67,7 @@ pytest-httpserver = "^1.0.0"
 trustme = "^0.9.0"
 Flask = "^2.1.1"
 Sphinx = "^4.5.0"
+strawberry-graphql = {extras = ["fastapi"], version = "^0.109.0"}
 
 [tool.poetry.plugins]
 pytest11 = {schemathesis = "schemathesis.extra.pytest_plugin"}

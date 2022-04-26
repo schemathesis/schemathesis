@@ -16,7 +16,7 @@ def test_raw_schema(graphql_schema):
 
 
 @pytest.mark.hypothesis_nested
-def test_query_strategy(graphql_strategy):
+def test_operation_strategy(graphql_strategy):
     @given(case=graphql_strategy)
     @settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
     def test(case):
@@ -73,3 +73,12 @@ def test_no_query(graphql_url):
     schema = schemathesis.graphql.from_dict(raw_schema)
     # Then no operations should be collected
     assert list(schema.get_all_operations()) == []
+    assert schema.operations_count == 0
+
+
+def test_operations_count(graphql_url):
+    response = requests.post(graphql_url, json={"query": INTROSPECTION_QUERY}, timeout=1)
+    decoded = response.json()
+    raw_schema = decoded["data"]
+    schema = schemathesis.graphql.from_dict(raw_schema)
+    assert schema.operations_count == 2
