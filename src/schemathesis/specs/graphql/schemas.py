@@ -186,7 +186,7 @@ def get_case_strategy(
     auth_storage: Optional[AuthStorage] = None,
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
 ) -> Any:
-    body = draw(gql_st.query(client_schema, fields=[operation.verbose_name]))
+    body = draw(gql_st.queries(client_schema, fields=[operation.verbose_name]))
     instance = GraphQLCase(body=body, operation=operation, data_generation_method=data_generation_method)  # type: ignore
     context = auth.AuthContext(
         operation=operation,
