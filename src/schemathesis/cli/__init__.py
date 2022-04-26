@@ -26,7 +26,7 @@ from ..constants import (
     CodeSampleStyle,
     DataGenerationMethod,
 )
-from ..exceptions import HTTPError
+from ..exceptions import HTTPError, SchemaLoadingError
 from ..fixups import ALL_FIXUPS
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..models import Case, CheckFunction
@@ -836,10 +836,10 @@ def _try_load_schema(
 ) -> BaseSchema:
     try:
         return first(config)
-    except HTTPError as exc:
+    except (HTTPError, SchemaLoadingError) as exc:
         try:
             return second(config)
-        except HTTPError:
+        except (HTTPError, SchemaLoadingError):
             # Raise the first loader's error
             raise exc  # pylint: disable=raise-missing-from
 
