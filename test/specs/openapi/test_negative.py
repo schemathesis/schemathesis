@@ -25,6 +25,8 @@ from schemathesis.specs.openapi.negative.mutations import (
 )
 from schemathesis.specs.openapi.utils import is_header_location
 
+MAX_EXAMPLES = 15
+SUPPRESSED_HEALTH_CHECKS = [HealthCheck.too_slow, HealthCheck.filter_too_much, HealthCheck.data_too_large]
 OBJECT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -50,8 +52,7 @@ INTEGER_SCHEMA = {
 }
 
 
-def validate_schema(schema):
-    Draft4Validator.check_schema(schema)
+validate_schema = Draft4Validator.check_schema
 
 
 @pytest.mark.parametrize(
@@ -65,7 +66,7 @@ def validate_schema(schema):
     ],
 )
 @given(data=st.data())
-@settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
+@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_top_level_strategy(data, location, schema):
     if location != "body" and schema.get("type") == "object":
         # It always comes this way from Schemathesis
@@ -116,7 +117,7 @@ def test_top_level_strategy(data, location, schema):
     ),
 )
 @given(data=st.data())
-@settings(deadline=None)
+@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_failing_mutations(data, mutation, schema, validate):
     if validate:
         validate_schema(schema)
@@ -131,7 +132,7 @@ def test_failing_mutations(data, mutation, schema, validate):
 
 
 @given(data=st.data())
-@settings(deadline=None)
+@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_change_type_urlencoded(data):
     # When `application/x-www-form-urlencoded` media type is passed to `change_type`
     schema = {"type": "object"}
@@ -176,7 +177,7 @@ def test_change_type_urlencoded(data):
     ),
 )
 @given(data=st.data())
-@settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
+@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_successful_mutations(data, mutation, schema):
     validate_schema(schema)
     validator = Draft4Validator(schema)
@@ -219,7 +220,7 @@ def test_successful_mutations(data, mutation, schema):
     ),
 )
 @given(data=st.data())
-@settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
+@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_path_parameters_are_string(data, schema):
     validator = Draft4Validator(schema)
     new_schema = deepcopy(schema)
@@ -239,7 +240,7 @@ def test_path_parameters_are_string(data, schema):
 
 @pytest.mark.parametrize("key", ("components", "description"))
 @given(data=st.data())
-@settings(deadline=None)
+@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_custom_fields_are_intact(data, key):
     # When the schema contains some non-JSON Schema keywords (e.g. components from Open API)
     schema = {
@@ -276,7 +277,7 @@ def test_mutation_result_success(left, right, expected):
     ),
 )
 @given(data=st.data())
-@settings(deadline=None)
+@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_negate_constraints_keep_dependencies(data, schema):
     # When `negate_constraints` is used
     schema = deepcopy(schema)
@@ -287,7 +288,7 @@ def test_negate_constraints_keep_dependencies(data, schema):
 
 
 @given(data=st.data())
-@settings(deadline=None)
+@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_no_unsatisfiable_schemas(data):
     schema = {"type": "object", "required": ["foo"]}
     mutated_schema = data.draw(mutated(schema, {}, location="body", media_type="application/json"))
@@ -342,7 +343,7 @@ def test_non_default_styles(empty_open_api_3_schema, location, schema, style, ex
     schema = schemathesis.from_dict(empty_open_api_3_schema)
 
     @given(case=schema["/bug"]["get"].as_strategy(data_generation_method=DataGenerationMethod.negative))
-    @settings(deadline=None, max_examples=10, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
+    @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
     def test(case):
         assert_requests_call(case)
 

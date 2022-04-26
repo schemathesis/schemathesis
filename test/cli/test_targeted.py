@@ -52,6 +52,7 @@ def test_custom_target_graphql(cli, new_target, graphql_url):
         "new_target",
         graphql_url,
         "--hypothesis-suppress-health-check=too_slow,filter_too_much",
+        "--hypothesis-max-examples=1",
     )
     # Then the test run should be successful
     assert result.exit_code == ExitCode.OK, result.stdout
