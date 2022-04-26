@@ -120,6 +120,7 @@ IGNORED_PATTERNS = (
     "Flaky example!",
     "Traceback (most recent call last):",
     "You can reproduce this example by temporarily",
+    "Unreliable test timings",
 )
 
 

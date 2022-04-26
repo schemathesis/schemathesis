@@ -630,7 +630,7 @@ def test_hypothesis_failed_event(cli, cli_args, workers):
     assert "DeadlineExceeded: API response time is too slow! " in result.stdout
     assert "which exceeds the deadline of 20.00ms" in result.stdout
     # And the CLI should not suggest showing full tracebacks to the user
-    assert "Add this option to your command line parameters to see full tracebacks" not in result.stdout
+    assert "Add this option to your command line parameters to see full tracebacks" not in result.stdout, result.stdout
 
 
 @pytest.mark.operations("success", "slow")
