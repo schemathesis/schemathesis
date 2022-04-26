@@ -25,20 +25,14 @@ def service_token(request):
     return request.config.getoption("--schemathesis-io-token")
 
 
-@pytest.fixture(scope="session")
-def _httpserver():
+@pytest.fixture
+def httpserver():
     # The default implementation doesn't play nice with pytest-xdist
     server = PluginHTTPServer(host="localhost", port=0)
     server.start()
     yield server
     if server.is_running():
         server.stop()
-
-
-@pytest.fixture
-def _httpserver(httpserver):
-    yield httpserver
-    httpserver.clear()
 
 
 @pytest.fixture
