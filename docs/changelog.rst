@@ -14,6 +14,7 @@ Changelog
 - Do not encode payloads in cassettes as base64 by default. This change makes Schemathesis match the default Ruby's VCR behavior and
   leads to more human-readable cassettes. Use ``--cassette-preserve-exact-body-bytes`` to restore the old behavior. `#1413`_
 - Bump ``hypothesis-graphql`` to ``0.8.1``.
+- Avoid simultaneous authentication requests inside auth providers when caching is enabled.
 
 **Fixed**
 

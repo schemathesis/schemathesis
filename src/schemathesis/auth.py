@@ -1,4 +1,5 @@
 """Support for custom API authentication mechanisms."""
+import threading
 import time
 from typing import TYPE_CHECKING, Any, Callable, Generic, Optional, Type, TypeVar
 
@@ -65,14 +66,18 @@ class CachingAuthProvider(Generic[Auth]):
     cache_entry: Optional[CacheEntry[Auth]] = attr.ib(default=None)
     # The timer exists here to simplify testing
     timer: Callable[[], float] = attr.ib(default=time.monotonic)
+    _refresh_lock: threading.Lock = attr.ib(factory=threading.Lock)
 
     def get(self, context: AuthContext) -> Auth:
         """Get cached auth value."""
         if self.cache_entry is None or self.timer() >= self.cache_entry.expires:
-            # No cache or cache expired
-            data: Auth = self.provider.get(context)
-            self.cache_entry = CacheEntry(data=data, expires=self.timer() + self.refresh_interval)
-            return data
+            with self._refresh_lock:
+                if not (self.cache_entry is None or self.timer() >= self.cache_entry.expires):
+                    # Another thread updated the cache
+                    return self.cache_entry.data
+                data: Auth = self.provider.get(context)
+                self.cache_entry = CacheEntry(data=data, expires=self.timer() + self.refresh_interval)
+                return data
         return self.cache_entry.data
 
     def set(self, case: "Case", data: Auth, context: AuthContext) -> None:
