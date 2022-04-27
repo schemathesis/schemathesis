@@ -82,3 +82,47 @@ def after_call(context, case, response):
     assert result.exit_code == ExitCode.OK, result.stdout
     # And the auth should be used
     assert expected in result.stdout.splitlines()
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("success", "custom_format")
+def test_multiple_threads(testdir, cli, schema_url):
+    module = testdir.make_importable_pyfile(
+        hook=f"""
+    import schemathesis
+    import time
+
+    TOKEN = "{TOKEN}"
+
+    @schemathesis.auth.register()
+    class TokenAuth:
+
+        def __init__(self):
+            self.get_calls = 0
+
+        def get(self, context):
+            self.get_calls += 1
+            time.sleep(0.05)
+            return TOKEN
+
+        def set(self, case, data, context):
+            case.headers = {{"Authorization": f"Bearer {{data}}"}}
+
+    @schemathesis.hooks.register
+    def after_call(context, case, response):
+        provider = schemathesis.auth.GLOBAL_AUTH_STORAGE.provider.provider
+        assert provider.get_calls == 1, provider.get_calls
+    """
+    )
+    result = cli.main(
+        "--pre-run",
+        module.purebasename,
+        "run",
+        schema_url,
+        "--workers",
+        "2",
+        "--hypothesis-max-examples=1",
+        "--show-errors-tracebacks",
+    )
+    # Then CLI should run successfully
+    assert result.exit_code == ExitCode.OK, result.stdout
