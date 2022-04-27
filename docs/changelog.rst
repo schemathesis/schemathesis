@@ -7,12 +7,13 @@ Changelog
 **Added**
 
 - **GraphQL**: Mutations supports. Schemathesis will generate random mutations by default from now on.
+- **GraphQL**: Support for registering strategies to generate custom scalars.
 
 **Changed**
 
 - Do not encode payloads in cassettes as base64 by default. This change makes Schemathesis match the default Ruby's VCR behavior and
   leads to more human-readable cassettes. Use ``--cassette-preserve-exact-body-bytes`` to restore the old behavior. `#1413`_
-- Bump ``hypothesis-graphql`` to ``0.7.0``.
+- Bump ``hypothesis-graphql`` to ``0.8.1``.
 
 **Fixed**
 
