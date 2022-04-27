@@ -85,6 +85,12 @@ Custom strategies for Open API "format" keyword
 
 .. autofunction:: schemathesis.register_string_format
 
+
+Custom scalars for GraphQL
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: schemathesis.graphql.register_scalar
+
 Loaders
 ~~~~~~~
 

@@ -4,11 +4,11 @@ _install_hypothesis_jsonschema_compatibility_shim()
 
 del _install_hypothesis_jsonschema_compatibility_shim
 
-from . import auth, fixups, hooks, runner, serializers, targets
+from . import auth, fixups, graphql, hooks, runner, serializers, targets
 from .cli import register_check, register_target
 from .constants import DataGenerationMethod, __version__
 from .models import Case
-from .specs import graphql, openapi
+from .specs import openapi
 from .specs.openapi._hypothesis import init_default_strategies, register_string_format
 from .utils import GenericResponse
 

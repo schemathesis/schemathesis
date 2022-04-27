@@ -310,7 +310,7 @@ zoneinfo = ["backports.zoneinfo (>=0.2.1)", "tzdata (>=2022.1)"]
 
 [[package]]
 name = "hypothesis-graphql"
-version = "0.7.0"
+version = "0.8.1"
 description = "Hypothesis strategies for GraphQL schemas and queries"
 category = "main"
 optional = false
@@ -972,7 +972,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "fc0f1501299add2b16609d56218703f404e55df62e163ce7ea3e56eca2009bd1"
+content-hash = "81be765c346a39c1b02e9deab99e8240dfc6436faca24e1b6e0e2af44b846d03"
 
 [metadata.files]
 aiohttp = [
@@ -1320,8 +1320,8 @@ hypothesis = [
     {file = "hypothesis-6.45.0.tar.gz", hash = "sha256:9d17ebf4137e15f6db24793dad7268b8b5afcfc78b770f307c94872f1d96850a"},
 ]
 hypothesis-graphql = [
-    {file = "hypothesis-graphql-0.7.0.tar.gz", hash = "sha256:329c952b29b7ad0e12b7ea546c9f162e12163b2e2a8977f98f65e163699d5e88"},
-    {file = "hypothesis_graphql-0.7.0-py3-none-any.whl", hash = "sha256:31130eaaa0ea790e4b30d3bb141ad9687b001b6e5404990250624e93d3c453b1"},
+    {file = "hypothesis-graphql-0.8.1.tar.gz", hash = "sha256:2cf996531268268c2e0f62dd9589344fd04ed936fd81e918ef655d2db8aa6737"},
+    {file = "hypothesis_graphql-0.8.1-py3-none-any.whl", hash = "sha256:a3e35686bb9812743c68b0b476ee0988a211d09e4b35c48a8a0fe24a073e9fa6"},
 ]
 hypothesis-jsonschema = [
     {file = "hypothesis-jsonschema-0.22.0.tar.gz", hash = "sha256:359504080a422924a77263789a00c4995b061991558ff6a8243949f94a4d74fc"},

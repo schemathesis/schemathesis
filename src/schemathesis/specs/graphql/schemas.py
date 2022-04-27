@@ -22,6 +22,7 @@ from ...schemas import BaseSchema
 from ...stateful import Stateful, StatefulTest
 from ...types import Body, Cookies, Headers, NotSet, PathParameters, Query
 from ...utils import NOT_SET, GenericResponse, Ok, Result
+from .scalars import CUSTOM_SCALARS
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
@@ -208,7 +209,7 @@ def get_case_strategy(
         "Query": gql_st.queries,
         "Mutation": gql_st.mutations,
     }[definition.type_.name]
-    body = draw(strategy(client_schema, fields=[definition.field_name]))
+    body = draw(strategy(client_schema, fields=[definition.field_name], custom_scalars=CUSTOM_SCALARS))
     instance = GraphQLCase(body=body, operation=operation, data_generation_method=data_generation_method)  # type: ignore
     context = auth.AuthContext(
         operation=operation,
