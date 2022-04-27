@@ -1,5 +1,6 @@
 # pylint: disable=too-many-ancestors
 import itertools
+import json
 from collections import defaultdict
 from contextlib import ExitStack, contextmanager
 from copy import deepcopy
@@ -474,7 +475,7 @@ class BaseOpenAPISchema(BaseSchema):
             return
         try:
             if isinstance(response, requests.Response):
-                data = response.json()
+                data = json.loads(response.text)
             else:
                 data = response.json
         except JSONDecodeError as exc:

@@ -18,6 +18,7 @@ Changelog
 **Fixed**
 
 - **GraphQL**: Semantically invalid queries without aliases.
+- Internal error inside ``BaseOpenAPISchema.validate_response`` on ``requests>=2.27`` when response body contains malformed JSON. `#1485`_
 
 **Performance**
 
@@ -2851,6 +2852,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1485: https://github.com/schemathesis/schemathesis/issues/1485
 .. _#1452: https://github.com/schemathesis/schemathesis/issues/1452
 .. _#1445: https://github.com/schemathesis/schemathesis/issues/1445
 .. _#1429: https://github.com/schemathesis/schemathesis/issues/1429
