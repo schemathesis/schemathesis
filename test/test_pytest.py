@@ -395,3 +395,28 @@ def test(case):
     # Then it should not fail
     # And should generate proper tests
     result.assert_outcomes(passed=1)
+
+
+def test_trimmed_output(testdir, openapi3_base_url):
+    testdir.make_test(
+        f"""
+schema.base_url = "{openapi3_base_url}"
+
+@schema.parametrize()
+def test_a(case):
+    case.call_and_validate()
+
+@given(st.integers())
+def test_b(v):
+    1 / v""",
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=2)
+    stdout = result.stdout.str()
+    # Internal Schemathesis' frames should not appear in the output
+    assert "def validate_response(" not in stdout
+    assert "in call_and_validate" not in stdout
+    # And Hypothesis "Falsifying example" block is not in the output of Schemathesis' tests
+    assert "Falsifying example: test_a(" not in stdout
+    # And regular Hypothesis tests have it
+    assert "Falsifying example: test_b(" in stdout

@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from functools import partial
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Type, TypeVar, cast
 
@@ -7,6 +8,7 @@ from _pytest.config import hookimpl
 from _pytest.fixtures import FuncFixtureInfo
 from _pytest.nodes import Node
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
+from hypothesis import reporting
 from hypothesis.errors import InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
@@ -211,13 +213,33 @@ def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -
         outcome.get_result()
 
 
+IGNORED_HYPOTHESIS_OUTPUT = ("Falsifying example",)
+
+
+def hypothesis_reporter(value: str) -> None:
+    if value.startswith(IGNORED_HYPOTHESIS_OUTPUT):
+        return
+    reporting.default(value)
+
+
+@contextmanager
+def skip_unnecessary_hypothesis_output() -> Generator:
+    """Avoid printing Hypothesis output that is not necessary in Schemathesis' pytest plugin."""
+    with reporting.with_reporter(hypothesis_reporter):  # type: ignore
+        yield
+
+
 @hookimpl(hookwrapper=True)  # pragma: no mutate
 def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     """It is possible to have a Hypothesis exception in runtime.
 
     For example - kwargs validation is failed for some strategy.
     """
-    outcome = yield
+    if isinstance(pyfuncitem, SchemathesisFunction):
+        with skip_unnecessary_hypothesis_output():
+            outcome = yield
+    else:
+        outcome = yield
     try:
         outcome.get_result()
     except InvalidArgument as exc:
