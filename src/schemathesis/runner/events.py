@@ -207,6 +207,7 @@ class Finished(ExecutionEvent):
     is_terminal = True
 
     passed_count: int = attr.ib()  # pragma: no mutate
+    skipped_count: int = attr.ib()  # pragma: no mutate
     failed_count: int = attr.ib()  # pragma: no mutate
     errored_count: int = attr.ib()  # pragma: no mutate
 
@@ -226,6 +227,7 @@ class Finished(ExecutionEvent):
     def from_results(cls, results: TestResultSet, running_time: float) -> "Finished":
         return cls(
             passed_count=results.passed_count,
+            skipped_count=results.skipped_count,
             failed_count=results.failed_count,
             errored_count=results.errored_count,
             has_failures=results.has_failures,

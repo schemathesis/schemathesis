@@ -16,6 +16,7 @@ Changelog
 - Bump ``hypothesis-graphql`` to ``0.8.1``.
 - Avoid simultaneous authentication requests inside auth providers when caching is enabled.
 - Reduce the verbosity of ``pytest`` output. A few internal frames and the "Falsifying example" block are removed from the output.
+- Skip negative tests on API operations that are not possible to negate. `#1463`_
 
 **Fixed**
 
@@ -2855,6 +2856,7 @@ Deprecated
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#1485: https://github.com/schemathesis/schemathesis/issues/1485
+.. _#1463: https://github.com/schemathesis/schemathesis/issues/1463
 .. _#1452: https://github.com/schemathesis/schemathesis/issues/1452
 .. _#1445: https://github.com/schemathesis/schemathesis/issues/1445
 .. _#1429: https://github.com/schemathesis/schemathesis/issues/1429

@@ -55,9 +55,12 @@ def get_percentage(position: int, length: int) -> str:
 
 def display_execution_result(context: ExecutionContext, event: events.AfterExecution) -> None:
     """Display an appropriate symbol for the given event's execution result."""
-    symbol, color = {Status.success: (".", "green"), Status.failure: ("F", "red"), Status.error: ("E", "red")}[
-        event.status
-    ]
+    symbol, color = {
+        Status.success: (".", "green"),
+        Status.failure: ("F", "red"),
+        Status.error: ("E", "red"),
+        Status.skip: ("S", "yellow"),
+    }[event.status]
     context.current_line_length += len(symbol)
     click.secho(symbol, nl=False, fg=color)
 
@@ -90,6 +93,9 @@ def get_summary_message_parts(event: events.Finished) -> List[str]:
     errored = event.errored_count
     if errored:
         parts.append(f"{errored} errored")
+    skipped = event.skipped_count
+    if skipped:
+        parts.append(f"{skipped} skipped")
     return parts
 
 
@@ -102,6 +108,8 @@ def get_summary_output(event: events.Finished) -> Tuple[str, str]:
         message = f'{", ".join(parts)} in {event.running_time:.2f}s'
         if event.has_failures or event.has_errors:
             color = "red"
+        elif event.skipped_count > 0:
+            color = "yellow"
         else:
             color = "green"
     return message, color

@@ -8,11 +8,10 @@ import attr
 from hypothesis import reject
 from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
-from hypothesis_jsonschema._canonicalise import canonicalish
 
 from ..utils import is_header_location
 from .types import Draw, Schema
-from .utils import get_type
+from .utils import can_negate, get_type
 
 T = TypeVar("T")
 
@@ -349,7 +348,7 @@ def _change_items_array(context: MutationContext, draw: Draw, schema: Schema, it
 
 def negate_constraints(context: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
     """Negate schema constrains while keeping the original type."""
-    if canonicalish(schema) == {}:
+    if not can_negate(schema):
         return MutationResult.FAILURE
     copied = schema.copy()
     schema.clear()

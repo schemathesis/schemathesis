@@ -30,6 +30,7 @@ from ...exceptions import (
     InvalidRegularExpression,
     InvalidSchema,
     NonCheckError,
+    SkipTest,
     get_grouped_exception,
 )
 from ...hooks import HookContext, get_all_by_name
@@ -321,6 +322,9 @@ def run_test(  # pylint: disable=too-many-locals
     except KeyboardInterrupt:
         yield events.Interrupted()
         return
+    except SkipTest:
+        status = Status.skip
+        result.mark_skipped()
     except AssertionError as exc:  # comes from `hypothesis-jsonschema`
         error = reraise(exc)
         status = Status.error
