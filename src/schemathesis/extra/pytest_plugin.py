@@ -15,7 +15,7 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from .. import DataGenerationMethod
 from .._hypothesis import create_test
 from ..constants import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54, RECURSIVE_REFERENCE_ERROR_MESSAGE
-from ..exceptions import InvalidSchema
+from ..exceptions import InvalidSchema, SkipTest
 from ..models import APIOperation
 from ..utils import (
     PARAMETRIZE_MARKER,
@@ -246,3 +246,5 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
         raise InvalidSchema(exc.args[0]) from None
     except HypothesisRefResolutionError:
         pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)
+    except SkipTest as exc:
+        pytest.skip(exc.args[0])

@@ -4,7 +4,7 @@ import string
 from base64 import b64encode
 from contextlib import contextmanager, suppress
 from copy import deepcopy
-from typing import Any, Callable, Dict, Generator, Iterable, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, Iterable, NoReturn, Optional, Tuple, Union
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
 
@@ -15,13 +15,14 @@ from requests.structures import CaseInsensitiveDict
 
 from ... import auth, utils
 from ...constants import DataGenerationMethod
-from ...exceptions import InvalidSchema
+from ...exceptions import InvalidSchema, SkipTest
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import APIOperation, Case
 from ...types import NotSet
 from ...utils import NOT_SET, compose
 from .constants import LOCATION_TO_CONTAINER
 from .negative import negative_schema
+from .negative.utils import can_negate
 from .parameters import OpenAPIBody, parameters_to_json_schema
 from .utils import is_header_location
 
@@ -139,10 +140,22 @@ def get_case_strategy(  # pylint: disable=too-many-locals
         cookies_value = get_parameters_value(cookies, "cookie", draw, operation, hook_context, hooks, to_strategy)
         query_value = get_parameters_value(query, "query", draw, operation, hook_context, hooks, to_strategy)
 
+        has_generated_parameters = any(
+            component is not None for component in (query_value, cookies_value, headers_value, path_parameters_value)
+        )
+
         media_type = None
         if body is NOT_SET:
             if operation.body:
-                parameter = draw(st.sampled_from(operation.body.items))
+                if data_generation_method.is_negative:
+                    # Consider only schemas that are possible to negate
+                    candidates = [item for item in operation.body.items if can_negate(item.as_json_schema(operation))]
+                    # Not possible to negate body
+                    if not candidates:
+                        skip(operation.verbose_name)
+                else:
+                    candidates = operation.body.items
+                parameter = draw(st.sampled_from(candidates))
                 strategy = _get_body_strategy(parameter, to_strategy, operation)
                 strategy = apply_hooks(operation, hook_context, hooks, strategy, "body")
                 media_type = parameter.media_type
@@ -158,6 +171,8 @@ def get_case_strategy(  # pylint: disable=too-many-locals
 
     if operation.schema.validate_schema and operation.method.upper() == "GET" and operation.body:
         raise InvalidSchema("Body parameters are defined for GET request.")
+    if data_generation_method.is_negative and isinstance(body, NotSet) and not has_generated_parameters:
+        skip(operation.verbose_name)
     instance = Case(
         operation=operation,
         media_type=media_type,
@@ -174,6 +189,10 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     )
     auth.set_on_case(instance, auth_context, auth_storage)
     return instance
+
+
+def skip(operation_name: str) -> NoReturn:
+    raise SkipTest(f"It is not possible to generate negative test cases for `{operation_name}`")
 
 
 YAML_PARSING_ISSUE_MESSAGE = (

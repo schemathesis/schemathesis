@@ -8,7 +8,7 @@ from hypothesis.core import HypothesisHandle
 from pytest_subtests import SubTests, nullcontext
 
 from .constants import CodeSampleStyle, DataGenerationMethod
-from .exceptions import InvalidSchema
+from .exceptions import InvalidSchema, SkipTest
 from .hooks import HookDispatcher, HookScope
 from .models import APIOperation
 from .schemas import BaseSchema
@@ -177,7 +177,10 @@ def run_subtest(
     with subtests.test(
         verbose_name=operation.verbose_name, data_generation_method=data_generation_method.as_short_name()
     ):
-        sub_test(**fixtures)
+        try:
+            sub_test(**fixtures)
+        except SkipTest as exc:
+            pytest.skip(exc.args[0])
 
 
 def _schema_error(

@@ -176,7 +176,7 @@ class SchemaLoadingError(ValueError):
 class NonCheckError(Exception):
     """An error happened in side the runner, but is not related to failed checks.
 
-    Used primarily to not let Hypothesis to consider the test as flaky or detect multiple failures as we handle it
+    Used primarily to not let Hypothesis consider the test as flaky or detect multiple failures as we handle it
     on our side.
     """
 
@@ -185,6 +185,12 @@ class NonCheckError(Exception):
 
 class InternalError(Exception):
     """Internal error in Schemathesis."""
+
+    __module__ = "builtins"
+
+
+class SkipTest(BaseException):
+    """Raises when a test should be skipped and return control to the execution engine (own Schemathesis' or pytest)."""
 
     __module__ = "builtins"
 

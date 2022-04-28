@@ -777,6 +777,7 @@ class Status(str, Enum):
     success = "success"  # pragma: no mutate
     failure = "failure"  # pragma: no mutate
     error = "error"  # pragma: no mutate
+    skip = "skip"  # pragma: no mutate
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
@@ -950,6 +951,7 @@ class TestResult:
     interactions: List[Interaction] = attr.ib(factory=list)  # pragma: no mutate
     logs: List[LogRecord] = attr.ib(factory=list)  # pragma: no mutate
     is_errored: bool = attr.ib(default=False)  # pragma: no mutate
+    is_skipped: bool = attr.ib(default=False)  # pragma: no mutate
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
     # To show a proper reproduction code if an error happens and there is no way to get actual headers that were
     # sent over the network. Or there could be no actual requests at all
@@ -957,6 +959,9 @@ class TestResult:
 
     def mark_errored(self) -> None:
         self.is_errored = True
+
+    def mark_skipped(self) -> None:
+        self.is_skipped = True
 
     @property
     def has_errors(self) -> bool:
@@ -1055,7 +1060,11 @@ class TestResultSet:
 
     @property
     def passed_count(self) -> int:
-        return self._count(lambda result: not result.has_errors and not result.has_failures)
+        return self._count(lambda result: not result.has_errors and not result.is_skipped and not result.has_failures)
+
+    @property
+    def skipped_count(self) -> int:
+        return self._count(lambda result: result.is_skipped)
 
     @property
     def failed_count(self) -> int:

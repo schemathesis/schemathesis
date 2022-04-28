@@ -58,6 +58,10 @@ class DataGenerationMethod(str, Enum):
             DataGenerationMethod.negative: "N",
         }[self]
 
+    @property
+    def is_negative(self) -> bool:
+        return self == DataGenerationMethod.negative
+
 
 DEFAULT_DATA_GENERATION_METHODS = (DataGenerationMethod.default(),)
 

@@ -384,7 +384,7 @@ def test_single_data_generation_method_passed_to_loader(testdir):
     # When `data_generation_methods` receives a single `DataGenerationMethod` value
     testdir.make_test(
         """
-schema = schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.negative)
+schema = schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.positive)
 
 @schema.parametrize()
 def test(case):
@@ -395,6 +395,63 @@ def test(case):
     # Then it should not fail
     # And should generate proper tests
     result.assert_outcomes(passed=1)
+
+
+def test_skip_negative_without_parameters(testdir):
+    # See GH-1463
+    # When an endpoint has no parameters to negate
+    testdir.make_test(
+        """
+schema = schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.negative)
+
+@schema.parametrize()
+def test_(case):
+    pass
+""",
+    )
+    # Then it should be skipped
+    result = testdir.runpytest("-v", "-rs")
+    result.assert_outcomes(skipped=1)
+    result.stdout.re_match_lines([r".*It is not possible to generate negative test cases for.*"])
+
+
+def test_skip_impossible_to_negate(testdir):
+    # See GH-1463
+    # When endpoint's body schema can't be negated
+    testdir.make_test(
+        """
+schema = schemathesis.from_dict(
+    raw_schema,
+    method="POST",
+    data_generation_methods=schemathesis.DataGenerationMethod.negative
+)
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_(case):
+    pass
+""",
+        paths={
+            "/pets": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    # Then it should be skipped
+    result = testdir.runpytest("-v", "-rs")
+    result.assert_outcomes(skipped=1)
+    result.stdout.re_match_lines([r".*It is not possible to generate negative test cases for.*"])
 
 
 def test_trimmed_output(testdir, openapi3_base_url):

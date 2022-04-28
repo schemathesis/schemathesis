@@ -1,4 +1,3 @@
-import base64
 import json
 import os
 import pathlib
@@ -2108,3 +2107,15 @@ def test_missing_content_and_schema(cli, base_url, tmp_path, testdir, empty_open
     assert events[1]["correlation_id"] == events[2]["correlation_id"]
     # And they should have the same "verbose_name"
     assert events[1]["verbose_name"] == events[2]["verbose_name"]
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("success")
+def test_skip_not_negated_tests(cli, schema_url):
+    # See GH-1463
+    # When an endpoint has no parameters to negate
+    result = cli.run(schema_url, "-D", "negative")
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # Then it should be skipped
+    lines = result.stdout.splitlines()
+    assert "1 skipped in" in lines[-1]
