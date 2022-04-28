@@ -152,7 +152,13 @@ def get_case_strategy(  # pylint: disable=too-many-locals
                     candidates = [item for item in operation.body.items if can_negate(item.as_json_schema(operation))]
                     # Not possible to negate body
                     if not candidates:
-                        skip(operation.verbose_name)
+                        # If other components are negated, then generate body that matches the schema
+                        # Other components were negated, therefore the whole test case will be negative
+                        if has_generated_parameters:
+                            candidates = operation.body.items
+                            to_strategy = make_positive_strategy
+                        else:
+                            skip(operation.verbose_name)
                 else:
                     candidates = operation.body.items
                 parameter = draw(st.sampled_from(candidates))

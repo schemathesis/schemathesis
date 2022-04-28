@@ -17,6 +17,7 @@ Changelog
 - Avoid simultaneous authentication requests inside auth providers when caching is enabled.
 - Reduce the verbosity of ``pytest`` output. A few internal frames and the "Falsifying example" block are removed from the output.
 - Skip negative tests on API operations that are not possible to negate. `#1463`_
+- Make it possible to generate negative tests if at least one parameter can be negated.
 
 **Fixed**
 

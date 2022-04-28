@@ -384,7 +384,7 @@ def test_single_data_generation_method_passed_to_loader(testdir):
     # When `data_generation_methods` receives a single `DataGenerationMethod` value
     testdir.make_test(
         """
-schema = schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.positive)
+schema = schemathesis.from_dict(raw_schema, data_generation_methods=DataGenerationMethod.positive)
 
 @schema.parametrize()
 def test(case):
@@ -402,7 +402,7 @@ def test_skip_negative_without_parameters(testdir):
     # When an endpoint has no parameters to negate
     testdir.make_test(
         """
-schema = schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.negative)
+schema = schemathesis.from_dict(raw_schema, data_generation_methods=DataGenerationMethod.negative)
 
 @schema.parametrize()
 def test_(case):
@@ -423,7 +423,7 @@ def test_skip_impossible_to_negate(testdir):
 schema = schemathesis.from_dict(
     raw_schema,
     method="POST",
-    data_generation_methods=schemathesis.DataGenerationMethod.negative
+    data_generation_methods=DataGenerationMethod.negative
 )
 
 @schema.parametrize()
@@ -452,6 +452,46 @@ def test_(case):
     result = testdir.runpytest("-v", "-rs")
     result.assert_outcomes(skipped=1)
     result.stdout.re_match_lines([r".*It is not possible to generate negative test cases for.*"])
+
+
+def test_do_not_skip_partially_negated(testdir):
+    # When endpoint's body schema can't be negated
+    # And there is another parameter that can be negated
+    testdir.make_test(
+        """
+schema = schemathesis.from_dict(
+    raw_schema,
+    method="POST",
+    data_generation_methods=DataGenerationMethod.negative
+)
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+""",
+        paths={
+            "/pets": {
+                "post": {
+                    "parameters": [{"in": "query", "name": "key", "required": True, "schema": {"type": "integer"}}],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {},
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    # Then it should NOT be skipped
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
 
 
 def test_trimmed_output(testdir, openapi3_base_url):
