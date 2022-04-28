@@ -39,7 +39,7 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 0$"])
 
 
-def test_invalid_operation(testdir, hypothesis_max_examples):
+def test_invalid_operation(testdir, hypothesis_max_examples, is_older_subtests):
     # When the given schema is invalid
     # And schema validation is disabled
     testdir.make_test(
@@ -69,14 +69,21 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-rf")
     # Then one test should be marked as failed (passed - /users, failed /)
     result.assert_outcomes(passed=1, failed=1)
-    result.stdout.re_match_lines(
-        [
+    if is_older_subtests:
+        expected = [
             r"test_invalid_operation.py::test_[GET /v1/valid][P] PASSED                [ 25%]",
             r"test_invalid_operation.py::test_[GET /v1/invalid][P] FAILED              [ 50%]",
             r"test_invalid_operation.py::test_[GET /v1/users][P] PASSED                [ 75%]",
             r".*1 passed",
         ]
-    )
+    else:
+        expected = [
+            r"test_invalid_operation.py::test_[GET /v1/valid][P] SUBPASS               [ 25%]",
+            r"test_invalid_operation.py::test_[GET /v1/invalid][P] SUBFAIL             [ 50%]",
+            r"test_invalid_operation.py::test_[GET /v1/users][P] SUBPASS               [ 75%]",
+            r".*1 passed",
+        ]
+    result.stdout.re_match_lines(expected)
     # 100 for /valid, 1 for /users
     hypothesis_calls = (hypothesis_max_examples or 100) + 1
     result.stdout.re_match_lines([rf"Hypothesis calls: {hypothesis_calls}$"])
@@ -501,7 +508,7 @@ def test_b(case):
     result.assert_outcomes(passed=2)
 
 
-def test_parametrized_fixture(testdir, openapi3_base_url):
+def test_parametrized_fixture(testdir, openapi3_base_url, is_older_subtests):
     # When the used pytest fixture is parametrized via `params`
     testdir.make_test(
         f"""
@@ -521,15 +528,20 @@ def test_(case):
     result = testdir.runpytest("-v")
     # Then tests should be parametrized as usual
     result.assert_outcomes(passed=2)
-    result.stdout.re_match_lines(
-        [
+    if is_older_subtests:
+        expected = [
             r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\]\[P\] PASSED",
             r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\]\[P\] PASSED",
         ]
-    )
+    else:
+        expected = [
+            r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\]\[P\] SUBPASS",
+            r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\]\[P\] SUBPASS",
+        ]
+    result.stdout.re_match_lines(expected)
 
 
-def test_data_generation_methods(testdir):
+def test_data_generation_methods(testdir, is_older_subtests):
     # When data generation method config is specified on the schema which is wrapped by a lazy one
     testdir.make_test(
         """
@@ -570,15 +582,20 @@ def pytest_terminal_summary(terminalreporter) -> None:
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1)  # It is still a single test on the top level
     # And each data generation method should have its own test
-    result.stdout.re_match_lines(
-        [
+    if is_older_subtests:
+        expected = [
             r"test_data_generation_methods.py::test_\[GET /v1/users\]\[P\] PASSED",
             r"test_data_generation_methods.py::test_\[GET /v1/users\]\[N\] PASSED",
         ]
-    )
+    else:
+        expected = [
+            r"test_data_generation_methods.py::test_\[GET /v1/users\]\[P\] SUBPASS",
+            r"test_data_generation_methods.py::test_\[GET /v1/users\]\[N\] SUBPASS",
+        ]
+    result.stdout.re_match_lines(expected)
 
 
-def test_data_generation_methods_override(testdir):
+def test_data_generation_methods_override(testdir, is_older_subtests):
     # When data generation method config is specified on the schema which is wrapped by a lazy one
     # And then overridden on the` from_pytest_fixture` level
     testdir.make_test(
@@ -601,11 +618,11 @@ def test_(case):
     # Then the overridden one should be used
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines(
-        [
-            r"test_data_generation_methods_override.py::test_\[GET /v1/users\]\[P\] PASSED *\[ 50%\]",
-        ]
-    )
+    if is_older_subtests:
+        expected = r"test_data_generation_methods_override.py::test_\[GET /v1/users\]\[P\] PASSED *\[ 50%\]"
+    else:
+        expected = r"test_data_generation_methods_override.py::test_\[GET /v1/users\]\[P\] SUBPASS *\[ 50%\]"
+    result.stdout.re_match_lines([expected])
 
 
 def test_hooks_are_merged(testdir):
