@@ -1,5 +1,7 @@
 import pytest
+import pytest_subtests
 import yaml
+from packaging import version
 
 import schemathesis
 
@@ -42,7 +44,7 @@ def test_(case):
     result.stdout.re_match_lines(EXPECTED_OUTPUT_LINES)
 
 
-def test_in_pytest_subtests(testdir, open_api_3_schema_with_recoverable_errors):
+def test_in_pytest_subtests(testdir, is_older_subtests, open_api_3_schema_with_recoverable_errors):
     testdir.make_test(
         """
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
@@ -58,7 +60,20 @@ def test_(case):
     # Then valid operation should be tested
     # And errors on the single operation error should be displayed
     result.assert_outcomes(passed=1, failed=2)
-    result.stdout.re_match_lines(EXPECTED_OUTPUT_LINES)
+    if is_older_subtests:
+        expected = EXPECTED_OUTPUT_LINES
+    else:
+        expected = [
+            # Path-level error. no method is displayed
+            r".*test_\[/foo\]\[P\] SUBFAIL",
+            # Valid operation
+            r".*test_\[GET /bar\]\[P\] SUBPASS",
+            # Operation-level error
+            r".*test_\[POST /bar\]\[P\] SUBFAIL",
+            # The error in both failing cases
+            ".*Unresolvable JSON pointer:.*",
+        ]
+    result.stdout.re_match_lines(expected)
 
 
 @pytest.mark.parametrize("workers", (1, 2))

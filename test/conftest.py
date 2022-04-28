@@ -5,8 +5,10 @@ import pytest
 import yaml
 from click.testing import CliRunner
 from hypothesis import settings
+from packaging import version
 
 import schemathesis.cli
+from schemathesis._compat import metadata
 from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.specs.openapi import loaders as oas_loaders
@@ -683,3 +685,10 @@ def mock_case_id(mocker):
     case_id = uuid.uuid4()
     mocker.patch("schemathesis.models.uuid4", lambda: case_id)
     return case_id
+
+
+@pytest.fixture(scope="session")
+def is_older_subtests():
+    # For compatibility needs
+    version_string = metadata.version("pytest_subtests")
+    return version.parse(version_string) < version.parse("0.6.0")
