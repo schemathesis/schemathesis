@@ -15,6 +15,7 @@ Changelog
   leads to more human-readable cassettes. Use ``--cassette-preserve-exact-body-bytes`` to restore the old behavior. `#1413`_
 - Bump ``hypothesis-graphql`` to ``0.8.1``.
 - Avoid simultaneous authentication requests inside auth providers when caching is enabled.
+- Reduce the verbosity of ``pytest`` output. A few internal frames and the "Falsifying example" block are removed from the output.
 
 **Fixed**
 

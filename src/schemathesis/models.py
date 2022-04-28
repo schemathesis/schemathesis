@@ -423,6 +423,7 @@ class Case:  # pylint: disable=too-many-public-methods
             argument.
         :param code_sample_style: Controls the style of code samples for failure reproduction.
         """
+        __tracebackhide__ = True  # pylint: disable=unused-variable
         from .checks import ALL_CHECKS  # pylint: disable=import-outside-toplevel
 
         checks = checks or ALL_CHECKS
@@ -472,6 +473,7 @@ class Case:  # pylint: disable=too-many-public-methods
         code_sample_style: Optional[str] = None,
         **kwargs: Any,
     ) -> requests.Response:
+        __tracebackhide__ = True  # pylint: disable=unused-variable
         response = self.call(base_url, session, headers, **kwargs)
         self.validate_response(response, checks, code_sample_style=code_sample_style)
         return response
