@@ -179,7 +179,6 @@ def test_as_requests_kwargs_override_content_type(empty_open_api_3_schema, heade
 
 
 @pytest.mark.parametrize("override", (False, True))
-@pytest.mark.filterwarnings("always")
 def test_call(override, base_url, swagger_20):
     operation = APIOperation("/success", "GET", {}, swagger_20)
     case = operation.make_case()
@@ -190,9 +189,6 @@ def test_call(override, base_url, swagger_20):
         response = case.call()
     assert response.status_code == 200
     assert response.json() == {"success": True}
-    with pytest.warns(None) as records:
-        del response
-    assert not records
 
 
 @pytest.mark.operations("success")
@@ -421,7 +417,7 @@ def test_method_suggestion(swagger_20):
 def test_deprecated_attribute(swagger_20):
     operation = APIOperation("/users/{name}", "GET", {}, swagger_20, base_url="http://127.0.0.1/api/v3")
     case = Case(operation)
-    with pytest.warns(None) as records:
+    with pytest.warns(Warning) as records:
         assert case.endpoint == case.operation == operation
     assert str(records[0].message) == (
         "Property `endpoint` is deprecated and will be removed in Schemathesis 4.0. Use `operation` instead."

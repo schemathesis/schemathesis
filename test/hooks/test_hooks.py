@@ -364,7 +364,7 @@ def test_b(case):
 
 def test_deprecated_attribute():
     context = HookContext(1)
-    with pytest.warns(None) as records:
+    with pytest.warns(Warning) as records:
         assert context.endpoint == context.operation == 1
     assert str(records[0].message) == (
         "Property `endpoint` is deprecated and will be removed in Schemathesis 4.0. Use `operation` instead."
