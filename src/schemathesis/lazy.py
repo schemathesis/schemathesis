@@ -174,6 +174,7 @@ def run_subtest(
     subtests: SubTests,
 ) -> None:
     """Run the given subtest with pytest fixtures."""
+    __tracebackhide__ = True  # pylint: disable=unused-variable
     with subtests.test(
         verbose_name=operation.verbose_name, data_generation_method=data_generation_method.as_short_name()
     ):

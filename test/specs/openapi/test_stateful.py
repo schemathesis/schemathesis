@@ -242,3 +242,21 @@ TestStateful.settings = settings(
     result.assert_outcomes(failed=1)
     # And the placed error should pop up to indicate that the overridden code is called
     result.stdout.re_match_lines([r".+ValueError: ERROR FOUND!"])
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("multiple_failures")
+def test_trimmed_output(testdir, app_schema, base_url, openapi_version):
+    # When an issue is found
+    testdir.make_test(
+        f"""
+schema.base_url = "{base_url}"
+
+TestStateful = schema.as_state_machine().TestCase
+""",
+        schema=app_schema,
+    )
+    result = testdir.runpytest("--tb=short")
+    result.assert_outcomes(failed=1)
+    # Then internal frames should not appear after the "Falsifying example" block
+    assert " in step" not in result.stdout.str()

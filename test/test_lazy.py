@@ -768,3 +768,21 @@ def test_(case):
         expected = [r".* SUBSKIP .*"]
     expected.append(r".*It is not possible to generate negative test cases.*")
     result.stdout.re_match_lines(expected)
+
+
+def test_trimmed_output(testdir, openapi3_base_url):
+    # When `from_pytest_fixture` is used
+    # And tests are failing
+    testdir.make_test(
+        f"""
+lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+
+@lazy_schema.parametrize()
+def test_(case):
+    1 / 0""",
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1, failed=1)
+    stdout = result.stdout.str()
+    # Internal Schemathesis' frames should not appear in the output
+    assert "def run_subtest" not in stdout
