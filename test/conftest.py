@@ -546,6 +546,7 @@ def testdir(testdir):
         import schemathesis
         from schemathesis.stateful import Stateful
         from schemathesis.utils import NOT_SET
+        from schemathesis import DataGenerationMethod
         from test.utils import *
         from hypothesis import given, settings, HealthCheck, Phase, assume, strategies as st
         raw_schema = {schema}
