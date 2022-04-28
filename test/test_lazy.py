@@ -556,6 +556,14 @@ lazy_schema = schemathesis.from_pytest_fixture("api_schema")
 def test_(case):
     pass
 """,
+        paths={
+            "/users": {
+                "get": {
+                    "parameters": [{"in": "query", "name": "key", "required": True, "type": "integer"}],
+                    "responses": {"200": {"description": "OK"}},
+                },
+            }
+        },
     )
     testdir.makepyfile(
         conftest="""
@@ -733,3 +741,30 @@ def test_schema(case):
     result = testdir.runpytest("-m", "not acceptance")
     # Then deselecting by a mark should work
     result.assert_outcomes()
+
+
+def test_skip_negative_without_parameters(testdir, is_older_subtests):
+    # See GH-1463
+    # When an endpoint has no parameters to negate
+    testdir.make_test(
+        """
+@pytest.fixture()
+def api_schema():
+    return schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.negative)
+
+lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+
+@lazy_schema.parametrize()
+def test_(case):
+    pass
+""",
+    )
+    # Then it should be skipped
+    result = testdir.runpytest("-v", "-rs")
+    result.assert_outcomes(passed=1, skipped=1)
+    if is_older_subtests:
+        expected = [r".* SKIPPED .*"]
+    else:
+        expected = [r".* SUBSKIP .*"]
+    expected.append(r".*It is not possible to generate negative test cases.*")
+    result.stdout.re_match_lines(expected)
