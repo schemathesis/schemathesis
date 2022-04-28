@@ -23,6 +23,7 @@ from ..constants import (
     DEFAULT_DATA_GENERATION_METHODS,
     DEFAULT_RESPONSE_TIMEOUT,
     DEFAULT_STATEFUL_RECURSION_LIMIT,
+    HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     CodeSampleStyle,
     DataGenerationMethod,
 )
@@ -456,7 +457,10 @@ with_hosts_file = click.option(
 )
 @click.option(
     "--hypothesis-database",
-    help="Implementation of a Hypothesis database.",
+    help="A way to store found examples in Hypothesis' database. "
+    "You can either disable it completely with `none`, "
+    f"do not persist bugs between test runs with `{HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER}` "
+    "or use an arbitrary path to store examples as files.",
     type=str,
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,

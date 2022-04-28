@@ -20,7 +20,13 @@ from schemathesis import Case, DataGenerationMethod, fixups, service
 from schemathesis.checks import ALL_CHECKS, not_a_server_error
 from schemathesis.cli import LoaderConfig, execute, get_exit_code, reset_checks
 from schemathesis.cli.callbacks import INVALID_SCHEMA_MESSAGE
-from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT, CodeSampleStyle
+from schemathesis.constants import (
+    DEFAULT_RESPONSE_TIMEOUT,
+    HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
+    SCHEMATHESIS_TEST_CASE_HEADER,
+    USER_AGENT,
+    CodeSampleStyle,
+)
 from schemathesis.hooks import unregister_all
 from schemathesis.models import APIOperation
 from schemathesis.runner import DEFAULT_CHECKS, from_schema
@@ -222,7 +228,12 @@ def test_commands_run_help(cli):
         "",
         "  Configuration of the underlying Hypothesis engine.",
         "",
-        "  --hypothesis-database TEXT      Implementation of a Hypothesis database.",
+        "  --hypothesis-database TEXT      A way to store found examples in Hypothesis'",
+        "                                  database. You can either disable it completely",
+        "                                  with `none`, do not persist bugs between test",
+        f"                                  runs with `{HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER}` "
+        f"or use an arbitrary path",
+        "                                  to store examples as files.",
         "  --hypothesis-deadline INTEGER RANGE",
         "                                  Duration in milliseconds that each individual",
         "                                  example with a test is not allowed to exceed.",
