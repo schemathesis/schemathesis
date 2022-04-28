@@ -42,6 +42,7 @@ def create_test(
 
     @proxies(test)  # type: ignore
     def test_function(*args: Any, **kwargs: Any) -> Any:
+        __tracebackhide__ = True  # pylint: disable=unused-variable
         return test(*args, **kwargs)
 
     wrapped_test = hypothesis.given(*_given_args, **_given_kwargs)(test_function)
