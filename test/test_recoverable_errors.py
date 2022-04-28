@@ -13,18 +13,6 @@ def schema(open_api_3_schema_with_recoverable_errors):
     return schemathesis.from_dict(open_api_3_schema_with_recoverable_errors)
 
 
-EXPECTED_OUTPUT_LINES = [
-    # Path-level error. no method is displayed
-    r".*test_\[/foo\]\[P\] FAILED",
-    # Valid operation
-    r".*test_\[GET /bar\]\[P\] PASSED",
-    # Operation-level error
-    r".*test_\[POST /bar\]\[P\] FAILED",
-    # The error in both failing cases
-    ".*Unresolvable JSON pointer:.*",
-]
-
-
 def test_in_pytest(testdir, open_api_3_schema_with_recoverable_errors):
     testdir.make_test(
         """
@@ -39,7 +27,18 @@ def test_(case):
     # Then valid operation should be tested
     # And errors on the single operation error should be displayed
     result.assert_outcomes(passed=1, failed=2)
-    result.stdout.re_match_lines(EXPECTED_OUTPUT_LINES)
+    result.stdout.re_match_lines(
+        [
+            # Path-level error. no method is displayed
+            r".*test_\[/foo\]\[P\] FAILED",
+            # Valid operation
+            r".*test_\[GET /bar\]\[P\] PASSED",
+            # Operation-level error
+            r".*test_\[POST /bar\]\[P\] FAILED",
+            # The error in both failing cases
+            ".*Unresolvable JSON pointer:.*",
+        ]
+    )
 
 
 def test_in_pytest_subtests(testdir, open_api_3_schema_with_recoverable_errors):
@@ -58,7 +57,18 @@ def test_(case):
     # Then valid operation should be tested
     # And errors on the single operation error should be displayed
     result.assert_outcomes(passed=1, failed=2)
-    result.stdout.re_match_lines(EXPECTED_OUTPUT_LINES)
+    result.stdout.re_match_lines(
+        [
+            # Path-level error. no method is displayed
+            r".*test_\[/foo\]\[P\] SUBFAIL",
+            # Valid operation
+            r".*test_\[GET /bar\]\[P\] SUBPASS",
+            # Operation-level error
+            r".*test_\[POST /bar\]\[P\] SUBFAIL",
+            # The error in both failing cases
+            ".*Unresolvable JSON pointer:.*",
+        ]
+    )
 
 
 @pytest.mark.parametrize("workers", (1, 2))

@@ -71,9 +71,9 @@ def test_(request, case):
     result.assert_outcomes(passed=1, failed=1)
     result.stdout.re_match_lines(
         [
-            r"test_invalid_operation.py::test_[GET /v1/valid][P] PASSED                [ 25%]",
-            r"test_invalid_operation.py::test_[GET /v1/invalid][P] FAILED              [ 50%]",
-            r"test_invalid_operation.py::test_[GET /v1/users][P] PASSED                [ 75%]",
+            r"test_invalid_operation.py::test_[GET /v1/valid][P] SUBPASS               [ 25%]",
+            r"test_invalid_operation.py::test_[GET /v1/invalid][P] SUBFAIL             [ 50%]",
+            r"test_invalid_operation.py::test_[GET /v1/users][P] SUBPASS               [ 75%]",
             r".*1 passed",
         ]
     )
@@ -523,8 +523,8 @@ def test_(case):
     result.assert_outcomes(passed=2)
     result.stdout.re_match_lines(
         [
-            r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\]\[P\] PASSED",
-            r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\]\[P\] PASSED",
+            r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\]\[P\] SUBPASS",
+            r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\]\[P\] SUBPASS",
         ]
     )
 
@@ -572,8 +572,8 @@ def pytest_terminal_summary(terminalreporter) -> None:
     # And each data generation method should have its own test
     result.stdout.re_match_lines(
         [
-            r"test_data_generation_methods.py::test_\[GET /v1/users\]\[P\] PASSED",
-            r"test_data_generation_methods.py::test_\[GET /v1/users\]\[N\] PASSED",
+            r"test_data_generation_methods.py::test_\[GET /v1/users\]\[P\] SUBPASS",
+            r"test_data_generation_methods.py::test_\[GET /v1/users\]\[N\] SUBPASS",
         ]
     )
 
@@ -603,7 +603,7 @@ def test_(case):
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines(
         [
-            r"test_data_generation_methods_override.py::test_\[GET /v1/users\]\[P\] PASSED *\[ 50%\]",
+            r"test_data_generation_methods_override.py::test_\[GET /v1/users\]\[P\] SUBPASS *\[ 50%\]",
         ]
     )
 
