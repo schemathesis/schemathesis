@@ -21,7 +21,7 @@ class ServiceClient(requests.Session):
         self.base_url = base_url
         self.headers.update({"Authorization": f"Bearer {token}", "User-Agent": USER_AGENT})
         # Automatically check responses for 4XX and 5XX
-        self.hooks["response"] = [lambda response, *args, **kwargs: response.raise_for_status()]
+        self.hooks["response"] = [lambda response, *args, **kwargs: response.raise_for_status()]  # type: ignore
         adapter = HTTPAdapter(max_retries=Retry(5))
         self.mount("https://", adapter)
         self.mount("http://", adapter)
