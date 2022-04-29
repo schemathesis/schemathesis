@@ -139,11 +139,10 @@ Let's imagine that we have an API where the user can create "orders", then the "
 1. Create order "A" -> 201 with payload that does not conform to the definition in the API schema;
 2. Create order "A" again to verify the failure -> 409 with conformant payload.
 
-Currently, the solution is to clean the application state between test runs.
-With CLI, it could be done via the :ref:`before_call <hooks_before_call>` hook. With Python tests you may want to write
-a context manager as `suggested <https://hypothesis.readthedocs.io/en/latest/healthchecks.html#hypothesis.HealthCheck.function_scoped_fixture>`_ by Hypothesis docs.
+With Python tests, you may want to write a context manager that cleans the application state between test runs as
+`suggested <https://hypothesis.readthedocs.io/en/latest/healthchecks.html#hypothesis.HealthCheck.function_scoped_fixture>`_ by Hypothesis docs.
 
-There is an `open issue <https://github.com/schemathesis/schemathesis/issues/1081>`_ for an option to disable this behaviour completely.
+CLI reports flaky failures as regular failures with a special note about their flakiness. Cleaning the application state could be done via the :ref:`before_call <hooks_before_call>` hook.
 
 Does Schemathesis support Open API discriminators? Schemathesis raises an "Unsatisfiable" error.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
