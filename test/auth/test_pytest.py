@@ -175,3 +175,33 @@ def test(case):
     result = testdir.runpytest("-s")
     # Then there should be a way to get auth from them
     result.assert_outcomes(passed=1)
+
+
+def test_from_pytest_fixture(testdir):
+    # When auth is registered on a schema created via a pytest fixture
+    testdir.make_test(
+        f"""
+lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+
+TOKEN = "Foo"
+
+@lazy_schema.auth.register()
+class {AUTH_CLASS_NAME}:
+
+    def get(self, context):
+        return TOKEN
+
+    def set(self, case, data, context):
+        case.headers = case.headers or {{}}
+        case.headers["Authorization"] = f"Bearer {{data}}"
+
+@lazy_schema.parametrize()
+@settings(max_examples=2)
+def test(case):
+    assert case.headers is not None
+    assert case.headers["Authorization"] == f"Bearer {{TOKEN}}"
+        """,
+    )
+    result = testdir.runpytest("-s")
+    # Then there should be a way to get auth from them
+    result.assert_outcomes(passed=1)
