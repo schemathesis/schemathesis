@@ -951,6 +951,7 @@ class TestResult:
     interactions: List[Interaction] = attr.ib(factory=list)  # pragma: no mutate
     logs: List[LogRecord] = attr.ib(factory=list)  # pragma: no mutate
     is_errored: bool = attr.ib(default=False)  # pragma: no mutate
+    is_flaky: bool = attr.ib(default=False)  # pragma: no mutate
     is_skipped: bool = attr.ib(default=False)  # pragma: no mutate
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
     # To show a proper reproduction code if an error happens and there is no way to get actual headers that were
@@ -959,6 +960,9 @@ class TestResult:
 
     def mark_errored(self) -> None:
         self.is_errored = True
+
+    def mark_flaky(self) -> None:
+        self.is_flaky = True
 
     def mark_skipped(self) -> None:
         self.is_skipped = True

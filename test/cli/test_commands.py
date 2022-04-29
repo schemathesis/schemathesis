@@ -20,6 +20,7 @@ from schemathesis import Case, DataGenerationMethod, fixups, service
 from schemathesis.checks import ALL_CHECKS, not_a_server_error
 from schemathesis.cli import LoaderConfig, execute, get_exit_code, reset_checks
 from schemathesis.cli.callbacks import INVALID_SCHEMA_MESSAGE
+from schemathesis.cli.output.default import FLAKY_FAILURE_MESSAGE
 from schemathesis.constants import (
     DEFAULT_RESPONSE_TIMEOUT,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
@@ -720,21 +721,18 @@ def test_flaky(cli, cli_args, workers):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And standard Hypothesis error should not appear in the output
     assert "Failed to reproduce exception. Expected:" not in result.stdout
-    # And this operation should be marked as errored in the progress line
+    # And this operation should be marked as failed in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[10].startswith("GET /api/flaky E")
+        assert lines[10].startswith("GET /api/flaky F")
     else:
-        assert lines[10] == "E"
-    # And it should be displayed only once in "ERRORS" section
-    assert "= ERRORS =" in result.stdout
+        assert lines[10] == "F"
+    # And it should be displayed only once in "FAILURES" section
+    assert "= FAILURES =" in result.stdout
     assert "_ GET /api/flaky [P] _" in result.stdout
-    # And it should not go into "FAILURES" section
-    assert "= FAILURES =" not in result.stdout
     # And more clear error message is displayed instead of Hypothesis one
     lines = result.stdout.split("\n")
-    assert "hypothesis.errors.Flaky: Tests on this API operation produce unreliable results: " in lines
-    assert "Falsified on the first call but did not on a subsequent one" in lines
+    assert FLAKY_FAILURE_MESSAGE.strip() in lines
     # And example is displayed
     assert "Query           : {'id': 0}" in lines
 
@@ -1949,7 +1947,7 @@ def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra, 
 
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 @pytest.mark.operations("flaky")
-def test_explicit_headers_in_output_on_errors(cli, base_url, schema_url, openapi_version, mock_case_id):
+def test_explicit_headers_in_output_on_errors(cli, schema_url):
     # When there is a non-fatal error during testing (e.g. flakiness)
     # And custom headers were passed explicitly
     auth = "Basic J3Rlc3Q6d3Jvbmcn"
@@ -1957,12 +1955,9 @@ def test_explicit_headers_in_output_on_errors(cli, base_url, schema_url, openapi
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
     # Then request representation in the output should have the overridden value
-    assert lines[17] == f"Headers         : {{'Authorization': '{auth}', 'User-Agent': '{USER_AGENT}'}}"
+    assert auth in lines[20]
     # And code sample as well
-    assert lines[22].startswith(
-        f"    curl -X GET -H 'Authorization: {auth}' -H 'User-Agent: {USER_AGENT}' "
-        f"-H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}' '{base_url}/flaky?id=0'"
-    )
+    assert f"Authorization: {auth}" in lines[30]
 
 
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
