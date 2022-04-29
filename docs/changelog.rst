@@ -8,6 +8,7 @@ Changelog
 
 - **GraphQL**: Mutations supports. Schemathesis will generate random mutations by default from now on.
 - **GraphQL**: Support for registering strategies to generate custom scalars.
+- Custom auth support for schemas created via ``from_pytest_fixture``.
 
 **Changed**
 
