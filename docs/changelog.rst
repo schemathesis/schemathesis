@@ -14,7 +14,7 @@ Changelog
 
 - Do not encode payloads in cassettes as base64 by default. This change makes Schemathesis match the default Ruby's VCR behavior and
   leads to more human-readable cassettes. Use ``--cassette-preserve-exact-body-bytes`` to restore the old behavior. `#1413`_
-- Bump ``hypothesis-graphql`` to ``0.8.1``.
+- Bump ``hypothesis-graphql`` to ``0.9.0``.
 - Avoid simultaneous authentication requests inside auth providers when caching is enabled.
 - Reduce the verbosity of ``pytest`` output. A few internal frames and the "Falsifying example" block are removed from the output.
 - Skip negative tests on API operations that are not possible to negate. `#1463`_
@@ -24,6 +24,7 @@ Changelog
 **Fixed**
 
 - **GraphQL**: Semantically invalid queries without aliases.
+- **GraphQL**: Rare crashes on invalid schemas.
 - Internal error inside ``BaseOpenAPISchema.validate_response`` on ``requests>=2.27`` when response body contains malformed JSON. `#1485`_
 
 **Performance**
