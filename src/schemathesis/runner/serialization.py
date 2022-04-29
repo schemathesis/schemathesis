@@ -130,6 +130,8 @@ class SerializedTestResult:
     has_errors: bool = attr.ib()  # pragma: no mutate
     has_logs: bool = attr.ib()  # pragma: no mutate
     is_errored: bool = attr.ib()  # pragma: no mutate
+    is_flaky: bool = attr.ib()  # pragma: no mutate
+    is_skipped: bool = attr.ib()  # pragma: no mutate
     seed: Optional[int] = attr.ib()  # pragma: no mutate
     data_generation_method: str = attr.ib()  # pragma: no mutate
     checks: List[SerializedCheck] = attr.ib()  # pragma: no mutate
@@ -148,6 +150,8 @@ class SerializedTestResult:
             has_errors=result.has_errors,
             has_logs=result.has_logs,
             is_errored=result.is_errored,
+            is_flaky=result.is_flaky,
+            is_skipped=result.is_skipped,
             seed=result.seed,
             data_generation_method=result.data_generation_method.as_short_name(),
             checks=[SerializedCheck.from_check(check) for check in result.checks],
