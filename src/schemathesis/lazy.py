@@ -7,6 +7,7 @@ from _pytest.fixtures import FixtureRequest
 from hypothesis.core import HypothesisHandle
 from pytest_subtests import SubTests, nullcontext
 
+from .auth import AuthStorage
 from .constants import CodeSampleStyle, DataGenerationMethod
 from .exceptions import InvalidSchema, SkipTest
 from .hooks import HookDispatcher, HookScope
@@ -37,6 +38,7 @@ class LazySchema:
     operation_id: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
     app: Any = attr.ib(default=NOT_SET)  # pragma: no mutate
     hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
+    auth: AuthStorage = attr.ib(factory=AuthStorage)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
     skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
     data_generation_methods: Union[DataGenerationMethodInput, NotSet] = attr.ib(default=NOT_SET)
@@ -96,6 +98,7 @@ class LazySchema:
                     tag=tag,
                     operation_id=operation_id,
                     hooks=self.hooks,
+                    auth=self.auth if self.auth.provider is not None else NOT_SET,
                     test_function=test,
                     validate_schema=validate_schema,
                     skip_deprecated_operations=skip_deprecated_operations,
@@ -210,6 +213,7 @@ def get_schema(
     app: Any = None,
     test_function: GenericTest,
     hooks: HookDispatcher,
+    auth: Union[AuthStorage, NotSet],
     validate_schema: Union[bool, NotSet] = NOT_SET,
     skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
     data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
@@ -228,6 +232,7 @@ def get_schema(
         app=app,
         test_function=test_function,
         hooks=schema.hooks.merge(hooks),
+        auth=auth,
         validate_schema=validate_schema,
         skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,

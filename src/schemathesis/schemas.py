@@ -259,6 +259,7 @@ class BaseSchema(Mapping):
         operation_id: Optional[Filter] = NOT_SET,
         app: Any = NOT_SET,
         hooks: Union[HookDispatcher, NotSet] = NOT_SET,
+        auth: Union[AuthStorage, NotSet] = NOT_SET,
         validate_schema: Union[bool, NotSet] = NOT_SET,
         skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
         data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
@@ -282,6 +283,8 @@ class BaseSchema(Mapping):
             skip_deprecated_operations = self.skip_deprecated_operations
         if hooks is NOT_SET:
             hooks = self.hooks
+        if auth is NOT_SET:
+            auth = self.auth
         if data_generation_methods is NOT_SET:
             data_generation_methods = self.data_generation_methods
         if code_sample_style is NOT_SET:
@@ -297,7 +300,7 @@ class BaseSchema(Mapping):
             operation_id=operation_id,
             app=app,
             hooks=hooks,  # type: ignore
-            auth=self.auth,  # type: ignore
+            auth=auth,  # type: ignore
             test_function=test_function,
             validate_schema=validate_schema,  # type: ignore
             skip_deprecated_operations=skip_deprecated_operations,  # type: ignore

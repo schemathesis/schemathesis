@@ -770,7 +770,7 @@ def test_(case):
     result.stdout.re_match_lines(expected)
 
 
-def test_trimmed_output(testdir, openapi3_base_url):
+def test_trimmed_output(testdir):
     # When `from_pytest_fixture` is used
     # And tests are failing
     testdir.make_test(
