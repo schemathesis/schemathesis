@@ -18,6 +18,8 @@ from ...runner.serialization import SerializedCase, SerializedError, SerializedT
 from ..context import ExecutionContext
 from ..handlers import EventHandler
 
+FLAKY_FAILURE_MESSAGE = "[FLAKY] Schemathesis was not able to reliably reproduce this failure\n"
+
 DISABLE_SCHEMA_VALIDATION_MESSAGE = (
     "\nYou can disable input schema validation with --validate-schema=false "
     "command-line option\nIn this case, Schemathesis cannot guarantee proper"
@@ -201,6 +203,8 @@ def display_failures(context: ExecutionContext, event: events.Finished) -> None:
 def display_failures_for_single_test(context: ExecutionContext, result: SerializedTestResult) -> None:
     """Display a failure for a single method / path."""
     display_subsection(result)
+    if result.is_flaky:
+        click.secho(FLAKY_FAILURE_MESSAGE, fg="red")
     checks = deduplicate_failures(result.checks)
     for idx, check in enumerate(checks, 1):
         message: Optional[str]

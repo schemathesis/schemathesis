@@ -306,15 +306,8 @@ def run_test(  # pylint: disable=too-many-locals
         # They raise different "grouped" exceptions, and `MultipleFailures` is risen as the result
         status = Status.failure
     except hypothesis.errors.Flaky:
-        status = Status.error
-        result.mark_errored()
-        result.add_error(
-            hypothesis.errors.Flaky(
-                "Tests on this API operation produce unreliable results: \n"
-                "Falsified on the first call but did not on a subsequent one"
-            ),
-            result.checks[-1].example if result.checks else None,
-        )
+        status = Status.failure
+        result.mark_flaky()
     except hypothesis.errors.Unsatisfiable:
         # We need more clear error message here
         status = Status.error
