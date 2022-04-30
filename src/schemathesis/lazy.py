@@ -5,11 +5,14 @@ import attr
 import pytest
 from _pytest.fixtures import FixtureRequest
 from hypothesis.core import HypothesisHandle
+from hypothesis.errors import MultipleFailures
+from hypothesis.internal.escalation import format_exception, get_interesting_origin, get_trimmed_traceback
+from hypothesis.internal.reflection import impersonate
 from pytest_subtests import SubTests, nullcontext
 
 from .auth import AuthStorage
 from .constants import CodeSampleStyle, DataGenerationMethod
-from .exceptions import InvalidSchema, SkipTest
+from .exceptions import CheckFailed, InvalidSchema, SkipTest, get_grouped_exception
 from .hooks import HookDispatcher, HookScope
 from .models import APIOperation
 from .schemas import BaseSchema
@@ -178,6 +181,27 @@ def run_subtest(
 ) -> None:
     """Run the given subtest with pytest fixtures."""
     __tracebackhide__ = True  # pylint: disable=unused-variable
+
+    # Deduplicate found checks in case of Hypothesis finding multiple of them
+    failed_checks = {}
+    exceptions = []
+    inner_test = sub_test.hypothesis.inner_test  # type: ignore
+
+    @impersonate(inner_test)  # type: ignore
+    def collecting_wrapper(*args: Any, **kwargs: Any) -> None:
+        __tracebackhide__ = True  # pylint: disable=unused-variable
+        try:
+            inner_test(*args, **kwargs)
+        except CheckFailed as failed:
+            failed_checks[failed.__class__] = failed
+            raise failed
+        except Exception as exception:
+            # Deduplicate it later, as it is more costly than for `CheckFailed`
+            exceptions.append(exception)
+            raise
+
+    sub_test.hypothesis.inner_test = collecting_wrapper  # type: ignore
+
     with subtests.test(
         verbose_name=operation.verbose_name, data_generation_method=data_generation_method.as_short_name()
     ):
@@ -185,6 +209,23 @@ def run_subtest(
             sub_test(**fixtures)
         except SkipTest as exc:
             pytest.skip(exc.args[0])
+        except MultipleFailures as exc:
+            # Hypothesis doesn't report the underlying failures in these circumstances, hence we display them manually
+            exc_class = get_grouped_exception("Lazy", *failed_checks.values())
+            failures = "".join(f"{SEPARATOR} {failure.args[0]}" for failure in failed_checks.values())
+            unique_exceptions = {get_interesting_origin(exception): exception for exception in exceptions}
+            message = (
+                f"Schemathesis found {len(failed_checks) + len(unique_exceptions)} distinct sets of failures.{failures}"
+            )
+            for exception in unique_exceptions.values():
+                # Non-check exceptions
+                message += f"{SEPARATOR}\n\n"
+                tb = get_trimmed_traceback(exception)
+                message += format_exception(exception, tb)
+            raise exc_class(message).with_traceback(exc.__traceback__) from None
+
+
+SEPARATOR = "\n===================="
 
 
 def _schema_error(

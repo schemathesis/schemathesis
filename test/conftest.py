@@ -548,7 +548,7 @@ def testdir(testdir):
         from schemathesis.utils import NOT_SET
         from schemathesis import DataGenerationMethod
         from test.utils import *
-        from hypothesis import given, settings, HealthCheck, Phase, assume, strategies as st
+        from hypothesis import given, settings, HealthCheck, Phase, assume, strategies as st, seed
         raw_schema = {schema}
 
         note = print  # An alias to distinguish with leftover prints
