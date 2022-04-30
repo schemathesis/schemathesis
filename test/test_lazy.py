@@ -786,3 +786,63 @@ def test_(case):
     stdout = result.stdout.str()
     # Internal Schemathesis' frames should not appear in the output
     assert "def run_subtest" not in stdout
+
+
+@pytest.mark.operations("multiple_failures")
+def test_multiple_failures(testdir, openapi3_schema_url):
+    # When multiple failures are discovered within the same test
+    testdir.make_test(
+        f"""
+@pytest.fixture
+def api_schema():
+    return schemathesis.from_uri('{openapi3_schema_url}')
+
+lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@settings(derandomize=True)
+@seed(1)
+def test_(case):
+    case.call_and_validate()""",
+    )
+    # Then all of them should be displayed
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1, failed=1)
+    stdout = result.stdout.str()
+    assert "Received a response with 5xx status code: 500" in stdout
+    assert "Received a response with 5xx status code: 504" in stdout
+    # And internal frames should not be displayed
+    assert "def run_subtest" not in stdout
+
+
+@pytest.mark.operations("multiple_failures")
+def test_multiple_failures(testdir, openapi3_schema_url):
+    # When multiple failures are discovered within the same test
+    # And there are non-check exceptions
+    testdir.make_test(
+        f"""
+@pytest.fixture
+def api_schema():
+    return schemathesis.from_uri('{openapi3_schema_url}')
+
+lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@settings(derandomize=True)
+@seed(1)
+def test_(case):
+    if case.query["id"] < 0:
+        assert 1 == 2
+    case.call_and_validate()""",
+    )
+    # Then all of them should be displayed
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1, failed=1)
+    stdout = result.stdout.str()
+    assert "Received a response with 5xx status code: 500" in stdout
+    assert "Received a response with 5xx status code: 504" in stdout
+    assert "assert 1 == 2" in stdout
+    # And internal frames should not be displayed
+    assert "def run_subtest" not in stdout
+    assert "def collecting_wrapper" not in stdout
+    assert stdout.count("E   test_multiple_failures.py:") == 1

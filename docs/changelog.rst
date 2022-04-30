@@ -26,6 +26,7 @@ Changelog
 - **GraphQL**: Semantically invalid queries without aliases.
 - **GraphQL**: Rare crashes on invalid schemas.
 - Internal error inside ``BaseOpenAPISchema.validate_response`` on ``requests>=2.27`` when response body contains malformed JSON. `#1485`_
+- ``schemathesis.from_pytest_fixture``: Display each failure if Hypothesis found multiple of them.
 
 **Performance**
 
