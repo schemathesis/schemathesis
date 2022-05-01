@@ -846,3 +846,30 @@ def test_(case):
     assert "def run_subtest" not in stdout
     assert "def collecting_wrapper" not in stdout
     assert stdout.count("E   test_multiple_failures.py:") == 1
+
+
+@pytest.mark.operations("flaky")
+def test_flaky(testdir, openapi3_schema_url):
+    # When failure is flaky
+    testdir.make_test(
+        f"""
+@pytest.fixture
+def api_schema():
+    return schemathesis.from_uri('{openapi3_schema_url}')
+
+lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+
+@lazy_schema.parametrize()
+def test_(case):
+    case.call_and_validate()""",
+    )
+    # Then it should be properly displayed
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1, failed=1)
+    stdout = result.stdout.str()
+    assert "Received a response with 5xx status code: 500" in stdout
+    # And internal frames should not be displayed
+    assert "def run_subtest" not in stdout
+    assert "def collecting_wrapper" not in stdout
+    assert "def __flaky" not in stdout
+    assert stdout.count("test_flaky.py:2") == 1

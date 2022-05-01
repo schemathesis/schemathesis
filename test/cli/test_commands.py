@@ -20,9 +20,9 @@ from schemathesis import Case, DataGenerationMethod, fixups, service
 from schemathesis.checks import ALL_CHECKS, not_a_server_error
 from schemathesis.cli import LoaderConfig, execute, get_exit_code, reset_checks
 from schemathesis.cli.callbacks import INVALID_SCHEMA_MESSAGE
-from schemathesis.cli.output.default import FLAKY_FAILURE_MESSAGE
 from schemathesis.constants import (
     DEFAULT_RESPONSE_TIMEOUT,
+    FLAKY_FAILURE_MESSAGE,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     SCHEMATHESIS_TEST_CASE_HEADER,
     USER_AGENT,
@@ -732,7 +732,7 @@ def test_flaky(cli, cli_args, workers):
     assert "_ GET /api/flaky [P] _" in result.stdout
     # And more clear error message is displayed instead of Hypothesis one
     lines = result.stdout.split("\n")
-    assert FLAKY_FAILURE_MESSAGE.strip() in lines
+    assert FLAKY_FAILURE_MESSAGE in lines
     # And example is displayed
     assert "Query           : {'id': 0}" in lines
 
