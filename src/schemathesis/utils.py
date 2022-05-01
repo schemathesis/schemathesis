@@ -115,6 +115,7 @@ def dict_not_none_values(**kwargs: Any) -> Dict[str, Any]:
 
 IGNORED_PATTERNS = (
     "Falsifying example: ",
+    "Falsifying explicit example: ",
     "You can add @seed",
     "Failed to reproduce exception. Expected:",
     "Flaky example!",

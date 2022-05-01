@@ -20,6 +20,7 @@ Changelog
 - Skip negative tests on API operations that are not possible to negate. `#1463`_
 - Make it possible to generate negative tests if at least one parameter can be negated.
 - Treat flaky errors as failures and display full report about the failure.
+- Do not duplicate failing explicit example in the `HYPOTHESIS OUTPUT` CLI output section. `#881`_
 
 **Fixed**
 
@@ -2978,6 +2979,7 @@ Deprecated
 .. _#886: https://github.com/schemathesis/schemathesis/issues/886
 .. _#884: https://github.com/schemathesis/schemathesis/issues/884
 .. _#882: https://github.com/schemathesis/schemathesis/issues/882
+.. _#881: https://github.com/schemathesis/schemathesis/issues/881
 .. _#880: https://github.com/schemathesis/schemathesis/issues/880
 .. _#877: https://github.com/schemathesis/schemathesis/issues/877
 .. _#876: https://github.com/schemathesis/schemathesis/issues/876
