@@ -19,7 +19,7 @@ Changelog
 - Reduce the verbosity of ``pytest`` output. A few internal frames and the "Falsifying example" block are removed from the output.
 - Skip negative tests on API operations that are not possible to negate. `#1463`_
 - Make it possible to generate negative tests if at least one parameter can be negated.
-- Treat flaky errors as failures and display full report about the failure.
+- Treat flaky errors as failures and display full report about the failure. `#1081`_
 - Do not duplicate failing explicit example in the `HYPOTHESIS OUTPUT` CLI output section. `#881`_
 
 **Fixed**
@@ -2922,6 +2922,7 @@ Deprecated
 .. _#1097: https://github.com/schemathesis/schemathesis/issues/1097
 .. _#1094: https://github.com/schemathesis/schemathesis/issues/1094
 .. _#1093: https://github.com/schemathesis/schemathesis/issues/1093
+.. _#1081: https://github.com/schemathesis/schemathesis/issues/1081
 .. _#1073: https://github.com/schemathesis/schemathesis/issues/1073
 .. _#1069: https://github.com/schemathesis/schemathesis/issues/1069
 .. _#1068: https://github.com/schemathesis/schemathesis/issues/1068
