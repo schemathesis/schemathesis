@@ -19,7 +19,7 @@ Changelog
 - Reduce the verbosity of ``pytest`` output. A few internal frames and the "Falsifying example" block are removed from the output.
 - Skip negative tests on API operations that are not possible to negate. `#1463`_
 - Make it possible to generate negative tests if at least one parameter can be negated.
-- Treat flaky errors as failures.
+- Treat flaky errors as failures and display full report about the failure.
 
 **Fixed**
 

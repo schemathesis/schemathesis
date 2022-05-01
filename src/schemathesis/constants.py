@@ -34,6 +34,7 @@ SERIALIZERS_SUGGESTION_MESSAGE = (
     "and Schemathesis will be able to make API calls with this media type. \n"
     "See https://schemathesis.readthedocs.io/en/stable/how.html#payload-serialization for more information."
 )
+FLAKY_FAILURE_MESSAGE = "[FLAKY] Schemathesis was not able to reliably reproduce this failure"
 
 
 class DataGenerationMethod(str, Enum):

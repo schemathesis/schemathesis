@@ -11,14 +11,12 @@ import requests
 
 from ... import service
 from ..._compat import metadata
-from ...constants import DISCORD_LINK, CodeSampleStyle, __version__
+from ...constants import DISCORD_LINK, FLAKY_FAILURE_MESSAGE, CodeSampleStyle, __version__
 from ...models import Response, Status
 from ...runner import events
 from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult, deduplicate_failures
 from ..context import ExecutionContext
 from ..handlers import EventHandler
-
-FLAKY_FAILURE_MESSAGE = "[FLAKY] Schemathesis was not able to reliably reproduce this failure\n"
 
 DISABLE_SCHEMA_VALIDATION_MESSAGE = (
     "\nYou can disable input schema validation with --validate-schema=false "
@@ -205,6 +203,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
     display_subsection(result)
     if result.is_flaky:
         click.secho(FLAKY_FAILURE_MESSAGE, fg="red")
+        click.echo()
     checks = deduplicate_failures(result.checks)
     for idx, check in enumerate(checks, 1):
         message: Optional[str]

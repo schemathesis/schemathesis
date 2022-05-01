@@ -1,17 +1,17 @@
 from inspect import signature
-from typing import Any, Callable, Dict, Generator, Optional, Union
+from typing import Any, Callable, Dict, Generator, Optional, Type, Union
 
 import attr
 import pytest
 from _pytest.fixtures import FixtureRequest
 from hypothesis.core import HypothesisHandle
-from hypothesis.errors import MultipleFailures
+from hypothesis.errors import Flaky, MultipleFailures
 from hypothesis.internal.escalation import format_exception, get_interesting_origin, get_trimmed_traceback
 from hypothesis.internal.reflection import impersonate
 from pytest_subtests import SubTests, nullcontext
 
 from .auth import AuthStorage
-from .constants import CodeSampleStyle, DataGenerationMethod
+from .constants import FLAKY_FAILURE_MESSAGE, CodeSampleStyle, DataGenerationMethod
 from .exceptions import CheckFailed, InvalidSchema, SkipTest, get_grouped_exception
 from .hooks import HookDispatcher, HookScope
 from .models import APIOperation
@@ -200,6 +200,9 @@ def run_subtest(
             exceptions.append(exception)
             raise
 
+    def get_exception_class() -> Type[CheckFailed]:
+        return get_grouped_exception("Lazy", *failed_checks.values())
+
     sub_test.hypothesis.inner_test = collecting_wrapper  # type: ignore
 
     with subtests.test(
@@ -211,7 +214,7 @@ def run_subtest(
             pytest.skip(exc.args[0])
         except MultipleFailures as exc:
             # Hypothesis doesn't report the underlying failures in these circumstances, hence we display them manually
-            exc_class = get_grouped_exception("Lazy", *failed_checks.values())
+            exc_class = get_exception_class()
             failures = "".join(f"{SEPARATOR} {failure.args[0]}" for failure in failed_checks.values())
             unique_exceptions = {get_interesting_origin(exception): exception for exception in exceptions}
             message = (
@@ -223,6 +226,15 @@ def run_subtest(
                 tb = get_trimmed_traceback(exception)
                 message += format_exception(exception, tb)
             raise exc_class(message).with_traceback(exc.__traceback__) from None
+        except Flaky as exc:
+            exc_class = get_exception_class()
+            failure = next(iter(failed_checks.values()))
+            message = f"{FLAKY_FAILURE_MESSAGE}{failure}"
+            # The outer frame is the one for user's test function, take it as the root one
+            traceback = exc.__traceback__.tb_next
+            # The next one comes from Hypothesis internals - remove it
+            traceback.tb_next = None
+            raise exc_class(message).with_traceback(traceback) from None
 
 
 SEPARATOR = "\n===================="
