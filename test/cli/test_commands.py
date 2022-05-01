@@ -3,7 +3,7 @@ import os
 import pathlib
 import sys
 import time
-from test.apps.openapi.schema import PAYLOAD, OpenAPIVersion
+from test.apps.openapi.schema import OpenAPIVersion
 from test.utils import HERE, SIMPLE_PATH
 from urllib.parse import urljoin
 
