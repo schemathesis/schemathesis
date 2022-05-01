@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.15.0:
+
+`3.15.0`_ - 2022-05-01
+----------------------
+
 **Added**
 
 - **GraphQL**: Mutations supports. Schemathesis will generate random mutations by default from now on.
@@ -2663,7 +2668,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.14.2...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.15.0...HEAD
+.. _3.15.0: https://github.com/schemathesis/schemathesis/compare/v3.14.2...v3.15.0
 .. _3.14.2: https://github.com/schemathesis/schemathesis/compare/v3.14.1...v3.14.2
 .. _3.14.1: https://github.com/schemathesis/schemathesis/compare/v3.14.0...v3.14.1
 .. _3.14.0: https://github.com/schemathesis/schemathesis/compare/v3.13.9...v3.14.0
