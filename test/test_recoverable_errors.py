@@ -1,7 +1,5 @@
 import pytest
-import pytest_subtests
 import yaml
-from packaging import version
 
 import schemathesis
 
