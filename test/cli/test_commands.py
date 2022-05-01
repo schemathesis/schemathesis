@@ -3,7 +3,7 @@ import os
 import pathlib
 import sys
 import time
-from test.apps.openapi.schema import OpenAPIVersion
+from test.apps.openapi.schema import PAYLOAD, OpenAPIVersion
 from test.utils import HERE, SIMPLE_PATH
 from urllib.parse import urljoin
 
@@ -2125,3 +2125,28 @@ def test_skip_not_negated_tests(cli, schema_url):
     # Then it should be skipped
     lines = result.stdout.splitlines()
     assert "1 skipped in" in lines[-1]
+
+
+@pytest.mark.operations("failure")
+def test_explicit_example_failure_output(testdir, cli, openapi3_base_url):
+    # When an explicit example fails
+    schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
+        "paths": {
+            "/failure": {
+                "get": {
+                    "parameters": [{"in": "query", "name": "key", "example": "foo", "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+    }
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
+    result = cli.run(str(schema_file), f"--base-url={openapi3_base_url}")
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # Then the failure should only appear in the FAILURES block
+    assert result.stdout.count("{'key': 'foo'}") == 1
+    assert "HYPOTHESIS OUTPUT" not in result.stdout
+    assert "/api/failure?key=foo" in result.stdout
+    assert "Received a response with 5xx status code: 500" in result.stdout
