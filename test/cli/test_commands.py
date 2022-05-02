@@ -6,6 +6,7 @@ import time
 from test.apps.openapi.schema import OpenAPIVersion
 from test.utils import HERE, SIMPLE_PATH
 from urllib.parse import urljoin
+from warnings import catch_warnings
 
 import hypothesis
 import pytest
@@ -14,6 +15,7 @@ import trustme
 import yaml
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, Verbosity
+from hypothesis.configuration import set_hypothesis_home_dir, storage_directory
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
 from schemathesis import Case, DataGenerationMethod, fixups, service
@@ -484,6 +486,28 @@ def test_hypothesis_database_report(cli, schema_url):
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
     assert lines[3] == "Hypothesis: database=InMemoryExampleDatabase({}), deadline=timedelta(milliseconds=15000)"
+
+
+@pytest.fixture
+def tmp_hypothesis_dir(tmp_path):
+    original = storage_directory()
+    tmp_path.chmod(0o222)
+    set_hypothesis_home_dir(str(tmp_path))
+    yield tmp_path
+    set_hypothesis_home_dir(original)
+    tmp_path.chmod(0o777)
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("success")
+def test_hypothesis_settings_no_warning_on_unusable_dir(monkeypatch, tmp_hypothesis_dir, cli, schema_url):
+    # When the `.hypothesis` directory is unusable
+    # And an in-memory DB version is used
+    with catch_warnings(record=True) as warnings:
+        result = cli.run(schema_url, "--hypothesis-database=:memory:")
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # Then there should be no warnings
+    assert not warnings
 
 
 def test_all_checks(cli, mocker, swagger_20):

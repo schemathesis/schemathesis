@@ -1,11 +1,12 @@
 """High-level API for creating Hypothesis tests."""
 import asyncio
+import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import hypothesis
 from hypothesis import Phase
 from hypothesis import strategies as st
-from hypothesis.errors import Unsatisfiable
+from hypothesis.errors import HypothesisWarning, Unsatisfiable
 from hypothesis.internal.reflection import proxies
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
@@ -64,7 +65,9 @@ def setup_default_deadline(wrapped_test: Callable) -> None:
     # tests globally
     existing_settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
     if existing_settings is not None and existing_settings.deadline == hypothesis.settings.default.deadline:
-        new_settings = hypothesis.settings(existing_settings, deadline=DEFAULT_DEADLINE)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", HypothesisWarning)
+            new_settings = hypothesis.settings(existing_settings, deadline=DEFAULT_DEADLINE)
         wrapped_test._hypothesis_internal_use_settings = new_settings  # type: ignore
 
 
