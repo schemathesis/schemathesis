@@ -225,7 +225,7 @@ def run_subtest(
                 message += f"{SEPARATOR}\n\n"
                 tb = get_trimmed_traceback(exception)
                 message += format_exception(exception, tb)
-            raise exc_class(message).with_traceback(exc.__traceback__) from None
+            raise exc_class(message, causes=tuple(failed_checks.values())).with_traceback(exc.__traceback__) from None
         except Flaky as exc:
             exc_class = get_exception_class()
             failure = next(iter(failed_checks.values()))
@@ -234,7 +234,7 @@ def run_subtest(
             traceback = exc.__traceback__.tb_next
             # The next one comes from Hypothesis internals - remove it
             traceback.tb_next = None
-            raise exc_class(message).with_traceback(traceback) from None
+            raise exc_class(message, causes=tuple(failed_checks.values())).with_traceback(traceback) from None
 
 
 SEPARATOR = "\n===================="

@@ -278,6 +278,7 @@ def test_validate_response(testdir):
     testdir.make_test(
         rf"""
 from requests import Response, Request
+from schemathesis.failures import UndefinedStatusCode
 
 @schema.parametrize()
 def test_(case):
@@ -289,6 +290,8 @@ def test_(case):
     try:
         case.validate_response(response)
     except AssertionError as exc:
+        assert len(exc.causes) == 1
+        assert isinstance(exc.causes[0].context, UndefinedStatusCode)
         assert exc.args[0].split("\n") == [
           "",
           "",
