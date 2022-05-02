@@ -273,3 +273,13 @@ def test_authenticated_with_slug(cli, service, service_token):
     # Then the schema location should be loaded
     assert result.exit_code == ExitCode.OK, result.stdout
     assert "1 passed" in result.stdout
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("success")
+def test_permission_denied_on_hosts_creation(mocker, cli, schema_url, service, hosts_file, service_token):
+    # When the hosts file can't be created
+    mocker.patch("pathlib.Path.mkdir", side_effect=PermissionError)
+    # Then it should not make the run fail
+    result = cli.run(schema_url, f"--hosts-file={hosts_file}")
+    assert result.exit_code == ExitCode.OK, result.stdout
