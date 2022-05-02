@@ -500,7 +500,7 @@ def tmp_hypothesis_dir(tmp_path):
 
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 @pytest.mark.operations("success")
-def test_hypothesis_settings_no_warning_on_unusable_dir(monkeypatch, tmp_hypothesis_dir, cli, schema_url):
+def test_hypothesis_settings_no_warning_on_unusable_dir(tmp_hypothesis_dir, cli, schema_url):
     # When the `.hypothesis` directory is unusable
     # And an in-memory DB version is used
     with catch_warnings(record=True) as warnings:
@@ -508,6 +508,18 @@ def test_hypothesis_settings_no_warning_on_unusable_dir(monkeypatch, tmp_hypothe
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then there should be no warnings
     assert not warnings
+
+
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("failure")
+def test_hypothesis_do_not_print_blob(testdir, monkeypatch, cli, schema_url):
+    # When runs in CI
+    monkeypatch.setenv("CI", "1")
+    result = testdir.run("schemathesis", "run", schema_url)
+    # result = cli.run(schema_url)
+    assert result.ret == ExitCode.TESTS_FAILED, result.stdout
+    # Then there are no reports about the `reproduce_failure` decorator
+    assert "You can reproduce this example by temporarily adding @reproduce_failure" not in result.stdout.str()
 
 
 def test_all_checks(cli, mocker, swagger_20):
