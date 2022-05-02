@@ -21,12 +21,26 @@ class BaseSecurityProcessor:
                 self.process_api_key_security_definition(definition, operation)
             self.process_http_security_definition(definition, operation)
 
+    @staticmethod
+    def get_security_requirements(schema: Dict[str, Any], operation: APIOperation) -> List[str]:
+        """Get applied security requirements for the given API operation."""
+        # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#operation-object
+        # > This definition overrides any declared top-level security.
+        # > To remove a top-level security declaration, an empty array can be used.
+        global_requirements = schema.get("security", [])
+        local_requirements = operation.definition.raw.get("security", None)
+        if local_requirements is not None:
+            requirements = local_requirements
+        else:
+            requirements = global_requirements
+        return [key for requirement in requirements for key in requirement]
+
     def _get_active_definitions(
         self, schema: Dict[str, Any], operation: APIOperation, resolver: RefResolver
     ) -> Generator[Dict[str, Any], None, None]:
         """Get only security definitions active for the given API operation."""
         definitions = self.get_security_definitions(schema, resolver)
-        requirements = get_security_requirements(schema, operation)
+        requirements = self.get_security_requirements(schema, operation)
         for name, definition in definitions.items():
             if name in requirements:
                 yield definition
@@ -113,17 +127,3 @@ class OpenAPISecurityProcessor(BaseSecurityProcessor):
 
     def _make_api_key_parameter(self, definition: Dict[str, Any]) -> Dict[str, Any]:
         return make_api_key_schema(definition, schema={"type": "string"})
-
-
-def get_security_requirements(schema: Dict[str, Any], operation: APIOperation) -> List[str]:
-    """Get applied security requirements for the given API operation."""
-    # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#operation-object
-    # > This definition overrides any declared top-level security.
-    # > To remove a top-level security declaration, an empty array can be used.
-    global_requirements = schema.get("security", [])
-    local_requirements = operation.definition.raw.get("security", None)
-    if local_requirements is not None:
-        requirements = local_requirements
-    else:
-        requirements = global_requirements
-    return [key for requirement in requirements for key in requirement]

@@ -668,6 +668,9 @@ class APIOperation(Generic[P, C]):
             strategy = _apply_hooks(hooks, strategy)
         return strategy
 
+    def get_security_requirements(self) -> List[str]:
+        return self.schema.get_security_requirements(self)
+
     def get_strategies_from_examples(self) -> List[st.SearchStrategy[Case]]:
         """Get examples from the API operation."""
         return self.schema.get_strategies_from_examples(self)
