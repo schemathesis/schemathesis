@@ -9,6 +9,10 @@ Changelog
 - **OpenAPI**: Expose ``APIOperation.get_security_requirements`` that returns a list of security requirements applied to the API operation
 - Attach originally failed checks to "grouped" exceptions.
 
+**Fixed**
+
+- Internal error when Schemathesis doesn't have permission to create its ``hosts.toml`` file.
+
 .. _v3.15.0:
 
 `3.15.0`_ - 2022-05-01
