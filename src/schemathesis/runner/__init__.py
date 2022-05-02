@@ -467,4 +467,4 @@ def prepare_hypothesis_settings(
         else:
             kwargs["database"] = DirectoryBasedExampleDatabase(database)
     kwargs.setdefault("deadline", DEFAULT_DEADLINE)
-    return hypothesis.settings(**kwargs)
+    return hypothesis.settings(print_blob=False, **kwargs)
