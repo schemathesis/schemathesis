@@ -190,6 +190,7 @@ def test_security_definitions_api_key(testdir, schema, location):
 @schema.parametrize()
 @settings(max_examples=1, deadline=None)
 def test_(case):
+    assert case.operation.get_security_requirements() == ["api_key"]
     assert_str(case.{location}["api_key"])
     assert_requests_call(case)
         """,

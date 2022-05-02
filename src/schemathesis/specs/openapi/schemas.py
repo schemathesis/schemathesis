@@ -272,6 +272,10 @@ class BaseOpenAPISchema(BaseSchema):
         """Get examples from the API operation."""
         raise NotImplementedError
 
+    def get_security_requirements(self, operation: APIOperation) -> List[str]:
+        """Get applied security requirements for the given API operation."""
+        return self.security.get_security_requirements(self.raw_schema, operation)
+
     def get_response_schema(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Optional[Dict[str, Any]]]:
         """Extract response schema from `responses`."""
         raise NotImplementedError
