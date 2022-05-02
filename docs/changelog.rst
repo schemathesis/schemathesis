@@ -12,6 +12,7 @@ Changelog
 **Fixed**
 
 - Internal error when Schemathesis doesn't have permission to create its ``hosts.toml`` file.
+- Do not show internal Hypothesis warning multiple times when the Hypothesis database directory is not usable.
 
 .. _v3.15.0:
 
