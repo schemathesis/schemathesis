@@ -19,10 +19,17 @@ class CheckFailed(AssertionError):
 
     __module__ = "builtins"
     context: Optional[FailureContext]
+    causes: Optional[Tuple[Union["CheckFailed", AssertionError], ...]]
 
-    def __init__(self, *args: Any, context: Optional[FailureContext] = None):
+    def __init__(
+        self,
+        *args: Any,
+        context: Optional[FailureContext] = None,
+        causes: Optional[Tuple[Union["CheckFailed", AssertionError], ...]] = None,
+    ):
         super().__init__(*args)
         self.context = context
+        self.causes = causes
 
 
 def make_unique_by_key(

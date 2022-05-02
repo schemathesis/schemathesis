@@ -447,7 +447,7 @@ def run_checks(
             result.add_success("max_response_time", case, response, elapsed_time)
 
     if errors:
-        raise get_grouped_exception(case.operation.verbose_name, *errors)
+        raise get_grouped_exception(case.operation.verbose_name, *errors)(causes=tuple(errors))
 
 
 def run_targets(targets: Iterable[Callable], context: TargetContext) -> None:
