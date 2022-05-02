@@ -452,7 +452,8 @@ class Case:  # pylint: disable=too-many-public-methods
                 f"----------\n\n"
                 f"Response status: {response.status_code}\n"
                 f"Response payload: `{payload}`\n\n"
-                f"{code_message}"
+                f"{code_message}",
+                causes=tuple(failed_checks),
             )
 
     def _get_code_message(self, code_sample_style: CodeSampleStyle, request: requests.PreparedRequest) -> str:

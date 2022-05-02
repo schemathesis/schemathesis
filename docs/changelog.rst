@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - **OpenAPI**: Expose ``APIOperation.get_security_requirements`` that returns a list of security requirements applied to the API operation
+- Attach originally failed checks to "grouped" exceptions.
 
 .. _v3.15.0:
 
