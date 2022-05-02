@@ -167,6 +167,10 @@ class BaseSchema(Mapping):
         """Get examples from the API operation."""
         raise NotImplementedError
 
+    def get_security_requirements(self, operation: APIOperation) -> List[str]:
+        """Get applied security requirements for the given API operation."""
+        raise NotImplementedError
+
     def get_stateful_tests(
         self, response: GenericResponse, operation: APIOperation, stateful: Optional[Stateful]
     ) -> Sequence[StatefulTest]:

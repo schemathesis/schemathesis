@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- **OpenAPI**: Expose ``APIOperation.get_security_requirements`` that returns a list of security requirements applied to the API operation
+
 .. _v3.15.0:
 
 `3.15.0`_ - 2022-05-01
