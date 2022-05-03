@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.15.1:
+
+`3.15.1`_ - 2022-05-03
+----------------------
+
 **Added**
 
 - **OpenAPI**: Expose ``APIOperation.get_security_requirements`` that returns a list of security requirements applied to the API operation
@@ -2680,7 +2685,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.15.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.15.1...HEAD
+.. _3.15.1: https://github.com/schemathesis/schemathesis/compare/v3.15.0...v3.15.1
 .. _3.15.0: https://github.com/schemathesis/schemathesis/compare/v3.14.2...v3.15.0
 .. _3.14.2: https://github.com/schemathesis/schemathesis/compare/v3.14.1...v3.14.2
 .. _3.14.1: https://github.com/schemathesis/schemathesis/compare/v3.14.0...v3.14.1
