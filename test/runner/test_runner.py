@@ -847,11 +847,16 @@ def test_encoding_octet_stream(empty_open_api_3_schema, openapi3_base_url):
 
 def test_graphql(graphql_url):
     schema = gql_loaders.from_url(graphql_url)
-    initialized, *_, finished = list(
+    initialized, *other, finished = list(
         from_schema(schema, hypothesis_settings=hypothesis.settings(max_examples=5, deadline=None)).execute()
     )
     assert initialized.operations_count == 4
     assert finished.passed_count == 4
+    for event, expected in zip(other, ["Query.getBooks", "Query.getBooks", "Query.getAuthors", "Query.getAuthors"]):
+        assert event.verbose_name == expected
+        if isinstance(event, events.AfterExecution):
+            for check in event.result.checks:
+                assert check.example.verbose_name == expected
 
 
 @pytest.mark.operations("success")

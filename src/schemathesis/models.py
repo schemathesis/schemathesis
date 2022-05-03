@@ -699,6 +699,7 @@ class APIOperation(Generic[P, C]):
             method=self.method,  # string, immutable
             definition=deepcopy(self.definition),
             schema=self.schema.clone(),  # shallow copy
+            verbose_name=self.verbose_name,  # string, immutable
             app=self.app,  # not deepcopyable
             base_url=self.base_url,  # string, immutable
             path_parameters=deepcopy(self.path_parameters),
