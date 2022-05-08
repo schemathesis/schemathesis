@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlencode
 
 import attr
 import jsonschema
@@ -104,9 +105,37 @@ def negative_schema(
     cache_key = CacheKey(operation_name, location, schema)
     validator = get_validator(cache_key)
     keywords, non_keywords = split_schema(cache_key)
+
+    if location == "query":
+
+        def filter_values(value: Dict[str, Any]) -> bool:
+            return is_non_empty_query(value) and not validator.is_valid(value)
+
+    else:
+
+        def filter_values(value: Dict[str, Any]) -> bool:
+            return not validator.is_valid(value)
+
     return mutated(keywords, non_keywords, location, media_type).flatmap(
-        lambda s: from_schema(s, custom_formats=custom_formats).filter(lambda v: not validator.is_valid(v))
+        lambda s: from_schema(s, custom_formats=custom_formats).filter(filter_values)
     )
+
+
+def is_non_empty_query(query: Dict[str, Any]) -> bool:
+    # Whether this query parameters will be encoded to a non-empty query string
+    result = []
+    for key, values in query.items():
+        if isinstance(values, str) or not hasattr(values, "__iter__"):
+            values = [values]
+        for value in values:
+            if value is not None:
+                result.append(
+                    (
+                        key.encode("utf-8") if isinstance(key, str) else key,
+                        value.encode("utf-8") if isinstance(value, str) else value,
+                    )
+                )
+    return urlencode(result, doseq=True) != ""
 
 
 @st.composite  # type: ignore
