@@ -1,7 +1,9 @@
 from copy import deepcopy
 from test.utils import assert_requests_call
+from urllib.parse import urlparse
 
 import pytest
+import requests
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
@@ -293,6 +295,31 @@ def test_no_unsatisfiable_schemas(data):
     schema = {"type": "object", "required": ["foo"]}
     mutated_schema = data.draw(mutated(schema, {}, location="body", media_type="application/json"))
     assert canonicalish(mutated_schema) != FALSEY
+
+
+@pytest.mark.hypothesis_nested
+def test_optional_query_param_negation(empty_open_api_3_schema):
+    # When all query parameters are optional
+    empty_open_api_3_schema["paths"]["/bug"] = {
+        "get": {
+            "parameters": [
+                {"name": "key1", "in": "query", "required": False, "schema": {"type": "string"}},
+            ],
+            "responses": {"200": {"description": "OK"}},
+        }
+    }
+
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    @given(case=schema["/bug"]["get"].as_strategy(data_generation_method=DataGenerationMethod.negative))
+    @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    def test(case):
+        request = requests.PreparedRequest()
+        request.prepare(**case.as_requests_kwargs(base_url="http://127.0.0.1"))
+        # Then negative schema should not generate empty queries
+        assert urlparse(request.url).query != ""
+
+    test()
 
 
 @pytest.mark.parametrize(

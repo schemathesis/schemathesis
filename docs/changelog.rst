@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Avoid generating negative query samples that ``requests`` will treat as an empty query.
+
 .. _v3.15.1:
 
 `3.15.1`_ - 2022-05-03
