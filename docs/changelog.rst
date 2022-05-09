@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Avoid generating negative query samples that ``requests`` will treat as an empty query.
+- Editable installation via ``pip``.
 
 .. _v3.15.1:
 
