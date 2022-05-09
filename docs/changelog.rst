@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.15.2:
+
+`3.15.2`_ - 2022-05-09
+----------------------
+
 **Fixed**
 
 - Avoid generating negative query samples that ``requests`` will treat as an empty query.
@@ -2690,7 +2695,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.15.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.15.2...HEAD
+.. _3.15.2: https://github.com/schemathesis/schemathesis/compare/v3.15.1...v3.15.2
 .. _3.15.1: https://github.com/schemathesis/schemathesis/compare/v3.15.0...v3.15.1
 .. _3.15.0: https://github.com/schemathesis/schemathesis/compare/v3.14.2...v3.15.0
 .. _3.14.2: https://github.com/schemathesis/schemathesis/compare/v3.14.1...v3.14.2
