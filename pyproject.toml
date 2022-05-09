@@ -90,5 +90,5 @@ known_first_party = "schemathesis"
 known_third_party = ["_pytest", "aiohttp", "attr", "click", "curlify", "fastapi", "flask", "graphene", "graphql", "graphql_server", "hypothesis", "hypothesis_graphql", "hypothesis_jsonschema", "jsonschema", "junit_xml", "packaging", "pydantic", "pytest", "pytest_subtests", "requests", "schemathesis", "starlette", "typing_extensions", "urllib3", "werkzeug", "yaml", "yarl"]
 
 [build-system]
-requires = ["poetry>=0.12", "setuptools"]
-build-backend = "poetry.masonry.api"
+requires = ["poetry-core>=1.0.8"]
+build-backend = "poetry.core.masonry.api"
