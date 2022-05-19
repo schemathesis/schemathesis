@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Report uploading to Schemathesis.io via the ``--report`` CLI option.
+
 .. _v3.15.6:
 
 `3.15.6`_ - 2022-06-23

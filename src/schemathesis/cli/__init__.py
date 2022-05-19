@@ -391,6 +391,7 @@ with_hosts_file = click.option(
 @click.option(
     "--junit-xml", help="Create junit-xml style report file at given path.", type=click.File("w", encoding="utf-8")
 )
+@click.option("--report", is_flag=True)
 @click.option(
     "--debug-output-file",
     help="Save debug output as JSON lines in the given file.",
@@ -590,6 +591,7 @@ def run(
     hypothesis_verbosity: Optional[hypothesis.Verbosity] = None,
     verbosity: int = 0,
     no_color: bool = False,
+    report: bool = False,
     schemathesis_io_token: Optional[str] = None,
     schemathesis_io_url: str = service.DEFAULT_URL,
     hosts_file: PathLike = service.DEFAULT_HOSTS_PATH,
@@ -640,7 +642,8 @@ def run(
                 base_url = base_url or test_run.config.base_url
         except requests.HTTPError as exc:
             handle_service_error(exc)
-
+    if report and client is None:
+        client = service.ServiceClient(base_url=schemathesis_io_url, token=None)
     if "all" in checks:
         selected_checks = checks_module.ALL_CHECKS
     else:
@@ -706,6 +709,7 @@ def run(
         schemathesis_io_url,
         client,
         test_run,
+        report,
     )
 
 
@@ -973,15 +977,20 @@ def execute(
     schemathesis_io_url: str,
     client: Optional[service.ServiceClient],
     test_run: Optional[service.TestRun],
+    report: bool,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
+    # pylint: disable=too-many-branches
     handlers: List[EventHandler] = []
     service_context = None
-    if client is not None and test_run is not None:
+    if client is not None:
         service_queue: Queue = Queue()
         service_context = ServiceContext(url=schemathesis_io_url, queue=service_queue)
-        reporter = service.ServiceReporter(client=client, test_run=test_run, out_queue=service_queue)
-        handlers.append(reporter)
+        if test_run is not None:
+            reporter = service.ServiceReporter(client=client, test_run=test_run, out_queue=service_queue)
+            handlers.append(reporter)
+        if report:
+            handlers.append(service.ReportHandler(client=client, out_queue=service_queue))
     if junit_xml is not None:
         handlers.append(JunitXMLHandler(junit_xml))
     if debug_output_file is not None:

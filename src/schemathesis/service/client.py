@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
 import attr
@@ -8,18 +8,20 @@ from requests.adapters import HTTPAdapter, Retry
 from ..constants import USER_AGENT
 from .constants import REQUEST_TIMEOUT
 from .metadata import Metadata
-from .models import ApiConfig, AuthResponse, TestRun
+from .models import ApiConfig, AuthResponse, TestRun, UploadResponse
 
 
 class ServiceClient(requests.Session):
     """A more convenient session to send requests to Schemathesis.io."""
 
-    def __init__(self, base_url: str, token: str, *, timeout: int = REQUEST_TIMEOUT, verify: bool = True):
+    def __init__(self, base_url: str, token: Optional[str], *, timeout: int = REQUEST_TIMEOUT, verify: bool = True):
         super().__init__()
         self.timeout = timeout
         self.verify = verify
         self.base_url = base_url
-        self.headers.update({"Authorization": f"Bearer {token}", "User-Agent": USER_AGENT})
+        self.headers["User-Agent"] = USER_AGENT
+        if token is not None:
+            self.headers["Authorization"] = f"Bearer {token}"
         # Automatically check responses for 4XX and 5XX
         self.hooks["response"] = [lambda response, *args, **kwargs: response.raise_for_status()]  # type: ignore
         adapter = HTTPAdapter(max_retries=Retry(5))
@@ -60,3 +62,8 @@ class ServiceClient(requests.Session):
         response = self.post("/auth/cli/login/", json={"metadata": attr.asdict(metadata)})
         data = response.json()
         return AuthResponse(username=data["username"])
+
+    def upload_report(self, report: bytes) -> UploadResponse:
+        """Upload test run report to Schemathesis.io."""
+        self.post("/reports/upload/", report, headers={"Content-Type": "application/x-gtar"})
+        return UploadResponse()

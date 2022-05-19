@@ -19,3 +19,8 @@ class TestRun:
 @attr.s(slots=True)
 class AuthResponse:
     username: str = attr.ib()
+
+
+@attr.s(slots=True)
+class UploadResponse:
+    pass

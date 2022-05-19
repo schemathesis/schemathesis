@@ -295,6 +295,7 @@ def test_commands_run_help(cli):
         "                                  certificate.",
         "  --junit-xml FILENAME            Create junit-xml style report file at given",
         "                                  path.",
+        "  --report",
         "  --debug-output-file FILENAME    Save debug output as JSON lines in the given",
         "                                  file.",
         "  --show-errors-tracebacks        Show full tracebacks for internal errors.",
@@ -2020,6 +2021,7 @@ def assert_exit_code(event_stream, code):
             schemathesis_io_url=service.DEFAULT_URL,
             client=None,
             test_run=None,
+            report=False,
         )
     assert exc.value.code == code
 
