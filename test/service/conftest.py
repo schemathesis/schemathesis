@@ -1,10 +1,12 @@
-import json
-import uuid
+import re
+from queue import Queue
 
 import attr
 import pytest
-from flask import Response
 from pytest_httpserver.pytest_plugin import PluginHTTPServer
+
+from schemathesis.service import ReportHandler, ServiceClient
+from schemathesis.service.hosts import HostData
 
 # A token for a testing Schemathesis.io instance
 DEFAULT_SERVICE_TOKEN = "25f8ee2357da497d8d0d07be62df62a1"
@@ -39,14 +41,8 @@ def httpserver():
 def setup_server(httpserver: PluginHTTPServer):
     def inner(callback, method, uri):
         callback(httpserver.expect_request(method=method, uri=uri))
-        return httpserver.url_for(uri)
 
     return inner
-
-
-@pytest.fixture
-def run_id():
-    return uuid.uuid4().hex
 
 
 @pytest.fixture
@@ -60,48 +56,57 @@ def service_setup(request, setup_server):
 
 
 @pytest.fixture
-def create_event_url(setup_server, run_id):
-    return setup_server(
-        lambda h: h.respond_with_json({"message": "Event processed successfully"}, status=201),
-        "POST",
-        f"/runs/{run_id}/events/",
-    )
-
-
-@pytest.fixture
-def start_run_url(setup_server, run_id, openapi3_schema_url):
+def get_api_details(setup_server, openapi3_schema_url):
     return setup_server(
         lambda h: h.respond_with_json(
-            {
-                "run_id": run_id,
-                "short_url": "http://127.0.0.1",
-                "config": {"location": openapi3_schema_url, "base_url": None},
-            },
-            status=201,
+            {"location": openapi3_schema_url, "base_url": None},
+            status=200,
         ),
-        "POST",
-        "/runs/",
+        "GET",
+        re.compile("/apis/.*/"),
     )
 
 
 @pytest.fixture
-def finish_run_url(setup_server, run_id):
-    return setup_server(lambda h: h.respond_with_response(Response(status=204)), "POST", f"/runs/{run_id}/finish/")
+def next_url():
+    return "http://127.0.0.1/r/next/"
+
+
+@pytest.fixture
+def correlation_id():
+    return "6a72c3e5-1236-46e9-9d40-a78758a25e48"
+
+
+@pytest.fixture
+def upload_message():
+    return "Hi!"
+
+
+@pytest.fixture
+def report_upload(setup_server, next_url, upload_message, correlation_id):
+    return setup_server(
+        lambda h: h.respond_with_json(
+            {"message": upload_message, "next": next_url, "correlation_id": correlation_id},
+            status=202,
+        ),
+        "POST",
+        "/reports/upload/",
+    )
 
 
 @attr.s()
 class Service:
     server = attr.ib()
-    base_url = attr.ib()
-    start_run_url = attr.ib()
-    create_event_url = attr.ib()
-    finish_run_url = attr.ib()
+    hostname = attr.ib()
+    token = attr.ib()
 
-    def assert_call(self, idx, url, response_status, event_type=None):
+    @property
+    def base_url(self) -> str:
+        return f"http://{self.hostname}"
+
+    def assert_call(self, idx, url, response_status):
         item = self.server.log[idx]
         assert item[0].url.endswith(url)
-        if event_type is not None:
-            assert next(iter(json.loads(item[0].data).keys())) == event_type
         assert item[1].status_code == response_status
 
 
@@ -111,16 +116,30 @@ def hostname(httpserver):
 
 
 @pytest.fixture
-def service(httpserver, hostname, service_setup, start_run_url, create_event_url, finish_run_url):
-    return Service(
-        server=httpserver,
-        base_url=f"http://{hostname}",
-        start_run_url=start_run_url,
-        create_event_url=create_event_url,
-        finish_run_url=finish_run_url,
-    )
+def service(httpserver, hostname, service_setup, get_api_details, report_upload, service_token):
+    return Service(server=httpserver, hostname=hostname, token=service_token)
 
 
 @pytest.fixture
 def hosts_file(tmp_path):
     return tmp_path / "hosts.toml"
+
+
+@pytest.fixture
+def service_client(service, service_token):
+    return ServiceClient(base_url=service.base_url, token=service_token)
+
+
+@pytest.fixture
+def report_handler(service_client, hostname, hosts_file, openapi3_schema_url):
+    handler = ReportHandler(
+        service_client,
+        host_data=HostData(hostname, hosts_file),
+        api_name="test",
+        location=openapi3_schema_url,
+        base_url=None,
+        out_queue=Queue(),
+        in_queue=Queue(),
+    )
+    yield handler
+    handler.shutdown()

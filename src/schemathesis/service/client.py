@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from urllib.parse import urljoin
 
 import attr
@@ -6,9 +6,9 @@ import requests
 from requests.adapters import HTTPAdapter, Retry
 
 from ..constants import USER_AGENT
-from .constants import REQUEST_TIMEOUT
+from .constants import REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT
 from .metadata import Metadata
-from .models import ApiConfig, AuthResponse, TestRun, UploadResponse
+from .models import ApiDetails, AuthResponse, UploadResponse
 
 
 class ServiceClient(requests.Session):
@@ -35,35 +35,23 @@ class ServiceClient(requests.Session):
         url = urljoin(self.base_url, url)
         return super().request(method, url, *args, **kwargs)
 
-    def create_test_run(self, api_slug: str) -> TestRun:
-        """Create a new test run on the Schemathesis.io side."""
-        response = self.post("/runs/", json={"api_slug": api_slug})
+    def get_api_details(self, name: str) -> ApiDetails:
+        """Get information about an API."""
+        response = self.get(f"/apis/{name}/")
         data = response.json()
-        config = data["config"]
-        return TestRun(
-            run_id=data["run_id"],
-            short_url=data["short_url"],
-            config=ApiConfig(location=config["location"], base_url=config["base_url"]),
-        )
+        return ApiDetails(location=data["location"], base_url=data["base_url"])
 
-    def finish_test_run(self, run_id: str) -> None:
-        """Finish a test run on the Schemathesis.io side.
-
-        Only needed in corner cases when Schemathesis CLI fails with an internal error in itself, not in the runner.
-        """
-        self.post(f"/runs/{run_id}/finish/")
-
-    def send_event(self, run_id: str, data: Dict[str, Any]) -> None:
-        """Send a single event to Schemathesis.io."""
-        self.post(f"/runs/{run_id}/events/", json=data)
-
-    def cli_login(self, metadata: Metadata) -> AuthResponse:
+    def login(self, metadata: Metadata) -> AuthResponse:
         """Send a login request."""
         response = self.post("/auth/cli/login/", json={"metadata": attr.asdict(metadata)})
         data = response.json()
         return AuthResponse(username=data["username"])
 
-    def upload_report(self, report: bytes) -> UploadResponse:
+    def upload_report(self, report: bytes, correlation_id: Optional[str] = None) -> UploadResponse:
         """Upload test run report to Schemathesis.io."""
-        self.post("/reports/upload/", report, headers={"Content-Type": "application/x-gtar"})
-        return UploadResponse()
+        headers = {"Content-Type": "application/x-gtar"}
+        if correlation_id is not None:
+            headers[REPORT_CORRELATION_ID_HEADER] = correlation_id
+        response = self.post("/reports/upload/", report, headers=headers)
+        data = response.json()
+        return UploadResponse(message=data["message"], next_url=data["next"], correlation_id=data["correlation_id"])

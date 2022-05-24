@@ -16,13 +16,13 @@ from ..utils import SIMPLE_PATH
 def test_parse_schema_kind(value):
     with pytest.raises(click.UsageError):
         kind = callbacks.parse_schema_kind(value, app=None)
-        callbacks.validate_schema(value, kind, base_url=None, dry_run=False, app=None, api_slug=None)
+        callbacks.validate_schema(value, kind, base_url=None, dry_run=False, app=None, api_name=None)
 
 
 def test_validate_schema_path_without_base_url():
     with pytest.raises(click.UsageError):
         callbacks.validate_schema(
-            SIMPLE_PATH, SchemaInputKind.PATH, base_url=None, dry_run=False, app=None, api_slug=None
+            SIMPLE_PATH, SchemaInputKind.PATH, base_url=None, dry_run=False, app=None, api_name=None
         )
 
 

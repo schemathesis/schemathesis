@@ -6,7 +6,7 @@ import traceback
 from collections import defaultdict
 from enum import Enum
 from queue import Queue
-from typing import Any, Callable, Dict, Generator, Iterable, List, NoReturn, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, Iterable, List, NoReturn, Optional, Tuple, Union, cast
 from urllib.parse import urlparse
 
 import attr
@@ -218,7 +218,7 @@ with_hosts_file = click.option(
 
 @schemathesis.command(short_help="Perform schemathesis test.", cls=CommandWithCustomHelp)
 @click.argument("schema", type=str)
-@click.argument("api_slug", type=str, required=False)
+@click.argument("api_name", type=str, required=False)
 @click.option(
     "--checks",
     "-c",
@@ -391,7 +391,7 @@ with_hosts_file = click.option(
 @click.option(
     "--junit-xml", help="Create junit-xml style report file at given path.", type=click.File("w", encoding="utf-8")
 )
-@click.option("--report", is_flag=True)
+@click.option("--report", help="Upload test report to Schemathesis.io, or store in a file.", is_flag=True)
 @click.option(
     "--debug-output-file",
     help="Save debug output as JSON lines in the given file.",
@@ -546,7 +546,7 @@ with_hosts_file = click.option(
 def run(
     ctx: click.Context,
     schema: str,
-    api_slug: Optional[str],
+    api_name: Optional[str],
     auth: Optional[Tuple[str, str]],
     auth_type: str,
     headers: Dict[str, str],
@@ -600,9 +600,9 @@ def run(
 
     SCHEMA must be a valid URL or file path pointing to an Open API / GraphQL specification.
 
-    API_SLUG is an API identifier to upload data to Schemathesis.io.
+    API_NAME is an API identifier to upload data to Schemathesis.io.
     """
-    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-locals,too-many-branches
     maybe_disable_color(ctx, no_color)
     check_auth(auth, headers)
     selected_targets = tuple(target for target in targets_module.ALL_TARGETS if target.__name__ in targets)
@@ -617,10 +617,11 @@ def run(
     schemathesis_io_hostname = urlparse(schemathesis_io_url).netloc
     token = schemathesis_io_token or service.hosts.get_token(hostname=schemathesis_io_hostname, hosts_file=hosts_file)
     schema_kind = callbacks.parse_schema_kind(schema, app)
-    callbacks.validate_schema(schema, schema_kind, base_url=base_url, dry_run=dry_run, app=app, api_slug=api_slug)
+    callbacks.validate_schema(schema, schema_kind, base_url=base_url, dry_run=dry_run, app=app, api_name=api_name)
     client = None
-    test_run = None
-    if api_slug is not None or schema_kind == callbacks.SchemaInputKind.SLUG:
+    if schema_kind == callbacks.SchemaInputKind.NAME:
+        api_name = schema
+    if api_name is not None or schema_kind == callbacks.SchemaInputKind.NAME:
         if token is None:
             hostname = (
                 "Schemathesis.io" if schemathesis_io_hostname == service.DEFAULT_HOSTNAME else schemathesis_io_hostname
@@ -634,16 +635,20 @@ def run(
                 "See https://schemathesis.readthedocs.io/en/stable/service.html for more details"
             )
         client = service.ServiceClient(base_url=schemathesis_io_url, token=token)
+        # It is assigned above
+        name: str = cast(str, api_name)
         try:
-            test_run = client.create_test_run(schema)
-            if schema_kind == callbacks.SchemaInputKind.SLUG:
+            details = client.get_api_details(name)
+            if schema_kind == callbacks.SchemaInputKind.NAME:
                 # Replace config values with ones loaded from the service
-                schema = test_run.config.location
-                base_url = base_url or test_run.config.base_url
+                schema = details.location
+                base_url = base_url or details.base_url
         except requests.HTTPError as exc:
-            handle_service_error(exc)
-    if report and client is None:
-        client = service.ServiceClient(base_url=schemathesis_io_url, token=None)
+            handle_service_error(exc, name)
+    if report and not client:
+        # Upload without connecting data to a certain API
+        client = service.ServiceClient(base_url=schemathesis_io_url, token=token)
+    host_data = service.hosts.HostData(schemathesis_io_hostname, hosts_file)
     if "all" in checks:
         selected_checks = checks_module.ALL_CHECKS
     else:
@@ -696,20 +701,22 @@ def run(
     )
     execute(
         event_stream,
-        hypothesis_settings,
-        workers_num,
-        show_errors_tracebacks,
-        validate_schema,
-        cassette_path,
-        cassette_preserve_exact_body_bytes,
-        junit_xml,
-        verbosity,
-        code_sample_style,
-        debug_output_file,
-        schemathesis_io_url,
-        client,
-        test_run,
-        report,
+        hypothesis_settings=hypothesis_settings,
+        workers_num=workers_num,
+        show_errors_tracebacks=show_errors_tracebacks,
+        validate_schema=validate_schema,
+        cassette_path=cassette_path,
+        cassette_preserve_exact_body_bytes=cassette_preserve_exact_body_bytes,
+        junit_xml=junit_xml,
+        verbosity=verbosity,
+        code_sample_style=code_sample_style,
+        debug_output_file=debug_output_file,
+        schemathesis_io_url=schemathesis_io_url,
+        host_data=host_data,
+        client=client,
+        api_name=api_name,
+        location=schema,
+        base_url=base_url,
     )
 
 
@@ -964,6 +971,7 @@ class OutputStyle(Enum):
 
 def execute(
     event_stream: Generator[events.ExecutionEvent, None, None],
+    *,
     hypothesis_settings: hypothesis.settings,
     workers_num: int,
     show_errors_tracebacks: bool,
@@ -975,22 +983,30 @@ def execute(
     code_sample_style: CodeSampleStyle,
     debug_output_file: Optional[click.utils.LazyFile],
     schemathesis_io_url: str,
+    host_data: service.hosts.HostData,
     client: Optional[service.ServiceClient],
-    test_run: Optional[service.TestRun],
-    report: bool,
+    api_name: Optional[str],
+    location: str,
+    base_url: Optional[str],
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     # pylint: disable=too-many-branches
     handlers: List[EventHandler] = []
     service_context = None
-    if client is not None:
+    if client:
+        # If API name is specified, validate it
         service_queue: Queue = Queue()
         service_context = ServiceContext(url=schemathesis_io_url, queue=service_queue)
-        if test_run is not None:
-            reporter = service.ServiceReporter(client=client, test_run=test_run, out_queue=service_queue)
-            handlers.append(reporter)
-        if report:
-            handlers.append(service.ReportHandler(client=client, out_queue=service_queue))
+        handlers.append(
+            service.ReportHandler(
+                client=client,
+                host_data=host_data,
+                api_name=api_name,
+                location=location,
+                base_url=base_url,
+                out_queue=service_queue,
+            )
+        )
     if junit_xml is not None:
         handlers.append(JunitXMLHandler(junit_xml))
     if debug_output_file is not None:
@@ -1038,9 +1054,9 @@ def execute(
     sys.exit(1)
 
 
-def handle_service_error(exc: requests.HTTPError) -> NoReturn:
+def handle_service_error(exc: requests.HTTPError, api_name: str) -> NoReturn:
     if exc.response.status_code == 404:
-        error_message("API_SLUG not found!")
+        error_message(f"API with name `{api_name}` not found!")
     else:
         output.default.display_service_error(service.Error(exc))
     sys.exit(1)
