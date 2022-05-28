@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.15.3:
+
+`3.15.3`_ - 2022-05-28
+----------------------
+
 **Fixed**
 
 - Deduplication of failures caused by malformed JSON payload. `#1518`_
@@ -2700,7 +2705,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.15.2...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.15.3...HEAD
+.. _3.15.3: https://github.com/schemathesis/schemathesis/compare/v3.15.2...v3.15.3
 .. _3.15.2: https://github.com/schemathesis/schemathesis/compare/v3.15.1...v3.15.2
 .. _3.15.1: https://github.com/schemathesis/schemathesis/compare/v3.15.0...v3.15.1
 .. _3.15.0: https://github.com/schemathesis/schemathesis/compare/v3.14.2...v3.15.0
