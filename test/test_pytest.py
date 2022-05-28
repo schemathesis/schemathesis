@@ -517,3 +517,17 @@ def test_b(v):
     assert "Falsifying example: test_a(" not in stdout
     # And regular Hypothesis tests have it
     assert "Falsifying example: test_b(" in stdout
+
+
+def test_invalid_schema_reraising(testdir):
+    # When there is a non-Schemathesis test failing because of Hypothesis' `InvalidArgument` error
+    testdir.make_test(
+        """
+@given(st.integers(min_value=5, max_value=4))
+def test(value):
+    pass""",
+    )
+    # Then it should not be re-raised as `InvalidSchema`
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    assert "InvalidSchema: Cannot have" not in result.stdout.str()
