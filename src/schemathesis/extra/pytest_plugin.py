@@ -238,13 +238,14 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     if isinstance(pyfuncitem, SchemathesisFunction):
         with skip_unnecessary_hypothesis_output():
             outcome = yield
+        try:
+            outcome.get_result()
+        except InvalidArgument as exc:
+            raise InvalidSchema(exc.args[0]) from None
+        except HypothesisRefResolutionError:
+            pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)
+        except SkipTest as exc:
+            pytest.skip(exc.args[0])
     else:
         outcome = yield
-    try:
         outcome.get_result()
-    except InvalidArgument as exc:
-        raise InvalidSchema(exc.args[0]) from None
-    except HypothesisRefResolutionError:
-        pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)
-    except SkipTest as exc:
-        pytest.skip(exc.args[0])
