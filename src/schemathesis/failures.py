@@ -49,6 +49,12 @@ class JSONDecodeErrorContext(FailureContext):
     message: str = attr.ib(default="Response is not a valid JSON")
     type: str = attr.ib(default="json_decode")
 
+    def unique_by_key(self, check_message: Optional[str]) -> Tuple[str, ...]:
+        # Treat different JSON decoding failures as the same issue
+        # Payloads often contain dynamic data and distinguishing it by the error location still would not be sufficient
+        # as it may be different on different dynamic payloads
+        return (self.title,)
+
 
 @attr.s(slots=True, repr=False)
 class ServerError(FailureContext):
