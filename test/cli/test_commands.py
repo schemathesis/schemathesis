@@ -2041,6 +2041,16 @@ def test_response_schema_conformance_deduplication(cli, cli_args):
     assert result.stdout.count("Response payload: ") == 1
 
 
+@pytest.mark.operations("malformed_json")
+def test_malformed_json_deduplication(cli, cli_args):
+    # See GH-1518
+    # When responses are not JSON as expected and their content differ each time
+    result = cli.run(*cli_args, "--checks=response_schema_conformance")
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # Then the errors should be deduplicated
+    assert result.stdout.count("Response payload: ") == 1
+
+
 @pytest.mark.parametrize("kind", ("env_var", "arg"))
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 @pytest.mark.operations("success")

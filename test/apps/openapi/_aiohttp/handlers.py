@@ -107,7 +107,7 @@ async def headers(request: web.Request) -> web.Response:
 
 
 async def malformed_json(request: web.Request) -> web.Response:
-    return web.Response(body="{malformed}", content_type="application/json")
+    return web.Response(body="{malformed}" + str(uuid4()), content_type="application/json")
 
 
 async def failure(request: web.Request) -> web.Response:

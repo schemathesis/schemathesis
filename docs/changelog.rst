@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Deduplication of failures caused by malformed JSON payload. `#1518`_
+
 .. _v3.15.2:
 
 `3.15.2`_ - 2022-05-09
@@ -2896,6 +2900,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1518: https://github.com/schemathesis/schemathesis/issues/1518
 .. _#1485: https://github.com/schemathesis/schemathesis/issues/1485
 .. _#1463: https://github.com/schemathesis/schemathesis/issues/1463
 .. _#1452: https://github.com/schemathesis/schemathesis/issues/1452
