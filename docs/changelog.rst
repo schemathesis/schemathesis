@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Deduplication of failures caused by malformed JSON payload. `#1518`_
+- Do not re-raise ``InvalidArgument`` exception as ``InvalidSchema`` in non-Schemathesis tests. `#1514`_
 
 .. _v3.15.2:
 
@@ -2901,6 +2902,7 @@ Deprecated
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#1518: https://github.com/schemathesis/schemathesis/issues/1518
+.. _#1514: https://github.com/schemathesis/schemathesis/issues/1514
 .. _#1485: https://github.com/schemathesis/schemathesis/issues/1485
 .. _#1463: https://github.com/schemathesis/schemathesis/issues/1463
 .. _#1452: https://github.com/schemathesis/schemathesis/issues/1452
