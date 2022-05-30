@@ -1,9 +1,10 @@
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
 
 import attr
 
 from ..runner import events
 from ..runner.serialization import SerializedCase, deduplicate_checks
+from ..utils import merge
 
 S = TypeVar("S", bound=events.ExecutionEvent)
 SerializeFunc = Callable[[S], Optional[Dict[str, Any]]]
@@ -105,17 +106,30 @@ def serialize_finished(event: events.Finished) -> Optional[Dict[str, Any]]:
     }
 
 
+SERIALIZER_MAP = {
+    events.Initialized: serialize_initialized,
+    events.BeforeExecution: serialize_before_execution,
+    events.AfterExecution: serialize_after_execution,
+    events.Interrupted: serialize_interrupted,
+    events.InternalError: serialize_internal_error,
+    events.Finished: serialize_finished,
+}
+
+
 def serialize_event(
     event: events.ExecutionEvent,
-    on_initialized: SerializeFunc = serialize_initialized,
-    on_before_execution: SerializeFunc = serialize_before_execution,
-    on_after_execution: SerializeFunc = serialize_after_execution,
-    on_interrupted: SerializeFunc = serialize_interrupted,
-    on_internal_error: SerializeFunc = serialize_internal_error,
-    on_finished: SerializeFunc = serialize_finished,
+    *,
+    on_initialized: Optional[SerializeFunc] = None,
+    on_before_execution: Optional[SerializeFunc] = None,
+    on_after_execution: Optional[SerializeFunc] = None,
+    on_interrupted: Optional[SerializeFunc] = None,
+    on_internal_error: Optional[SerializeFunc] = None,
+    on_finished: Optional[SerializeFunc] = None,
+    extra: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Optional[Dict[str, Any]]]:
     """Turn an event into JSON-serializable structure."""
     # Due to https://github.com/python-attrs/attrs/issues/864 it is easier to implement filtration manually
+    # Use the explicitly provided serializer for this event and fallback to default one if it is not provided
     serializer = {
         events.Initialized: on_initialized,
         events.BeforeExecution: on_before_execution,
@@ -123,9 +137,19 @@ def serialize_event(
         events.Interrupted: on_interrupted,
         events.InternalError: on_internal_error,
         events.Finished: on_finished,
-    }[event.__class__]
+    }.get(event.__class__)
+    if serializer is None:
+        serializer = cast(SerializeFunc, SERIALIZER_MAP[event.__class__])
+    data = serializer(event)
+    if extra is not None:
+        # If `extra` is present, then merge it with the serialized data. If serialized data is empty, then replace it
+        # with `extra` value
+        if data is None:
+            data = extra
+        else:
+            data = merge(data, extra)
     # Externally tagged structure
-    return {event.__class__.__name__: serializer(event)}
+    return {event.__class__.__name__: data}
 
 
 def stringify_path_parameters(path_parameters: Optional[Dict[str, Any]]) -> Dict[str, str]:

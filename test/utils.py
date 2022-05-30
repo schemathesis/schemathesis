@@ -13,7 +13,7 @@ import yaml
 import schemathesis
 from schemathesis import Case
 from schemathesis.schemas import BaseSchema
-from schemathesis.utils import StringDatesYAMLLoader
+from schemathesis.utils import StringDatesYAMLLoader, merge
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -40,16 +40,6 @@ def load_schema(schema_name: str) -> Dict[str, Any]:
     path = get_schema_path(schema_name)
     with open(path) as fd:
         return yaml.load(fd, StringDatesYAMLLoader)
-
-
-def merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
-    for key in b:
-        if key in a:
-            if isinstance(a[key], dict) and isinstance(b[key], dict):
-                merge(a[key], b[key])
-        else:
-            a[key] = b[key]
-    return a
 
 
 def integer(**kwargs: Any) -> Dict[str, Any]:
