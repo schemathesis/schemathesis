@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- **INTERNAL**: Improve flexibility of event serialization.
+
 .. _v3.15.3:
 
 `3.15.3`_ - 2022-05-28

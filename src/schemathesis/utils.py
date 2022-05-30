@@ -444,3 +444,16 @@ def prepare_data_generation_methods(data_generation_methods: DataGenerationMetho
     if isinstance(data_generation_methods, DataGenerationMethod):
         return [data_generation_methods]
     return list(data_generation_methods)
+
+
+def merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge two dictionaries recursively."""
+    for key in b:
+        if key in a:
+            if isinstance(a[key], dict) and isinstance(b[key], dict):
+                merge(a[key], b[key])
+            else:
+                a[key] = b[key]
+        else:
+            a[key] = b[key]
+    return a
