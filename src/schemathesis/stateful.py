@@ -1,5 +1,6 @@
 import enum
 import json
+import time
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, Generator, List, Optional, Tuple
 
 import attr
@@ -117,6 +118,7 @@ class StepResult:
 
     response: GenericResponse = attr.ib()  # pragma: no mutate
     case: Case = attr.ib()  # pragma: no mutate
+    elapsed: float = attr.ib()  # pragma: no mutate
 
 
 class Direction:
@@ -124,7 +126,7 @@ class Direction:
     status_code: str
     operation: APIOperation
 
-    def set_data(self, case: Case, **kwargs: Any) -> None:
+    def set_data(self, case: Case, elapsed: float, **kwargs: Any) -> None:
         raise NotImplementedError
 
 
@@ -212,10 +214,12 @@ class APIStateMachine(RuleBasedStateMachine):
             case = self.transform(result, direction, case)
         self.before_call(case)
         kwargs = self.get_call_kwargs(case)
+        start = time.monotonic()
         response = self.call(case, **kwargs)
+        elapsed = time.monotonic() - start
         self.after_call(response, case)
         self.validate_response(response, case)
-        return self.store_result(response, case)
+        return self.store_result(response, case, elapsed)
 
     def before_call(self, case: Case) -> None:
         """Hook method for modifying the case data before making a request.
@@ -350,5 +354,5 @@ class APIStateMachine(RuleBasedStateMachine):
         __tracebackhide__ = True  # pylint: disable=unused-variable
         case.validate_response(response, additional_checks=additional_checks)
 
-    def store_result(self, response: GenericResponse, case: Case) -> StepResult:
-        return StepResult(response, case)
+    def store_result(self, response: GenericResponse, case: Case, elapsed: float) -> StepResult:
+        return StepResult(response, case, elapsed)

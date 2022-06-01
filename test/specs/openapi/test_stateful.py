@@ -1,3 +1,4 @@
+import io
 from test.apps.openapi.schema import OpenAPIVersion
 
 import pytest
@@ -5,16 +6,33 @@ import requests
 from hypothesis import HealthCheck, settings
 from hypothesis.stateful import run_state_machine_as_test
 from requests import Response
+from urllib3 import HTTPResponse
 
 import schemathesis
 from schemathesis.exceptions import CheckFailed
 from schemathesis.specs.openapi.stateful.links import make_response_filter, match_status_code
 from schemathesis.stateful import StepResult
+from src.schemathesis.models import CaseSource, Check, Status
+from src.schemathesis.runner.serialization import SerializedCheck
+from src.schemathesis.utils import WSGIResponse
 
 
 def make_response(status_code):
     response = Response()
     response.status_code = status_code
+    response._content = b'{"some": "value"}'
+    response.raw = HTTPResponse(
+        body=io.BytesIO(response._content), status=response.status_code, headers=response.headers
+    )
+    response.request = requests.PreparedRequest()
+    response.request.prepare(method="POST", url="http://example.com", headers={"Content-Type": "application/json"})
+    return response
+
+
+def make_wsgi_response(status_code):
+    response = WSGIResponse(response=b'{"some": "value"}', status=status_code)
+    response.request = requests.PreparedRequest()
+    response.request.prepare(method="POST", url="http://example.com", headers={"Content-Type": "application/json"})
     return response
 
 
@@ -33,7 +51,7 @@ def test_match_status_code(response_status, filter_value, matching):
     filter_function = match_status_code(filter_value)
     assert filter_function.__name__ == f"match_{filter_value}_response"
     # Then that response should match or not depending on the `matching` value
-    assert filter_function(StepResult(response, None)) is matching
+    assert filter_function(StepResult(response, None, 1.0)) is matching
 
 
 @pytest.mark.parametrize(
@@ -48,7 +66,7 @@ def test_match_status_code(response_status, filter_value, matching):
 def test_default_status_code(response_status, status_codes, matching):
     response = make_response(response_status)
     filter_function = make_response_filter("default", status_codes)
-    assert filter_function(StepResult(response, None)) is matching
+    assert filter_function(StepResult(response, None, 1.0)) is matching
 
 
 def test_custom_rule(testdir, openapi3_base_url):
@@ -260,3 +278,26 @@ TestStateful = schema.as_state_machine().TestCase
     result.assert_outcomes(failed=1)
     # Then internal frames should not appear after the "Falsifying example" block
     assert " in step" not in result.stdout.str()
+
+
+@pytest.mark.parametrize("response_factory", (make_response, make_wsgi_response))
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("create_user", "get_user", "update_user")
+def test_history(testdir, app_schema, base_url, openapi_version, response_factory):
+    # When cases are serialized
+    schema = schemathesis.from_dict(app_schema)
+    first = schema["/users/"]["POST"].make_case(body={"first_name": "Foo", "last_name": "bar"})
+    first_response = response_factory(201)
+    second = schema["/users/{user_id}"]["PATCH"].make_case(
+        path_parameters={"user_id": 42}, body={"first_name": "SPAM", "last_name": "bar"}
+    )
+    second_response = response_factory(200)
+    second.source = CaseSource(case=first, response=first_response, elapsed=10)
+    third = schema["/users/{user_id}"]["GET"].make_case(path_parameters={"user_id": 42})
+    third_response = response_factory(200)
+    third.source = CaseSource(case=second, response=second_response, elapsed=10)
+    check = Check(name="not_a_server_error", value=Status.success, response=third_response, elapsed=10, example=third)
+    serialized = SerializedCheck.from_check(check)
+    # Then they should store all history
+    assert serialized.history[0].case.verbose_name == "PATCH /api/users/{user_id}"
+    assert serialized.history[1].case.verbose_name == "POST /api/users/"

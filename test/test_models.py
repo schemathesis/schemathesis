@@ -268,7 +268,9 @@ def test_case_partial_deepcopy_source(swagger_20):
     original_case = Case(operation=operation)
     response = requests.Response()
     response.status_code = 500
-    original_case.source = CaseSource(case=Case(operation=operation, query={"first": 1}), response=response)
+    original_case.source = CaseSource(
+        case=Case(operation=operation, query={"first": 1}), response=response, elapsed=1.0
+    )
     copied_case = original_case.partial_deepcopy()
     assert copied_case.source.case.query == original_case.source.case.query
     assert copied_case.source.response.status_code == original_case.source.response.status_code

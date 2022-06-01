@@ -24,7 +24,7 @@ APIOperationConnections = Dict[str, List[SearchStrategy[Tuple[StepResult, OpenAP
 class OpenAPIStateMachine(APIStateMachine):
     def transform(self, result: StepResult, direction: Direction, case: "Case") -> "Case":
         context = expressions.ExpressionContext(case=result.case, response=result.response)
-        direction.set_data(case, context=context)
+        direction.set_data(case, elapsed=result.elapsed, context=context)
         return case
 
 

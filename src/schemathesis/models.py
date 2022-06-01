@@ -83,9 +83,12 @@ class CaseSource:
 
     case: "Case" = attr.ib()  # pragma: no mutate
     response: GenericResponse = attr.ib()  # pragma: no mutate
+    elapsed: float = attr.ib()  # pragma: no mutate
 
     def partial_deepcopy(self) -> "CaseSource":
-        return self.__class__(case=self.case.partial_deepcopy(), response=copy_response(self.response))
+        return self.__class__(
+            case=self.case.partial_deepcopy(), response=copy_response(self.response), elapsed=self.elapsed
+        )
 
 
 def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
@@ -154,8 +157,8 @@ class Case:  # pylint: disable=too-many-public-methods
     def app(self) -> Any:
         return self.operation.app
 
-    def set_source(self, response: GenericResponse, case: "Case") -> None:
-        self.source = CaseSource(case=case, response=response)
+    def set_source(self, response: GenericResponse, case: "Case", elapsed: float) -> None:
+        self.source = CaseSource(case=case, response=response, elapsed=elapsed)
 
     @property
     def formatted_path(self) -> str:

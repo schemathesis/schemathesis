@@ -7,6 +7,7 @@ Changelog
 **Changed**
 
 - **INTERNAL**: Improve flexibility of event serialization.
+- **INTERNAL**: Store request / response history in ``SerializedCheck``.
 
 .. _v3.15.3:
 
