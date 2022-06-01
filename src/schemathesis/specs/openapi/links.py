@@ -181,12 +181,12 @@ class OpenAPILink(Direction):
         ]
         self.body = self.definition.get("requestBody", NOT_SET)
 
-    def set_data(self, case: Case, **kwargs: Any) -> None:
+    def set_data(self, case: Case, elapsed: float, **kwargs: Any) -> None:
         """Assign all linked definitions to the new case instance."""
         context = kwargs["context"]
         self.set_parameters(case, context)
         self.set_body(case, context)
-        case.set_source(context.response, context.case)
+        case.set_source(context.response, context.case, elapsed)
 
     def set_parameters(self, case: Case, context: expressions.ExpressionContext) -> None:
         for location, name, expression in self.parameters:
