@@ -53,6 +53,8 @@ class SerializedCheck:
     message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     # Failure-specific context
     context: Optional[FailureContext] = attr.ib(default=None)  # pragma: no mutate
+    # Cases & responses that were made before this one
+    history: List["SerializedHistoryEntry"] = attr.ib(factory=list)  # pragma: no mutate
 
     @classmethod
     def from_check(cls, check: Check) -> "SerializedCheck":
@@ -72,6 +74,18 @@ class SerializedCheck:
         else:
             response = None
         headers = {key: value[0] for key, value in request.headers.items()}
+        history = []
+        case = check.example
+        while case.source is not None:
+            if isinstance(case.source.response, requests.Response):
+                history_response = Response.from_requests(case.source.response)
+            else:
+                history_response = Response.from_wsgi(case.source.response, case.source.elapsed)
+            entry = SerializedHistoryEntry(
+                case=SerializedCase.from_case(case.source.case, headers), response=history_response
+            )
+            history.append(entry)
+            case = case.source.case
         return cls(
             name=check.name,
             value=check.value,
@@ -80,7 +94,14 @@ class SerializedCheck:
             request=request,
             response=response,
             context=check.context,
+            history=history,
         )
+
+
+@attr.s(slots=True)  # pragma: no mutate
+class SerializedHistoryEntry:
+    case: SerializedCase = attr.ib()
+    response: Response = attr.ib()
 
 
 @attr.s(slots=True)  # pragma: no mutate
