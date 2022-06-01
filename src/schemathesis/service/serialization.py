@@ -2,6 +2,7 @@ from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
 
 import attr
 
+from ..models import Response
 from ..runner import events
 from ..runner.serialization import SerializedCase, deduplicate_checks
 from ..utils import merge
@@ -38,6 +39,16 @@ def _serialize_case(case: SerializedCase) -> Dict[str, Any]:
     }
 
 
+def _serialize_response(response: Response) -> Dict[str, Any]:
+    return {
+        "status_code": response.status_code,
+        "headers": response.headers,
+        "body": response.body,
+        "encoding": response.encoding,
+        "elapsed": response.elapsed,
+    }
+
+
 def serialize_after_execution(event: events.AfterExecution) -> Optional[Dict[str, Any]]:
     return {
         "correlation_id": event.correlation_id,
@@ -54,18 +65,14 @@ def serialize_after_execution(event: events.AfterExecution) -> Optional[Dict[str
                         "body": check.request.body,
                         "headers": check.request.headers,
                     },
-                    "response": {
-                        "status_code": check.response.status_code,
-                        "headers": check.response.headers,
-                        "body": check.response.body,
-                        "encoding": check.response.encoding,
-                        "elapsed": check.response.elapsed,
-                    }
-                    if check.response is not None
-                    else None,
+                    "response": _serialize_response(check.response) if check.response is not None else None,
                     "example": _serialize_case(check.example),
                     "message": check.message,
                     "context": attr.asdict(check.context) if check.context is not None else None,
+                    "history": [
+                        {"case": _serialize_case(entry.case), "response": _serialize_response(entry.response)}
+                        for entry in check.history
+                    ],
                 }
                 for check in deduplicate_checks(event.result.checks)
             ],
