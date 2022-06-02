@@ -292,7 +292,12 @@ def run_test(  # pylint: disable=too-many-locals
     try:
         with catch_warnings(record=True) as warnings, capture_hypothesis_output() as hypothesis_output:
             test(checks, targets, result, errors=errors, headers=headers, **kwargs)
-        status = Status.success
+        # Test body was not executed at all - Hypothesis did not generate any tests, but there is no error
+        if not result.is_executed:
+            status = Status.skip
+            result.mark_skipped()
+        else:
+            status = Status.success
     except CheckFailed:
         status = Status.failure
     except NonCheckError:
@@ -521,6 +526,7 @@ def network_test(
 ) -> None:
     """A single test body will be executed against the target."""
     with ErrorCollector(errors):
+        result.mark_executed()
         headers = headers or {}
         if "user-agent" not in {header.lower() for header in headers}:
             headers["User-Agent"] = USER_AGENT
@@ -642,6 +648,7 @@ def wsgi_test(
     errors: List[Exception],
 ) -> None:
     with ErrorCollector(errors):
+        result.mark_executed()
         headers = _prepare_wsgi_headers(headers, auth, auth_type)
         if not dry_run:
             response = _wsgi_test(
@@ -731,6 +738,7 @@ def asgi_test(
 ) -> None:
     """A single test body will be executed against the target."""
     with ErrorCollector(errors):
+        result.mark_executed()
         headers = headers or {}
 
         if not dry_run:

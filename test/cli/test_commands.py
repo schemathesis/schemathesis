@@ -2196,3 +2196,14 @@ def test_explicit_example_failure_output(testdir, cli, openapi3_base_url):
     assert "HYPOTHESIS OUTPUT" not in result.stdout
     assert "/api/failure?key=foo" in result.stdout
     assert "Received a response with 5xx status code: 500" in result.stdout
+
+
+@pytest.mark.operations("success")
+def test_skipped_on_no_explicit_examples(testdir, cli, openapi3_schema_url):
+    # See GH-1323
+    # When there are no explicit examples
+    result = cli.run(openapi3_schema_url, "--hypothesis-phases=explicit")
+    # Then tests should be marked as skipped
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert "/api/success S" in result.stdout
+    assert "1 skipped in" in result.stdout

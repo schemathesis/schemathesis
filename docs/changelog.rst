@@ -6,6 +6,7 @@ Changelog
 
 **Changed**
 
+- Mark tests as skipped if there are no explicit examples and ``--hypothesis-phases=explicit`` is used. `#1323`_
 - **INTERNAL**: Improve flexibility of event serialization.
 - **INTERNAL**: Store request / response history in ``SerializedCheck``.
 
@@ -2941,6 +2942,7 @@ Deprecated
 .. _#1328: https://github.com/schemathesis/schemathesis/issues/1328
 .. _#1326: https://github.com/schemathesis/schemathesis/issues/1326
 .. _#1325: https://github.com/schemathesis/schemathesis/issues/1325
+.. _#1323: https://github.com/schemathesis/schemathesis/issues/1323
 .. _#1303: https://github.com/schemathesis/schemathesis/issues/1303
 .. _#1292: https://github.com/schemathesis/schemathesis/issues/1292
 .. _#1290: https://github.com/schemathesis/schemathesis/issues/1290
