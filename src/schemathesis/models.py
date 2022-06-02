@@ -961,6 +961,7 @@ class TestResult:
     is_errored: bool = attr.ib(default=False)  # pragma: no mutate
     is_flaky: bool = attr.ib(default=False)  # pragma: no mutate
     is_skipped: bool = attr.ib(default=False)  # pragma: no mutate
+    is_executed: bool = attr.ib(default=False)  # pragma: no mutate
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
     # To show a proper reproduction code if an error happens and there is no way to get actual headers that were
     # sent over the network. Or there could be no actual requests at all
@@ -974,6 +975,9 @@ class TestResult:
 
     def mark_skipped(self) -> None:
         self.is_skipped = True
+
+    def mark_executed(self) -> None:
+        self.is_executed = True
 
     @property
     def has_errors(self) -> bool:
