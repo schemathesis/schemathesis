@@ -1,10 +1,9 @@
-import json
 import re
 import string
 from base64 import b64encode
-from contextlib import contextmanager, suppress
+from contextlib import suppress
 from copy import deepcopy
-from typing import Any, Callable, Dict, Generator, Iterable, NoReturn, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, NoReturn, Optional, Tuple, Union
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
 
@@ -132,48 +131,47 @@ def get_case_strategy(  # pylint: disable=too-many-locals
 
     hook_context = HookContext(operation)
 
-    with detect_invalid_schema(operation):
-        path_parameters_value = get_parameters_value(
-            path_parameters, "path", draw, operation, hook_context, hooks, to_strategy
-        )
-        headers_value = get_parameters_value(headers, "header", draw, operation, hook_context, hooks, to_strategy)
-        cookies_value = get_parameters_value(cookies, "cookie", draw, operation, hook_context, hooks, to_strategy)
-        query_value = get_parameters_value(query, "query", draw, operation, hook_context, hooks, to_strategy)
+    path_parameters_value = get_parameters_value(
+        path_parameters, "path", draw, operation, hook_context, hooks, to_strategy
+    )
+    headers_value = get_parameters_value(headers, "header", draw, operation, hook_context, hooks, to_strategy)
+    cookies_value = get_parameters_value(cookies, "cookie", draw, operation, hook_context, hooks, to_strategy)
+    query_value = get_parameters_value(query, "query", draw, operation, hook_context, hooks, to_strategy)
 
-        has_generated_parameters = any(
-            component is not None for component in (query_value, cookies_value, headers_value, path_parameters_value)
-        )
+    has_generated_parameters = any(
+        component is not None for component in (query_value, cookies_value, headers_value, path_parameters_value)
+    )
 
-        media_type = None
-        if body is NOT_SET:
-            if operation.body:
-                if data_generation_method.is_negative:
-                    # Consider only schemas that are possible to negate
-                    candidates = [item for item in operation.body.items if can_negate(item.as_json_schema(operation))]
-                    # Not possible to negate body
-                    if not candidates:
-                        # If other components are negated, then generate body that matches the schema
-                        # Other components were negated, therefore the whole test case will be negative
-                        if has_generated_parameters:
-                            candidates = operation.body.items
-                            to_strategy = make_positive_strategy
-                        else:
-                            skip(operation.verbose_name)
-                else:
-                    candidates = operation.body.items
-                parameter = draw(st.sampled_from(candidates))
-                strategy = _get_body_strategy(parameter, to_strategy, operation)
-                strategy = apply_hooks(operation, hook_context, hooks, strategy, "body")
-                media_type = parameter.media_type
-                body = draw(strategy)
-        else:
-            media_types = operation.get_request_payload_content_types() or ["application/json"]
-            # Take the first available media type.
-            # POSSIBLE IMPROVEMENT:
-            #   - Test examples for each available media type on Open API 2.0;
-            #   - On Open API 3.0, media types are explicit, and each example has it.
-            #     We can pass `OpenAPIBody.media_type` here from the examples handling code.
-            media_type = media_types[0]
+    media_type = None
+    if body is NOT_SET:
+        if operation.body:
+            if data_generation_method.is_negative:
+                # Consider only schemas that are possible to negate
+                candidates = [item for item in operation.body.items if can_negate(item.as_json_schema(operation))]
+                # Not possible to negate body
+                if not candidates:
+                    # If other components are negated, then generate body that matches the schema
+                    # Other components were negated, therefore the whole test case will be negative
+                    if has_generated_parameters:
+                        candidates = operation.body.items
+                        to_strategy = make_positive_strategy
+                    else:
+                        skip(operation.verbose_name)
+            else:
+                candidates = operation.body.items
+            parameter = draw(st.sampled_from(candidates))
+            strategy = _get_body_strategy(parameter, to_strategy, operation)
+            strategy = apply_hooks(operation, hook_context, hooks, strategy, "body")
+            media_type = parameter.media_type
+            body = draw(strategy)
+    else:
+        media_types = operation.get_request_payload_content_types() or ["application/json"]
+        # Take the first available media type.
+        # POSSIBLE IMPROVEMENT:
+        #   - Test examples for each available media type on Open API 2.0;
+        #   - On Open API 3.0, media types are explicit, and each example has it.
+        #     We can pass `OpenAPIBody.media_type` here from the examples handling code.
+        media_type = media_types[0]
 
     if operation.schema.validate_schema and operation.method.upper() == "GET" and operation.body:
         raise InvalidSchema("Body parameters are defined for GET request.")
@@ -199,38 +197,6 @@ def get_case_strategy(  # pylint: disable=too-many-locals
 
 def skip(operation_name: str) -> NoReturn:
     raise SkipTest(f"It is not possible to generate negative test cases for `{operation_name}`")
-
-
-YAML_PARSING_ISSUE_MESSAGE = (
-    "The API schema contains non-string keys. "
-    "If you store your schema in YAML, it is likely caused by unquoted keys parsed as "
-    "non-strings. For example, `on` is parsed as boolean `true`, "
-    "but `'on'` (with quotes) is a string `'on'`. See more information at https://noyaml.com/."
-)
-
-
-@contextmanager
-def detect_invalid_schema(operation: APIOperation) -> Generator[None, None, None]:
-    """Detect common issues with schemas."""
-    try:
-        yield
-    except TypeError as exc:
-        if is_yaml_parsing_issue(operation):
-            raise InvalidSchema(YAML_PARSING_ISSUE_MESSAGE) from exc
-        raise
-
-
-def is_yaml_parsing_issue(operation: APIOperation) -> bool:
-    """Detect whether the API operation has problems because of YAML syntax.
-
-    For example, unquoted 'on' is parsed as `True`.
-    """
-    try:
-        # Sorting keys involves their comparison, when there is a non-string value, it leads to a TypeError
-        json.dumps(operation.schema.raw_schema, sort_keys=True)
-    except TypeError:
-        return True
-    return False
 
 
 _BODY_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()

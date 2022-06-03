@@ -7,6 +7,9 @@ Changelog
 **Changed**
 
 - Mark tests as skipped if there are no explicit examples and ``--hypothesis-phases=explicit`` is used. `#1323`_
+- Parse all YAML mapping keys as strings, ignoring the YAML grammar rules. For example, ``on: true`` will be parsed as ``{"on": True}`` instead of ``{True: True}``.
+  Even though YAML does not restrict keys to strings, in the Open API and JSON Schema context, this restriction is implied because the underlying data model
+  comes from JSON.
 - **INTERNAL**: Improve flexibility of event serialization.
 - **INTERNAL**: Store request / response history in ``SerializedCheck``.
 
