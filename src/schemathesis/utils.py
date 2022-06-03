@@ -212,6 +212,22 @@ def make_loader(*tags_to_remove: str) -> Type[yaml.SafeLoader]:
         list("-+0123456789."),
     )
 
+    def construct_mapping(self: SafeLoader, node: yaml.Node, deep: bool = False) -> Dict[str, Any]:
+        if isinstance(node, yaml.MappingNode):
+            self.flatten_mapping(node)  # type: ignore
+        mapping = {}
+        for key_node, value_node in node.value:
+            # If the key has a tag different from `str` - use its string value.
+            # With this change all integer keys or YAML 1.1 boolean-ish values like "on" / "off" will not be cast to
+            # a different type
+            if key_node.tag != "tag:yaml.org,2002:str":
+                key = key_node.value
+            else:
+                key = self.construct_object(key_node, deep)  # type: ignore
+            mapping[key] = self.construct_object(value_node, deep)  # type: ignore
+        return mapping
+
+    cls.construct_mapping = construct_mapping  # type: ignore
     return cls
 
 
