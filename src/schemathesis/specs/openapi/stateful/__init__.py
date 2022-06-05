@@ -4,7 +4,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Dict, Generator, List, Tuple, Type
 
 from hypothesis import strategies as st
-from hypothesis.stateful import Bundle, Rule, rule
+from hypothesis.stateful import Bundle, Rule, initialize, rule
 from requests.structures import CaseInsensitiveDict
 
 from ....stateful import APIStateMachine, Direction, StepResult
@@ -41,7 +41,11 @@ def create_state_machine(schema: "BaseOpenAPISchema") -> Type[APIStateMachine]:
 
     rules = make_all_rules(schema, bundles, connections)
 
-    kwargs: Dict[str, Any] = {"bundles": bundles, "schema": schema}
+    kwargs: Dict[str, Any] = {
+        "bundles": bundles,
+        "schema": schema,
+        "init_failures": initialize(failures=st.shared(st.just([]), key="failures"))(APIStateMachine.init_failures),
+    }
     return type("APIWorkflow", (OpenAPIStateMachine,), {**kwargs, **rules})
 
 

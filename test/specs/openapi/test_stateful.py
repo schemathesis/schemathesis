@@ -280,6 +280,24 @@ TestStateful = schema.as_state_machine().TestCase
     assert " in step" not in result.stdout.str()
 
 
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.operations("flaky")
+def test_flaky(testdir, app_schema, base_url, openapi_version):
+    # When a flaky issue is found
+    testdir.make_test(
+        f"""
+schema.base_url = "{base_url}"
+
+TestStateful = schema.as_state_machine().TestCase
+""",
+        schema=app_schema,
+    )
+    result = testdir.runpytest("--tb=short")
+    result.assert_outcomes(failed=1)
+    # Then it should be reported as regular failure
+    assert "Unreliable assumption:" not in result.stdout.str()
+
+
 @pytest.mark.parametrize("response_factory", (make_response, make_wsgi_response))
 @pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
 @pytest.mark.operations("create_user", "get_user", "update_user")

@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, Generator, List
 
 import attr
 import hypothesis
-from hypothesis.stateful import RuleBasedStateMachine
+from hypothesis.stateful import INITIALIZE_RULE_MARKER, MultipleResults, Rule, RuleBasedStateMachine
 from requests.structures import CaseInsensitiveDict
 from starlette.applications import Starlette
 
 from .constants import DataGenerationMethod
-from .exceptions import InvalidSchema
+from .exceptions import CheckFailed, InvalidSchema
 from .models import APIOperation, Case, CheckFunction
 from .utils import NOT_SET, GenericResponse, Ok, Result
 
@@ -168,6 +168,15 @@ class APIStateMachine(RuleBasedStateMachine):
         super().__init__()  # type: ignore
         self.setup()
 
+    def init_failures(self, failures: List[Tuple[Case, CheckFailed]]) -> None:
+        # pylint: disable=attribute-defined-outside-init
+        self.failures = failures
+
+    def _print_step(self, rule: Rule, data: Dict[str, str], result: Optional[MultipleResults]) -> None:
+        if rule == getattr(self.init_failures, INITIALIZE_RULE_MARKER, None):
+            return
+        super()._print_step(rule, data, result)
+
     def _pretty_print(self, value: Any) -> str:
         if isinstance(value, Case):
             return _print_case(value)
@@ -218,7 +227,14 @@ class APIStateMachine(RuleBasedStateMachine):
         response = self.call(case, **kwargs)
         elapsed = time.monotonic() - start
         self.after_call(response, case)
-        self.validate_response(response, case)
+        try:
+            self.validate_response(response, case)
+        except CheckFailed as exc:
+            self.failures.append((case, exc))
+            raise
+        for failed, exception in self.failures:
+            if case == failed:
+                raise exception
         return self.store_result(response, case, elapsed)
 
     def before_call(self, case: Case) -> None:
