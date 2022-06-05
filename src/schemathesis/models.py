@@ -281,12 +281,13 @@ class Case:  # pylint: disable=too-many-public-methods
     def _get_serializer(self) -> Optional[Serializer]:
         """Get a serializer for the payload, if there is any."""
         if self.media_type is not None:
-            cls = serializers.get(self.media_type)
-            if cls is None:
-                all_media_types = self.operation.get_request_payload_content_types()
-                if all(serializers.get(media_type) is None for media_type in all_media_types):
-                    raise SerializationNotPossible.from_media_types(*all_media_types)
-                cant_serialize(self.media_type)
+            media_type = serializers.get_first_matching_media_type(self.media_type)
+            if media_type is None:
+                # This media type is set manually. Otherwise, it should have been rejected during the data generation
+                raise SerializationNotPossible.for_media_type(self.media_type)
+            # SAFETY: It is safe to assume that serializer will be found, because `media_type` returned above
+            # is registered. This intentionally ignores cases with concurrent serializers registry modification.
+            cls = cast(Type[serializers.Serializer], serializers.get(media_type))
             return cls()
         return None
 

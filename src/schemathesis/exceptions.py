@@ -206,6 +206,10 @@ SERIALIZATION_NOT_POSSIBLE_MESSAGE = (
     f"Schemathesis can't serialize data to any of the defined media types: {{}} \n{SERIALIZERS_SUGGESTION_MESSAGE}"
 )
 
+SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE = (
+    f"Schemathesis can't serialize data to {{}} \n{SERIALIZERS_SUGGESTION_MESSAGE}"
+)
+
 
 class SerializationNotPossible(Exception):
     """Not possible to serialize to any of the media types defined for some API operation.
@@ -219,6 +223,10 @@ class SerializationNotPossible(Exception):
     @classmethod
     def from_media_types(cls, *media_types: str) -> "SerializationNotPossible":
         return cls(SERIALIZATION_NOT_POSSIBLE_MESSAGE.format(", ".join(media_types)))
+
+    @classmethod
+    def for_media_type(cls, media_type: str) -> "SerializationNotPossible":
+        return cls(SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE.format(media_type))
 
 
 class InvalidRegularExpression(Exception):

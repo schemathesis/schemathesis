@@ -6,7 +6,8 @@ import pytest
 from hypothesis import given, settings
 
 import schemathesis
-from schemathesis.exceptions import SerializationNotPossible
+from schemathesis import serializers
+from schemathesis.exceptions import SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE, SerializationNotPossible
 
 
 def to_csv(data):
@@ -36,6 +37,7 @@ def csv_serializer():
     yield
 
     schemathesis.serializers.unregister("text/csv")
+    schemathesis.serializers.unregister("text/tsv")
 
 
 @pytest.fixture(params=["aiohttp", "flask"])
@@ -93,17 +95,14 @@ def test_no_serialization_possible(api_schema):
     @given(case=api_schema["/csv"]["POST"].as_strategy())
     @settings(max_examples=5)
     def test(case):
-        # Then there should be an error indicating this
-        with pytest.raises(
-            SerializationNotPossible,
-            match="Schemathesis can't serialize data to any of the defined media types: text/csv",
-        ):
-            if case.app is not None:
-                case.call_wsgi()
-            else:
-                case.call()
+        pass
 
-    test()
+    # Then there should be an error indicating this
+    with pytest.raises(
+        SerializationNotPossible,
+        match="Schemathesis can't serialize data to any of the defined media types: text/csv",
+    ):
+        test()
 
 
 @pytest.mark.parametrize("method", ("as_requests_kwargs", "as_werkzeug_kwargs"))
@@ -119,6 +118,61 @@ def test_serialize_yaml(open_api_3_schema_with_yaml_payload, method):
         kwargs = getattr(case, method)()
         assert kwargs["headers"]["Content-Type"] == "text/yaml"
         assert kwargs["data"] == "- 42\n"
+
+    test()
+
+
+def test_serialize_any(empty_open_api_3_schema):
+    # See GH-1526
+    # When API expects `*/*`
+    empty_open_api_3_schema["paths"] = {
+        "/any": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {"*/*": {"schema": {"type": "array"}}},
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    @given(case=schema["/any"]["POST"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        # Then Schemathesis should generate valid data of any supported type
+        assert case.as_requests_kwargs()["headers"]["Content-Type"] in serializers.SERIALIZERS
+
+    test()
+
+
+def test_serialization_not_possible_manual(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "integer"},
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    @given(case=schema["/test"]["POST"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        case.media_type = "application/xml"
+        with pytest.raises(
+            SerializationNotPossible, match=SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE.format(case.media_type)
+        ):
+            case.as_requests_kwargs()
 
     test()
 
@@ -159,3 +213,20 @@ def test_binary_data(empty_open_api_3_schema, media_type):
         assert werkzeug_kwargs["headers"]["Content-Type"] == media_type
     # And it is OK to send it over the network
     assert_requests_call(case)
+
+
+@pytest.mark.parametrize(
+    "media_type, expected",
+    (
+        ("application/json", {"application/json"}),
+        ("application/problem+json", {"application/problem+json"}),
+        (
+            "application/*",
+            {"application/json", "application/octet-stream", "application/x-www-form-urlencoded", "application/x-yaml"},
+        ),
+        ("*/form-data", {"multipart/form-data"}),
+        ("*/*", set(serializers.SERIALIZERS)),
+    ),
+)
+def test_get_matching_serializers(media_type, expected):
+    assert set(serializers.get_matching_media_types(media_type)) == expected
