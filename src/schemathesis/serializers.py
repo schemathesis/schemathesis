@@ -1,13 +1,13 @@
 import binascii
 import os
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Optional, Type
+from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Generator, Optional, Type
 
 import attr
 import yaml
 from typing_extensions import Protocol, runtime_checkable
 
-from .utils import is_json_media_type, is_plain_text_media_type
+from .utils import is_json_media_type, is_plain_text_media_type, parse_content_type
 
 if TYPE_CHECKING:
     from .models import Case
@@ -222,6 +222,26 @@ class OctetStreamSerializer:
 
     def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
         return {"data": _to_bytes(value)}
+
+
+def get_matching_media_types(media_type: str) -> Generator[str, None, None]:
+    """Get all registered media types matching the given media type."""
+    if media_type == "*/*":
+        # Shortcut to avoid comparing all values
+        yield from iter(SERIALIZERS)
+    else:
+        main, sub = parse_content_type(media_type)
+        if main == "application" and (sub == "json" or sub.endswith("+json")):
+            yield media_type
+        else:
+            for registered_media_type in SERIALIZERS:
+                target_main, target_sub = parse_content_type(registered_media_type)
+                if main in ("*", target_main) and sub in ("*", target_sub):
+                    yield registered_media_type
+
+
+def get_first_matching_media_type(media_type: str) -> Optional[str]:
+    return next(get_matching_media_types(media_type), None)
 
 
 def get(media_type: str) -> Optional[Type[Serializer]]:

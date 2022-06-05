@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Support generating data for Open API request payloads with wildcard media types. `#1526`_
+
 **Changed**
 
 - Mark tests as skipped if there are no explicit examples and ``--hypothesis-phases=explicit`` is used. `#1323`_
@@ -2916,6 +2920,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1526: https://github.com/schemathesis/schemathesis/issues/1526
 .. _#1518: https://github.com/schemathesis/schemathesis/issues/1518
 .. _#1514: https://github.com/schemathesis/schemathesis/issues/1514
 .. _#1485: https://github.com/schemathesis/schemathesis/issues/1485
