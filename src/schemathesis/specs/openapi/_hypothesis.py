@@ -12,11 +12,11 @@ from hypothesis_jsonschema import from_schema
 from requests.auth import _basic_auth_str
 from requests.structures import CaseInsensitiveDict
 
-from ... import auth, utils
+from ... import auth, serializers, utils
 from ...constants import DataGenerationMethod
-from ...exceptions import InvalidSchema, SkipTest
+from ...exceptions import InvalidSchema, SerializationNotPossible, SkipTest
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
-from ...models import APIOperation, Case
+from ...models import APIOperation, Case, cant_serialize
 from ...types import NotSet
 from ...utils import NOT_SET, compose
 from .constants import LOCATION_TO_CONTAINER
@@ -162,7 +162,16 @@ def get_case_strategy(  # pylint: disable=too-many-locals
             parameter = draw(st.sampled_from(candidates))
             strategy = _get_body_strategy(parameter, to_strategy, operation)
             strategy = apply_hooks(operation, hook_context, hooks, strategy, "body")
-            media_type = parameter.media_type
+            # Parameter may have a wildcard media type. In this case, choose any supported one
+            possible_media_types = sorted(serializers.get_matching_media_types(parameter.media_type))
+            if not possible_media_types:
+                all_media_types = operation.get_request_payload_content_types()
+                if all(serializers.get_first_matching_media_type(media_type) is None for media_type in all_media_types):
+                    # None of media types defined for this operation are not supported
+                    raise SerializationNotPossible.from_media_types(*all_media_types)
+                # Other media types are possible - avoid choosing this media type in the future
+                cant_serialize(parameter.media_type)
+            media_type = draw(st.sampled_from(possible_media_types))
             body = draw(strategy)
     else:
         media_types = operation.get_request_payload_content_types() or ["application/json"]
