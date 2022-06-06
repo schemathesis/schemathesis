@@ -3,8 +3,8 @@ import operator
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Dict, Generator, List, Tuple, Type
 
+from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, rule
-from hypothesis.strategies import SearchStrategy, none
 from requests.structures import CaseInsensitiveDict
 
 from ....stateful import APIStateMachine, Direction, StepResult
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from ..schemas import BaseOpenAPISchema
 
 
-APIOperationConnections = Dict[str, List[SearchStrategy[Tuple[StepResult, OpenAPILink]]]]
+APIOperationConnections = Dict[str, List[st.SearchStrategy[Tuple[StepResult, OpenAPILink]]]]
 
 
 class OpenAPIStateMachine(APIStateMachine):
@@ -76,17 +76,17 @@ def make_rules(
 ) -> Generator[Rule, None, None]:
     """Create a rule for an API operation."""
 
-    def _make_rule(previous: SearchStrategy) -> Rule:
+    def _make_rule(previous: st.SearchStrategy) -> Rule:
         decorator = rule(target=bundle, previous=previous, case=operation.as_strategy())  # type: ignore
         return decorator(APIStateMachine._step)
 
     previous_strategies = connections.get(operation.verbose_name)
     if previous_strategies is not None:
         yield _make_rule(_combine_strategies(previous_strategies))
-    yield _make_rule(none())
+    yield _make_rule(st.none())
 
 
-def _combine_strategies(strategies: List[SearchStrategy]) -> SearchStrategy:
+def _combine_strategies(strategies: List[st.SearchStrategy]) -> st.SearchStrategy:
     """Combine a list of strategies into a single one.
 
     If the input is `[a, b, c]`, then the result is equivalent to `a | b | c`.
