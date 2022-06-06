@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.15.4:
+
+`3.15.4`_ - 2022-06-06
+----------------------
+
 **Added**
 
 - Support generating data for Open API request payloads with wildcard media types. `#1526`_
@@ -2718,7 +2723,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.15.3...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.15.4...HEAD
+.. _3.15.4: https://github.com/schemathesis/schemathesis/compare/v3.15.3...v3.15.4
 .. _3.15.3: https://github.com/schemathesis/schemathesis/compare/v3.15.2...v3.15.3
 .. _3.15.2: https://github.com/schemathesis/schemathesis/compare/v3.15.1...v3.15.2
 .. _3.15.1: https://github.com/schemathesis/schemathesis/compare/v3.15.0...v3.15.1
