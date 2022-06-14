@@ -43,16 +43,14 @@ Both examples above will run hundreds of requests against the API under test and
 Features
 --------
 
- - Content-Type, schema, headers, and status code conformance checks for Open API;
- - Testing of explicit examples from the input schema;
- - Stateful testing via Open API links;
- - Concurrent test execution;
- - Targeted testing;
- - Storing and replaying network requests;
- - Built-in ASGI / WSGI application support;
- - Code samples for easy failure reproduction;
- - Ready-to-go Docker image;
- - Configurable with user-defined checks, string formats, hooks, and targets.
+- Open API: Schema conformance, explicit examples, stateful testing;
+- GraphQL: queries generation;
+- Multi-worker test execution;
+- Storing and replaying tests;
+- ASGI / WSGI support;
+- Generated code samples (cURL, Python);
+- Docker image;
+- Customizable checks & test generation
 
 .. note::
 
@@ -77,10 +75,12 @@ User's Guide
    targeted
    extending
 
-Commercial support
-------------------
+Support
+-------
 
-If you are interested in the effective integration of Schemathesis to your private project, you can contact me via email or `Twitter <https://twitter.com/Stranger6667>`_ and I will help you do that.
+If you want to integrate Schemathesis into your company workflows or improve its effectiveness, feel free to reach out to `support@schemathesis.io`.
+
+Schemathesis.io also runs workshops about effective API testing. `Signup here <https://forms.gle/epkovRdQNMCYh2Ax8>`_
 
 Resources
 ---------

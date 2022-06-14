@@ -21,16 +21,14 @@ Schemathesis.io has a free tier, so you can combine the CLI flexibility with ric
 Features
 --------
 
-- Content-Type, schema, and status code conformance checks for Open API;
-- Testing of explicit examples from the input schema;
-- Stateful testing via Open API links;
-- Concurrent test execution;
-- Targeted testing;
-- Storing and replaying network requests;
-- Built-in ASGI / WSGI application support;
-- Code samples for easy failure reproduction;
-- Ready-to-go Docker image;
-- Configurable with user-defined checks, string formats, hooks, and targets.
+- Open API: Schema conformance, explicit examples, stateful testing;
+- GraphQL: queries generation;
+- Multi-worker test execution;
+- Storing and replaying tests;
+- ASGI / WSGI support;
+- Generated code samples (cURL, Python);
+- Docker image;
+- Customizable checks & test generation
 
 CLI installation
 ----------------
@@ -82,21 +80,18 @@ Both examples above will run hundreds of requests against the API under test and
 
 💡 See a complete working example project in the ``/example`` directory. 💡
 
+Support
+-------
+
+If you want to integrate Schemathesis into your company workflows or improve its effectiveness, feel free to reach out to `support@schemathesis.io`.
+
+Schemathesis.io also runs workshops about effective API testing. `Signup here <https://forms.gle/epkovRdQNMCYh2Ax8>`_
+
 Contributing
 ------------
 
 Any contribution to development, testing, or any other area is highly appreciated and useful to the project.
 For guidance on how to contribute to Schemathesis, see the `contributing guidelines <https://github.com/schemathesis/schemathesis/blob/master/CONTRIBUTING.rst>`_.
-
-Support this project
---------------------
-
-Hi, my name is Dmitry! I started this project during my work at `Kiwi.com <https://kiwi.com/>`_. I am grateful to them for all the support they
-provided to this project during its early days and for the opportunity to evolve Schemathesis independently.
-
-In order to grow the community of contributors and users, and allow me to devote more time to this project, please `donate today <https://github.com/sponsors/Stranger6667>`_.
-
-Also, I occasionally write posts about Schemathesis in `my blog <https://dygalo.dev/>`_.
 
 Links
 -----
