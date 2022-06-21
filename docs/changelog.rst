@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.15.5:
+
+`3.15.5`_ - 2022-06-21
+----------------------
+
 **Fixed**
 
 - ``TypeError`` when using ``--auth-type=digest`` in CLI.
@@ -2727,7 +2732,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.15.4...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.15.5...HEAD
+.. _3.15.5: https://github.com/schemathesis/schemathesis/compare/v3.15.4...v3.15.5
 .. _3.15.4: https://github.com/schemathesis/schemathesis/compare/v3.15.3...v3.15.4
 .. _3.15.3: https://github.com/schemathesis/schemathesis/compare/v3.15.2...v3.15.3
 .. _3.15.2: https://github.com/schemathesis/schemathesis/compare/v3.15.1...v3.15.2
