@@ -2116,7 +2116,7 @@ def test_explicit_example_failure_output(testdir, cli, openapi3_base_url):
 
 
 @pytest.mark.operations("success")
-def test_skipped_on_no_explicit_examples(testdir, cli, openapi3_schema_url):
+def test_skipped_on_no_explicit_examples(cli, openapi3_schema_url):
     # See GH-1323
     # When there are no explicit examples
     result = cli.run(openapi3_schema_url, "--hypothesis-phases=explicit")
@@ -2124,3 +2124,11 @@ def test_skipped_on_no_explicit_examples(testdir, cli, openapi3_schema_url):
     assert result.exit_code == ExitCode.OK, result.stdout
     assert "/api/success S" in result.stdout
     assert "1 skipped in" in result.stdout
+
+
+@pytest.mark.operations("success")
+def test_digest_auth(cli, openapi3_schema_url):
+    # When a digest auth is used
+    result = cli.run(openapi3_schema_url, "--auth='test:test'", "--auth-type=digest")
+    # Then it should not cause any exceptions
+    assert result.exit_code == ExitCode.OK, result.stdout
