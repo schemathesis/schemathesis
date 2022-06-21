@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- ``TypeError`` when using ``--auth-type=digest`` in CLI.
+
 .. _v3.15.4:
 
 `3.15.4`_ - 2022-06-06
