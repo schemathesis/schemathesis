@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.15.6:
+
+`3.15.6`_ - 2022-06-23
+----------------------
+
 **Fixed**
 
 - Do not discard dots (``.``) in OpenAPI expressions during parsing.
@@ -2736,7 +2741,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.15.5...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.15.6...HEAD
+.. _3.15.6: https://github.com/schemathesis/schemathesis/compare/v3.15.5...v3.15.6
 .. _3.15.5: https://github.com/schemathesis/schemathesis/compare/v3.15.4...v3.15.5
 .. _3.15.4: https://github.com/schemathesis/schemathesis/compare/v3.15.3...v3.15.4
 .. _3.15.3: https://github.com/schemathesis/schemathesis/compare/v3.15.2...v3.15.3
