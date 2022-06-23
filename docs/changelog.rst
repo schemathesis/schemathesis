@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Do not discard dots (``.``) in OpenAPI expressions during parsing.
+
 .. _v3.15.5:
 
 `3.15.5`_ - 2022-06-21

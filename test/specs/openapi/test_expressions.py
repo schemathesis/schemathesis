@@ -73,6 +73,7 @@ def context(case, response):
         ("$response.body", DOCUMENT),
         ("ID_{$response.body#/g|h}", "ID_4"),
         ("ID_{$response.body#/g|h}_{$response.body#/a~1b}", "ID_4_1"),
+        ("eq.{$response.body#/g|h}", "eq.4"),
     ),
 )
 def test_evaluate(context, expr, expected):
