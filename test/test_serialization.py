@@ -83,7 +83,7 @@ def test_register_incomplete_serializer():
         @schemathesis.serializers.register("text/csv")
         class CSVSerializer:
             def as_requests(self, context, value):
-                return {}
+                pass
 
 
 @pytest.mark.hypothesis_nested

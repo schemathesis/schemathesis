@@ -282,58 +282,6 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
-def make_nullable_test_data(spec_version):
-    field_name = {"openapi": "nullable", "swagger": "x-nullable"}[spec_version]
-    return (
-        (
-            {
-                "properties": {
-                    "id": {"format": "int64", "type": "integer", field_name: True},
-                    "name": {"type": "string"},
-                },
-                "type": "object",
-            },
-            {
-                "properties": {
-                    "id": {"anyOf": [{"format": "int64", "type": "integer"}, {"type": "null"}]},
-                    "name": {"type": "string"},
-                },
-                "type": "object",
-            },
-        ),
-        (
-            {
-                "parameters": [
-                    {"name": "id", "in": "query", "type": "integer", "format": "int64", field_name: True},
-                    {"name": "name", "type": "string"},
-                ]
-            },
-            {
-                "parameters": [
-                    {"name": "id", "in": "query", "format": "int64", "anyOf": [{"type": "integer"}, {"type": "null"}]},
-                    {"name": "name", "type": "string"},
-                ]
-            },
-        ),
-        (
-            {
-                "properties": {
-                    "id": {"type": "string", "enum": ["a", "b"], field_name: True},
-                    "name": {"type": "string"},
-                },
-                "type": "object",
-            },
-            {
-                "properties": {
-                    "id": {"anyOf": [{"type": "string", "enum": ["a", "b"]}, {"type": "null"}]},
-                    "name": {"type": "string"},
-                },
-                "type": "object",
-            },
-        ),
-    )
-
-
 @pytest.mark.parametrize("extra", ({}, {"enum": ["foo"]}))
 @pytest.mark.parametrize("spec_version", ("open_api_2", "open_api_3"))
 def test_nullable_parameters(request, testdir, spec_version, extra):

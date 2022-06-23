@@ -816,7 +816,7 @@ def test_(case):
 
 
 @pytest.mark.operations("multiple_failures")
-def test_multiple_failures(testdir, openapi3_schema_url):
+def test_multiple_failures_non_check(testdir, openapi3_schema_url):
     # When multiple failures are discovered within the same test
     # And there are non-check exceptions
     testdir.make_test(
@@ -845,7 +845,7 @@ def test_(case):
     # And internal frames should not be displayed
     assert "def run_subtest" not in stdout
     assert "def collecting_wrapper" not in stdout
-    assert stdout.count("E   test_multiple_failures.py:") == 1
+    assert stdout.count("E   test_multiple_failures_non_check.py:") == 1
 
 
 @pytest.mark.operations("flaky")

@@ -1,4 +1,3 @@
-import datetime
 import os
 import platform
 from functools import lru_cache
@@ -46,15 +45,6 @@ def integer(**kwargs: Any) -> Dict[str, Any]:
     return {"type": "integer", "in": "query", **kwargs}
 
 
-def array(**kwargs: Any) -> Dict[str, Any]:
-    return {
-        "name": "values",
-        "in": "body",
-        "schema": {"type": "object", "required": ["values"], "properties": {"values": {"type": "array", **kwargs}}},
-        "required": True,
-    }
-
-
 def as_param(*parameters: Any) -> Dict[str, Any]:
     return {"paths": {"/users": {"get": {"parameters": list(parameters), "responses": {"200": {"description": "OK"}}}}}}
 
@@ -78,22 +68,6 @@ def assert_str(value: Any, predicate: Callable = noop) -> None:
 
 def assert_list(value: Any, predicate: Callable = noop) -> None:
     _assert_value(value, list, predicate)
-
-
-def _assert_date(value: str, format: str) -> bool:
-    try:
-        datetime.datetime.strptime(value, format)
-        return True
-    except ValueError:
-        return False
-
-
-def assert_date(value: str) -> bool:
-    return _assert_date(value, "%Y-%m-%d")
-
-
-def assert_datetime(value: str) -> bool:
-    return _assert_date(value, "%Y-%m-%dT%H:%M:%S%z") or _assert_date(value, "%Y-%m-%dT%H:%M:%S.%f%z")
 
 
 def assert_requests_call(case: Case):

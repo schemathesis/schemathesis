@@ -210,7 +210,7 @@ def test_display_hypothesis_output(capsys):
     assert " ".join(lines[1:3]) == strip_style_win32(click.style("foo bar", fg="red"))
 
 
-@pytest.mark.parametrize("body", ({}, {"foo": "bar"}, None))
+@pytest.mark.parametrize("body", ({}, {"foo": "bar"}, NOT_SET))
 def test_display_single_failure(capsys, swagger_20, execution_context, operation, body, response):
     # Given a single test result with multiple successful & failed checks
     success = models.Check("not_a_server_error", models.Status.success, response, 0, models.Case(operation, body=body))
