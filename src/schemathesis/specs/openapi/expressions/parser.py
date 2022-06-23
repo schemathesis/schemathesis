@@ -15,7 +15,7 @@ def _parse(expr: str) -> Generator[nodes.Node, None, None]:
     tokens = lexer.tokenize(expr)
     brackets_stack: List[str] = []
     for token in tokens:
-        if token.is_string:
+        if token.is_string or token.is_dot:
             yield nodes.String(token.value)
         elif token.is_variable:
             yield from _parse_variable(tokens, token, expr)
