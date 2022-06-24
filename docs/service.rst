@@ -121,3 +121,4 @@ CLI sends info to Schemathesis.io in the following cases:
 
 - Authentication. Metadata about your host machine, that helps us to understand our users better. We collect your Python interpreter version, implementation, system/OS name and release. For more information look at ``service/metadata.py``
 - Test runs. Most of Schemathesis runner's events, including all generated data and explicitly passed headers. For more information look at ``service/serialization.py``
+- Some environment variables specific to CI providers. We use them to comment on pull requests.

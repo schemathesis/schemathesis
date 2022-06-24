@@ -15,7 +15,7 @@ import click
 from ..cli.context import ExecutionContext
 from ..cli.handlers import EventHandler
 from ..runner.events import ExecutionEvent, Initialized, InternalError, Interrupted
-from . import ServiceClient, events
+from . import ServiceClient, ci, events
 from .constants import REPORT_FORMAT_VERSION, STOP_MARKER, WORKER_JOIN_TIMEOUT
 from .hosts import HostData
 from .metadata import Metadata
@@ -41,7 +41,15 @@ class ReportWriter:
         info.mtime = int(time.time())
         self._tar.addfile(info, buffer)
 
-    def add_metadata(self, *, api_name: Optional[str], location: str, base_url: str, metadata: Metadata) -> None:
+    def add_metadata(
+        self,
+        *,
+        api_name: Optional[str],
+        location: str,
+        base_url: str,
+        metadata: Metadata,
+        ci_environment: Optional[ci.Environment],
+    ) -> None:
         data = {
             # API identifier on the Schemathesis.io side (optional)
             "api_name": api_name,
@@ -51,6 +59,8 @@ class ReportWriter:
             "base_url": base_url,
             # Metadata about CLI environment
             "environment": attr.asdict(metadata),
+            # Environment variables specific for CI providers
+            "ci": ci_environment.asdict() if ci_environment is not None else None,
             # Report format version
             "version": REPORT_FORMAT_VERSION,
         }
@@ -141,7 +151,13 @@ def write_remote(
     try:
         with tarfile.open(mode="w:gz", fileobj=payload) as tar:
             writer = ReportWriter(tar)
-            writer.add_metadata(api_name=api_name, location=location, base_url=base_url, metadata=Metadata())
+            writer.add_metadata(
+                api_name=api_name,
+                location=location,
+                base_url=base_url,
+                metadata=Metadata(),
+                ci_environment=ci.environment(),
+            )
             if consume_events(writer, in_queue) == ConsumeResult.INTERRUPT:
                 return
         response = client.upload_report(payload.getvalue(), host_data.correlation_id)
@@ -176,7 +192,9 @@ class FileReportHandler(BaseReportHandler):
 def write_file(file_handle: click.utils.LazyFile, location: str, base_url: str, in_queue: Queue) -> None:
     with file_handle.open() as fileobj, tarfile.open(mode="w:gz", fileobj=fileobj) as tar:
         writer = ReportWriter(tar)
-        writer.add_metadata(api_name=None, location=location, base_url=base_url, metadata=Metadata())
+        writer.add_metadata(
+            api_name=None, location=location, base_url=base_url, metadata=Metadata(), ci_environment=ci.environment()
+        )
         result = consume_events(writer, in_queue)
     if result == ConsumeResult.INTERRUPT:
         with suppress(OSError):

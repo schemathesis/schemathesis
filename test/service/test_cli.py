@@ -1,3 +1,4 @@
+import json
 import re
 from test.apps.openapi.schema import OpenAPIVersion
 
@@ -297,7 +298,41 @@ def test_save_to_file(cli, schema_url, tmp_path, read_report, service):
     payload = report_file.read_bytes()
     with read_report(payload) as tar:
         assert len(tar.getmembers()) == 6
+        assert json.load(tar.extractfile("metadata.json"))["ci"] is None
     # And it should be written in CLI
     assert f"Report: {report_file}" in result.stdout
     # And should not be sent to the SaaS
     assert not service.server.log
+
+
+@pytest.mark.operations("success")
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+def test_ci_environment(monkeypatch, cli, schema_url, tmp_path, read_report, service):
+    # When executed in CI
+    for key, value in {
+        "GITHUB_ACTIONS": "true",
+        "GITHUB_API_URL": "https://api.github.com",
+        "GITHUB_REPOSITORY": "schemathesis/schemathesis",
+        "GITHUB_ACTOR": "Stranger6667",
+        "GITHUB_SHA": "e56e13224f08469841e106449f6467b769e2afca",
+        "GITHUB_HEAD_REF": "dd/report-ci",
+        "GITHUB_BASE_REF": "main",
+        "GITHUB_REF": "refs/pull/1533/merge",
+    }.items():
+        monkeypatch.setenv(key, value)
+    report_file = tmp_path / "report.tar.gz"
+    result = cli.run(schema_url, f"--report={report_file}")
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # Then CI variables should be stored inside metadata
+    payload = report_file.read_bytes()
+    with read_report(payload) as tar:
+        assert json.load(tar.extractfile("metadata.json"))["ci"] == {
+            "actor": "Stranger6667",
+            "api_url": "https://api.github.com",
+            "base_ref": "main",
+            "head_ref": "dd/report-ci",
+            "provider": "github",
+            "ref": "refs/pull/1533/merge",
+            "repository": "schemathesis/schemathesis",
+            "sha": "e56e13224f08469841e106449f6467b769e2afca",
+        }
