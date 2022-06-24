@@ -1,8 +1,7 @@
 import json
+import os
 import tarfile
-from contextlib import contextmanager
 from io import BytesIO
-from queue import Queue
 from unittest import mock
 
 import attr
@@ -14,16 +13,7 @@ from schemathesis.runner import events
 from schemathesis.service import metadata, report
 
 
-@contextmanager
-def read_report(data):
-    buffer = BytesIO()
-    buffer.write(data)
-    buffer.seek(0)
-    with tarfile.open(mode="r:gz", fileobj=buffer) as tar:
-        yield tar
-
-
-def test_add_events(openapi3_schema_url):
+def test_add_events(openapi3_schema_url, read_report):
     schema = schemathesis.from_uri(openapi3_schema_url, validate_schema=False)
     payload = BytesIO()
     with tarfile.open(mode="w:gz", fileobj=payload) as tar:
@@ -47,7 +37,7 @@ def test_add_events(openapi3_schema_url):
             assert event_type in event
 
 
-def test_metadata():
+def test_metadata(read_report):
     payload = BytesIO()
     with tarfile.open(mode="w:gz", fileobj=payload) as tar:
         writer = report.ReportWriter(tar)
@@ -60,15 +50,33 @@ def test_metadata():
         assert attr.asdict(metadata.Metadata()) == json.load(tar.extractfile("metadata.json"))["environment"]
 
 
+def generate_events(schema_url):
+    schema = schemathesis.from_uri(schema_url, validate_schema=False)
+    yield from schemathesis.runner.from_schema(schema).execute()
+
+
 @pytest.mark.operations("success")
-def test_do_not_send_incomplete_report(report_handler, service, openapi3_schema_url):
+def test_do_not_send_incomplete_report_service(service_report_handler, service, openapi3_schema_url):
     # When the test process is interrupted or there is an internal error
-    schema = schemathesis.from_uri(openapi3_schema_url, validate_schema=False)
     context = mock.create_autospec(ExecutionContext)
-    for event in schemathesis.runner.from_schema(schema).execute():
+    for event in generate_events(openapi3_schema_url):
         if isinstance(event, events.Finished):
-            report_handler.handle_event(context, events.Interrupted())
+            service_report_handler.handle_event(context, events.Interrupted())
         else:
-            report_handler.handle_event(context, event)
+            service_report_handler.handle_event(context, event)
     # Then the report should not be sent
     assert not service.server.log
+
+
+@pytest.mark.operations("success")
+def test_do_not_send_incomplete_report_file(file_report_handler, service, openapi3_schema_url):
+    # When the test process is interrupted or there is an internal error
+    context = mock.create_autospec(ExecutionContext)
+    for event in generate_events(openapi3_schema_url):
+        if isinstance(event, events.Finished):
+            file_report_handler.handle_event(context, events.Interrupted())
+        else:
+            file_report_handler.handle_event(context, event)
+    file_report_handler.shutdown()
+    # Then the report should not be sent
+    assert not os.path.exists(file_report_handler.file_handle.name)

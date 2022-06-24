@@ -14,4 +14,4 @@ from .constants import (
     WORKER_FINISH_TIMEOUT,
 )
 from .events import Completed, Error, Event, Timeout
-from .report import ReportHandler
+from .report import FileReportHandler, ServiceReportHandler

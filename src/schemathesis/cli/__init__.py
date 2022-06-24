@@ -42,7 +42,7 @@ from ..types import Filter, PathLike, RequestCert
 from ..utils import GenericResponse, file_exists, get_requests_auth, import_app
 from . import callbacks, cassettes, output
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
-from .context import ExecutionContext, ServiceContext
+from .context import ExecutionContext, FileReportContext, ServiceReportContext
 from .debug import DebugOutputHandler
 from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
@@ -214,6 +214,7 @@ with_hosts_file = click.option(
     default=service.DEFAULT_HOSTS_PATH,
     envvar=service.HOSTS_PATH_ENV_VAR,
 )
+REPORT_TO_SERVICE = object()
 
 
 @schemathesis.command(short_help="Perform schemathesis test.", cls=CommandWithCustomHelp)
@@ -391,7 +392,13 @@ with_hosts_file = click.option(
 @click.option(
     "--junit-xml", help="Create junit-xml style report file at given path.", type=click.File("w", encoding="utf-8")
 )
-@click.option("--report", help="Upload test report to Schemathesis.io, or store in a file.", is_flag=True)
+@click.option(
+    "--report",
+    help="Upload test report to Schemathesis.io, or store in a file.",
+    is_flag=False,
+    flag_value=REPORT_TO_SERVICE,
+    type=click.File("wb"),
+)
 @click.option(
     "--debug-output-file",
     help="Save debug output as JSON lines in the given file.",
@@ -591,7 +598,7 @@ def run(
     hypothesis_verbosity: Optional[hypothesis.Verbosity] = None,
     verbosity: int = 0,
     no_color: bool = False,
-    report: bool = False,
+    report: Optional[click.utils.LazyFile] = None,
     schemathesis_io_token: Optional[str] = None,
     schemathesis_io_url: str = service.DEFAULT_URL,
     hosts_file: PathLike = service.DEFAULT_HOSTS_PATH,
@@ -645,7 +652,7 @@ def run(
                 base_url = base_url or details.base_url
         except requests.HTTPError as exc:
             handle_service_error(exc, name)
-    if report and not client:
+    if report and report.name is REPORT_TO_SERVICE and not client:
         # Upload without connecting data to a certain API
         client = service.ServiceClient(base_url=schemathesis_io_url, token=token)
     host_data = service.hosts.HostData(schemathesis_io_hostname, hosts_file)
@@ -711,9 +718,9 @@ def run(
         verbosity=verbosity,
         code_sample_style=code_sample_style,
         debug_output_file=debug_output_file,
-        schemathesis_io_url=schemathesis_io_url,
         host_data=host_data,
         client=client,
+        report=report,
         api_name=api_name,
         location=schema,
         base_url=base_url,
@@ -982,9 +989,9 @@ def execute(
     verbosity: int,
     code_sample_style: CodeSampleStyle,
     debug_output_file: Optional[click.utils.LazyFile],
-    schemathesis_io_url: str,
     host_data: service.hosts.HostData,
     client: Optional[service.ServiceClient],
+    report: Optional[click.utils.LazyFile],
     api_name: Optional[str],
     location: str,
     base_url: Optional[str],
@@ -992,19 +999,28 @@ def execute(
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     # pylint: disable=too-many-branches
     handlers: List[EventHandler] = []
-    service_context = None
+    report_context: Optional[Union[ServiceReportContext, FileReportContext]] = None
     if client:
         # If API name is specified, validate it
-        service_queue: Queue = Queue()
-        service_context = ServiceContext(url=schemathesis_io_url, queue=service_queue)
+        report_queue: Queue = Queue()
+        report_context = ServiceReportContext(queue=report_queue)
         handlers.append(
-            service.ReportHandler(
+            service.ServiceReportHandler(
                 client=client,
                 host_data=host_data,
                 api_name=api_name,
                 location=location,
                 base_url=base_url,
-                out_queue=service_queue,
+                out_queue=report_queue,
+            )
+        )
+    elif report and report.name is not REPORT_TO_SERVICE:
+        report_context = FileReportContext(filename=report.name)
+        handlers.append(
+            service.FileReportHandler(
+                file_handle=report,
+                location=location,
+                base_url=base_url,
             )
         )
     if junit_xml is not None:
@@ -1026,7 +1042,7 @@ def execute(
         junit_xml_file=junit_xml.name if junit_xml is not None else None,
         verbosity=verbosity,
         code_sample_style=code_sample_style,
-        service=service_context,
+        report=report_context,
     )
 
     def shutdown() -> None:
