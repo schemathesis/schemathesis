@@ -284,3 +284,20 @@ def test_anonymous_upload(cli, schema_url, service, hosts_file, correlation_id):
     # Then the command succeeds
     assert result.exit_code == 0, result.stdout
     assert load_for_host(service.hostname, hosts_file)["correlation_id"] == correlation_id
+
+
+@pytest.mark.operations("success")
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+def test_save_to_file(cli, schema_url, tmp_path, read_report, service):
+    # When an argument is provided to the `--report` option
+    report_file = tmp_path / "report.tar.gz"
+    result = cli.run(schema_url, f"--report={report_file}")
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # Then the report should be saved to a file
+    payload = report_file.read_bytes()
+    with read_report(payload) as tar:
+        assert len(tar.getmembers()) == 6
+    # And it should be written in CLI
+    assert f"Report: {report_file}" in result.stdout
+    # And should not be sent to the SaaS
+    assert not service.server.log

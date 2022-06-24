@@ -1,5 +1,3 @@
-from typing import Optional
-
 import attr
 
 from ..utils import format_exception
@@ -20,7 +18,7 @@ class Event:
 class Completed(Event):
     """Report uploaded successfully."""
 
-    message: Optional[str] = attr.ib()
+    message: str = attr.ib()
     next_url: str = attr.ib()
 
 

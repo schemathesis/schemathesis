@@ -295,7 +295,7 @@ def test_commands_run_help(cli):
         "                                  certificate.",
         "  --junit-xml FILENAME            Create junit-xml style report file at given",
         "                                  path.",
-        "  --report                        Upload test report to Schemathesis.io, or",
+        "  --report FILENAME               Upload test report to Schemathesis.io, or",
         "                                  store in a file.",
         "  --debug-output-file FILENAME    Save debug output as JSON lines in the given",
         "                                  file.",
@@ -2019,12 +2019,12 @@ def assert_exit_code(event_stream, code):
             verbosity=0,
             code_sample_style=CodeSampleStyle.default(),
             debug_output_file=None,
-            schemathesis_io_url=service.DEFAULT_URL,
             host_data=None,
             client=None,
             api_name=None,
             location="http://127.0.0.1",
             base_url=None,
+            report=None,
         )
     assert exc.value.code == code
 
