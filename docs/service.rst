@@ -76,7 +76,7 @@ And then run the tests:
 
 .. code::
 
-    st run demo-1 --checks all
+    st run demo-1 --checks all --report
 
 .. note::
 
@@ -86,8 +86,11 @@ Once all events are uploaded to Schemathesis.io you'll see a message at the end 
 
 .. code:: text
 
-    Schemathesis.io: COMPLETED
-    Report URL: https://app.schemathesis.io/r/mF9ke/
+    Upload: COMPLETED
+
+    Your test report is successfully uploaded! Please, follow this link for details:
+
+    https://app.schemathesis.io/r/mF9ke/
 
 To observe the test run results, follow the link from the output.
 
