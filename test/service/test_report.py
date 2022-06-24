@@ -10,7 +10,7 @@ import pytest
 import schemathesis
 from schemathesis.cli import ExecutionContext
 from schemathesis.runner import events
-from schemathesis.service import metadata, report
+from schemathesis.service import ci, metadata, report
 
 
 def test_add_events(openapi3_schema_url, read_report):
@@ -42,7 +42,11 @@ def test_metadata(read_report):
     with tarfile.open(mode="w:gz", fileobj=payload) as tar:
         writer = report.ReportWriter(tar)
         writer.add_metadata(
-            api_name="test", location="http://127.0.0.1", base_url="http://127.0.0.1", metadata=metadata.Metadata()
+            api_name="test",
+            location="http://127.0.0.1",
+            base_url="http://127.0.0.1",
+            metadata=metadata.Metadata(),
+            ci_environment=ci.environment(),
         )
     data = payload.getvalue()
     with read_report(data) as tar:
