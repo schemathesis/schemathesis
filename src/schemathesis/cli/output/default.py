@@ -15,7 +15,7 @@ from ...constants import DISCORD_LINK, FLAKY_FAILURE_MESSAGE, CodeSampleStyle, _
 from ...models import Response, Status
 from ...runner import events
 from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult, deduplicate_failures
-from ..context import ExecutionContext
+from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
 
 DISABLE_SCHEMA_VALIDATION_MESSAGE = (
@@ -288,31 +288,36 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
         category = click.style("JUnit XML file", bold=True)
         click.secho(f"{category}: {context.junit_xml_file}")
 
-    handle_service_integration(context)
+    if isinstance(context.report, FileReportContext):
+        click.echo()
+        category = click.style("Report", bold=True)
+        click.secho(f"{category}: {context.report.filename}")
+
+    if isinstance(context.report, ServiceReportContext):
+        click.echo()
+        handle_service_integration(context.report)
 
 
-def handle_service_integration(context: ExecutionContext) -> None:
+def handle_service_integration(context: ServiceReportContext) -> None:
     """If Schemathesis.io integration is enabled, wait for the handler & print the resulting status."""
-    if context.service:
+    title = click.style("Upload", bold=True)
+    event = wait_for_report_handler(context.queue, title)
+    color = {
+        service.Completed: "green",
+        service.Error: "red",
+        service.Timeout: "red",
+    }[event.__class__]
+    status = click.style(event.status, fg=color, bold=True)
+    click.echo(f"{title}: {status}\r", nl=False)
+    click.echo()
+    if isinstance(event, service.Error):
         click.echo()
-        title = click.style("Upload", bold=True)
-        event = wait_for_service_handler(context.service.queue, title)
-        color = {
-            service.Completed: "green",
-            service.Error: "red",
-            service.Timeout: "red",
-        }[event.__class__]
-        status = click.style(event.status, fg=color, bold=True)
-        click.echo(f"{title}: {status}\r", nl=False)
+        display_service_error(event)
+    if isinstance(event, service.Completed):
         click.echo()
-        if isinstance(event, service.Error):
-            click.echo()
-            display_service_error(event)
-        if isinstance(event, service.Completed):
-            click.echo()
-            click.echo(event.message)
-            click.echo()
-            click.echo(event.next_url)
+        click.echo(event.message)
+        click.echo()
+        click.echo(event.next_url)
 
 
 def display_service_error(event: service.Error) -> None:
@@ -363,7 +368,7 @@ def ask_to_report(event: service.Error, report_to_issues: bool = True, extra: st
     )
 
 
-def wait_for_service_handler(queue: Queue, title: str) -> service.Event:
+def wait_for_report_handler(queue: Queue, title: str) -> service.Event:
     """Wait for the Schemathesis.io handler to finish its job."""
     start = time.monotonic()
     spinner = create_spinner(SPINNER_REPETITION_NUMBER)
@@ -450,7 +455,7 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     click.echo(f"Specification version: {event.specification_name}")
     click.echo(f"Workers: {context.workers_num}")
     click.secho(f"Collected API operations: {context.operations_count}", bold=True)
-    if context.service is not None:
+    if context.report is not None:
         click.secho("Schemathesis.io: ENABLED", bold=True)
     if context.operations_count >= 1:
         click.echo()

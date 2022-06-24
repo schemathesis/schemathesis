@@ -1,11 +1,15 @@
 import re
+import tarfile
+from contextlib import contextmanager
+from io import BytesIO
 from queue import Queue
 
 import attr
+import click
 import pytest
 from pytest_httpserver.pytest_plugin import PluginHTTPServer
 
-from schemathesis.service import ReportHandler, ServiceClient
+from schemathesis.service import FileReportHandler, ServiceClient, ServiceReportHandler
 from schemathesis.service.hosts import HostData
 
 # A token for a testing Schemathesis.io instance
@@ -131,8 +135,8 @@ def service_client(service, service_token):
 
 
 @pytest.fixture
-def report_handler(service_client, hostname, hosts_file, openapi3_schema_url):
-    handler = ReportHandler(
+def service_report_handler(service_client, hostname, hosts_file, openapi3_schema_url):
+    handler = ServiceReportHandler(
         service_client,
         host_data=HostData(hostname, hosts_file),
         api_name="test",
@@ -143,3 +147,29 @@ def report_handler(service_client, hostname, hosts_file, openapi3_schema_url):
     )
     yield handler
     handler.shutdown()
+
+
+@pytest.fixture
+def file_report_handler(service_client, hostname, hosts_file, openapi3_schema_url, tmp_path):
+    report_file = tmp_path / "report.tar.gz"
+    handler = FileReportHandler(
+        file_handle=click.utils.LazyFile(str(report_file), mode="wb"),
+        location=openapi3_schema_url,
+        base_url=None,
+        in_queue=Queue(),
+    )
+    yield handler
+    handler.shutdown()
+
+
+@pytest.fixture
+def read_report():
+    @contextmanager
+    def reader(data):
+        buffer = BytesIO()
+        buffer.write(data)
+        buffer.seek(0)
+        with tarfile.open(mode="r:gz", fileobj=buffer) as tar:
+            yield tar
+
+    return reader

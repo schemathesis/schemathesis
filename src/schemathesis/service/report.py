@@ -1,12 +1,16 @@
+import enum
 import json
+import os
 import tarfile
 import threading
 import time
+from contextlib import suppress
 from io import BytesIO
 from queue import Queue
 from typing import Any, Optional
 
 import attr
+import click
 
 from ..cli.context import ExecutionContext
 from ..cli.handlers import EventHandler
@@ -60,30 +64,9 @@ class ReportWriter:
 
 
 @attr.s(slots=True)  # pragma: no mutate
-class ReportHandler(EventHandler):
-    client: ServiceClient = attr.ib()  # pragma: no mutate
-    host_data: HostData = attr.ib()  # pragma: no mutate
-    api_name: Optional[str] = attr.ib()  # pragma: no mutate
-    location: str = attr.ib()  # pragma: no mutate
-    base_url: Optional[str] = attr.ib()  # pragma: no mutate
-    out_queue: Queue = attr.ib()  # pragma: no mutate
-    in_queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
-    worker: threading.Thread = attr.ib(init=False)  # pragma: no mutate
-
-    def __attrs_post_init__(self) -> None:
-        self.worker = threading.Thread(
-            target=start,
-            kwargs={
-                "client": self.client,
-                "host_data": self.host_data,
-                "api_name": self.api_name,
-                "location": self.location,
-                "base_url": self.base_url,
-                "in_queue": self.in_queue,
-                "out_queue": self.out_queue,
-            },
-        )
-        self.worker.start()
+class BaseReportHandler(EventHandler):
+    in_queue: Queue
+    worker: threading.Thread
 
     def handle_event(self, context: ExecutionContext, event: ExecutionEvent) -> None:
         self.in_queue.put(event)
@@ -96,7 +79,55 @@ class ReportHandler(EventHandler):
         self.worker.join(WORKER_JOIN_TIMEOUT)
 
 
-def start(
+@attr.s(slots=True)  # pragma: no mutate
+class ServiceReportHandler(BaseReportHandler):
+    client: ServiceClient = attr.ib()  # pragma: no mutate
+    host_data: HostData = attr.ib()  # pragma: no mutate
+    api_name: Optional[str] = attr.ib()  # pragma: no mutate
+    location: str = attr.ib()  # pragma: no mutate
+    base_url: Optional[str] = attr.ib()  # pragma: no mutate
+    out_queue: Queue = attr.ib()  # pragma: no mutate
+    in_queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
+    worker: threading.Thread = attr.ib(init=False)  # pragma: no mutate
+
+    def __attrs_post_init__(self) -> None:
+        self.worker = threading.Thread(
+            target=write_remote,
+            kwargs={
+                "client": self.client,
+                "host_data": self.host_data,
+                "api_name": self.api_name,
+                "location": self.location,
+                "base_url": self.base_url,
+                "in_queue": self.in_queue,
+                "out_queue": self.out_queue,
+            },
+        )
+        self.worker.start()
+
+
+@enum.unique
+class ConsumeResult(enum.Enum):
+    NORMAL = 1
+    INTERRUPT = 2
+
+
+def consume_events(writer: ReportWriter, in_queue: Queue) -> ConsumeResult:
+    while True:
+        event = in_queue.get()
+        if event is STOP_MARKER or isinstance(event, (Interrupted, InternalError)):
+            # If the run is interrupted, or there is an internal error - do not send the report
+            return ConsumeResult.INTERRUPT
+        # Add every event to the report
+        if isinstance(event, Initialized):
+            writer.add_json_file("schema.json", event.schema)
+        writer.add_event(event)
+        if event.is_terminal:
+            break
+    return ConsumeResult.NORMAL
+
+
+def write_remote(
     client: ServiceClient,
     host_data: HostData,
     api_name: Optional[str],
@@ -111,20 +142,42 @@ def start(
         with tarfile.open(mode="w:gz", fileobj=payload) as tar:
             writer = ReportWriter(tar)
             writer.add_metadata(api_name=api_name, location=location, base_url=base_url, metadata=Metadata())
-            while True:
-                event = in_queue.get()
-                if event is STOP_MARKER or isinstance(event, (Interrupted, InternalError)):
-                    # If the run is interrupted, or there is an internal error - do not send the report
-                    return
-                # Add every event to the report
-                if isinstance(event, Initialized):
-                    writer.add_json_file("schema.json", event.schema)
-                writer.add_event(event)
-                if event.is_terminal:
-                    break
+            if consume_events(writer, in_queue) == ConsumeResult.INTERRUPT:
+                return
         response = client.upload_report(payload.getvalue(), host_data.correlation_id)
         host_data.store_correlation_id(response.correlation_id)
         event = events.Completed(message=response.message, next_url=response.next_url)
         out_queue.put(event)
     except Exception as exc:
         out_queue.put(events.Error(exc))
+
+
+@attr.s(slots=True)  # pragma: no mutate
+class FileReportHandler(BaseReportHandler):
+    file_handle: click.utils.LazyFile = attr.ib()  # pragma: no mutate
+    location: str = attr.ib()  # pragma: no mutate
+    base_url: Optional[str] = attr.ib()  # pragma: no mutate
+    in_queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
+    worker: threading.Thread = attr.ib(init=False)  # pragma: no mutate
+
+    def __attrs_post_init__(self) -> None:
+        self.worker = threading.Thread(
+            target=write_file,
+            kwargs={
+                "file_handle": self.file_handle,
+                "location": self.location,
+                "base_url": self.base_url,
+                "in_queue": self.in_queue,
+            },
+        )
+        self.worker.start()
+
+
+def write_file(file_handle: click.utils.LazyFile, location: str, base_url: str, in_queue: Queue) -> None:
+    with file_handle.open() as fileobj, tarfile.open(mode="w:gz", fileobj=fileobj) as tar:
+        writer = ReportWriter(tar)
+        writer.add_metadata(api_name=None, location=location, base_url=base_url, metadata=Metadata())
+        result = consume_events(writer, in_queue)
+    if result == ConsumeResult.INTERRUPT:
+        with suppress(OSError):
+            os.remove(file_handle.name)
