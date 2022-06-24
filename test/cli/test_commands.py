@@ -191,14 +191,14 @@ def test_commands_run_help(cli):
 
     assert result_help.exit_code == ExitCode.OK, result_help.stdout
     assert result_help.stdout.strip().split("\n") == [
-        "Usage: schemathesis run [OPTIONS] SCHEMA [API_SLUG]",
+        "Usage: schemathesis run [OPTIONS] SCHEMA [API_NAME]",
         "",
         "  Perform schemathesis test against an API specified by SCHEMA.",
         "",
         "  SCHEMA must be a valid URL or file path pointing to an Open API / GraphQL",
         "  specification.",
         "",
-        "  API_SLUG is an API identifier to upload data to Schemathesis.io.",
+        "  API_NAME is an API identifier to upload data to Schemathesis.io.",
         "",
         "Filtering options:",
         "",
@@ -295,6 +295,8 @@ def test_commands_run_help(cli):
         "                                  certificate.",
         "  --junit-xml FILENAME            Create junit-xml style report file at given",
         "                                  path.",
+        "  --report                        Upload test report to Schemathesis.io, or",
+        "                                  store in a file.",
         "  --debug-output-file FILENAME    Save debug output as JSON lines in the given",
         "                                  file.",
         "  --show-errors-tracebacks        Show full tracebacks for internal errors.",
@@ -2018,8 +2020,11 @@ def assert_exit_code(event_stream, code):
             code_sample_style=CodeSampleStyle.default(),
             debug_output_file=None,
             schemathesis_io_url=service.DEFAULT_URL,
+            host_data=None,
             client=None,
-            test_run=None,
+            api_name=None,
+            location="http://127.0.0.1",
+            base_url=None,
         )
     assert exc.value.code == code
 

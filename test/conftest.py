@@ -1,3 +1,4 @@
+import os
 import uuid
 from textwrap import dedent
 
@@ -11,6 +12,7 @@ import schemathesis.cli
 from schemathesis._compat import metadata
 from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
+from schemathesis.service import HOSTS_PATH_ENV_VAR
 from schemathesis.specs.openapi import loaders as oas_loaders
 
 from .apps import _graphql as graphql
@@ -24,6 +26,15 @@ pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
 # Register Hypothesis profile. Could be used as
 # `pytest test -m hypothesis --hypothesis-profile <profile-name>`
 settings.register_profile("CI", max_examples=1000)
+
+
+@pytest.fixture(autouse=True)
+def setup(tmp_path_factory):
+    # Avoid failing tests if the local schemathesis CLI is already authenticated with SaaS
+    config_dir = tmp_path_factory.mktemp(basename="schemathesis-config")
+    hosts_path = config_dir / "hosts.toml"
+    hosts_path.touch(exist_ok=True)
+    os.environ[HOSTS_PATH_ENV_VAR] = str(hosts_path)
 
 
 @pytest.fixture(scope="session")

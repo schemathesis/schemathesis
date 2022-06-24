@@ -4,6 +4,15 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Report uploading to Schemathesis.io via the ``--report`` CLI option.
+
+**Removed**
+
+- Previously, data was uploaded to Schemathesis.io when the proper credentials were specified. This release removes this behavior.
+  From now on, every upload requires the explicit ``--report`` CLI option.
+
 .. _v3.15.6:
 
 `3.15.6`_ - 2022-06-23
@@ -142,13 +151,13 @@ Changelog
 - ``X-Schemathesis-TestCaseId`` header to help to distinguish test cases on the application side. `#1303`_
 - Support for comma separated lists in the ``--checks`` CLI option. `#1373`_
 - Hypothesis Database configuration for CLI via the ``--hypothesis-database`` option. `#1326`_
-- Make the ``SCHEMA`` CLI argument accept API slugs from Schemathesis.io.
+- Make the ``SCHEMA`` CLI argument accept API names from Schemathesis.io.
 
 **Changed**
 
 - Enable Open API links traversal by default. To disable it, use ``--stateful=none``.
 - Do not validate API schema by default. To enable it back, use ``--validate-schema=true``.
-- Add the ``api_slug`` CLI argument to upload data to Schemathesis.io.
+- Add the ``api_name`` CLI argument to upload data to Schemathesis.io.
 - Show response status code on failing checks output in CLI.
 - Improve error message on malformed Open API path templates (like ``/foo}/``). `#1372`_
 - Improve error message on malformed media types that appear in the schema or in response headers. `#1382`_

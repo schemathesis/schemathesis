@@ -17,7 +17,7 @@ from .constants import DEFAULT_WORKERS
 MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE = (
     'Missing argument, "--cassette-path" should be specified as well if you use "--cassette-preserve-exact-body-bytes".'
 )
-INVALID_SCHEMA_MESSAGE = "Invalid SCHEMA, must be a valid URL, file path or an API slug from Schemathesis.io."
+INVALID_SCHEMA_MESSAGE = "Invalid SCHEMA, must be a valid URL, file path or an API name from Schemathesis.io."
 
 
 @enum.unique
@@ -30,8 +30,8 @@ class SchemaInputKind(enum.Enum):
     PATH = 2
     # Relative path within a Python app
     APP_PATH = 3
-    # A short name for API created in Schemathesis.io
-    SLUG = 4
+    # A name for API created in Schemathesis.io
+    NAME = 4
 
 
 def parse_schema_kind(schema: str, app: Optional[str]) -> SchemaInputKind:
@@ -48,8 +48,8 @@ def parse_schema_kind(schema: str, app: Optional[str]) -> SchemaInputKind:
         return SchemaInputKind.PATH
     if app is not None:
         return SchemaInputKind.APP_PATH
-    # Assume SLUG if it is not a URL or PATH or APP_PATH
-    return SchemaInputKind.SLUG
+    # Assume NAME if it is not a URL or PATH or APP_PATH
+    return SchemaInputKind.NAME
 
 
 def validate_schema(
@@ -59,7 +59,7 @@ def validate_schema(
     base_url: Optional[str],
     dry_run: bool,
     app: Optional[str],
-    api_slug: Optional[str],
+    api_name: Optional[str],
 ) -> None:
     if kind == SchemaInputKind.URL:
         validate_url(schema)
@@ -67,9 +67,9 @@ def validate_schema(
         # Base URL is required if it is not a dry run
         if app is None and base_url is None and not dry_run:
             raise click.UsageError('Missing argument, "--base-url" is required for SCHEMA specified by file.')
-    if kind == SchemaInputKind.SLUG:
-        if api_slug is not None:
-            raise click.UsageError(f"Got unexpected extra argument ({api_slug})")
+    if kind == SchemaInputKind.NAME:
+        if api_name is not None:
+            raise click.UsageError(f"Got unexpected extra argument ({api_name})")
 
 
 def validate_url(value: str) -> None:

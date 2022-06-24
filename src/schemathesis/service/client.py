@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Optional
 from urllib.parse import urljoin
 
 import attr
@@ -6,20 +6,22 @@ import requests
 from requests.adapters import HTTPAdapter, Retry
 
 from ..constants import USER_AGENT
-from .constants import REQUEST_TIMEOUT
+from .constants import REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT
 from .metadata import Metadata
-from .models import ApiConfig, AuthResponse, TestRun
+from .models import ApiDetails, AuthResponse, UploadResponse
 
 
 class ServiceClient(requests.Session):
     """A more convenient session to send requests to Schemathesis.io."""
 
-    def __init__(self, base_url: str, token: str, *, timeout: int = REQUEST_TIMEOUT, verify: bool = True):
+    def __init__(self, base_url: str, token: Optional[str], *, timeout: int = REQUEST_TIMEOUT, verify: bool = True):
         super().__init__()
         self.timeout = timeout
         self.verify = verify
         self.base_url = base_url
-        self.headers.update({"Authorization": f"Bearer {token}", "User-Agent": USER_AGENT})
+        self.headers["User-Agent"] = USER_AGENT
+        if token is not None:
+            self.headers["Authorization"] = f"Bearer {token}"
         # Automatically check responses for 4XX and 5XX
         self.hooks["response"] = [lambda response, *args, **kwargs: response.raise_for_status()]  # type: ignore
         adapter = HTTPAdapter(max_retries=Retry(5))
@@ -33,30 +35,23 @@ class ServiceClient(requests.Session):
         url = urljoin(self.base_url, url)
         return super().request(method, url, *args, **kwargs)
 
-    def create_test_run(self, api_slug: str) -> TestRun:
-        """Create a new test run on the Schemathesis.io side."""
-        response = self.post("/runs/", json={"api_slug": api_slug})
+    def get_api_details(self, name: str) -> ApiDetails:
+        """Get information about an API."""
+        response = self.get(f"/apis/{name}/")
         data = response.json()
-        config = data["config"]
-        return TestRun(
-            run_id=data["run_id"],
-            short_url=data["short_url"],
-            config=ApiConfig(location=config["location"], base_url=config["base_url"]),
-        )
+        return ApiDetails(location=data["location"], base_url=data["base_url"])
 
-    def finish_test_run(self, run_id: str) -> None:
-        """Finish a test run on the Schemathesis.io side.
-
-        Only needed in corner cases when Schemathesis CLI fails with an internal error in itself, not in the runner.
-        """
-        self.post(f"/runs/{run_id}/finish/")
-
-    def send_event(self, run_id: str, data: Dict[str, Any]) -> None:
-        """Send a single event to Schemathesis.io."""
-        self.post(f"/runs/{run_id}/events/", json=data)
-
-    def cli_login(self, metadata: Metadata) -> AuthResponse:
+    def login(self, metadata: Metadata) -> AuthResponse:
         """Send a login request."""
         response = self.post("/auth/cli/login/", json={"metadata": attr.asdict(metadata)})
         data = response.json()
         return AuthResponse(username=data["username"])
+
+    def upload_report(self, report: bytes, correlation_id: Optional[str] = None) -> UploadResponse:
+        """Upload test run report to Schemathesis.io."""
+        headers = {"Content-Type": "application/x-gtar"}
+        if correlation_id is not None:
+            headers[REPORT_CORRELATION_ID_HEADER] = correlation_id
+        response = self.post("/reports/upload/", report, headers=headers)
+        data = response.json()
+        return UploadResponse(message=data["message"], next_url=data["next"], correlation_id=data["correlation_id"])

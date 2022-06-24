@@ -4,6 +4,8 @@ DEFAULT_HOSTNAME = "api.schemathesis.io"
 # The main Schemathesis.io API address
 DEFAULT_URL = f"https://{DEFAULT_HOSTNAME}/"
 DEFAULT_PROTOCOL = "https"
+# An HTTP header name to store report correlation id
+REPORT_CORRELATION_ID_HEADER = "X-Schemathesis-Report-Correlation-Id"
 # A sentinel to signal the worker thread to stop
 STOP_MARKER = object()
 # Timeout for each API call
@@ -16,6 +18,8 @@ WORKER_CHECK_PERIOD = 0.005
 WORKER_JOIN_TIMEOUT = 10
 # Version of the hosts file format
 HOSTS_FORMAT_VERSION = "0.1"
+# Upload report version
+REPORT_FORMAT_VERSION = "1"
 # Default path to the hosts file
 DEFAULT_HOSTS_PATH = pathlib.Path.home() / ".config/schemathesis/hosts.toml"
 TOKEN_ENV_VAR = "SCHEMATHESIS_TOKEN"
