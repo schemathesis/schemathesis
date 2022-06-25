@@ -7,6 +7,13 @@ Changelog
 **Added**
 
 - Add ``SCHEMATHESIS_BASE_URL`` environment variable for specifying ``--base-url`` in CLI.
+- Collect anonymyzed CLI usage telemetry when reports are uploaded. We do not collect any free-form values you use in your CLI,
+  except for header names. Instead, we measure how many times you use each free-form option in this command.
+  Additionally we count all non-default hook types only by hook name.
+
+.. important::
+
+  You can disable usage this with the ``--schemathesis-io-telemetry=false`` CLI option or the ``SCHEMATHESIS_TELEMETRY=false`` environment variable.
 
 .. _v3.16.0:
 

@@ -351,9 +351,10 @@ def test_save_to_file(cli, schema_url, tmp_path, read_report, service, name):
 
 
 @pytest.mark.parametrize("kind", ("service", "file"))
+@pytest.mark.parametrize("telemetry", ("true", "false"))
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
-def test_report_via_env_var(cli, schema_url, tmp_path, read_report, service, monkeypatch, kind):
+def test_report_via_env_var(cli, schema_url, tmp_path, read_report, service, monkeypatch, kind, telemetry):
     # When report processing is triggered via an env var
     if kind == "service":
         env_variable_value = "true"
@@ -361,7 +362,9 @@ def test_report_via_env_var(cli, schema_url, tmp_path, read_report, service, mon
         report_file = tmp_path / "report.tar.gz"
         env_variable_value = str(report_file)
     monkeypatch.setenv(REPORT_ENV_VAR, env_variable_value)
-    result = cli.run(schema_url, f"--schemathesis-io-url={service.base_url}")
+    result = cli.run(
+        schema_url, f"--schemathesis-io-url={service.base_url}", f"--schemathesis-io-telemetry={telemetry}"
+    )
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then the report should be processed according to the env var value
     if kind == "service":
@@ -376,7 +379,12 @@ def test_report_via_env_var(cli, schema_url, tmp_path, read_report, service, mon
         assert not service.server.log
     with read_report(payload) as tar:
         assert len(tar.getmembers()) == 6
-        assert json.load(tar.extractfile("metadata.json"))["ci"] is None
+        metadata = json.load(tar.extractfile("metadata.json"))
+        assert metadata["ci"] is None
+        if telemetry == "true":
+            assert metadata["usage"]
+        else:
+            assert not metadata["usage"]
 
 
 DEFAULT_GITHUB_ENVIRONMENT = ci.GitHubActionsEnvironment(

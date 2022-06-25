@@ -49,6 +49,7 @@ def test_metadata(read_report):
             metadata=metadata.Metadata(),
             started_at=current_datetime(),
             ci_environment=ci.environment(),
+            usage_data=None,
         )
     data = payload.getvalue()
     with read_report(data) as tar:
