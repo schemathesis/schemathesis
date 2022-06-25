@@ -455,8 +455,8 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     click.echo(f"Specification version: {event.specification_name}")
     click.echo(f"Workers: {context.workers_num}")
     click.secho(f"Collected API operations: {context.operations_count}", bold=True)
-    if context.report is not None:
-        click.secho("Schemathesis.io: ENABLED", bold=True)
+    if isinstance(context.report, ServiceReportContext):
+        click.secho("Report to Schemathesis.io: ENABLED", bold=True)
     if context.operations_count >= 1:
         click.echo()
 
