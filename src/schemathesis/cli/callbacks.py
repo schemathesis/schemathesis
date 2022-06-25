@@ -233,7 +233,7 @@ def convert_hosts_file(ctx: click.core.Context, param: click.core.Parameter, val
     return value
 
 
-def convert_request_tls_verify(ctx: click.core.Context, param: click.core.Parameter, value: str) -> Union[str, bool]:
+def convert_boolean_string(ctx: click.core.Context, param: click.core.Parameter, value: str) -> Union[str, bool]:
     if value.lower() in TRUE_VALUES:
         return True
     if value.lower() in FALSE_VALUES:

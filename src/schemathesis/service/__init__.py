@@ -11,6 +11,7 @@ from .constants import (
     HOSTS_PATH_ENV_VAR,
     PROTOCOL_ENV_VAR,
     REPORT_ENV_VAR,
+    TELEMETRY_ENV_VAR,
     TOKEN_ENV_VAR,
     URL_ENV_VAR,
     WORKER_CHECK_PERIOD,

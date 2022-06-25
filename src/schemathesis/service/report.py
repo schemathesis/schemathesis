@@ -7,7 +7,7 @@ import time
 from contextlib import suppress
 from io import BytesIO
 from queue import Queue
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 import attr
 import click
@@ -15,7 +15,7 @@ import click
 from ..cli.context import ExecutionContext
 from ..cli.handlers import EventHandler
 from ..runner.events import ExecutionEvent, Initialized, InternalError, Interrupted
-from . import ServiceClient, ci, events
+from . import ServiceClient, ci, events, usage
 from .constants import REPORT_FORMAT_VERSION, STOP_MARKER, WORKER_JOIN_TIMEOUT
 from .hosts import HostData
 from .metadata import Metadata
@@ -51,6 +51,7 @@ class ReportWriter:
         started_at: str,
         metadata: Metadata,
         ci_environment: Optional[ci.Environment],
+        usage_data: Optional[Dict[str, Any]],
     ) -> None:
         data = {
             # API identifier on the Schemathesis.io side (optional)
@@ -65,6 +66,8 @@ class ReportWriter:
             "environment": attr.asdict(metadata),
             # Environment variables specific for CI providers
             "ci": ci_environment.asdict() if ci_environment is not None else None,
+            # CLI usage statistic
+            "usage": usage_data,
             # Report format version
             "version": REPORT_FORMAT_VERSION,
         }
@@ -101,6 +104,7 @@ class ServiceReportHandler(BaseReportHandler):
     location: str = attr.ib()  # pragma: no mutate
     base_url: Optional[str] = attr.ib()  # pragma: no mutate
     started_at: str = attr.ib()  # pragma: no mutate
+    telemetry: bool = attr.ib()  # pragma: no mutate
     out_queue: Queue = attr.ib()  # pragma: no mutate
     in_queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
     worker: threading.Thread = attr.ib(init=False)  # pragma: no mutate
@@ -117,6 +121,7 @@ class ServiceReportHandler(BaseReportHandler):
                 "started_at": self.started_at,
                 "in_queue": self.in_queue,
                 "out_queue": self.out_queue,
+                "usage_data": usage.collect() if self.telemetry else None,
             },
         )
         self.worker.start()
@@ -152,6 +157,7 @@ def write_remote(
     started_at: str,
     in_queue: Queue,
     out_queue: Queue,
+    usage_data: Optional[Dict[str, Any]],
 ) -> None:
     """Create a compressed ``tar.gz`` file during the run & upload it to Schemathesis.io when the run is finished."""
     payload = BytesIO()
@@ -166,6 +172,7 @@ def write_remote(
                 started_at=started_at,
                 metadata=Metadata(),
                 ci_environment=ci_environment,
+                usage_data=usage_data,
             )
             if consume_events(writer, in_queue) == ConsumeResult.INTERRUPT:
                 return
@@ -191,6 +198,7 @@ class FileReportHandler(BaseReportHandler):
     location: str = attr.ib()  # pragma: no mutate
     base_url: Optional[str] = attr.ib()  # pragma: no mutate
     started_at: str = attr.ib()  # pragma: no mutate
+    telemetry: bool = attr.ib()  # pragma: no mutate
     out_queue: Queue = attr.ib()  # pragma: no mutate
     in_queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
     worker: threading.Thread = attr.ib(init=False)  # pragma: no mutate
@@ -206,6 +214,7 @@ class FileReportHandler(BaseReportHandler):
                 "started_at": self.started_at,
                 "in_queue": self.in_queue,
                 "out_queue": self.out_queue,
+                "usage_data": usage.collect() if self.telemetry else None,
             },
         )
         self.worker.start()
@@ -219,6 +228,7 @@ def write_file(
     started_at: str,
     in_queue: Queue,
     out_queue: Queue,
+    usage_data: Optional[Dict[str, Any]],
 ) -> None:
     with file_handle.open() as fileobj, tarfile.open(mode="w:gz", fileobj=fileobj) as tar:
         writer = ReportWriter(tar)
@@ -230,6 +240,7 @@ def write_file(
             started_at=started_at,
             metadata=Metadata(),
             ci_environment=ci_environment,
+            usage_data=usage_data,
         )
         result = consume_events(writer, in_queue)
     if result == ConsumeResult.INTERRUPT:
