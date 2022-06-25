@@ -171,6 +171,9 @@ class HookDispatcher:
                 f"Hook '{name}' takes {len(spec.signature.parameters)} arguments but {len(signature.parameters)} is defined"
             )
 
+    def collect_statistic(self) -> Dict[str, int]:
+        return {name: len(hooks) for name, hooks in self._hooks.items()}
+
     def get_all_by_name(self, name: str) -> List[Callable]:
         """Get a list of hooks registered for a name."""
         return self._hooks.get(name, [])
@@ -264,6 +267,7 @@ def add_case(context: HookContext, case: "Case", response: GenericResponse) -> O
 GLOBAL_HOOK_DISPATCHER = HookDispatcher(scope=HookScope.GLOBAL)
 dispatch = GLOBAL_HOOK_DISPATCHER.dispatch
 get_all_by_name = GLOBAL_HOOK_DISPATCHER.get_all_by_name
+collect_statistic = GLOBAL_HOOK_DISPATCHER.collect_statistic
 register = GLOBAL_HOOK_DISPATCHER.register
 unregister = GLOBAL_HOOK_DISPATCHER.unregister
 unregister_all = GLOBAL_HOOK_DISPATCHER.unregister_all

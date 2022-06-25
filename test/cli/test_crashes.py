@@ -63,7 +63,7 @@ def csv_strategy(enum):
 
 
 # The following strategies generate CLI parameters, for example "--workers=5" or "--exitfirst"
-@settings(suppress_health_check=[HealthCheck.too_slow], deadline=None)
+@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture], deadline=None)
 @given(
     params=st.fixed_dictionaries(
         {},
@@ -127,8 +127,9 @@ def csv_strategy(enum):
 @example(params=["--hypothesis-deadline=86399999999999993"], flags=[], multiple_params=[], csv_params=[])
 @example(params=["--hypothesis-max-examples=0"], flags=[], multiple_params=[], csv_params=[])
 @pytest.mark.usefixtures("mocked_schema")
-def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params):
-    result = cli.run(schema_url, *params, *multiple_params, *flags, *csv_params)
+def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params, tmp_path):
+    report = tmp_path / "temp.tar.gz"
+    result = cli.run(schema_url, *params, *multiple_params, *flags, *csv_params, f"--report={report}")
     check_result(result)
 
 

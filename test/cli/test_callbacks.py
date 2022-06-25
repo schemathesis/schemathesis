@@ -84,7 +84,7 @@ def test_validate_regex(value):
     ),
 )
 def test_convert_request_tls_verify(value, expected):
-    assert callbacks.convert_request_tls_verify(None, None, value) == expected
+    assert callbacks.convert_boolean_string(None, None, value) == expected
 
 
 @pytest.mark.parametrize("value, expected", (("2", 2), ("auto", callbacks.get_workers_count())))

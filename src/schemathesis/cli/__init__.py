@@ -188,7 +188,7 @@ with_request_tls_verify = click.option(
     type=str,
     default="true",
     show_default=True,
-    callback=callbacks.convert_request_tls_verify,
+    callback=callbacks.convert_boolean_string,
 )
 with_request_cert = click.option(
     "--request-cert",
@@ -551,6 +551,15 @@ REPORT_TO_SERVICE = object()
     type=str,
     envvar=service.URL_ENV_VAR,
 )
+@click.option(
+    "--schemathesis-io-telemetry",
+    help="Controls whether you send anonymized CLI usage data to Schemathesis.io along with your report.",
+    type=str,
+    default="true",
+    show_default=True,
+    callback=callbacks.convert_boolean_string,
+    envvar=service.TELEMETRY_ENV_VAR,
+)
 @with_hosts_file
 @click.option("--verbosity", "-v", help="Reduce verbosity of error output.", count=True)
 @click.pass_context
@@ -605,6 +614,7 @@ def run(
     report: Optional[click.utils.LazyFile] = None,
     schemathesis_io_token: Optional[str] = None,
     schemathesis_io_url: str = service.DEFAULT_URL,
+    schemathesis_io_telemetry: bool = True,
     hosts_file: PathLike = service.DEFAULT_HOSTS_PATH,
 ) -> None:
     """Perform schemathesis test against an API specified by SCHEMA.
@@ -733,6 +743,7 @@ def run(
         host_data=host_data,
         client=client,
         report=report,
+        telemetry=schemathesis_io_telemetry,
         api_name=api_name,
         location=schema,
         base_url=base_url,
@@ -1007,6 +1018,7 @@ def execute(
     host_data: service.hosts.HostData,
     client: Optional[service.ServiceClient],
     report: Optional[click.utils.LazyFile],
+    telemetry: bool,
     api_name: Optional[str],
     location: str,
     base_url: Optional[str],
@@ -1030,6 +1042,7 @@ def execute(
                 base_url=base_url,
                 started_at=started_at,
                 out_queue=report_queue,
+                telemetry=telemetry,
             )
         )
     elif report and report.name is not REPORT_TO_SERVICE:
@@ -1043,6 +1056,7 @@ def execute(
                 base_url=base_url,
                 started_at=started_at,
                 out_queue=report_queue,
+                telemetry=telemetry,
             )
         )
     if junit_xml is not None:

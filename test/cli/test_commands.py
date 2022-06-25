@@ -319,6 +319,10 @@ def test_commands_run_help(cli):
         "  --no-color                      Disable ANSI color escape codes.",
         "  --schemathesis-io-token TEXT    Schemathesis.io authentication token.",
         "  --schemathesis-io-url TEXT      Schemathesis.io base URL.",
+        "  --schemathesis-io-telemetry TEXT",
+        "                                  Controls whether you send anonymized CLI usage",
+        "                                  data to Schemathesis.io along with your",
+        "                                  report.  [default: true]",
         "  --hosts-file FILE               Path to a file to store the Schemathesis.io",
         "                                  auth configuration.",
         "  -v, --verbosity                 Reduce verbosity of error output.",
@@ -2028,6 +2032,7 @@ def assert_exit_code(event_stream, code):
             base_url=None,
             started_at=current_datetime(),
             report=None,
+            telemetry=False,
         )
     assert exc.value.code == code
 
