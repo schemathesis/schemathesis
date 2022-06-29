@@ -3,7 +3,7 @@
 They all consist of primitive types and don't have references to schemas, app, etc.
 """
 import logging
-from typing import Any, Dict, Generator, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import attr
 import requests
@@ -194,13 +194,3 @@ def deduplicate_failures(checks: List[SerializedCheck]) -> List[SerializedCheck]
                 unique_checks.append(check)
                 seen.add(key)
     return unique_checks
-
-
-def deduplicate_checks(checks: List[SerializedCheck]) -> Generator[SerializedCheck, None, None]:
-    """Return only unique checks outcomes."""
-    seen: Set[Tuple[Optional[str], ...]] = set()
-    for check in reversed(checks):
-        key = make_unique_by_key(check.name, check.message, check.context)
-        if key not in seen:
-            yield check
-            seen.add(key)
