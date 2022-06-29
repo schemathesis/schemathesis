@@ -33,6 +33,13 @@ class Error(Event):
 
 
 @attr.s(slots=True)
+class Failed(Event):
+    """A client-side error which should be displayed to the user."""
+
+    detail: str = attr.ib()
+
+
+@attr.s(slots=True)
 class Timeout(Event):
     """The handler did not finish its work in time.
 
