@@ -292,10 +292,15 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
         click.echo()
         category = click.style("Report", bold=True)
         click.secho(f"{category}: {context.report.filename}")
-
-    if isinstance(context.report, ServiceReportContext):
+    elif isinstance(context.report, ServiceReportContext):
         click.echo()
         handle_service_integration(context.report)
+    else:
+        click.echo()
+        category = click.style("Hint", bold=True)
+        click.echo(
+            f"{category}: You can visualize test results in Schemathesis.io by using `--report` in your CLI command."
+        )
 
 
 def handle_service_integration(context: ServiceReportContext) -> None:
