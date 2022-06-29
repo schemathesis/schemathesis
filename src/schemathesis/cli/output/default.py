@@ -362,9 +362,9 @@ SERVICE_ERROR_MESSAGE = "An error happened during uploading reports to Schemathe
 
 def ask_to_report(event: service.Error, report_to_issues: bool = True, extra: str = "") -> None:
     # Likely an internal Schemathesis error
-    message = event.get_message(True)
+    traceback = event.get_message(True)
     if isinstance(event.exception, requests.RequestException) and event.exception.response is not None:
-        response = f"Response: {event.exception.response.text}"
+        response = f"Response: {event.exception.response.text}\n"
     else:
         response = ""
     if report_to_issues:
@@ -372,7 +372,7 @@ def ask_to_report(event: service.Error, report_to_issues: bool = True, extra: st
     else:
         ask = ""
     click.secho(
-        f"{SERVICE_ERROR_MESSAGE}:\n" f"{extra}" f"{ask}" f"{response}" f"\n    {message.strip()}",
+        f"{SERVICE_ERROR_MESSAGE}:\n{extra}{ask}{response}\n{traceback.strip()}",
         fg="red",
     )
 
