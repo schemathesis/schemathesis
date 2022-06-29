@@ -336,3 +336,25 @@ def test_ci_environment(monkeypatch, cli, schema_url, tmp_path, read_report, ser
             "repository": "schemathesis/schemathesis",
             "sha": "e56e13224f08469841e106449f6467b769e2afca",
         }
+
+
+PAYLOAD_TOO_LARGE_MESSAGE = "Your report is too large. The limit is 100 KB, but your report is 101 KB."
+
+
+@pytest.mark.service(
+    data={"title": "Payload Too Large", "status": 413, "detail": PAYLOAD_TOO_LARGE_MESSAGE},
+    status=413,
+    method="POST",
+    path="/reports/upload/",
+)
+@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+def test_too_large_payload(cli, schema_url, service):
+    # When the report exceeds the size limit
+    result = cli.run(
+        schema_url, "my-api", f"--schemathesis-io-token={service.token}", f"--schemathesis-io-url={service.base_url}"
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # Then it should be correctly handled & reported in CLI
+    lines = get_stdout_lines(result.stdout)
+    assert "Upload: FAILED" in lines
+    assert PAYLOAD_TOO_LARGE_MESSAGE in lines
