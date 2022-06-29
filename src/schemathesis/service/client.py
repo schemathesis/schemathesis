@@ -1,4 +1,5 @@
-from typing import Any, Optional
+import http
+from typing import Any, Optional, Union
 from urllib.parse import urljoin
 
 import attr
@@ -8,7 +9,12 @@ from requests.adapters import HTTPAdapter, Retry
 from ..constants import USER_AGENT
 from .constants import REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT
 from .metadata import Metadata
-from .models import ApiDetails, AuthResponse, UploadResponse
+from .models import ApiDetails, AuthResponse, FailedUploadResponse, UploadResponse
+
+
+def response_hook(response: requests.Response, **_kwargs: Any) -> None:
+    if response.status_code != http.HTTPStatus.REQUEST_ENTITY_TOO_LARGE:
+        response.raise_for_status()
 
 
 class ServiceClient(requests.Session):
@@ -23,7 +29,7 @@ class ServiceClient(requests.Session):
         if token is not None:
             self.headers["Authorization"] = f"Bearer {token}"
         # Automatically check responses for 4XX and 5XX
-        self.hooks["response"] = [lambda response, *args, **kwargs: response.raise_for_status()]  # type: ignore
+        self.hooks["response"] = [response_hook]  # type: ignore
         adapter = HTTPAdapter(max_retries=Retry(5))
         self.mount("https://", adapter)
         self.mount("http://", adapter)
@@ -47,11 +53,15 @@ class ServiceClient(requests.Session):
         data = response.json()
         return AuthResponse(username=data["username"])
 
-    def upload_report(self, report: bytes, correlation_id: Optional[str] = None) -> UploadResponse:
+    def upload_report(
+        self, report: bytes, correlation_id: Optional[str] = None
+    ) -> Union[UploadResponse, FailedUploadResponse]:
         """Upload test run report to Schemathesis.io."""
         headers = {"Content-Type": "application/x-gtar"}
         if correlation_id is not None:
             headers[REPORT_CORRELATION_ID_HEADER] = correlation_id
         response = self.post("/reports/upload/", report, headers=headers)
         data = response.json()
+        if response.status_code == http.HTTPStatus.REQUEST_ENTITY_TOO_LARGE:
+            return FailedUploadResponse(detail=data["detail"])
         return UploadResponse(message=data["message"], next_url=data["next"], correlation_id=data["correlation_id"])

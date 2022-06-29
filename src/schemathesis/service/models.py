@@ -19,3 +19,8 @@ class UploadResponse:
     message: str = attr.ib()
     next_url: str = attr.ib()
     correlation_id: str = attr.ib()
+
+
+@attr.s(slots=True)
+class FailedUploadResponse:
+    detail: str = attr.ib()

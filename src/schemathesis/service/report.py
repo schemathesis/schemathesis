@@ -19,6 +19,7 @@ from . import ServiceClient, ci, events
 from .constants import REPORT_FORMAT_VERSION, STOP_MARKER, WORKER_JOIN_TIMEOUT
 from .hosts import HostData
 from .metadata import Metadata
+from .models import UploadResponse
 from .serialization import serialize_event
 
 
@@ -161,8 +162,12 @@ def write_remote(
             if consume_events(writer, in_queue) == ConsumeResult.INTERRUPT:
                 return
         response = client.upload_report(payload.getvalue(), host_data.correlation_id)
-        host_data.store_correlation_id(response.correlation_id)
-        event = events.Completed(message=response.message, next_url=response.next_url)
+        event: events.Event
+        if isinstance(response, UploadResponse):
+            host_data.store_correlation_id(response.correlation_id)
+            event = events.Completed(message=response.message, next_url=response.next_url)
+        else:
+            event = events.Failed(detail=response.detail)
         out_queue.put(event)
     except Exception as exc:
         out_queue.put(events.Error(exc))

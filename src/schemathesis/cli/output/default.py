@@ -310,6 +310,7 @@ def handle_service_integration(context: ServiceReportContext) -> None:
     color = {
         service.Completed: "green",
         service.Error: "red",
+        service.Failed: "red",
         service.Timeout: "red",
     }[event.__class__]
     status = click.style(event.status, fg=color, bold=True)
@@ -318,6 +319,9 @@ def handle_service_integration(context: ServiceReportContext) -> None:
     if isinstance(event, service.Error):
         click.echo()
         display_service_error(event)
+    if isinstance(event, service.Failed):
+        click.echo()
+        click.echo(event.detail)
     if isinstance(event, service.Completed):
         click.echo()
         click.echo(event.message)
