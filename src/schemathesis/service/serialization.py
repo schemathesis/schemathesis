@@ -53,6 +53,8 @@ def serialize_after_execution(event: events.AfterExecution) -> Optional[Dict[str
     return {
         "correlation_id": event.correlation_id,
         "verbose_name": event.verbose_name,
+        "status": event.status,
+        "elapsed_time": event.elapsed_time,
         "data_generation_method": event.data_generation_method,
         "result": {
             "checks": [
