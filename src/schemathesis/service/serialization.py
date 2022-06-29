@@ -4,7 +4,7 @@ import attr
 
 from ..models import Response
 from ..runner import events
-from ..runner.serialization import SerializedCase, deduplicate_checks
+from ..runner.serialization import SerializedCase
 from ..utils import merge
 
 S = TypeVar("S", bound=events.ExecutionEvent)
@@ -74,7 +74,7 @@ def serialize_after_execution(event: events.AfterExecution) -> Optional[Dict[str
                         for entry in check.history
                     ],
                 }
-                for check in deduplicate_checks(event.result.checks)
+                for check in event.result.checks
             ],
             "errors": [
                 {
