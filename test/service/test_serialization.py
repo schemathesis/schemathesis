@@ -1,4 +1,3 @@
-from test.apps.openapi.schema import OpenAPIVersion
 from unittest.mock import ANY
 
 import pytest
@@ -10,7 +9,7 @@ from schemathesis.service.serialization import prepare_query, serialize_event, s
 
 
 @pytest.mark.operations("success", "multiple_failures")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_serialize_event(schema_url):
     schema = schemathesis.from_uri(schema_url)
     events = from_schema(schema).execute()
@@ -23,7 +22,7 @@ def test_serialize_event(schema_url):
 
 
 @pytest.mark.operations("success")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_serialize_interrupted(mocker, schema_url):
     mocker.patch("schemathesis.runner.impl.solo.SingleThreadRunner._execute_impl", side_effect=KeyboardInterrupt)
     schema = schemathesis.from_uri(schema_url)
@@ -74,7 +73,7 @@ def test_stringify_path_parameters(query, expected):
     "serializer, expected", ((None, "GET /api/success"), (lambda e: {"verbose_name": "Bar"}, "Bar"))
 )
 @pytest.mark.operations("success")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_explicit_serialization(serializer, expected, schema_url):
     schema = schemathesis.from_uri(schema_url)
     events = from_schema(schema).execute()
@@ -84,7 +83,7 @@ def test_explicit_serialization(serializer, expected, schema_url):
 
 
 @pytest.mark.operations("success")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("2.0"),))
+@pytest.mark.openapi_version("2.0")
 def test_extra_values(schema_url):
     schema = schemathesis.from_uri(schema_url)
     events = from_schema(schema).execute()

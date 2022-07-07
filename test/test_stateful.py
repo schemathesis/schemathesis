@@ -7,7 +7,7 @@ from schemathesis.specs.openapi import expressions
 from schemathesis.stateful import ParsedData
 from schemathesis.utils import NOT_SET
 
-from .apps.openapi.schema import OpenAPIVersion
+pytestmark = [pytest.mark.openapi_version("3.0")]
 
 
 @pytest.mark.parametrize(
@@ -16,11 +16,6 @@ from .apps.openapi.schema import OpenAPIVersion
 def test_hashable(parameters, body):
     # All parsed data should be hashable
     hash(ParsedData(parameters, body))
-
-
-@pytest.fixture
-def openapi_version():
-    return OpenAPIVersion("3.0")
 
 
 def add_link(schema, target, **kwargs):

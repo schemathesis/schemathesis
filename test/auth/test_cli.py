@@ -1,5 +1,3 @@
-from test.apps.openapi.schema import OpenAPIVersion
-
 import pytest
 from _pytest.main import ExitCode
 
@@ -30,7 +28,7 @@ class TokenAuth:
 """
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_custom_auth(testdir, cli, schema_url, app):
     # When a custom auth is used
@@ -61,7 +59,7 @@ def after_call(context, case, response):
         (("-H", "Authorization: Bearer EXPLICIT"), "Bearer EXPLICIT"),
     ),
 )
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_explicit_auth_precedence(testdir, cli, schema_url, args, expected):
     # If explicit auth is passed via CLI
@@ -84,7 +82,7 @@ def after_call(context, case, response):
     assert expected in result.stdout.splitlines()
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success", "custom_format")
 def test_multiple_threads(testdir, cli, schema_url):
     module = testdir.make_importable_pyfile(

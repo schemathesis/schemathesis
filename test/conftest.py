@@ -57,10 +57,31 @@ def pytest_collection_modifyitems(session, config, items):
             item.add_marker("hypothesis_nested")
 
 
+def pytest_generate_tests(metafunc):
+    # A more ergonomic way to limit test parametrization to the specific Open API versions:
+    #
+    #     @pytest.mark.openapi_version("2.0")
+    #
+    #  or:
+    #
+    #     @pytest.mark.openapi_version("2.0", "3.0")
+    if "openapi_version" in metafunc.fixturenames:
+        marker = metafunc.definition.get_closest_marker("openapi_version")
+        if marker is not None:
+            variants = [OpenAPIVersion(variant) if isinstance(variant, str) else variant for variant in marker.args]
+        else:
+            variants = [OpenAPIVersion("2.0"), OpenAPIVersion("3.0")]
+        metafunc.parametrize("openapi_version", variants)
+
+
 def pytest_configure(config):
-    config.addinivalue_line("markers", "operations(*names): add only specified API operations to the test application.")
+    config.addinivalue_line("markers", "operations(*names): Add only specified API operations to the test application.")
     config.addinivalue_line("markers", "service(**kwargs): Setup mock server for Schemathesis.io.")
-    config.addinivalue_line("markers", "hypothesis_nested: mark tests with nested Hypothesis tests.")
+    config.addinivalue_line("markers", "hypothesis_nested: Mark tests with nested Hypothesis tests.")
+    config.addinivalue_line(
+        "markers",
+        "openapi_version(*versions): Restrict test parametrization only to the specified Open API version(s).",
+    )
 
 
 @pytest.fixture(scope="session")
@@ -88,11 +109,6 @@ def reset_app(_app, operations):
         openapi._aiohttp.reset_app(_app, operations, version)
 
     return inner
-
-
-@pytest.fixture(params=[OpenAPIVersion("2.0"), OpenAPIVersion("3.0")])
-def openapi_version(request):
-    return request.param
 
 
 @pytest.fixture
@@ -669,7 +685,7 @@ def loadable_flask_app(testdir, operations):
 
 
 @pytest.fixture
-def loadable_aiohttp_app(testdir, operations):
+def loadable_aiohttp_app(testdir, operations, openapi_version):
     module = testdir.make_importable_pyfile(
         location=f"""
         from test.apps.openapi._aiohttp import create_app

@@ -1,5 +1,4 @@
 import io
-from test.apps.openapi.schema import OpenAPIVersion
 
 import pytest
 import requests
@@ -231,9 +230,9 @@ def test_all_operations_with_links(openapi3_base_url):
     )
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
-def test_step_override(testdir, app_schema, base_url, openapi_version):
+def test_step_override(testdir, app_schema, base_url):
     # See GH-970
     # When the user overrides the `step` method
     testdir.make_test(
@@ -262,9 +261,9 @@ TestStateful.settings = settings(
     result.stdout.re_match_lines([r".+ValueError: ERROR FOUND!"])
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("multiple_failures")
-def test_trimmed_output(testdir, app_schema, base_url, openapi_version):
+def test_trimmed_output(testdir, app_schema, base_url):
     # When an issue is found
     testdir.make_test(
         f"""
@@ -281,9 +280,9 @@ TestStateful = schema.as_state_machine().TestCase
 
 
 @pytest.mark.parametrize("response_factory", (make_response, make_wsgi_response))
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
-def test_history(testdir, app_schema, base_url, openapi_version, response_factory):
+def test_history(testdir, app_schema, base_url, response_factory):
     # When cases are serialized
     schema = schemathesis.from_dict(app_schema)
     first = schema["/users/"]["POST"].make_case(body={"first_name": "Foo", "last_name": "bar"})
