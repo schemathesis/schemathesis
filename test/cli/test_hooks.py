@@ -1,5 +1,3 @@
-from test.apps.openapi.schema import OpenAPIVersion
-
 import pytest
 from _pytest.main import ExitCode
 
@@ -47,7 +45,7 @@ def test_custom_cli_handlers(testdir, cli, schema_url, app):
     assert result.stdout.strip() == "Done!"
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_before_call(testdir, cli, cli_args):
     # When the `before_call` hook is registered
@@ -69,7 +67,7 @@ def before_call(context, case):
     assert "Before!" in result.stdout.splitlines()
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_after_call(testdir, cli, cli_args):
     # When the `after_call` hook is registered
@@ -94,7 +92,7 @@ def after_call(context, case, response):
     assert 'Response payload: `{"wrong": 42}`' in result.stdout.splitlines()
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_process_call_kwargs(testdir, cli, cli_args, mocker, app_type):
     # When the `process_call_kwargs` hook is registered

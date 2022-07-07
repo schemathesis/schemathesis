@@ -1,6 +1,5 @@
 import base64
 import io
-from test.apps.openapi.schema import OpenAPIVersion
 from urllib.parse import parse_qsl, quote_plus, unquote_plus, urlencode, urlparse, urlunparse
 
 import pytest
@@ -248,7 +247,7 @@ def request_args(request, tmp_path):
         return [f"--request-cert={cert}", f"--request-cert-key={key}"], "cert", (str(cert), str(key))
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_replay_cert_options(cli, schema_url, cassette_path, request_args, mocker):
     # Record a cassette
     cli.run(
@@ -344,7 +343,7 @@ def test_filter_cassette(filters, expected):
 
 
 @pytest.mark.operations("success")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_use_deprecation(cli, schema_url, cassette_path):
     result = cli.run(
         schema_url,
@@ -355,7 +354,7 @@ def test_use_deprecation(cli, schema_url, cassette_path):
 
 
 @pytest.mark.operations("success")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_forbid_simultaneous_use_of_deprecated_and_new_options(cli, schema_url, cassette_path):
     result = cli.run(
         schema_url,
@@ -366,7 +365,7 @@ def test_forbid_simultaneous_use_of_deprecated_and_new_options(cli, schema_url, 
     assert result.stdout.splitlines()[0].endswith(CASSETTES_PATH_INVALID_USAGE_MESSAGE)
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_forbid_preserve_exact_bytes_without_cassette_path(cli, schema_url):
     # When `--cassette-preserve-exact-body-bytes` is specified without `--cassette-path`
     result = cli.run(

@@ -5,7 +5,6 @@ from packaging import version
 import schemathesis
 from schemathesis.parameters import PayloadAlternatives
 
-from .apps.openapi.schema import OpenAPIVersion
 from .utils import integer
 
 
@@ -788,9 +787,9 @@ def test_(request, case):
     result.stdout.re_match_lines([r".*\[GET /v1/users\]"])
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("slow")
-def test_long_response(testdir, app_schema, openapi3_base_url, openapi_version):
+def test_long_response(testdir, app_schema, openapi3_base_url):
     # When response takes too long
     testdir.make_test(
         f"""

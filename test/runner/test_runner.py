@@ -1,6 +1,5 @@
 import base64
 import json
-from test.apps.openapi.schema import OpenAPIVersion
 from typing import Dict, Optional
 from unittest.mock import ANY
 
@@ -196,7 +195,7 @@ def test_empty_response_interaction(any_app_schema):
         assert interaction.response.encoding is None
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("empty_string")
 def test_empty_string_response_interaction(any_app_schema):
     # When there is a response that returns payload of length 0
@@ -935,7 +934,7 @@ def test_finish(event_stream):
 
 
 @pytest.mark.operations("success")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_case_mutation(real_app_schema):
     # When two checks mutate the case
 
@@ -954,7 +953,7 @@ def test_case_mutation(real_app_schema):
 
 
 @pytest.mark.operations("success")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_response_mutation(any_app_schema):
     # When two checks mutate the response
 
