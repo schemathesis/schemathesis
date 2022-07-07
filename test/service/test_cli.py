@@ -1,6 +1,5 @@
 import json
 import re
-from test.apps.openapi.schema import OpenAPIVersion
 
 import pytest
 from _pytest.main import ExitCode
@@ -26,7 +25,7 @@ def get_stdout_lines(stdout):
 
 
 @pytest.mark.operations("success")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_no_failures(cli, schema_url, service, next_url, upload_message):
     # When Schemathesis.io is enabled and there are no errors
     result = cli.run(
@@ -56,7 +55,7 @@ def test_no_failures(cli, schema_url, service, next_url, upload_message):
 
 @pytest.mark.operations("success")
 @pytest.mark.service(data={"detail": "Internal Server Error"}, status=500, method="POST", path="/reports/upload/")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_server_error(cli, schema_url, service):
     # When Schemathesis.io is enabled but returns 500 on the first call
     args = [
@@ -78,7 +77,7 @@ def test_server_error(cli, schema_url, service):
 
 
 @pytest.mark.operations("success")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_error_in_another_handler(testdir, cli, schema_url, service):
     # When a non-Schemathesis.io handler fails
     module = testdir.make_importable_pyfile(
@@ -117,7 +116,7 @@ def test_error_in_another_handler(testdir, cli, schema_url, service):
 
 
 @pytest.mark.operations("success")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_server_timeout(cli, schema_url, service, mocker):
     # When Schemathesis.io responds slowly
     mocker.patch("schemathesis.service.WORKER_FINISH_TIMEOUT", 0)
@@ -141,7 +140,7 @@ def test_server_timeout(cli, schema_url, service, mocker):
     method="GET",
     path=re.compile("/apis/.*/"),
 )
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_unauthorized(cli, schema_url, service):
     # When the token is invalid
     result = cli.run(
@@ -159,7 +158,7 @@ def test_unauthorized(cli, schema_url, service):
     method="POST",
     path="/reports/upload/",
 )
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_invalid_payload(cli, schema_url, service):
     # When there is no token or invalid token
     result = cli.run(
@@ -178,7 +177,7 @@ def test_invalid_payload(cli, schema_url, service):
     assert "400 Client Error" in result.stdout
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_connection_issue(cli, schema_url, service, mocker):
     # When there is a connection issue
     mocker.patch("schemathesis.service.report.serialize_event", side_effect=Timeout)
@@ -197,7 +196,7 @@ def test_connection_issue(cli, schema_url, service, mocker):
     assert "Timeout" in result.stdout
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_api_id_no_token(cli, schema_url, hosts_file):
     # When there is API ID
     # And there is no token
@@ -213,7 +212,7 @@ def test_api_id_no_token(cli, schema_url, hosts_file):
     method="GET",
     path=re.compile("/apis/.*/"),
 )
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_invalid_api_name(cli, schema_url, service):
     # When API name does not exist
     result = cli.run(
@@ -253,7 +252,7 @@ def test_authenticated_with_name(cli, service):
     assert "1 passed" in result.stdout
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_permission_denied_on_hosts_creation(mocker, cli, schema_url, service, hosts_file):
     # When the hosts file can't be created
@@ -265,7 +264,7 @@ def test_permission_denied_on_hosts_creation(mocker, cli, schema_url, service, h
 
 @pytest.mark.operations("success")
 @pytest.mark.service(data={"username": "TestUser"}, status=200, method="POST", path="/auth/cli/login/")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_anonymous_upload(cli, schema_url, service, hosts_file, correlation_id):
     # When upload is anonymous
     result = cli.run(schema_url, f"--schemathesis-io-url={service.base_url}", f"--hosts-file={hosts_file}", "--report")
@@ -288,7 +287,7 @@ def test_anonymous_upload(cli, schema_url, service, hosts_file, correlation_id):
 
 
 @pytest.mark.operations("success")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_save_to_file(cli, schema_url, tmp_path, read_report, service):
     # When an argument is provided to the `--report` option
     report_file = tmp_path / "report.tar.gz"
@@ -306,7 +305,7 @@ def test_save_to_file(cli, schema_url, tmp_path, read_report, service):
 
 
 @pytest.mark.operations("success")
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_ci_environment(monkeypatch, cli, schema_url, tmp_path, read_report, service):
     # When executed in CI
     for key, value in {
@@ -347,7 +346,7 @@ PAYLOAD_TOO_LARGE_MESSAGE = "Your report is too large. The limit is 100 KB, but 
     method="POST",
     path="/reports/upload/",
 )
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 def test_too_large_payload(cli, schema_url, service):
     # When the report exceeds the size limit
     result = cli.run(

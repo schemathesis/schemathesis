@@ -3,7 +3,6 @@ import os
 import pathlib
 import sys
 import time
-from test.apps.openapi.schema import OpenAPIVersion
 from test.utils import HERE, SIMPLE_PATH
 from urllib.parse import urljoin
 from warnings import catch_warnings
@@ -18,7 +17,7 @@ from hypothesis import HealthCheck, Phase, Verbosity
 from hypothesis.configuration import set_hypothesis_home_dir, storage_directory
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
-from schemathesis import Case, DataGenerationMethod, fixups, service
+from schemathesis import Case, DataGenerationMethod, fixups
 from schemathesis.checks import ALL_CHECKS, not_a_server_error
 from schemathesis.cli import LoaderConfig, execute, get_exit_code, reset_checks
 from schemathesis.cli.callbacks import INVALID_SCHEMA_MESSAGE
@@ -171,7 +170,7 @@ def test_certificate_only_key(cli, tmp_path):
     )
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_certificates(cli, schema_url, mocker):
     request = mocker.spy(requests.Session, "request")
@@ -481,7 +480,7 @@ def test_hypothesis_database_parsing(request, cli, mocker, swagger_20, factory, 
     assert isinstance(hypothesis_settings.database, cls)
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_hypothesis_database_report(cli, schema_url):
     result = cli.run(schema_url, "--hypothesis-database=:memory:")
@@ -500,7 +499,7 @@ def tmp_hypothesis_dir(tmp_path):
     tmp_path.chmod(0o777)
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_hypothesis_settings_no_warning_on_unusable_dir(tmp_hypothesis_dir, cli, schema_url):
     # When the `.hypothesis` directory is unusable
@@ -512,7 +511,7 @@ def test_hypothesis_settings_no_warning_on_unusable_dir(tmp_hypothesis_dir, cli,
     assert not warnings
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("failure")
 def test_hypothesis_do_not_print_blob(testdir, monkeypatch, cli, schema_url):
     # When runs in CI
@@ -1446,7 +1445,7 @@ def test_wsgi_app_internal_exception(testdir, cli):
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
-def test_aiohttp_app(openapi_version, request, cli, loadable_aiohttp_app, args):
+def test_aiohttp_app(request, cli, loadable_aiohttp_app, args):
     # When a URL is passed together with app
     if args:
         args += (request.getfixturevalue("base_url"),)
@@ -1742,10 +1741,10 @@ def test_max_response_time_valid(cli, server, schema_url):
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.parametrize("header", ("Authorization", "authorization"))
 @pytest.mark.operations()
-def test_auth_and_authorization_header_are_disallowed(cli, schema_url, header, openapi_version):
+def test_auth_and_authorization_header_are_disallowed(cli, schema_url, header):
     # When ``--auth`` is passed together with ``--header`` that sets the ``Authorization`` header
     result = cli.run(schema_url, "--auth=test:test", f"--header={header}:token123")
     # Then it causes a validation error
@@ -1757,9 +1756,9 @@ def test_auth_and_authorization_header_are_disallowed(cli, schema_url, header, o
 
 
 @pytest.mark.parametrize("workers_num", (1, 2))
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("failure", "success")
-def test_exit_first(cli, schema_url, openapi_version, workers_num, mocker):
+def test_exit_first(cli, schema_url, workers_num, mocker):
     # When the `--exit-first` CLI option is passed
     # And a failure occurs
     stop_worker = mocker.spy(threadpool, "stop_worker")
@@ -1783,8 +1782,8 @@ def test_exit_first(cli, schema_url, openapi_version, workers_num, mocker):
         stop_worker.assert_called()
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
-def test_base_url_not_required_for_dry_run(testdir, cli, openapi_version, empty_open_api_3_schema):
+@pytest.mark.openapi_version("3.0")
+def test_base_url_not_required_for_dry_run(testdir, cli, empty_open_api_3_schema):
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(empty_open_api_3_schema))
     result = cli.run(str(schema_file), "--dry-run")
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -1900,7 +1899,7 @@ def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra, 
     )
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("flaky")
 def test_explicit_headers_in_output_on_errors(cli, schema_url):
     # When there is a non-fatal error during testing (e.g. flakiness)
@@ -1915,9 +1914,9 @@ def test_explicit_headers_in_output_on_errors(cli, schema_url):
     assert f"Authorization: {auth}" in lines[30]
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("__all__")
-def test_debug_output(tmp_path, cli, schema_url, openapi_version, hypothesis_max_examples):
+def test_debug_output(tmp_path, cli, schema_url, hypothesis_max_examples):
     # When the `--debug-output-file` option is passed
     debug_file = tmp_path / "debug.jsonl"
     cassette_path = tmp_path / "output.yaml"
@@ -1971,7 +1970,7 @@ def test_malformed_json_deduplication(cli, cli_args):
 
 
 @pytest.mark.parametrize("kind", ("env_var", "arg"))
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_no_color(monkeypatch, cli, schema_url, kind):
     args = (schema_url,)
@@ -2083,7 +2082,7 @@ def test_missing_content_and_schema(cli, base_url, tmp_path, testdir, empty_open
     assert events[1]["verbose_name"] == events[2]["verbose_name"]
 
 
-@pytest.mark.parametrize("openapi_version", (OpenAPIVersion("3.0"),))
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_skip_not_negated_tests(cli, schema_url):
     # See GH-1463
