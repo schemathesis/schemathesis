@@ -447,22 +447,23 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     """Display information about the test session."""
     context.operations_count = cast(int, event.operations_count)  # INVARIANT: should not be `None`
     display_section_name("Schemathesis test session starts")
-    versions = (
-        f"platform {platform.system()} -- "
-        f"Python {platform.python_version()}, "
-        f"schemathesis-{__version__}, "
-        f"hypothesis-{metadata.version('hypothesis')}, "
-        f"hypothesis_jsonschema-{metadata.version('hypothesis_jsonschema')}, "
-        f"jsonschema-{metadata.version('jsonschema')}"
-    )
-    click.echo(versions)
-    click.echo(f"rootdir: {os.getcwd()}")
-    click.echo(f"Hypothesis: {context.hypothesis_settings.show_changed()}")
+    if context.verbosity > 0:
+        versions = (
+            f"platform {platform.system()} -- "
+            f"Python {platform.python_version()}, "
+            f"schemathesis-{__version__}, "
+            f"hypothesis-{metadata.version('hypothesis')}, "
+            f"hypothesis_jsonschema-{metadata.version('hypothesis_jsonschema')}, "
+            f"jsonschema-{metadata.version('jsonschema')}"
+        )
+        click.echo(versions)
+        click.echo(f"rootdir: {os.getcwd()}")
+        click.echo(f"Hypothesis: {context.hypothesis_settings.show_changed()}")
     if event.location is not None:
-        click.echo(f"Schema location: {event.location}")
-    click.echo(f"Base URL: {event.base_url}")
-    click.echo(f"Specification version: {event.specification_name}")
-    click.echo(f"Workers: {context.workers_num}")
+        click.secho(f"Schema location: {event.location}", bold=True)
+    click.secho(f"Base URL: {event.base_url}", bold=True)
+    click.secho(f"Specification version: {event.specification_name}", bold=True)
+    click.secho(f"Workers: {context.workers_num}", bold=True)
     click.secho(f"Collected API operations: {context.operations_count}", bold=True)
     if isinstance(context.report, ServiceReportContext):
         click.secho("Report to Schemathesis.io: ENABLED", bold=True)

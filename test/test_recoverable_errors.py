@@ -82,10 +82,10 @@ def test_in_cli(testdir, cli, open_api_3_schema_with_recoverable_errors, workers
     # Then valid operation should be tested
     # And errors on the single operation error should be displayed
     if workers == 1:
-        assert lines[10].startswith("GET /bar .")
-        assert lines[11].startswith("POST /bar E")
+        assert lines[7].startswith("GET /bar .")
+        assert lines[8].startswith("POST /bar E")
     else:
-        assert lines[10] in ("E.", ".E")
+        assert lines[7] in ("E.", ".E")
     error = "Unresolvable JSON pointer: 'components/UnknownParameter'"
     assert len([line for line in lines if error in line]) == 1
     assert "1 passed, 2 errored" in lines[-1]
