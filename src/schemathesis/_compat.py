@@ -1,4 +1,5 @@
 # pylint: disable=ungrouped-imports
+import hypothesis
 import hypothesis_jsonschema._from_schema
 import jsonschema
 import werkzeug
@@ -25,6 +26,11 @@ try:
     from hypothesis.utils.conventions import InferType
 except ImportError:
     InferType = type(...)
+
+if version.parse(hypothesis.__version__) >= version.parse("6.49"):
+    from hypothesis.internal.reflection import get_signature
+else:
+    from inspect import getfullargspec as get_signature
 
 
 def _get_format_filter(
