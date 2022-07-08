@@ -8,6 +8,10 @@ Changelog
 
 - Report uploading to Schemathesis.io via the ``--report`` CLI option.
 
+**Fixed**
+
+- Compatibility with ``hypothesis>=6.49``. `#1538`_
+
 **Removed**
 
 - Previously, data was uploaded to Schemathesis.io when the proper credentials were specified. This release removes this behavior.
@@ -2955,6 +2959,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1538: https://github.com/schemathesis/schemathesis/issues/1538
 .. _#1526: https://github.com/schemathesis/schemathesis/issues/1526
 .. _#1518: https://github.com/schemathesis/schemathesis/issues/1518
 .. _#1514: https://github.com/schemathesis/schemathesis/issues/1514

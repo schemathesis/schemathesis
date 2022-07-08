@@ -38,7 +38,7 @@ from requests.exceptions import InvalidHeader  # type: ignore
 from requests.utils import check_header_validity  # type: ignore
 from werkzeug.wrappers import Response as BaseResponse
 
-from ._compat import InferType, JSONMixin
+from ._compat import InferType, JSONMixin, get_signature
 from .constants import USER_AGENT, DataGenerationMethod
 from .exceptions import UsageError
 from .types import DataGenerationMethodInput, Filter, GenericTest, NotSet, RawAuth
@@ -442,8 +442,8 @@ def merge_given_args(func: GenericTest, args: Tuple, kwargs: Dict[str, Any]) -> 
 
 
 def validate_given_args(func: GenericTest, args: Tuple, kwargs: Dict[str, Any]) -> Optional[Callable]:
-    argspec = getfullargspec(func)
-    return is_invalid_test(func, argspec, args, kwargs)  # type: ignore
+    signature = get_signature(func)
+    return is_invalid_test(func, signature, args, kwargs)  # type: ignore
 
 
 def compose(*functions: Callable) -> Callable:
