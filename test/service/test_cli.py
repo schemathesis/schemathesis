@@ -130,7 +130,7 @@ def test_server_timeout(cli, schema_url, service, mocker):
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then the output indicates timeout
     lines = get_stdout_lines(result.stdout)
-    assert lines[18].endswith("Upload: TIMEOUT")
+    assert lines[15].endswith("Upload: TIMEOUT")
 
 
 @pytest.mark.service(

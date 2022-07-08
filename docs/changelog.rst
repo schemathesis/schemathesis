@@ -8,6 +8,10 @@ Changelog
 
 - Report uploading to Schemathesis.io via the ``--report`` CLI option.
 
+**Changed**
+
+- CLI: Display test run environment metadata only if ``-v`` is provided.
+
 **Fixed**
 
 - Compatibility with ``hypothesis>=6.49``. `#1538`_

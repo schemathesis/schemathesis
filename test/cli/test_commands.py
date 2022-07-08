@@ -483,10 +483,23 @@ def test_hypothesis_database_parsing(request, cli, mocker, swagger_20, factory, 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_hypothesis_database_report(cli, schema_url):
-    result = cli.run(schema_url, "--hypothesis-database=:memory:")
+    result = cli.run(schema_url, "--hypothesis-database=:memory:", "-v")
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
     assert lines[3] == "Hypothesis: database=InMemoryExampleDatabase({}), deadline=timedelta(milliseconds=15000)"
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_metadata(cli, schema_url):
+    # When the verbose mode is enabled
+    result = cli.run(schema_url, "-v")
+    assert result.exit_code == ExitCode.OK, result.stdout
+    lines = result.stdout.split("\n")
+    # Then there should be metadata displayed
+    assert lines[1].startswith("platform")
+    assert lines[2].startswith("rootdir")
+    assert lines[3].startswith("Hypothesis")
 
 
 @pytest.fixture
@@ -561,11 +574,11 @@ def test_cli_run_output_success(cli, cli_args, workers):
     result = cli.run(*cli_args, f"--workers={workers}")
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
-    assert lines[7] == f"Workers: {workers}"
+    assert lines[4] == f"Workers: {workers}"
     if workers == 1:
-        assert lines[10].startswith("GET /api/success .")
+        assert lines[7].startswith("GET /api/success .")
     else:
-        assert lines[10] == "."
+        assert lines[7] == "."
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
 
@@ -640,7 +653,7 @@ def test_cli_run_changed_base_url(cli, server, cli_args, workers):
     result = cli.run(*cli_args, "--base-url", base_url, f"--workers={workers}")
     # Then the base URL should be correctly displayed in the CLI output
     lines = result.stdout.strip().split("\n")
-    assert lines[5] == f"Base URL: {base_url}"
+    assert lines[2] == f"Base URL: {base_url}"
 
 
 @pytest.mark.parametrize(
@@ -668,12 +681,12 @@ def test_hypothesis_failed_event(cli, cli_args, workers):
     # And the given operation should be displayed as an error
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[10].startswith("GET /api/slow E")
+        assert lines[7].startswith("GET /api/slow E")
     else:
         # It could be in any sequence, because of multiple threads
-        assert lines[10].split("\n")[0] in ("E.", ".E", "EE")
+        assert lines[7].split("\n")[0] in ("E.", ".E", "EE")
         # empty line after all tests progress output
-        assert lines[11] == ""
+        assert lines[8] == ""
     # And the proper error message should be displayed
     assert "DeadlineExceeded: API response time is too slow! " in result.stdout
     assert "which exceeds the deadline of 20.00ms" in result.stdout
@@ -691,11 +704,11 @@ def test_connection_timeout(cli, server, schema_url, workers):
     # And the given operation should be displayed as a failure
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[10].startswith("GET /api/slow F")
-        assert lines[11].startswith("GET /api/success .")
+        assert lines[7].startswith("GET /api/slow F")
+        assert lines[8].startswith("GET /api/success .")
     else:
         # It could be in any sequence, because of multiple threads
-        assert lines[10].split("\n")[0] in ("F.", ".F")
+        assert lines[7].split("\n")[0] in ("F.", ".F")
     # And the proper error message should be displayed
     assert "1. Response timed out after 80.00ms" in result.stdout
 
@@ -709,11 +722,11 @@ def test_default_hypothesis_settings(cli, cli_args, workers):
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[10].startswith("GET /api/slow .")
-        assert lines[11].startswith("GET /api/success .")
+        assert lines[7].startswith("GET /api/slow .")
+        assert lines[8].startswith("GET /api/success .")
     else:
         # It could be in any sequence, because of multiple threads
-        assert lines[10] == ".."
+        assert lines[7] == ".."
 
 
 @pytest.mark.operations("failure")
@@ -740,9 +753,9 @@ def test_unsatisfiable(cli, cli_args, workers):
     # And this operation should be marked as errored in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[10].startswith("POST /api/unsatisfiable E")
+        assert lines[7].startswith("POST /api/unsatisfiable E")
     else:
-        assert lines[10] == "E"
+        assert lines[7] == "E"
     # And more clear error message is displayed instead of Hypothesis one
     lines = result.stdout.split("\n")
     assert "hypothesis.errors.Unsatisfiable: Unable to satisfy schema parameters for this API operation" in lines
@@ -761,9 +774,9 @@ def test_flaky(cli, cli_args, workers):
     # And this operation should be marked as failed in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[10].startswith("GET /api/flaky F")
+        assert lines[7].startswith("GET /api/flaky F")
     else:
-        assert lines[10] == "F"
+        assert lines[7] == "F"
     # And it should be displayed only once in "FAILURES" section
     assert "= FAILURES =" in result.stdout
     assert "_ GET /api/flaky [P] _" in result.stdout
@@ -788,14 +801,14 @@ def test_invalid_operation(cli, cli_args, workers):
     # And this operation should be marked as errored in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[10].startswith("POST /api/invalid E")
+        assert lines[7].startswith("POST /api/invalid E")
     else:
-        assert lines[10] == "E"
-    assert " POST /api/invalid " in lines[13]
+        assert lines[7] == "E"
+    assert " POST /api/invalid " in lines[10]
     # There shouldn't be a section end immediately after section start - there should be some error text
     # An internal error happened during a test run
     # Error: AssertionError
-    assert not lines[14].startswith("=")
+    assert not lines[11].startswith("=")
 
 
 @pytest.mark.operations("invalid")
@@ -833,13 +846,13 @@ def test_status_code_conformance(cli, cli_args, workers):
     # And this operation should be marked as failed in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[10].startswith("POST /api/teapot F")
+        assert lines[7].startswith("POST /api/teapot F")
     else:
-        assert lines[10] == "F"
+        assert lines[7] == "F"
     assert "status_code_conformance                    0 / 2 passed          FAILED" in result.stdout
     lines = result.stdout.split("\n")
     assert "1. Received a response with a status code, which is not defined in the schema: 418" in lines
-    assert lines[16].strip() == "Declared status codes: 200"
+    assert lines[13].strip() == "Declared status codes: 200"
 
 
 @pytest.mark.operations("headers")
@@ -902,10 +915,10 @@ def test_connection_error(cli, schema_url, workers):
     # And all collected API operations should be marked as errored
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[10].startswith("GET /api/failure E")
-        assert lines[11].startswith("GET /api/success E")
+        assert lines[7].startswith("GET /api/failure E")
+        assert lines[8].startswith("GET /api/success E")
     else:
-        assert lines[10] == "EE"
+        assert lines[7] == "EE"
     # And errors section title should be displayed
     assert "= ERRORS =" in result.stdout
     # And all API operations should be mentioned in this section as subsections
@@ -1251,7 +1264,7 @@ def test_register_check(new_check, cli, schema_url):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And a message from the new check should be displayed
     lines = result.stdout.strip().split("\n")
-    assert lines[14] == message
+    assert lines[11] == message
 
 
 def assert_threaded_executor_interruption(lines, expected, optional_interrupt=False):
@@ -1261,11 +1274,11 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
     # way around
     # The app under test was killed ungracefully and since we run it in a child or the main thread
     # its output might occur in the captured stdout.
-    ignored_exception = "Exception ignored in: " in lines[10]
-    assert lines[10] in expected or ignored_exception, lines
+    ignored_exception = "Exception ignored in: " in lines[7]
+    assert lines[7] in expected or ignored_exception, lines
     if not optional_interrupt:
-        assert "!! KeyboardInterrupt !!" in lines[11], lines
-    assert any("=== SUMMARY ===" in line for line in lines[10:])
+        assert "!! KeyboardInterrupt !!" in lines[8], lines
+    assert any("=== SUMMARY ===" in line for line in lines[7:])
 
 
 @pytest.mark.parametrize("workers", (1, 2))
@@ -1298,11 +1311,11 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
     lines = result.stdout.strip().split("\n")
     # And summary is still displayed in the end of the output
     if workers == 1:
-        assert lines[10].startswith("GET /api/failure .")
-        assert lines[10].endswith("[ 50%]")
-        assert lines[11] == "GET /api/success "
-        assert "!! KeyboardInterrupt !!" in lines[12]
-        assert "== SUMMARY ==" in lines[14]
+        assert lines[7].startswith("GET /api/failure .")
+        assert lines[7].endswith("[ 50%]")
+        assert lines[8] == "GET /api/success "
+        assert "!! KeyboardInterrupt !!" in lines[9]
+        assert "== SUMMARY ==" in lines[11]
     else:
         assert_threaded_executor_interruption(lines, ("", "."))
 
@@ -1439,9 +1452,9 @@ def test_wsgi_app_internal_exception(testdir, cli):
     result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--hypothesis-derandomize")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
-    assert "== APPLICATION LOGS ==" in lines[50], result.stdout.strip()
-    assert "ERROR in app: Exception on /api/success [GET]" in lines[52]
-    assert lines[64] == "ZeroDivisionError: division by zero"
+    assert "== APPLICATION LOGS ==" in lines[47], result.stdout.strip()
+    assert "ERROR in app: Exception on /api/success [GET]" in lines[49]
+    assert lines[61] == "ZeroDivisionError: division by zero"
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
@@ -1651,13 +1664,13 @@ def test_openapi_links(cli, cli_args, schema_url, hypothesis_max_examples):
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then these links should be tested
     # And lines with the results of these tests should be indented
-    assert lines[11].startswith("    -> GET /api/users/{user_id} .")
+    assert lines[8].startswith("    -> GET /api/users/{user_id} .")
     # And percentage should be adjusted appropriately
-    assert lines[11].endswith("[ 50%]")
-    assert lines[12].startswith("        -> PATCH /api/users/{user_id} .")
-    assert lines[12].endswith("[ 60%]")
-    assert lines[13].startswith("    -> PATCH /api/users/{user_id} .")
-    assert lines[13].endswith("[ 66%]")
+    assert lines[8].endswith("[ 50%]")
+    assert lines[9].startswith("        -> PATCH /api/users/{user_id} .")
+    assert lines[9].endswith("[ 60%]")
+    assert lines[10].startswith("    -> PATCH /api/users/{user_id} .")
+    assert lines[10].endswith("[ 66%]")
 
 
 @pytest.mark.operations("create_user", "get_user", "update_user")
@@ -1675,9 +1688,9 @@ def test_openapi_links_disabled(cli, schema_url, hypothesis_max_examples):
     lines = result.stdout.splitlines()
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then the links should not be traversed
-    assert lines[10].startswith("POST /api/users/ .")
-    assert lines[11].startswith("GET /api/users/{user_id} .")
-    assert lines[12].startswith("PATCH /api/users/{user_id} .")
+    assert lines[7].startswith("POST /api/users/ .")
+    assert lines[8].startswith("GET /api/users/{user_id} .")
+    assert lines[9].startswith("PATCH /api/users/{user_id} .")
 
 
 @pytest.mark.parametrize("recursion_limit, expected", ((1, "....."), (5, "......")))
@@ -1698,7 +1711,7 @@ def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_lim
     )
     lines = result.stdout.splitlines()
     assert result.exit_code == ExitCode.OK, result.stdout
-    assert lines[10] == expected + "." if hypothesis_max_examples else expected
+    assert lines[7] == expected + "." if hypothesis_max_examples else expected
 
 
 def test_get_request_with_body(testdir, cli, base_url, hypothesis_max_examples, schema_with_get_payload):
@@ -1725,9 +1738,9 @@ def test_max_response_time_invalid(cli, server, schema_url, workers):
     # And the given operation should be displayed as a failure
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[10].startswith("GET /api/slow F")
+        assert lines[7].startswith("GET /api/slow F")
     else:
-        assert lines[10].startswith("F")
+        assert lines[7].startswith("F")
     # And the proper error message should be displayed
     assert "max_response_time                     0 / 2 passed          FAILED" in result.stdout
     assert "Response time exceeded the limit of 50 ms" in result.stdout
@@ -1886,13 +1899,13 @@ def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra, 
     lines = result.stdout.splitlines()
     # Then request representation in the output should have the overridden value
     assert (
-        lines[18] == f"Headers         : {{'Authorization': 'Basic J3Rlc3Q6d3Jvbmcn', 'User-Agent': '{USER_AGENT}',"
+        lines[15] == f"Headers         : {{'Authorization': 'Basic J3Rlc3Q6d3Jvbmcn', 'User-Agent': '{USER_AGENT}',"
         f" 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', "
         f"'{SCHEMATHESIS_TEST_CASE_HEADER}': '{mock_case_id.hex}'}}"
     )
     # And code sample as well
     assert (
-        lines[27] == f"    curl -X GET -H 'Accept: */*' -H 'Accept-Encoding: gzip, deflate' "
+        lines[24] == f"    curl -X GET -H 'Accept: */*' -H 'Accept-Encoding: gzip, deflate' "
         f"-H 'Authorization: Basic J3Rlc3Q6d3Jvbmcn' -H 'Connection: keep-alive' "
         f"-H 'User-Agent: {USER_AGENT}' -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}' "
         f"{base_url}/basic"
@@ -1909,9 +1922,9 @@ def test_explicit_headers_in_output_on_errors(cli, schema_url):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
     # Then request representation in the output should have the overridden value
-    assert auth in lines[20]
+    assert auth in lines[17]
     # And code sample as well
-    assert f"Authorization: {auth}" in lines[30]
+    assert f"Authorization: {auth}" in lines[27]
 
 
 @pytest.mark.openapi_version("3.0")
@@ -2066,12 +2079,12 @@ def test_missing_content_and_schema(cli, base_url, tmp_path, testdir, empty_open
     # Then CLI should show that this API operation errored
     # And show the proper message under its "ERRORS" section
     if base_url is None:
-        assert lines[10].startswith("GET /foo E")
+        assert lines[7].startswith("GET /foo E")
     else:
-        assert lines[10].startswith("GET /apiv2/foo E")
-        assert "_ GET /apiv2/foo [P] _" in lines[13]
+        assert lines[7].startswith("GET /apiv2/foo E")
+        assert "_ GET /apiv2/foo [P] _" in lines[10]
     assert (
-        lines[14] == f'InvalidSchema: Can not generate data for {location} parameter "X-Foo"! '
+        lines[11] == f'InvalidSchema: Can not generate data for {location} parameter "X-Foo"! '
         "It should have either `schema` or `content` keywords defined"
     )
     # And emitted Before / After event pairs have the same correlation ids

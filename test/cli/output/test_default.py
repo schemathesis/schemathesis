@@ -100,7 +100,9 @@ def test_display_section_name(capsys, title, separator, printed, expected):
     assert expected in out
 
 
-def test_handle_initialized(capsys, execution_context, results_set, swagger_20):
+@pytest.mark.parametrize("verbosity", (0, 1))
+def test_handle_initialized(capsys, execution_context, results_set, swagger_20, verbosity):
+    execution_context.verbosity = verbosity
     # Given Initialized event
     event = runner.events.Initialized.from_schema(schema=swagger_20)
     # When this even is handled
@@ -109,10 +111,11 @@ def test_handle_initialized(capsys, execution_context, results_set, swagger_20):
     lines = out.split("\n")
     # Then initial title is displayed
     assert " Schemathesis test session starts " in lines[0]
-    # And platform information is there
-    assert lines[1].startswith("platform")
-    # And current directory
-    assert f"rootdir: {os.getcwd()}" in lines
+    if verbosity == 1:
+        # And platform information is there
+        assert lines[1].startswith("platform")
+        # And current directory
+        assert f"rootdir: {os.getcwd()}" in lines
     # And number of collected operations
     assert strip_style_win32(click.style("Collected API operations: 1", bold=True)) in lines
     # And the output has an empty line in the end
