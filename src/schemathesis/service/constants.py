@@ -1,4 +1,7 @@
+import os
 import pathlib
+
+IS_CI = os.getenv("CI") == "true"
 
 DEFAULT_HOSTNAME = "api.schemathesis.io"
 # The main Schemathesis.io API address
@@ -13,7 +16,8 @@ REQUEST_TIMEOUT = 1
 # The time the main thread will wait for the worker thread to finish its job before exiting
 WORKER_FINISH_TIMEOUT = 10.0
 # A period between checking the worker thread for events
-WORKER_CHECK_PERIOD = 0.005
+# Decrease the frequency for CI environment to avoid too much output from the waiting spinner
+WORKER_CHECK_PERIOD = 0.1 if IS_CI else 0.005
 # Wait until the worker terminates
 WORKER_JOIN_TIMEOUT = 10
 # Version of the hosts file format
