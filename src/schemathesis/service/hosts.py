@@ -51,15 +51,19 @@ def load(path: PathLike) -> Dict[str, Any]:
         with open(path, "rb") as fd:
             return tomli.load(fd)
     except FileNotFoundError:
-        # Try to create the parent dir - it could be the first run, when the config dir doesn't exist yet
-        try:
-            Path(path).parent.mkdir(mode=0o755, parents=True, exist_ok=True)
-        except OSError:
-            # Ignore permission errors, etc
-            pass
+        _try_make_config_directory(path)
         return {}
     except tomli.TOMLDecodeError:
         return {}
+
+
+def _try_make_config_directory(path: PathLike) -> None:
+    # Try to create the parent dir - it could be the first run, when the config dir doesn't exist yet
+    try:
+        Path(path).parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    except OSError:
+        # Ignore permission errors, etc
+        pass
 
 
 def load_for_host(hostname: str = DEFAULT_HOSTNAME, hosts_file: PathLike = DEFAULT_HOSTS_PATH) -> Dict[str, Any]:
@@ -97,7 +101,14 @@ def get_token(hostname: str = DEFAULT_HOSTNAME, hosts_file: PathLike = DEFAULT_H
     return load_for_host(hostname, hosts_file).get("token")
 
 
-def _dump_hosts(path: PathLike, hosts: Dict[str, Any]) -> None:
+def _dump_hosts(path: PathLike, hosts: Dict[str, Any], is_first_try: bool = True) -> None:
     """Write hosts data to a file."""
-    with open(path, "wb") as fd:
-        tomli_w.dump(hosts, fd)
+    try:
+        with open(path, "wb") as fd:
+            tomli_w.dump(hosts, fd)
+    except FileNotFoundError:
+        if is_first_try:
+            _try_make_config_directory(path)
+            _dump_hosts(path, hosts, is_first_try=False)
+        else:
+            raise
