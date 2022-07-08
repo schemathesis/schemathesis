@@ -629,29 +629,31 @@ def run(
     if schema_kind == callbacks.SchemaInputKind.NAME:
         api_name = schema
     if api_name is not None or schema_kind == callbacks.SchemaInputKind.NAME:
-        if token is None:
-            hostname = (
-                "Schemathesis.io" if schemathesis_io_hostname == service.DEFAULT_HOSTNAME else schemathesis_io_hostname
-            )
-            raise click.UsageError(
-                "\n\n"
-                f"You are trying to upload data to {hostname}, but your CLI appears to be not authenticated.\n\n"
-                "To authenticate, grab your token from `app.schemathesis.io` and run `st auth login <TOKEN>`\n"
-                "Alternatively, you can pass the token explicitly via the `--schemathesis-io-token` option / "
-                f"`{service.TOKEN_ENV_VAR}` environment variable\n\n"
-                "See https://schemathesis.readthedocs.io/en/stable/service.html for more details"
-            )
         client = service.ServiceClient(base_url=schemathesis_io_url, token=token)
         # It is assigned above
-        name: str = cast(str, api_name)
-        try:
-            details = client.get_api_details(name)
-            if schema_kind == callbacks.SchemaInputKind.NAME:
+        if token is not None or schema_kind == callbacks.SchemaInputKind.NAME:
+            if token is None:
+                hostname = (
+                    "Schemathesis.io"
+                    if schemathesis_io_hostname == service.DEFAULT_HOSTNAME
+                    else schemathesis_io_hostname
+                )
+                raise click.UsageError(
+                    "\n\n"
+                    f"You are trying to upload data to {hostname}, but your CLI appears to be not authenticated.\n\n"
+                    "To authenticate, grab your token from `app.schemathesis.io` and run `st auth login <TOKEN>`\n"
+                    "Alternatively, you can pass the token explicitly via the `--schemathesis-io-token` option / "
+                    f"`{service.TOKEN_ENV_VAR}` environment variable\n\n"
+                    "See https://schemathesis.readthedocs.io/en/stable/service.html for more details"
+                )
+            name: str = cast(str, api_name)
+            try:
+                details = client.get_api_details(name)
                 # Replace config values with ones loaded from the service
                 schema = details.location
                 base_url = base_url or details.base_url
-        except requests.HTTPError as exc:
-            handle_service_error(exc, name)
+            except requests.HTTPError as exc:
+                handle_service_error(exc, name)
     if report and report.name is REPORT_TO_SERVICE and not client:
         # Upload without connecting data to a certain API
         client = service.ServiceClient(base_url=schemathesis_io_url, token=token)
@@ -1071,7 +1073,9 @@ def execute(
 
 
 def handle_service_error(exc: requests.HTTPError, api_name: str) -> NoReturn:
-    if exc.response.status_code == 404:
+    if exc.response.status_code == 403:
+        error_message(exc.response.json()["detail"])
+    elif exc.response.status_code == 404:
         error_message(f"API with name `{api_name}` not found!")
     else:
         output.default.display_service_error(service.Error(exc))
