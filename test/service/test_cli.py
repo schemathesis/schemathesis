@@ -41,7 +41,6 @@ def test_no_failures(cli, schema_url, service, next_url, upload_message):
     # And all requests should have the proper User-Agent
     for (request, _) in service.server.log:
         assert request.headers["User-Agent"] == USER_AGENT
-    # Create test run
     service.assert_call(0, "/apis/my-api/", 200)
     service.assert_call(1, "/reports/upload/", 202)
     # And it should be noted in the output
@@ -196,14 +195,20 @@ def test_connection_issue(cli, schema_url, service, mocker):
     assert "Timeout" in result.stdout
 
 
+@pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
-def test_api_id_no_token(cli, schema_url, hosts_file):
-    # When there is API ID
+def test_anonymous_upload_with_name(cli, schema_url, hosts_file, service, upload_message, next_url):
+    # When there is API name
     # And there is no token
-    result = cli.run(schema_url, "my-api", f"--hosts-file={hosts_file}")
-    # Then it should be an error
-    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
-    assert "CLI appears to be not authenticated" in result.stdout
+    result = cli.run(
+        schema_url, "my-api", "--report", f"--hosts-file={hosts_file}", f"--schemathesis-io-url={service.base_url}"
+    )
+    # Then the report should be uploaded
+    assert result.exit_code == ExitCode.OK, result.stdout
+    lines = get_stdout_lines(result.stdout)
+    assert "Upload: COMPLETED" in lines
+    assert upload_message in lines
+    assert next_url in lines
 
 
 @pytest.mark.service(
@@ -221,6 +226,23 @@ def test_invalid_api_name(cli, schema_url, service):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then the error should be immediately visible
     assert result.stdout.strip() == "❌ API with name `my-api` not found!"
+
+
+@pytest.mark.service(
+    data={"title": "Forbidden", "status": 403, "detail": "FORBIDDEN!"},
+    status=403,
+    method="GET",
+    path=re.compile("/apis/.*/"),
+)
+@pytest.mark.openapi_version("3.0")
+def test_forbidden(cli, schema_url, service):
+    # When there is 403 from Schemathesis.io
+    result = cli.run(
+        schema_url, "my-api", f"--schemathesis-io-token={service.token}", f"--schemathesis-io-url={service.base_url}"
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # Then the error should be immediately visible
+    assert result.stdout.strip() == "❌ FORBIDDEN!"
 
 
 def test_not_authenticated_with_name(cli):
