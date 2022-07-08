@@ -11,6 +11,7 @@ Changelog
 **Fixed**
 
 - Compatibility with ``hypothesis>=6.49``. `#1538`_
+- Handling of ``unittest.case.SkipTest`` emitted by newer Hypothesis versions.
 
 **Removed**
 

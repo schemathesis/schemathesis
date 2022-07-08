@@ -2,6 +2,7 @@
 import logging
 import threading
 import time
+import unittest
 import uuid
 from contextlib import contextmanager
 from types import TracebackType
@@ -298,6 +299,10 @@ def run_test(  # pylint: disable=too-many-locals
             result.mark_skipped()
         else:
             status = Status.success
+    except unittest.case.SkipTest:
+        # Newer Hypothesis versions raise this exception if no tests were executed
+        status = Status.skip
+        result.mark_skipped()
     except CheckFailed:
         status = Status.failure
     except NonCheckError:

@@ -34,7 +34,7 @@ def test_(request, case):
     )
     result = testdir.runpytest("-v", "-s")
     # Then settings should be applied to the test
-    result.assert_outcomes(passed=1)
+    result.assert_outcomes(passed=1, skipped=1)
     result.stdout.re_match_lines([r"test_with_settings.py::test_ PASSED", r".*1 passed"])
     result.stdout.re_match_lines([r"Hypothesis calls: 0$"])
 

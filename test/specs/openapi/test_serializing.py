@@ -128,6 +128,7 @@ def assert_generates(testdir, raw_schema, expected, parameter):
 
     testdir.make_test(
         f"""
+import json
 from urllib.parse import quote, unquote
 
 def chunks(items, n):
@@ -151,6 +152,11 @@ class Prefixed:
         return self.prepare(instance) == self.prepare(other)
 
 
+class JSONString(Prefixed):
+    def prepare(self, value):
+        return json.loads(unquote(value))
+
+
 class CommaDelimitedObject(Prefixed):
     def prepare(self, value):
         if not value:
@@ -169,7 +175,6 @@ class DelimitedObject(Prefixed):
         return dict(item.split("=") for item in items)
 
 @schema.parametrize()
-@settings(phases=[Phase.explicit])
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.{attribute} in {repr(expected)}
