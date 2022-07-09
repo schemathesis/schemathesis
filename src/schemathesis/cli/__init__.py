@@ -398,6 +398,8 @@ REPORT_TO_SERVICE = object()
     is_flag=False,
     flag_value=REPORT_TO_SERVICE,
     type=click.File("wb"),
+    envvar=service.REPORT_ENV_VAR,
+    callback=callbacks.convert_report,  # type: ignore
 )
 @click.option(
     "--debug-output-file",

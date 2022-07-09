@@ -8,7 +8,7 @@ from requests import Timeout
 import schemathesis
 from schemathesis.cli.output.default import SERVICE_ERROR_MESSAGE
 from schemathesis.constants import USER_AGENT
-from schemathesis.service.constants import REPORT_CORRELATION_ID_HEADER
+from schemathesis.service.constants import REPORT_CORRELATION_ID_HEADER, REPORT_ENV_VAR
 from schemathesis.service.hosts import load_for_host
 
 from ..utils import strip_style_win32
@@ -324,6 +324,35 @@ def test_save_to_file(cli, schema_url, tmp_path, read_report, service):
     assert f"Report: {report_file}" in result.stdout
     # And should not be sent to the SaaS
     assert not service.server.log
+
+
+@pytest.mark.parametrize("kind", ("service", "file"))
+@pytest.mark.operations("success")
+@pytest.mark.openapi_version("3.0")
+def test_report_via_env_var(cli, schema_url, tmp_path, read_report, service, monkeypatch, kind):
+    # When report processing is triggered via an env var
+    if kind == "service":
+        env_variable_value = "true"
+    else:
+        report_file = tmp_path / "report.tar.gz"
+        env_variable_value = str(report_file)
+    monkeypatch.setenv(REPORT_ENV_VAR, env_variable_value)
+    result = cli.run(schema_url, f"--schemathesis-io-url={service.base_url}")
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # Then the report should be processed according to the env var value
+    if kind == "service":
+        assert service.server.log
+        payload = service.server.log[0][0].data
+    else:
+        payload = report_file.read_bytes()
+        # And should not be sent to the SaaS
+        assert not service.server.log
+        # And it should be written in CLI
+        assert f"Report: {report_file}" in result.stdout
+        assert not service.server.log
+    with read_report(payload) as tar:
+        assert len(tar.getmembers()) == 6
+        assert json.load(tar.extractfile("metadata.json"))["ci"] is None
 
 
 @pytest.mark.operations("success")
