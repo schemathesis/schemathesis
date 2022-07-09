@@ -1897,10 +1897,8 @@ def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra, 
     lines = result.stdout.splitlines()
     # Then the code sample representation in the output should have the overridden value
     assert (
-        lines[20] == f"    curl -X GET -H 'Accept: */*' -H 'Accept-Encoding: gzip, deflate' "
-        f"-H 'Authorization: Basic J3Rlc3Q6d3Jvbmcn' -H 'Connection: keep-alive' "
-        f"-H 'User-Agent: {USER_AGENT}' -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}' "
-        f"{base_url}/basic"
+        lines[20] == f"    curl -X GET -H 'Authorization: Basic J3Rlc3Q6d3Jvbmcn' "
+        f"-H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}' {base_url}/basic"
     )
 
 

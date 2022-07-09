@@ -16,17 +16,14 @@ def test_as_curl_command(case: Case, headers):
     expected_headers = "" if not headers else " ".join(f" -H '{name}: {value}'" for name, value in headers.items())
     assert (
         command
-        == f"curl -X GET -H 'User-Agent: {USER_AGENT}'{expected_headers} -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {case.id}' http://localhost/users"
+        == f"curl -X GET{expected_headers} -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {case.id}' http://localhost/users"
     )
 
 
 def test_non_utf_8_body():
     case = Case(operation=schema["/users"]["GET"], body=b"42\xff", media_type="application/octet-stream")
     command = case.as_curl_command()
-    assert (
-        command == "curl -X GET -H 'Content-Length: 3' -H 'Content-Type: application/octet-stream' "
-        f"-H 'User-Agent: {USER_AGENT}' -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {case.id}' -d '42�' http://localhost/users"
-    )
+    assert command == f"curl -X GET -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {case.id}' -d '42�' http://localhost/users"
 
 
 @pytest.mark.operations("failure")
@@ -34,11 +31,7 @@ def test_cli_output(cli, base_url, schema_url, mock_case_id):
     result = cli.run(schema_url, "--code-sample-style=curl")
     lines = result.stdout.splitlines()
     assert "Run this cURL command to reproduce this failure: " in lines
-    headers = (
-        f"-H 'Accept: */*' -H 'Accept-Encoding: gzip, deflate' "
-        f"-H 'Connection: keep-alive' -H 'User-Agent: {USER_AGENT}'"
-        f" -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}'"
-    )
+    headers = f"-H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}'"
     assert f"    curl -X GET {headers} {base_url}/failure" in lines
 
 

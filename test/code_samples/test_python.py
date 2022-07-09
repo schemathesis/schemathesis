@@ -20,17 +20,11 @@ def openapi_case(request, swagger_20):
 
 
 def get_full_code(case_id, kwargs_repr=""):
-    # Simple way to detect json for these tests
-    if kwargs_repr.startswith("json"):
-        headers = ", 'Content-Type': 'application/json'"
-    else:
-        headers = ""
     if kwargs_repr:
         kwargs_repr = f", {kwargs_repr}"
     return (
         f"requests.get('http://127.0.0.1:1/users', "
-        f"headers={{'User-Agent': '{USER_AGENT}', "
-        f"'{SCHEMATHESIS_TEST_CASE_HEADER}': '{case_id}'{headers}}}{kwargs_repr})"
+        f"headers={{'{SCHEMATHESIS_TEST_CASE_HEADER}': '{case_id}'}}{kwargs_repr})"
     )
 
 
@@ -113,8 +107,7 @@ def test_graphql_code_sample(graphql_url, graphql_schema, graphql_strategy):
     case = graphql_strategy.example()
     assert (
         case.get_code_to_reproduce() == f"requests.post('{graphql_url}', "
-        f"headers={{'User-Agent': '{USER_AGENT}', '{SCHEMATHESIS_TEST_CASE_HEADER}': '{case.id}'}}, "
-        f"json={{'query': {repr(case.body)}}})"
+        f"headers={{'{SCHEMATHESIS_TEST_CASE_HEADER}': '{case.id}'}}, json={{'query': {repr(case.body)}}})"
     )
 
 
@@ -123,11 +116,7 @@ def test_cli_output(cli, base_url, schema_url, mock_case_id):
     result = cli.run(schema_url, "--code-sample-style=python")
     lines = result.stdout.splitlines()
     assert "Run this Python code to reproduce this failure: " in lines
-    headers = (
-        f"{{'User-Agent': '{USER_AGENT}', '{SCHEMATHESIS_TEST_CASE_HEADER}': '{mock_case_id.hex}',"
-        f" 'Accept-Encoding': 'gzip, deflate', "
-        f"'Accept': '*/*', 'Connection': 'keep-alive'}}"
-    )
+    headers = f"{{'{SCHEMATHESIS_TEST_CASE_HEADER}': '{mock_case_id.hex}'}}"
     assert f"    requests.get('{base_url}/failure', headers={headers})" in lines
 
 
@@ -137,21 +126,13 @@ def test_reproduce_code_with_overridden_headers(any_app_schema, base_url, mock_c
     # real vs wsgi apps. It is the simplest solution, but not the most flexible one, though.
     if isinstance(any_app_schema.app, Flask):
         headers = {
-            "User-Agent": USER_AGENT,
             SCHEMATHESIS_TEST_CASE_HEADER: mock_case_id.hex,
             "X-Token": "test",
-            "Accept-Encoding": "gzip, deflate",
-            "Accept": "*/*",
-            "Connection": "keep-alive",
         }
         expected = f"requests.get('http://localhost/api/failure', headers={headers})"
     else:
         headers = {
-            "User-Agent": USER_AGENT,
             SCHEMATHESIS_TEST_CASE_HEADER: mock_case_id.hex,
-            "Accept-Encoding": "gzip, deflate",
-            "Accept": "*/*",
-            "Connection": "keep-alive",
             "X-Token": "test",
         }
         expected = f"requests.get('{base_url}/failure', headers={headers})"
