@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 import click
 import hypothesis
+from click.types import LazyFile  # type: ignore
 from requests import PreparedRequest, RequestException
 
 from .. import utils
@@ -206,11 +207,21 @@ def convert_data_generation_method(
     return [DataGenerationMethod[value]]
 
 
+TRUE_VALUES = ("y", "yes", "t", "true", "on", "1")
+FALSE_VALUES = ("n", "no", "f", "false", "off", "0")
+
+
 def convert_request_tls_verify(ctx: click.core.Context, param: click.core.Parameter, value: str) -> Union[str, bool]:
-    if value.lower() in ("y", "yes", "t", "true", "on", "1"):
+    if value.lower() in TRUE_VALUES:
         return True
-    if value.lower() in ("n", "no", "f", "false", "off", "0"):
+    if value.lower() in FALSE_VALUES:
         return False
+    return value
+
+
+def convert_report(ctx: click.core.Context, param: click.core.Option, value: LazyFile) -> LazyFile:
+    if param.resolve_envvar_value(ctx) is not None and value.name.lower() in TRUE_VALUES:
+        value.name = param.flag_value
     return value
 
 
