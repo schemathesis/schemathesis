@@ -63,6 +63,7 @@ from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .serializers import Serializer, SerializerContext
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
 from .utils import (
+    IGNORED_HEADERS,
     NOT_SET,
     GenericResponse,
     WSGIResponse,
@@ -200,6 +201,7 @@ class Case:  # pylint: disable=too-many-public-methods
             final_headers = kwargs["headers"] or {}
             final_headers.update(headers)
             kwargs["headers"] = final_headers
+        kwargs["headers"] = {key: value for key, value in kwargs["headers"].items() if key not in IGNORED_HEADERS}
         method = kwargs["method"].lower()
 
         def should_display(key: str, value: Any) -> bool:
@@ -230,6 +232,9 @@ class Case:  # pylint: disable=too-many-public-methods
         if isinstance(prepared.body, bytes):
             # Note, it may be not sufficient to reproduce the error :(
             prepared.body = prepared.body.decode("utf-8", errors="replace")
+        for header in tuple(prepared.headers):
+            if header in IGNORED_HEADERS:
+                del prepared.headers[header]
         return curlify.to_curl(prepared)
 
     def _get_base_url(self, base_url: Optional[str] = None) -> str:

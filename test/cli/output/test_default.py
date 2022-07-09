@@ -335,10 +335,7 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set, ve
     assert " GET /v1/api/failure " in out
     assert "Message" in out
     assert "Run this cURL command to reproduce this failure:" in out
-    headers = (
-        f"-H 'Content-Length: 0' -H 'Content-Type: application/json' -H 'User-Agent: {USER_AGENT}'"
-        f" -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}'"
-    )
+    headers = f"-H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}'"
     assert f"curl -X GET {headers} http://127.0.0.1:8080/api/failure" in out
 
 

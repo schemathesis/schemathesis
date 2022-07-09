@@ -10,7 +10,7 @@ import requests
 
 from ..exceptions import FailureContext, InternalError, make_unique_by_key
 from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
-from ..utils import WSGIResponse, format_exception
+from ..utils import IGNORED_HEADERS, WSGIResponse, format_exception
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -71,7 +71,7 @@ class SerializedCheck:
             response = Response.from_wsgi(check.response, check.elapsed)
         else:
             response = None
-        headers = {key: value[0] for key, value in request.headers.items()}
+        headers = {key: value[0] for key, value in request.headers.items() if key not in IGNORED_HEADERS}
         history = []
         case = check.example
         while case.source is not None:

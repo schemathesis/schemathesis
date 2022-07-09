@@ -11,6 +11,7 @@ Changelog
 **Changed**
 
 - CLI: Display test run environment metadata only if ``-v`` is provided.
+- CLI: Do not display headers automatically added by ``requests`` in code samples.
 
 **Fixed**
 

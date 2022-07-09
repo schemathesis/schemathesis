@@ -280,14 +280,12 @@ def test(case):
     if style == "python":
         lines = [
             r".+Run this Python code to reproduce this response:",
-            rf".+requests.get\('{openapi3_base_url}/failure', headers={{'User-Agent': '{USER_AGENT}'",
+            rf".+requests.get\('{openapi3_base_url}/failure', headers={{",
         ]
     else:
         lines = [
             r".+Run this cURL command to reproduce this response:",
-            rf".+curl -X GET -H 'Accept: \*/\*' -H 'Accept-Encoding: gzip, deflate' "
-            rf"-H 'Connection: keep-alive' -H 'User-Agent: {USER_AGENT}' "
-            rf"-H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}' {openapi3_base_url}/failure",
+            rf".+curl -X GET -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}' {openapi3_base_url}/failure",
         ]
     result.stdout.re_match_lines(
         [
