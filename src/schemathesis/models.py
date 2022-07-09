@@ -182,33 +182,6 @@ class Case:  # pylint: disable=too-many-public-methods
             return urlunsplit(("http", "localhost", path or "", "", ""))
         return self.base_url
 
-    def as_text_lines(self, headers: Optional[Dict[str, Any]] = None) -> List[str]:
-        """Textual representation.
-
-        Each component is a separate line.
-        """
-        output = {
-            "Path parameters": self.path_parameters,
-            "Headers": self.headers,
-            "Cookies": self.cookies,
-            "Query": self.query,
-            "Body": self.body,
-        }
-        if headers:
-            final_headers = output["Headers"] or {}
-            final_headers = cast(Dict[str, Any], final_headers)
-            final_headers.update(headers)
-            output["Headers"] = final_headers
-        max_length = max(map(len, output))
-        template = f"{{:<{max_length}}} : {{}}"
-
-        def should_display(key: str, value: Any) -> bool:
-            if key == "Body":
-                return not isinstance(value, NotSet)
-            return value is not None
-
-        return [template.format(key, value) for key, value in output.items() if should_display(key, value)]
-
     def get_code_to_reproduce(
         self, headers: Optional[Dict[str, Any]] = None, request: Optional[requests.PreparedRequest] = None
     ) -> str:

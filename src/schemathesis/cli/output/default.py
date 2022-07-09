@@ -237,12 +237,9 @@ def display_example(
             message = reduce_schema_error(message)
         click.secho(message, fg="red")
         click.echo()
-    for line in case.text_lines:
-        click.secho(line, fg="red")
-    click.echo()
     if response is not None and response.body is not None:
         payload = base64.b64decode(response.body).decode(response.encoding or "utf8", errors="replace")
-        click.secho(f"----------\n\nResponse status: {response.status_code}\nResponse payload: `{payload}`\n", fg="red")
+        click.secho(f"Response status: {response.status_code}\nResponse payload: `{payload}`\n", fg="red")
     if context.code_sample_style == CodeSampleStyle.python:
         click.secho(f"Run this Python code to reproduce this failure: \n\n    {case.requests_code}\n", fg="red")
     if context.code_sample_style == CodeSampleStyle.curl:

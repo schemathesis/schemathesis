@@ -238,17 +238,6 @@ def test_display_single_failure(capsys, swagger_20, execution_context, operation
     lines = out.split("\n")
     # Then the path is displayed as a subsection
     assert " GET /v1/success " in lines[0]
-    # And body should be displayed if it is not NOT_SET
-    if body is NOT_SET:
-        assert "Body" not in out
-    else:
-        assert strip_style_win32(click.style(f"Body            : {body}", fg="red")) in lines
-    # And empty parameters are not present in the output
-    assert "Path parameters" not in out
-    # And not needed attributes are not displayed
-    assert "Path" not in out
-    assert "Method" not in out
-    assert "Base url" not in out
 
 
 @pytest.mark.parametrize(
@@ -383,8 +372,6 @@ def test_display_errors(swagger_20, capsys, results_set, execution_context, show
     assert " GET /v1/api/error " in out
     # And the error itself is displayed
     assert "ConnectionError: Connection refused!" in out
-    # And the example is displayed
-    assert "Query           : {'a': 1}" in out
     assert "Or add this option to your command line parameters: --hypothesis-seed=123" in out
 
 

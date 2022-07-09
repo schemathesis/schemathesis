@@ -783,8 +783,6 @@ def test_flaky(cli, cli_args, workers):
     # And more clear error message is displayed instead of Hypothesis one
     lines = result.stdout.split("\n")
     assert FLAKY_FAILURE_MESSAGE in lines
-    # And example is displayed
-    assert "Query           : {'id': 0}" in lines
 
 
 @pytest.mark.operations("invalid")
@@ -1452,9 +1450,9 @@ def test_wsgi_app_internal_exception(testdir, cli):
     result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--hypothesis-derandomize")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
-    assert "== APPLICATION LOGS ==" in lines[47], result.stdout.strip()
-    assert "ERROR in app: Exception on /api/success [GET]" in lines[49]
-    assert lines[61] == "ZeroDivisionError: division by zero"
+    assert "== APPLICATION LOGS ==" in lines[39], result.stdout.strip()
+    assert "ERROR in app: Exception on /api/success [GET]" in lines[41]
+    assert lines[53] == "ZeroDivisionError: division by zero"
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
@@ -1897,15 +1895,9 @@ def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra, 
     # And there is an error during testing
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
-    # Then request representation in the output should have the overridden value
+    # Then the code sample representation in the output should have the overridden value
     assert (
-        lines[15] == f"Headers         : {{'Authorization': 'Basic J3Rlc3Q6d3Jvbmcn', 'User-Agent': '{USER_AGENT}',"
-        f" 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', "
-        f"'{SCHEMATHESIS_TEST_CASE_HEADER}': '{mock_case_id.hex}'}}"
-    )
-    # And code sample as well
-    assert (
-        lines[24] == f"    curl -X GET -H 'Accept: */*' -H 'Accept-Encoding: gzip, deflate' "
+        lines[20] == f"    curl -X GET -H 'Accept: */*' -H 'Accept-Encoding: gzip, deflate' "
         f"-H 'Authorization: Basic J3Rlc3Q6d3Jvbmcn' -H 'Connection: keep-alive' "
         f"-H 'User-Agent: {USER_AGENT}' -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}' "
         f"{base_url}/basic"
@@ -1921,10 +1913,8 @@ def test_explicit_headers_in_output_on_errors(cli, schema_url):
     result = cli.run(schema_url, "--checks=all", f"-H Authorization: {auth}")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
-    # Then request representation in the output should have the overridden value
-    assert auth in lines[17]
-    # And code sample as well
-    assert f"Authorization: {auth}" in lines[27]
+    # Then the code sample should have the overridden value
+    assert f"Authorization: {auth}" in lines[22]
 
 
 @pytest.mark.openapi_version("3.0")
@@ -2126,7 +2116,6 @@ def test_explicit_example_failure_output(testdir, cli, openapi3_base_url):
     result = cli.run(str(schema_file), f"--base-url={openapi3_base_url}")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then the failure should only appear in the FAILURES block
-    assert result.stdout.count("{'key': 'foo'}") == 1
     assert "HYPOTHESIS OUTPUT" not in result.stdout
     assert "/api/failure?key=foo" in result.stdout
     assert "Received a response with 5xx status code: 500" in result.stdout
