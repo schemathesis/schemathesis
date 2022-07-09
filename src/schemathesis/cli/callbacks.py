@@ -12,7 +12,9 @@ from requests import PreparedRequest, RequestException
 
 from .. import utils
 from ..constants import CodeSampleStyle, DataGenerationMethod
+from ..service.hosts import get_temporary_hosts_file
 from ..stateful import Stateful
+from ..types import PathLike
 from .constants import DEFAULT_WORKERS
 
 MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE = (
@@ -209,6 +211,26 @@ def convert_data_generation_method(
 
 TRUE_VALUES = ("y", "yes", "t", "true", "on", "1")
 FALSE_VALUES = ("n", "no", "f", "false", "off", "0")
+
+
+def _is_usable_dir(path: PathLike) -> bool:
+    if os.path.isfile(path):
+        path = os.path.dirname(path)
+    while not os.path.exists(path):
+        path = os.path.dirname(path)
+    return os.path.isdir(path) and os.access(path, os.R_OK | os.W_OK | os.X_OK)
+
+
+def convert_hosts_file(ctx: click.core.Context, param: click.core.Parameter, value: str) -> str:
+    if not _is_usable_dir(value):
+        path = get_temporary_hosts_file()
+        click.secho(
+            "The provided hosts.toml file location is unusable - using a temporary file for this session. "
+            f"path={value!r}",
+            fg="yellow",
+        )
+        return path
+    return value
 
 
 def convert_request_tls_verify(ctx: click.core.Context, param: click.core.Parameter, value: str) -> Union[str, bool]:

@@ -1,6 +1,10 @@
+import platform
+from pathlib import Path
+
 import pytest
 
 from schemathesis.service import TOKEN_ENV_VAR, hosts
+from schemathesis.service.hosts import get_temporary_hosts_file
 
 
 def malform_hosts(path):
@@ -60,6 +64,23 @@ def test_missing_parent_dir(cli, hostname, service, tmp_path):
     # Then the config file should be created anyway
     assert result.exit_code == 0, result.stdout
     assert_token(hostname, hosts_file, token)
+
+
+@successful_login
+@pytest.mark.skipif(platform.system() != "Linux", reason="Linux specific issue")
+def test_permission_denied(cli, hostname, service, tmp_path):
+    # When the default config directory is not usable
+    config_directory = tmp_path / ".config"
+    config_directory.mkdir(mode=0o644)
+    hosts_file = config_directory / "hosts.toml"
+    token = "sample_token"
+    result = cli.auth.login(token, f"--hosts-file={hosts_file}", f"--hostname={hostname}", "--protocol=http")
+    # Then the config file should be created anyway in a different location
+    assert result.exit_code == 0, result.stdout
+    # And a warning is emitted
+    assert result.stdout.splitlines()[0].startswith("The provided hosts.toml file location is unusable")
+    actual_hosts_file = Path(get_temporary_hosts_file())
+    assert_token(hostname, actual_hosts_file, token)
 
 
 ERROR_MESSAGE = "Invalid credentials"
