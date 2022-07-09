@@ -15,7 +15,6 @@ from ..utils import WSGIResponse, format_exception
 
 @attr.s(slots=True)  # pragma: no mutate
 class SerializedCase:
-    text_lines: List[str] = attr.ib()  # pragma: no mutate
     requests_code: str = attr.ib()
     curl_code: str = attr.ib()
     path_template: str = attr.ib()
@@ -28,7 +27,6 @@ class SerializedCase:
     @classmethod
     def from_case(cls, case: Case, headers: Optional[Dict[str, Any]]) -> "SerializedCase":
         return cls(
-            text_lines=case.as_text_lines(headers),
             requests_code=case.get_code_to_reproduce(headers),
             curl_code=case.as_curl_command(headers),
             path_template=case.path,

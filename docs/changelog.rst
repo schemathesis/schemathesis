@@ -21,6 +21,8 @@ Changelog
 
 - Previously, data was uploaded to Schemathesis.io when the proper credentials were specified. This release removes this behavior.
   From now on, every upload requires the explicit ``--report`` CLI option.
+- Textual representation of HTTP requests in CLI output in order to decrease verbosity and avoid showing the same data
+  in multiple places.
 
 .. _v3.15.6:
 
