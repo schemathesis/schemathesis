@@ -128,7 +128,7 @@ def test_numeric_status_codes(empty_open_api_3_schema):
     # And schema validation is enabled
     # Then Schemathesis reports an error about numeric status codes
     with pytest.raises(SchemaLoadingError, match=NUMERIC_STATUS_CODES_MESSAGE) as exc:
-        schemathesis.from_dict(empty_open_api_3_schema)
+        schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
     # And shows all locations of these keys
     assert " - 200 at schema['paths']['/foo']['get']['responses']" in exc.value.args[0]
     assert " - 201 at schema['paths']['/foo']['post']['responses']" in exc.value.args[0]
@@ -139,4 +139,4 @@ def test_non_string_keys(empty_open_api_3_schema):
     empty_open_api_3_schema[True] = 42
     # Then it should be reported with a proper message
     with pytest.raises(SchemaLoadingError, match=NON_STRING_OBJECT_KEY):
-        schemathesis.from_dict(empty_open_api_3_schema)
+        schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
