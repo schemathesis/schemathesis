@@ -140,7 +140,7 @@ def test_schema_error_on_path(simple_schema):
     simple_schema["paths"] = {None: "", "/foo": {"post": RESPONSES}}
     # Then it should be rejected during loading if schema validation is enabled
     with pytest.raises(SchemaLoadingError):
-        schemathesis.from_dict(simple_schema)
+        schemathesis.from_dict(simple_schema, validate_schema=True)
     # And should produce an `Err` instance on operation parsing
     schema = schemathesis.from_dict(simple_schema, validate_schema=False)
     operations = list(schema.get_all_operations())

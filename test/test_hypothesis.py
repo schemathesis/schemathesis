@@ -95,6 +95,7 @@ def test_no_body_in_get(swagger_20):
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_invalid_body_in_get(swagger_20):
+    swagger_20.validate_schema = True
     operation = APIOperation(
         path="/foo",
         method="GET",
