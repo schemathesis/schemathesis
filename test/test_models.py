@@ -308,7 +308,7 @@ def test_(case):
           "",
           "Run this cURL command to reproduce this response: ",
           "",
-          f"    curl -X GET -H 'User-Agent: {USER_AGENT}' -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {{case.id}}' http://localhost/v1/users",
+          f"    curl -X GET -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {{case.id}}' http://localhost/v1/users",
           "",
     ]
 """
