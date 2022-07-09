@@ -1,5 +1,6 @@
 """Work with stored auth data."""
 import enum
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -101,14 +102,12 @@ def get_token(hostname: str = DEFAULT_HOSTNAME, hosts_file: PathLike = DEFAULT_H
     return load_for_host(hostname, hosts_file).get("token")
 
 
-def _dump_hosts(path: PathLike, hosts: Dict[str, Any], is_first_try: bool = True) -> None:
+def get_temporary_hosts_file() -> str:
+    temporary_dir = Path(tempfile.gettempdir()).resolve()
+    return str(temporary_dir / "schemathesis-hosts.toml")
+
+
+def _dump_hosts(path: PathLike, hosts: Dict[str, Any]) -> None:
     """Write hosts data to a file."""
-    try:
-        with open(path, "wb") as fd:
-            tomli_w.dump(hosts, fd)
-    except FileNotFoundError:
-        if is_first_try:
-            _try_make_config_directory(path)
-            _dump_hosts(path, hosts, is_first_try=False)
-        else:
-            raise
+    with open(path, "wb") as fd:
+        tomli_w.dump(hosts, fd)

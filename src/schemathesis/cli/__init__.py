@@ -213,6 +213,7 @@ with_hosts_file = click.option(
     type=click.Path(dir_okay=False, writable=True),
     default=service.DEFAULT_HOSTS_PATH,
     envvar=service.HOSTS_PATH_ENV_VAR,
+    callback=callbacks.convert_hosts_file,
 )
 REPORT_TO_SERVICE = object()
 
