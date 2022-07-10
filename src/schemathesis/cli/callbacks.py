@@ -221,12 +221,12 @@ def _is_usable_dir(path: PathLike) -> bool:
     return os.path.isdir(path) and os.access(path, os.R_OK | os.W_OK | os.X_OK)
 
 
-def convert_hosts_file(ctx: click.core.Context, param: click.core.Parameter, value: str) -> str:
+def convert_hosts_file(ctx: click.core.Context, param: click.core.Parameter, value: PathLike) -> PathLike:
     if not _is_usable_dir(value):
         path = get_temporary_hosts_file()
         click.secho(
-            "The provided hosts.toml file location is unusable - using a temporary file for this session. "
-            f"path={value!r}",
+            "WARNING: The provided hosts.toml file location is unusable - using a temporary file for this session. "
+            f"path={str(value)!r}",
             fg="yellow",
         )
         return path
