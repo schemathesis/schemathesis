@@ -1,0 +1,59 @@
+name: Example project
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/example-project.yml'
+      - 'example/**'
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+
+  local-ci:
+    name: Example app
+    runs-on: ubuntu-20.04
+    container: python:3.10.5-slim
+
+    # Setup PostgreSQL
+    services:
+      db:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_USER: test
+          POSTGRES_DB: schemathesis-example
+        # Wait until Postgres is ready
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      API_SCHEMA: http://localhost:5000/api/openapi.json
+
+    steps:
+      - uses: actions/checkout@v3.0.0
+
+      - name: Install dependencies
+        run: pip install asyncpg attrs connexion[aiohttp,swagger-ui] .
+
+      # Start the API in the background
+      - name: Start API
+        run: python main.py &
+        working-directory: ./example
+
+      # Waits until localhost:5000 is available
+      # Tries to connect every 200 ms with a total waiting time of 5 seconds
+      - name: Wait for API
+        run: >
+          timeout 5
+          bash -c
+          'until printf "" 2>>/dev/null >>/dev/tcp/$0/$1; do sleep 0.2; done'
+          localhost 5000
+
+      # Runs positive Schemathesis tests
+      - name: Run Schemathesis
+        run: st run $API_SCHEMA --checks=all --hypothesis-max-examples=10 || true
