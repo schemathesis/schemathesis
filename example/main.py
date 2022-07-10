@@ -1,4 +1,5 @@
 import logging
+import os
 
 from app.app import create_app
 from app.settings import load_config
@@ -13,4 +14,5 @@ def main(config_path, port):
 
 
 if __name__ == "__main__":
-    main("config.json", port=5000)
+    PORT = int(os.getenv("APP_PORT", 5000))
+    main("config.json", port=PORT)
