@@ -65,6 +65,7 @@ User's Guide
    introduction
    cli
    python
+   continuous_integration
    auth
    stateful
    service

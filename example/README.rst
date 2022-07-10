@@ -70,7 +70,7 @@ Here are examples of how you can run Schemathesis CLI:
     st run -c status_code_conformance $SCHEMA_URL
 
     # Include your own checks. They should be registered in the `test/hooks.py` module
-    schemathesis --pre-run test.hooks run $SCHEMA_URL
+    st --pre-run test.hooks run $SCHEMA_URL
 
     # Provide custom headers
     st run -H "Authorization: Bearer <token>" $SCHEMA_URL
@@ -84,7 +84,7 @@ Here are examples of how you can run Schemathesis CLI:
     # Store network log to a file
     st run --cassette-path=cassette.yaml $SCHEMA_URL
     # Replay requests from the log
-    schemathesis replay cassette.yaml
+    st replay cassette.yaml
 
     # Integration tests
     st run $SCHEMA_URL
