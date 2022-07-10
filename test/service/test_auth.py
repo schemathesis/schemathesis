@@ -78,7 +78,8 @@ def test_permission_denied(cli, hostname, service, tmp_path):
     # Then the config file should be created anyway in a different location
     assert result.exit_code == 0, result.stdout
     # And a warning is emitted
-    assert result.stdout.splitlines()[0].startswith("The provided hosts.toml file location is unusable")
+    warning = result.stdout.splitlines()[0]
+    assert warning.startswith("WARNING: The provided hosts.toml file location is unusable")
     actual_hosts_file = Path(get_temporary_hosts_file())
     assert_token(hostname, actual_hosts_file, token)
 
