@@ -69,6 +69,12 @@ class GitHubActionsEnvironment:
     # The commit SHA that triggered the workflow.
     # For example, `e56e13224f08469841e106449f6467b769e2afca`
     sha: str = attr.ib()
+    # A unique number for each workflow run within a repository.
+    # For example, `1658821493`.
+    run_id: str = attr.ib()
+    # The name of the workflow.
+    # For example, `My test workflow`.
+    workflow: str = attr.ib()
     # The head ref or source branch of the pull request in a workflow run.
     # For example, `dd/report-ci`.
     head_ref: Optional[str] = attr.ib()
@@ -87,6 +93,8 @@ class GitHubActionsEnvironment:
             repository=os.environ["GITHUB_REPOSITORY"],
             actor=os.environ["GITHUB_ACTOR"],
             sha=os.environ["GITHUB_SHA"],
+            run_id=os.environ["GITHUB_RUN_ID"],
+            workflow=os.environ["GITHUB_WORKFLOW"],
             head_ref=os.getenv("GITHUB_HEAD_REF"),
             base_ref=os.getenv("GITHUB_BASE_REF"),
             ref=os.getenv("GITHUB_REF"),

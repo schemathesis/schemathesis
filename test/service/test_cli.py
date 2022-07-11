@@ -365,6 +365,8 @@ def test_ci_environment(monkeypatch, cli, schema_url, tmp_path, read_report, ser
         "GITHUB_REPOSITORY": "schemathesis/schemathesis",
         "GITHUB_ACTOR": "Stranger6667",
         "GITHUB_SHA": "e56e13224f08469841e106449f6467b769e2afca",
+        "GITHUB_RUN_ID": "1658821493",
+        "GITHUB_WORKFLOW": "Build job",
         "GITHUB_HEAD_REF": "dd/report-ci",
         "GITHUB_BASE_REF": "main",
         "GITHUB_REF": "refs/pull/1533/merge",
@@ -385,6 +387,8 @@ def test_ci_environment(monkeypatch, cli, schema_url, tmp_path, read_report, ser
             "ref": "refs/pull/1533/merge",
             "repository": "schemathesis/schemathesis",
             "sha": "e56e13224f08469841e106449f6467b769e2afca",
+            "run_id": "1658821493",
+            "workflow": "Build job",
         }
 
 
