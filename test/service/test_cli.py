@@ -308,18 +308,25 @@ def test_anonymous_upload(cli, schema_url, service, hosts_file, correlation_id):
     assert load_for_host(service.hostname, hosts_file)["correlation_id"] == correlation_id
 
 
+@pytest.mark.parametrize("name", (None, "test-api"))
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
-def test_save_to_file(cli, schema_url, tmp_path, read_report, service):
+def test_save_to_file(cli, schema_url, tmp_path, read_report, service, name):
     # When an argument is provided to the `--report` option
     report_file = tmp_path / "report.tar.gz"
-    result = cli.run(schema_url, f"--report={report_file}")
+    if name is not None:
+        args = (name,)
+    else:
+        args = ()
+    result = cli.run(schema_url, *args, f"--report={report_file}")
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then the report should be saved to a file
     payload = report_file.read_bytes()
     with read_report(payload) as tar:
         assert len(tar.getmembers()) == 6
-        assert json.load(tar.extractfile("metadata.json"))["ci"] is None
+        metadata = json.load(tar.extractfile("metadata.json"))
+        assert metadata["ci"] is None
+        assert metadata["api_name"] == name
     # And it should be written in CLI
     assert f"Report: {report_file}" in result.stdout
     # And should not be sent to the SaaS
