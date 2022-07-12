@@ -631,7 +631,11 @@ def run(
     client = None
     if schema_kind == callbacks.SchemaInputKind.NAME:
         api_name = schema
-    if api_name is not None or schema_kind == callbacks.SchemaInputKind.NAME:
+    if (
+        not (report and report.name is not REPORT_TO_SERVICE)
+        and api_name is not None
+        or schema_kind == callbacks.SchemaInputKind.NAME
+    ):
         client = service.ServiceClient(base_url=schemathesis_io_url, token=token)
         # It is assigned above
         if token is not None or schema_kind == callbacks.SchemaInputKind.NAME:
@@ -1024,6 +1028,7 @@ def execute(
         handlers.append(
             service.FileReportHandler(
                 file_handle=report,
+                api_name=api_name,
                 location=location,
                 base_url=base_url,
             )

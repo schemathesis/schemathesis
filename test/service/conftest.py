@@ -154,6 +154,7 @@ def file_report_handler(service_client, hostname, hosts_file, openapi3_schema_ur
     report_file = tmp_path / "report.tar.gz"
     handler = FileReportHandler(
         file_handle=click.utils.LazyFile(str(report_file), mode="wb"),
+        api_name=None,
         location=openapi3_schema_url,
         base_url=None,
         in_queue=Queue(),
