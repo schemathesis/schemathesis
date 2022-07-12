@@ -342,7 +342,7 @@ def make_positive_strategy(
         # This way, only allowed values will be used during data generation, which reduces the amount of filtering later
         # If a property schema contains `pattern` it leads to heavy filtering and worse performance - therefore, skip it
         for sub_schema in schema.get("properties", {}).values():
-            if list(sub_schema) == ["type"]:
+            if list(sub_schema) == ["type"] and sub_schema["type"] == "string":
                 sub_schema.setdefault("format", HEADER_FORMAT)
     return from_schema(schema, custom_formats={**STRING_FORMATS, **(custom_formats or {})})
 

@@ -42,7 +42,7 @@ def test_cookies(testdir, type_):
     testdir.make_test(
         """
 @schema.parametrize()
-@settings(suppress_health_check=[HealthCheck.filter_too_much], deadline=None, max_examples=3)
+@settings(suppress_health_check=[HealthCheck.filter_too_much], deadline=None, max_examples=20)
 def test_(case):
     assert_str(case.cookies["token"])
     assert_requests_call(case)
