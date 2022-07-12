@@ -1,4 +1,4 @@
-from . import auth, hosts
+from . import auth, ci, hosts
 from .client import ServiceClient
 from .constants import (
     DEFAULT_HOSTNAME,
@@ -14,5 +14,5 @@ from .constants import (
     WORKER_CHECK_PERIOD,
     WORKER_FINISH_TIMEOUT,
 )
-from .events import Completed, Error, Event, Failed, Timeout
+from .events import Completed, Error, Event, Failed, Metadata, Timeout
 from .report import FileReportHandler, ServiceReportHandler

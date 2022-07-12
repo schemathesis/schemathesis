@@ -158,6 +158,7 @@ def file_report_handler(service_client, hostname, hosts_file, openapi3_schema_ur
         location=openapi3_schema_url,
         base_url=None,
         in_queue=Queue(),
+        out_queue=Queue(),
     )
     yield handler
     handler.shutdown()

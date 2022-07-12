@@ -152,16 +152,19 @@ def write_remote(
     try:
         with tarfile.open(mode="w:gz", fileobj=payload) as tar:
             writer = ReportWriter(tar)
+            ci_environment = ci.environment()
             writer.add_metadata(
                 api_name=api_name,
                 location=location,
                 base_url=base_url,
                 metadata=Metadata(),
-                ci_environment=ci.environment(),
+                ci_environment=ci_environment,
             )
             if consume_events(writer, in_queue) == ConsumeResult.INTERRUPT:
                 return
-        response = client.upload_report(payload.getvalue(), host_data.correlation_id)
+        data = payload.getvalue()
+        out_queue.put(events.Metadata(size=len(data), ci_environment=ci_environment))
+        response = client.upload_report(data, host_data.correlation_id)
         event: events.Event
         if isinstance(response, UploadResponse):
             host_data.store_correlation_id(response.correlation_id)
@@ -179,6 +182,7 @@ class FileReportHandler(BaseReportHandler):
     api_name: Optional[str] = attr.ib()  # pragma: no mutate
     location: str = attr.ib()  # pragma: no mutate
     base_url: Optional[str] = attr.ib()  # pragma: no mutate
+    out_queue: Queue = attr.ib()  # pragma: no mutate
     in_queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
     worker: threading.Thread = attr.ib(init=False)  # pragma: no mutate
 
@@ -191,24 +195,33 @@ class FileReportHandler(BaseReportHandler):
                 "location": self.location,
                 "base_url": self.base_url,
                 "in_queue": self.in_queue,
+                "out_queue": self.out_queue,
             },
         )
         self.worker.start()
 
 
 def write_file(
-    file_handle: click.utils.LazyFile, api_name: Optional[str], location: str, base_url: str, in_queue: Queue
+    file_handle: click.utils.LazyFile,
+    api_name: Optional[str],
+    location: str,
+    base_url: str,
+    in_queue: Queue,
+    out_queue: Queue,
 ) -> None:
     with file_handle.open() as fileobj, tarfile.open(mode="w:gz", fileobj=fileobj) as tar:
         writer = ReportWriter(tar)
+        ci_environment = ci.environment()
         writer.add_metadata(
             api_name=api_name,
             location=location,
             base_url=base_url,
             metadata=Metadata(),
-            ci_environment=ci.environment(),
+            ci_environment=ci_environment,
         )
         result = consume_events(writer, in_queue)
     if result == ConsumeResult.INTERRUPT:
         with suppress(OSError):
             os.remove(file_handle.name)
+    else:
+        out_queue.put(events.Metadata(size=os.path.getsize(file_handle.name), ci_environment=ci_environment))

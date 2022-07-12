@@ -1009,10 +1009,11 @@ def execute(
     # pylint: disable=too-many-branches
     handlers: List[EventHandler] = []
     report_context: Optional[Union[ServiceReportContext, FileReportContext]] = None
+    report_queue: Queue
     if client:
         # If API name is specified, validate it
-        report_queue: Queue = Queue()
-        report_context = ServiceReportContext(queue=report_queue)
+        report_queue = Queue()
+        report_context = ServiceReportContext(queue=report_queue, service_base_url=client.base_url)
         handlers.append(
             service.ServiceReportHandler(
                 client=client,
@@ -1024,13 +1025,15 @@ def execute(
             )
         )
     elif report and report.name is not REPORT_TO_SERVICE:
-        report_context = FileReportContext(filename=report.name)
+        report_queue = Queue()
+        report_context = FileReportContext(queue=report_queue, filename=report.name)
         handlers.append(
             service.FileReportHandler(
                 file_handle=report,
                 api_name=api_name,
                 location=location,
                 base_url=base_url,
+                out_queue=report_queue,
             )
         )
     if junit_xml is not None:

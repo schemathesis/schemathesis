@@ -17,11 +17,21 @@ class CIProvider(enum.Enum):
 @runtime_checkable
 class Environment(Protocol):
     provider: CIProvider
+    variable_name: str
+    verbose_name: str
 
-    def from_env(self) -> "Environment":
+    @classmethod
+    def is_set(cls) -> bool:
         pass
 
-    def asdict(self) -> Dict[str, str]:
+    @classmethod
+    def from_env(cls) -> "Environment":
+        pass
+
+    def asdict(self) -> Dict[str, Optional[str]]:
+        pass
+
+    def as_env(self) -> Dict[str, Optional[str]]:
         pass
 
 
@@ -37,14 +47,14 @@ def environment() -> Optional[Environment]:
 
 def detect() -> Optional[CIProvider]:
     """Detect the current CI provider."""
-    if os.getenv("GITHUB_ACTIONS") == "true":
-        return CIProvider.GITHUB
-    if os.getenv("GITLAB_CI") == "true":
-        return CIProvider.GITLAB
+    if GitHubActionsEnvironment.is_set():
+        return GitHubActionsEnvironment.provider
+    if GitLabCIEnvironment.is_set():
+        return GitLabCIEnvironment.provider
     return None
 
 
-def asdict(env: Environment) -> Dict[str, str]:
+def asdict(env: Environment) -> Dict[str, Optional[str]]:
     data = attr.asdict(env)
     data["provider"] = env.provider.value
     return data
@@ -55,6 +65,8 @@ class GitHubActionsEnvironment:
     """Useful data to capture from GitHub Actions environment."""
 
     provider = CIProvider.GITHUB
+    variable_name = "GITHUB_ACTIONS"
+    verbose_name = "GitHub Actions"
     asdict = asdict
 
     # GitHub API URL.
@@ -87,6 +99,10 @@ class GitHubActionsEnvironment:
     ref: Optional[str] = attr.ib()
 
     @classmethod
+    def is_set(cls) -> bool:
+        return os.getenv(cls.variable_name) == "true"
+
+    @classmethod
     def from_env(cls) -> "GitHubActionsEnvironment":
         return cls(
             api_url=os.environ["GITHUB_API_URL"],
@@ -100,12 +116,27 @@ class GitHubActionsEnvironment:
             ref=os.getenv("GITHUB_REF"),
         )
 
+    def as_env(self) -> Dict[str, Optional[str]]:
+        return {
+            "GITHUB_API_URL": self.api_url,
+            "GITHUB_REPOSITORY": self.repository,
+            "GITHUB_ACTOR": self.actor,
+            "GITHUB_SHA": self.sha,
+            "GITHUB_RUN_ID": self.run_id,
+            "GITHUB_WORKFLOW": self.workflow,
+            "GITHUB_HEAD_REF": self.head_ref,
+            "GITHUB_BASE_REF": self.base_ref,
+            "GITHUB_REF": self.ref,
+        }
+
 
 @attr.s(slots=True)
 class GitLabCIEnvironment:
     """Useful data to capture from GitLab CI environment."""
 
     provider = CIProvider.GITLAB
+    variable_name = "GITLAB_CI"
+    verbose_name = "GitLab CI"
     asdict = asdict
 
     # GitLab API URL
@@ -137,6 +168,10 @@ class GitLabCIEnvironment:
     merge_request_iid: Optional[str] = attr.ib()
 
     @classmethod
+    def is_set(cls) -> bool:
+        return os.getenv(cls.variable_name) == "true"
+
+    @classmethod
     def from_env(cls) -> "GitLabCIEnvironment":
         return cls(
             api_v4_url=os.environ["CI_API_V4_URL"],
@@ -148,3 +183,15 @@ class GitLabCIEnvironment:
             merge_request_target_branch_name=os.getenv("CI_MERGE_REQUEST_TARGET_BRANCH_NAME"),
             merge_request_iid=os.getenv("CI_MERGE_REQUEST_IID"),
         )
+
+    def as_env(self) -> Dict[str, Optional[str]]:
+        return {
+            "CI_API_V4_URL": self.api_v4_url,
+            "CI_PROJECT_ID": self.project_id,
+            "GITLAB_USER_LOGIN": self.user_login,
+            "CI_COMMIT_SHA": self.commit_sha,
+            "CI_COMMIT_BRANCH": self.commit_branch,
+            "CI_MERGE_REQUEST_SOURCE_BRANCH_NAME": self.merge_request_source_branch_name,
+            "CI_MERGE_REQUEST_TARGET_BRANCH_NAME": self.merge_request_target_branch_name,
+            "CI_MERGE_REQUEST_IID": self.merge_request_iid,
+        }

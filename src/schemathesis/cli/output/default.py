@@ -287,8 +287,8 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
 
     if isinstance(context.report, FileReportContext):
         click.echo()
-        category = click.style("Report", bold=True)
-        click.secho(f"{category}: {context.report.filename}")
+        display_report_metadata(context.report.queue.get())
+        click.secho(f"Report is saved to {context.report.filename}", bold=True)
     elif isinstance(context.report, ServiceReportContext):
         click.echo()
         handle_service_integration(context.report)
@@ -302,8 +302,12 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
 
 def handle_service_integration(context: ServiceReportContext) -> None:
     """If Schemathesis.io integration is enabled, wait for the handler & print the resulting status."""
+    event = context.queue.get()
     title = click.style("Upload", bold=True)
-    event = wait_for_report_handler(context.queue, title)
+    if isinstance(event, service.Metadata):
+        display_report_metadata(event)
+        click.secho(f"Uploading reports to {context.service_base_url} ...", bold=True)
+        event = wait_for_report_handler(context.queue, title)
     color = {
         service.Completed: "green",
         service.Error: "red",
@@ -324,6 +328,16 @@ def handle_service_integration(context: ServiceReportContext) -> None:
         click.echo(event.message)
         click.echo()
         click.echo(event.next_url)
+
+
+def display_report_metadata(meta: service.Metadata) -> None:
+    if meta.ci_environment is not None:
+        click.secho(f"{meta.ci_environment.verbose_name} detected:", bold=True)
+        for key, value in meta.ci_environment.as_env().items():
+            if value is not None:
+                click.secho(f"  -> {key}: {value}")
+        click.echo()
+    click.secho(f"Compressed report size: {meta.size / 1024.:,.0f} KB", bold=True)
 
 
 def display_service_error(event: service.Error) -> None:

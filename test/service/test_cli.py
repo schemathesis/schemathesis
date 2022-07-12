@@ -8,6 +8,7 @@ from requests import Timeout
 import schemathesis
 from schemathesis.cli.output.default import SERVICE_ERROR_MESSAGE
 from schemathesis.constants import USER_AGENT
+from schemathesis.service import ci
 from schemathesis.service.constants import REPORT_CORRELATION_ID_HEADER, REPORT_ENV_VAR
 from schemathesis.service.hosts import load_for_host
 
@@ -128,9 +129,12 @@ def test_server_timeout(cli, schema_url, service, mocker):
         "--report",
     )
     assert result.exit_code == ExitCode.OK, result.stdout
-    # Then the output indicates timeout
     lines = get_stdout_lines(result.stdout)
-    assert lines[15].endswith("Upload: TIMEOUT")
+    # And meta information should be displayed
+    assert lines[15] == "Compressed report size: 1 KB"
+    assert lines[16] == f"Uploading reports to {service.base_url} ..."
+    # Then the output indicates timeout
+    assert lines[17] == "Upload: TIMEOUT"
 
 
 @pytest.mark.service(
@@ -328,7 +332,7 @@ def test_save_to_file(cli, schema_url, tmp_path, read_report, service, name):
         assert metadata["ci"] is None
         assert metadata["api_name"] == name
     # And it should be written in CLI
-    assert f"Report: {report_file}" in result.stdout
+    assert f"Report is saved to {report_file}" in result.stdout
     # And should not be sent to the SaaS
     assert not service.server.log
 
@@ -355,48 +359,64 @@ def test_report_via_env_var(cli, schema_url, tmp_path, read_report, service, mon
         # And should not be sent to the SaaS
         assert not service.server.log
         # And it should be written in CLI
-        assert f"Report: {report_file}" in result.stdout
+        assert f"Report is saved to {report_file}" in result.stdout
         assert not service.server.log
     with read_report(payload) as tar:
         assert len(tar.getmembers()) == 6
         assert json.load(tar.extractfile("metadata.json"))["ci"] is None
 
 
+@pytest.mark.parametrize(
+    "environment",
+    (
+        (
+            ci.GitHubActionsEnvironment(
+                api_url="https://api.github.com",
+                repository="schemathesis/schemathesis",
+                actor="Stranger6667",
+                sha="e56e13224f08469841e106449f6467b769e2afca",
+                run_id="1658821493",
+                workflow="Build job",
+                head_ref="dd/report-ci",
+                base_ref="main",
+                ref=None,
+            ),
+            ci.GitLabCIEnvironment(
+                api_v4_url="https://gitlab.com/api/v4",
+                project_id="7",
+                user_login="Stranger6667",
+                commit_sha="e56e13224f08469841e106449f6467b769e2afca",
+                commit_branch=None,
+                merge_request_source_branch_name="dd/report-ci",
+                merge_request_target_branch_name="main",
+                merge_request_iid="43",
+            ),
+        )
+    ),
+)
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
-def test_ci_environment(monkeypatch, cli, schema_url, tmp_path, read_report, service):
+def test_ci_environment(monkeypatch, cli, schema_url, tmp_path, read_report, service, environment):
     # When executed in CI
-    for key, value in {
-        "GITHUB_ACTIONS": "true",
-        "GITHUB_API_URL": "https://api.github.com",
-        "GITHUB_REPOSITORY": "schemathesis/schemathesis",
-        "GITHUB_ACTOR": "Stranger6667",
-        "GITHUB_SHA": "e56e13224f08469841e106449f6467b769e2afca",
-        "GITHUB_RUN_ID": "1658821493",
-        "GITHUB_WORKFLOW": "Build job",
-        "GITHUB_HEAD_REF": "dd/report-ci",
-        "GITHUB_BASE_REF": "main",
-        "GITHUB_REF": "refs/pull/1533/merge",
-    }.items():
-        monkeypatch.setenv(key, value)
+    monkeypatch.setenv(environment.variable_name, "true")
+    for key, value in environment.as_env().items():
+        if value is not None:
+            monkeypatch.setenv(key, value)
     report_file = tmp_path / "report.tar.gz"
     result = cli.run(schema_url, f"--report={report_file}")
     assert result.exit_code == ExitCode.OK, result.stdout
+    # And CI information is displayed in stdout
+    lines = get_stdout_lines(result.stdout)
+    assert lines[14] == f"{environment.verbose_name} detected:"
+    key, value = next(iter(environment.as_env().items()))
+    assert lines[15] == f"  -> {key}: {value}"
+    # And missing env vars are not displayed
+    key, _ = next(filter(lambda kv: kv[1] is None, iter(environment.as_env().items())))
+    assert key not in result.stdout
     # Then CI variables should be stored inside metadata
     payload = report_file.read_bytes()
     with read_report(payload) as tar:
-        assert json.load(tar.extractfile("metadata.json"))["ci"] == {
-            "actor": "Stranger6667",
-            "api_url": "https://api.github.com",
-            "base_ref": "main",
-            "head_ref": "dd/report-ci",
-            "provider": "github",
-            "ref": "refs/pull/1533/merge",
-            "repository": "schemathesis/schemathesis",
-            "sha": "e56e13224f08469841e106449f6467b769e2afca",
-            "run_id": "1658821493",
-            "workflow": "Build job",
-        }
+        assert json.load(tar.extractfile("metadata.json"))["ci"] == environment.asdict()
 
 
 PAYLOAD_TOO_LARGE_MESSAGE = "Your report is too large. The limit is 100 KB, but your report is 101 KB."
