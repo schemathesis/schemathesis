@@ -176,6 +176,7 @@ def write_remote(
 @attr.s(slots=True)  # pragma: no mutate
 class FileReportHandler(BaseReportHandler):
     file_handle: click.utils.LazyFile = attr.ib()  # pragma: no mutate
+    api_name: Optional[str] = attr.ib()  # pragma: no mutate
     location: str = attr.ib()  # pragma: no mutate
     base_url: Optional[str] = attr.ib()  # pragma: no mutate
     in_queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
@@ -186,6 +187,7 @@ class FileReportHandler(BaseReportHandler):
             target=write_file,
             kwargs={
                 "file_handle": self.file_handle,
+                "api_name": self.api_name,
                 "location": self.location,
                 "base_url": self.base_url,
                 "in_queue": self.in_queue,
@@ -194,11 +196,17 @@ class FileReportHandler(BaseReportHandler):
         self.worker.start()
 
 
-def write_file(file_handle: click.utils.LazyFile, location: str, base_url: str, in_queue: Queue) -> None:
+def write_file(
+    file_handle: click.utils.LazyFile, api_name: Optional[str], location: str, base_url: str, in_queue: Queue
+) -> None:
     with file_handle.open() as fileobj, tarfile.open(mode="w:gz", fileobj=fileobj) as tar:
         writer = ReportWriter(tar)
         writer.add_metadata(
-            api_name=None, location=location, base_url=base_url, metadata=Metadata(), ci_environment=ci.environment()
+            api_name=api_name,
+            location=location,
+            base_url=base_url,
+            metadata=Metadata(),
+            ci_environment=ci.environment(),
         )
         result = consume_events(writer, in_queue)
     if result == ConsumeResult.INTERRUPT:
