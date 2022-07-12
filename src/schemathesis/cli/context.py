@@ -13,10 +13,12 @@ from ..runner.serialization import SerializedTestResult
 @attr.s(slots=True)  # pragma: no mutate
 class ServiceReportContext:
     queue: Queue = attr.ib()  # pragma: no mutate
+    service_base_url: str = attr.ib()  # pragma: no mutate
 
 
 @attr.s(slots=True)  # pragma: no mutate
 class FileReportContext:
+    queue: Queue = attr.ib()  # pragma: no mutate
     filename: str = attr.ib(default=None)  # pragma: no mutate
 
 
