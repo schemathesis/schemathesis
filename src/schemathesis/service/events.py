@@ -1,6 +1,9 @@
+from typing import Optional
+
 import attr
 
 from ..utils import format_exception
+from . import ci
 
 
 class Event:
@@ -12,6 +15,14 @@ class Event:
     @property
     def status(self) -> str:
         return self.__class__.__name__.upper()
+
+
+@attr.s(slots=True)
+class Metadata(Event):
+    """Meta-information about the report."""
+
+    size: int = attr.ib()
+    ci_environment: Optional[ci.Environment] = attr.ib()
 
 
 @attr.s(slots=True)
