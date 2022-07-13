@@ -20,7 +20,15 @@ from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import DEFAULT_TARGETS, Target
 from ..types import Filter, NotSet, RawAuth, RequestCert
-from ..utils import deprecated, dict_not_none_values, dict_true_values, file_exists, get_requests_auth, import_app
+from ..utils import (
+    current_datetime,
+    deprecated,
+    dict_not_none_values,
+    dict_true_values,
+    file_exists,
+    get_requests_auth,
+    import_app,
+)
 from . import events
 from .impl import (
     BaseRunner,
@@ -311,6 +319,7 @@ def from_schema(
     request_cert: Optional[RequestCert] = None,
     seed: Optional[int] = None,
     exit_first: bool = False,
+    started_at: Optional[str] = None,
     dry_run: bool = False,
     store_interactions: bool = False,
     stateful: Optional[Stateful] = None,
@@ -318,6 +327,7 @@ def from_schema(
     count_operations: bool = True,
 ) -> BaseRunner:
     hypothesis_settings = hypothesis_settings or hypothesis.settings(deadline=DEFAULT_DEADLINE)
+    started_at = started_at or current_datetime()
     if workers_num > 1:
         if not schema.app:
             return ThreadPoolRunner(
@@ -335,6 +345,7 @@ def from_schema(
                 request_tls_verify=request_tls_verify,
                 request_cert=request_cert,
                 exit_first=exit_first,
+                started_at=started_at,
                 dry_run=dry_run,
                 store_interactions=store_interactions,
                 stateful=stateful,
@@ -353,6 +364,7 @@ def from_schema(
                 headers=headers,
                 seed=seed,
                 exit_first=exit_first,
+                started_at=started_at,
                 dry_run=dry_run,
                 store_interactions=store_interactions,
                 stateful=stateful,
@@ -371,6 +383,7 @@ def from_schema(
             seed=seed,
             workers_num=workers_num,
             exit_first=exit_first,
+            started_at=started_at,
             dry_run=dry_run,
             store_interactions=store_interactions,
             stateful=stateful,
@@ -392,6 +405,7 @@ def from_schema(
             request_tls_verify=request_tls_verify,
             request_cert=request_cert,
             exit_first=exit_first,
+            started_at=started_at,
             dry_run=dry_run,
             store_interactions=store_interactions,
             stateful=stateful,
@@ -410,6 +424,7 @@ def from_schema(
             headers=headers,
             seed=seed,
             exit_first=exit_first,
+            started_at=started_at,
             dry_run=dry_run,
             store_interactions=store_interactions,
             stateful=stateful,
@@ -427,6 +442,7 @@ def from_schema(
         headers=headers,
         seed=seed,
         exit_first=exit_first,
+        started_at=started_at,
         dry_run=dry_run,
         store_interactions=store_interactions,
         stateful=stateful,
