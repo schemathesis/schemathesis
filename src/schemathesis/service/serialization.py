@@ -111,7 +111,8 @@ def serialize_finished(event: events.Finished) -> Optional[Dict[str, Any]]:
                 "title": error.title,
             }
             for error in event.generic_errors
-        ]
+        ],
+        "running_time": event.running_time,
     }
 
 
