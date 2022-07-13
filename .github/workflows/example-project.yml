@@ -33,6 +33,7 @@ jobs:
           --health-retries 5
     env:
       API_SCHEMA: http://localhost:5000/api/openapi.json
+      SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
 
     steps:
       - uses: actions/checkout@v3.0.0
@@ -56,4 +57,4 @@ jobs:
 
       # Runs positive Schemathesis tests
       - name: Run Schemathesis
-        run: st run $API_SCHEMA --checks=all --hypothesis-max-examples=10 || true
+        run: st run $API_SCHEMA --checks=all --hypothesis-max-examples=10 --report || true
