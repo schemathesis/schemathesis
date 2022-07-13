@@ -7,6 +7,7 @@ import traceback
 import warnings
 from contextlib import contextmanager
 from copy import copy, deepcopy
+from datetime import datetime, timezone
 from inspect import getfullargspec
 from json import JSONDecodeError
 from typing import (
@@ -487,3 +488,7 @@ def merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
         else:
             a[key] = b[key]
     return a
+
+
+def current_datetime() -> str:
+    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")

@@ -9,7 +9,7 @@ from ..constants import DataGenerationMethod
 from ..exceptions import HTTPError
 from ..models import APIOperation, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
-from ..utils import format_exception
+from ..utils import current_datetime, format_exception
 from .serialization import SerializedError, SerializedTestResult
 
 
@@ -40,18 +40,24 @@ class Initialized(ExecutionEvent):
     base_url: str = attr.ib()  # pragma: no mutate
     # API schema specification name
     specification_name: str = attr.ib()  # pragma: no mutate
-    # Timestamp of test run start
+    # Monotonic clock value when the test run started. Used to properly calculate run duration, since this clock
+    # can't go backwards.
     start_time: float = attr.ib(factory=time.monotonic)  # pragma: no mutate
+    # Datetime of the test run start
+    started_at: str = attr.ib(factory=current_datetime)  # pragma: no mutate
     thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
 
     @classmethod
-    def from_schema(cls, *, schema: BaseSchema, count_operations: bool = True) -> "Initialized":
+    def from_schema(
+        cls, *, schema: BaseSchema, count_operations: bool = True, started_at: Optional[str] = None
+    ) -> "Initialized":
         """Computes all needed data from a schema instance."""
         return cls(
             schema=schema.raw_schema,
             operations_count=schema.operations_count if count_operations else None,
             location=schema.location,
             base_url=schema.get_base_url(),
+            started_at=started_at or current_datetime(),
             specification_name=schema.verbose_name,
         )
 

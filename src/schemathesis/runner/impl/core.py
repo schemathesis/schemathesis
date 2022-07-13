@@ -47,6 +47,7 @@ from ...utils import (
     WSGIResponse,
     capture_hypothesis_output,
     copy_response,
+    current_datetime,
     format_exception,
     maybe_set_assertion_message,
 )
@@ -67,6 +68,7 @@ class BaseRunner:
     store_interactions: bool = attr.ib(default=False)  # pragma: no mutate
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
     exit_first: bool = attr.ib(default=False)  # pragma: no mutate
+    started_at: str = attr.ib(factory=current_datetime)  # pragma: no mutate
     dry_run: bool = attr.ib(default=False)  # pragma: no mutate
     stateful: Optional[Stateful] = attr.ib(default=None)  # pragma: no mutate
     stateful_recursion_limit: int = attr.ib(default=DEFAULT_STATEFUL_RECURSION_LIMIT)  # pragma: no mutate
