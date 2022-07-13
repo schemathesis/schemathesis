@@ -48,6 +48,7 @@ class ReportWriter:
         api_name: Optional[str],
         location: str,
         base_url: str,
+        started_at: str,
         metadata: Metadata,
         ci_environment: Optional[ci.Environment],
     ) -> None:
@@ -58,6 +59,8 @@ class ReportWriter:
             "location": location,
             # The base URL against which the tests are running
             "base_url": base_url,
+            # The time that the test run began
+            "started_at": started_at,
             # Metadata about CLI environment
             "environment": attr.asdict(metadata),
             # Environment variables specific for CI providers
@@ -97,6 +100,7 @@ class ServiceReportHandler(BaseReportHandler):
     api_name: Optional[str] = attr.ib()  # pragma: no mutate
     location: str = attr.ib()  # pragma: no mutate
     base_url: Optional[str] = attr.ib()  # pragma: no mutate
+    started_at: str = attr.ib()  # pragma: no mutate
     out_queue: Queue = attr.ib()  # pragma: no mutate
     in_queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
     worker: threading.Thread = attr.ib(init=False)  # pragma: no mutate
@@ -110,6 +114,7 @@ class ServiceReportHandler(BaseReportHandler):
                 "api_name": self.api_name,
                 "location": self.location,
                 "base_url": self.base_url,
+                "started_at": self.started_at,
                 "in_queue": self.in_queue,
                 "out_queue": self.out_queue,
             },
@@ -144,6 +149,7 @@ def write_remote(
     api_name: Optional[str],
     location: str,
     base_url: str,
+    started_at: str,
     in_queue: Queue,
     out_queue: Queue,
 ) -> None:
@@ -157,6 +163,7 @@ def write_remote(
                 api_name=api_name,
                 location=location,
                 base_url=base_url,
+                started_at=started_at,
                 metadata=Metadata(),
                 ci_environment=ci_environment,
             )
@@ -182,6 +189,7 @@ class FileReportHandler(BaseReportHandler):
     api_name: Optional[str] = attr.ib()  # pragma: no mutate
     location: str = attr.ib()  # pragma: no mutate
     base_url: Optional[str] = attr.ib()  # pragma: no mutate
+    started_at: str = attr.ib()  # pragma: no mutate
     out_queue: Queue = attr.ib()  # pragma: no mutate
     in_queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
     worker: threading.Thread = attr.ib(init=False)  # pragma: no mutate
@@ -194,6 +202,7 @@ class FileReportHandler(BaseReportHandler):
                 "api_name": self.api_name,
                 "location": self.location,
                 "base_url": self.base_url,
+                "started_at": self.started_at,
                 "in_queue": self.in_queue,
                 "out_queue": self.out_queue,
             },
@@ -206,6 +215,7 @@ def write_file(
     api_name: Optional[str],
     location: str,
     base_url: str,
+    started_at: str,
     in_queue: Queue,
     out_queue: Queue,
 ) -> None:
@@ -216,6 +226,7 @@ def write_file(
             api_name=api_name,
             location=location,
             base_url=base_url,
+            started_at=started_at,
             metadata=Metadata(),
             ci_environment=ci_environment,
         )

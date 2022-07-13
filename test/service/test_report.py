@@ -11,6 +11,7 @@ import schemathesis
 from schemathesis.cli import ExecutionContext
 from schemathesis.runner import events
 from schemathesis.service import ci, metadata, report
+from schemathesis.utils import current_datetime
 
 
 def test_add_events(openapi3_schema_url, read_report):
@@ -46,6 +47,7 @@ def test_metadata(read_report):
             location="http://127.0.0.1",
             base_url="http://127.0.0.1",
             metadata=metadata.Metadata(),
+            started_at=current_datetime(),
             ci_environment=ci.environment(),
         )
     data = payload.getvalue()

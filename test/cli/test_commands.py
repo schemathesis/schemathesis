@@ -4,6 +4,7 @@ import pathlib
 import sys
 import time
 from test.utils import HERE, SIMPLE_PATH
+from unittest.mock import ANY
 from urllib.parse import urljoin
 from warnings import catch_warnings
 
@@ -26,7 +27,6 @@ from schemathesis.constants import (
     FLAKY_FAILURE_MESSAGE,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     SCHEMATHESIS_TEST_CASE_HEADER,
-    USER_AGENT,
     CodeSampleStyle,
 )
 from schemathesis.hooks import unregister_all
@@ -36,6 +36,7 @@ from schemathesis.runner.impl import threadpool
 from schemathesis.specs.openapi.checks import status_code_conformance
 from schemathesis.stateful import Stateful
 from schemathesis.targets import DEFAULT_TARGETS
+from schemathesis.utils import current_datetime
 
 PHASES = ", ".join(map(lambda x: x.name, Phase))
 HEALTH_CHECKS = "|".join(map(lambda x: x.name, HealthCheck))
@@ -372,6 +373,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "targets": DEFAULT_TARGETS,
         "workers_num": 1,
         "exit_first": False,
+        "started_at": ANY,
         "dry_run": False,
         "stateful": Stateful.links,
         "stateful_recursion_limit": 5,
@@ -2024,6 +2026,7 @@ def assert_exit_code(event_stream, code):
             api_name=None,
             location="http://127.0.0.1",
             base_url=None,
+            started_at=current_datetime(),
             report=None,
         )
     assert exc.value.code == code

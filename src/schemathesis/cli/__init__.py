@@ -39,7 +39,7 @@ from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import Target
 from ..types import Filter, PathLike, RequestCert
-from ..utils import GenericResponse, file_exists, get_requests_auth, import_app
+from ..utils import GenericResponse, current_datetime, file_exists, get_requests_auth, import_app
 from . import callbacks, cassettes, output
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
 from .context import ExecutionContext, FileReportContext, ServiceReportContext
@@ -613,6 +613,7 @@ def run(
     API_NAME is an API identifier to upload data to Schemathesis.io.
     """
     # pylint: disable=too-many-locals,too-many-branches
+    started_at = current_datetime()
     maybe_disable_color(ctx, no_color)
     check_auth(auth, headers)
     selected_targets = tuple(target for target in targets_module.ALL_TARGETS if target.__name__ in targets)
@@ -689,6 +690,7 @@ def run(
         schema,
         app=app,
         base_url=base_url,
+        started_at=started_at,
         validate_schema=validate_schema,
         skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
@@ -733,6 +735,7 @@ def run(
         api_name=api_name,
         location=schema,
         base_url=base_url,
+        started_at=started_at,
     )
 
 
@@ -774,6 +777,7 @@ def into_event_stream(
     *,
     app: Any,
     base_url: Optional[str],
+    started_at: str,
     validate_schema: bool,
     skip_deprecated_operations: bool,
     data_generation_methods: Tuple[DataGenerationMethod, ...],
@@ -835,6 +839,7 @@ def into_event_stream(
             request_cert=request_cert,
             seed=seed,
             exit_first=exit_first,
+            started_at=started_at,
             dry_run=dry_run,
             store_interactions=store_interactions,
             checks=checks,
@@ -1004,6 +1009,7 @@ def execute(
     api_name: Optional[str],
     location: str,
     base_url: Optional[str],
+    started_at: str,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     # pylint: disable=too-many-branches
@@ -1021,6 +1027,7 @@ def execute(
                 api_name=api_name,
                 location=location,
                 base_url=base_url,
+                started_at=started_at,
                 out_queue=report_queue,
             )
         )
@@ -1033,6 +1040,7 @@ def execute(
                 api_name=api_name,
                 location=location,
                 base_url=base_url,
+                started_at=started_at,
                 out_queue=report_queue,
             )
         )

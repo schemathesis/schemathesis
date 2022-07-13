@@ -1,5 +1,5 @@
 import platform
-from typing import List, Optional
+from typing import List
 
 import attr
 from click.utils import LazyFile
@@ -15,11 +15,8 @@ from .handlers import EventHandler, ExecutionContext
 class JunitXMLHandler(EventHandler):
     file_handle: LazyFile = attr.ib()  # pragma: no mutate
     test_cases: List = attr.ib(factory=list)  # pragma: no mutate
-    start_time: Optional[float] = attr.ib(default=None)  # pragma: no mutate
 
     def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
-        if isinstance(event, events.Initialized):
-            self.start_time = event.start_time
         if isinstance(event, events.AfterExecution):
             test_case = TestCase(
                 f"{event.result.method} {event.result.path}",

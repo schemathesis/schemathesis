@@ -11,6 +11,7 @@ from pytest_httpserver.pytest_plugin import PluginHTTPServer
 
 from schemathesis.service import FileReportHandler, ServiceClient, ServiceReportHandler
 from schemathesis.service.hosts import HostData
+from schemathesis.utils import current_datetime
 
 # A token for a testing Schemathesis.io instance
 DEFAULT_SERVICE_TOKEN = "25f8ee2357da497d8d0d07be62df62a1"
@@ -142,6 +143,7 @@ def service_report_handler(service_client, hostname, hosts_file, openapi3_schema
         api_name="test",
         location=openapi3_schema_url,
         base_url=None,
+        started_at=current_datetime(),
         out_queue=Queue(),
         in_queue=Queue(),
     )
@@ -157,6 +159,7 @@ def file_report_handler(service_client, hostname, hosts_file, openapi3_schema_ur
         api_name=None,
         location=openapi3_schema_url,
         base_url=None,
+        started_at=current_datetime(),
         in_queue=Queue(),
         out_queue=Queue(),
     )
