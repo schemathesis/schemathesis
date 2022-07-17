@@ -9,7 +9,7 @@ import schemathesis
 from schemathesis.cli.output.default import SERVICE_ERROR_MESSAGE
 from schemathesis.constants import USER_AGENT
 from schemathesis.service import ci
-from schemathesis.service.constants import REPORT_CORRELATION_ID_HEADER, REPORT_ENV_VAR
+from schemathesis.service.constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REPORT_ENV_VAR
 from schemathesis.service.hosts import load_for_host
 
 from ..utils import strip_style_win32
@@ -366,21 +366,24 @@ def test_report_via_env_var(cli, schema_url, tmp_path, read_report, service, mon
         assert json.load(tar.extractfile("metadata.json"))["ci"] is None
 
 
+DEFAULT_GITHUB_ENVIRONMENT = ci.GitHubActionsEnvironment(
+    api_url="https://api.github.com",
+    repository="schemathesis/schemathesis",
+    actor="Stranger6667",
+    sha="e56e13224f08469841e106449f6467b769e2afca",
+    run_id="1658821493",
+    workflow="Build job",
+    head_ref="dd/report-ci",
+    base_ref="main",
+    ref=None,
+)
+
+
 @pytest.mark.parametrize(
     "environment",
     (
         (
-            ci.GitHubActionsEnvironment(
-                api_url="https://api.github.com",
-                repository="schemathesis/schemathesis",
-                actor="Stranger6667",
-                sha="e56e13224f08469841e106449f6467b769e2afca",
-                run_id="1658821493",
-                workflow="Build job",
-                head_ref="dd/report-ci",
-                base_ref="main",
-                ref=None,
-            ),
+            DEFAULT_GITHUB_ENVIRONMENT,
             ci.GitLabCIEnvironment(
                 api_v4_url="https://gitlab.com/api/v4",
                 project_id="7",
@@ -417,6 +420,22 @@ def test_ci_environment(monkeypatch, cli, schema_url, tmp_path, read_report, ser
     payload = report_file.read_bytes()
     with read_report(payload) as tar:
         assert json.load(tar.extractfile("metadata.json"))["ci"] == environment.asdict()
+
+
+@pytest.mark.operations("success")
+@pytest.mark.openapi_version("3.0")
+def test_send_provider_header(monkeypatch, cli, schema_url, service):
+    # When executed in CI
+    monkeypatch.setenv(DEFAULT_GITHUB_ENVIRONMENT.variable_name, "true")
+    for key, value in DEFAULT_GITHUB_ENVIRONMENT.as_env().items():
+        if value is not None:
+            monkeypatch.setenv(key, value)
+    result = cli.run(
+        schema_url, "--report", f"--schemathesis-io-token={service.token}", f"--schemathesis-io-url={service.base_url}"
+    )
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # Then send CI provider name in a header
+    assert service.server.log[0][0].headers[CI_PROVIDER_HEADER] == "github"
 
 
 PAYLOAD_TOO_LARGE_MESSAGE = "Your report is too large. The limit is 100 KB, but your report is 101 KB."

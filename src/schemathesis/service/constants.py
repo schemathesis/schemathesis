@@ -9,6 +9,7 @@ DEFAULT_URL = f"https://{DEFAULT_HOSTNAME}/"
 DEFAULT_PROTOCOL = "https"
 # An HTTP header name to store report correlation id
 REPORT_CORRELATION_ID_HEADER = "X-Schemathesis-Report-Correlation-Id"
+CI_PROVIDER_HEADER = "X-Schemathesis-CI-Provider"
 # A sentinel to signal the worker thread to stop
 STOP_MARKER = object()
 # Timeout for each API call

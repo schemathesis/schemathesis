@@ -171,7 +171,8 @@ def write_remote(
                 return
         data = payload.getvalue()
         out_queue.put(events.Metadata(size=len(data), ci_environment=ci_environment))
-        response = client.upload_report(data, host_data.correlation_id)
+        provider = ci_environment.provider if ci_environment is not None else None
+        response = client.upload_report(data, host_data.correlation_id, provider)
         event: events.Event
         if isinstance(response, UploadResponse):
             host_data.store_correlation_id(response.correlation_id)
