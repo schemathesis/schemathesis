@@ -7,7 +7,8 @@ import requests
 from requests.adapters import HTTPAdapter, Retry
 
 from ..constants import USER_AGENT
-from .constants import REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT
+from .ci import CIProvider
+from .constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT
 from .metadata import Metadata
 from .models import ApiDetails, AuthResponse, FailedUploadResponse, UploadResponse
 
@@ -54,12 +55,14 @@ class ServiceClient(requests.Session):
         return AuthResponse(username=data["username"])
 
     def upload_report(
-        self, report: bytes, correlation_id: Optional[str] = None
+        self, report: bytes, correlation_id: Optional[str] = None, ci_provider: Optional[CIProvider] = None
     ) -> Union[UploadResponse, FailedUploadResponse]:
         """Upload test run report to Schemathesis.io."""
         headers = {"Content-Type": "application/x-gtar"}
         if correlation_id is not None:
             headers[REPORT_CORRELATION_ID_HEADER] = correlation_id
+        if ci_provider is not None:
+            headers[CI_PROVIDER_HEADER] = ci_provider.value
         response = self.post("/reports/upload/", report, headers=headers)
         data = response.json()
         if response.status_code == http.HTTPStatus.REQUEST_ENTITY_TOO_LARGE:
