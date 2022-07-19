@@ -16,6 +16,7 @@ Changelog
 
 **Fixed**
 
+- Do not report optional headers as missing.
 - Compatibility with ``hypothesis>=6.49``. `#1538`_
 - Handling of ``unittest.case.SkipTest`` emitted by newer Hypothesis versions.
 - Generating invalid headers when their schema has ``array`` or ``object`` types.

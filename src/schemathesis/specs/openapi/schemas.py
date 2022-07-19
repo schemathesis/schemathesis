@@ -87,6 +87,7 @@ SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefReso
 class BaseOpenAPISchema(BaseSchema):
     nullable_name: str
     links_field: str
+    header_required_field: str
     security: BaseSecurityProcessor
     component_locations: ClassVar[Tuple[Tuple[str, ...], ...]] = ()
     _operations_by_id: Dict[str, APIOperation]
@@ -620,6 +621,7 @@ class SwaggerV20(BaseOpenAPISchema):
     nullable_name = "x-nullable"
     example_field = "x-example"
     examples_field = "x-examples"
+    header_required_field = "x-required"
     security = SwaggerSecurityProcessor()
     component_locations: ClassVar[Tuple[Tuple[str, ...], ...]] = (("definitions",),)
     links_field = "x-links"
@@ -787,6 +789,7 @@ class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
     nullable_name = "nullable"
     example_field = "example"
     examples_field = "examples"
+    header_required_field = "required"
     security = OpenAPISecurityProcessor()
     component_locations = (("components", "schemas"),)
     links_field = "links"

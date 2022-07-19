@@ -253,7 +253,9 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
                     "200": {
                         "description": "OK",
                         "schema": {"type": "object"},
-                        "headers": {"X-Custom-Header": {"description": "Custom header", "type": "integer"}},
+                        "headers": {
+                            "X-Custom-Header": {"description": "Custom header", "type": "integer", "x-required": True}
+                        },
                     },
                     "default": {"description": "Default response"},
                 },
@@ -640,7 +642,13 @@ def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
                     "200": {
                         "description": "OK",
                         "content": {"application/json": {"schema": {"type": "object"}}},
-                        "headers": {"X-Custom-Header": {"description": "Custom header", "schema": {"type": "integer"}}},
+                        "headers": {
+                            "X-Custom-Header": {
+                                "description": "Custom header",
+                                "schema": {"type": "integer"},
+                                "required": True,
+                            }
+                        },
                     },
                     "default": {"description": "Default response"},
                 },
