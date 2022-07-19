@@ -99,7 +99,11 @@ def response_headers_conformance(response: GenericResponse, case: "Case") -> Opt
     if not defined_headers:
         return None
 
-    missing_headers = [header for header in defined_headers if header not in response.headers]
+    missing_headers = [
+        header
+        for header, definition in defined_headers.items()
+        if header not in response.headers and definition.get(case.operation.schema.header_required_field, False)
+    ]
     if not missing_headers:
         return None
     message = ",".join(missing_headers)

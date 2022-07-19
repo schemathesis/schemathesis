@@ -10,6 +10,7 @@ from schemathesis import DataGenerationMethod, models
 from schemathesis.checks import (
     content_type_conformance,
     not_a_server_error,
+    response_headers_conformance,
     response_schema_conformance,
     status_code_conformance,
 )
@@ -541,3 +542,63 @@ def test_deduplication(empty_open_api_3_schema):
         run_checks(case, (content_type_conformance, response_schema_conformance), failures, result, response, 0)
     # Then the resulting output should be deduplicated
     assert len(deduplicate_failures(failures)) == 1
+
+
+@pytest.fixture(params=["2.0", "3.0"])
+def schema_with_optional_headers(request):
+    if request.param == "2.0":
+        # definition["x-required"] = False
+        base_schema = request.getfixturevalue("empty_open_api_2_schema")
+        base_schema["paths"] = {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "schema": {"type": "object"},
+                            "headers": {
+                                "X-Optional": {
+                                    "description": "Optional header",
+                                    "type": "integer",
+                                    "x-required": False,
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+        }
+        return base_schema
+    if request.param == "3.0":
+        base_schema = request.getfixturevalue("empty_open_api_3_schema")
+        base_schema["paths"] = {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                            "headers": {
+                                "X-Optional": {
+                                    "description": "Optional header",
+                                    "schema": {"type": "integer"},
+                                    "required": False,
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+        }
+        return base_schema
+
+
+def test_optional_headers_missing(schema_with_optional_headers):
+    # When a response header is declared as optional
+    # NOTE: Open API 2.0 headers are much simpler and do not contain any notion of declaring them as optional
+    # For this reason we support `x-required` instead
+    schema = schemathesis.from_dict(schema_with_optional_headers, validate_schema=True)
+    case = make_case(schema, schema_with_optional_headers["paths"]["/data"]["get"])
+    response = make_response()
+    # Then it should not be reported as missing
+    assert response_headers_conformance(response, case) is None
