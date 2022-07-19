@@ -56,6 +56,8 @@ Changelog
 - Compatibility with ``hypothesis>=6.49``. `#1538`_
 - Handling of ``unittest.case.SkipTest`` emitted by newer Hypothesis versions.
 - Generating invalid headers when their schema has ``array`` or ``object`` types.
+- Failure ``The received response is not valid JSON: ... Exception: Unexpected UTF-8 BOM 
+  (decode using utf-8-sig): line 1 column 1 (char 0)`` when server response in UTF-8 encoding with BOM.
 
 **Removed**
 
