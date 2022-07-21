@@ -7,6 +7,10 @@ into your Continuous Integration workflows.
 GitHub Actions
 --------------
 
+.. important::
+
+    We have a native `GitHub app`_ that reports test results directly to your pull requests.
+
 Publicly available `Open API 3 app`_:
 
 .. code-block:: yaml
@@ -18,8 +22,13 @@ Publicly available `Open API 3 app`_:
     env:
       # Your API schema location
       API_SCHEMA: 'https://example.schemathesis.io/openapi.json'
-      # Whether you'd like to see the results in a Web UI in Schemathesis.io. Off by default
+      # OPTIONAL. Whether you'd like to see the results posted to your pull requests
       SCHEMATHESIS_REPORT: 'true'
+      # OPTIONAL. Your Schemathesis.io token
+      SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
+      # OPTIONAL. A name to connect reports for the same API
+      # Use it and see how your API improves over time
+      SCHEMATHESIS_API_NAME: my-api
 
     steps:
       # Runs positive Schemathesis tests with all checks enabled
@@ -36,8 +45,13 @@ A `Python app`_ which you need to start manually:
     env:
       # Your API schema location
       API_SCHEMA: 'http://localhost:5000/api/openapi.json'
-      # Whether you'd like to see the results in a Web UI in Schemathesis.io. Off by default
+      # OPTIONAL. Whether you'd like to see the results posted to your pull requests
       SCHEMATHESIS_REPORT: 'true'
+      # OPTIONAL. Your Schemathesis.io token
+      SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
+      # OPTIONAL. A name to connect reports for the same API
+      # Use it and see how your API improves over time
+      SCHEMATHESIS_API_NAME: my-api
 
     steps:
       # Gets a copy of the source code in your repository before running API tests
@@ -65,6 +79,10 @@ A `Python app`_ which you need to start manually:
 
     For the complete example, check ``.github/workflows/example-project.yml`` in the repository.
 
+If you enabled PR comments via our `GitHub app`_, you'll see a test report once your pipeline is finished:
+
+.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_github_report.png
+
 GitLab CI
 ---------
 
@@ -81,8 +99,13 @@ Publicly available `Open API 3 app`_:
     variables:
       # Your API schema location
       API_SCHEMA: 'https://example.schemathesis.io/openapi.json'
-      # Whether you'd like to see the results in a Web UI in Schemathesis.io. Off by default
+      # OPTIONAL. Whether you'd like to see the results in a Web UI in Schemathesis.io
       SCHEMATHESIS_REPORT: 'true'
+      # OPTIONAL. Your Schemathesis.io token
+      SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
+      # OPTIONAL. A name to connect reports for the same API
+      # Use it and see how your API improves over time
+      SCHEMATHESIS_API_NAME: my-api
 
     script:
       - st run $API_SCHEMA --checks=all
@@ -101,8 +124,13 @@ A `Python app`_ which you need to start manually:
     variables:
       # Your API schema location
       API_SCHEMA: 'https://example.schemathesis.io/openapi.json'
-      # Whether you'd like to see the results in a Web UI in Schemathesis.io. Off by default
+      # OPTIONAL. Whether you'd like to see the results in a Web UI in Schemathesis.io
       SCHEMATHESIS_REPORT: 'true'
+      # OPTIONAL. Your Schemathesis.io token
+      SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
+      # OPTIONAL. A name to connect reports for the same API
+      # Use it and see how your API improves over time
+      SCHEMATHESIS_API_NAME: my-api
 
     script:
       # Install the project's dependencies and Schemathesis
@@ -142,3 +170,4 @@ It will try to connect to ``localhost:5000`` until it is available or bail out a
 
 .. _Open API 3 app: https://example.schemathesis.io/openapi.json
 .. _Python app: https://github.com/schemathesis/schemathesis/tree/master/example
+.. _GitHub app: https://github.com/apps/schemathesis

@@ -66,9 +66,9 @@ User's Guide
    cli
    python
    continuous_integration
+   service
    auth
    stateful
-   service
    how
    compatibility
    examples
