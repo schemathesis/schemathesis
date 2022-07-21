@@ -3,7 +3,7 @@ name: Example project
 on:
   pull_request:
     paths:
-      - '.github/workflows/example-project.yml'
+      - '.github/workflows/example-manual-build.yml'
       - 'example/**'
   push:
     branches:
