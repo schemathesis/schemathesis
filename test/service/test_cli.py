@@ -211,12 +211,6 @@ def test_anonymous_upload_with_name(cli, schema_url, hosts_file, service, upload
     assert next_url in lines
 
 
-@pytest.mark.service(
-    data={"title": "Not found", "status": 404, "detail": "Resource not found"},
-    status=404,
-    method="GET",
-    path=re.compile("/apis/.*/"),
-)
 @pytest.mark.openapi_version("3.0")
 def test_api_name(cli, schema_url, service, next_url):
     # When API name does not exist
@@ -230,6 +224,27 @@ def test_api_name(cli, schema_url, service, next_url):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then the report should be uploaded anyway
     assert next_url in result.stdout.strip()
+
+
+@pytest.mark.service(
+    data={"title": "Not found", "status": 404, "detail": "Resource not found"},
+    status=404,
+    method="GET",
+    path=re.compile("/apis/.*/"),
+)
+@pytest.mark.openapi_version("3.0")
+def test_invalid_name(cli, schema_url, service, next_url):
+    # When API name does not exist
+    # And API data is loaded by name
+    result = cli.run(
+        "my-api",
+        "--report",
+        f"--schemathesis-io-token={service.token}",
+        f"--schemathesis-io-url={service.base_url}",
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # Then the report should be uploaded anyway
+    assert result.stdout.strip() == "❌ API with name `my-api` not found!"
 
 
 @pytest.mark.service(
