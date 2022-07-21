@@ -635,7 +635,7 @@ def run(
     if (
         not (report and report.name is not REPORT_TO_SERVICE)
         and api_name is not None
-        or schema_kind == callbacks.SchemaInputKind.NAME
+        and schema_kind != callbacks.SchemaInputKind.URL
     ):
         client = service.ServiceClient(base_url=schemathesis_io_url, token=token)
         # It is assigned above
