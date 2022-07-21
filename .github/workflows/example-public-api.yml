@@ -1,0 +1,22 @@
+name: Public API report example
+
+on:
+  workflow_dispatch:
+
+jobs:
+
+  api-tests:
+    runs-on: ubuntu-20.04
+    container: schemathesis/schemathesis:stable
+
+    env:
+      # Your API schema location
+      API_SCHEMA: 'https://example.schemathesis.io/openapi.json'
+      # Enable Schemathesis reporting
+      SCHEMATHESIS_REPORT: 'true'
+      # Set your token from secrets
+      SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
+
+    steps:
+      # Runs positive Schemathesis tests with all checks enabled
+      - run: st run $API_SCHEMA --checks=all
