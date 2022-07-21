@@ -220,7 +220,7 @@ REPORT_TO_SERVICE = object()
 
 @schemathesis.command(short_help="Perform schemathesis test.", cls=CommandWithCustomHelp)
 @click.argument("schema", type=str)
-@click.argument("api_name", type=str, required=False)
+@click.argument("api_name", type=str, required=False, envvar=service.API_NAME_ENV_VAR)
 @click.option(
     "--checks",
     "-c",
