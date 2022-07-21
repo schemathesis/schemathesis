@@ -30,7 +30,6 @@ def get_stdout_lines(stdout):
 def test_no_failures(cli, schema_url, service, next_url, upload_message):
     # When Schemathesis.io is enabled and there are no errors
     result = cli.run(
-        schema_url,
         "my-api",
         f"--schemathesis-io-token={service.token}",
         f"--schemathesis-io-url={service.base_url}",
@@ -67,9 +66,8 @@ def test_server_error(cli, schema_url, service):
     ]
     result = cli.run(*args)
     assert result.exit_code == ExitCode.OK, result.stdout
-    assert len(service.server.log) == 2
-    service.assert_call(0, "/apis/my-api/", 200)
-    service.assert_call(1, f"/reports/upload/", 500)
+    assert len(service.server.log) == 1
+    service.assert_call(0, f"/reports/upload/", 500)
     # And it should be noted in the output
     lines = get_stdout_lines(result.stdout)
     assert "Upload: ERROR" in lines
@@ -146,9 +144,7 @@ def test_server_timeout(cli, schema_url, service, mocker):
 @pytest.mark.openapi_version("3.0")
 def test_unauthorized(cli, schema_url, service):
     # When the token is invalid
-    result = cli.run(
-        schema_url, "my-api", "--schemathesis-io-token=invalid", f"--schemathesis-io-url={service.base_url}"
-    )
+    result = cli.run("my-api", "--schemathesis-io-token=invalid", f"--schemathesis-io-url={service.base_url}")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then a proper error message should be displayed
     lines = get_stdout_lines(result.stdout)
@@ -222,14 +218,18 @@ def test_anonymous_upload_with_name(cli, schema_url, hosts_file, service, upload
     path=re.compile("/apis/.*/"),
 )
 @pytest.mark.openapi_version("3.0")
-def test_invalid_api_name(cli, schema_url, service):
+def test_api_name(cli, schema_url, service, next_url):
     # When API name does not exist
     result = cli.run(
-        schema_url, "my-api", f"--schemathesis-io-token={service.token}", f"--schemathesis-io-url={service.base_url}"
+        schema_url,
+        "my-api",
+        "--report",
+        f"--schemathesis-io-token={service.token}",
+        f"--schemathesis-io-url={service.base_url}",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # Then the error should be immediately visible
-    assert result.stdout.strip() == "❌ API with name `my-api` not found!"
+    # Then the report should be uploaded anyway
+    assert next_url in result.stdout.strip()
 
 
 @pytest.mark.service(
@@ -241,9 +241,7 @@ def test_invalid_api_name(cli, schema_url, service):
 @pytest.mark.openapi_version("3.0")
 def test_forbidden(cli, schema_url, service):
     # When there is 403 from Schemathesis.io
-    result = cli.run(
-        schema_url, "my-api", f"--schemathesis-io-token={service.token}", f"--schemathesis-io-url={service.base_url}"
-    )
+    result = cli.run("my-api", f"--schemathesis-io-token={service.token}", f"--schemathesis-io-url={service.base_url}")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then the error should be immediately visible
     assert result.stdout.strip() == "❌ FORBIDDEN!"
@@ -451,7 +449,11 @@ PAYLOAD_TOO_LARGE_MESSAGE = "Your report is too large. The limit is 100 KB, but 
 def test_too_large_payload(cli, schema_url, service):
     # When the report exceeds the size limit
     result = cli.run(
-        schema_url, "my-api", f"--schemathesis-io-token={service.token}", f"--schemathesis-io-url={service.base_url}"
+        schema_url,
+        "my-api",
+        "--report",
+        f"--schemathesis-io-token={service.token}",
+        f"--schemathesis-io-url={service.base_url}",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then it should be correctly handled & reported in CLI
