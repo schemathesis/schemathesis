@@ -480,10 +480,6 @@ class BaseOpenAPISchema(BaseSchema):
             return
         try:
             if isinstance(response, requests.Response):
-
-                if response.encoding == 'utf-8' and (response.text[0:1] in ('\ufeff', '\ufffe')): # utf-8 with BOM
-                    response.encoding = 'utf-8-sig'
-
                 data = json.loads(response.text)
             else:
                 data = response.json

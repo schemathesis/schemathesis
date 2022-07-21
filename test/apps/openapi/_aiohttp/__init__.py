@@ -60,7 +60,11 @@ def create_app(
     app["users"] = {}
     app["incoming_requests"] = incoming_requests
     app["schema_requests"] = schema_requests
-    app["config"] = {"should_fail": True, "schema_data": make_openapi_schema(operations, version)}
+    app["config"] = {
+        "should_fail": True,
+        "schema_data": make_openapi_schema(operations, version),
+        "prefix_with_bom": False,
+    }
     return app
 
 
@@ -73,4 +77,6 @@ def reset_app(
     app["users"].clear()
     app["incoming_requests"][:] = []
     app["schema_requests"][:] = []
-    app["config"].update({"should_fail": True, "schema_data": make_openapi_schema(operations, version)})
+    app["config"].update(
+        {"should_fail": True, "schema_data": make_openapi_schema(operations, version), "prefix_with_bom": False}
+    )

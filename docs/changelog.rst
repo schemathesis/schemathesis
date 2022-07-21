@@ -9,6 +9,7 @@ Changelog
 - CLI: Warning if **ALL** API responses are HTTP 404.
 - The ``after_load_schema`` hook, which is designed for modifying the loaded API schema before running tests.
   For example, you can use it to add Open API links to your schema via ``schema.add_link``.
+- New ``utf8_bom`` fixup. It helps to mitigate JSON decoding errors inside the ``response_schema_conformance`` check when payload contains BOM. `#1563`_
 
 **Fixed**
 
@@ -56,8 +57,6 @@ Changelog
 - Compatibility with ``hypothesis>=6.49``. `#1538`_
 - Handling of ``unittest.case.SkipTest`` emitted by newer Hypothesis versions.
 - Generating invalid headers when their schema has ``array`` or ``object`` types.
-- Failure ``The received response is not valid JSON: ... Exception: Unexpected UTF-8 BOM 
-  (decode using utf-8-sig): line 1 column 1 (char 0)`` when server response in UTF-8 encoding with BOM.
 
 **Removed**
 
@@ -3010,6 +3009,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1563: https://github.com/schemathesis/schemathesis/issues/1563
 .. _#1538: https://github.com/schemathesis/schemathesis/issues/1538
 .. _#1526: https://github.com/schemathesis/schemathesis/issues/1526
 .. _#1518: https://github.com/schemathesis/schemathesis/issues/1518

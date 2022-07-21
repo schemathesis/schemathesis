@@ -26,3 +26,9 @@ To use it, you need to add this code before you load your schema with Schemathes
     # schemathesis.fixups.install(["fast_api"])
 
 If you use the Command Line Interface, then you can utilize the ``--fixups=all`` option.
+
+UTF-8 BOM
+---------
+
+Some web servers may prefix JSON with UTF-8 Byte Order Mark - ``\ufeff``, which is explicitly forbidden by RFC 7159 (JSON).
+Enabling the ``utf8_bom`` fixup allows Schemathesis to process such responses by removing this mark from responses.

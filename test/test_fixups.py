@@ -1,6 +1,14 @@
 import pytest
+from pytest import ExitCode
 
 from schemathesis import fixups
+
+
+@pytest.fixture(autouse=True)
+def reset_fixups():
+    fixups.uninstall()
+    yield
+    fixups.uninstall()
 
 
 def test_global_fixup(testdir, fast_api_schema):
@@ -46,3 +54,14 @@ def test(case):
 def test_fastapi_schema_conversion(value, expected):
     fixups.fast_api.before_load_schema(None, value)
     assert value == expected
+
+
+@pytest.mark.operations("success")
+def test_bom_json(openapi_3_app, cli, openapi3_schema_url):
+    # When server responds with JSON that contains BOM
+    openapi_3_app["config"]["prefix_with_bom"] = True
+    # And the `utf8_bom` fixup is enabled
+    result = cli.run(openapi3_schema_url, "--fixups=utf8_bom", "--checks=response_schema_conformance")
+    # Then the data should be properly decoded
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert "Unexpected UTF-8 BOM (decode using utf-8-sig)" not in result.stdout

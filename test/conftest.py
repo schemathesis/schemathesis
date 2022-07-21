@@ -1,12 +1,17 @@
+import io
 import os
 import uuid
 from textwrap import dedent
+from types import SimpleNamespace
+from typing import Optional
 
 import pytest
+import requests
 import yaml
 from click.testing import CliRunner
 from hypothesis import settings
 from packaging import version
+from urllib3 import HTTPResponse
 
 import schemathesis.cli
 from schemathesis._compat import metadata
@@ -14,6 +19,7 @@ from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.service import HOSTS_PATH_ENV_VAR
 from schemathesis.specs.openapi import loaders as oas_loaders
+from schemathesis.utils import WSGIResponse
 
 from .apps import _graphql as graphql
 from .apps import openapi
@@ -720,3 +726,32 @@ def is_older_subtests():
     # For compatibility needs
     version_string = metadata.version("pytest_subtests")
     return version.parse(version_string) < version.parse("0.6.0")
+
+
+@pytest.fixture
+def response_factory():
+    def requests_factory(
+        *, content: bytes = b"{}", content_type: Optional[str] = "application/json", status_code: int = 200
+    ) -> requests.Response:
+        response = requests.Response()
+        response._content = content
+        response.status_code = status_code
+        headers = {}
+        if content_type:
+            headers["Content-Type"] = content_type
+        response.headers.update(headers)
+        response.raw = HTTPResponse(body=io.BytesIO(content), status=status_code, headers=response.headers)
+        response.request = requests.PreparedRequest()
+        response.request.prepare(method="POST", url="http://127.0.0.1", headers=headers)
+        return response
+
+    def werkzeug_factory(*, status_code: int = 200):
+        response = WSGIResponse(response=b'{"some": "value"}', status=status_code)
+        response.request = requests.PreparedRequest()
+        response.request.prepare(method="POST", url="http://example.com", headers={"Content-Type": "application/json"})
+        return response
+
+    return SimpleNamespace(
+        requests=requests_factory,
+        werkzeug=werkzeug_factory,
+    )
