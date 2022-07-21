@@ -32,7 +32,12 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
+      # Your API schema location
       API_SCHEMA: http://localhost:5000/api/openapi.json
+      # Enable Schemathesis reporting
+      SCHEMATHESIS_REPORT: 'true'
+      # Set your token from secrets
+      SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
 
     steps:
       - uses: actions/checkout@v3.0.0
