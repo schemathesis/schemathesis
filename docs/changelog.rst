@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.16.0:
+
+`3.16.0`_ - 2022-07-22
+----------------------
+
 **Added**
 
 - Report uploading to Schemathesis.io via the ``--report`` CLI option.
@@ -2765,7 +2770,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.15.6...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.16.0...HEAD
+.. _3.16.0: https://github.com/schemathesis/schemathesis/compare/v3.15.6...v3.16.0
 .. _3.15.6: https://github.com/schemathesis/schemathesis/compare/v3.15.5...v3.15.6
 .. _3.15.5: https://github.com/schemathesis/schemathesis/compare/v3.15.4...v3.15.5
 .. _3.15.4: https://github.com/schemathesis/schemathesis/compare/v3.15.3...v3.15.4
