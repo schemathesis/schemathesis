@@ -3,20 +3,33 @@ Schemathesis
 
 |Build| |Coverage| |Version| |Python versions| |Docs| |Chat| |License|
 
-Schemathesis is a modern API testing tool for web applications built with Open API and GraphQL specifications.
+Schemathesis is a specification-centric API testing tool for Open API and GraphQL-based applications.
 
-It reads the application schema and generates test cases, which will ensure that your application is compliant with its schema (read more about how it works in `our research paper <https://arxiv.org/abs/2112.10328>`_).
+Why use Schemathesis?
+---------------------
+
+- **Application crashes**. Learn what payloads make your API crash, corrupt the database or hang forever.
+- **Up-to-date API documentation**. Never worry that your API consumers will use an incorrect specification or outdated payload example.
+- **Instant debugging**. Get a detailed failure report and reproduce the problem with a single command.
+
+How does it work?
+-----------------
+
+Schemathesis reads the application schema and generates test cases, which will ensure that your application is compliant with its schema and never crashes.
 
 The application under test could be written in any language; the only thing you need is a valid API schema in a supported format.
 
-Simple to use and yet powerful to uncover hard-to-find errors thanks to the property-based testing approach backed by state-of-the-art `Hypothesis <http://hypothesis.works/>`_ library.
+Read more about how it works in `our research paper <https://arxiv.org/abs/2112.10328>`_.
 
-🚀 Schemathesis is available as a `service <https://schemathesis.io/?utm_source=github>`_, standalone CLI, or a Python library 🚀
+How do I start?
+---------------
+
+Schemathesis is available as a `service <https://schemathesis.io/?utm_source=github>`_, standalone CLI, or a Python library.
 
 The service enables you to verify your API schema in a few clicks, CLI gives more control.
 Schemathesis.io has a free tier, so you can combine the CLI flexibility with rich visuals by uploading your test results there.
 
-`Signup to reveal all issues on a dashboard <https://app.schemathesis.io/auth/sign-up/?utm_source=oss_readme>`_.
+If you use GitHub Actions, there is a native `GitHub app <https://github.com/apps/schemathesis>`_ that reports test results directly to your pull requests.
 
 Features
 --------
@@ -28,7 +41,7 @@ Features
 - ASGI / WSGI support;
 - Generated code samples (cURL, Python);
 - Docker image;
-- Customizable checks & test generation
+- Customizable checks & test generation;
 
 CLI installation
 ----------------
@@ -39,14 +52,14 @@ To install Schemathesis via ``pip`` run the following command:
 
     pip install schemathesis
 
-This command installs the ``schemathesis`` entrypoint + ``st`` as its alias.
+This command installs the ``st`` entrypoint.
 
 You can also use our Docker image without installing Schemathesis as a Python package.
 
 Usage
 -----
 
-You can use Schemathesis in the command line directly (``st`` is an alias to ``schemathesis``):
+You can use Schemathesis in the command line directly:
 
 .. code:: bash
 
