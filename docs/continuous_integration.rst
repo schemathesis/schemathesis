@@ -34,6 +34,14 @@ Publicly available `Open API 3 app`_:
       # Runs positive Schemathesis tests with all checks enabled
       - run: st run $API_SCHEMA --checks=all
 
+.. note::
+
+    For the complete example, check |public-api.yml|_ in the repository.
+
+.. |public-api.yml| replace:: ``.github/workflows/example-public-api.yml``
+.. _public-api.yml: https://github.com/schemathesis/schemathesis/blob/master/.github/workflows/example-public-api.yml
+
+
 A `Python app`_ which you need to start manually:
 
 .. code-block:: yaml
@@ -77,7 +85,10 @@ A `Python app`_ which you need to start manually:
 
 .. note::
 
-    For the complete example, check ``.github/workflows/example-project.yml`` in the repository.
+    For the complete example, check |manual-build.yml|_ in the repository.
+
+.. |manual-build.yml| replace:: ``.github/workflows/example-manual-build.yml``
+.. _manual-build.yml: https://github.com/schemathesis/schemathesis/blob/master/.github/workflows/example-manual-build.yml
 
 If you enabled PR comments via our `GitHub app`_, you'll see a test report once your pipeline is finished:
 
