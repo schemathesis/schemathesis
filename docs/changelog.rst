@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Add ``SCHEMATHESIS_BASE_URL`` environment variable for specifying ``--base-url`` in CLI.
+
 .. _v3.16.0:
 
 `3.16.0`_ - 2022-07-22
