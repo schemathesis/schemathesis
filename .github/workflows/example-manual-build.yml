@@ -1,4 +1,4 @@
-name: Example project
+name: Manual build API example
 
 on:
   pull_request:
@@ -32,23 +32,30 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      # Your API schema location
+      # A local API schema location
+      # Could be a URL or a file available in the CI environment
       API_SCHEMA: http://localhost:5000/api/openapi.json
-      # Enable Schemathesis reporting
+      # Explicitly enable Schemathesis reporting integration
+      # This step is required at the moment, as this job
+      # uses the default Schemathesis CLI directly
       SCHEMATHESIS_REPORT: 'true'
       # Set your token from secrets
       SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
+      # OPTIONAL. A name to connect reports for the same API
+      # Use it and see how your API improves over time
+      # Without this variable you won't be able to see
+      # diffs with the target branch and history data
+      SCHEMATHESIS_API_NAME: schemathesis-example-manual-build
 
     steps:
       - uses: actions/checkout@v3.0.0
 
       - name: Install dependencies
-        run: pip install asyncpg attrs connexion[aiohttp,swagger-ui] .
+        run: pip install -r example/requirements.txt && pip install .
 
-      # Start the API in the background
+      # Starts the API in the background
       - name: Start API
-        run: python main.py &
-        working-directory: ./example
+        run: python example/main.py &
 
       # Waits until localhost:5000 is available
       # Tries to connect every 200 ms with a total waiting time of 5 seconds

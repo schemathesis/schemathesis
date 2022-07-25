@@ -120,7 +120,7 @@ you can load it by using the ``schemathesis.from_uri`` loader:
 
     schema = schemathesis.from_uri("http://app.com/api/openapi.json")
 
-If you want to load the schema from one URL, but run tests against an URL which differs in port value,
+If you want to load the schema from one URL, but run tests against a URL which differs in port value,
 then you can use the ``port`` argument:
 
 .. code:: python

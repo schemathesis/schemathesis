@@ -10,12 +10,17 @@ jobs:
     container: schemathesis/schemathesis:stable
 
     env:
-      # Your API schema location
+      # A publicly available API schema location
       API_SCHEMA: 'https://example.schemathesis.io/openapi.json'
       # Enable Schemathesis reporting
       SCHEMATHESIS_REPORT: 'true'
       # Set your token from secrets
       SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
+      # OPTIONAL. A name to connect reports for the same API
+      # Use it and see how your API improves over time
+      # Without this variable you won't be able to see
+      # diffs with the target branch and history data
+      SCHEMATHESIS_API_NAME: schemathesis-example-public-api
 
     steps:
       # Runs positive Schemathesis tests with all checks enabled
