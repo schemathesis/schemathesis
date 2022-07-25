@@ -360,6 +360,7 @@ REPORT_TO_SERVICE = object()
     help="Base URL address of the API, required for SCHEMA if specified by file.",
     type=str,
     callback=callbacks.validate_base_url,
+    envvar=service.BASE_URL_ENV_VAR,
 )
 @click.option("--app", help="WSGI/ASGI application to test.", type=str, callback=callbacks.validate_app)
 @click.option(
