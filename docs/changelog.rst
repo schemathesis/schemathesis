@@ -6,6 +6,7 @@ Changelog
 
 **Added**
 
+- CLI: Warning if the API returns too many HTTP 401.
 - Add ``SCHEMATHESIS_BASE_URL`` environment variable for specifying ``--base-url`` in CLI.
 - Collect anonymyzed CLI usage telemetry when reports are uploaded. We do not collect any free-form values you use in your CLI,
   except for header names. Instead, we measure how many times you use each free-form option in this command.

@@ -6,6 +6,7 @@ from unittest.mock import ANY
 import attr
 import hypothesis
 import pytest
+import requests
 from aiohttp import web
 from aiohttp.streams import EmptyStreamReader
 from flask import Flask
@@ -15,11 +16,16 @@ from requests.auth import HTTPDigestAuth
 import schemathesis
 from schemathesis._hypothesis import add_examples
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
-from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
-from schemathesis.models import Status
+from schemathesis.constants import (
+    RECURSIVE_REFERENCE_ERROR_MESSAGE,
+    SCHEMATHESIS_TEST_CASE_HEADER,
+    USER_AGENT,
+    DataGenerationMethod,
+)
+from schemathesis.models import Check, Status, TestResult, TestResultSet
 from schemathesis.runner import ThreadPoolRunner, events, from_schema, get_requests_auth
 from schemathesis.runner.impl import threadpool
-from schemathesis.runner.impl.core import get_wsgi_auth, reraise
+from schemathesis.runner.impl.core import get_wsgi_auth, has_too_many_unauthorized, reraise
 from schemathesis.specs.graphql import loaders as gql_loaders
 from schemathesis.specs.openapi import loaders as oas_loaders
 
@@ -986,3 +992,38 @@ def test_malformed_path_template(empty_open_api_3_schema):
         event.result.errors[0].exception == f"InvalidSchema: Malformed path template: `{path}`\n\n  "
         f"Single '}}' encountered in format string\n"
     )
+
+
+@pytest.fixture
+def result():
+    return TestResult(
+        method="POST",
+        path="/users/",
+        verbose_name="POST /users/",
+        overridden_headers=None,
+        data_generation_method=DataGenerationMethod.positive,
+    )
+
+
+def make_check(status_code):
+    response = requests.Response()
+    response.status_code = status_code
+    return Check(name="not_a_server_error", value=Status.success, response=response, elapsed=0.1, example=None)
+
+
+def test_authorization_warning_no_checks(result):
+    # When there are no checks
+    # Then the warning should not be added
+    assert not has_too_many_unauthorized(result)
+
+
+def test_authorization_warning_missing_threshold(result):
+    # When there are not enough 401 responses to meet the threshold
+    result.checks.extend(
+        [
+            make_check(201),
+            make_check(401),
+        ]
+    )
+    # Then the warning should not be added
+    assert not has_too_many_unauthorized(result)

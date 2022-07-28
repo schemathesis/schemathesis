@@ -358,6 +358,8 @@ def run_test(  # pylint: disable=too-many-locals
         test, "_hypothesis_internal_use_generated_seed", None
     )
     results.append(result)
+    if has_too_many_unauthorized(result):
+        results.add_warning(TOO_MANY_UNAUTHORIZED_RESPONSES_WARNING_TEMPLATE.format(f"`{operation.verbose_name}`"))
     yield events.AfterExecution.from_result(
         result=result,
         status=status,
@@ -367,6 +369,26 @@ def run_test(  # pylint: disable=too-many-locals
         data_generation_method=data_generation_method,
         correlation_id=correlation_id,
     )
+
+
+TOO_MANY_UNAUTHORIZED_RESPONSES_WARNING_TEMPLATE = (
+    "Most of the responses from {} have a 401 status code. Did you specify proper API credentials?"
+)
+TOO_MANY_AUTHORIZED_RESPONSES_THRESHOLD = 0.9
+
+
+def has_too_many_unauthorized(result: TestResult) -> bool:
+    # It is faster than creating an intermediate list
+    unauthorized_count = 0
+    total = 0
+    for check in result.checks:
+        if check.response is not None:
+            if check.response.status_code == 401:
+                unauthorized_count += 1
+            total += 1
+    if not total:
+        return False
+    return unauthorized_count / total >= TOO_MANY_AUTHORIZED_RESPONSES_THRESHOLD
 
 
 def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> None:

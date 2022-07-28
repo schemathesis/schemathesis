@@ -14,7 +14,7 @@ import schemathesis.cli.context
 from schemathesis import models, runner, utils
 from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT, DataGenerationMethod
+from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, DataGenerationMethod
 from schemathesis.runner.events import Finished, InternalError
 from schemathesis.runner.serialization import SerializedTestResult
 from schemathesis.utils import NOT_SET
@@ -152,6 +152,21 @@ def test_display_statistic(capsys, swagger_20, execution_context, operation, res
     assert lines[2:4] == [
         f"    not_a_server_error                    3 / 5 passed          {failed} ",
         f"    different_check                       1 / 1 passed          {passed} ",
+    ]
+
+
+def test_display_multiple_warnings(capsys, swagger_20, execution_context, operation, response):
+    results = models.TestResultSet([])
+    results.add_warning("Foo")
+    results.add_warning("Bar")
+    event = Finished.from_results(results, running_time=1.0)
+    # When test results are displayed
+    default.display_statistic(execution_context, event)
+    lines = [click.unstyle(line) for line in capsys.readouterr().out.split("\n") if line]
+    assert lines[2:5] == [
+        "WARNINGS:",
+        "  - Foo",
+        "  - Bar",
     ]
 
 

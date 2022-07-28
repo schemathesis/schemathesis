@@ -1026,6 +1026,7 @@ class TestResultSet:
 
     results: List[TestResult] = attr.ib(factory=list)  # pragma: no mutate
     generic_errors: List[InvalidSchema] = attr.ib(factory=list)  # pragma: no mutate
+    warnings: List[str] = attr.ib(factory=list)  # pragma: no mutate
 
     def __iter__(self) -> Iterator[TestResult]:
         return iter(self.results)
@@ -1086,6 +1087,10 @@ class TestResultSet:
     def append(self, item: TestResult) -> None:
         """Add a new item to the results list."""
         self.results.append(item)
+
+    def add_warning(self, warning: str) -> None:
+        """Add a new warning to the warnings list."""
+        self.warnings.append(warning)
 
 
 CheckFunction = Callable[[GenericResponse, Case], Optional[bool]]  # pragma: no mutate

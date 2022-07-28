@@ -3,7 +3,7 @@ import os
 import pathlib
 import sys
 import time
-from test.utils import HERE, SIMPLE_PATH
+from test.utils import HERE, SIMPLE_PATH, strip_style_win32
 from unittest.mock import ANY
 from urllib.parse import urljoin
 from warnings import catch_warnings
@@ -2144,3 +2144,15 @@ def test_digest_auth(cli, openapi3_schema_url):
     result = cli.run(openapi3_schema_url, "--auth='test:test'", "--auth-type=digest")
     # Then it should not cause any exceptions
     assert result.exit_code == ExitCode.OK, result.stdout
+
+
+@pytest.mark.operations("basic")
+def test_warning_on_unauthorized(cli, openapi3_schema_url):
+    # When endpoint returns only 401
+    result = cli.run(openapi3_schema_url)
+    # Then the output should contain a warning about it
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert (
+        "WARNING: Most of the responses from `GET /api/basic` have a 401 status code. "
+        "Did you specify proper API credentials?" in strip_style_win32(result.stdout)
+    )

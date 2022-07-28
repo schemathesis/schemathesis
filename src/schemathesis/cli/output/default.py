@@ -285,6 +285,17 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
         category = click.style("JUnit XML file", bold=True)
         click.secho(f"{category}: {context.junit_xml_file}")
 
+    if event.warnings:
+        click.echo()
+        if len(event.warnings) == 1:
+            title = click.style("WARNING:", bold=True, fg="yellow")
+            warning = click.style(event.warnings[0], fg="yellow")
+            click.secho(f"{title} {warning}")
+        else:
+            click.secho("WARNINGS:", bold=True, fg="yellow")
+            for warning in event.warnings:
+                click.secho(f"  - {warning}", fg="yellow")
+
     if isinstance(context.report, FileReportContext):
         click.echo()
         display_report_metadata(context.report.queue.get())
