@@ -222,6 +222,7 @@ class Finished(ExecutionEvent):
     has_logs: bool = attr.ib()  # pragma: no mutate
     is_empty: bool = attr.ib()  # pragma: no mutate
     generic_errors: List[SerializedError] = attr.ib()  # pragma: no mutate
+    warnings: List[str] = attr.ib()  # pragma: no mutate
 
     total: Dict[str, Dict[Union[str, Status], int]] = attr.ib()  # pragma: no mutate
 
@@ -244,5 +245,6 @@ class Finished(ExecutionEvent):
             generic_errors=[
                 SerializedError.from_error(error, None, None, error.full_path) for error in results.generic_errors
             ],
+            warnings=results.warnings,
             running_time=running_time,
         )
