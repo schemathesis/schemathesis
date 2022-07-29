@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.16.1:
+
+`3.16.1`_ - 2022-07-29
+----------------------
+
 **Added**
 
 - CLI: Warning if the API returns too many HTTP 401.
@@ -2782,7 +2787,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.16.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.16.1...HEAD
+.. _3.16.1: https://github.com/schemathesis/schemathesis/compare/v3.16.0...v3.16.1
 .. _3.16.0: https://github.com/schemathesis/schemathesis/compare/v3.15.6...v3.16.0
 .. _3.15.6: https://github.com/schemathesis/schemathesis/compare/v3.15.5...v3.15.6
 .. _3.15.5: https://github.com/schemathesis/schemathesis/compare/v3.15.4...v3.15.5
