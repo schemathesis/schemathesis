@@ -10,7 +10,7 @@ Why use Schemathesis?
 
 - **Application crashes**. Learn what payloads make your API crash, corrupt the database or hang forever.
 - **Up-to-date API documentation**. Never worry that your API consumers will use an incorrect specification or outdated payload example.
-- **Instant debugging**. Get a detailed failure report and reproduce the problem with a single command.
+- **Instant debugging**. Get a detailed failure report with a single cURL command to reproduce the problem immediately.
 
 How does it work?
 -----------------
