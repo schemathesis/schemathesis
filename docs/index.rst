@@ -1,9 +1,9 @@
 Schemathesis: Property-based testing for API schemas
 ====================================================
 
-Schemathesis is a modern API testing tool for web applications built with Open API and GraphQL specifications.
+Schemathesis is a specification-centric API testing tool for Open API and GraphQL-based applications.
 
-It reads the application schema and generates test cases, which will ensure that your application is compliant with its schema.
+It reads the application schema and generates test cases, which will ensure that your application is compliant with its schema and never crashes.
 
 The application under test could be written in any language; the only thing you need is a valid API schema in a supported format.
 
