@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Description of ``-v`` or ``--verbosity`` option for CLI.
+
 .. _v3.16.1:
 
 `3.16.1`_ - 2022-07-29
