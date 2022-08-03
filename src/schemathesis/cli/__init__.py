@@ -561,7 +561,7 @@ REPORT_TO_SERVICE = object()
     envvar=service.TELEMETRY_ENV_VAR,
 )
 @with_hosts_file
-@click.option("--verbosity", "-v", help="Increase verbosity of error output.", count=True)
+@click.option("--verbosity", "-v", help="Increase verbosity of the output.", count=True)
 @click.pass_context
 def run(
     ctx: click.Context,

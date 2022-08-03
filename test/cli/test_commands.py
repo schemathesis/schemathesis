@@ -325,7 +325,7 @@ def test_commands_run_help(cli):
         "                                  report.  [default: true]",
         "  --hosts-file FILE               Path to a file to store the Schemathesis.io",
         "                                  auth configuration.",
-        "  -v, --verbosity                 Increase verbosity of error output.",
+        "  -v, --verbosity                 Increase verbosity of the output.",
         "  -h, --help                      Show this message and exit.",
     ]
 
