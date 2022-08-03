@@ -90,7 +90,7 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
     recursion_level: int = attr.ib()  # pragma: no mutate
     # The way data will be generated
     data_generation_method: DataGenerationMethod = attr.ib()  # pragma: no mutate
-    # An unique ID which connects events that happen during testing of the same API operation
+    # A unique ID which connects events that happen during testing of the same API operation
     # It may be useful when multiple threads are involved where incoming events are not ordered
     correlation_id: str = attr.ib()  # pragma: no mutate
     thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
