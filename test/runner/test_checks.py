@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import pytest
 import requests
@@ -28,19 +28,6 @@ def make_case(schema: BaseSchema, definition: Dict[str, Any]) -> models.Case:
     return models.Case(operation)
 
 
-def make_response(
-    content: bytes = b"{}", content_type: Optional[str] = "application/json", status_code: int = 200
-) -> requests.Response:
-    response = requests.Response()
-    response._content = content
-    response.status_code = status_code
-    if content_type:
-        response.headers["Content-Type"] = content_type
-    request = requests.Request(method="POST", url="http://127.0.0.1", headers={})
-    response.request = request.prepare()
-    return response
-
-
 @pytest.fixture()
 def spec(request):
     param = getattr(request, "param", None)
@@ -52,8 +39,8 @@ def spec(request):
 
 
 @pytest.fixture()
-def response(request):
-    return make_response(content_type=request.param)
+def response(request, response_factory):
+    return response_factory.requests(content_type=request.param)
 
 
 @pytest.fixture()
@@ -130,8 +117,8 @@ def test_content_type_conformance_valid(spec, response, case):
     ),
 )
 @pytest.mark.parametrize("content_type, is_error", (("application/json", False), ("application/xml", True)))
-def test_content_type_conformance_integration(raw_schema, content_type, is_error):
-    assert_content_type_conformance(raw_schema, content_type, is_error)
+def test_content_type_conformance_integration(response_factory, raw_schema, content_type, is_error):
+    assert_content_type_conformance(response_factory, raw_schema, content_type, is_error)
 
 
 @pytest.mark.parametrize(
@@ -141,7 +128,7 @@ def test_content_type_conformance_integration(raw_schema, content_type, is_error
         ("application/xml", True),
     ),
 )
-def test_content_type_conformance_default_response(content_type, is_error):
+def test_content_type_conformance_default_response(response_factory, content_type, is_error):
     raw_schema = {
         "openapi": "3.0.2",
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -153,7 +140,7 @@ def test_content_type_conformance_default_response(content_type, is_error):
             }
         },
     }
-    assert_content_type_conformance(raw_schema, content_type, is_error)
+    assert_content_type_conformance(response_factory, raw_schema, content_type, is_error)
 
 
 @pytest.mark.parametrize(
@@ -163,7 +150,7 @@ def test_content_type_conformance_default_response(content_type, is_error):
         ("application/json", "application:json", "Response has a malformed media type: `application:json`"),
     ),
 )
-def test_malformed_content_type(schema_media_type, response_media_type, expected):
+def test_malformed_content_type(schema_media_type, response_media_type, expected, response_factory):
     # When the verified content type is malformed
     raw_schema = {
         "openapi": "3.0.2",
@@ -177,10 +164,10 @@ def test_malformed_content_type(schema_media_type, response_media_type, expected
         },
     }
     # Then it should raise an assertion error, rather than an internal one
-    assert_content_type_conformance(raw_schema, response_media_type, True, expected)
+    assert_content_type_conformance(response_factory, raw_schema, response_media_type, True, expected)
 
 
-def test_content_type_conformance_another_status_code():
+def test_content_type_conformance_another_status_code(response_factory):
     # When the schema only defines a response for status code 400
     raw_schema = {
         "openapi": "3.0.2",
@@ -195,14 +182,14 @@ def test_content_type_conformance_another_status_code():
     }
     # And the response has another status code
     # Then the content type should be ignored, since the schema does not contain relevant definitions
-    assert_content_type_conformance(raw_schema, "application/xml", False)
+    assert_content_type_conformance(response_factory, raw_schema, "application/xml", False)
 
 
-def assert_content_type_conformance(raw_schema, content_type, is_error, match=None):
+def assert_content_type_conformance(response_factory, raw_schema, content_type, is_error, match=None):
     schema = schemathesis.from_dict(raw_schema)
     operation = schema["/users"]["get"]
     case = models.Case(operation)
-    response = make_response(content_type=content_type)
+    response = response_factory.requests(content_type=content_type)
     if not is_error:
         assert content_type_conformance(response, case) is None
     else:
@@ -211,8 +198,8 @@ def assert_content_type_conformance(raw_schema, content_type, is_error, match=No
 
 
 @pytest.mark.parametrize("value", (500, 502))
-def test_not_a_server_error(value, swagger_20):
-    response = make_response()
+def test_not_a_server_error(value, swagger_20, response_factory):
+    response = response_factory.requests()
     response.status_code = value
     case = make_case(swagger_20, {})
     with pytest.raises(AssertionError) as exc_info:
@@ -221,16 +208,16 @@ def test_not_a_server_error(value, swagger_20):
 
 
 @pytest.mark.parametrize("value", (400, 405))
-def test_status_code_conformance_valid(value, swagger_20):
-    response = make_response()
+def test_status_code_conformance_valid(value, swagger_20, response_factory):
+    response = response_factory.requests()
     response.status_code = value
     case = make_case(swagger_20, {"responses": {"4XX"}})
     status_code_conformance(response, case)
 
 
 @pytest.mark.parametrize("value", (400, 405))
-def test_status_code_conformance_invalid(value, swagger_20):
-    response = make_response()
+def test_status_code_conformance_invalid(value, swagger_20, response_factory):
+    response = response_factory.requests()
     response.status_code = value
     case = make_case(swagger_20, {"responses": {"5XX"}})
     with pytest.raises(AssertionError) as exc_info:
@@ -254,7 +241,7 @@ def test_content_type_conformance_invalid(spec, response, case):
     assert exc_info.type.__name__ == "CheckFailed"
 
 
-def test_invalid_schema_on_content_type_check():
+def test_invalid_schema_on_content_type_check(response_factory):
     # When schema validation is disabled, and it doesn't contain "responses" key
     schema = schemathesis.from_dict(
         {
@@ -266,15 +253,15 @@ def test_invalid_schema_on_content_type_check():
     )
     operation = schema["/users"]["get"]
     case = models.Case(operation)
-    response = make_response(content_type="application/json")
+    response = response_factory.requests(content_type="application/json")
     # Then an error should be risen
     with pytest.raises(InvalidSchema):
         content_type_conformance(response, case)
 
 
-def test_missing_content_type_header(case):
+def test_missing_content_type_header(case, response_factory):
     # When the response has no `Content-Type` header
-    response = make_response(content_type=None)
+    response = response_factory.requests(content_type=None)
     # Then an error should be risen
     with pytest.raises(CheckFailed, match="The response is missing the `Content-Type` header"):
         content_type_conformance(response, case)
@@ -293,8 +280,8 @@ SUCCESS_SCHEMA = {"type": "object", "properties": {"success": {"type": "boolean"
         (b'{"success": true}', {"responses": {"default": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
     ),
 )
-def test_response_schema_conformance_swagger(swagger_20, content, definition):
-    response = make_response(content)
+def test_response_schema_conformance_swagger(swagger_20, content, definition, response_factory):
+    response = response_factory.requests(content=content)
     case = make_case(swagger_20, definition)
     assert response_schema_conformance(response, case) is None
     assert case.operation.is_response_valid(response)
@@ -343,8 +330,8 @@ def test_response_schema_conformance_swagger(swagger_20, content, definition):
         ),
     ),
 )
-def test_response_schema_conformance_openapi(openapi_30, content, definition):
-    response = make_response(content)
+def test_response_schema_conformance_openapi(openapi_30, content, definition, response_factory):
+    response = response_factory.requests(content=content)
     case = make_case(openapi_30, definition)
     assert response_schema_conformance(response, case) is None
     assert case.operation.is_response_valid(response)
@@ -359,28 +346,28 @@ def test_response_schema_conformance_openapi(openapi_30, content, definition):
         {"content": {}},
     ),
 )
-def test_response_conformance_openapi_no_media_types(openapi_30, extra):
+def test_response_conformance_openapi_no_media_types(openapi_30, extra, response_factory):
     # When there is no media type defined in the schema
     definition = {"responses": {"default": {"description": "text", **extra}}}
-    assert_no_media_types(openapi_30, definition)
+    assert_no_media_types(response_factory, openapi_30, definition)
 
 
-def test_response_conformance_swagger_no_media_types(swagger_20):
+def test_response_conformance_swagger_no_media_types(swagger_20, response_factory):
     # When there is no media type defined in the schema
     definition = {"responses": {"default": {"description": "text"}}}
-    assert_no_media_types(swagger_20, definition)
+    assert_no_media_types(response_factory, swagger_20, definition)
 
 
-def assert_no_media_types(schema, definition):
+def assert_no_media_types(response_factory, schema, definition):
     case = make_case(schema, definition)
     # And no "Content-Type" header in the received response
-    response = make_response(content_type=None, status_code=204)
+    response = response_factory.requests(content_type=None, status_code=204)
     # Then there should be no errors
     assert response_schema_conformance(response, case) is None
 
 
 @pytest.mark.parametrize("spec", ("swagger_20", "openapi_30"))
-def test_response_conformance_no_content_type(request, spec):
+def test_response_conformance_no_content_type(request, spec, response_factory):
     # When there is a media type defined in the schema
     schema = request.getfixturevalue(spec)
     if spec == "swagger_20":
@@ -396,7 +383,7 @@ def test_response_conformance_no_content_type(request, spec):
         }
     case = make_case(schema, definition)
     # And no "Content-Type" header in the received response
-    response = make_response(content_type=None, status_code=200)
+    response = response_factory.requests(content_type=None, status_code=200)
     # Then the check should fail
     with pytest.raises(
         CheckFailed,
@@ -413,8 +400,8 @@ def test_response_conformance_no_content_type(request, spec):
         (b'{"random": "text"}', {"responses": {"default": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
     ),
 )
-def test_response_schema_conformance_invalid_swagger(swagger_20, content, definition):
-    response = make_response(content)
+def test_response_schema_conformance_invalid_swagger(swagger_20, content, definition, response_factory):
+    response = response_factory.requests(content=content)
     case = make_case(swagger_20, definition)
     with pytest.raises(AssertionError) as exc_info:
         response_schema_conformance(response, case)
@@ -457,18 +444,18 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
         ),
     ),
 )
-def test_response_schema_conformance_invalid_openapi(openapi_30, media_type, content, definition):
-    response = make_response(content, media_type)
+def test_response_schema_conformance_invalid_openapi(openapi_30, media_type, content, definition, response_factory):
+    response = response_factory.requests(content=content, content_type=media_type)
     case = make_case(openapi_30, definition)
     with pytest.raises(AssertionError):
         response_schema_conformance(response, case)
     assert not case.operation.is_response_valid(response)
 
 
-def test_no_schema(openapi_30):
+def test_no_schema(openapi_30, response_factory):
     # See GH-1220
     # When the response definition has no "schema" key
-    response = make_response(b"{}", "application/json")
+    response = response_factory.requests()
     definition = {
         "responses": {
             "default": {
@@ -484,13 +471,13 @@ def test_no_schema(openapi_30):
 
 
 @pytest.mark.hypothesis_nested
-def test_response_schema_conformance_references_invalid(complex_schema):
+def test_response_schema_conformance_references_invalid(complex_schema, response_factory):
     schema = schemathesis.from_path(complex_schema)
 
     @given(case=schema["/teapot"]["POST"].as_strategy())
     @settings(max_examples=3, deadline=None)
     def test(case):
-        response = make_response(json.dumps({"foo": 1}).encode())
+        response = response_factory.requests(content=json.dumps({"foo": 1}).encode())
         with pytest.raises(AssertionError):
             case.validate_response(response)
         assert not case.operation.is_response_valid(response)
@@ -500,13 +487,13 @@ def test_response_schema_conformance_references_invalid(complex_schema):
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.parametrize("value", ("foo", None))
-def test_response_schema_conformance_references_valid(complex_schema, value):
+def test_response_schema_conformance_references_valid(complex_schema, value, response_factory):
     schema = schemathesis.from_path(complex_schema)
 
     @given(case=schema["/teapot"]["POST"].as_strategy())
     @settings(max_examples=3, deadline=None)
     def test(case):
-        response = make_response(json.dumps({"key": value, "referenced": value}).encode())
+        response = response_factory.requests(content=json.dumps({"key": value, "referenced": value}).encode())
         case.validate_response(response)
 
     test()
@@ -593,12 +580,12 @@ def schema_with_optional_headers(request):
         return base_schema
 
 
-def test_optional_headers_missing(schema_with_optional_headers):
+def test_optional_headers_missing(schema_with_optional_headers, response_factory):
     # When a response header is declared as optional
     # NOTE: Open API 2.0 headers are much simpler and do not contain any notion of declaring them as optional
     # For this reason we support `x-required` instead
     schema = schemathesis.from_dict(schema_with_optional_headers, validate_schema=True)
     case = make_case(schema, schema_with_optional_headers["paths"]["/data"]["get"])
-    response = make_response()
+    response = response_factory.requests()
     # Then it should not be reported as missing
     assert response_headers_conformance(response, case) is None

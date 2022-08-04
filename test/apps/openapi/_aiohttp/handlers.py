@@ -8,6 +8,8 @@ from uuid import uuid4
 import jsonschema
 from aiohttp import web
 
+from schemathesis.constants import BOM_MARK
+
 try:
     from ..schema import PAYLOAD_VALIDATOR
 except (ImportError, ValueError):
@@ -23,6 +25,8 @@ async def expect_content_type(request: web.Request, value: str):
 
 
 async def success(request: web.Request) -> web.Response:
+    if request.app["config"]["prefix_with_bom"]:
+        return web.Response(body=(BOM_MARK + '{"success": true}').encode(), content_type="application/json")
     return web.json_response({"success": True})
 
 

@@ -1,8 +1,8 @@
 from typing import Iterable, Optional
 
-from . import fast_api
+from . import fast_api, utf8_bom
 
-ALL_FIXUPS = {"fast_api": fast_api}
+ALL_FIXUPS = {"fast_api": fast_api, "utf8_bom": utf8_bom}
 
 
 def install(fixups: Optional[Iterable[str]] = None) -> None:
