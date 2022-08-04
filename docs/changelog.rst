@@ -6,6 +6,7 @@ Changelog
 
 **Added**
 
+- CLI: Warning if **ALL** API responses are HTTP 404.
 - The ``after_load_schema`` hook, which is designed for modifying the loaded API schema before running tests.
   For example, you can use it to add Open API links to your schema via ``schema.add_link``.
 
