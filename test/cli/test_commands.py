@@ -2156,3 +2156,15 @@ def test_warning_on_unauthorized(cli, openapi3_schema_url):
         "WARNING: Most of the responses from `GET /api/basic` have a 401 status code. "
         "Did you specify proper API credentials?" in strip_style_win32(result.stdout)
     )
+
+
+@pytest.mark.operations("success", "failure")
+def test_warning_on_all_not_found(cli, openapi3_schema_url, openapi3_base_url):
+    # When all endpoints return 404
+    result = cli.run(openapi3_schema_url, f"--base-url={openapi3_base_url}/v4/")
+    # Then the output should contain a warning about it
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert (
+        "WARNING: All API responses have a 404 status code. "
+        "Did you specify proper API location?" in strip_style_win32(result.stdout)
+    )
