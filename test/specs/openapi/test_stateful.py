@@ -1,11 +1,7 @@
-import io
-
 import pytest
 import requests
 from hypothesis import HealthCheck, settings
 from hypothesis.stateful import run_state_machine_as_test
-from requests import Response
-from urllib3 import HTTPResponse
 
 import schemathesis
 from schemathesis.exceptions import CheckFailed
@@ -13,26 +9,6 @@ from schemathesis.specs.openapi.stateful.links import make_response_filter, matc
 from schemathesis.stateful import StepResult
 from src.schemathesis.models import CaseSource, Check, Status
 from src.schemathesis.runner.serialization import SerializedCheck
-from src.schemathesis.utils import WSGIResponse
-
-
-def make_response(status_code):
-    response = Response()
-    response.status_code = status_code
-    response._content = b'{"some": "value"}'
-    response.raw = HTTPResponse(
-        body=io.BytesIO(response._content), status=response.status_code, headers=response.headers
-    )
-    response.request = requests.PreparedRequest()
-    response.request.prepare(method="POST", url="http://example.com", headers={"Content-Type": "application/json"})
-    return response
-
-
-def make_wsgi_response(status_code):
-    response = WSGIResponse(response=b'{"some": "value"}', status=status_code)
-    response.request = requests.PreparedRequest()
-    response.request.prepare(method="POST", url="http://example.com", headers={"Content-Type": "application/json"})
-    return response
 
 
 @pytest.mark.parametrize(
@@ -43,9 +19,9 @@ def make_wsgi_response(status_code):
         (200, "20X", True),
     ),
 )
-def test_match_status_code(response_status, filter_value, matching):
+def test_match_status_code(response_status, filter_value, matching, response_factory):
     # When the response has `response_status` status
-    response = make_response(response_status)
+    response = response_factory.requests(status_code=response_status)
     # And the filter should filter by `filter_value`
     filter_function = match_status_code(filter_value)
     assert filter_function.__name__ == f"match_{filter_value}_response"
@@ -62,8 +38,8 @@ def test_match_status_code(response_status, filter_value, matching):
         (210, ["20X", "default"], True),
     ),
 )
-def test_default_status_code(response_status, status_codes, matching):
-    response = make_response(response_status)
+def test_default_status_code(response_status, status_codes, matching, response_factory):
+    response = response_factory.requests(status_code=response_status)
     filter_function = make_response_filter("default", status_codes)
     assert filter_function(StepResult(response, None, 1.0)) is matching
 
@@ -279,21 +255,22 @@ TestStateful = schema.as_state_machine().TestCase
     assert " in step" not in result.stdout.str()
 
 
-@pytest.mark.parametrize("response_factory", (make_response, make_wsgi_response))
+@pytest.mark.parametrize("method", ("requests", "werkzeug"))
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
-def test_history(testdir, app_schema, base_url, response_factory):
+def test_history(testdir, app_schema, base_url, response_factory, method):
     # When cases are serialized
     schema = schemathesis.from_dict(app_schema)
     first = schema["/users/"]["POST"].make_case(body={"first_name": "Foo", "last_name": "bar"})
-    first_response = response_factory(201)
+    factory = getattr(response_factory, method)
+    first_response = factory(status_code=201)
     second = schema["/users/{user_id}"]["PATCH"].make_case(
         path_parameters={"user_id": 42}, body={"first_name": "SPAM", "last_name": "bar"}
     )
-    second_response = response_factory(200)
+    second_response = factory(status_code=200)
     second.source = CaseSource(case=first, response=first_response, elapsed=10)
     third = schema["/users/{user_id}"]["GET"].make_case(path_parameters={"user_id": 42})
-    third_response = response_factory(200)
+    third_response = factory(status_code=200)
     third.source = CaseSource(case=second, response=second_response, elapsed=10)
     check = Check(name="not_a_server_error", value=Status.success, response=third_response, elapsed=10, example=third)
     serialized = SerializedCheck.from_check(check)

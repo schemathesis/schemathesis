@@ -35,6 +35,7 @@ SERIALIZERS_SUGGESTION_MESSAGE = (
     "See https://schemathesis.readthedocs.io/en/stable/how.html#payload-serialization for more information."
 )
 FLAKY_FAILURE_MESSAGE = "[FLAKY] Schemathesis was not able to reliably reproduce this failure"
+BOM_MARK = "\ufeff"
 
 
 class DataGenerationMethod(str, Enum):
