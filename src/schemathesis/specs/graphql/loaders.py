@@ -135,8 +135,9 @@ def from_dict(
     :return: GraphQLSchema
     """
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
-    dispatch("before_load_schema", HookContext(), raw_schema)
-    return GraphQLSchema(
+    hook_context = HookContext()
+    dispatch("before_load_schema", hook_context, raw_schema)
+    instance = GraphQLSchema(
         raw_schema,
         location=location,
         base_url=base_url,
@@ -144,6 +145,8 @@ def from_dict(
         data_generation_methods=prepare_data_generation_methods(data_generation_methods),
         code_sample_style=_code_sample_style,
     )  # type: ignore
+    dispatch("after_load_schema", hook_context, instance)
+    return instance
 
 
 def from_wsgi(
