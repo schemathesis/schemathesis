@@ -14,6 +14,10 @@ Changelog
 
 - Description of ``-v`` or ``--verbosity`` option for CLI.
 
+**Changed**
+
+- Execute ``before_call`` / ``after_call`` hooks inside the ``call_*`` methods. It makes them available for the ``pytest`` integration.
+
 .. _v3.16.1:
 
 `3.16.1`_ - 2022-07-29

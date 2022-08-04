@@ -58,7 +58,7 @@ from .exceptions import (
     get_grouped_exception,
     get_timeout_error,
 )
-from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
+from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .serializers import Serializer, SerializerContext
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
@@ -310,6 +310,8 @@ class Case:  # pylint: disable=too-many-public-methods
         **kwargs: Any,
     ) -> requests.Response:
         """Make a network call with `requests`."""
+        hook_context = HookContext(operation=self.operation)
+        dispatch("before_call", hook_context, self)
         data = self.as_requests_kwargs(base_url, headers)
         data.update(kwargs)
         data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
@@ -328,6 +330,7 @@ class Case:  # pylint: disable=too-many-public-methods
                 f"\n\n1. Request timed out after {timeout:.2f}ms\n\n----------\n\n{code_message}",
                 context=failures.RequestTimeout(timeout=timeout),
             ) from None
+        dispatch("after_call", hook_context, self, response)
         if close_session:
             session.close()
         return response
@@ -361,12 +364,15 @@ class Case:  # pylint: disable=too-many-public-methods
                 "WSGI application instance is required. "
                 "Please, set `app` argument in the schema constructor or pass it to `call_wsgi`"
             )
+        hook_context = HookContext(operation=self.operation)
+        dispatch("before_call", hook_context, self)
         data = self.as_werkzeug_kwargs(headers)
         client = werkzeug.Client(application, WSGIResponse)
         with cookie_handler(client, self.cookies):
             response = client.open(**data, **kwargs)
         requests_kwargs = self.as_requests_kwargs(base_url=self.get_full_base_url(), headers=headers)
         response.request = requests.Request(**requests_kwargs).prepare()
+        dispatch("after_call", hook_context, self, response)
         return response
 
     def call_asgi(

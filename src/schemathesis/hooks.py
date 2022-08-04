@@ -270,6 +270,28 @@ def add_case(context: HookContext, case: "Case", response: GenericResponse) -> O
     """
 
 
+@HookDispatcher.register_spec([HookScope.GLOBAL])
+def before_call(context: HookContext, case: "Case") -> None:
+    """Called before every network call in CLI tests.
+
+    Use cases:
+     - Modification of `case`. For example, adding some pre-determined value to its query string.
+     - Logging
+    """
+
+
+@HookDispatcher.register_spec([HookScope.GLOBAL])
+def after_call(context: HookContext, case: "Case", response: GenericResponse) -> None:
+    """Called after every network call in CLI tests.
+
+    Note that you need to modify the response in-place.
+
+    Use cases:
+     - Response post-processing, like modifying its payload.
+     - Logging
+    """
+
+
 GLOBAL_HOOK_DISPATCHER = HookDispatcher(scope=HookScope.GLOBAL)
 dispatch = GLOBAL_HOOK_DISPATCHER.dispatch
 get_all_by_name = GLOBAL_HOOK_DISPATCHER.get_all_by_name
