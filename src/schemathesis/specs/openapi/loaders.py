@@ -186,11 +186,12 @@ def from_dict(
     :param dict raw_schema: A schema to load.
     """
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
-    dispatch("before_load_schema", HookContext(), raw_schema)
+    hook_context = HookContext()
+    dispatch("before_load_schema", hook_context, raw_schema)
 
     def init_openapi_2() -> SwaggerV20:
         _maybe_validate_schema(raw_schema, definitions.SWAGGER_20_VALIDATOR, validate_schema)
-        return SwaggerV20(
+        instance = SwaggerV20(
             raw_schema,
             app=app,
             base_url=base_url,
@@ -204,10 +205,12 @@ def from_dict(
             code_sample_style=_code_sample_style,
             location=location,
         )
+        dispatch("after_load_schema", hook_context, instance)
+        return instance
 
     def init_openapi_3() -> OpenApi30:
         _maybe_validate_schema(raw_schema, definitions.OPENAPI_30_VALIDATOR, validate_schema)
-        return OpenApi30(
+        instance = OpenApi30(
             raw_schema,
             app=app,
             base_url=base_url,
@@ -221,6 +224,8 @@ def from_dict(
             code_sample_style=_code_sample_style,
             location=location,
         )
+        dispatch("after_load_schema", hook_context, instance)
+        return instance
 
     if force_schema_version == "20":
         return init_openapi_2()

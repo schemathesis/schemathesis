@@ -166,6 +166,26 @@ Called just before schema instance is created. Takes a raw schema representation
 
 This hook allows you to modify schema before loading.
 
+.. _after-load-schema-hook:
+
+``after_load_schema``
+~~~~~~~~~~~~~~~~~~~~~
+
+Called just after schema instance is created. Takes a loaded schema:
+
+.. code:: python
+
+    import schemathesis
+
+
+    def after_load_schema(
+        context: schemathesis.hooks.HookContext,
+        schema: schemathesis.schemas.BaseSchema,
+    ) -> None:
+        ...
+
+For example, with this hook you can programmatically add Open API links before tests.
+
 ``before_init_operation``
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
