@@ -88,6 +88,8 @@ class BaseRunner:
         initialized = events.Initialized.from_schema(schema=self.schema, count_operations=self.count_operations)
 
         def _finish() -> events.Finished:
+            if has_all_not_found(results):
+                results.add_warning(ALL_NOT_FOUND_WARNING_MESSAGE)
             return events.Finished.from_results(results=results, running_time=time.monotonic() - initialized.start_time)
 
         if stop_event.is_set():
@@ -389,6 +391,25 @@ def has_too_many_unauthorized(result: TestResult) -> bool:
     if not total:
         return False
     return unauthorized_count / total >= TOO_MANY_AUTHORIZED_RESPONSES_THRESHOLD
+
+
+ALL_NOT_FOUND_WARNING_MESSAGE = "All API responses have a 404 status code. Did you specify proper API location?"
+
+
+def has_all_not_found(results: TestResultSet) -> bool:
+    """Check if all responses are 404."""
+    has_not_found = False
+    for result in results.results:
+        for check in result.checks:
+            if check.response is not None:
+                if check.response.status_code == 404:
+                    has_not_found = True
+                else:
+                    # There are non-404 responses, no reason to check any other response
+                    return False
+    # Only happens if all responses are 404, ot there are no responses at all.
+    # In the first case, it returns True, for the latter - False
+    return has_not_found
 
 
 def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> None:
