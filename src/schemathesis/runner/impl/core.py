@@ -610,7 +610,6 @@ def _network_test(
     check_results: List[Check] = []
     try:
         hook_context = HookContext(operation=case.operation)
-        hooks.dispatch("before_call", hook_context, case)
         kwargs: Dict[str, Any] = {
             "session": session,
             "headers": headers,
@@ -620,7 +619,6 @@ def _network_test(
         }
         hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
         response = case.call(**kwargs)
-        hooks.dispatch("after_call", hook_context, case, response)
     except CheckFailed as exc:
         check_name = "request_timeout"
         requests_kwargs = case.as_requests_kwargs(base_url=case.get_full_base_url(), headers=headers)
@@ -710,11 +708,9 @@ def _wsgi_test(
     with catching_logs(LogCaptureHandler(), level=logging.DEBUG) as recorded:
         start = time.monotonic()
         hook_context = HookContext(operation=case.operation)
-        hooks.dispatch("before_call", hook_context, case)
         kwargs = {"headers": headers}
         hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
         response = case.call_wsgi(**kwargs)
-        hooks.dispatch("after_call", hook_context, case, response)
         elapsed = time.monotonic() - start
     context = TargetContext(case=case, response=response, response_time=elapsed)
     run_targets(targets, context)
@@ -799,11 +795,9 @@ def _asgi_test(
     max_response_time: Optional[int],
 ) -> requests.Response:
     hook_context = HookContext(operation=case.operation)
-    hooks.dispatch("before_call", hook_context, case)
     kwargs: Dict[str, Any] = {"headers": headers}
     hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
     response = case.call_asgi(**kwargs)
-    hooks.dispatch("after_call", hook_context, case, response)
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
     status = Status.success

@@ -39,7 +39,7 @@ from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import Target
 from ..types import Filter, PathLike, RequestCert
-from ..utils import GenericResponse, current_datetime, file_exists, get_requests_auth, import_app
+from ..utils import current_datetime, file_exists, get_requests_auth, import_app
 from . import callbacks, cassettes, output
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
 from .context import ExecutionContext, FileReportContext, ServiceReportContext
@@ -1265,28 +1265,6 @@ def after_init_cli_run_handlers(
     """Called after CLI hooks are initialized.
 
     Might be used to add extra event handlers.
-    """
-
-
-@HookDispatcher.register_spec([HookScope.GLOBAL])
-def before_call(context: HookContext, case: Case) -> None:
-    """Called before every network call in CLI tests.
-
-    Use cases:
-     - Modification of `case`. For example, adding some pre-determined value to its query string.
-     - Logging
-    """
-
-
-@HookDispatcher.register_spec([HookScope.GLOBAL])
-def after_call(context: HookContext, case: Case, response: GenericResponse) -> None:
-    """Called after every network call in CLI tests.
-
-    Note that you need to modify the response in-place.
-
-    Use cases:
-     - Response post-processing, like modifying its payload.
-     - Logging
     """
 
 

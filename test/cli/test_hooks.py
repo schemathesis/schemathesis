@@ -1,8 +1,9 @@
 import pytest
+import requests
+import werkzeug
 from _pytest.main import ExitCode
 
 import schemathesis
-from schemathesis import models
 
 
 @pytest.fixture(autouse=True)
@@ -111,9 +112,9 @@ def process_call_kwargs(context, case, kwargs):
         """
     )
     if app_type == "real":
-        spy = mocker.spy(models.Case, "call")
+        spy = mocker.spy(requests.Session, "request")
     else:
-        spy = mocker.spy(models.Case, "call_wsgi")
+        spy = mocker.spy(werkzeug.Client, "open")
     result = cli.main("--pre-run", module.purebasename, "run", *cli_args)
     assert result.exit_code == ExitCode.OK, result.stdout
     if app_type == "real":
