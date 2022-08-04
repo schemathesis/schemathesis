@@ -12,6 +12,7 @@ from .utils import GenericResponse, deprecated_property
 
 if TYPE_CHECKING:
     from .models import APIOperation, Case
+    from .schemas import BaseSchema
 
 
 @unique
@@ -241,6 +242,11 @@ def before_process_path(context: HookContext, path: str, methods: Dict[str, Any]
 @HookDispatcher.register_spec([HookScope.GLOBAL])
 def before_load_schema(context: HookContext, raw_schema: Dict[str, Any]) -> None:
     """Called before schema instance is created."""
+
+
+@HookDispatcher.register_spec([HookScope.GLOBAL])
+def after_load_schema(context: HookContext, schema: "BaseSchema") -> None:
+    """Called after schema instance is created."""
 
 
 @all_scopes

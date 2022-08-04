@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- The ``after_load_schema`` hook, which is designed for modifying the loaded API schema before running tests.
+  For example, you can use it to add Open API links to your schema via ``schema.add_link``.
+
 **Fixed**
 
 - Description of ``-v`` or ``--verbosity`` option for CLI.

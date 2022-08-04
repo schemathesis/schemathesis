@@ -68,6 +68,8 @@ Schemathesis will use this connection during ``GET /users/{userId}`` parameters 
 If you don't want to modify your schema source, :func:`add_link <schemathesis.specs.openapi.schemas.BaseOpenAPISchema.add_link>`
 allows you to define links between a pair of operations programmatically.
 
+For CLI, you can use the :ref:`after_load_schema <after-load-schema-hook>` hook to attach links before tests.
+
 .. automethod:: schemathesis.specs.openapi.schemas.BaseOpenAPISchema.add_link(source, target, status_code, parameters=None, request_body=None) -> None
 
 With some `minor limitations <#open-api-links-limitations>`_, Schemathesis fully supports Open API links, including the `runtime expressions <https://swagger.io/docs/specification/links/#runtime-expressions>`_ syntax.
