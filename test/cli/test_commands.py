@@ -2167,5 +2167,5 @@ def test_warning_on_all_not_found(cli, openapi3_schema_url, openapi3_base_url):
     assert result.exit_code == ExitCode.OK, result.stdout
     assert (
         "WARNING: All API responses have a 404 status code. "
-        "Did you specify proper API location?" in strip_style_win32(result.stdout)
+        "Did you specify the proper API location?" in strip_style_win32(result.stdout)
     )
