@@ -228,7 +228,7 @@ def delimited_object(item: Generated, name: str) -> None:
 def extracted_object(item: Generated, name: str) -> None:
     """Merge a child node to the parent one."""
     generated = item.pop(name)
-    if generated:
+    if generated and isinstance(generated, dict):
         item.update(generated)
     else:
         item[name] = ""
