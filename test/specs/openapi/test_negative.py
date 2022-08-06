@@ -341,6 +341,7 @@ OBJECT_PARAMETER = {
     "properties": {"foo": {"type": "string", "format": "ipv4"}, "bar": {"type": "string", "format": "ipv4"}},
     "additionalProperties": False,
 }
+DYNAMIC_OBJECT_PARAMETER = {"type": "object", "additionalProperties": {"type": "string"}}
 
 
 @pytest.mark.parametrize("explode", (True, False))
@@ -348,6 +349,7 @@ OBJECT_PARAMETER = {
     "location, schema, style",
     [("query", ARRAY_PARAMETER, style) for style in ("pipeDelimited", "spaceDelimited")]
     + [("query", OBJECT_PARAMETER, "deepObject")]
+    + [("query", DYNAMIC_OBJECT_PARAMETER, "form")]
     + [
         ("path", parameter, style)
         for parameter in [OBJECT_PARAMETER, ARRAY_PARAMETER]

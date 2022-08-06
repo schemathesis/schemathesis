@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Internal error on generating negative tests for query parameters with ``explode: true``.
+
 .. _v3.16.2:
 
 `3.16.2`_ - 2022-08-05
