@@ -54,6 +54,10 @@ from ...utils import (
 from ..serialization import SerializedTestResult
 
 
+def _should_count_towards_stop(event: events.ExecutionEvent) -> bool:
+    return isinstance(event, events.AfterExecution) and event.status in (Status.error, Status.failure)
+
+
 @attr.s  # pragma: no mutate
 class BaseRunner:
     schema: BaseSchema = attr.ib()  # pragma: no mutate
@@ -68,11 +72,13 @@ class BaseRunner:
     store_interactions: bool = attr.ib(default=False)  # pragma: no mutate
     seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
     exit_first: bool = attr.ib(default=False)  # pragma: no mutate
+    max_failures: Optional[int] = attr.ib(default=None)  # pragma: no mutate
     started_at: str = attr.ib(factory=current_datetime)  # pragma: no mutate
     dry_run: bool = attr.ib(default=False)  # pragma: no mutate
     stateful: Optional[Stateful] = attr.ib(default=None)  # pragma: no mutate
     stateful_recursion_limit: int = attr.ib(default=DEFAULT_STATEFUL_RECURSION_LIMIT)  # pragma: no mutate
     count_operations: bool = attr.ib(default=True)  # pragma: no mutate
+    _failures_counter: int = attr.ib(default=0)
 
     def execute(self) -> "EventStream":
         """Common logic for all runners."""
@@ -111,11 +117,13 @@ class BaseRunner:
         yield _finish()
 
     def _should_stop(self, event: events.ExecutionEvent) -> bool:
-        return (
-            self.exit_first
-            and isinstance(event, events.AfterExecution)
-            and event.status in (Status.error, Status.failure)
-        )
+        if _should_count_towards_stop(event):
+            if self.exit_first:
+                return True
+            if self.max_failures is not None:
+                self._failures_counter += 1
+                return self._failures_counter >= self.max_failures
+        return False
 
     def _execute(
         self, results: TestResultSet, stop_event: threading.Event
