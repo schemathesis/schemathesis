@@ -644,6 +644,16 @@ def test_exit_first(any_app_schema):
     assert results[-1].failed_count == 1
 
 
+@pytest.mark.operations("failure", "multiple_failures", "unsatisfiable")
+def test_max_failures(any_app_schema):
+    # When `max_failures` is specified
+    results = list(from_schema(any_app_schema, max_failures=2).execute())
+    # Then the total numbers of failures and errors should not exceed this number
+    result = results[-1]
+    assert result.has_failures is True
+    assert result.failed_count + result.errored_count == 2
+
+
 @pytest.mark.operations("success")
 def test_workers_num_regression(mocker, real_app_schema):
     # GH: 579

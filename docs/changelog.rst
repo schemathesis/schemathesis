@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- CLI: ``--max-failures=N`` option to exit after first ``N`` failures or errors. `#1580`_
+
 **Fixed**
 
 - Internal error on generating negative tests for query parameters with ``explode: true``.
@@ -3019,6 +3023,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1580: https://github.com/schemathesis/schemathesis/issues/1580
 .. _#1563: https://github.com/schemathesis/schemathesis/issues/1563
 .. _#1538: https://github.com/schemathesis/schemathesis/issues/1538
 .. _#1526: https://github.com/schemathesis/schemathesis/issues/1526
