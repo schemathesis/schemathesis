@@ -324,8 +324,6 @@ Called right before any test request during CLI runs. With this hook, you can mo
     def before_call(context, case):
         case.query = {"q": "42"}
 
-.. important:: The ``before_call`` hook works only in CLI.
-
 ``after_call``
 ~~~~~~~~~~~~~~
 
@@ -342,7 +340,7 @@ Called right after any successful test request during CLI runs. With this hook, 
         parsed = response.json()
         response._content = json.dumps({"my-wrapper": parsed}).encode()
 
-.. important:: The ``after_call`` hook works only in CLI. Won't be called if request times-out.
+.. important:: Won't be called if request times-out.
 
 Depending on whether you use your Python app in-process, you might get different types for the ``response`` argument.
 For the WSGI case, it will be ``schemathesis.utils.WSGIResponse``.
