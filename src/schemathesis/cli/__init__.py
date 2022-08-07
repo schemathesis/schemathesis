@@ -270,6 +270,13 @@ REPORT_TO_SERVICE = object()
     show_default=True,
 )
 @click.option(
+    "--max-failures",
+    "max_failures",
+    type=click.IntRange(min=1),
+    help="Exit after N failures or errors.",
+    show_default=True,
+)
+@click.option(
     "--dry-run",
     "dry_run",
     is_flag=True,
@@ -575,6 +582,7 @@ def run(
     max_response_time: Optional[int] = None,
     targets: Iterable[str] = DEFAULT_TARGETS_NAMES,
     exit_first: bool = False,
+    max_failures: Optional[int] = None,
     dry_run: bool = False,
     endpoints: Optional[Filter] = None,
     methods: Optional[Filter] = None,
@@ -718,6 +726,7 @@ def run(
         request_timeout=request_timeout,
         seed=hypothesis_seed,
         exit_first=exit_first,
+        max_failures=max_failures,
         dry_run=dry_run,
         store_interactions=cassette_path is not None,
         checks=selected_checks,
@@ -814,6 +823,7 @@ def into_event_stream(
     hypothesis_settings: Optional[hypothesis.settings],
     seed: Optional[int],
     exit_first: bool,
+    max_failures: Optional[int],
     dry_run: bool,
     store_interactions: bool,
     stateful: Optional[Stateful],
@@ -851,6 +861,7 @@ def into_event_stream(
             request_cert=request_cert,
             seed=seed,
             exit_first=exit_first,
+            max_failures=max_failures,
             started_at=started_at,
             dry_run=dry_run,
             store_interactions=store_interactions,
