@@ -449,6 +449,7 @@ def display_check_result(check_name: str, results: Dict[Union[str, Status], int]
 
 def display_internal_error(context: ExecutionContext, event: events.InternalError) -> None:
     click.secho(event.message, fg="red")
+    click.echo()
     if event.exception:
         if context.show_errors_tracebacks:
             message = (

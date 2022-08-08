@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Suggest using ``--wait-for-schema`` if API schema is not available.
+
 .. _v3.16.3:
 
 `3.16.3`_ - 2022-08-08
