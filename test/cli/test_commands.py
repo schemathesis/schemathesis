@@ -30,6 +30,7 @@ from schemathesis.constants import (
     FLAKY_FAILURE_MESSAGE,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     SCHEMATHESIS_TEST_CASE_HEADER,
+    USE_WAIT_FOR_SCHEMA_SUGGESTION_MESSAGE,
     CodeSampleStyle,
 )
 from schemathesis.extra._flask import run_server
@@ -952,7 +953,8 @@ def test_schema_not_available(cli, workers):
     # And error message is displayed
     lines = result.stdout.split("\n")
     assert lines[0] == "Failed to load schema from http://127.0.0.1:1/schema.yaml"
-    assert lines[1].startswith(
+    assert lines[1] == USE_WAIT_FOR_SCHEMA_SUGGESTION_MESSAGE
+    assert lines[3].startswith(
         "Error: requests.exceptions.ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=1): "
         "Max retries exceeded with url: /schema.yaml"
     )

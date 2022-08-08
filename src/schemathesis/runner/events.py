@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Union
 import attr
 from requests import exceptions
 
-from ..constants import DataGenerationMethod
+from ..constants import USE_WAIT_FOR_SCHEMA_SUGGESTION_MESSAGE, DataGenerationMethod
 from ..exceptions import HTTPError
 from ..models import APIOperation, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
@@ -181,7 +181,7 @@ class InternalError(ExecutionEvent):
     thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
 
     @classmethod
-    def from_exc(cls, exc: Exception) -> "InternalError":
+    def from_exc(cls, exc: Exception, wait_for_schema: Optional[float] = None) -> "InternalError":
         exception_type = f"{exc.__class__.__module__}.{exc.__class__.__qualname__}"
         if isinstance(exc, HTTPError):
             if exc.response.status_code == 404:
@@ -193,6 +193,8 @@ class InternalError(ExecutionEvent):
         exception_with_traceback = format_exception(exc, include_traceback=True)
         if isinstance(exc, exceptions.ConnectionError):
             message = f"Failed to load schema from {exc.request.url}"
+            if wait_for_schema is None:
+                message += f"\n{USE_WAIT_FOR_SCHEMA_SUGGESTION_MESSAGE}"
         else:
             message = "An internal error happened during a test run"
         return cls(
