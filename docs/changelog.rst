@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.16.4:
+
+`3.16.4`_ - 2022-08-09
+----------------------
+
 **Changed**
 
 - Suggest using ``--wait-for-schema`` if API schema is not available.
@@ -2826,7 +2831,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.16.3...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.16.4...HEAD
+.. _3.16.4: https://github.com/schemathesis/schemathesis/compare/v3.16.3...v3.16.4
 .. _3.16.3: https://github.com/schemathesis/schemathesis/compare/v3.16.2...v3.16.3
 .. _3.16.2: https://github.com/schemathesis/schemathesis/compare/v3.16.1...v3.16.2
 .. _3.16.1: https://github.com/schemathesis/schemathesis/compare/v3.16.0...v3.16.1
