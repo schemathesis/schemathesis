@@ -7,8 +7,9 @@ into your Continuous Integration workflows.
 Quickstart
 ----------
 
-These are short code samples for you to copy! They cover the case if **your API is publicly available**.
-For other deployment scenarios, check out the `API deployment scenarios`_ section below.
+You can use these code samples to test your API in a pull request or run against a publicly resolvable API.
+
+If you need to start your API server locally before testing, check out the `Preparing your App`_ section below.
 
 GitHub Actions
 ~~~~~~~~~~~~~~
@@ -24,8 +25,8 @@ GitHub Actions
     container: schemathesis/schemathesis:stable
 
     env:
-      # Publicly available API schema URL
-      API_SCHEMA: 'https://example.schemathesis.io/openapi.json'
+      # API Schema location
+      API_SCHEMA: 'http://localhost:5000/api/openapi.json'
       # OPTIONAL. Whether you'd like to see the results in a Web UI in Schemathesis.io
       SCHEMATHESIS_REPORT: 'true'
       # OPTIONAL. Your Schemathesis.io token
@@ -35,10 +36,10 @@ GitHub Actions
       # Runs Schemathesis tests with all checks enabled
       - run: st run $API_SCHEMA --checks=all
 
-For the fully working example, check |public-api.yml|_ in the repository.
+For the fully working example, check |no-build.yml|_ in the repository.
 
-.. |public-api.yml| replace:: ``.github/workflows/example-public-api.yml``
-.. _public-api.yml: https://github.com/schemathesis/schemathesis/blob/master/.github/workflows/example-public-api.yml
+.. |no-build.yml| replace:: ``.github/workflows/example-no-build.yml``
+.. _no-build.yml: https://github.com/schemathesis/schemathesis/blob/master/.github/workflows/example-no-build.yml
 
 If you enabled PR comments via our `GitHub app`_, you'll see a test report once your pipeline is finished:
 
@@ -56,8 +57,8 @@ GitLab CI
       entrypoint: [""]
 
     variables:
-      # Publicly available API schema URL
-      API_SCHEMA: 'https://example.schemathesis.io/openapi.json'
+      # API Schema location
+      API_SCHEMA: 'http://localhost:5000/api/openapi.json'
       # OPTIONAL. Whether you'd like to see the results in a Web UI in Schemathesis.io
       SCHEMATHESIS_REPORT: 'true'
       # OPTIONAL. Your Schemathesis.io token
@@ -70,24 +71,13 @@ How does it work?
 ------------------
 
 Schemathesis works over HTTP and expects that your application is reachable from the CI environment.
-The application itself could live separately from the CI environment or could be built as the previous step.
+You can prepare your application in the same CI as the previous step or run it against a staging environment.
 
-For the latter case, you need to ensure that the app has started before running Schemathesis.
-Here is a Bash snippet you can copy-paste:
+Preparing your App
+------------------
 
-.. code-block::
-
-    timeout 5 bash -c
-    'until printf "" 2>>/dev/null >>/dev/tcp/$0/$1; do sleep 0.2; done'
-    localhost 5000
-
-It will try to connect to ``localhost:5000`` until it is available or bail out after 5 seconds.
-
-API deployment scenarios
-------------------------
-
-Build your app in the same CI
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Start API before testing
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 It is common to have a test suite as a part of the application repo. For this scenario, you will need to build your app first.
 
@@ -106,6 +96,8 @@ Here is a GitHub Actions workflow for a sample `Python app`_:
       API_SCHEMA: 'http://localhost:5000/api/openapi.json'
       # OPTIONAL. Whether you'd like to see the results in a Web UI in Schemathesis.io
       SCHEMATHESIS_REPORT: 'true'
+      # OPTIONAL. Maximum time in seconds to wait on the API schema availability.
+      SCHEMATHESIS_WAIT_FOR_SCHEMA: 5
       # OPTIONAL. Your Schemathesis.io token
       SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
 
@@ -119,14 +111,6 @@ Here is a GitHub Actions workflow for a sample `Python app`_:
       # Start the API in the background
       - run: python main.py &
 
-      # Waits until localhost:5000 is available
-      # Tries to connect every 200 ms with a total waiting time of 5 seconds
-      - name: Wait for API
-        run: >
-          timeout 5 bash -c
-          'until printf "" 2>>/dev/null >>/dev/tcp/$0/$1; do sleep 0.2; done'
-          localhost 5000
-
       # Run Schemathesis tests with all checks enabled
       - run: st run $API_SCHEMA --checks=all
 
@@ -134,10 +118,10 @@ Here is a GitHub Actions workflow for a sample `Python app`_:
 
    This example expects the API schema available at ``http://localhost:5000/api/openapi.json`` inside the CI environment.
 
-For the fully working example, check |manual-build.yml|_ in the repository.
+For the fully working example, check |build.yml|_ in the repository.
 
-.. |manual-build.yml| replace:: ``.github/workflows/example-manual-build.yml``
-.. _manual-build.yml: https://github.com/schemathesis/schemathesis/blob/master/.github/workflows/example-manual-build.yml
+.. |build.yml| replace:: ``.github/workflows/example-build.yml``
+.. _build.yml: https://github.com/schemathesis/schemathesis/blob/master/.github/workflows/example-build.yml
 
 API schema in a file
 ~~~~~~~~~~~~~~~~~~~~
