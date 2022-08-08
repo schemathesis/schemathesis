@@ -1,4 +1,5 @@
 # pylint: disable=too-many-lines,redefined-outer-name
+import base64
 import enum
 import os
 import sys
@@ -1161,6 +1162,7 @@ def get_exit_code(event: events.ExecutionEvent) -> int:
 @click.option("--uri", help="A regexp that filters interactions by their request URI.", type=str)
 @click.option("--method", help="A regexp that filters interactions by their request method.", type=str)
 @click.option("--no-color", help="Disable ANSI color escape codes.", type=bool, is_flag=True)
+@click.option("--verbosity", "-v", help="Increase verbosity of the output.", count=True)
 @with_request_tls_verify
 @with_request_cert
 @with_request_cert_key
@@ -1173,6 +1175,7 @@ def replay(
     uri: Optional[str] = None,
     method: Optional[str] = None,
     no_color: bool = False,
+    verbosity: int = 0,
     request_tls_verify: bool = True,
     request_cert: Optional[str] = None,
     request_cert_key: Optional[str] = None,
@@ -1199,7 +1202,21 @@ def replay(
         click.secho(f"  {bold('ID')}              : {replayed.interaction['id']}")
         click.secho(f"  {bold('URI')}             : {replayed.interaction['request']['uri']}")
         click.secho(f"  {bold('Old status code')} : {replayed.interaction['response']['status']['code']}")
-        click.secho(f"  {bold('New status code')} : {replayed.response.status_code}\n")
+        click.secho(f"  {bold('New status code')} : {replayed.response.status_code}")
+        if verbosity > 0:
+            data = replayed.interaction["response"]
+            old_body = ""
+            # Body may be missing for 204 responses
+            if "body" in data:
+                if "base64_string" in data["body"]:
+                    content = data["body"]["base64_string"]
+                    if content:
+                        old_body = base64.b64decode(content).decode(errors="replace")
+                else:
+                    old_body = data["body"]["string"]
+            click.secho(f"  {bold('Old payload')} : {old_body}")
+            click.secho(f"  {bold('New payload')} : {replayed.response.text}")
+        click.echo()
 
 
 @schemathesis.group(short_help="Authenticate Schemathesis.io.")

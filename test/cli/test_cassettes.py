@@ -185,8 +185,11 @@ def test_main_process_error(cli, schema_url, hypothesis_max_examples, cassette_p
 
 
 @pytest.mark.operations("__all__")
+@pytest.mark.parametrize("verbose", (True, False))
 @pytest.mark.parametrize("args", ((), ("--cassette-preserve-exact-body-bytes",)), ids=("plain", "base64"))
-async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette_path, hypothesis_max_examples, args):
+async def test_replay(
+    openapi_version, cli, schema_url, app, reset_app, cassette_path, hypothesis_max_examples, verbose, args
+):
     # Record a cassette
     result = cli.run(
         schema_url,
@@ -202,8 +205,14 @@ async def test_replay(openapi_version, cli, schema_url, app, reset_app, cassette
     reset_app(openapi_version)
     assert not app["incoming_requests"]
     # When a valid cassette is replayed
-    result = cli.replay(str(cassette_path))
+    replay_args = []
+    if verbose:
+        replay_args.append("-v")
+    result = cli.replay(str(cassette_path), *replay_args)
     assert result.exit_code == ExitCode.OK, result.stdout
+    if verbose:
+        assert "Old payload : {" in result.stdout
+        assert "New payload : {" in result.stdout
     cassette = load_cassette(cassette_path)
     interactions = cassette["http_interactions"]
     # Then there should be the same number or fewer of requests made to the app as there are in the cassette

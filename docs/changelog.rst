@@ -8,6 +8,7 @@ Changelog
 
 - CLI: ``--max-failures=N`` option to exit after first ``N`` failures or errors. `#1580`_
 - CLI: ``--wait-for-schema=N`` option to automatically retry schema loading for ``N`` seconds. `#1582`_
+- CLI: Display old and new payloads in ``st replay`` when the ``-v`` option is passed. `#1584`_
 
 **Fixed**
 
@@ -3024,6 +3025,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1584: https://github.com/schemathesis/schemathesis/issues/1584
 .. _#1582: https://github.com/schemathesis/schemathesis/issues/1582
 .. _#1580: https://github.com/schemathesis/schemathesis/issues/1580
 .. _#1563: https://github.com/schemathesis/schemathesis/issues/1563
