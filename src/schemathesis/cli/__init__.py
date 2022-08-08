@@ -890,7 +890,7 @@ def into_event_stream(
             hypothesis_settings=hypothesis_settings,
         ).execute()
     except Exception as exc:
-        yield events.InternalError.from_exc(exc)
+        yield events.InternalError.from_exc(exc, wait_for_schema)
 
 
 def load_schema(config: LoaderConfig) -> BaseSchema:

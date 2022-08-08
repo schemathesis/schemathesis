@@ -7,7 +7,7 @@ into your Continuous Integration workflows.
 Quickstart
 ----------
 
-You can use these code samples to test your API in a pull request or run against a publicly resolvable API.
+You can use these code samples to test your API in a pull request or run tests against a publicly resolvable API.
 
 If you need to start your API server locally before testing, check out the `Preparing your App`_ section below.
 
