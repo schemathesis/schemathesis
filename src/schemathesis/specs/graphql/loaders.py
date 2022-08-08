@@ -1,6 +1,7 @@
 import pathlib
 from typing import IO, Any, Callable, Dict, Optional, Union, cast
 
+import backoff
 import graphql
 import requests
 from graphql import ExecutionResult
@@ -9,7 +10,7 @@ from starlette.testclient import TestClient as ASGIClient
 from werkzeug import Client
 from yarl import URL
 
-from ...constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle
+from ...constants import DEFAULT_DATA_GENERATION_METHODS, WAIT_FOR_SCHEMA_INTERVAL, CodeSampleStyle
 from ...exceptions import HTTPError
 from ...hooks import HookContext, dispatch
 from ...types import DataGenerationMethodInput, PathLike
@@ -53,6 +54,7 @@ def from_url(
     port: Optional[int] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
+    wait_for_schema: Optional[float] = None,
     **kwargs: Any,
 ) -> GraphQLSchema:
     """Load GraphQL schema from the network.
@@ -68,7 +70,21 @@ def from_url(
     kwargs.setdefault("json", {"query": INTROSPECTION_QUERY})
     if not base_url and port:
         base_url = str(URL(url).with_port(port))
-    response = requests.post(url, **kwargs)
+
+    if wait_for_schema is not None:
+
+        @backoff.on_exception(  # type: ignore
+            backoff.constant,
+            requests.exceptions.ConnectionError,
+            max_time=wait_for_schema,
+            interval=WAIT_FOR_SCHEMA_INTERVAL,
+        )
+        def _load_schema(_uri: str, **_kwargs: Any) -> requests.Response:
+            return requests.post(_uri, **kwargs)
+
+    else:
+        _load_schema = requests.post
+    response = _load_schema(url, **kwargs)
     HTTPError.raise_for_status(response)
     decoded = response.json()
     return from_dict(

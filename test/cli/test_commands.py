@@ -3,6 +3,8 @@ import os
 import pathlib
 import sys
 import time
+from test.apps._graphql._flask import create_app as create_graphql_app
+from test.apps.openapi._flask import create_app as create_openapi_app
 from test.utils import HERE, SIMPLE_PATH, strip_style_win32
 from unittest.mock import ANY
 from urllib.parse import urljoin
@@ -14,6 +16,7 @@ import requests
 import trustme
 import yaml
 from _pytest.main import ExitCode
+from aiohttp.test_utils import unused_port
 from hypothesis import HealthCheck, Phase, Verbosity
 from hypothesis.configuration import set_hypothesis_home_dir, storage_directory
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
@@ -29,6 +32,7 @@ from schemathesis.constants import (
     SCHEMATHESIS_TEST_CASE_HEADER,
     CodeSampleStyle,
 )
+from schemathesis.extra._flask import run_server
 from schemathesis.hooks import unregister_all
 from schemathesis.models import APIOperation
 from schemathesis.runner import DEFAULT_CHECKS, from_schema
@@ -280,6 +284,8 @@ def test_commands_run_help(cli):
         "  -b, --base-url TEXT             Base URL address of the API, required for",
         "                                  SCHEMA if specified by file.",
         "  --app TEXT                      WSGI/ASGI application to test.",
+        "  --wait-for-schema FLOAT RANGE   Maximum time in seconds to wait on the API",
+        "                                  schema availability.  [x>=1.0]",
         "  --request-timeout INTEGER RANGE",
         "                                  Timeout in milliseconds for network requests",
         "                                  during the test run.  [x>=1]",
@@ -431,6 +437,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
             **{
                 "app": None,
                 "base_url": None,
+                "wait_for_schema": None,
                 "auth": None,
                 "auth_type": "basic",
                 "endpoint": None,
@@ -2171,3 +2178,35 @@ def test_warning_on_all_not_found(cli, openapi3_schema_url, openapi3_base_url):
         "WARNING: All API responses have a 404 status code. "
         "Did you specify the proper API location?" in strip_style_win32(result.stdout)
     )
+
+
+@pytest.mark.parametrize(
+    "schema_path, app_factory",
+    (
+        (
+            (
+                "schema.yaml",
+                lambda: create_openapi_app(operations=("success",)),
+            ),
+            (
+                "graphql",
+                create_graphql_app,
+            ),
+        )
+    ),
+)
+def test_wait_for_schema(cli, schema_path, app_factory):
+    # When Schemathesis is asked to wait for API schema to become available
+    app = app_factory()
+    original_run = app.run
+
+    def run_with_delay(*args, **kwargs):
+        time.sleep(0.1)
+        return original_run(*args, **kwargs)
+
+    app.run = run_with_delay
+    port = unused_port()
+    schema_url = f"http://127.0.0.1:{port}/{schema_path}"
+    run_server(app, port=port)
+    result = cli.run(schema_url, "--wait-for-schema=1", "--hypothesis-max-examples=1")
+    assert result.exit_code == ExitCode.OK, result.stdout

@@ -20,10 +20,13 @@ from .. import fixups as _fixups
 from .. import runner, service
 from .. import targets as targets_module
 from ..constants import (
+    API_NAME_ENV_VAR,
+    BASE_URL_ENV_VAR,
     DEFAULT_DATA_GENERATION_METHODS,
     DEFAULT_RESPONSE_TIMEOUT,
     DEFAULT_STATEFUL_RECURSION_LIMIT,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
+    WAIT_FOR_SCHEMA_ENV_VAR,
     CodeSampleStyle,
     DataGenerationMethod,
 )
@@ -220,7 +223,7 @@ REPORT_TO_SERVICE = object()
 
 @schemathesis.command(short_help="Perform schemathesis test.", cls=CommandWithCustomHelp)
 @click.argument("schema", type=str)
-@click.argument("api_name", type=str, required=False, envvar=service.API_NAME_ENV_VAR)
+@click.argument("api_name", type=str, required=False, envvar=API_NAME_ENV_VAR)
 @click.option(
     "--checks",
     "-c",
@@ -367,9 +370,16 @@ REPORT_TO_SERVICE = object()
     help="Base URL address of the API, required for SCHEMA if specified by file.",
     type=str,
     callback=callbacks.validate_base_url,
-    envvar=service.BASE_URL_ENV_VAR,
+    envvar=BASE_URL_ENV_VAR,
 )
 @click.option("--app", help="WSGI/ASGI application to test.", type=str, callback=callbacks.validate_app)
+@click.option(
+    "--wait-for-schema",
+    help="Maximum time in seconds to wait on the API schema availability.",
+    type=click.FloatRange(1.0),
+    default=None,
+    envvar=WAIT_FOR_SCHEMA_ENV_VAR,
+)
 @click.option(
     "--request-timeout",
     help="Timeout in milliseconds for network requests during the test run.",
@@ -604,6 +614,7 @@ def run(
     cassette_path: Optional[click.utils.LazyFile] = None,
     cassette_preserve_exact_body_bytes: bool = False,
     store_network_log: Optional[click.utils.LazyFile] = None,
+    wait_for_schema: Optional[float] = None,
     fixups: Tuple[str] = (),  # type: ignore
     stateful: Optional[Stateful] = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
@@ -716,6 +727,7 @@ def run(
         force_schema_version=force_schema_version,
         request_tls_verify=request_tls_verify,
         request_cert=prepare_request_cert(request_cert, request_cert_key),
+        wait_for_schema=wait_for_schema,
         auth=auth,
         auth_type=auth_type,
         headers=headers,
@@ -782,6 +794,7 @@ class LoaderConfig:
     force_schema_version: Optional[str] = attr.ib()  # pragma: no mutate
     request_tls_verify: Union[bool, str] = attr.ib()  # pragma: no mutate
     request_cert: Optional[RequestCert] = attr.ib()  # pragma: no mutate
+    wait_for_schema: Optional[float] = attr.ib()  # pragma: no mutate
     # Network request parameters
     auth: Optional[Tuple[str, str]] = attr.ib()  # pragma: no mutate
     auth_type: Optional[str] = attr.ib()  # pragma: no mutate
@@ -810,6 +823,7 @@ def into_event_stream(
     auth_type: Optional[str],
     headers: Optional[Dict[str, str]],
     request_timeout: Optional[int],
+    wait_for_schema: Optional[float],
     # Schema filters
     endpoint: Optional[Filter],
     method: Optional[Filter],
@@ -842,6 +856,7 @@ def into_event_stream(
             force_schema_version=force_schema_version,
             request_tls_verify=request_tls_verify,
             request_cert=request_cert,
+            wait_for_schema=wait_for_schema,
             auth=auth,
             auth_type=auth_type,
             headers=headers,
@@ -974,6 +989,8 @@ def _add_requests_kwargs(kwargs: Dict[str, Any], config: LoaderConfig) -> None:
         kwargs["cert"] = config.request_cert
     if config.auth is not None:
         kwargs["auth"] = get_requests_auth(config.auth, config.auth_type)
+    if config.wait_for_schema is not None:
+        kwargs["wait_for_schema"] = config.wait_for_schema
 
 
 def is_probably_graphql(location: str) -> bool:

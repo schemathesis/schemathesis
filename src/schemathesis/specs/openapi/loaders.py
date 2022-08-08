@@ -3,6 +3,7 @@ import pathlib
 from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import urljoin
 
+import backoff
 import jsonschema
 import requests
 import yaml
@@ -12,7 +13,7 @@ from starlette.testclient import TestClient as ASGIClient
 from werkzeug.test import Client
 from yarl import URL
 
-from ...constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle
+from ...constants import DEFAULT_DATA_GENERATION_METHODS, WAIT_FOR_SCHEMA_INTERVAL, CodeSampleStyle
 from ...exceptions import HTTPError, SchemaLoadingError
 from ...hooks import HookContext, dispatch
 from ...lazy import LazySchema
@@ -83,6 +84,7 @@ def from_uri(
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
+    wait_for_schema: Optional[float] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from the network.
@@ -92,7 +94,22 @@ def from_uri(
     setup_headers(kwargs)
     if not base_url and port:
         base_url = str(URL(uri).with_port(port))
-    response = requests.get(uri, **kwargs)
+
+    if wait_for_schema is not None:
+
+        @backoff.on_exception(  # type: ignore
+            backoff.constant,
+            requests.exceptions.ConnectionError,
+            max_time=wait_for_schema,
+            interval=WAIT_FOR_SCHEMA_INTERVAL,
+        )
+        def _load_schema(_uri: str, **_kwargs: Any) -> requests.Response:
+            return requests.get(_uri, **kwargs)
+
+    else:
+        _load_schema = requests.get
+
+    response = _load_schema(uri, **kwargs)
     HTTPError.raise_for_status(response)
     try:
         return from_file(
