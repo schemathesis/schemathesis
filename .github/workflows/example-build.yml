@@ -3,7 +3,7 @@ name: Manual build API example
 on:
   pull_request:
     paths:
-      - '.github/workflows/example-manual-build.yml'
+      - '.github/workflows/example-build.yml'
       - 'example/**'
   push:
     branches:
@@ -46,6 +46,9 @@ jobs:
       # Without this variable you won't be able to see
       # diffs with the target branch and history data
       SCHEMATHESIS_API_NAME: schemathesis-example-manual-build
+      # OPTIONAL. Maximum time in seconds to wait on the
+      # API schema availability.
+      SCHEMATHESIS_WAIT_FOR_SCHEMA: 5
 
     steps:
       - uses: actions/checkout@v3.0.0
@@ -56,15 +59,6 @@ jobs:
       # Starts the API in the background
       - name: Start API
         run: python example/main.py &
-
-      # Waits until localhost:5000 is available
-      # Tries to connect every 200 ms with a total waiting time of 5 seconds
-      - name: Wait for API
-        run: >
-          timeout 5
-          bash -c
-          'until printf "" 2>>/dev/null >>/dev/tcp/$0/$1; do sleep 0.2; done'
-          localhost 5000
 
       # Runs positive Schemathesis tests
       - name: Run Schemathesis
