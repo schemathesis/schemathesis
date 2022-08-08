@@ -1,8 +1,6 @@
 from . import auth, ci, hosts
 from .client import ServiceClient
 from .constants import (
-    API_NAME_ENV_VAR,
-    BASE_URL_ENV_VAR,
     DEFAULT_HOSTNAME,
     DEFAULT_HOSTS_PATH,
     DEFAULT_PROTOCOL,

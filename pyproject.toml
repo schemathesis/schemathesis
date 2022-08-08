@@ -55,6 +55,7 @@ typing-extensions = ">=3.7,<5"
 colorama = "^0.4"
 tomli = "^2.0.1"
 tomli-w = "^1.0.0"
+backoff = "^2.1.2"
 
 [tool.poetry.dev-dependencies]
 coverage = "^6"
