@@ -296,13 +296,14 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
             for warning in event.warnings:
                 click.secho(f"  - {warning}", fg="yellow")
 
-    if isinstance(context.report, FileReportContext):
-        click.echo()
-        display_report_metadata(context.report.queue.get())
-        click.secho(f"Report is saved to {context.report.filename}", bold=True)
-    elif isinstance(context.report, ServiceReportContext):
-        click.echo()
-        handle_service_integration(context.report)
+    if context.report is not None and not context.is_interrupted:
+        if isinstance(context.report, FileReportContext):
+            click.echo()
+            display_report_metadata(context.report.queue.get())
+            click.secho(f"Report is saved to {context.report.filename}", bold=True)
+        elif isinstance(context.report, ServiceReportContext):
+            click.echo()
+            handle_service_integration(context.report)
     else:
         click.echo()
         category = click.style("Hint", bold=True)
@@ -534,6 +535,7 @@ def handle_finished(context: ExecutionContext, event: events.Finished) -> None:
 
 def handle_interrupted(context: ExecutionContext, event: events.Interrupted) -> None:
     click.echo()
+    context.is_interrupted = True
     display_section_name("KeyboardInterrupt", "!", bold=False)
 
 

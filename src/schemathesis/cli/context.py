@@ -39,6 +39,7 @@ class ExecutionContext:
     results: List[SerializedTestResult] = attr.ib(factory=list)  # pragma: no mutate
     cassette_path: Optional[str] = attr.ib(default=None)  # pragma: no mutate
     junit_xml_file: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    is_interrupted: bool = attr.ib(default=False)  # pragma: no mutate
     verbosity: int = attr.ib(default=0)  # pragma: no mutate
     code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate
     report: Optional[Union[ServiceReportContext, FileReportContext]] = attr.ib(default=None)  # pragma: no mutate
