@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- CLI: Hanging on ``CTRL-C`` when ``--report`` is enabled.
+
 .. _v3.16.4:
 
 `3.16.4`_ - 2022-08-09
