@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.16.5:
+
+`3.16.5`_ - 2022-08-11
+----------------------
+
 **Fixed**
 
 - CLI: Hanging on ``CTRL-C`` when ``--report`` is enabled.
@@ -2836,7 +2841,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.16.4...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.16.5...HEAD
+.. _3.16.5: https://github.com/schemathesis/schemathesis/compare/v3.16.4...v3.16.5
 .. _3.16.4: https://github.com/schemathesis/schemathesis/compare/v3.16.3...v3.16.4
 .. _3.16.3: https://github.com/schemathesis/schemathesis/compare/v3.16.2...v3.16.3
 .. _3.16.2: https://github.com/schemathesis/schemathesis/compare/v3.16.1...v3.16.2
