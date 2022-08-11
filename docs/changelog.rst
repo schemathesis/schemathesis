@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - CLI: Hanging on ``CTRL-C`` when ``--report`` is enabled.
+- Internal error when GraphQL schema has its root types renamed. `#1591`_
 
 .. _v3.16.4:
 
@@ -3045,6 +3046,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1591: https://github.com/schemathesis/schemathesis/issues/1591
 .. _#1584: https://github.com/schemathesis/schemathesis/issues/1584
 .. _#1582: https://github.com/schemathesis/schemathesis/issues/1582
 .. _#1580: https://github.com/schemathesis/schemathesis/issues/1580

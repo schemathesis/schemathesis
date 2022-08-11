@@ -1,5 +1,7 @@
 # Pylint bug - `Callable` is used below
 # pylint: disable=unused-import
+import enum
+from enum import unique
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
 from urllib.parse import urlsplit
 
@@ -23,6 +25,12 @@ from ...stateful import Stateful, StatefulTest
 from ...types import Body, Cookies, Headers, NotSet, PathParameters, Query
 from ...utils import NOT_SET, GenericResponse, Ok, Result
 from .scalars import CUSTOM_SCALARS
+
+
+@unique
+class RootType(enum.Enum):
+    QUERY = enum.auto()
+    MUTATION = enum.auto()
 
 
 @attr.s(slots=True, repr=False)  # pragma: no mutate
@@ -82,6 +90,7 @@ C = TypeVar("C", bound=Case)
 class GraphQLOperationDefinition(OperationDefinition):
     field_name: str = attr.ib()
     type_: graphql.GraphQLType = attr.ib()
+    root_type: RootType = attr.ib()
 
 
 @attr.s()  # pragma: no mutate
@@ -124,7 +133,10 @@ class GraphQLSchema(BaseSchema):
 
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         schema = self.client_schema
-        for operation_type in (schema.query_type, schema.mutation_type):
+        for root_type, operation_type in (
+            (RootType.QUERY, schema.query_type),
+            (RootType.MUTATION, schema.mutation_type),
+        ):
             if operation_type is None:
                 continue
             for field_name, definition in operation_type.fields.items():
@@ -144,6 +156,7 @@ class GraphQLSchema(BaseSchema):
                             parameters=[],
                             type_=operation_type,
                             field_name=field_name,
+                            root_type=root_type,
                         ),
                         case_cls=GraphQLCase,
                     )
@@ -206,9 +219,9 @@ def get_case_strategy(
 ) -> Any:
     definition = cast(GraphQLOperationDefinition, operation.definition)
     strategy = {
-        "Query": gql_st.queries,
-        "Mutation": gql_st.mutations,
-    }[definition.type_.name]
+        RootType.QUERY: gql_st.queries,
+        RootType.MUTATION: gql_st.mutations,
+    }[definition.root_type]
     body = draw(strategy(client_schema, fields=[definition.field_name], custom_scalars=CUSTOM_SCALARS))
     instance = GraphQLCase(body=body, operation=operation, data_generation_method=data_generation_method)  # type: ignore
     context = auth.AuthContext(

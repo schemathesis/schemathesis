@@ -83,3 +83,30 @@ def test_operations_count(graphql_url):
     raw_schema = decoded["data"]
     schema = schemathesis.graphql.from_dict(raw_schema)
     assert schema.operations_count == 4
+
+
+def test_type_names():
+    # When the user gives custom names to query types
+    raw_schema = """
+    schema {
+       query: MyQuery
+       mutation: MyMutation
+    }
+
+    type MyQuery {
+       v: String
+    }
+    type MyMutation {
+       v(i: Int): String
+    }
+    """
+    # Then the schema should be loaded without errors
+    schema = schemathesis.graphql.from_file(raw_schema)
+    # And requests should be properly generated
+
+    @given(case=schema[b""]["POST"].as_strategy())
+    @settings(max_examples=1, deadline=None)
+    def test(case):
+        pass
+
+    test()
