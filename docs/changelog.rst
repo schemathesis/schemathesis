@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Allow creating APIs in Schemathesis.io by name when the schema is passed as a file.
+
 .. _v3.16.5:
 
 `3.16.5`_ - 2022-08-11
