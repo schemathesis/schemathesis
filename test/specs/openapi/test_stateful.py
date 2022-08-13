@@ -67,7 +67,7 @@ TestStateful = APIWorkflow.TestCase
     result = testdir.runpytest()
     # Then the reproducing steps should be correctly displayed
     result.assert_outcomes(failed=1)
-    result.stdout.re_match_lines([r"state.some\(data='foo'\)"])
+    result.stdout.re_match_lines([r".*state.some\(data='foo'\)"])
 
 
 # With the following tests we try to uncover a bug that requires multiple steps with a shared step
@@ -104,9 +104,14 @@ TestStateful.settings = settings(
     # And there should be Python code to reproduce the error in the GET call
     result.stdout.re_match_lines([rf"E +curl -X GET .+ '{openapi3_base_url}/users/\w+.+"])
     # And the reproducing example should work
-    first = result.outlines.index("Falsifying example:") + 1
-    last = result.outlines.index("state.teardown()") + 1
-    example = "\n".join(result.outlines[first:last])
+    try:
+        first = result.outlines.index("Falsifying example:") + 1
+        last = result.outlines.index("state.teardown()") + 1
+    except ValueError:
+        first = result.outlines.index("E   Falsifying example:") + 1
+        last = result.outlines.index("E   state.teardown()") + 1
+
+    example = "\n".join([removeprefix(line, "E   ") for line in result.outlines[first:last]])
     testdir.make_test(
         f"""
 schema.base_url = "{openapi3_base_url}"
@@ -117,6 +122,12 @@ APIWorkflow = schema.as_state_machine()
     )
     result = testdir.runpytest()
     assert "E   1. Received a response with 5xx status code: 500" in result.outlines
+
+
+def removeprefix(value: str, prefix: str) -> str:
+    if value.startswith(prefix):
+        return value[len(prefix) :]
+    return value
 
 
 @pytest.mark.parametrize("factory_name", ("wsgi_app_factory", "asgi_app_factory"))

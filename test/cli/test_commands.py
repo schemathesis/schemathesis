@@ -5,6 +5,7 @@ import sys
 import time
 from test.apps._graphql._flask import create_app as create_graphql_app
 from test.apps.openapi._flask import create_app as create_openapi_app
+from test.conftest import HYPOTHESIS_ABOVE_6_54
 from test.utils import HERE, SIMPLE_PATH, strip_style_win32
 from unittest.mock import ANY
 from urllib.parse import urljoin
@@ -1362,6 +1363,7 @@ def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
 
 @pytest.mark.operations("failure")
 @pytest.mark.parametrize("workers", (1, 2))
+@pytest.mark.skipif(HYPOTHESIS_ABOVE_6_54, reason="Newer Hypothesis versions handle it via exception notes.")
 def test_hypothesis_output_capture(mocker, cli, cli_args, workers):
     mocker.patch("schemathesis.utils.IGNORED_PATTERNS", ())
 

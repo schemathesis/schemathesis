@@ -212,14 +212,15 @@ def run_subtest(
             sub_test(**fixtures)
         except SkipTest as exc:
             pytest.skip(exc.args[0])
-        except MultipleFailures as exc:
+        except (MultipleFailures, CheckFailed) as exc:
             # Hypothesis doesn't report the underlying failures in these circumstances, hence we display them manually
             exc_class = get_exception_class()
             failures = "".join(f"{SEPARATOR} {failure.args[0]}" for failure in failed_checks.values())
             unique_exceptions = {get_interesting_origin(exception): exception for exception in exceptions}
-            message = (
-                f"Schemathesis found {len(failed_checks) + len(unique_exceptions)} distinct sets of failures.{failures}"
-            )
+            total_problems = len(failed_checks) + len(unique_exceptions)
+            if total_problems == 1:
+                raise
+            message = f"Schemathesis found {total_problems} distinct sets of failures.{failures}"
             for exception in unique_exceptions.values():
                 # Non-check exceptions
                 message += f"{SEPARATOR}\n\n"
