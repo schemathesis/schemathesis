@@ -216,8 +216,12 @@ def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -
 IGNORED_HYPOTHESIS_OUTPUT = ("Falsifying example",)
 
 
+def _should_ignore_entry(value: str) -> bool:
+    return value.startswith(IGNORED_HYPOTHESIS_OUTPUT)
+
+
 def hypothesis_reporter(value: str) -> None:
-    if value.startswith(IGNORED_HYPOTHESIS_OUTPUT):
+    if _should_ignore_entry(value):
         return
     reporting.default(value)
 
@@ -246,6 +250,10 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
             pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)
         except SkipTest as exc:
             pytest.skip(exc.args[0])
+        except Exception as exc:
+            if hasattr(exc, "__notes__"):
+                exc.__notes__ = [note for note in exc.__notes__ if not _should_ignore_entry(note)]  # type: ignore
+            raise
     else:
         outcome = yield
         outcome.get_result()

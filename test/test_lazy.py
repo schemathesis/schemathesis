@@ -813,6 +813,7 @@ def test_(case):
     assert "Received a response with 5xx status code: 504" in stdout
     # And internal frames should not be displayed
     assert "def run_subtest" not in stdout
+    assert "Falsifying example" not in stdout
 
 
 @pytest.mark.operations("multiple_failures")
@@ -845,7 +846,7 @@ def test_(case):
     # And internal frames should not be displayed
     assert "def run_subtest" not in stdout
     assert "def collecting_wrapper" not in stdout
-    assert stdout.count("E   test_multiple_failures_non_check.py:") == 1
+    assert stdout.count("test_multiple_failures_non_check.py:30") == 1
 
 
 @pytest.mark.operations("flaky")
