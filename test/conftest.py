@@ -5,12 +5,14 @@ from textwrap import dedent
 from types import SimpleNamespace
 from typing import Optional
 
+import hypothesis
 import pytest
 import requests
 import yaml
 from click.testing import CliRunner
 from hypothesis import settings
 from packaging import version
+from packaging.version import parse
 from urllib3 import HTTPResponse
 
 import schemathesis.cli
@@ -41,6 +43,20 @@ def setup(tmp_path_factory):
     hosts_path = config_dir / "hosts.toml"
     hosts_path.touch(exist_ok=True)
     os.environ[HOSTS_PATH_ENV_VAR] = str(hosts_path)
+
+
+HYPOTHESIS_VERSION = parse(hypothesis.__version__)
+HYPOTHESIS_ABOVE_6_54 = HYPOTHESIS_VERSION >= parse("6.54.0")
+
+
+@pytest.fixture(scope="session")
+def hypothesis_version():
+    return HYPOTHESIS_VERSION
+
+
+@pytest.fixture(scope="session")
+def hypothesis_above_6_54():
+    return HYPOTHESIS_ABOVE_6_54
 
 
 @pytest.fixture(scope="session")

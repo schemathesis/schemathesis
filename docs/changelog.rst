@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Allow creating APIs in Schemathesis.io by name when the schema is passed as a file.
+- Properly trim tracebacks on ``Hypothesis>=6.54.0``.
 
 .. _v3.16.5:
 
