@@ -5,7 +5,6 @@ import sys
 import time
 from test.apps._graphql._flask import create_app as create_graphql_app
 from test.apps.openapi._flask import create_app as create_openapi_app
-from test.conftest import HYPOTHESIS_ABOVE_6_54
 from test.utils import HERE, SIMPLE_PATH, strip_style_win32
 from unittest.mock import ANY
 from urllib.parse import urljoin
@@ -23,6 +22,7 @@ from hypothesis.configuration import set_hypothesis_home_dir, storage_directory
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
 from schemathesis import Case, DataGenerationMethod, fixups
+from schemathesis._compat import IS_HYPOTHESIS_ABOVE_6_54
 from schemathesis.checks import ALL_CHECKS, not_a_server_error
 from schemathesis.cli import LoaderConfig, execute, get_exit_code, reset_checks
 from schemathesis.cli.callbacks import INVALID_SCHEMA_MESSAGE
@@ -1363,7 +1363,7 @@ def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
 
 @pytest.mark.operations("failure")
 @pytest.mark.parametrize("workers", (1, 2))
-@pytest.mark.skipif(HYPOTHESIS_ABOVE_6_54, reason="Newer Hypothesis versions handle it via exception notes.")
+@pytest.mark.skipif(IS_HYPOTHESIS_ABOVE_6_54, reason="Newer Hypothesis versions handle it via exception notes.")
 def test_hypothesis_output_capture(mocker, cli, cli_args, workers):
     mocker.patch("schemathesis.utils.IGNORED_PATTERNS", ())
 

@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Support for exception groups in newer ``Hypothesis`` versions. `#1592`_
+
 **Fixed**
 
 - Allow creating APIs in Schemathesis.io by name when the schema is passed as a file.
@@ -3057,6 +3061,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1592: https://github.com/schemathesis/schemathesis/issues/1592
 .. _#1591: https://github.com/schemathesis/schemathesis/issues/1591
 .. _#1584: https://github.com/schemathesis/schemathesis/issues/1584
 .. _#1582: https://github.com/schemathesis/schemathesis/issues/1582
