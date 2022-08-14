@@ -5,18 +5,16 @@ from textwrap import dedent
 from types import SimpleNamespace
 from typing import Optional
 
-import hypothesis
 import pytest
 import requests
 import yaml
 from click.testing import CliRunner
 from hypothesis import settings
 from packaging import version
-from packaging.version import parse
 from urllib3 import HTTPResponse
 
 import schemathesis.cli
-from schemathesis._compat import metadata
+from schemathesis._compat import IS_HYPOTHESIS_ABOVE_6_54, metadata
 from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.service import HOSTS_PATH_ENV_VAR
@@ -45,18 +43,9 @@ def setup(tmp_path_factory):
     os.environ[HOSTS_PATH_ENV_VAR] = str(hosts_path)
 
 
-HYPOTHESIS_VERSION = parse(hypothesis.__version__)
-HYPOTHESIS_ABOVE_6_54 = HYPOTHESIS_VERSION >= parse("6.54.0")
-
-
 @pytest.fixture(scope="session")
-def hypothesis_version():
-    return HYPOTHESIS_VERSION
-
-
-@pytest.fixture(scope="session")
-def hypothesis_above_6_54():
-    return HYPOTHESIS_ABOVE_6_54
+def is_hypothesis_above_6_54():
+    return IS_HYPOTHESIS_ABOVE_6_54
 
 
 @pytest.fixture(scope="session")

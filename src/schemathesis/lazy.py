@@ -5,11 +5,12 @@ import attr
 import pytest
 from _pytest.fixtures import FixtureRequest
 from hypothesis.core import HypothesisHandle
-from hypothesis.errors import Flaky, MultipleFailures
+from hypothesis.errors import Flaky
 from hypothesis.internal.escalation import format_exception, get_interesting_origin, get_trimmed_traceback
 from hypothesis.internal.reflection import impersonate
 from pytest_subtests import SubTests, nullcontext
 
+from ._compat import MultipleFailures
 from .auth import AuthStorage
 from .constants import FLAKY_FAILURE_MESSAGE, CodeSampleStyle, DataGenerationMethod
 from .exceptions import CheckFailed, InvalidSchema, SkipTest, get_grouped_exception
