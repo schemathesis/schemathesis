@@ -18,6 +18,7 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
 from ... import failures, hooks
+from ..._compat import MultipleFailures
 from ...auth import unregister as unregister_auth
 from ...constants import (
     DEFAULT_STATEFUL_RECURSION_LIMIT,
@@ -323,9 +324,9 @@ def run_test(  # pylint: disable=too-many-locals
         result.mark_errored()
         for error in deduplicate_errors(errors):
             result.add_error(error)
-    except hypothesis.errors.MultipleFailures:
+    except MultipleFailures:
         # Schemathesis may detect multiple errors that come from different check results
-        # They raise different "grouped" exceptions, and `MultipleFailures` is risen as the result
+        # They raise different "grouped" exceptions
         status = Status.failure
     except hypothesis.errors.Flaky:
         status = Status.failure

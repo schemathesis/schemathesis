@@ -22,15 +22,24 @@ else:
         pass
 
 
+HYPOTHESIS_VERSION = version.parse(hypothesis.__version__)
+IS_HYPOTHESIS_ABOVE_6_49 = HYPOTHESIS_VERSION >= version.parse("6.49.0")
+IS_HYPOTHESIS_ABOVE_6_54 = HYPOTHESIS_VERSION >= version.parse("6.54.0")
+
 try:
     from hypothesis.utils.conventions import InferType
 except ImportError:
     InferType = type(...)
 
-if version.parse(hypothesis.__version__) >= version.parse("6.49"):
+if IS_HYPOTHESIS_ABOVE_6_49:
     from hypothesis.internal.reflection import get_signature
 else:
     from inspect import getfullargspec as get_signature
+
+if IS_HYPOTHESIS_ABOVE_6_54:
+    from exceptiongroup import BaseExceptionGroup as MultipleFailures
+else:
+    from hypothesis.errors import MultipleFailures
 
 
 def _get_format_filter(
