@@ -7,11 +7,17 @@ Changelog
 **Added**
 
 - Support for exception groups in newer ``Hypothesis`` versions. `#1592`_
+- A way to generate negative and positive test cases within the same CLI run via ``-D all``.
 
 **Fixed**
 
 - Allow creating APIs in Schemathesis.io by name when the schema is passed as a file.
 - Properly trim tracebacks on ``Hypothesis>=6.54.0``.
+- Skipping negative tests when they should not be skipped.
+
+**Changed**
+
+- **pytest**: Generate positive & negative within the same test node.
 
 .. _v3.16.5:
 

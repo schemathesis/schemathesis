@@ -15,7 +15,7 @@ from .constants import DEFAULT_DEADLINE, DataGenerationMethod
 from .exceptions import InvalidSchema
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import APIOperation, Case
-from .utils import GivenInput
+from .utils import GivenInput, combine_strategies
 
 
 def create_test(
@@ -24,16 +24,21 @@ def create_test(
     test: Callable,
     settings: Optional[hypothesis.settings] = None,
     seed: Optional[int] = None,
-    data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+    data_generation_methods: List[DataGenerationMethod],
     _given_args: Tuple[GivenInput, ...] = (),
     _given_kwargs: Optional[Dict[str, GivenInput]] = None,
 ) -> Callable:
     """Create a Hypothesis test."""
     hook_dispatcher = getattr(test, "_schemathesis_hooks", None)
     auth_storage = get_auth_storage_from_test(test)
-    strategy = operation.as_strategy(
-        hooks=hook_dispatcher, auth_storage=auth_storage, data_generation_method=data_generation_method
-    )
+    strategies = []
+    for data_generation_method in data_generation_methods:
+        strategies.append(
+            operation.as_strategy(
+                hooks=hook_dispatcher, auth_storage=auth_storage, data_generation_method=data_generation_method
+            )
+        )
+    strategy = combine_strategies(strategies)
     _given_kwargs = (_given_kwargs or {}).copy()
     _given_kwargs.setdefault("case", strategy)
 

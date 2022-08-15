@@ -12,7 +12,6 @@ from hypothesis import reporting
 from hypothesis.errors import InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
-from .. import DataGenerationMethod
 from .._hypothesis import create_test
 from ..constants import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54, RECURSIVE_REFERENCE_ERROR_MESSAGE
 from ..exceptions import InvalidSchema, SkipTest
@@ -45,13 +44,11 @@ class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
         *args: Any,
         test_func: Callable,
         test_name: Optional[str] = None,
-        data_generation_method: DataGenerationMethod,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.test_function = test_func
         self.test_name = test_name
-        self.data_generation_method = data_generation_method
 
     if not IS_PYTEST_ABOVE_7:
         # On pytest 7, `self.obj` is already `partial`
@@ -87,12 +84,10 @@ class SchemathesisCase(PyCollector):
         self.schemathesis_case = getattr(test_function, PARAMETRIZE_MARKER)
         super().__init__(*args, **kwargs)
 
-    def _get_test_name(self, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:
-        return f"{self.name}[{operation.verbose_name}][{data_generation_method.as_short_name()}]"
+    def _get_test_name(self, operation: APIOperation) -> str:
+        return f"{self.name}[{operation.verbose_name}]"
 
-    def _gen_items(
-        self, result: Result[APIOperation, InvalidSchema], data_generation_method: DataGenerationMethod
-    ) -> Generator[SchemathesisFunction, None, None]:
+    def _gen_items(self, result: Result[APIOperation, InvalidSchema]) -> Generator[SchemathesisFunction, None, None]:
         """Generate all tests for the given API operation.
 
         Could produce more than one test item if
@@ -110,9 +105,9 @@ class SchemathesisCase(PyCollector):
                     operation=operation,
                     test=self.test_function,
                     _given_kwargs=self.given_kwargs,
-                    data_generation_method=data_generation_method,
+                    data_generation_methods=self.schemathesis_case.data_generation_methods,
                 )
-            name = self._get_test_name(operation, data_generation_method)
+            name = self._get_test_name(operation)
         else:
             error = result.err()
             funcobj = error.as_failing_test_function()
@@ -122,7 +117,6 @@ class SchemathesisCase(PyCollector):
                 name += f"[{error.method.upper()} {error.full_path}]"
             else:
                 name += f"[{error.full_path}]"
-            name += f"[{data_generation_method.as_short_name()}]"
 
         cls = self._get_class_parent()
         definition: FunctionDefinition = create(FunctionDefinition, name=self.name, parent=self.parent, callobj=funcobj)
@@ -144,7 +138,6 @@ class SchemathesisCase(PyCollector):
                 fixtureinfo=fixtureinfo,
                 test_func=self.test_function,
                 originalname=self.name,
-                data_generation_method=data_generation_method,
             )
         else:
             fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)  # type: ignore[arg-type]
@@ -161,7 +154,6 @@ class SchemathesisCase(PyCollector):
                     keywords={callspec.id: True},
                     originalname=name,
                     test_func=self.test_function,
-                    data_generation_method=data_generation_method,
                 )
 
     def _get_class_parent(self) -> Optional[Type]:
@@ -191,10 +183,7 @@ class SchemathesisCase(PyCollector):
         """Generate different test items for all API operations available in the given schema."""
         try:
             items = [
-                item
-                for data_generation_method in self.schemathesis_case.data_generation_methods
-                for operation in self.schemathesis_case.get_all_operations()
-                for item in self._gen_items(operation, data_generation_method)
+                item for operation in self.schemathesis_case.get_all_operations() for item in self._gen_items(operation)
             ]
             if not items:
                 fail_on_no_matches(self.nodeid)

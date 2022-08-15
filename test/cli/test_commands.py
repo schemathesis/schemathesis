@@ -264,7 +264,7 @@ def test_commands_run_help(cli):
         "                                  Verbosity level of Hypothesis messages.",
         "",
         "Generic options:",
-        "  -D, --data-generation-method [positive|negative]",
+        "  -D, --data-generation-method [positive|negative|all]",
         "                                  Defines how Schemathesis generates data for",
         "                                  tests.  [default:",
         "                                  DataGenerationMethod.positive]",
@@ -797,7 +797,7 @@ def test_flaky(cli, cli_args, workers):
         assert lines[7] == "F"
     # And it should be displayed only once in "FAILURES" section
     assert "= FAILURES =" in result.stdout
-    assert "_ GET /api/flaky [P] _" in result.stdout
+    assert "_ GET /api/flaky _" in result.stdout
     # And more clear error message is displayed instead of Hypothesis one
     lines = result.stdout.split("\n")
     assert FLAKY_FAILURE_MESSAGE in lines
@@ -938,8 +938,8 @@ def test_connection_error(cli, schema_url, workers):
     # And errors section title should be displayed
     assert "= ERRORS =" in result.stdout
     # And all API operations should be mentioned in this section as subsections
-    assert "_ GET /api/success [P] _" in result.stdout
-    assert "_ GET /api/failure [P] _" in result.stdout
+    assert "_ GET /api/success _" in result.stdout
+    assert "_ GET /api/failure _" in result.stdout
     # And the proper error messages should be displayed for each operation
     assert "Max retries exceeded with url: /api/success" in result.stdout
     assert "Max retries exceeded with url: /api/failure" in result.stdout
@@ -1898,7 +1898,7 @@ def test_unsupported_regex(testdir, cli, empty_open_api_3_schema):
     assert "POST /foo E" in result.stdout
     lines = result.stdout.splitlines()
     for idx, line in enumerate(lines):
-        if "__ POST /foo [P] __" in line:
+        if "__ POST /foo __" in line:
             break
     else:
         pytest.fail("Line not found")
@@ -2038,6 +2038,7 @@ def assert_exit_code(event_stream, code):
             junit_xml=None,
             verbosity=0,
             code_sample_style=CodeSampleStyle.default(),
+            data_generation_methods=[DataGenerationMethod.default()],
             debug_output_file=None,
             host_data=None,
             client=None,
@@ -2092,7 +2093,7 @@ def test_missing_content_and_schema(cli, base_url, tmp_path, testdir, empty_open
         assert lines[7].startswith("GET /foo E")
     else:
         assert lines[7].startswith("GET /apiv2/foo E")
-        assert "_ GET /apiv2/foo [P] _" in lines[10]
+        assert "_ GET /apiv2/foo _" in lines[10]
     assert (
         lines[11] == f'InvalidSchema: Can not generate data for {location} parameter "X-Foo"! '
         "It should have either `schema` or `content` keywords defined"
@@ -2170,6 +2171,41 @@ def test_warning_on_unauthorized(cli, openapi3_schema_url):
         "WARNING: Most of the responses from `GET /api/basic` have a 401 status code. "
         "Did you specify proper API credentials?" in strip_style_win32(result.stdout)
     )
+
+
+@pytest.mark.operations("payload")
+def test_multiple_data_generation_methods(testdir, cli, openapi3_schema_url):
+    # When multiple data generation methods are supplied in CLI
+    module = testdir.make_importable_pyfile(
+        hook="""
+import schemathesis
+
+note = print
+
+@schemathesis.register_check
+def data_generation_check(response, case):
+    if case.data_generation_method:
+        note("METHOD: {}".format(case.data_generation_method.name))
+"""
+    )
+    result = cli.main(
+        "--pre-run",
+        module.purebasename,
+        "run",
+        "-c",
+        "data_generation_check",
+        "-c",
+        "not_a_server_error",
+        openapi3_schema_url,
+        "--hypothesis-max-examples=25",
+        "--hypothesis-suppress-health-check=data_too_large,filter_too_much,too_slow",
+        "-D",
+        "all",
+    )
+    # Then there should be cases generated from different methods
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert "METHOD: positive" in result.stdout
+    assert "METHOD: negative" in result.stdout
 
 
 @pytest.mark.operations("success", "failure")

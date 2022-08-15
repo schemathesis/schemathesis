@@ -58,7 +58,7 @@ def results_set(operation):
     statistic = models.TestResult(
         operation.method,
         operation.full_path,
-        data_generation_method=DataGenerationMethod.default(),
+        data_generation_method=[DataGenerationMethod.default()],
         verbose_name=f"{operation.method} {operation.full_path}",
     )
     return models.TestResultSet([statistic])
@@ -72,7 +72,7 @@ def after_execution(results_set, operation, swagger_20):
         hypothesis_output=[],
         elapsed_time=1.0,
         operation=operation,
-        data_generation_method=DataGenerationMethod.positive,
+        data_generation_method=[DataGenerationMethod.positive],
         correlation_id="foo",
     )
 
@@ -130,7 +130,7 @@ def test_display_statistic(capsys, swagger_20, execution_context, operation, res
         method=operation.method,
         path=operation.full_path,
         verbose_name=f"{operation.method} {operation.full_path}",
-        data_generation_method=DataGenerationMethod.default(),
+        data_generation_method=[DataGenerationMethod.default()],
         checks=[
             success,
             success,
@@ -236,7 +236,7 @@ def test_display_single_failure(capsys, swagger_20, execution_context, operation
     test_statistic = models.TestResult(
         method=operation.method,
         path=operation.full_path,
-        data_generation_method=DataGenerationMethod.default(),
+        data_generation_method=[DataGenerationMethod.default()],
         verbose_name=f"{operation.method} {operation.full_path}",
         checks=[
             success,
@@ -301,7 +301,7 @@ def test_display_single_error(capsys, swagger_20, operation, execution_context, 
         operation.method,
         operation.path,
         verbose_name=f"{operation.method} {operation.full_path}",
-        data_generation_method=DataGenerationMethod.default(),
+        data_generation_method=[DataGenerationMethod.default()],
     )
     result.add_error(exception)
     # When the related test result is displayed
@@ -335,7 +335,7 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set, ve
         operation.method,
         operation.full_path,
         verbose_name=f"{operation.method} {operation.full_path}",
-        data_generation_method=DataGenerationMethod.default(),
+        data_generation_method=[DataGenerationMethod.default()],
     )
     failure.add_failure("test", models.Case(operation), response, 0, "Message", None)
     execution_context.results.append(SerializedTestResult.from_test_result(failure))
@@ -362,7 +362,7 @@ def test_display_errors(swagger_20, capsys, results_set, execution_context, show
         operation.method,
         operation.full_path,
         verbose_name=f"{operation.method} {operation.full_path}",
-        data_generation_method=DataGenerationMethod.default(),
+        data_generation_method=[DataGenerationMethod.default()],
         seed=123,
     )
     error.add_error(ConnectionError("Connection refused!"), models.Case(operation, query={"a": 1}))

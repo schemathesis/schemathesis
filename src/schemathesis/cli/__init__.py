@@ -73,7 +73,7 @@ DEFAULT_TARGETS_NAMES = _get_callable_names(targets_module.DEFAULT_TARGETS)
 ALL_TARGETS_NAMES = _get_callable_names(targets_module.ALL_TARGETS)
 TARGETS_TYPE = click.Choice((*ALL_TARGETS_NAMES, "all"))
 
-DATA_GENERATION_METHOD_TYPE = click.Choice([item.name for item in DataGenerationMethod])
+DATA_GENERATION_METHOD_TYPE = click.Choice([item.name for item in DataGenerationMethod] + ["all"])
 
 DEPRECATED_CASSETTE_PATH_OPTION_WARNING = (
     "Warning: Option `--store-network-log` is deprecated and will be removed in Schemathesis 4.0. "
@@ -761,6 +761,7 @@ def run(
         junit_xml=junit_xml,
         verbosity=verbosity,
         code_sample_style=code_sample_style,
+        data_generation_methods=data_generation_methods,
         debug_output_file=debug_output_file,
         host_data=host_data,
         client=client,
@@ -1043,6 +1044,7 @@ def execute(
     junit_xml: Optional[click.utils.LazyFile],
     verbosity: int,
     code_sample_style: CodeSampleStyle,
+    data_generation_methods: Tuple[DataGenerationMethod, ...],
     debug_output_file: Optional[click.utils.LazyFile],
     host_data: service.hosts.HostData,
     client: Optional[service.ServiceClient],
