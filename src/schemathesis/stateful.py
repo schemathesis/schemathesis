@@ -9,7 +9,6 @@ from hypothesis.stateful import RuleBasedStateMachine
 from requests.structures import CaseInsensitiveDict
 from starlette.applications import Starlette
 
-from .constants import DataGenerationMethod
 from .exceptions import InvalidSchema
 from .models import APIOperation, Case, CheckFunction
 from .utils import NOT_SET, GenericResponse, Ok, Result
@@ -95,21 +94,20 @@ class Feedback:
 
     def get_stateful_tests(
         self, test: Callable, settings: Optional[hypothesis.settings], seed: Optional[int]
-    ) -> Generator[Tuple[Result[Tuple[APIOperation, Callable], InvalidSchema], DataGenerationMethod], None, None]:
+    ) -> Generator[Result[Tuple[APIOperation, Callable], InvalidSchema], None, None]:
         """Generate additional tests that use data from the previous ones."""
         from ._hypothesis import create_test  # pylint: disable=import-outside-toplevel
 
         for data in self.stateful_tests.values():
             operation = data.make_operation()
-            for data_generation_method in operation.schema.data_generation_methods:
-                test_function = create_test(
-                    operation=operation,
-                    test=test,
-                    settings=settings,
-                    seed=seed,
-                    data_generation_method=data_generation_method,
-                )
-                yield Ok((operation, test_function)), data_generation_method
+            test_function = create_test(
+                operation=operation,
+                test=test,
+                settings=settings,
+                seed=seed,
+                data_generation_methods=operation.schema.data_generation_methods,
+            )
+            yield Ok((operation, test_function))
 
 
 @attr.s(slots=True)  # pragma: no mutate

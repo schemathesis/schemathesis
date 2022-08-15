@@ -3,7 +3,7 @@ import string
 from base64 import b64encode
 from contextlib import suppress
 from copy import deepcopy
-from typing import Any, Callable, Dict, Iterable, NoReturn, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Union
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
 
@@ -14,11 +14,11 @@ from requests.structures import CaseInsensitiveDict
 
 from ... import auth, serializers, utils
 from ...constants import DataGenerationMethod
-from ...exceptions import InvalidSchema, SerializationNotPossible, SkipTest
+from ...exceptions import InvalidSchema, SerializationNotPossible
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import APIOperation, Case, cant_serialize
 from ...types import NotSet
-from ...utils import NOT_SET, compose
+from ...utils import NOT_SET, compose, skip
 from .constants import LOCATION_TO_CONTAINER
 from .negative import negative_schema
 from .negative.utils import can_negate
@@ -141,6 +141,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     has_generated_parameters = any(
         component is not None for component in (query_value, cookies_value, headers_value, path_parameters_value)
     )
+    has_generated_body = False
 
     media_type = None
     if body is NOT_SET:
@@ -173,6 +174,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
                 cant_serialize(parameter.media_type)
             media_type = draw(st.sampled_from(possible_media_types))
             body = draw(strategy)
+            has_generated_body = True
     else:
         media_types = operation.get_request_payload_content_types() or ["application/json"]
         # Take the first available media type.
@@ -184,7 +186,7 @@ def get_case_strategy(  # pylint: disable=too-many-locals
 
     if operation.schema.validate_schema and operation.method.upper() == "GET" and operation.body:
         raise InvalidSchema("Body parameters are defined for GET request.")
-    if data_generation_method.is_negative and isinstance(body, NotSet) and not has_generated_parameters:
+    if data_generation_method.is_negative and not has_generated_body and not has_generated_parameters:
         skip(operation.verbose_name)
     instance = Case(
         operation=operation,
@@ -202,10 +204,6 @@ def get_case_strategy(  # pylint: disable=too-many-locals
     )
     auth.set_on_case(instance, auth_context, auth_storage)
     return instance
-
-
-def skip(operation_name: str) -> NoReturn:
-    raise SkipTest(f"It is not possible to generate negative test cases for `{operation_name}`")
 
 
 _BODY_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()

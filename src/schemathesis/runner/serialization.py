@@ -22,6 +22,7 @@ class SerializedCase:
     query: Optional[Dict[str, Any]] = attr.ib()
     cookies: Optional[Dict[str, Any]] = attr.ib()
     verbose_name: str = attr.ib()
+    data_generation_method: Optional[str] = attr.ib()
     media_type: Optional[str] = attr.ib()
 
     @classmethod
@@ -34,6 +35,9 @@ class SerializedCase:
             query=case.query,
             cookies=case.cookies,
             verbose_name=case.operation.verbose_name,
+            data_generation_method=case.data_generation_method.as_short_name()
+            if case.data_generation_method is not None
+            else None,
             media_type=case.media_type,
         )
 
@@ -152,7 +156,7 @@ class SerializedTestResult:
     is_flaky: bool = attr.ib()  # pragma: no mutate
     is_skipped: bool = attr.ib()  # pragma: no mutate
     seed: Optional[int] = attr.ib()  # pragma: no mutate
-    data_generation_method: str = attr.ib()  # pragma: no mutate
+    data_generation_method: List[str] = attr.ib()  # pragma: no mutate
     checks: List[SerializedCheck] = attr.ib()  # pragma: no mutate
     logs: List[str] = attr.ib()  # pragma: no mutate
     errors: List[SerializedError] = attr.ib()  # pragma: no mutate
@@ -172,7 +176,7 @@ class SerializedTestResult:
             is_flaky=result.is_flaky,
             is_skipped=result.is_skipped,
             seed=result.seed,
-            data_generation_method=result.data_generation_method.as_short_name(),
+            data_generation_method=[m.as_short_name() for m in result.data_generation_method],
             checks=[SerializedCheck.from_check(check) for check in result.checks],
             logs=[formatter.format(record) for record in result.logs],
             errors=[SerializedError.from_error(*error, headers=result.overridden_headers) for error in result.errors],

@@ -19,10 +19,10 @@ def test_(request, case):
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
-            r"test_basic_pytest_graphql.py::test_\[Query.getBooks]\[P\] PASSED",
-            r"test_basic_pytest_graphql.py::test_\[Query.getAuthors]\[P\] PASSED",
-            r"test_basic_pytest_graphql.py::test_\[Mutation.addBook]\[P\] PASSED",
-            r"test_basic_pytest_graphql.py::test_\[Mutation.addAuthor]\[P\] PASSED",
+            r"test_basic_pytest_graphql.py::test_\[Query.getBooks] PASSED",
+            r"test_basic_pytest_graphql.py::test_\[Query.getAuthors] PASSED",
+            r"test_basic_pytest_graphql.py::test_\[Mutation.addBook] PASSED",
+            r"test_basic_pytest_graphql.py::test_\[Mutation.addAuthor] PASSED",
             r"Hypothesis calls: 40",
         ]
     )
@@ -50,10 +50,10 @@ def test_(request, case):
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
-            r"test_from_wsgi.py::test_\[Query.getBooks]\[P\] PASSED",
-            r"test_from_wsgi.py::test_\[Query.getAuthors]\[P\] PASSED",
-            r"test_from_wsgi.py::test_\[Mutation.addBook]\[P\] PASSED",
-            r"test_from_wsgi.py::test_\[Mutation.addAuthor]\[P\] PASSED",
+            r"test_from_wsgi.py::test_\[Query.getBooks] PASSED",
+            r"test_from_wsgi.py::test_\[Query.getAuthors] PASSED",
+            r"test_from_wsgi.py::test_\[Mutation.addBook] PASSED",
+            r"test_from_wsgi.py::test_\[Mutation.addAuthor] PASSED",
             r"Hypothesis calls: 40",
         ]
     )

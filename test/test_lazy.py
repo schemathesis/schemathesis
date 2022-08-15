@@ -71,16 +71,16 @@ def test_(request, case):
     result.assert_outcomes(passed=1, failed=1)
     if is_older_subtests:
         expected = [
-            r"test_invalid_operation.py::test_[GET /v1/valid][P] PASSED                [ 25%]",
-            r"test_invalid_operation.py::test_[GET /v1/invalid][P] FAILED              [ 50%]",
-            r"test_invalid_operation.py::test_[GET /v1/users][P] PASSED                [ 75%]",
+            r"test_invalid_operation.py::test_[GET /v1/valid] PASSED                   [ 25%]",
+            r"test_invalid_operation.py::test_[GET /v1/invalid] FAILED                 [ 50%]",
+            r"test_invalid_operation.py::test_[GET /v1/users] PASSED                   [ 75%]",
             r".*1 passed",
         ]
     else:
         expected = [
-            r"test_invalid_operation.py::test_[GET /v1/valid][P] SUBPASS               [ 25%]",
-            r"test_invalid_operation.py::test_[GET /v1/invalid][P] SUBFAIL             [ 50%]",
-            r"test_invalid_operation.py::test_[GET /v1/users][P] SUBPASS               [ 75%]",
+            r"test_invalid_operation.py::test_[GET /v1/valid] SUBPASS                  [ 25%]",
+            r"test_invalid_operation.py::test_[GET /v1/invalid] SUBFAIL                [ 50%]",
+            r"test_invalid_operation.py::test_[GET /v1/users] SUBPASS                  [ 75%]",
             r".*1 passed",
         ]
     result.stdout.re_match_lines(expected)
@@ -530,13 +530,13 @@ def test_(case):
     result.assert_outcomes(passed=2)
     if is_older_subtests:
         expected = [
-            r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\]\[P\] PASSED",
-            r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\]\[P\] PASSED",
+            r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\] PASSED",
+            r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\] PASSED",
         ]
     else:
         expected = [
-            r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\]\[P\] SUBPASS",
-            r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\]\[P\] SUBPASS",
+            r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\] SUBPASS",
+            r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\] SUBPASS",
         ]
     result.stdout.re_match_lines(expected)
 
@@ -582,25 +582,20 @@ def pytest_terminal_summary(terminalreporter) -> None:
         for report in reports
     }
     # SubTest reports should contain unique kwargs
-    assert len(unique) == len(reports) == 2
+    assert len(unique) == len(reports) == 1
     yield
 """
     )
     # Then it should be taken into account
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1)  # It is still a single test on the top level
-    # And each data generation method should have its own test
+    # And it should be the same test in the end
+    message = r"test_data_generation_methods.py::test_\[GET /v1/users\] "
     if is_older_subtests:
-        expected = [
-            r"test_data_generation_methods.py::test_\[GET /v1/users\]\[P\] PASSED",
-            r"test_data_generation_methods.py::test_\[GET /v1/users\]\[N\] PASSED",
-        ]
+        message += "PASSED"
     else:
-        expected = [
-            r"test_data_generation_methods.py::test_\[GET /v1/users\]\[P\] SUBPASS",
-            r"test_data_generation_methods.py::test_\[GET /v1/users\]\[N\] SUBPASS",
-        ]
-    result.stdout.re_match_lines(expected)
+        message += "SUBPASS"
+    result.stdout.re_match_lines([message])
 
 
 def test_data_generation_methods_override(testdir, is_older_subtests):
@@ -627,9 +622,9 @@ def test_(case):
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1)
     if is_older_subtests:
-        expected = r"test_data_generation_methods_override.py::test_\[GET /v1/users\]\[P\] PASSED *\[ 50%\]"
+        expected = r"test_data_generation_methods_override.py::test_\[GET /v1/users\] PASSED *\[ 50%\]"
     else:
-        expected = r"test_data_generation_methods_override.py::test_\[GET /v1/users\]\[P\] SUBPASS *\[ 50%\]"
+        expected = r"test_data_generation_methods_override.py::test_\[GET /v1/users\] SUBPASS *\[ 50%\]"
     result.stdout.re_match_lines([expected])
 
 
