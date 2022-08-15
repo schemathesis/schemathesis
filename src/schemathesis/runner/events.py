@@ -89,7 +89,7 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
     # The current level of recursion during stateful testing
     recursion_level: int = attr.ib()  # pragma: no mutate
     # The way data will be generated
-    data_generation_method: DataGenerationMethod = attr.ib()  # pragma: no mutate
+    data_generation_method: List[DataGenerationMethod] = attr.ib()  # pragma: no mutate
     # A unique ID which connects events that happen during testing of the same API operation
     # It may be useful when multiple threads are involved where incoming events are not ordered
     correlation_id: str = attr.ib()  # pragma: no mutate
@@ -100,7 +100,7 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
         cls,
         operation: APIOperation,
         recursion_level: int,
-        data_generation_method: DataGenerationMethod,
+        data_generation_method: List[DataGenerationMethod],
         correlation_id: str,
     ) -> "BeforeExecution":
         return cls(
@@ -127,7 +127,7 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
     # APIOperation test status - success / failure / error
     status: Status = attr.ib()  # pragma: no mutate
     # The way data was generated
-    data_generation_method: DataGenerationMethod = attr.ib()  # pragma: no mutate
+    data_generation_method: List[DataGenerationMethod] = attr.ib()  # pragma: no mutate
     result: SerializedTestResult = attr.ib()  # pragma: no mutate
     # Test running time
     elapsed_time: float = attr.ib()  # pragma: no mutate
@@ -144,7 +144,7 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
         elapsed_time: float,
         hypothesis_output: List[str],
         operation: APIOperation,
-        data_generation_method: DataGenerationMethod,
+        data_generation_method: List[DataGenerationMethod],
         correlation_id: str,
     ) -> "AfterExecution":
         return cls(

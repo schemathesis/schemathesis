@@ -15,11 +15,11 @@ def schema(open_api_3_schema_with_recoverable_errors):
 
 EXPECTED_OUTPUT_LINES = [
     # Path-level error. no method is displayed
-    r".*test_\[/foo\]\[P\] FAILED",
+    r".*test_\[/foo\] FAILED",
     # Valid operation
-    r".*test_\[GET /bar\]\[P\] PASSED",
+    r".*test_\[GET /bar\] PASSED",
     # Operation-level error
-    r".*test_\[POST /bar\]\[P\] FAILED",
+    r".*test_\[POST /bar\] FAILED",
     # The error in both failing cases
     ".*Unresolvable JSON pointer:.*",
 ]
@@ -63,11 +63,11 @@ def test_(case):
     else:
         expected = [
             # Path-level error. no method is displayed
-            r".*test_\[/foo\]\[P\] SUBFAIL",
+            r".*test_\[/foo\] SUBFAIL",
             # Valid operation
-            r".*test_\[GET /bar\]\[P\] SUBPASS",
+            r".*test_\[GET /bar\] SUBPASS",
             # Operation-level error
-            r".*test_\[POST /bar\]\[P\] SUBFAIL",
+            r".*test_\[POST /bar\] SUBFAIL",
             # The error in both failing cases
             ".*Unresolvable JSON pointer:.*",
         ]

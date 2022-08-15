@@ -12,7 +12,7 @@ from pytest_subtests import SubTests, nullcontext
 
 from ._compat import MultipleFailures
 from .auth import AuthStorage
-from .constants import FLAKY_FAILURE_MESSAGE, CodeSampleStyle, DataGenerationMethod
+from .constants import FLAKY_FAILURE_MESSAGE, CodeSampleStyle
 from .exceptions import CheckFailed, InvalidSchema, SkipTest, get_grouped_exception
 from .hooks import HookDispatcher, HookScope
 from .models import APIOperation
@@ -120,13 +120,13 @@ class LazySchema:
                 request.session.testscollected += len(tests)
                 suspend_capture_ctx = _get_capturemanager(request)
                 subtests = SubTests(request.node.ihook, suspend_capture_ctx, request)
-                for result, data_generation_method in tests:
+                for result in tests:
                     if isinstance(result, Ok):
                         operation, sub_test = result.ok()
-                        subtests.item._nodeid = _get_node_name(node_id, operation, data_generation_method)
-                        run_subtest(operation, data_generation_method, fixtures, sub_test, subtests)
+                        subtests.item._nodeid = _get_node_name(node_id, operation)
+                        run_subtest(operation, fixtures, sub_test, subtests)
                     else:
-                        _schema_error(subtests, result.err(), node_id, data_generation_method)
+                        _schema_error(subtests, result.err(), node_id)
                 subtests.item._nodeid = node_id
 
             wrapped_test = pytest.mark.usefixtures(self.fixture_name)(wrapped_test)
@@ -157,25 +157,23 @@ def _get_capturemanager(request: FixtureRequest) -> Generator:
     return nullcontext
 
 
-def _get_node_name(node_id: str, operation: APIOperation, data_generation_method: DataGenerationMethod) -> str:
+def _get_node_name(node_id: str, operation: APIOperation) -> str:
     """Make a test node name. For example: test_api[GET /users]."""
-    return f"{node_id}[{operation.method.upper()} {operation.full_path}][{data_generation_method.as_short_name()}]"
+    return f"{node_id}[{operation.method.upper()} {operation.full_path}]"
 
 
-def _get_partial_node_name(node_id: str, data_generation_method: DataGenerationMethod, **kwargs: Any) -> str:
+def _get_partial_node_name(node_id: str, **kwargs: Any) -> str:
     """Make a test node name for failing tests caused by schema errors."""
     name = node_id
     if "method" in kwargs:
         name += f"[{kwargs['method']} {kwargs['path']}]"
     else:
         name += f"[{kwargs['path']}]"
-    name += f"[{data_generation_method.as_short_name()}]"
     return name
 
 
 def run_subtest(
     operation: APIOperation,
-    data_generation_method: DataGenerationMethod,
     fixtures: Dict[str, Any],
     sub_test: Callable,
     subtests: SubTests,
@@ -206,9 +204,7 @@ def run_subtest(
 
     sub_test.hypothesis.inner_test = collecting_wrapper  # type: ignore
 
-    with subtests.test(
-        verbose_name=operation.verbose_name, data_generation_method=data_generation_method.as_short_name()
-    ):
+    with subtests.test(verbose_name=operation.verbose_name):
         try:
             sub_test(**fixtures)
         except SkipTest as exc:
@@ -242,16 +238,14 @@ def run_subtest(
 SEPARATOR = "\n===================="
 
 
-def _schema_error(
-    subtests: SubTests, error: InvalidSchema, node_id: str, data_generation_method: DataGenerationMethod
-) -> None:
+def _schema_error(subtests: SubTests, error: InvalidSchema, node_id: str) -> None:
     """Run a failing test, that will show the underlying problem."""
     sub_test = error.as_failing_test_function()
     # `full_path` is always available in this case
     kwargs = {"path": error.full_path}
     if error.method:
         kwargs["method"] = error.method.upper()
-    subtests.item._nodeid = _get_partial_node_name(node_id, data_generation_method, **kwargs)
+    subtests.item._nodeid = _get_partial_node_name(node_id, **kwargs)
     with subtests.test(**kwargs):
         sub_test()
 

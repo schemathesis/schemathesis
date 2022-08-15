@@ -8,7 +8,7 @@ from hypothesis.stateful import Bundle, Rule, rule
 from requests.structures import CaseInsensitiveDict
 
 from ....stateful import APIStateMachine, Direction, StepResult
-from ....utils import Ok
+from ....utils import Ok, combine_strategies
 from .. import expressions
 from ..links import OpenAPILink
 from . import links
@@ -82,13 +82,5 @@ def make_rules(
 
     previous_strategies = connections.get(operation.verbose_name)
     if previous_strategies is not None:
-        yield _make_rule(_combine_strategies(previous_strategies))
+        yield _make_rule(combine_strategies(previous_strategies))
     yield _make_rule(st.none())
-
-
-def _combine_strategies(strategies: List[st.SearchStrategy]) -> st.SearchStrategy:
-    """Combine a list of strategies into a single one.
-
-    If the input is `[a, b, c]`, then the result is equivalent to `a | b | c`.
-    """
-    return functools.reduce(operator.or_, strategies[1:], strategies[0])

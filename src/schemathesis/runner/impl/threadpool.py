@@ -9,6 +9,7 @@ import attr
 import hypothesis
 
 from ..._hypothesis import create_test
+from ...constants import DataGenerationMethod
 from ...models import CheckFunction, TestResultSet
 from ...stateful import Feedback, Stateful
 from ...targets import Target
@@ -25,6 +26,7 @@ def _run_task(
     generator_done: threading.Event,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
+    data_generation_methods: Iterable[DataGenerationMethod],
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
@@ -35,7 +37,7 @@ def _run_task(
     def _run_tests(maker: Callable, recursion_level: int = 0) -> None:
         if recursion_level > stateful_recursion_limit:
             return
-        for _result, _data_generation_method in maker(test_template, settings, seed):
+        for _result in maker(test_template, settings, seed):
             # `result` is always `Ok` here
             _operation, test = _result.ok()
             feedback = Feedback(stateful, _operation)
@@ -43,7 +45,7 @@ def _run_task(
                 _operation,
                 test,
                 checks,
-                data_generation_method,
+                data_generation_methods,
                 targets,
                 results,
                 recursion_level=recursion_level,
@@ -56,7 +58,7 @@ def _run_task(
     with capture_hypothesis_output():
         while True:
             try:
-                result, data_generation_method = tasks_queue.get(timeout=0.001)
+                result = tasks_queue.get(timeout=0.001)
             except queue.Empty:
                 # The queue is empty & there will be no more tasks
                 if generator_done.is_set():
@@ -70,17 +72,14 @@ def _run_task(
                     test=test_template,
                     settings=settings,
                     seed=seed,
-                    data_generation_method=data_generation_method,
+                    data_generation_methods=list(data_generation_methods),
                 )
-                items = (
-                    Ok((operation, test_function)),
-                    data_generation_method,
-                )
+                items = Ok((operation, test_function))
                 # This lambda ignores the input arguments to support the same interface for
                 # `feedback.get_stateful_tests`
                 _run_tests(lambda *_: (items,))
             else:
-                for event in handle_schema_error(result.err(), results, data_generation_method, 0):
+                for event in handle_schema_error(result.err(), results, data_generation_methods, 0):
                     events_queue.put(event)
 
 
@@ -90,6 +89,7 @@ def thread_task(
     generator_done: threading.Event,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
+    data_generation_methods: Iterable[DataGenerationMethod],
     settings: hypothesis.settings,
     auth: Optional[RawAuth],
     auth_type: Optional[str],
@@ -113,6 +113,7 @@ def thread_task(
             generator_done,
             checks,
             targets,
+            data_generation_methods,
             settings,
             seed,
             results,
@@ -130,6 +131,7 @@ def wsgi_thread_task(
     generator_done: threading.Event,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
+    data_generation_methods: Iterable[DataGenerationMethod],
     settings: hypothesis.settings,
     seed: Optional[int],
     results: TestResultSet,
@@ -144,6 +146,7 @@ def wsgi_thread_task(
         generator_done,
         checks,
         targets,
+        data_generation_methods,
         settings,
         seed,
         results,
@@ -159,6 +162,7 @@ def asgi_thread_task(
     generator_done: threading.Event,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
+    data_generation_methods: Iterable[DataGenerationMethod],
     settings: hypothesis.settings,
     headers: Optional[Dict[str, Any]],
     seed: Optional[int],
@@ -174,6 +178,7 @@ def asgi_thread_task(
         generator_done,
         checks,
         targets,
+        data_generation_methods,
         settings,
         seed,
         results,
@@ -207,11 +212,7 @@ class ThreadPoolRunner(BaseRunner):
         # It would be better to have a separate producer thread and communicate via threading events.
         # Though it is a bit more complex, so the current solution is suboptimal in terms of resources utilization,
         # but good enough and easy enough to implement.
-        tasks_generator = (
-            (operation, data_generation_method)
-            for operation in self.schema.get_all_operations()
-            for data_generation_method in self.schema.data_generation_methods
-        )
+        tasks_generator = iter(self.schema.get_all_operations())
         generator_done = threading.Event()
         tasks_queue: Queue = Queue()
         # Add at least `workers_num` tasks first, so all workers are busy
@@ -300,6 +301,7 @@ class ThreadPoolRunner(BaseRunner):
             "results": results,
             "stateful": self.stateful,
             "stateful_recursion_limit": self.stateful_recursion_limit,
+            "data_generation_methods": self.schema.data_generation_methods,
             "kwargs": {
                 "request_timeout": self.request_timeout,
                 "request_tls_verify": self.request_tls_verify,
@@ -329,6 +331,7 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
             "results": results,
             "stateful": self.stateful,
             "stateful_recursion_limit": self.stateful_recursion_limit,
+            "data_generation_methods": self.schema.data_generation_methods,
             "kwargs": {
                 "auth": self.auth,
                 "auth_type": self.auth_type,
@@ -359,6 +362,7 @@ class ThreadPoolASGIRunner(ThreadPoolRunner):
             "results": results,
             "stateful": self.stateful,
             "stateful_recursion_limit": self.stateful_recursion_limit,
+            "data_generation_methods": self.schema.data_generation_methods,
             "kwargs": {
                 "store_interactions": self.store_interactions,
                 "max_response_time": self.max_response_time,

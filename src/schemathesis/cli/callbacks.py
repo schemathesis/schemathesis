@@ -206,6 +206,8 @@ def convert_code_sample_style(ctx: click.core.Context, param: click.core.Paramet
 def convert_data_generation_method(
     ctx: click.core.Context, param: click.core.Parameter, value: str
 ) -> List[DataGenerationMethod]:
+    if value == "all":
+        return DataGenerationMethod.all()
     return [DataGenerationMethod[value]]
 
 

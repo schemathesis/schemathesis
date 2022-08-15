@@ -25,7 +25,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
     # Then only tests for these API operations should be generated
-    result.stdout.re_match_lines([r"test_endpoint_filter.py::test_[GET /v1/foo][P] PASSED"])
+    result.stdout.re_match_lines([r"test_endpoint_filter.py::test_[GET /v1/foo] PASSED"])
 
 
 @pytest.mark.parametrize("method", ("'get'", "'GET'", ["GET"], ["get"]))
@@ -50,8 +50,8 @@ def test_(request, case):
     # Then only tests for this method should be generated
     result.stdout.re_match_lines(
         [
-            r"test_method_filter.py::test_[GET /v1/foo][P] PASSED",
-            r"test_method_filter.py::test_[GET /v1/users][P] PASSED",
+            r"test_method_filter.py::test_[GET /v1/foo] PASSED",
+            r"test_method_filter.py::test_[GET /v1/users] PASSED",
         ]
     )
 
@@ -77,7 +77,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
     # Then only tests for this tag should be generated
-    result.stdout.re_match_lines([r"test_tag_filter.py::test_[GET /v1/bar][P] PASSED"])
+    result.stdout.re_match_lines([r"test_tag_filter.py::test_[GET /v1/bar] PASSED"])
 
 
 def test_loader_filter(testdir):
@@ -164,7 +164,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
 
-    result.stdout.re_match_lines([r"test_operation_id_filter.py::test_[GET /v1/bar][P] PASSED"])
+    result.stdout.re_match_lines([r"test_operation_id_filter.py::test_[GET /v1/bar] PASSED"])
 
 
 def test_operation_id_list_filter(testdir):
@@ -190,8 +190,8 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=2)
 
-    result.stdout.re_match_lines([r"test_operation_id_list_filter.py::test_[GET /v1/foo][P] PASSED"])
-    result.stdout.re_match_lines([r"test_operation_id_list_filter.py::test_[POST /v1/foo][P] PASSED"])
+    result.stdout.re_match_lines([r"test_operation_id_list_filter.py::test_[GET /v1/foo] PASSED"])
+    result.stdout.re_match_lines([r"test_operation_id_list_filter.py::test_[POST /v1/foo] PASSED"])
 
 
 def test_error_on_no_matches(testdir):

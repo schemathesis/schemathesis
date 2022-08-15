@@ -144,7 +144,7 @@ class BaseRunner:
         """Run tests and recursively run additional tests."""
         if recursion_level > self.stateful_recursion_limit:
             return
-        for result, data_generation_method in maker(template, settings, seed):
+        for result in maker(template, settings, seed):
             if isinstance(result, Ok):
                 operation, test = result.ok()
                 feedback = Feedback(self.stateful, operation)
@@ -159,7 +159,7 @@ class BaseRunner:
                         results=results,
                         feedback=feedback,
                         recursion_level=recursion_level,
-                        data_generation_method=data_generation_method,
+                        data_generation_methods=self.schema.data_generation_methods,
                         **kwargs,
                     ):
                         yield event
@@ -181,13 +181,15 @@ class BaseRunner:
                     yield from handle_schema_error(
                         exc,
                         results,
-                        data_generation_method,
+                        self.schema.data_generation_methods,
                         recursion_level,
                         before_execution_correlation_id=before_execution_correlation_id,
                     )
             else:
                 # Schema errors
-                yield from handle_schema_error(result.err(), results, data_generation_method, recursion_level)
+                yield from handle_schema_error(
+                    result.err(), results, self.schema.data_generation_methods, recursion_level
+                )
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -222,7 +224,7 @@ class EventStream:
 def handle_schema_error(
     error: InvalidSchema,
     results: TestResultSet,
-    data_generation_method: DataGenerationMethod,
+    data_generation_methods: Iterable[DataGenerationMethod],
     recursion_level: int,
     *,
     before_execution_correlation_id: Optional[str] = None,
@@ -230,13 +232,14 @@ def handle_schema_error(
     if error.method is not None:
         assert error.path is not None
         assert error.full_path is not None
+        data_generation_methods = list(data_generation_methods)
         method = error.method.upper()
         verbose_name = f"{method} {error.full_path}"
         result = TestResult(
             method=method,
             path=error.full_path,
             verbose_name=verbose_name,
-            data_generation_method=data_generation_method,
+            data_generation_method=data_generation_methods,
         )
         result.add_error(error)
         # It might be already emitted - reuse its correlation id
@@ -250,7 +253,7 @@ def handle_schema_error(
                 verbose_name=verbose_name,
                 relative_path=error.path,
                 recursion_level=recursion_level,
-                data_generation_method=data_generation_method,
+                data_generation_method=data_generation_methods,
                 correlation_id=correlation_id,
             )
         yield events.AfterExecution(
@@ -260,7 +263,7 @@ def handle_schema_error(
             verbose_name=verbose_name,
             status=Status.error,
             result=SerializedTestResult.from_test_result(result),
-            data_generation_method=data_generation_method,
+            data_generation_method=data_generation_methods,
             elapsed_time=0.0,
             hypothesis_output=[],
             correlation_id=correlation_id,
@@ -276,7 +279,7 @@ def run_test(  # pylint: disable=too-many-locals
     operation: APIOperation,
     test: Callable,
     checks: Iterable[CheckFunction],
-    data_generation_method: DataGenerationMethod,
+    data_generation_methods: Iterable[DataGenerationMethod],
     targets: Iterable[Target],
     results: TestResultSet,
     headers: Optional[Dict[str, Any]],
@@ -284,19 +287,20 @@ def run_test(  # pylint: disable=too-many-locals
     **kwargs: Any,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """A single test run with all error handling needed."""
+    data_generation_methods = list(data_generation_methods)
     result = TestResult(
         method=operation.method.upper(),
         path=operation.full_path,
         verbose_name=operation.verbose_name,
         overridden_headers=headers,
-        data_generation_method=data_generation_method,
+        data_generation_method=data_generation_methods,
     )
     # To simplify connecting `before` and `after` events in external systems
     correlation_id = uuid.uuid4().hex
     yield events.BeforeExecution.from_operation(
         operation=operation,
         recursion_level=recursion_level,
-        data_generation_method=data_generation_method,
+        data_generation_method=data_generation_methods,
         correlation_id=correlation_id,
     )
     hypothesis_output: List[str] = []
@@ -377,7 +381,7 @@ def run_test(  # pylint: disable=too-many-locals
         elapsed_time=test_elapsed_time,
         hypothesis_output=hypothesis_output,
         operation=operation,
-        data_generation_method=data_generation_method,
+        data_generation_method=data_generation_methods,
         correlation_id=correlation_id,
     )
 

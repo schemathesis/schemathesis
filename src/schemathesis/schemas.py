@@ -92,7 +92,7 @@ class BaseSchema(Mapping):
     test_function: Optional[GenericTest] = attr.ib(default=None)  # pragma: no mutate
     validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
     skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
-    data_generation_methods: Iterable[DataGenerationMethod] = attr.ib(
+    data_generation_methods: List[DataGenerationMethod] = attr.ib(
         default=DEFAULT_DATA_GENERATION_METHODS
     )  # pragma: no mutate
     code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate
@@ -187,22 +187,21 @@ class BaseSchema(Mapping):
         settings: Optional[hypothesis.settings] = None,
         seed: Optional[int] = None,
         _given_kwargs: Optional[Dict[str, GivenInput]] = None,
-    ) -> Generator[Tuple[Result[Tuple[APIOperation, Callable], InvalidSchema], DataGenerationMethod], None, None]:
+    ) -> Generator[Result[Tuple[APIOperation, Callable], InvalidSchema], None, None]:
         """Generate all operations and Hypothesis tests for them."""
         for result in self.get_all_operations():
-            for data_generation_method in self.data_generation_methods:
-                if isinstance(result, Ok):
-                    test = create_test(
-                        operation=result.ok(),
-                        test=func,
-                        settings=settings,
-                        seed=seed,
-                        data_generation_method=data_generation_method,
-                        _given_kwargs=_given_kwargs,
-                    )
-                    yield Ok((result.ok(), test)), data_generation_method
-                else:
-                    yield result, data_generation_method
+            if isinstance(result, Ok):
+                test = create_test(
+                    operation=result.ok(),
+                    test=func,
+                    settings=settings,
+                    seed=seed,
+                    data_generation_methods=self.data_generation_methods,
+                    _given_kwargs=_given_kwargs,
+                )
+                yield Ok((result.ok(), test))
+            else:
+                yield result
 
     def parametrize(
         self,

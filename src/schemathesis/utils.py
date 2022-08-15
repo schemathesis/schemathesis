@@ -1,5 +1,6 @@
 import cgi
 import functools
+import operator
 import pathlib
 import re
 import sys
@@ -31,6 +32,7 @@ import pytest
 import requests
 import yaml
 import yarl
+from hypothesis import strategies as st
 from hypothesis.core import is_invalid_test
 from hypothesis.reporting import with_reporter
 from hypothesis.strategies import SearchStrategy
@@ -41,7 +43,7 @@ from werkzeug.wrappers import Response as BaseResponse
 
 from ._compat import InferType, JSONMixin, get_signature
 from .constants import USER_AGENT, DataGenerationMethod
-from .exceptions import UsageError
+from .exceptions import SkipTest, UsageError
 from .types import DataGenerationMethodInput, Filter, GenericTest, NotSet, RawAuth
 
 try:
@@ -492,3 +494,15 @@ def merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
 
 def current_datetime() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+
+
+def combine_strategies(strategies: List[st.SearchStrategy]) -> st.SearchStrategy:
+    """Combine a list of strategies into a single one.
+
+    If the input is `[a, b, c]`, then the result is equivalent to `a | b | c`.
+    """
+    return functools.reduce(operator.or_, strategies[1:], strategies[0])
+
+
+def skip(operation_name: str) -> NoReturn:
+    raise SkipTest(f"It is not possible to generate negative test cases for `{operation_name}`")
