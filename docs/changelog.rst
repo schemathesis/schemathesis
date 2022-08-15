@@ -18,6 +18,7 @@ Changelog
 **Changed**
 
 - **pytest**: Generate positive & negative within the same test node.
+- **CLI**: Warning if there are too many HTTP 403 API responses.
 
 .. _v3.16.5:
 
