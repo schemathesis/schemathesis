@@ -19,6 +19,8 @@ Changelog
 
 - **pytest**: Generate positive & negative within the same test node.
 - **CLI**: Warning if there are too many HTTP 403 API responses.
+- **Runner**: ``BeforeExecution.data_generation_method`` and ``AfterExecution.data_generation_method`` changed to
+  lists of ``DataGenerationMethod`` as the same test may contain data coming from different data generation methods.
 
 .. _v3.16.5:
 
