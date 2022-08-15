@@ -373,8 +373,9 @@ def run_test(  # pylint: disable=too-many-locals
         test, "_hypothesis_internal_use_generated_seed", None
     )
     results.append(result)
-    if has_too_many_unauthorized(result):
-        results.add_warning(TOO_MANY_UNAUTHORIZED_RESPONSES_WARNING_TEMPLATE.format(f"`{operation.verbose_name}`"))
+    for status_code in (401, 403):
+        if has_too_many_responses_with_status(result, status_code):
+            results.add_warning(TOO_MANY_RESPONSES_WARNING_TEMPLATE.format(f"`{operation.verbose_name}`", status_code))
     yield events.AfterExecution.from_result(
         result=result,
         status=status,
@@ -386,24 +387,24 @@ def run_test(  # pylint: disable=too-many-locals
     )
 
 
-TOO_MANY_UNAUTHORIZED_RESPONSES_WARNING_TEMPLATE = (
-    "Most of the responses from {} have a 401 status code. Did you specify proper API credentials?"
+TOO_MANY_RESPONSES_WARNING_TEMPLATE = (
+    "Most of the responses from {} have a {} status code. Did you specify proper API credentials?"
 )
-TOO_MANY_AUTHORIZED_RESPONSES_THRESHOLD = 0.9
+TOO_MANY_RESPONSES_THRESHOLD = 0.9
 
 
-def has_too_many_unauthorized(result: TestResult) -> bool:
+def has_too_many_responses_with_status(result: TestResult, status_code: int) -> bool:
     # It is faster than creating an intermediate list
     unauthorized_count = 0
     total = 0
     for check in result.checks:
         if check.response is not None:
-            if check.response.status_code == 401:
+            if check.response.status_code == status_code:
                 unauthorized_count += 1
             total += 1
     if not total:
         return False
-    return unauthorized_count / total >= TOO_MANY_AUTHORIZED_RESPONSES_THRESHOLD
+    return unauthorized_count / total >= TOO_MANY_RESPONSES_THRESHOLD
 
 
 ALL_NOT_FOUND_WARNING_MESSAGE = "All API responses have a 404 status code. Did you specify the proper API location?"
