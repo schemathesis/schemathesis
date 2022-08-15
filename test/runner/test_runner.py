@@ -22,10 +22,10 @@ from schemathesis.constants import (
     USER_AGENT,
     DataGenerationMethod,
 )
-from schemathesis.models import Check, Status, TestResult, TestResultSet
+from schemathesis.models import Check, Status, TestResult
 from schemathesis.runner import ThreadPoolRunner, events, from_schema, get_requests_auth
 from schemathesis.runner.impl import threadpool
-from schemathesis.runner.impl.core import get_wsgi_auth, has_too_many_unauthorized, reraise
+from schemathesis.runner.impl.core import get_wsgi_auth, has_too_many_responses_with_status, reraise
 from schemathesis.specs.graphql import loaders as gql_loaders
 from schemathesis.specs.openapi import loaders as oas_loaders
 
@@ -1024,7 +1024,7 @@ def make_check(status_code):
 def test_authorization_warning_no_checks(result):
     # When there are no checks
     # Then the warning should not be added
-    assert not has_too_many_unauthorized(result)
+    assert not has_too_many_responses_with_status(result, 401)
 
 
 def test_authorization_warning_missing_threshold(result):
@@ -1036,4 +1036,4 @@ def test_authorization_warning_missing_threshold(result):
         ]
     )
     # Then the warning should not be added
-    assert not has_too_many_unauthorized(result)
+    assert not has_too_many_responses_with_status(result, 401)
