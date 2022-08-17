@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.17.0:
+
+`3.17.0`_ - 2022-08-17
+----------------------
+
 **Added**
 
 - Support for exception groups in newer ``Hypothesis`` versions. `#1592`_
@@ -2859,7 +2864,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.16.5...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.17.0...HEAD
+.. _3.17.0: https://github.com/schemathesis/schemathesis/compare/v3.16.5...v3.17.0
 .. _3.16.5: https://github.com/schemathesis/schemathesis/compare/v3.16.4...v3.16.5
 .. _3.16.4: https://github.com/schemathesis/schemathesis/compare/v3.16.3...v3.16.4
 .. _3.16.3: https://github.com/schemathesis/schemathesis/compare/v3.16.2...v3.16.3
