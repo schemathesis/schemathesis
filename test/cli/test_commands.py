@@ -1470,9 +1470,9 @@ def test_wsgi_app_internal_exception(testdir, cli):
     result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--hypothesis-derandomize")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
-    assert "== APPLICATION LOGS ==" in lines[39], result.stdout.strip()
-    assert "ERROR in app: Exception on /api/success [GET]" in lines[41]
-    assert lines[53] == "ZeroDivisionError: division by zero"
+    assert "== APPLICATION LOGS ==" in lines[41], result.stdout.strip()
+    assert "ERROR in app: Exception on /api/success [GET]" in lines[43]
+    assert lines[55] == "ZeroDivisionError: division by zero"
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
