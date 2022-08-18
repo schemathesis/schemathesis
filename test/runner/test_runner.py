@@ -144,7 +144,7 @@ def test_interactions(request, any_app_schema, workers):
     if isinstance(any_app_schema.app, Flask):
         assert failure.response.headers == {
             "Content-Type": ["text/html; charset=utf-8"],
-            "Content-Length": ["290"],
+            "Content-Length": ["265"],
             "ETag": ANY,
         }
     else:
