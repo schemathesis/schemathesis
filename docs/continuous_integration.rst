@@ -22,19 +22,14 @@ GitHub Actions
 
   api-tests:
     runs-on: ubuntu-20.04
-    container: schemathesis/schemathesis:stable
-
-    env:
-      # API Schema location
-      API_SCHEMA: 'http://localhost:5000/api/openapi.json'
-      # OPTIONAL. Whether you'd like to see the results in a Web UI in Schemathesis.io
-      SCHEMATHESIS_REPORT: 'true'
-      # OPTIONAL. Your Schemathesis.io token
-      SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
-
     steps:
       # Runs Schemathesis tests with all checks enabled
-      - run: st run $API_SCHEMA --checks=all
+      - uses: schemathesis/action@v1
+        with:
+          # Your API schema location
+          schema: 'http://localhost:5000/api/openapi.json'
+          # OPTIONAL. Your Schemathesis.io token
+          token: ${{ secrets.SCHEMATHESIS_TOKEN }}
 
 For the fully working example, check |no-build.yml|_ in the repository.
 
@@ -59,13 +54,11 @@ GitLab CI
     variables:
       # API Schema location
       API_SCHEMA: 'http://localhost:5000/api/openapi.json'
-      # OPTIONAL. Whether you'd like to see the results in a Web UI in Schemathesis.io
-      SCHEMATHESIS_REPORT: 'true'
       # OPTIONAL. Your Schemathesis.io token
       SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
 
     script:
-      - st run $API_SCHEMA --checks=all
+      - st run $API_SCHEMA --checks=all --report
 
 How does it work?
 ------------------
@@ -89,30 +82,27 @@ Here is a GitHub Actions workflow for a sample `Python app`_:
 
   api-tests:
     runs-on: ubuntu-20.04
-    container: python:3.10.5-slim
-
-    env:
-      # Your API schema location
-      API_SCHEMA: 'http://localhost:5000/api/openapi.json'
-      # OPTIONAL. Whether you'd like to see the results in a Web UI in Schemathesis.io
-      SCHEMATHESIS_REPORT: 'true'
-      # OPTIONAL. Maximum time in seconds to wait on the API schema availability.
-      SCHEMATHESIS_WAIT_FOR_SCHEMA: 5
-      # OPTIONAL. Your Schemathesis.io token
-      SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
-
     steps:
       # Gets a copy of the source code in your repository before running API tests
       - uses: actions/checkout@v3.0.0
 
-      # Installs project's dependencies & Schemathesis
-      - run: pip install -r requirements.txt schemathesis
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      # Installs project's dependencies
+      - run: pip install -r requirements.txt
 
       # Start the API in the background
       - run: python main.py &
 
-      # Run Schemathesis tests with all checks enabled
-      - run: st run $API_SCHEMA --checks=all
+      # Runs Schemathesis tests with all checks enabled
+      - uses: schemathesis/action@v1
+        with:
+          # Your API schema location
+          schema: 'http://localhost:5000/api/openapi.json'
+          # OPTIONAL. Your Schemathesis.io token
+          token: ${{ secrets.SCHEMATHESIS_TOKEN }}
 
 .. note::
 
@@ -133,17 +123,16 @@ Set your API base path to ``SCHEMATHESIS_BASE_URL``:
 
   api-tests:
     runs-on: ubuntu-20.04
-    container: schemathesis/schemathesis:stable
-
-    env:
-      # API schema file path
-      API_SCHEMA: './docs/openapi.json'
-      # API base URL
-      SCHEMATHESIS_BASE_URL: 'http://127.0.0.1:8080/api/v2/'
-      # OPTIONAL. Whether you'd like to see the results in a Web UI in Schemathesis.io
-      SCHEMATHESIS_REPORT: 'true'
-      # OPTIONAL. Your Schemathesis.io token
-      SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
+    steps:
+      # Runs positive Schemathesis tests
+      - uses: schemathesis/action@v1
+        with:
+          # A local API schema location
+          schema: './docs/openapi.json'
+          # API base URL
+          base-url: 'http://127.0.0.1:8080/api/v2/'
+          # OPTIONAL. Your Schemathesis.io token
+          token: ${{ secrets.SCHEMATHESIS_TOKEN }}
 
 .. _Python app: https://github.com/schemathesis/schemathesis/tree/master/example
 .. _GitHub app: https://github.com/apps/schemathesis
