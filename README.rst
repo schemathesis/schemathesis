@@ -29,8 +29,6 @@ Schemathesis is available as a `service <https://schemathesis.io/?utm_source=git
 The service enables you to verify your API schema in a few clicks, CLI gives more control.
 Schemathesis.io has a free tier, so you can combine the CLI flexibility with rich visuals by uploading your test results there.
 
-If you use GitHub Actions, there is a native `GitHub app <https://github.com/apps/schemathesis>`_ that reports test results directly to your pull requests.
-
 Features
 --------
 
@@ -55,6 +53,26 @@ To install Schemathesis via ``pip`` run the following command:
 This command installs the ``st`` entrypoint.
 
 You can also use our Docker image without installing Schemathesis as a Python package.
+
+GitHub Actions
+--------------
+
+If you use GitHub Actions, there is a native `GitHub app <https://github.com/apps/schemathesis>`_ that reports test results directly to your pull requests.
+
+.. code:: yaml
+
+  api-tests:
+    runs-on: ubuntu-20.04
+    steps:
+      # Runs Schemathesis tests with all checks enabled
+      - uses: schemathesis/action@v1
+        with:
+          # Your API schema location
+          schema: 'http://localhost:5000/api/openapi.json'
+          # OPTIONAL. Your Schemathesis.io token
+          token: ${{ secrets.SCHEMATHESIS_TOKEN }}
+
+Check our `GitHub Action <https://github.com/schemathesis/action>`_ for more details.
 
 Usage
 -----
