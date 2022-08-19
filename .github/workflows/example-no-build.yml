@@ -4,24 +4,14 @@ on:
   workflow_dispatch:
 
 jobs:
-
   api-tests:
     runs-on: ubuntu-20.04
-    container: schemathesis/schemathesis:stable
-
-    env:
-      # A publicly available API schema location
-      API_SCHEMA: 'https://example.schemathesis.io/openapi.json'
-      # Enable Schemathesis reporting
-      SCHEMATHESIS_REPORT: 'true'
-      # Set your token from secrets
-      SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
-      # OPTIONAL. A name to connect reports for the same API
-      # Use it and see how your API improves over time
-      # Without this variable you won't be able to see
-      # diffs with the target branch and history data
-      SCHEMATHESIS_API_NAME: schemathesis-example-public-api
 
     steps:
-      # Runs positive Schemathesis tests with all checks enabled
-      - run: st run $API_SCHEMA --checks=all
+      # Runs positive Schemathesis tests
+      - uses: schemathesis/action@v1.0.0
+        with:
+          # A publicly available API schema location
+          schema: 'https://example.schemathesis.io/openapi.json'
+          # Set your token from secrets
+          token: ${{ secrets.SCHEMATHESIS_TOKEN }}
