@@ -15,7 +15,6 @@ jobs:
   local-ci:
     name: Example app
     runs-on: ubuntu-20.04
-    container: python:3.10.5-slim
 
     # Setup PostgreSQL
     services:
@@ -31,35 +30,30 @@ jobs:
           --health-interval 2s
           --health-timeout 5s
           --health-retries 5
-    env:
-      # A local API schema location
-      # Could be a URL or a file available in the CI environment
-      API_SCHEMA: http://localhost:5000/api/openapi.json
-      # Explicitly enable Schemathesis reporting integration
-      # This step is required at the moment, as this job
-      # uses the default Schemathesis CLI directly
-      SCHEMATHESIS_REPORT: 'true'
-      # Set your token from secrets
-      SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
-      # OPTIONAL. A name to connect reports for the same API
-      # Use it and see how your API improves over time
-      # Without this variable you won't be able to see
-      # diffs with the target branch and history data
-      SCHEMATHESIS_API_NAME: schemathesis-example-manual-build
-      # OPTIONAL. Maximum time in seconds to wait on the
-      # API schema availability.
-      SCHEMATHESIS_WAIT_FOR_SCHEMA: 5
-
+        ports:
+          - 5432:5432
     steps:
       - uses: actions/checkout@v3.0.0
 
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
       - name: Install dependencies
-        run: pip install -r example/requirements.txt && pip install .
+        run: pip install -r example/requirements.txt
 
       # Starts the API in the background
       - name: Start API
         run: python example/main.py &
+        env:
+          DB_URL: 'postgresql://test:test@127.0.0.1/schemathesis-example'
 
       # Runs positive Schemathesis tests
-      - name: Run Schemathesis
-        run: st run $API_SCHEMA --checks=all --hypothesis-max-examples=10 || true
+      - uses: schemathesis/action@v1
+        continue-on-error: true
+        with:
+          # A local API schema location
+          schema: 'http://localhost:5000/api/openapi.json'
+          # Set your token from secrets
+          token: ${{ secrets.SCHEMATHESIS_TOKEN }}
+          max-examples: '10'

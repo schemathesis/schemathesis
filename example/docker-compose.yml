@@ -10,6 +10,7 @@ services:
       - "127.0.0.1:5000:5000"
     environment:
       - PYTHONUNBUFFERED=0
+      - DB_URL=postgresql://test:test@db/schemathesis-example
     depends_on:
       - db
     working_dir: /example
@@ -26,3 +27,5 @@ services:
       POSTGRES_DB: schemathesis-example
     volumes:
       - ./database:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
