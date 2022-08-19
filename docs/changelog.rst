@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Support ``requests==2.28.1``.
+
 .. _v3.17.0:
 
 `3.17.0`_ - 2022-08-17
