@@ -4,6 +4,9 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+`3.17.1`_ - 2022-08-19
+----------------------
+
 **Changed**
 
 - Support ``requests==2.28.1``.
@@ -2868,7 +2871,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.17.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.17.1...HEAD
+.. _3.17.1: https://github.com/schemathesis/schemathesis/compare/v3.17.0...v3.17.1
 .. _3.17.0: https://github.com/schemathesis/schemathesis/compare/v3.16.5...v3.17.0
 .. _3.16.5: https://github.com/schemathesis/schemathesis/compare/v3.16.4...v3.16.5
 .. _3.16.4: https://github.com/schemathesis/schemathesis/compare/v3.16.3...v3.16.4
