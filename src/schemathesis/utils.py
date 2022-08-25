@@ -493,7 +493,7 @@ def merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def current_datetime() -> str:
-    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    return datetime.now(timezone.utc).astimezone().isoformat()
 
 
 def combine_strategies(strategies: List[st.SearchStrategy]) -> st.SearchStrategy:
