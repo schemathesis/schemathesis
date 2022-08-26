@@ -397,6 +397,7 @@ DEFAULT_GITHUB_ENVIRONMENT = ci.GitHubActionsEnvironment(
     head_ref="dd/report-ci",
     base_ref="main",
     ref=None,
+    action_ref=None,
 )
 
 

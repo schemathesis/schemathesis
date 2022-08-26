@@ -29,6 +29,7 @@ from schemathesis.service import ci
                 head_ref="dd/report-ci",
                 base_ref="main",
                 ref="refs/pull/1533/merge",
+                action_ref=None,
             ),
         ),
         (
