@@ -97,6 +97,9 @@ class GitHubActionsEnvironment:
     # This is only set if a branch or tag is available for the event type.
     # For example, `refs/pull/1533/merge`
     ref: Optional[str] = attr.ib()
+    # The Schemathesis GitHub Action version.
+    # For example `v1.0.1`
+    action_ref: Optional[str] = attr.ib()
 
     @classmethod
     def is_set(cls) -> bool:
@@ -114,6 +117,7 @@ class GitHubActionsEnvironment:
             head_ref=os.getenv("GITHUB_HEAD_REF"),
             base_ref=os.getenv("GITHUB_BASE_REF"),
             ref=os.getenv("GITHUB_REF"),
+            action_ref=os.getenv("SCHEMATHESIS_ACTION_REF"),
         )
 
     def as_env(self) -> Dict[str, Optional[str]]:
@@ -127,6 +131,7 @@ class GitHubActionsEnvironment:
             "GITHUB_HEAD_REF": self.head_ref,
             "GITHUB_BASE_REF": self.base_ref,
             "GITHUB_REF": self.ref,
+            "SCHEMATHESIS_ACTION_REF": self.action_ref,
         }
 
 
