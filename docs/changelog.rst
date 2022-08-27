@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.17.2:
+
+`3.17.2`_ - 2022-08-27
+----------------------
+
 **Fixed**
 
 - Insufficient timeout for report uploads.
@@ -2877,7 +2882,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.17.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.17.2...HEAD
+.. _3.17.2: https://github.com/schemathesis/schemathesis/compare/v3.17.1...v3.17.2
 .. _3.17.1: https://github.com/schemathesis/schemathesis/compare/v3.17.0...v3.17.1
 .. _3.17.0: https://github.com/schemathesis/schemathesis/compare/v3.16.5...v3.17.0
 .. _3.16.5: https://github.com/schemathesis/schemathesis/compare/v3.16.4...v3.16.5
