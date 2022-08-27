@@ -1,3 +1,4 @@
+import hashlib
 import http
 from typing import Any, Optional, Union
 from urllib.parse import urljoin
@@ -58,12 +59,13 @@ class ServiceClient(requests.Session):
         self, report: bytes, correlation_id: Optional[str] = None, ci_provider: Optional[CIProvider] = None
     ) -> Union[UploadResponse, FailedUploadResponse]:
         """Upload test run report to Schemathesis.io."""
-        headers = {"Content-Type": "application/x-gtar"}
+        headers = {"Content-Type": "application/x-gtar", "X-Checksum-Blake2s256": hashlib.blake2s(report).hexdigest()}
         if correlation_id is not None:
             headers[REPORT_CORRELATION_ID_HEADER] = correlation_id
         if ci_provider is not None:
             headers[CI_PROVIDER_HEADER] = ci_provider.value
-        response = self.post("/reports/upload/", report, headers=headers)
+        # Do not limit the upload timeout
+        response = self.post("/reports/upload/", report, headers=headers, timeout=None)
         data = response.json()
         if response.status_code == http.HTTPStatus.REQUEST_ENTITY_TOO_LARGE:
             return FailedUploadResponse(detail=data["detail"])

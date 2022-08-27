@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Insufficient timeout for report uploads.
+
 .. _v3.17.1:
 
 `3.17.1`_ - 2022-08-19
