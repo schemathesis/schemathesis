@@ -319,9 +319,7 @@
     "POST /v1/parse",
     "POST /v1/serp"
   ],
-  "getsandbox.com/v1/swagger.yaml": [
-    "PUT /api/1/sandboxes/{sandboxName}"
-  ],
+  "getsandbox.com/v1/swagger.yaml": ["PUT /api/1/sandboxes/{sandboxName}"],
   "googleapis.com/analyticsdata/v1alpha/openapi.yaml": [
     "POST /v1alpha/{property}:runRealtimeReport",
     "POST /v1alpha:batchRunPivotReports",
@@ -396,9 +394,7 @@
     "POST /v3beta1/{parent}/testCases",
     "POST /v3beta1/{parent}/transitionRouteGroups"
   ],
-  "googleapis.com/docs/v1/openapi.yaml": [
-    "POST /v1/documents"
-  ],
+  "googleapis.com/docs/v1/openapi.yaml": ["POST /v1/documents"],
   "googleapis.com/documentai/v1beta3/openapi.yaml": [
     "POST /v1beta3/{humanReviewConfig}:reviewDocument",
     "POST /v1beta3/{name}:process"
@@ -434,15 +430,11 @@
   "googleapis.com/healthcare/v1beta1/openapi.yaml": [
     "POST /v1beta1/{parent}/hl7V2Stores"
   ],
-  "googleapis.com/ml/v1/openapi.yaml": [
-    "POST /v1/{parent}/studies"
-  ],
+  "googleapis.com/ml/v1/openapi.yaml": ["POST /v1/{parent}/studies"],
   "googleapis.com/servicemanagement/v1/openapi.yaml": [
     "POST /v1/services/{serviceName}/configs"
   ],
-  "googleapis.com/slides/v1/openapi.yaml": [
-    "POST /v1/presentations"
-  ],
+  "googleapis.com/slides/v1/openapi.yaml": ["POST /v1/presentations"],
   "googleapis.com/spanner/v1/openapi.yaml": [
     "POST /v1/{session}:executeBatchDml",
     "POST /v1/{session}:executeSql",
@@ -1441,9 +1433,7 @@
     "PUT /v2.1/payments/{id}",
     "PUT /v2.1/subscriptions/{id}"
   ],
-  "redirection.io/1.1.0/swagger.yaml": [
-    "POST /crawls/{id}/cancel"
-  ],
+  "redirection.io/1.1.0/swagger.yaml": ["POST /crawls/{id}/cancel"],
   "slicebox.local/2.0/swagger.yaml": [
     "POST /api/anonymization/anonymize",
     "POST /api/boxes/{id}/send",
@@ -1453,9 +1443,7 @@
     "PUT /api/images/{id}/anonymize",
     "PUT /api/images/{id}/modify"
   ],
-  "smart-me.com/v1/swagger.yaml": [
-    "POST /api/FolderMenu"
-  ],
+  "smart-me.com/v1/swagger.yaml": ["POST /api/FolderMenu"],
   "squareup.com/2.0/swagger.yaml": [
     "POST /v2/catalog/batch-upsert",
     "POST /v2/catalog/object"

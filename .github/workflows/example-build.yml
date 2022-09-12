@@ -3,15 +3,14 @@ name: Manual build API example
 on:
   pull_request:
     paths:
-      - '.github/workflows/example-build.yml'
-      - 'example/**'
+      - ".github/workflows/example-build.yml"
+      - "example/**"
   push:
     branches:
       - master
   workflow_dispatch:
 
 jobs:
-
   local-ci:
     name: Example app
     runs-on: ubuntu-20.04
@@ -37,7 +36,7 @@ jobs:
 
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
       - name: Install dependencies
         run: pip install -r example/requirements.txt
@@ -46,14 +45,14 @@ jobs:
       - name: Start API
         run: python example/main.py &
         env:
-          DB_URL: 'postgresql://test:test@127.0.0.1/schemathesis-example'
+          DB_URL: "postgresql://test:test@127.0.0.1/schemathesis-example"
 
       # Runs positive Schemathesis tests
       - uses: schemathesis/action@v1
         continue-on-error: true
         with:
           # A local API schema location
-          schema: 'http://localhost:5000/api/openapi.json'
+          schema: "http://localhost:5000/api/openapi.json"
           # Set your token from secrets
           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
-          max-examples: '10'
+          max-examples: "10"

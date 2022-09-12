@@ -68,21 +68,21 @@ jobs:
     name: Build and publish package to pypi.org
     runs-on: ubuntu-20.04
     steps:
-    - uses: actions/checkout@v3.0.0
-      with:
-        fetch-depth: 1
+      - uses: actions/checkout@v3.0.0
+        with:
+          fetch-depth: 1
 
-    - uses: actions/setup-python@v3.1.0
-      with:
-        python-version: '3.8'
+      - uses: actions/setup-python@v3.1.0
+        with:
+          python-version: "3.8"
 
-    - run: pip install poetry
+      - run: pip install poetry
 
-    - name: Build package
-      run: poetry build --no-interaction
+      - name: Build package
+        run: poetry build --no-interaction
 
-    - name: Publish package
-      run: poetry publish --no-interaction --username=${PYPI_USERNAME} --password=${PYPI_PASSWORD}
-      env:
-        PYPI_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      - name: Publish package
+        run: poetry publish --no-interaction --username=${PYPI_USERNAME} --password=${PYPI_PASSWORD}
+        env:
+          PYPI_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
