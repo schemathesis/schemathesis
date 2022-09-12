@@ -48,7 +48,7 @@ To install Schemathesis via ``pip`` run the following command:
 
 .. code:: bash
 
-    pip install schemathesis
+    python -m pip install schemathesis
 
 This command installs the ``st`` entrypoint.
 
