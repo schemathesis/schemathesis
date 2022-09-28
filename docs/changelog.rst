@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Added `httpx` as explicit dependency after change in `starlette`'s dependencies for tests
+
 .. _v3.17.2:
 
 `3.17.2`_ - 2022-08-27
