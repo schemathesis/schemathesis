@@ -229,7 +229,7 @@ REPORT_TO_SERVICE = object()
     "--checks",
     "-c",
     multiple=True,
-    help="List of checks to run.",
+    help="Comma-separated list of checks to run.",
     type=CHECKS_TYPE,
     default=DEFAULT_CHECKS_NAMES,
     cls=GroupedOption,
