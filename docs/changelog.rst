@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.17.3:
+
+`3.17.3`_ - 2022-10-10
+----------------------
+
 **Fixed**
 
 - Missing ``httpx`` dependency. `#1614`_
@@ -2886,7 +2891,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.17.2...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.17.3...HEAD
+.. _3.17.3: https://github.com/schemathesis/schemathesis/compare/v3.17.2...v3.17.3
 .. _3.17.2: https://github.com/schemathesis/schemathesis/compare/v3.17.1...v3.17.2
 .. _3.17.1: https://github.com/schemathesis/schemathesis/compare/v3.17.0...v3.17.1
 .. _3.17.0: https://github.com/schemathesis/schemathesis/compare/v3.16.5...v3.17.0
