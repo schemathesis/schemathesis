@@ -56,6 +56,7 @@ colorama = "^0.4"
 tomli = "^2.0.1"
 tomli-w = "^1.0.0"
 backoff = "^2.1.2"
+httpx = ">=0.22.0"
 
 [tool.poetry.dev-dependencies]
 coverage = "^6"
