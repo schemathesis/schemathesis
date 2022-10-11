@@ -224,8 +224,8 @@ def test_commands_run_help(cli):
         "",
         "  -c, --checks [not_a_server_error|status_code_conformance|"
         "content_type_conformance|response_headers_conformance|response_schema_conformance|all]",
-        "                                  List of checks to run.  [default:",
-        "                                  not_a_server_error]",
+        "                                  Comma-separated list of checks to run.",
+        "                                  [default: not_a_server_error]",
         "  --max-response-time INTEGER RANGE",
         "                                  A custom check that will fail if the response",
         "                                  time is greater than the specified one in",
