@@ -12,7 +12,7 @@ jobs:
       - uses: schemathesis/action@v1
         with:
           # A publicly available API schema location
-          schema: 'https://example.schemathesis.io/openapi.json'
+          schema: "https://example.schemathesis.io/openapi.json"
           # Set your token from secrets
           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
-          args: '-E success'
+          args: "-E success"

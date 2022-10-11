@@ -239,9 +239,7 @@
     "POST /#X-Amz-Target=StorageGateway_20130630.CreateCachediSCSIVolume",
     "POST /#X-Amz-Target=StorageGateway_20130630.CreateStorediSCSIVolume"
   ],
-  "amazonaws.com/sts/2011-06-15/openapi.yaml": [
-    "GET /#Action=AssumeRole"
-  ],
+  "amazonaws.com/sts/2011-06-15/openapi.yaml": ["GET /#Action=AssumeRole"],
   "amazonaws.com/translate/2017-07-01/openapi.yaml": [
     "POST /#X-Amz-Target=AWSShineFrontendService_20170701.DescribeTextTranslationJob",
     "POST /#X-Amz-Target=AWSShineFrontendService_20170701.StopTextTranslationJob",

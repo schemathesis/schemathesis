@@ -6,7 +6,6 @@ on:
     branches:
       - master
 
-
 jobs:
   commitsar:
     name: Verify commit messages

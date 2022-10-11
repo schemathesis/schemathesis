@@ -15,5 +15,5 @@ paths:
       produces:
         - application/json
       responses:
-        '200':
+        "200":
           description: OK
