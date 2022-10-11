@@ -43,10 +43,6 @@
     "PUT /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Logic/integrationAccounts/{integrationAccountName}/assemblies/{assemblyArtifactName}",
     "PUT /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Logic/integrationAccounts/{integrationAccountName}/batchConfigurations/{batchConfigurationName}"
   ],
-  "amazonaws.com/sts/2011-06-15/openapi.yaml": [
-    "GET /#Action=AssumeRole"
-  ],
-  "intellifi.nl/2.18.0+0.g0bcb16f.dirty/openapi.yaml": [
-    "POST /api/items"
-  ]
+  "amazonaws.com/sts/2011-06-15/openapi.yaml": ["GET /#Action=AssumeRole"],
+  "intellifi.nl/2.18.0+0.g0bcb16f.dirty/openapi.yaml": ["POST /api/items"]
 }

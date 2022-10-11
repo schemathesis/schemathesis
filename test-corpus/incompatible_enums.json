@@ -47,13 +47,7 @@
     "POST /api/v4/system/config/oauth/clients",
     "PUT /api/v4/system/config/oauth/clients/{client_id}"
   ],
-  "visagecloud.com/1.1/swagger.yaml": [
-    "PUT /rest/v1.1/collection/purpose"
-  ],
-  "whatsapp.local/1.0/openapi.yaml": [
-    "POST /v1/account/shards"
-  ],
-  "zoom.us/2.0.0/swagger.yaml": [
-    "POST /v2/webhooks"
-  ]
+  "visagecloud.com/1.1/swagger.yaml": ["PUT /rest/v1.1/collection/purpose"],
+  "whatsapp.local/1.0/openapi.yaml": ["POST /v1/account/shards"],
+  "zoom.us/2.0.0/swagger.yaml": ["POST /v2/webhooks"]
 }

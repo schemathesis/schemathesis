@@ -32,9 +32,9 @@ paths:
             GetBookingById:
               operationId: app.views.get_booking_by_id
               parameters:
-                booking_id: '$response.body#/id'
+                booking_id: "$response.body#/id"
       requestBody:
-        $ref: '#/components/requestBodies/Booking'
+        $ref: "#/components/requestBodies/Booking"
     get:
       summary: Get bookings
       operationId: app.views.get_bookings
@@ -56,7 +56,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Booking'
+            $ref: "#/components/schemas/Booking"
   schemas:
     Booking:
       properties:

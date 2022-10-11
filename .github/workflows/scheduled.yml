@@ -17,7 +17,7 @@ jobs:
 
       - uses: actions/setup-python@v3.1.0
         with:
-          python-version: '3.8'
+          python-version: "3.8"
 
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends sqlite3
 
@@ -41,23 +41,21 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
 
       - name: Run mutmut tests
-        run:
-          mutmut run
-            --backup
-            --paths-to-mutate "src/"
-            --tests-dir "test/"
-            --paths-to-exclude=definitions.py
-            --runner "poetry run pytest -n auto -x -q test"
+        run: mutmut run
+          --backup
+          --paths-to-mutate "src/"
+          --tests-dir "test/"
+          --paths-to-exclude=definitions.py
+          --runner "poetry run pytest -n auto -x -q test"
 
       - name: Display survived mutations
         if: failure()
-        run:
-          while read -r line;
-            do mutmut show $line;
+        run: while read -r line;
+          do mutmut show $line;
           done <<< $(
-            sqlite3 .mutmut-cache
-              "select id from Mutant where status in ('bad_survived', 'bad_timeout', 'ok_suspicious');"
-            );
+          sqlite3 .mutmut-cache
+          "select id from Mutant where status in ('bad_survived', 'bad_timeout', 'ok_suspicious');"
+          );
 
   hypothesis-tests:
     name: Hypothesis tests with CI profile

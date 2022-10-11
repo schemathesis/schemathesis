@@ -14,6 +14,11 @@ repos:
         args: [--fix=lf]
       - id: check-merge-conflict
 
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v2.7.1
+    hooks:
+      - id: prettier
+
   - repo: https://github.com/jorisroovers/gitlint
     rev: v0.17.0
     hooks:
@@ -44,7 +49,7 @@ repos:
     rev: v1.12.1
     hooks:
       - id: blacken-docs
-        additional_dependencies: [ black==22.3.0 ]
+        additional_dependencies: [black==22.3.0]
 
   - repo: https://github.com/pre-commit/mirrors-isort
     rev: v5.10.1
@@ -59,7 +64,8 @@ repos:
       - id: mypy
         exclude: ^(docs/|test/|test-corpus/|example/).*$
         args: ["--ignore-missing-imports"]
-        additional_dependencies: [types-attrs, types-click, types-requests, types-PyYAML]
+        additional_dependencies:
+          [types-attrs, types-click, types-requests, types-PyYAML]
 
   - repo: https://github.com/pre-commit/mirrors-pylint
     rev: v3.0.0a4
