@@ -81,7 +81,7 @@ def csv_strategy(enum):
             "stateful-recursion-limit": st.integers(),
             "max-response-time": st.integers(),
             "validate-schema": st.booleans(),
-            "--hypothesis-database": st.text(),
+            "hypothesis-database": st.text(),
             "hypothesis-deadline": st.integers() | st.none(),
             "hypothesis-max-examples": st.integers(),
             "hypothesis-report-multiple-bugs": st.booleans(),

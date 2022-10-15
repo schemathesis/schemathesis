@@ -509,6 +509,18 @@ def test_hypothesis_database_report(cli, schema_url):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
+def test_hypothesis_database_with_derandomize(cli, schema_url):
+    result = cli.run(schema_url, "--hypothesis-database=:memory:", "--hypothesis-derandomize")
+    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
+    lines = result.stdout.split("\n")
+    assert (
+        lines[3]
+        == "Error: --hypothesis-derandomize implies no database, so passing --hypothesis-database too is invalid."
+    )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
 def test_metadata(cli, schema_url):
     # When the verbose mode is enabled
     result = cli.run(schema_url, "-v")

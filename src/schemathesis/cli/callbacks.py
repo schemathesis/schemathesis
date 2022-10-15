@@ -121,6 +121,18 @@ def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value
         raise click.exceptions.Exit(1)
 
 
+def validate_hypothesis_database(
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]
+) -> Optional[str]:
+    if raw_value is None:
+        return raw_value
+    if ctx.params.get("hypothesis_derandomize"):
+        raise click.UsageError(
+            "--hypothesis-derandomize implies no database, so passing --hypothesis-database too is invalid."
+        )
+    return raw_value
+
+
 def validate_auth(
     ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]
 ) -> Optional[Tuple[str, str]]:

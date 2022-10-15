@@ -494,6 +494,7 @@ REPORT_TO_SERVICE = object()
     type=str,
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,
+    callback=callbacks.validate_hypothesis_database,
 )
 @click.option(
     "--hypothesis-deadline",
@@ -507,6 +508,7 @@ REPORT_TO_SERVICE = object()
     "--hypothesis-derandomize",
     help="Use Hypothesis's deterministic mode.",
     is_flag=True,
+    is_eager=True,
     default=None,
     show_default=True,
     cls=GroupedOption,
