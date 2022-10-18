@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Appending an extra slash to the ``/`` path. `#1625`_
+
 .. _v3.17.3:
 
 `3.17.3`_ - 2022-10-10
@@ -3106,6 +3110,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1625: https://github.com/schemathesis/schemathesis/issues/1625
 .. _#1614: https://github.com/schemathesis/schemathesis/issues/1614
 .. _#1592: https://github.com/schemathesis/schemathesis/issues/1592
 .. _#1591: https://github.com/schemathesis/schemathesis/issues/1591

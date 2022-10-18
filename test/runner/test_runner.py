@@ -9,6 +9,7 @@ import pytest
 import requests
 from aiohttp import web
 from aiohttp.streams import EmptyStreamReader
+from fastapi import FastAPI
 from flask import Flask
 from hypothesis import Phase
 from requests.auth import HTTPDigestAuth
@@ -237,6 +238,26 @@ def test_base_url(openapi3_base_url, schema_url, app, converter):
     assert_request(app, 0, "GET", "/api/failure")
     assert_request(app, 1, "GET", "/api/failure")
     assert_request(app, 2, "GET", "/api/success")
+
+
+# @pytest.mark.openapi_version("3.0")
+def test_root_url():
+    app = FastAPI(
+        title="Silly",
+        version="1.0.0",
+    )
+
+    @app.get("/")
+    def empty():
+        return {}
+
+    def check(response, case):
+        assert case.as_requests_kwargs()["url"] == "/"
+        assert response.status_code == 200
+
+    schema = oas_loaders.from_asgi("/openapi.json", app=app)
+    finished = execute(schema, checks=(check,))
+    assert not finished.has_failures
 
 
 def test_execute_with_headers(any_app, any_app_schema):
