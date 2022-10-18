@@ -280,7 +280,9 @@ class Case:  # pylint: disable=too-many-public-methods
                 final_headers["Content-Type"] = self.media_type
         base_url = self._get_base_url(base_url)
         formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
-        url = unquote(urljoin(base_url + "/", quote(formatted_path)))
+        if not base_url.endswith("/"):
+            base_url += "/"
+        url = unquote(urljoin(base_url, quote(formatted_path)))
         extra: Dict[str, Any]
         serializer = self._get_serializer()
         if serializer is not None and not isinstance(self.body, NotSet):
