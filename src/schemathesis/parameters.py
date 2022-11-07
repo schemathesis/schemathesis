@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from .models import APIOperation
 
 
-@attr.s(slots=True, eq=False)  # pragma: no mutate
+@attr.s(eq=False)  # pragma: no mutate
 class Parameter:
     """A logically separate parameter bound to a location (e.g., to "query string").
 

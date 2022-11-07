@@ -9,7 +9,7 @@ from ...parameters import Parameter
 from .converter import to_json_schema_recursive
 
 
-@attr.s(slots=True, eq=False)
+@attr.s(eq=False)
 class OpenAPIParameter(Parameter):
     """A single Open API operation parameter."""
 
@@ -122,7 +122,7 @@ class OpenAPIParameter(Parameter):
         return json.dumps(self.as_json_schema(operation), sort_keys=True)
 
 
-@attr.s(slots=True, eq=False)
+@attr.s(eq=False)
 class OpenAPI20Parameter(OpenAPIParameter):
     """Open API 2.0 parameter.
 
@@ -167,7 +167,7 @@ class OpenAPI20Parameter(OpenAPIParameter):
         return None
 
 
-@attr.s(slots=True, eq=False)
+@attr.s(eq=False)
 class OpenAPI30Parameter(OpenAPIParameter):
     """Open API 3.0 parameter.
 
@@ -217,7 +217,7 @@ class OpenAPI30Parameter(OpenAPIParameter):
         return super().from_open_api_to_json_schema(operation, open_api_schema)
 
 
-@attr.s(slots=True, eq=False)
+@attr.s(eq=False)
 class OpenAPIBody(OpenAPIParameter):
     media_type: str = attr.ib()
 
