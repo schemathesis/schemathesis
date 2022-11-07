@@ -36,10 +36,13 @@ if IS_HYPOTHESIS_ABOVE_6_49:
 else:
     from inspect import getfullargspec as get_signature
 
-if IS_HYPOTHESIS_ABOVE_6_54:
-    from exceptiongroup import BaseExceptionGroup as MultipleFailures
-else:
-    from hypothesis.errors import MultipleFailures
+try:
+    MultipleFailures = BaseExceptionGroup  # type: ignore
+except NameError:
+    if IS_HYPOTHESIS_ABOVE_6_54:
+        from exceptiongroup import BaseExceptionGroup as MultipleFailures  # type: ignore
+    else:
+        from hypothesis.errors import MultipleFailures  # type: ignore
 
 
 def _get_format_filter(

@@ -6,7 +6,7 @@ from ...constants import HTTP_METHODS
 def is_pattern_error(exception: TypeError) -> bool:
     """Detect whether the input exception was caused by invalid type passed to `re.search`."""
     # This is intentionally simplistic and do not involve any traceback analysis
-    return str(exception) == "expected string or bytes-like object"
+    return "expected string or bytes-like object" in str(exception)
 
 
 def find_numeric_http_status_codes(schema: Any) -> List[Tuple[int, List[Union[str, int]]]]:
