@@ -1027,8 +1027,12 @@ def test_pre_run_hook_invalid(testdir, cli):
     # And a helpful message should be displayed in the output
     lines = result.stdout.strip().split("\n")
     assert lines[0] == "An exception happened during the hook loading:"
-    assert lines[7] == "ZeroDivisionError: division by zero"
-    assert lines[9] == "Aborted!"
+    if sys.version_info >= (3, 11):
+        idx = (8, 10)
+    else:
+        idx = (7, 9)
+    assert lines[idx[0]] == "ZeroDivisionError: division by zero"
+    assert lines[idx[1]] == "Aborted!"
 
 
 def test_pre_run_hook_module_not_found(testdir, cli):
@@ -1042,8 +1046,12 @@ def test_pre_run_hook_module_not_found(testdir, cli):
     assert "ModuleNotFoundError" not in result.stdout
     lines = result.stdout.strip().split("\n")
     assert lines[0] == "An exception happened during the hook loading:"
-    assert lines[7] == "ZeroDivisionError: division by zero"
-    assert lines[9] == "Aborted!"
+    if sys.version_info >= (3, 11):
+        idx = (8, 10)
+    else:
+        idx = (7, 9)
+    assert lines[idx[0]] == "ZeroDivisionError: division by zero"
+    assert lines[idx[1]] == "Aborted!"
 
 
 @pytest.mark.usefixtures("reset_hooks")
@@ -1484,7 +1492,11 @@ def test_wsgi_app_internal_exception(testdir, cli):
     lines = result.stdout.strip().split("\n")
     assert "== APPLICATION LOGS ==" in lines[41], result.stdout.strip()
     assert "ERROR in app: Exception on /api/success [GET]" in lines[43]
-    assert lines[55] == "ZeroDivisionError: division by zero"
+    if sys.version_info >= (3, 11):
+        idx = 60
+    else:
+        idx = 55
+    assert lines[idx] == "ZeroDivisionError: division by zero"
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))

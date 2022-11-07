@@ -16,6 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: Implementation :: CPython",
     "Topic :: Software Development :: Testing",
 ]
@@ -35,7 +36,7 @@ include = ["src/schemathesis/py.typed"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
-attrs = ">=19.2,<=21.4"
+attrs = "^22.1.0"
 hypothesis = "^6.13.3"
 hypothesis_jsonschema = "^0.22.0"
 hypothesis_graphql = "^0.9.0"
@@ -60,16 +61,17 @@ httpx = ">=0.22.0"
 
 [tool.poetry.dev-dependencies]
 coverage = "^6"
-aiohttp = "^3.8"
+aiohttp = "^3.8.3"
 pytest-mock = "^3.7.0"
 pytest-asyncio = "^0.18.0"
 pytest-xdist = "^2.5"
-fastapi = "^0.75.0"
+fastapi = "^0.86.0"
 pytest-httpserver = "^1.0.0"
 trustme = "^0.9.0"
 Flask = "^2.1.1"
 Sphinx = "^4.5.0"
 strawberry-graphql = {extras = ["fastapi"], version = "^0.109.0"}
+pydantic = "^1.10.2"
 
 [tool.poetry.plugins]
 pytest11 = {schemathesis = "schemathesis.extra.pytest_plugin"}
