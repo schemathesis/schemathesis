@@ -26,7 +26,7 @@ else:
 @pytest.mark.parametrize(
     "framework, expected",
     (
-        ("flask", "INFO:werkzeug: * Running on"),
+        ("flask", "INFO:werkzeug:"),
         ("aiohttp", AIOHTTP_OUTPUT),
     ),
 )

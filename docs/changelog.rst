@@ -8,6 +8,10 @@ Changelog
 
 - Python 3.11 support. `#1632`_
 
+**Fixed**
+
+- Allow ``Werkzeug<=2.2.2``. `#1631`_
+
 .. _v3.17.4:
 
 `3.17.4`_ - 2022-10-19
@@ -3121,6 +3125,7 @@ Deprecated
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#1632: https://github.com/schemathesis/schemathesis/issues/1632
+.. _#1631: https://github.com/schemathesis/schemathesis/issues/1631
 .. _#1625: https://github.com/schemathesis/schemathesis/issues/1625
 .. _#1614: https://github.com/schemathesis/schemathesis/issues/1614
 .. _#1592: https://github.com/schemathesis/schemathesis/issues/1592
