@@ -15,7 +15,6 @@ on:
       - "pyproject.toml"
       - "tox.ini"
       - "mypy.ini"
-      - "!docs/**"
   push:
     branches:
       - master
