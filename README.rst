@@ -153,7 +153,7 @@ License
 The code in this project is licensed under `MIT license`_.
 By contributing to Schemathesis, you agree that your contributions will be licensed under its MIT license.
 
-.. |Build| image:: https://github.com/schemathesis/schemathesis/workflows/build/badge.svg
+.. |Build| image:: https://github.com/schemathesis/schemathesis/actions/workflows/build.yml/badge.svg
    :target: https://github.com/schemathesis/schemathesis/actions
 .. |Coverage| image:: https://codecov.io/gh/schemathesis/schemathesis/branch/master/graph/badge.svg
    :target: https://codecov.io/gh/schemathesis/schemathesis/branch/master
