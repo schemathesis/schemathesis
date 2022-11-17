@@ -4,6 +4,14 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Support for ``httpx`` as a transport for executing test cases.
+
+**Fixed**
+
+- Support for ``starlette>=0.21``. `#1637`_
+
 .. _v3.17.5:
 
 `3.17.5`_ - 2022-11-08
@@ -3130,6 +3138,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1637: https://github.com/schemathesis/schemathesis/issues/1637
 .. _#1632: https://github.com/schemathesis/schemathesis/issues/1632
 .. _#1631: https://github.com/schemathesis/schemathesis/issues/1631
 .. _#1625: https://github.com/schemathesis/schemathesis/issues/1625

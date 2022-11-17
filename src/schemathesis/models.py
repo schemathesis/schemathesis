@@ -26,12 +26,14 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    overload,
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 from uuid import uuid4
 
 import attr
 import curlify
+import httpx
 import requests
 import werkzeug
 from hypothesis import event, note, reject
@@ -304,39 +306,6 @@ class Case:  # pylint: disable=too-many-public-methods
             **extra,
         }
 
-    def call(
-        self,
-        base_url: Optional[str] = None,
-        session: Optional[requests.Session] = None,
-        headers: Optional[Dict[str, Any]] = None,
-        **kwargs: Any,
-    ) -> requests.Response:
-        """Make a network call with `requests`."""
-        hook_context = HookContext(operation=self.operation)
-        dispatch("before_call", hook_context, self)
-        data = self.as_requests_kwargs(base_url, headers)
-        data.update(kwargs)
-        data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
-        if session is None:
-            validate_vanilla_requests_kwargs(data)
-            session = requests.Session()
-            close_session = True
-        else:
-            close_session = False
-        try:
-            response = session.request(**data)  # type: ignore
-        except requests.Timeout as exc:
-            timeout = 1000 * data["timeout"]  # It is defined and not empty, since the exception happened
-            code_message = self._get_code_message(self.operation.schema.code_sample_style, exc.request)
-            raise get_timeout_error(timeout)(
-                f"\n\n1. Request timed out after {timeout:.2f}ms\n\n----------\n\n{code_message}",
-                context=failures.RequestTimeout(timeout=timeout),
-            ) from None
-        dispatch("after_call", hook_context, self, response)
-        if close_session:
-            session.close()
-        return response
-
     def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
         final_headers = self._get_headers(headers)
@@ -358,6 +327,59 @@ class Case:  # pylint: disable=too-many-public-methods
             "query_string": self.query,
             **extra,
         }
+
+    def as_httpx_kwargs(
+        self, base_url: Optional[str] = None, headers: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        # TODO!
+        return {}
+
+    @overload
+    def _call(self, client: requests.Session, **kwargs: Any) -> requests.Response:
+        ...
+
+    @overload
+    def _call(self, client: httpx.Client, **kwargs: Any) -> httpx.Response:
+        ...
+
+    def _call(
+        self, client: Union[requests.Session, httpx.Client], **kwargs: Any
+    ) -> Union[requests.Response, httpx.Response]:
+        hook_context = HookContext(operation=self.operation)
+        dispatch("before_call", hook_context, self)
+        kwargs.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
+        try:
+            response = client.request(**kwargs)  # type: ignore
+        except requests.Timeout as exc:
+            timeout = 1000 * kwargs["timeout"]  # It is defined and not empty, since the exception happened
+            code_message = self._get_code_message(self.operation.schema.code_sample_style, exc.request)
+            raise get_timeout_error(timeout)(
+                f"\n\n1. Request timed out after {timeout:.2f}ms\n\n----------\n\n{code_message}",
+                context=failures.RequestTimeout(timeout=timeout),
+            ) from None
+        dispatch("after_call", hook_context, self, response)
+        return response
+
+    def call(
+        self,
+        base_url: Optional[str] = None,
+        session: Optional[requests.Session] = None,
+        headers: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> requests.Response:
+        """Make a network call with `requests`."""
+        data = self.as_requests_kwargs(base_url, headers)
+        data.update(kwargs)
+        if session is None:
+            validate_vanilla_requests_kwargs(data)
+            session = requests.Session()
+            close_session = True
+        else:
+            close_session = False
+        response = self._call(session, **data)
+        if close_session:
+            session.close()
+        return response
 
     def call_wsgi(self, app: Any = None, headers: Optional[Dict[str, str]] = None, **kwargs: Any) -> WSGIResponse:
         application = app or self.app
