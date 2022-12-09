@@ -27,7 +27,7 @@ attrs==21.4.0
     #   jsonschema
     #   pytest
     #   schemathesis
-certifi==2022.6.15
+certifi==2022.12.7
     # via requests
 charset-normalizer==2.0.12
     # via
@@ -46,8 +46,6 @@ connexion[aiohttp,swagger-ui]==2.14.0
     # via -r requirements.in
 curlify==2.2.1
     # via schemathesis
-exceptiongroup==1.0.0rc8
-    # via hypothesis
 flask==2.1.3
     # via connexion
 frozenlist==1.3.0
