@@ -76,13 +76,13 @@ jobs:
         with:
           python-version: "3.8"
 
-      - run: pip install poetry
+      - run: pip install hatch
 
       - name: Build package
-        run: poetry build --no-interaction
+        run: hatch build
 
       - name: Publish package
-        run: poetry publish --no-interaction --username=${PYPI_USERNAME} --password=${PYPI_PASSWORD}
+        run: hatch publish --no-interaction
         env:
-          PYPI_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          PYPI_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+          HATCH_INDEX_USER: ${{ secrets.PYPI_USERNAME }}
+          HATCH_INDEX_AUTH: ${{ secrets.PYPI_PASSWORD }}

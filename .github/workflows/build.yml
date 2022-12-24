@@ -11,7 +11,6 @@ on:
       - ".pydocstyle"
       - ".relint.yml"
       - ".yamllint"
-      - "poetry.lock"
       - "pyproject.toml"
       - "tox.ini"
       - "mypy.ini"
@@ -94,7 +93,7 @@ jobs:
         with:
           python-version: "${{ matrix.python }}"
 
-      - run: pip install tox coverage poetry
+      - run: pip install tox coverage
 
       - name: Run ${{ matrix.python }} tox job
         run: tox -e py${TOX_JOB//.} # Strip dot from python version to match tox job
@@ -128,7 +127,7 @@ jobs:
         with:
           python-version: 3.7
 
-      - run: pip install tox coverage poetry
+      - run: pip install tox coverage
 
       - name: Run ${{ matrix.tox_job }} tox job
         run: tox -e ${{ matrix.tox_job }}
@@ -160,7 +159,7 @@ jobs:
         with:
           python-version: 3.7
 
-      - run: pip install tox coverage poetry
+      - run: pip install tox coverage
 
       - name: Run ${{ matrix.tox_job }} tox job
         run: tox -e ${{ matrix.tox_job }}
@@ -192,7 +191,7 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install tox coverage poetry
+      - run: pip install tox coverage
 
       - name: Run ${{ matrix.tox_job }} tox job
         run: tox -e ${{ matrix.tox_job }}
