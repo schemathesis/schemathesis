@@ -57,7 +57,7 @@ jobs:
       - run: pre-commit run ${{ matrix.lint }} --all-files
 
   docs:
-    name: Documentation check
+    name: Documentation
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3.0.0
@@ -83,7 +83,7 @@ jobs:
             os: ubuntu-20.04
             python: "3.8"
 
-    name: ${{ matrix.os }}/tests_${{ matrix.python }}${{ matrix.tox_env }}
+    name: Tests
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3.0.0
@@ -97,7 +97,7 @@ jobs:
       - run: pip install tox tox-gh-actions
 
       - if: ${{ matrix.tox_env }}
-        run: python -m tox -e ${{ matrix.tox_env }}
+        run: python -m tox -e "${{ matrix.tox_env }}"
       - if: ${{ !matrix.tox_env }}
         run: python -m tox
 
