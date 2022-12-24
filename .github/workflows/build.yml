@@ -35,8 +35,14 @@ jobs:
       - run: pip install pre-commit
       - run: SKIP=pylint,mypy pre-commit run --all-files
 
-  pylint:
-    name: Pylint
+  lints:
+    strategy:
+      matrix:
+        lint:
+          - pylint
+          - mypy
+
+    name: Lints
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3.0.0
@@ -48,22 +54,7 @@ jobs:
           python-version: 3.9
 
       - run: pip install pre-commit
-      - run: pre-commit run pylint --all-files
-
-  mypy:
-    name: Mypy
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v3.0.0
-        with:
-          fetch-depth: 1
-
-      - uses: actions/setup-python@v3.1.0
-        with:
-          python-version: 3.9
-
-      - run: pip install pre-commit
-      - run: pre-commit run mypy --all-files
+      - run: pre-commit run ${{ matrix.lint }} --all-files
 
   docs:
     name: Documentation check
@@ -93,95 +84,23 @@ jobs:
         with:
           python-version: "${{ matrix.python }}"
 
-      - run: pip install tox
+      - run: pip install tox tox-gh-actions
 
-      - name: Run ${{ matrix.python }} tox job
-        run: tox -e py${TOX_JOB//.} # Strip dot from python version to match tox job
-        env:
-          TOX_JOB: ${{ matrix.python }}
-
-      - run: coverage combine
-      - run: coverage report
-      - run: coverage xml -i
+      - run: python -m tox
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3.0.0
-        with:
-          file: ./coverage.xml
 
-  pytest-5:
+  tests-older-dependencies:
     strategy:
       matrix:
-        os: [ubuntu-20.04]
-        tox_job:
-          - py3-pytest53
-
-    name: ${{ matrix.os }}/tests_${{ matrix.tox_job }}
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v3.0.0
-        with:
-          fetch-depth: 1
-
-      - uses: actions/setup-python@v3.1.0
-        with:
-          python-version: 3.7
-
-      - run: pip install tox coverage
-
-      - name: Run ${{ matrix.tox_job }} tox job
-        run: tox -e ${{ matrix.tox_job }}
-
-      - run: coverage combine
-      - run: coverage report
-      - run: coverage xml -i
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3.0.0
-        with:
-          file: ./coverage.xml
-
-  pytest-6:
-    strategy:
-      matrix:
-        os: [ubuntu-20.04]
-        tox_job:
-          - py3-pytest6
-
-    name: ${{ matrix.os }}/tests_${{ matrix.tox_job }}
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v3.0.0
-        with:
-          fetch-depth: 1
-
-      - uses: actions/setup-python@v3.1.0
-        with:
-          python-version: 3.7
-
-      - run: pip install tox coverage
-
-      - name: Run ${{ matrix.tox_job }} tox job
-        run: tox -e ${{ matrix.tox_job }}
-
-      - run: coverage combine
-      - run: coverage report
-      - run: coverage xml -i
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3.0.0
-        with:
-          file: ./coverage.xml
-
-  hypothesis-6-48:
-    strategy:
-      matrix:
-        os: [ubuntu-20.04]
         tox_job:
           - py3-hypothesis-6-48
+          - py3-pytest6
+          - py3-pytest53
 
-    name: ${{ matrix.os }}/tests_${{ matrix.tox_job }}
-    runs-on: ${{ matrix.os }}
+    name: ubuntu-20.04/tests_${{ matrix.tox_job }}
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3.0.0
         with:
@@ -191,16 +110,9 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install tox coverage
+      - run: pip install tox
 
-      - name: Run ${{ matrix.tox_job }} tox job
-        run: tox -e ${{ matrix.tox_job }}
-
-      - run: coverage combine
-      - run: coverage report
-      - run: coverage xml -i
+      - run: tox -e ${{ matrix.tox_job }}
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3.0.0
-        with:
-          file: ./coverage.xml
