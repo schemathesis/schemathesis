@@ -50,15 +50,7 @@ dependencies = [
     "backoff>=2.1.2,<3.0",
     "httpx>=0.22.0,<1.0",
 ]
-
-[project.urls]
-Documentation = "https://schemathesis.readthedocs.io/en/stable/"
-Changelog = "https://schemathesis.readthedocs.io/en/stable/changelog.html"
-"Bug Tracker" = "https://github.com/schemathesis/schemathesis"
-Funding = "https://github.com/sponsors/Stranger6667"
-"Source Code" = "https://github.com/schemathesis/schemathesis"
-
-[tool.optional-dependencies]
+[project.optional-dependencies]
 tests = [
     "coverage>=^6",
     "aiohttp>=3.8.3,<4.0",
@@ -76,6 +68,13 @@ docs = [
     "sphinx",
 ]
 dev = ["schemathesis[tests,docs]"]
+
+[project.urls]
+Documentation = "https://schemathesis.readthedocs.io/en/stable/"
+Changelog = "https://schemathesis.readthedocs.io/en/stable/changelog.html"
+"Bug Tracker" = "https://github.com/schemathesis/schemathesis"
+Funding = "https://github.com/sponsors/Stranger6667"
+"Source Code" = "https://github.com/schemathesis/schemathesis"
 
 [project.scripts]
 schemathesis = "schemathesis.cli:schemathesis"
