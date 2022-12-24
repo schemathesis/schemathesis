@@ -83,7 +83,7 @@ jobs:
             os: ubuntu-20.04
             python: "3.8"
 
-    name: ${{ matrix.os }}/tests_${{ matrix.python }}
+    name: ${{ matrix.os }}/tests_${{ matrix.python }}${{ matrix.tox_env }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3.0.0
