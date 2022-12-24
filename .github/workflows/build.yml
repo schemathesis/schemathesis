@@ -93,8 +93,7 @@ jobs:
         with:
           python-version: "${{ matrix.python }}"
 
-      - run: pip install --upgrade pip
-      - run: pip install tox coverage
+      - run: pip install tox
 
       - name: Run ${{ matrix.python }} tox job
         run: tox -e py${TOX_JOB//.} # Strip dot from python version to match tox job
