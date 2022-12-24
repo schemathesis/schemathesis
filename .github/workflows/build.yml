@@ -83,7 +83,7 @@ jobs:
             os: ubuntu-20.04
             python: "3.8"
 
-    name: Tests
+    name: Tests (Python ${{ matrix.python }} on ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3.0.0
@@ -92,12 +92,13 @@ jobs:
 
       - uses: actions/setup-python@v3.1.0
         with:
-          python-version: "${{ matrix.python }}"
+          python-version: ${{ matrix.python }}
 
       - run: pip install tox tox-gh-actions
 
       - if: ${{ matrix.tox_env }}
-        run: python -m tox -e "${{ matrix.tox_env }}"
+        run: python -m tox -e ${{ matrix.tox_env }}
+
       - if: ${{ !matrix.tox_env }}
         run: python -m tox
 
