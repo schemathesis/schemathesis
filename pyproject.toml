@@ -79,7 +79,9 @@ Funding = "https://github.com/sponsors/Stranger6667"
 [project.scripts]
 schemathesis = "schemathesis.cli:schemathesis"
 st = "schemathesis.cli:schemathesis"
-pytest11 = "schemathesis.extra.pytest_plugin:None"
+
+[project.entry-points.pytest11]
+schemathesis = "schemathesis.extra.pytest_plugin"
 
 [tool.black]
 line-length = 120
