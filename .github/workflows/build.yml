@@ -72,6 +72,16 @@ jobs:
       matrix:
         os: [ubuntu-20.04, windows-2019]
         python: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+        include:
+          - tox_env: hypothesis-6-48
+            os: ubuntu-20.04
+            python: "3.8"
+          - tox_env: pytest6
+            os: ubuntu-20.04
+            python: "3.8"
+          - tox_env: pytest53
+            os: ubuntu-20.04
+            python: "3.8"
 
     name: ${{ matrix.os }}/tests_${{ matrix.python }}
     runs-on: ${{ matrix.os }}
@@ -86,33 +96,10 @@ jobs:
 
       - run: pip install tox tox-gh-actions
 
-      - run: python -m tox
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3.0.0
-
-  tests-older-dependencies:
-    strategy:
-      matrix:
-        tox_job:
-          - py3-hypothesis-6-48
-          - py3-pytest6
-          - py3-pytest53
-
-    name: ubuntu-20.04/tests_${{ matrix.tox_job }}
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v3.0.0
-        with:
-          fetch-depth: 1
-
-      - uses: actions/setup-python@v3.1.0
-        with:
-          python-version: 3.8
-
-      - run: pip install tox
-
-      - run: tox -e ${{ matrix.tox_job }}
+      - if: ${{ matrix.tox_env }}
+        run: python -m tox -e ${{ matrix.tox_env }}
+      - if: ${{ !matrix.tox_env }}
+        run: python -m tox
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3.0.0
