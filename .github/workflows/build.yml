@@ -73,17 +73,17 @@ jobs:
         os: [ubuntu-20.04, windows-2019]
         python: ["3.7", "3.8", "3.9", "3.10", "3.11"]
         include:
-          - tox_env: hypothesis-6-48
-            os: ubuntu-20.04
+          - os: ubuntu-20.04
             python: "3.8"
-          - tox_env: pytest6
-            os: ubuntu-20.04
+            tox_env: hypothesis648
+          - os: ubuntu-20.04
             python: "3.8"
-          - tox_env: pytest53
-            os: ubuntu-20.04
+            tox_env: pytest6
+          - os: ubuntu-20.04
             python: "3.8"
+            tox_env: pytest53
 
-    name: Tests (Python ${{ matrix.python }} on ${{ matrix.os }})
+    name: Tests (Python ${{ matrix.python }} on ${{ matrix.os }} ${{ matrix.tox_env }})
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3.0.0
