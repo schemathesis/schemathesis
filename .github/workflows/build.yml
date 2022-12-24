@@ -74,13 +74,13 @@ jobs:
         python: ["3.7", "3.8", "3.9", "3.10", "3.11"]
         include:
           - os: ubuntu-20.04
-            python: "3.8"
+            python: "3.9.16"
             tox_env: hypothesis648
           - os: ubuntu-20.04
-            python: "3.8"
+            python: "3.9.16"
             tox_env: pytest6
           - os: ubuntu-20.04
-            python: "3.8"
+            python: "3.9.16"
             tox_env: pytest53
 
     name: Tests (Python ${{ matrix.python }} on ${{ matrix.os }} ${{ matrix.tox_env }})
