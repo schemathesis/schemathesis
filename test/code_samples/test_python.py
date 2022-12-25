@@ -5,7 +5,7 @@ from flask import Flask
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
+from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.models import _escape_single_quotes
 from schemathesis.runner import from_schema
 
