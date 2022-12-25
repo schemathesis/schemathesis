@@ -21,24 +21,7 @@ jobs:
 
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends sqlite3
 
-      - run: pip install poetry mutmut
-
-      - name: Cache Poetry virtualenv
-        uses: actions/cache@v3.0.2
-        id: cache
-        with:
-          path: ~/.virtualenvs
-          key: poetry-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            poetry-${{ hashFiles('**/poetry.lock') }}
-
-      - name: Set Poetry config
-        run: |
-          poetry config virtualenvs.in-project false
-          poetry config virtualenvs.path ~/.virtualenvs
-
-      - run: poetry install
-        if: steps.cache.outputs.cache-hit != 'true'
+      - run: pip install mutmut
 
       - name: Run mutmut tests
         run: mutmut run
@@ -46,7 +29,7 @@ jobs:
           --paths-to-mutate "src/"
           --tests-dir "test/"
           --paths-to-exclude=definitions.py
-          --runner "poetry run pytest -n auto -x -q test"
+          --runner "pytest -n auto -x -q test"
 
       - name: Display survived mutations
         if: failure()
@@ -69,9 +52,8 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install poetry
-      - run: poetry install
-      - run: poetry run pytest -m hypothesis -m hypothesis_nested --hypothesis-profile CI test
+      - run: pip install .
+      - run: pytest -m hypothesis -m hypothesis_nested --hypothesis-profile CI test
 
   test-corpus-part-1:
     name: Corpus tests. Part 1
@@ -86,10 +68,9 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install poetry
-      - run: poetry install
+      - run: pip install .
       # Azure.com APIs take >50% of all APIs in the test corpus
-      - run: poetry run pytest test-corpus -k 'azure.com'
+      - run: pytest test-corpus -k 'azure.com'
 
   test-corpus-part-2:
     name: Corpus tests. Part 2
@@ -104,11 +85,10 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install poetry
-      - run: poetry install
+      - run: pip install .
       # It matches 'microsoft.com/graph/1.0.1/openapi.yaml' that has >5000 API operations.
       # Running tests only for this API takes a lot of time and worth having a separate job due to the max time limit
-      - run: poetry run pytest test-corpus -k 'microsoft.com and graph'
+      - run: pytest test-corpus -k 'microsoft.com and graph'
 
   test-corpus-part-3:
     name: Corpus tests. Part 3
@@ -123,10 +103,9 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install poetry
-      - run: poetry install
+      - run: pip install .
       # It matches all Amazon APIs
-      - run: poetry run pytest test-corpus -k 'amazonaws.com'
+      - run: pytest test-corpus -k 'amazonaws.com'
 
   test-corpus-part-4:
     name: Corpus tests. Part 4
@@ -141,10 +120,9 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install poetry
-      - run: poetry install
+      - run: pip install .
       # It matches all Google APIs
-      - run: poetry run pytest test-corpus -k 'googleapis.com'
+      - run: pytest test-corpus -k 'googleapis.com'
 
   test-corpus-part-5:
     name: Corpus tests. Part 5
@@ -159,7 +137,6 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install poetry
-      - run: poetry install
+      - run: pip install .
       # It matches everything except that large MS API and all Azure.com | Amazon | Google APIs
-      - run: poetry run pytest test-corpus -k 'not (microsoft.com and graph) and not azure.com and not amazonaws.com and not googleapis.com'
+      - run: pytest test-corpus -k 'not (microsoft.com and graph) and not azure.com and not amazonaws.com and not googleapis.com'

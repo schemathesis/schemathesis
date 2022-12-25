@@ -5,7 +5,6 @@ from schemathesis.constants import (
     IS_PYTEST_ABOVE_54,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
     SCHEMATHESIS_TEST_CASE_HEADER,
-    USER_AGENT,
 )
 
 

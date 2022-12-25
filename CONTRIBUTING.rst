@@ -60,12 +60,11 @@ Using a local test server
 Schemathesis provides a local test server to simplify the development of new features or fixing bugs.
 It allows you to configure the generated API schema to reflect various common scenarios of server-side behavior.
 
-To start using it, you need to prepare a virtual environment with `poetry`_.
-Install ``poetry`` (check out the `installation guide`_) and run this command inside the project root:
+To start using it, you need to prepare a virtual environment.
 
 .. code:: bash
 
-    poetry install
+    pip install
 
 To start the server, run the following command in your terminal:
 
@@ -196,5 +195,3 @@ We prefer to keep all communications in English.
 Thanks!
 
 .. _@Stranger6667: https://github.com/Stranger6667
-.. _poetry: https://github.com/sdispater/poetry
-.. _installation guide: https://github.com/sdispater/poetry#installation
