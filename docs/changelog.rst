@@ -8,6 +8,7 @@ Changelog
 
 - Build: Switch the build backend to `Hatch <https://hatch.pypa.io/>`_.
 - Set ``starlette>=0.13,<0.21``.
+- Relax requirements for ``attrs``. `#1643`_
 
 .. _v3.17.5:
 
@@ -3135,6 +3136,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1643: https://github.com/schemathesis/schemathesis/issues/1643
 .. _#1632: https://github.com/schemathesis/schemathesis/issues/1632
 .. _#1631: https://github.com/schemathesis/schemathesis/issues/1631
 .. _#1625: https://github.com/schemathesis/schemathesis/issues/1625
