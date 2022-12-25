@@ -4,7 +4,7 @@ import pytest
 
 import schemathesis
 from schemathesis import Case
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
+from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
 
 schema = schemathesis.from_dict(app.openapi())
 
