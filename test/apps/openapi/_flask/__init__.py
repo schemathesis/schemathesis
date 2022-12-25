@@ -7,7 +7,7 @@ from uuid import uuid4
 
 import jsonschema
 import yaml
-from flask import Flask, Response, _request_ctx_stack, jsonify, request
+from flask import Flask, Response, jsonify, request
 from werkzeug.exceptions import BadRequest, GatewayTimeout, InternalServerError
 
 from ..schema import PAYLOAD_VALIDATOR, OpenAPIVersion, make_openapi_schema
@@ -35,7 +35,7 @@ def create_app(
 
     @app.before_request
     def store_request():
-        current_request = _request_ctx_stack.top.request
+        current_request = request._get_current_object()
         if request.path == "/schema.yaml":
             app.config["schema_requests"].append(current_request)
         else:
