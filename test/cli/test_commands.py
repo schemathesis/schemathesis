@@ -1316,7 +1316,7 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
         ignored_exception = "Exception ignored in: " in lines[7]
         assert lines[7] in expected or ignored_exception, lines
     if not optional_interrupt:
-        assert "!! KeyboardInterrupt !!" in lines[8], lines
+        assert any("!! KeyboardInterrupt !!" in line for line in lines[8:]), lines
     assert any("=== SUMMARY ===" in line for line in lines[7:])
 
 
