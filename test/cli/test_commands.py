@@ -739,7 +739,7 @@ def test_connection_timeout(cli, server, schema_url, workers):
         assert lines[8].startswith("GET /api/success .")
     else:
         # It could be in any sequence, because of multiple threads
-        assert lines[7].split("\n")[0] in ("F.", ".F")
+        assert lines[7].split("\n")[0] in ("F.", ".F", "FF")
     # And the proper error message should be displayed
     assert "1. Response timed out after 80.00ms" in result.stdout
 
