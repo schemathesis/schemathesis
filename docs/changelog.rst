@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Build: Switch the build backend to `Hatch <https://hatch.pypa.io/>`_.
+
 .. _v3.17.5:
 
 `3.17.5`_ - 2022-11-08

@@ -30,6 +30,7 @@ from schemathesis.constants import (
     DEFAULT_RESPONSE_TIMEOUT,
     FLAKY_FAILURE_MESSAGE,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
+    IS_PYTEST_ABOVE_54,
     SCHEMATHESIS_TEST_CASE_HEADER,
     USE_WAIT_FOR_SCHEMA_SUGGESTION_MESSAGE,
     CodeSampleStyle,
@@ -738,7 +739,7 @@ def test_connection_timeout(cli, server, schema_url, workers):
         assert lines[8].startswith("GET /api/success .")
     else:
         # It could be in any sequence, because of multiple threads
-        assert lines[7].split("\n")[0] in ("F.", ".F")
+        assert lines[7].split("\n")[0] in ("F.", ".F", "FF")
     # And the proper error message should be displayed
     assert "1. Response timed out after 80.00ms" in result.stdout
 
@@ -1311,10 +1312,11 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
     # way around
     # The app under test was killed ungracefully and since we run it in a child or the main thread
     # its output might occur in the captured stdout.
-    ignored_exception = "Exception ignored in: " in lines[7]
-    assert lines[7] in expected or ignored_exception, lines
+    if IS_PYTEST_ABOVE_54:
+        ignored_exception = "Exception ignored in: " in lines[7]
+        assert lines[7] in expected or ignored_exception, lines
     if not optional_interrupt:
-        assert "!! KeyboardInterrupt !!" in lines[8], lines
+        assert any("!! KeyboardInterrupt !!" in line for line in lines[8:]), lines
     assert any("=== SUMMARY ===" in line for line in lines[7:])
 
 
