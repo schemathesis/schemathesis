@@ -7,6 +7,7 @@ Changelog
 **Changed**
 
 - Build: Switch the build backend to `Hatch <https://hatch.pypa.io/>`_.
+- Set ``starlette>=0.13,<0.21``.
 
 .. _v3.17.5:
 
