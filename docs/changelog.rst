@@ -10,6 +10,11 @@ Changelog
 - Set ``starlette>=0.13,<0.21``.
 - Relax requirements for ``attrs``. `#1643`_
 
+**Fixed**
+
+- Remove recursive references from the last reference resolution level.
+  It works on the best effort basis and does not cover all possible cases. `#947`_
+
 .. _v3.17.5:
 
 `3.17.5`_ - 2022-11-08
@@ -3249,6 +3254,7 @@ Deprecated
 .. _#965: https://github.com/schemathesis/schemathesis/issues/965
 .. _#963: https://github.com/schemathesis/schemathesis/issues/963
 .. _#951: https://github.com/schemathesis/schemathesis/issues/951
+.. _#947: https://github.com/schemathesis/schemathesis/issues/947
 .. _#945: https://github.com/schemathesis/schemathesis/issues/945
 .. _#941: https://github.com/schemathesis/schemathesis/issues/941
 .. _#939: https://github.com/schemathesis/schemathesis/issues/939

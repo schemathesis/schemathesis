@@ -7,6 +7,7 @@ import jsonschema
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 
+from ..constants import ALL_KEYWORDS
 from .mutations import MutationContext
 from .types import Draw, Schema
 
@@ -31,46 +32,6 @@ def get_validator(cache_key: CacheKey) -> jsonschema.Draft4Validator:
     """Get JSON Schema validator for the given schema."""
     # Each operation / location combo has only a single schema, therefore could be cached
     return jsonschema.Draft4Validator(cache_key.schema)
-
-
-ALL_KEYWORDS = {
-    "additionalItems",
-    "additionalProperties",
-    "allOf",
-    "anyOf",
-    "const",
-    "contains",
-    "contentEncoding",
-    "contentMediaType",
-    "dependencies",
-    "enum",
-    "else",
-    "exclusiveMaximum",
-    "exclusiveMinimum",
-    "format",
-    "if",
-    "items",
-    "maxItems",
-    "maxLength",
-    "maxProperties",
-    "maximum",
-    "minItems",
-    "minLength",
-    "minProperties",
-    "minimum",
-    "multipleOf",
-    "not",
-    "oneOf",
-    "pattern",
-    "patternProperties",
-    "properties",
-    "propertyNames",
-    "$ref",
-    "required",
-    "then",
-    "type",
-    "uniqueItems",
-}
 
 
 @lru_cache()

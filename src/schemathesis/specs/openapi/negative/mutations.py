@@ -9,9 +9,9 @@ from hypothesis import reject
 from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
 
-from ..utils import is_header_location
+from ..utils import get_type, is_header_location
 from .types import Draw, Schema
-from .utils import can_negate, get_type
+from .utils import can_negate
 
 T = TypeVar("T")
 
