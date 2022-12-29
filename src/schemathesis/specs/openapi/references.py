@@ -9,7 +9,9 @@ import yaml
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...utils import StringDatesYAMLLoader
+from .constants import ALL_KEYWORDS
 from .converter import to_json_schema_recursive
+from .utils import get_type
 
 # Reference resolving will stop after this depth
 RECURSION_DEPTH_LIMIT = 100
@@ -64,8 +66,6 @@ class InliningResolver(jsonschema.RefResolver):
     # pylint: disable=function-redefined
     def resolve_all(self, item: JSONType, recursion_level: int = 0) -> JSONType:
         """Recursively resolve all references in the given object."""
-        if recursion_level > RECURSION_DEPTH_LIMIT:
-            return item
         if isinstance(item, dict):
             ref = item.get("$ref")
             if ref is not None and isinstance(ref, str):
@@ -74,7 +74,9 @@ class InliningResolver(jsonschema.RefResolver):
                     # In other cases, this method create new objects for mutable types (dict & list)
                     next_recursion_level = recursion_level + 1
                     if next_recursion_level > RECURSION_DEPTH_LIMIT:
-                        return deepcopy(resolved)
+                        copied = deepcopy(resolved)
+                        remove_optional_references(copied)
+                        return copied
                     return self.resolve_all(resolved, next_recursion_level)
             return {key: self.resolve_all(sub_item, recursion_level) for key, sub_item in item.items()}
         if isinstance(item, list):
@@ -113,3 +115,93 @@ class ConvertingResolver(InliningResolver):
             document, nullable_name=self.nullable_name, is_response_schema=self.is_response_schema
         )
         return url, document
+
+
+def remove_optional_references(schema: Dict[str, Any]) -> None:
+    """Remove optional parts of the schema that contain references.
+
+    It covers only the most popular cases, as removing all optional parts is complicated.
+    We might fall back to filtering out invalid cases in the future.
+    """
+
+    def clean_properties(s: Dict[str, Any]) -> None:
+        properties = s["properties"]
+        required = s.get("required", [])
+        for name, value in list(properties.items()):
+            if name not in required and contains_ref(value):
+                # Drop the property - it will not be generated
+                del properties[name]
+            elif on_single_item_combinators(value):
+                properties.pop(name, None)
+            else:
+                stack.append(value)
+
+    def clean_items(s: Dict[str, Any]) -> None:
+        items = s["items"]
+        min_items = s.get("minItems", 0)
+        if not min_items:
+            if isinstance(items, dict) and ("$ref" in items or on_single_item_combinators(items)):
+                force_empty_list(s)
+            if isinstance(items, list) and any_ref(items):
+                force_empty_list(s)
+
+    def clean_additional_properties(s: Dict[str, Any]) -> None:
+        additional_properties = s["additionalProperties"]
+        if isinstance(additional_properties, dict) and "$ref" in additional_properties:
+            s["additionalProperties"] = False
+
+    def force_empty_list(s: Dict[str, Any]) -> None:
+        del s["items"]
+        s["maxItems"] = 0
+
+    def any_ref(i: List[Dict[str, Any]]) -> bool:
+        return any("$ref" in item for item in i)
+
+    def contains_ref(s: Dict[str, Any]) -> bool:
+        if "$ref" in s:
+            return True
+        i = s.get("items")
+        return (isinstance(i, dict) and "$ref" in i) or isinstance(i, list) and any_ref(i)
+
+    def can_elide(s: Dict[str, Any]) -> bool:
+        # Whether this schema could be dropped from a list of schemas
+        type_ = get_type(s)
+        if type_ == ["object"]:
+            # Empty object is valid for this schema -> could be dropped
+            return s.get("required", []) == [] and s.get("minProperties", 0) == 0
+        # Has at least one keyword -> should not be removed
+        return not any(k in ALL_KEYWORDS for k in s)
+
+    def on_single_item_combinators(s: Dict[str, Any]) -> List[str]:
+        # Schema example:
+        # {
+        #     "type": "object",
+        #     "properties": {
+        #         "parent": {
+        #             "allOf": [{"$ref": "#/components/schemas/User"}]
+        #         }
+        #     }
+        # }
+        found = []
+        for keyword in ("allOf", "oneOf", "anyOf"):
+            v = s.get(keyword)
+            if v is not None:
+                elided = [sub for sub in v if not can_elide(sub)]
+                if len(elided) == 1 and "$ref" in elided[0]:
+                    found.append(keyword)
+        return found
+
+    stack = [schema]
+    while stack:
+        definition = stack.pop()
+        # Optional properties
+        if "properties" in definition:
+            clean_properties(definition)
+        # Optional items
+        if "items" in definition:
+            clean_items(definition)
+        # Not required additional properties
+        if "additionalProperties" in definition:
+            clean_additional_properties(definition)
+        for k in on_single_item_combinators(definition):
+            del definition[k]

@@ -1,6 +1,9 @@
 from pathlib import Path
 
 import pytest
+from hypothesis import HealthCheck, given, settings
+from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
+from jsonschema.validators import Draft4Validator
 
 import schemathesis
 
@@ -66,58 +69,147 @@ def test_resolve(petstore, ref, expected):
     assert petstore.resolver.resolve_all(ref) == expected
 
 
-def test_recursive_reference(mocker):
+def test_recursive_reference(mocker, schema_with_recursive_references):
     mocker.patch("schemathesis.specs.openapi.references.RECURSION_DEPTH_LIMIT", 1)
     reference = {"$ref": "#/components/schemas/Node"}
-    raw_schema = {
-        "info": {"description": "Test", "title": "Test", "version": "1.0.0"},
-        "openapi": "3.0.2",
-        "paths": {
-            "/events": {
-                "get": {
-                    "description": "Test",
-                    "responses": {
-                        "200": {
-                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Response"}}},
-                            "description": "Test",
-                        },
-                    },
-                    "summary": "Test",
-                }
-            }
-        },
-        "components": {
-            "schemas": {
-                "Response": {
-                    "description": "Test",
-                    "properties": {"data": reference},
-                    "required": ["data"],
-                    "type": "object",
-                },
-                "Node": {
-                    "description": "Test",
-                    "properties": {"children": {"items": reference, "type": "array"}},
-                    "type": "object",
-                },
-            }
-        },
-        "servers": [{"url": "/abc"}],
-    }
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.from_dict(schema_with_recursive_references)
     assert schema.resolver.resolve_all(reference) == {
-        "description": "Test",
-        "properties": {
-            "children": {
-                "items": {
-                    "description": "Test",
-                    "properties": {"children": {"items": reference, "type": "array"}},
-                    "type": "object",
-                },
-                "type": "array",
-            }
-        },
+        "properties": {"child": {"properties": {"child": reference}, "required": ["child"], "type": "object"}},
+        "required": ["child"],
         "type": "object",
     }
+
+
+USER_REFERENCE = {"$ref": "#/components/schemas/User"}
+ELIDABLE_SCHEMA = {"description": "Test", "type": "object", "properties": {"foo": {"type": "integer"}}}
+ALL_OF_ROOT = {"allOf": [USER_REFERENCE, {"description": "Test"}], "type": "object", "additionalProperties": False}
+
+
+def build_schema_with_recursion(schema, definition):
+    schema["paths"]["/users"] = {
+        "post": {
+            "description": "Test",
+            "summary": "Test",
+            "requestBody": {"content": {"application/json": {"schema": USER_REFERENCE}}, "required": True},
+            "responses": {"200": {"description": "Test"}},
+        }
+    }
+    schema["components"] = {"schemas": {"User": definition}}
+
+
+@pytest.mark.parametrize(
+    "definition",
+    (
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"parent": USER_REFERENCE, "foo": {"type": "integer"}},
+        },
+        {"type": "array", "items": USER_REFERENCE, "maxItems": 1},
+        {"type": "array", "items": [USER_REFERENCE, {"type": "integer"}], "maxItems": 1},
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "children": {
+                    "items": USER_REFERENCE,
+                    "maxItems": 1,
+                    "type": "array",
+                },
+            },
+        },
+        {"type": "object", "additionalProperties": USER_REFERENCE, "maxProperties": 1},
+        {"type": "object", "additionalProperties": False, "properties": {"parent": {"allOf": [USER_REFERENCE]}}},
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"parent": {"allOf": [USER_REFERENCE, {"description": "Test"}]}},
+        },
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"parent": {"allOf": [USER_REFERENCE, ELIDABLE_SCHEMA]}},
+        },
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"parent": {"allOf": [ELIDABLE_SCHEMA, USER_REFERENCE]}},
+        },
+        {"type": "array", "items": {"allOf": [USER_REFERENCE]}, "maxItems": 1},
+        ALL_OF_ROOT,
+    ),
+    ids=[
+        "properties",
+        "items-object",
+        "items-array",
+        "items-inside-properties",
+        "additionalProperties",
+        "allOf-one-item-properties",
+        "allOf-one-item-properties-with-empty-schema",
+        "allOf-one-item-properties-with-elidable-schema-1",
+        "allOf-one-item-properties-with-elidable-schema-2",
+        "allOf-one-item-items",
+        "allOf-one-item-root",
+    ],
+)
+@pytest.mark.hypothesis_nested
+def test_drop_recursive_references_from_the_last_resolution_level(empty_open_api_3_schema, definition):
+    build_schema_with_recursion(empty_open_api_3_schema, definition)
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    validator = Draft4Validator({**USER_REFERENCE, "components": empty_open_api_3_schema["components"]})
+
+    @given(case=schema["/users"]["POST"].as_strategy())
+    @settings(max_examples=25, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much], deadline=None)
+    def test(case):
+        # Generated payload should be valid for the original schema (with references)
+        try:
+            validator.validate(case.body)
+        except RecursionError:
+            # jsonschema infinitely recurse on some cases
+            if definition is not ALL_OF_ROOT:
+                raise
+            pass
+
+    test()
+
+
+@pytest.mark.parametrize(
+    "definition",
+    (
+        USER_REFERENCE,
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["parent"],
+            "properties": {"parent": USER_REFERENCE, "foo": {"type": "integer"}},
+        },
+        {"type": "array", "items": USER_REFERENCE, "minItems": 1},
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "parent": {
+                    "allOf": [
+                        {"type": "object", "properties": {"foo": {"type": "integer"}}, "required": ["foo"]},
+                        USER_REFERENCE,
+                    ]
+                }
+            },
+        },
+    ),
+)
+def test_non_removable_recursive_references(empty_open_api_3_schema, definition):
+    build_schema_with_recursion(empty_open_api_3_schema, definition)
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    @given(case=schema["/users"]["POST"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        pass
+
+    with pytest.raises(HypothesisRefResolutionError):
+        test()
 
 
 def test_simple_dereference(testdir):

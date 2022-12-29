@@ -84,7 +84,10 @@ def deeply_nested_schema(empty_open_api_3_schema):
             "foo3": {"$ref": "#/components/schemas/foo4"},
             "foo4": {"$ref": "#/components/schemas/foo5"},
             "foo5": {"$ref": "#/components/schemas/foo6"},
-            "foo6": {"$ref": "#/components/schemas/bar"},
+            "foo6": {"$ref": "#/components/schemas/foo7"},
+            "foo7": {"$ref": "#/components/schemas/foo8"},
+            "foo8": {"$ref": "#/components/schemas/foo9"},
+            "foo9": {"$ref": "#/components/schemas/bar"},
             "bar": {
                 "type": "string",
             },
@@ -240,7 +243,7 @@ def _scoped_remote_schema(testdir):
 def test_inline_remote_refs(testdir, deeply_nested_schema, setup, check):
     # See GH-986
     setup(testdir)
-    deeply_nested_schema["components"]["schemas"]["foo6"] = {"$ref": "bar.json#/bar"}
+    deeply_nested_schema["components"]["schemas"]["foo9"] = {"$ref": "bar.json#/bar"}
 
     original = json.dumps(deeply_nested_schema, sort_keys=True, ensure_ascii=True)
     schema = schemathesis.from_dict(deeply_nested_schema)

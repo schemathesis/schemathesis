@@ -504,8 +504,8 @@ def schema_with_recursive_references():
             "schemas": {
                 "Node": {
                     "type": "object",
-                    "required": ["children"],
-                    "properties": {"children": {"type": "array", "items": {"$ref": "#/components/schemas/Node"}}},
+                    "required": ["child"],
+                    "properties": {"child": {"$ref": "#/components/schemas/Node"}},
                 }
             }
         },
@@ -516,20 +516,7 @@ def schema_with_recursive_references():
                     "description": "",
                     "requestBody": {
                         "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["nodes"],
-                                    "properties": {
-                                        "nodes": {
-                                            "type": "object",
-                                            "additionalProperties": {"$ref": "#/components/schemas/Node"},
-                                        }
-                                    },
-                                }
-                            }
-                        },
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Node"}}},
                     },
                     "responses": {
                         "200": {
