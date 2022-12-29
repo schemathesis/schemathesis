@@ -182,14 +182,14 @@ class BaseOpenAPISchema(BaseSchema):
                     continue
                 self.dispatch_hook("before_process_path", context, path, methods)
                 scope, raw_methods = self._resolve_methods(methods)
-                common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 5)
+                common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 8)
                 for method, definition in raw_methods.items():
                     try:
                         # Setting a low recursion limit doesn't solve the problem with recursive references & inlining
                         # too much but decreases the number of cases when Schemathesis stuck on this step.
                         self.resolver.push_scope(scope)
                         try:
-                            resolved_definition = self.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 5)
+                            resolved_definition = self.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 8)
                         finally:
                             self.resolver.pop_scope()
                         # Only method definitions are parsed
@@ -290,13 +290,13 @@ class BaseOpenAPISchema(BaseSchema):
     def _group_operations_by_id(self) -> Generator[Tuple[str, APIOperation], None, None]:
         for path, methods in self.raw_schema["paths"].items():
             scope, raw_methods = self._resolve_methods(methods)
-            common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 5)
+            common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 8)
             for method, definition in methods.items():
                 if method not in HTTP_METHODS or "operationId" not in definition:
                     continue
                 self.resolver.push_scope(scope)
                 try:
-                    resolved_definition = self.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 5)
+                    resolved_definition = self.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 8)
                 finally:
                     self.resolver.pop_scope()
                 parameters = self.collect_parameters(
@@ -316,7 +316,7 @@ class BaseOpenAPISchema(BaseSchema):
         resolved_definition = self.resolver.resolve_all(data)
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
         _, methods = self.resolver.resolve(parent_ref)
-        common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 5)
+        common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 8)
         parameters = self.collect_parameters(
             itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
         )

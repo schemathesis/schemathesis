@@ -180,7 +180,7 @@ def test_runner(schema_path):
         if schema_id in XFAILING and ev.current_operation in XFAILING[schema_id]:
             if ev.result.errors:
                 message = XFAILING[schema_id][ev.current_operation]
-                # If is is failed for some other reason, then an assertion will be risen
+                # If failed for some other reason, then an assertion will be risen
                 return any(message in err.exception_with_traceback for err in ev.result.errors)
             pytest.fail("Expected a failure")
         return False
