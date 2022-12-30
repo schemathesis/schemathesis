@@ -309,7 +309,15 @@ def run_test(  # pylint: disable=too-many-locals
     setup_hypothesis_database_key(test, operation)
     try:
         with catch_warnings(record=True) as warnings, capture_hypothesis_output() as hypothesis_output:
-            test(checks, targets, result, errors=errors, headers=headers, **kwargs)
+            test(
+                checks,
+                targets,
+                result,
+                errors=errors,
+                headers=headers,
+                data_generation_methods=data_generation_methods,
+                **kwargs,
+            )
         # Test body was not executed at all - Hypothesis did not generate any tests, but there is no error
         if not result.is_executed:
             status = Status.skip
@@ -572,6 +580,12 @@ class ErrorCollector:
         raise NonCheckError from None
 
 
+def _force_data_generation_method(values: List[DataGenerationMethod], case: Case) -> None:
+    # Set data generation method to the one that actually used
+    data_generation_method = cast(DataGenerationMethod, case.data_generation_method)
+    values[:] = [data_generation_method]
+
+
 def network_test(
     case: Case,
     checks: Iterable[CheckFunction],
@@ -585,11 +599,13 @@ def network_test(
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
     max_response_time: Optional[int],
+    data_generation_methods: List[DataGenerationMethod],
     dry_run: bool,
     errors: List[Exception],
 ) -> None:
     """A single test body will be executed against the target."""
     with ErrorCollector(errors):
+        _force_data_generation_method(data_generation_methods, case)
         result.mark_executed()
         headers = headers or {}
         if "user-agent" not in {header.lower() for header in headers}:
@@ -706,10 +722,12 @@ def wsgi_test(
     store_interactions: bool,
     feedback: Feedback,
     max_response_time: Optional[int],
+    data_generation_methods: List[DataGenerationMethod],
     dry_run: bool,
     errors: List[Exception],
 ) -> None:
     with ErrorCollector(errors):
+        _force_data_generation_method(data_generation_methods, case)
         result.mark_executed()
         headers = _prepare_wsgi_headers(headers, auth, auth_type)
         if not dry_run:
@@ -793,11 +811,13 @@ def asgi_test(
     headers: Optional[Dict[str, Any]],
     feedback: Feedback,
     max_response_time: Optional[int],
+    data_generation_methods: List[DataGenerationMethod],
     dry_run: bool,
     errors: List[Exception],
 ) -> None:
     """A single test body will be executed against the target."""
     with ErrorCollector(errors):
+        _force_data_generation_method(data_generation_methods, case)
         result.mark_executed()
         headers = headers or {}
 

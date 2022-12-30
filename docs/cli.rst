@@ -280,6 +280,9 @@ Schemathesis provides the following extra fields:
 - ``http_interactions.seed``. The Hypothesis seed used in that particular case could be used as an argument to ``--hypothesis-seed`` CLI option to reproduce this request.
 - ``http_interactions.elapsed``. Time in seconds that a request took.
 - ``http_interactions.checks``. A list of executed checks and and their status.
+- ``http_interactions.data_generation_method``. The way test case was generated - ``positive`` or ``negative``.
+- ``http_interactions.thread_id``. Unique integer that identifies the thread where a test case was used.
+- ``http_interactions.correlation_id``. A unique ID which connects events that happen during testing of the same API operation
 
 By default, payloads are converted to strings, but similar to the original Ruby's VCR, Schemathesis supports preserving exact body bytes via the ``--cassette-preserve-exact-body-bytes`` option.
 
