@@ -60,6 +60,12 @@ class CassetteWriter(EventHandler):
             self.queue.put(
                 Process(
                     seed=seed,
+                    correlation_id=event.correlation_id,
+                    thread_id=event.thread_id,
+                    # NOTE: For backward compatibility reasons AfterExecution stores a list of data generation methods
+                    # The list always contains one element - the method that was actually used for generation
+                    # This will change in the future
+                    data_generation_method=event.data_generation_method[0],
                     interactions=event.result.interactions,
                 )
             )
@@ -84,6 +90,9 @@ class Process:
     """A new chunk of data should be processed."""
 
     seed: int = attr.ib()  # pragma: no mutate
+    correlation_id: str = attr.ib()  # pragma: no mutate
+    thread_id: int = attr.ib()  # pragma: no mutate
+    data_generation_method: constants.DataGenerationMethod = attr.ib()  # pragma: no mutate
     interactions: List[SerializedInteraction] = attr.ib()  # pragma: no mutate
 
 
@@ -106,10 +115,10 @@ def worker(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, q
 
     This implementation doesn't use `pyyaml` package and composes YAML manually as string due to the following reasons:
       - It is much faster. The string-based approach gives only ~2.5% time overhead when `yaml.CDumper` has ~11.2%;
-      - Implementation complexity. We have a quite simple format where all values are strings, and it is much simpler to
-        implement it with string composition rather than with adjusting `yaml.Serializer` to emit explicit types.
-        Another point is that with `pyyaml` we need to emit events and handle some low-level details like providing
-        tags, anchors to have incremental writing, with strings it is much simpler.
+      - Implementation complexity. We have a quite simple format where almost all values are strings, and it is much
+        simpler to implement it with string composition rather than with adjusting `yaml.Serializer` to emit explicit
+        types. Another point is that with `pyyaml` we need to emit events and handle some low-level details like
+        providing tags, anchors to have incremental writing, with primitive types it is much simpler.
     """
     current_id = 1
     stream = file_handle.open()
@@ -186,6 +195,9 @@ http_interactions:"""
                     f"""\n- id: '{current_id}'
   status: '{status}'
   seed: '{item.seed}'
+  thread_id: {item.thread_id}
+  correlation_id: '{item.correlation_id}'
+  data_generation_method: '{item.data_generation_method.value}'
   elapsed: '{interaction.response.elapsed}'
   recorded_at: '{interaction.recorded_at}'
   checks:

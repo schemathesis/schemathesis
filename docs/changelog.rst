@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Extra information to VCR cassettes.
+
 **Changed**
 
 - Build: Switch the build backend to `Hatch <https://hatch.pypa.io/>`_.
