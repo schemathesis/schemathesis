@@ -1,6 +1,8 @@
 import base64
 import io
+import threading
 from urllib.parse import parse_qsl, quote_plus, unquote_plus, urlencode, urlparse, urlunparse
+from uuid import UUID
 
 import pytest
 import requests
@@ -18,7 +20,7 @@ from schemathesis.cli.cassettes import (
     get_prepared_request,
     write_double_quoted,
 )
-from schemathesis.constants import USER_AGENT
+from schemathesis.constants import USER_AGENT, DataGenerationMethod
 from schemathesis.models import Request
 
 
@@ -39,26 +41,36 @@ def load_response_body(cassette, idx):
     return body["string"]
 
 
+@pytest.mark.parametrize("data_generation_method", [m.value for m in DataGenerationMethod.all()] + ["all"])
 @pytest.mark.parametrize("args", ((), ("--cassette-preserve-exact-body-bytes",)), ids=("plain", "base64"))
 @pytest.mark.operations("success", "upload_file")
-def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples, args):
+def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples, args, data_generation_method):
     hypothesis_max_examples = hypothesis_max_examples or 2
     result = cli.run(
         schema_url,
         f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples}",
+        f"--data-generation-method={data_generation_method}",
         "--hypothesis-seed=1",
         *args,
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
-    assert len(cassette["http_interactions"]) == 1 + hypothesis_max_examples
+    assert len(cassette["http_interactions"]) in (hypothesis_max_examples, hypothesis_max_examples + 1)
     assert cassette["http_interactions"][0]["id"] == "1"
     assert cassette["http_interactions"][1]["id"] == "2"
     assert cassette["http_interactions"][0]["status"] == "SUCCESS"
     assert cassette["http_interactions"][0]["seed"] == "1"
+    if data_generation_method == "all":
+        assert cassette["http_interactions"][0]["data_generation_method"] in ["positive", "negative"]
+    else:
+        assert cassette["http_interactions"][0]["data_generation_method"] == data_generation_method
+    assert cassette["http_interactions"][0]["thread_id"] == threading.get_ident()
+    correlation_id = cassette["http_interactions"][0]["correlation_id"]
+    UUID(correlation_id)
     assert float(cassette["http_interactions"][0]["elapsed"]) >= 0
-    assert load_response_body(cassette, 0) == '{"success": true}'
+    if data_generation_method == "positive":
+        assert load_response_body(cassette, 0) == '{"success": true}'
     assert all("checks" in interaction for interaction in cassette["http_interactions"])
     assert len(cassette["http_interactions"][0]["checks"]) == 1
     assert cassette["http_interactions"][0]["checks"][0] == {
