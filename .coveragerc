@@ -12,6 +12,7 @@ source =
 show_missing = true
 precision = 2
 exclude_lines =
+   pragma: no cover
    raise NotImplementedError
    if TYPE_CHECKING:
    pass

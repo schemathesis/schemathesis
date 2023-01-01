@@ -36,7 +36,6 @@ from schemathesis.constants import (
     CodeSampleStyle,
 )
 from schemathesis.extra._flask import run_server
-from schemathesis.hooks import unregister_all
 from schemathesis.models import APIOperation
 from schemathesis.runner import DEFAULT_CHECKS, from_schema
 from schemathesis.runner.impl import threadpool
@@ -269,6 +268,8 @@ def test_commands_run_help(cli):
         "                                  Defines how Schemathesis generates data for",
         "                                  tests.  [default:",
         "                                  DataGenerationMethod.positive]",
+        "  --data-generation-unique        Forces Schemathesis to generate unique test",
+        "                                  cases.",
         "  -t, --target [response_time|all]",
         "                                  Targets for input generation.",
         "  -x, --exitfirst                 Exit instantly on first error or failed test.",
@@ -1254,13 +1255,6 @@ def test_add_case_output(testdir, cli, hypothesis_max_examples, schema_url):
         filter(lambda line: line.strip().startswith("add_case_check"), result.stdout.split("\n"))
     )
     assert "8 / 12" in add_case_check_line
-
-
-@pytest.fixture
-def reset_hooks():
-    yield
-    unregister_all()
-    reset_checks()
 
 
 @pytest.fixture(
