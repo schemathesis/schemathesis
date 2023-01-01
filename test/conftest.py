@@ -15,8 +15,10 @@ from urllib3 import HTTPResponse
 
 import schemathesis.cli
 from schemathesis._compat import IS_HYPOTHESIS_ABOVE_6_54, metadata
+from schemathesis.cli import reset_checks
 from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
+from schemathesis.hooks import unregister_all
 from schemathesis.service import HOSTS_PATH_ENV_VAR
 from schemathesis.specs.openapi import loaders as oas_loaders
 from schemathesis.utils import WSGIResponse
@@ -41,6 +43,13 @@ def setup(tmp_path_factory):
     hosts_path = config_dir / "hosts.toml"
     hosts_path.touch(exist_ok=True)
     os.environ[HOSTS_PATH_ENV_VAR] = str(hosts_path)
+
+
+@pytest.fixture
+def reset_hooks():
+    yield
+    unregister_all()
+    reset_checks()
 
 
 @pytest.fixture(scope="session")

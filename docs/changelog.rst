@@ -7,6 +7,8 @@ Changelog
 **Added**
 
 - Extra information to VCR cassettes.
+- The ``--data-generation-unique`` CLI option that forces Schemathesis to generate unique test cases only.
+  This feature is also available as a hook in ``schemathesis.contrib.unique_data``.
 
 **Changed**
 

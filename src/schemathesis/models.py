@@ -2,6 +2,7 @@
 import base64
 import datetime
 import http
+import json
 from collections import Counter
 from contextlib import contextmanager
 from copy import deepcopy
@@ -100,7 +101,14 @@ def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
     reject()  # type: ignore
 
 
-@attr.s(slots=True, repr=False)  # pragma: no mutate
+def _serialize_unknown(data: Any) -> str:
+    if isinstance(data, bytes):
+        return base64.b64encode(data).decode("utf8")
+    # Schemathesis does not generate other types
+    raise TypeError(f"Object of type {data.__class__.__name__} is not JSON serializable")  # pragma: no cover
+
+
+@attr.s(slots=True, repr=False, hash=False)  # pragma: no mutate
 class Case:  # pylint: disable=too-many-public-methods
     """A single test case parameters."""
 
@@ -133,6 +141,25 @@ class Case:  # pylint: disable=too-many-public-methods
                     parts.append(", ")
                 parts.extend((name, "=", repr(value)))
         return "".join(parts) + ")"
+
+    def __hash__(self) -> int:
+        value = hash(
+            (
+                self.media_type,
+                ("path_parameters", tuple(self.path_parameters.items()) if self.path_parameters else None),
+                ("headers", tuple(self.headers.items()) if self.headers else None),
+                ("cookies", tuple(self.cookies.items()) if self.cookies else None),
+                ("query", tuple(self.query.items()) if self.query else None),
+            )
+        )
+        if self.body is not NOT_SET:
+            if isinstance(self.body, (dict, list)):
+                # The simplest way to get a hash of a potentially nested structure
+                value ^= hash(json.dumps(self.body, sort_keys=True, default=_serialize_unknown))
+            else:
+                # These types should be hashable
+                value ^= hash(self.body)
+        return value
 
     @deprecated_property(removed_in="4.0", replacement="operation")
     def endpoint(self) -> "APIOperation":

@@ -44,7 +44,7 @@ def test_global_query_hook(schema, schema_url):
     strategy = schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3)
+    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow])
     def test(case):
         assert case.query["id"].isdigit()
 

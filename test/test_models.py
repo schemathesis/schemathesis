@@ -196,7 +196,7 @@ def test_call_and_validate(openapi3_schema_url):
     api_schema = schemathesis.from_uri(openapi3_schema_url)
 
     @given(case=api_schema["/success"]["GET"].as_strategy())
-    @settings(max_examples=1)
+    @settings(max_examples=1, deadline=None)
     def test(case):
         case.call_and_validate()
 

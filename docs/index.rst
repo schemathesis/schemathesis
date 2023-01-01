@@ -68,6 +68,7 @@ User's Guide
    continuous_integration
    service
    auth
+   contrib
    stateful
    how
    compatibility

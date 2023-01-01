@@ -17,6 +17,7 @@ import requests
 import yaml
 
 from .. import checks as checks_module
+from .. import contrib
 from .. import fixups as _fixups
 from .. import runner, service
 from .. import targets as targets_module
@@ -245,6 +246,14 @@ REPORT_TO_SERVICE = object()
     type=DATA_GENERATION_METHOD_TYPE,
     default=DataGenerationMethod.default(),
     callback=callbacks.convert_data_generation_method,
+    show_default=True,
+)
+@click.option(
+    "--data-generation-unique",
+    "data_generation_unique",
+    help="Forces Schemathesis to generate unique test cases.",
+    is_flag=True,
+    default=False,
     show_default=True,
 )
 @click.option(
@@ -592,6 +601,7 @@ def run(
     headers: Dict[str, str],
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
     data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
+    data_generation_unique: bool = False,
     max_response_time: Optional[int] = None,
     targets: Iterable[str] = DEFAULT_TARGETS_NAMES,
     exit_first: bool = False,
@@ -709,6 +719,10 @@ def run(
             _fixups.install()
         else:
             _fixups.install(fixups)
+
+    if data_generation_unique:
+        contrib.unique_data.install()
+
     hypothesis_settings = prepare_hypothesis_settings(
         database=hypothesis_database,
         deadline=hypothesis_deadline,
