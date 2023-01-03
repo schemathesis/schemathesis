@@ -927,15 +927,19 @@ class Interaction:
     response: Response = attr.ib()  # pragma: no mutate
     checks: List[Check] = attr.ib()  # pragma: no mutate
     status: Status = attr.ib()  # pragma: no mutate
+    data_generation_method: DataGenerationMethod = attr.ib()  # pragma: no mutate
     recorded_at: str = attr.ib(factory=lambda: datetime.datetime.now().isoformat())  # pragma: no mutate
 
     @classmethod
-    def from_requests(cls, response: requests.Response, status: Status, checks: List[Check]) -> "Interaction":
+    def from_requests(
+        cls, case: Case, response: requests.Response, status: Status, checks: List[Check]
+    ) -> "Interaction":
         return cls(
             request=Request.from_prepared_request(response.request),
             response=Response.from_requests(response),
             status=status,
             checks=checks,
+            data_generation_method=cast(DataGenerationMethod, case.data_generation_method),
         )
 
     @classmethod
@@ -955,6 +959,7 @@ class Interaction:
             response=Response.from_wsgi(response, elapsed),
             status=status,
             checks=checks,
+            data_generation_method=cast(DataGenerationMethod, case.data_generation_method),
         )
 
 
@@ -1038,8 +1043,10 @@ class TestResult:
     def add_error(self, exception: Exception, example: Optional[Case] = None) -> None:
         self.errors.append((exception, example))
 
-    def store_requests_response(self, response: requests.Response, status: Status, checks: List[Check]) -> None:
-        self.interactions.append(Interaction.from_requests(response, status, checks))
+    def store_requests_response(
+        self, case: Case, response: requests.Response, status: Status, checks: List[Check]
+    ) -> None:
+        self.interactions.append(Interaction.from_requests(case, response, status, checks))
 
     def store_wsgi_response(
         self,
