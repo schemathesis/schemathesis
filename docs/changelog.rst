@@ -15,6 +15,7 @@ Changelog
 - Build: Switch the build backend to `Hatch <https://hatch.pypa.io/>`_.
 - Set ``starlette>=0.13,<0.21``.
 - Relax requirements for ``attrs``. `#1643`_
+- Avoid occasional empty lines in cassettes.
 
 **Fixed**
 
