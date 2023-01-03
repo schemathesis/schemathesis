@@ -108,6 +108,10 @@ def _serialize_unknown(data: Any) -> str:
     raise TypeError(f"Object of type {data.__class__.__name__} is not JSON serializable")  # pragma: no cover
 
 
+def serialize(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, default=_serialize_unknown)
+
+
 @attr.s(slots=True, repr=False, hash=False)  # pragma: no mutate
 class Case:  # pylint: disable=too-many-public-methods
     """A single test case parameters."""
@@ -146,16 +150,16 @@ class Case:  # pylint: disable=too-many-public-methods
         value = hash(
             (
                 self.media_type,
-                ("path_parameters", tuple(self.path_parameters.items()) if self.path_parameters else None),
-                ("headers", tuple(self.headers.items()) if self.headers else None),
-                ("cookies", tuple(self.cookies.items()) if self.cookies else None),
-                ("query", tuple(self.query.items()) if self.query else None),
+                ("path_parameters", serialize(dict(self.path_parameters)) if self.path_parameters else None),
+                ("headers", serialize(dict(self.headers)) if self.headers else None),
+                ("cookies", serialize(dict(self.cookies)) if self.cookies else None),
+                ("query", serialize(dict(self.query)) if self.query else None),
             )
         )
         if self.body is not NOT_SET:
             if isinstance(self.body, (dict, list)):
                 # The simplest way to get a hash of a potentially nested structure
-                value ^= hash(json.dumps(self.body, sort_keys=True, default=_serialize_unknown))
+                value ^= hash(serialize(self.body))
             else:
                 # These types should be hashable
                 value ^= hash(self.body)
