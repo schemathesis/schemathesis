@@ -105,12 +105,13 @@ def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, c
     assert load_response_body(cassette, 2) == '{"result": "flaky!"}'
 
 
-def test_encoding_error(testdir, cli, cassette_path, hypothesis_max_examples, openapi3_base_url):
+def test_bad_yaml_headers(testdir, cli, cassette_path, hypothesis_max_examples, openapi3_base_url):
     # See GH-708
     # When the schema expects an input that is not ascii and represented as UTF-8
     # And is not representable in CP1251. E.g. "àààà"
     # And these interactions are recorded to a cassette
     fixed_header = "àààà"
+    header_name = "*lh"
     raw_schema = {
         "openapi": "3.0.2",
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -119,7 +120,7 @@ def test_encoding_error(testdir, cli, cassette_path, hypothesis_max_examples, op
                 "post": {
                     "parameters": [
                         {
-                            "name": "X-id",
+                            "name": header_name,
                             "in": "header",
                             "required": True,
                             "schema": {"type": "string", "enum": [fixed_header]},
@@ -146,7 +147,7 @@ def test_encoding_error(testdir, cli, cassette_path, hypothesis_max_examples, op
     # And the cassette should be correctly recorded
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) == 1
-    assert cassette["http_interactions"][0]["request"]["headers"]["X-id"] == [fixed_header]
+    assert cassette["http_interactions"][0]["request"]["headers"][header_name] == [fixed_header]
 
 
 def test_get_command_representation_unknown():
