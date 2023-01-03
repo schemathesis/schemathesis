@@ -143,7 +143,8 @@ def worker(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, q
         def format_request_body(output: IO, request: Request) -> None:
             if request.body is not None:
                 output.write(
-                    f"""    body:
+                    f"""
+    body:
       encoding: 'utf-8'
       base64_string: '{request.body}'"""
                 )
@@ -162,7 +163,8 @@ def worker(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, q
             if request.body is not None:
                 string = _safe_decode(request.body, "utf8")
                 output.write(
-                    """    body:
+                    """
+    body:
       encoding: 'utf-8'
       string: """
                 )
@@ -206,8 +208,7 @@ http_interactions:"""
     uri: '{interaction.request.uri}'
     method: '{interaction.request.method}'
     headers:
-{format_headers(interaction.request.headers)}
-"""
+{format_headers(interaction.request.headers)}"""
                 )
                 format_request_body(stream, interaction.request)
                 stream.write(
