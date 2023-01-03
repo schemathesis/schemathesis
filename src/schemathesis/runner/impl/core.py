@@ -690,7 +690,7 @@ def _network_test(
         raise
     finally:
         if store_interactions:
-            result.store_requests_response(response, status, check_results)
+            result.store_requests_response(case, response, status, check_results)
     feedback.add_test_case(case, response)
     return response
 
@@ -864,6 +864,6 @@ def _asgi_test(
         raise
     finally:
         if store_interactions:
-            result.store_requests_response(response, status, check_results)
+            result.store_requests_response(case, response, status, check_results)
     feedback.add_test_case(case, response)
     return response
