@@ -1,12 +1,11 @@
 import json
 
 import pytest
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, Phase, given, settings
 from pytest import ExitCode
 
 import schemathesis
-from schemathesis import contrib
-from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
+from schemathesis import DataGenerationMethod, contrib
 
 
 @pytest.fixture
@@ -53,10 +52,15 @@ def raw_schema(request, empty_open_api_3_schema):
                         "name": f"{location}_param",
                         "in": location,
                         "required": True,
-                        "schema": {"type": "integer"},
+                        "schema": {"type": "string"},
+                        **kwargs,
                     }
-                    for location in LOCATION_TO_CONTAINER
-                    if location != "body"
+                    for location, kwargs in (
+                        ("path", {}),
+                        ("query", {"style": "simple", "explode": True}),
+                        ("header", {}),
+                        ("cookie", {}),
+                    )
                 ],
                 "responses": {"200": {"description": "OK"}},
             }
@@ -77,12 +81,17 @@ def raw_schema(request, empty_open_api_3_schema):
 @pytest.mark.hypothesis_nested
 def test_python_tests(unique_data, raw_schema, hypothesis_max_examples):
     schema = schemathesis.from_dict(raw_schema)
+    endpoint = schema["/data/{path_param}/"]["GET"]
     seen = set()
 
-    @given(case=schema["/data/{path_param}/"]["GET"].as_strategy())
+    @given(
+        case=endpoint.as_strategy(data_generation_method=DataGenerationMethod.positive)
+        | endpoint.as_strategy(data_generation_method=DataGenerationMethod.negative)
+    )
     @settings(
         max_examples=hypothesis_max_examples or 30,
         suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
+        phases=[Phase.generate],
         deadline=None,
     )
     def test(case):
@@ -119,5 +128,7 @@ def test_cli(testdir, raw_schema, cli, openapi3_base_url, hypothesis_max_example
         "-cunique_test_cases",
         f"--hypothesis-max-examples={hypothesis_max_examples or 30}",
         "--data-generation-unique",
+        "--data-generation-method=all",
+        "--hypothesis-phases=generate",
     )
     assert result.exit_code == ExitCode.OK, result.stdout
