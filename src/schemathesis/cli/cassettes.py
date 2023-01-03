@@ -127,7 +127,7 @@ def worker(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, q
         return "\n".join(f"      - {json.dumps(v)}" for v in values)
 
     def format_headers(headers: Dict[str, List[str]]) -> str:
-        return "\n".join(f"      {name}:\n{format_header_values(values)}" for name, values in headers.items())
+        return "\n".join(f'      "{name}":\n{format_header_values(values)}' for name, values in headers.items())
 
     def format_check_message(message: Optional[str]) -> str:
         return "~" if message is None else f"{repr(message)}"
