@@ -329,9 +329,14 @@ class BaseOpenAPISchema(BaseSchema):
         hooks: Optional[HookDispatcher] = None,
         auth_storage: Optional[AuthStorage] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        **kwargs: Any,
     ) -> SearchStrategy:
         return get_case_strategy(
-            operation=operation, auth_storage=auth_storage, hooks=hooks, data_generation_method=data_generation_method
+            operation=operation,
+            auth_storage=auth_storage,
+            hooks=hooks,
+            data_generation_method=data_generation_method,
+            **kwargs,
         )
 
     def get_parameter_serializer(self, operation: APIOperation, location: str) -> Optional[Callable]:

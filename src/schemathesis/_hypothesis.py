@@ -25,6 +25,7 @@ def create_test(
     settings: Optional[hypothesis.settings] = None,
     seed: Optional[int] = None,
     data_generation_methods: List[DataGenerationMethod],
+    as_strategy_kwargs: Optional[Dict[str, Any]] = None,
     _given_args: Tuple[GivenInput, ...] = (),
     _given_kwargs: Optional[Dict[str, GivenInput]] = None,
 ) -> Callable:
@@ -35,7 +36,10 @@ def create_test(
     for data_generation_method in data_generation_methods:
         strategies.append(
             operation.as_strategy(
-                hooks=hook_dispatcher, auth_storage=auth_storage, data_generation_method=data_generation_method
+                hooks=hook_dispatcher,
+                auth_storage=auth_storage,
+                data_generation_method=data_generation_method,
+                **(as_strategy_kwargs or {}),
             )
         )
     strategy = combine_strategies(strategies)

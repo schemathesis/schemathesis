@@ -675,9 +675,10 @@ class APIOperation(Generic[P, C]):
         hooks: Optional["HookDispatcher"] = None,
         auth_storage: Optional[AuthStorage] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        **kwargs: Any,
     ) -> st.SearchStrategy:
         """Turn this API operation into a Hypothesis strategy."""
-        strategy = self.schema.get_case_strategy(self, hooks, auth_storage, data_generation_method)
+        strategy = self.schema.get_case_strategy(self, hooks, auth_storage, data_generation_method, **kwargs)
 
         def _apply_hooks(dispatcher: HookDispatcher, _strategy: st.SearchStrategy[Case]) -> st.SearchStrategy[Case]:
             for hook in dispatcher.get_all_by_name("before_generate_case"):

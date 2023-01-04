@@ -32,12 +32,17 @@ def _run_task(
     results: TestResultSet,
     stateful: Optional[Stateful],
     stateful_recursion_limit: int,
+    headers: Optional[Dict[str, Any]] = None,
     **kwargs: Any,
 ) -> None:
+    as_strategy_kwargs = {}
+    if headers is not None:
+        as_strategy_kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
+
     def _run_tests(maker: Callable, recursion_level: int = 0) -> None:
         if recursion_level > stateful_recursion_limit:
             return
-        for _result in maker(test_template, settings, seed):
+        for _result in maker(test_template, settings, seed, as_strategy_kwargs=as_strategy_kwargs):
             # `result` is always `Ok` here
             _operation, test = _result.ok()
             feedback = Feedback(stateful, _operation)
@@ -50,6 +55,7 @@ def _run_task(
                 results,
                 recursion_level=recursion_level,
                 feedback=feedback,
+                headers=headers,
                 **kwargs,
             ):
                 events_queue.put(_event)
@@ -73,11 +79,12 @@ def _run_task(
                     settings=settings,
                     seed=seed,
                     data_generation_methods=list(data_generation_methods),
+                    as_strategy_kwargs=as_strategy_kwargs,
                 )
                 items = Ok((operation, test_function))
                 # This lambda ignores the input arguments to support the same interface for
                 # `feedback.get_stateful_tests`
-                _run_tests(lambda *_: (items,))
+                _run_tests(lambda *_, **__: (items,))
             else:
                 for event in handle_schema_error(result.err(), results, data_generation_methods, 0):
                     events_queue.put(event)

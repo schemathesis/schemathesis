@@ -241,14 +241,16 @@ def get_parameters_value(
     If the value is not set, then generate it from the relevant strategy. Otherwise, check what is missing in it and
     generate those parts.
     """
-    if isinstance(value, NotSet):
+    if isinstance(value, NotSet) or not value:
         strategy = get_parameters_strategy(operation, to_strategy, location)
         strategy = apply_hooks(operation, context, hooks, strategy, location)
         return draw(strategy)
     strategy = get_parameters_strategy(operation, to_strategy, location, exclude=value.keys())
     strategy = apply_hooks(operation, context, hooks, strategy, location)
-    value = deepcopy(value)
-    value.update(draw(strategy))
+    new = draw(strategy)
+    if new is not None:
+        value = deepcopy(value)
+        value.update(new)
     return value
 
 

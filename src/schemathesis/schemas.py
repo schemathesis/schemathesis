@@ -186,6 +186,7 @@ class BaseSchema(Mapping):
         func: Callable,
         settings: Optional[hypothesis.settings] = None,
         seed: Optional[int] = None,
+        as_strategy_kwargs: Optional[Dict[str, Any]] = None,
         _given_kwargs: Optional[Dict[str, GivenInput]] = None,
     ) -> Generator[Result[Tuple[APIOperation, Callable], InvalidSchema], None, None]:
         """Generate all operations and Hypothesis tests for them."""
@@ -197,6 +198,7 @@ class BaseSchema(Mapping):
                     settings=settings,
                     seed=seed,
                     data_generation_methods=self.data_generation_methods,
+                    as_strategy_kwargs=as_strategy_kwargs,
                     _given_kwargs=_given_kwargs,
                 )
                 yield Ok((result.ok(), test))
@@ -359,6 +361,7 @@ class BaseSchema(Mapping):
         hooks: Optional[HookDispatcher] = None,
         auth_storage: Optional[AuthStorage] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        **kwargs: Any,
     ) -> SearchStrategy:
         raise NotImplementedError
 
