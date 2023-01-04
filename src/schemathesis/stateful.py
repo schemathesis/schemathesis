@@ -93,7 +93,11 @@ class Feedback:
             data.store(case, response)
 
     def get_stateful_tests(
-        self, test: Callable, settings: Optional[hypothesis.settings], seed: Optional[int]
+        self,
+        test: Callable,
+        settings: Optional[hypothesis.settings],
+        seed: Optional[int],
+        as_strategy_kwargs: Optional[Dict[str, Any]],
     ) -> Generator[Result[Tuple[APIOperation, Callable], InvalidSchema], None, None]:
         """Generate additional tests that use data from the previous ones."""
         from ._hypothesis import create_test  # pylint: disable=import-outside-toplevel
@@ -106,6 +110,7 @@ class Feedback:
                 settings=settings,
                 seed=seed,
                 data_generation_methods=operation.schema.data_generation_methods,
+                as_strategy_kwargs=as_strategy_kwargs,
             )
             yield Ok((operation, test_function))
 
