@@ -139,12 +139,18 @@ class BaseRunner:
         seed: Optional[int],
         results: TestResultSet,
         recursion_level: int = 0,
+        headers: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> Generator[events.ExecutionEvent, None, None]:
         """Run tests and recursively run additional tests."""
         if recursion_level > self.stateful_recursion_limit:
             return
-        for result in maker(template, settings, seed):
+        as_strategy_kwargs = {}
+        if headers is not None:
+            as_strategy_kwargs["headers"] = {
+                key: value for key, value in headers.items() if key.lower() != "user-agent"
+            }
+        for result in maker(template, settings, seed, as_strategy_kwargs=as_strategy_kwargs):
             if isinstance(result, Ok):
                 operation, test = result.ok()
                 feedback = Feedback(self.stateful, operation)
@@ -160,6 +166,7 @@ class BaseRunner:
                         feedback=feedback,
                         recursion_level=recursion_level,
                         data_generation_methods=self.schema.data_generation_methods,
+                        headers=headers,
                         **kwargs,
                     ):
                         yield event
@@ -175,6 +182,7 @@ class BaseRunner:
                         seed,
                         recursion_level=recursion_level + 1,
                         results=results,
+                        headers=headers,
                         **kwargs,
                     )
                 except InvalidSchema as exc:

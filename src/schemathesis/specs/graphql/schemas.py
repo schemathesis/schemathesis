@@ -168,6 +168,7 @@ class GraphQLSchema(BaseSchema):
         hooks: Optional[HookDispatcher] = None,
         auth_storage: Optional[AuthStorage] = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        **kwargs: Any,
     ) -> SearchStrategy:
         return get_case_strategy(
             operation=operation,
@@ -175,6 +176,7 @@ class GraphQLSchema(BaseSchema):
             hooks=hooks,
             auth_storage=auth_storage,
             data_generation_method=data_generation_method,
+            **kwargs,
         )
 
     def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
@@ -216,6 +218,7 @@ def get_case_strategy(
     hooks: Optional[HookDispatcher] = None,
     auth_storage: Optional[AuthStorage] = None,
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+    **kwargs: Any,
 ) -> Any:
     definition = cast(GraphQLOperationDefinition, operation.definition)
     strategy = {

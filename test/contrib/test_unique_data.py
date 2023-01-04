@@ -103,25 +103,28 @@ def test_python_tests(unique_data, raw_schema, hypothesis_max_examples):
     test()
 
 
-@pytest.mark.usefixtures("reset_hooks")
-def test_cli(testdir, raw_schema, cli, openapi3_base_url, hypothesis_max_examples):
-    module = testdir.make_importable_pyfile(
+@pytest.fixture
+def unique_hook(testdir):
+    return testdir.make_importable_pyfile(
         hook="""
-    import schemathesis
+        import schemathesis
 
-    seen = set()
+        seen = set()
 
-    @schemathesis.register_check
-    def unique_test_cases(response, case):
-        command = case.as_curl_command({"X-Schemathesis-TestCaseId": "0"})
-        assert command not in seen, "Test case already seen!"
-        seen.add(command)
-    """
+        @schemathesis.register_check
+        def unique_test_cases(response, case):
+            command = case.as_curl_command({**response.request.headers, "X-Schemathesis-TestCaseId": "0"})
+            assert command not in seen, f"Test case already seen! {command}"
+            seen.add(command)
+        """
     )
-    schema_file = testdir.makefile(".json", schema=json.dumps(raw_schema))
-    result = cli.main(
+
+
+def run(testdir, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_examples, *args):
+    schema_file = testdir.makefile(".json", schema=json.dumps(schema))
+    return cli.main(
         "--pre-run",
-        module.purebasename,
+        unique_hook.purebasename,
         "run",
         str(schema_file),
         f"--base-url={openapi3_base_url}",
@@ -130,5 +133,52 @@ def test_cli(testdir, raw_schema, cli, openapi3_base_url, hypothesis_max_example
         "--data-generation-unique",
         "--data-generation-method=all",
         "--hypothesis-phases=generate",
+        *args,
     )
+
+
+@pytest.mark.usefixtures("reset_hooks")
+def test_cli(testdir, unique_hook, raw_schema, cli, openapi3_base_url, hypothesis_max_examples):
+    result = run(testdir, cli, unique_hook, raw_schema, openapi3_base_url, hypothesis_max_examples)
+    assert result.exit_code == ExitCode.OK, result.stdout
+
+
+@pytest.mark.parametrize("workers", (1, 2))
+@pytest.mark.usefixtures("reset_hooks")
+def test_explicit_headers(
+    testdir, unique_hook, empty_open_api_3_schema, cli, openapi3_base_url, hypothesis_max_examples, workers
+):
+    header_name = "X-Session-ID"
+    empty_open_api_3_schema["paths"] = {
+        "/data/": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": name,
+                        "in": location,
+                        "required": True,
+                        "schema": {"type": "string"},
+                    }
+                    for name, location in (
+                        (header_name, "header"),
+                        ("key", "query"),
+                    )
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    # When explicit headers are passed to CLI
+    # And they match one of the parameters
+    result = run(
+        testdir,
+        cli,
+        unique_hook,
+        empty_open_api_3_schema,
+        openapi3_base_url,
+        hypothesis_max_examples,
+        f"-H {header_name}: fixed",
+        f"--workers={workers}",
+    )
+    # Then they should be included in the uniqueness check
     assert result.exit_code == ExitCode.OK, result.stdout
