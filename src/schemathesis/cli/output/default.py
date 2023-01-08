@@ -399,14 +399,14 @@ def ask_to_report(event: service.Error, report_to_issues: bool = True, extra: st
     )
 
 
-def wait_for_report_handler(queue: Queue, title: str) -> service.Event:
+def wait_for_report_handler(queue: Queue, title: str, timeout: float = service.WORKER_FINISH_TIMEOUT) -> service.Event:
     """Wait for the Schemathesis.io handler to finish its job."""
     start = time.monotonic()
     spinner = create_spinner(SPINNER_REPETITION_NUMBER)
     # The testing process is done, and we need to wait for the Schemathesis.io handler to finish
     # It might still have some data to send
     while queue.empty():
-        if time.monotonic() - start >= service.WORKER_FINISH_TIMEOUT:
+        if time.monotonic() - start >= timeout:
             return service.Timeout()
         click.echo(f"{title}: {next(spinner)}\r", nl=False)
         time.sleep(service.WORKER_CHECK_PERIOD)
