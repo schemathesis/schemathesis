@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING
 
+import requests
+
 from ..constants import BOM_MARK
 from ..hooks import HookContext, register, unregister
 
@@ -16,5 +18,5 @@ def uninstall() -> None:
 
 
 def after_call(context: HookContext, case: "Case", response: "GenericResponse") -> None:
-    if response.encoding == "utf-8" and response.text[0:1] == BOM_MARK:
+    if isinstance(response, requests.Response) and response.encoding == "utf-8" and response.text[0:1] == BOM_MARK:
         response.encoding = "utf-8-sig"

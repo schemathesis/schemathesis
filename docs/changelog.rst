@@ -39,6 +39,7 @@ Changelog
   It works on the best effort basis and does not cover all possible cases. `#947`_
 - Invalid cassettes when headers contain characters with a special meaning in YAML.
 - Properly display flaky deadline errors.
+- Internal error when the ``utf8_bom`` fixup is used for WSGI apps.
 
 .. _v3.17.5:
 
