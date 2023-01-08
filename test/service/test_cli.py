@@ -1,14 +1,15 @@
 import json
 import re
+from queue import Queue
 
 import pytest
 from _pytest.main import ExitCode
 from requests import Timeout
 
 import schemathesis
-from schemathesis.cli.output.default import SERVICE_ERROR_MESSAGE
+from schemathesis.cli.output.default import SERVICE_ERROR_MESSAGE, wait_for_report_handler
 from schemathesis.constants import USER_AGENT
-from schemathesis.service import ci
+from schemathesis.service import ci, events
 from schemathesis.service.constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REPORT_ENV_VAR
 from schemathesis.service.hosts import load_for_host
 
@@ -117,7 +118,7 @@ def test_error_in_another_handler(testdir, cli, schema_url, service):
 @pytest.mark.openapi_version("3.0")
 def test_server_timeout(cli, schema_url, service, mocker):
     # When Schemathesis.io responds slowly
-    mocker.patch("schemathesis.service.WORKER_FINISH_TIMEOUT", 0)
+    mocker.patch("schemathesis.cli.output.default.wait_for_report_handler", return_value=events.Timeout())
     # And the waiting is more than allowed
     result = cli.run(
         schema_url,
@@ -133,6 +134,10 @@ def test_server_timeout(cli, schema_url, service, mocker):
     assert lines[16] == f"Uploading reports to {service.base_url} ..."
     # Then the output indicates timeout
     assert lines[17] == "Upload: TIMEOUT"
+
+
+def test_wait_for_report_handler():
+    assert wait_for_report_handler(Queue(), "", 0.0) == events.Timeout()
 
 
 @pytest.mark.service(

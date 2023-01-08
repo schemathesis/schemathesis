@@ -17,10 +17,10 @@ def reset_hooks():
 @pytest.mark.parametrize(
     "args, expected",
     (
-        ([SCHEMA], {"schema_kind": "URL", "parameters": {}, "used_headers": [], "hooks": {}}),
+        ([SCHEMA], {"schema_kind": "URL", "parameters": {}, "used_headers": []}),
         (
             [SCHEMA, "-H", "Authorization:key", "-H", "X-Key:value"],
-            {"schema_kind": "URL", "parameters": {}, "used_headers": ["Authorization", "X-Key"], "hooks": {}},
+            {"schema_kind": "URL", "parameters": {}, "used_headers": ["Authorization", "X-Key"]},
         ),
         (
             [SCHEMA, "--hypothesis-max-examples=10"],
@@ -28,7 +28,6 @@ def reset_hooks():
                 "schema_kind": "URL",
                 "parameters": {"hypothesis_max_examples": {"value": "10"}},
                 "used_headers": [],
-                "hooks": {},
             },
         ),
         (
@@ -37,7 +36,6 @@ def reset_hooks():
                 "schema_kind": "URL",
                 "parameters": {"hypothesis_phases": {"value": "generate"}},
                 "used_headers": [],
-                "hooks": {},
             },
         ),
         (
@@ -46,7 +44,6 @@ def reset_hooks():
                 "schema_kind": "URL",
                 "parameters": {"checks": {"value": ["not_a_server_error", "response_conformance"]}},
                 "used_headers": [],
-                "hooks": {},
             },
         ),
         (
@@ -55,12 +52,11 @@ def reset_hooks():
                 "schema_kind": "URL",
                 "parameters": {"auth_type": {"value": "digest"}, "auth": {"count": 1}},
                 "used_headers": [],
-                "hooks": {},
             },
         ),
         (
             [SCHEMA, "-E", "a", "-E", "b"],
-            {"schema_kind": "URL", "parameters": {"endpoints": {"count": 2}}, "used_headers": [], "hooks": {}},
+            {"schema_kind": "URL", "parameters": {"endpoints": {"count": 2}}, "used_headers": []},
         ),
     ),
 )
@@ -69,7 +65,11 @@ def test_collect(args, expected):
 
     @click.command()
     def run() -> None:
-        assert usage.collect(args) == expected
+        collected = usage.collect(args)
+        # Hooks are global, and could be modified by other tests.
+        # Drop them, as it is simpler than introducing locking
+        del collected["hooks"]
+        assert collected == expected
 
     result = cli_runner.invoke(run)
     assert result.exit_code == 0, result.exception
