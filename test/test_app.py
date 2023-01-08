@@ -1,3 +1,4 @@
+import os
 import platform
 import sys
 from pathlib import Path
@@ -37,6 +38,8 @@ def test_app(testdir, aiohttp_unused_port, framework, expected):
         timeout = 4.0
     else:
         timeout = 2.0
+    if os.getenv("COVERAGE_RUN") == "true":
+        timeout *= 2
     with pytest.raises(TimeoutExpired):
         testdir.run(
             sys.executable, str(HERE / "apps/__init__.py"), str(port), f"--framework={framework}", timeout=timeout
