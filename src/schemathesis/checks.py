@@ -33,3 +33,24 @@ OPTIONAL_CHECKS = (
     response_schema_conformance,
 )
 ALL_CHECKS: Tuple["CheckFunction", ...] = DEFAULT_CHECKS + OPTIONAL_CHECKS
+
+
+def register(check: "CheckFunction") -> "CheckFunction":
+    """Register a new check for schemathesis CLI.
+
+    :param check: A function to validate API responses.
+
+    .. code-block:: python
+
+        @schemathesis.checks.register
+        def new_check(response, case):
+            # some awesome assertions!
+            ...
+    """
+    from . import cli  # pylint: disable=import-outside-toplevel
+
+    global ALL_CHECKS  # pylint: disable=global-statement
+
+    ALL_CHECKS += (check,)
+    cli.CHECKS_TYPE.choices += (check.__name__,)  # type: ignore
+    return check

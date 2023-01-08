@@ -4,7 +4,7 @@ Public API reference
 Checks
 ~~~~~~
 
-.. autofunction:: schemathesis.register_check
+.. autofunction:: schemathesis.checks.register
 
 Fixups
 ~~~~~~
