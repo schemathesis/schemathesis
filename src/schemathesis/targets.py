@@ -30,3 +30,17 @@ Target = Callable[[TargetContext], float]
 DEFAULT_TARGETS = ()
 OPTIONAL_TARGETS = (response_time,)
 ALL_TARGETS: Tuple[Target, ...] = DEFAULT_TARGETS + OPTIONAL_TARGETS
+
+
+def register(target: Target) -> Target:
+    """Register a new testing target for schemathesis CLI.
+
+    :param target: A function that will be called to calculate a metric passed to ``hypothesis.target``.
+    """
+    from . import cli  # pylint: disable=import-outside-toplevel
+
+    global ALL_TARGETS  # pylint: disable=global-statement
+
+    ALL_TARGETS += (target,)
+    cli.TARGETS_TYPE.choices += (target.__name__,)  # type: ignore
+    return target

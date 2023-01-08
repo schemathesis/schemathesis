@@ -5,7 +5,6 @@ _install_hypothesis_jsonschema_compatibility_shim()
 del _install_hypothesis_jsonschema_compatibility_shim
 
 from . import auth, checks, contrib, fixups, graphql, hooks, runner, serializers, targets
-from .cli import register_target
 from .constants import DataGenerationMethod, __version__
 from .models import Case
 from .specs import openapi
@@ -29,3 +28,4 @@ from_wsgi = openapi.from_wsgi
 
 # Backward compatibility
 register_check = checks.register
+register_target = targets.register
