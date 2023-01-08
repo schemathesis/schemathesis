@@ -19,6 +19,10 @@ on:
       - master
   workflow_dispatch:
 
+env:
+  FORCE_COLOR: "1"
+  TOX_TESTENV_PASSENV: FORCE_COLOR
+
 jobs:
   pre-commit:
     name: Generic pre-commit checks
