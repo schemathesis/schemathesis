@@ -7,6 +7,7 @@ import schemathesis
 from schemathesis.exceptions import CheckFailed
 from schemathesis.specs.openapi.stateful.links import make_response_filter, match_status_code
 from schemathesis.stateful import StepResult
+from schemathesis.utils import capture_hypothesis_output
 from src.schemathesis.models import CaseSource, Check, Status
 from src.schemathesis.runner.serialization import SerializedCheck
 
@@ -82,6 +83,16 @@ TestStateful = APIWorkflow.TestCase
 #   3. Get info about this user
 
 
+def find_reproduction_code(lines):
+    try:
+        first = lines.index("Falsifying example:") + 1
+        last = lines.index("state.teardown()") + 1
+    except ValueError:
+        first = lines.index("E   Falsifying example:") + 1
+        last = lines.index("E   state.teardown()") + 1
+    return "\n".join([removeprefix(line, "E   ") for line in lines[first:last]])
+
+
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_hidden_failure(testdir, app_schema, openapi3_base_url):
     # When we run test as a state machine
@@ -104,14 +115,7 @@ TestStateful.settings = settings(
     # And there should be Python code to reproduce the error in the GET call
     result.stdout.re_match_lines([rf"E +curl -X GET .+ '{openapi3_base_url}/users/\w+.+"])
     # And the reproducing example should work
-    try:
-        first = result.outlines.index("Falsifying example:") + 1
-        last = result.outlines.index("state.teardown()") + 1
-    except ValueError:
-        first = result.outlines.index("E   Falsifying example:") + 1
-        last = result.outlines.index("E   state.teardown()") + 1
-
-    example = "\n".join([removeprefix(line, "E   ") for line in result.outlines[first:last]])
+    example = find_reproduction_code(result.outlines)
     testdir.make_test(
         f"""
 schema.base_url = "{openapi3_base_url}"
@@ -214,6 +218,33 @@ def test_all_operations_with_links(openapi3_base_url):
     # And there should be no "Unsatisfiable" error
     run_state_machine_as_test(
         APIWorkflow, settings=settings(max_examples=1, deadline=None, suppress_health_check=HealthCheck.all())
+    )
+
+
+@pytest.mark.operations("failure")
+@pytest.mark.openapi_version("3.0")
+def test_explicit_headers_reproduction(testdir, openapi3_base_url, app_schema):
+    # See GH-828
+    # When the user specifies headers manually in the state machine
+    testdir.make_test(
+        f"""
+schema.base_url = "{openapi3_base_url}"
+
+class APIWorkflow(schema.as_state_machine()):
+    def get_call_kwargs(self, case):
+        return {{"headers": {{"X-Token": "FOOBAR"}}}}
+
+TestCase = APIWorkflow.TestCase
+    """,
+        schema=app_schema,
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    # Then these headers should be displayed in the generated Python code
+    example = find_reproduction_code(result.outlines)
+    assert (
+        example.splitlines()[1]
+        == "state._step(case=state.schema['/failure']['GET'].make_case(headers={'X-Token': 'FOOBAR'}), previous=None)"
     )
 
 

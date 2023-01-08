@@ -133,8 +133,11 @@ class Direction:
         raise NotImplementedError
 
 
-def _print_case(case: Case) -> str:
+def _print_case(case: Case, kwargs: Dict[str, Any]) -> str:
     operation = f"state.schema['{case.operation.path}']['{case.operation.method.upper()}']"
+    headers = case.headers or CaseInsensitiveDict()
+    headers.update(kwargs.get("headers", {}))
+    case.headers = headers
     data = [
         f"{name}={repr(getattr(case, name))}"
         for name in ("path_parameters", "headers", "cookies", "query", "body", "media_type")
@@ -173,7 +176,9 @@ class APIStateMachine(RuleBasedStateMachine):
 
     def _pretty_print(self, value: Any) -> str:
         if isinstance(value, Case):
-            return _print_case(value)
+            # State machines suppose to be reproducible, hence it is OK to get kwargs here
+            kwargs = self.get_call_kwargs(value)
+            return _print_case(value, kwargs)
         if isinstance(value, tuple) and len(value) == 2:
             result, direction = value
             wrapper = _DirectionWrapper(direction)
