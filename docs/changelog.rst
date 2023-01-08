@@ -38,6 +38,7 @@ Changelog
 - Remove recursive references from the last reference resolution level.
   It works on the best effort basis and does not cover all possible cases. `#947`_
 - Invalid cassettes when headers contain characters with a special meaning in YAML.
+- Properly display flaky deadline errors.
 
 .. _v3.17.5:
 

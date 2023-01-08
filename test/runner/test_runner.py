@@ -299,6 +299,18 @@ def test_hypothesis_deadline(any_app, any_app_schema):
     assert_request(any_app, 0, "GET", "/api/slow")
 
 
+@pytest.mark.operations("path_variable")
+@pytest.mark.openapi_version("3.0")
+def test_hypothesis_deadline_always_an_error(wsgi_app_schema, flask_app):
+    flask_app.config["random_delay"] = 0.05
+    # When the app responses are randomly slow
+    *_, after, _ = list(from_schema(wsgi_app_schema, hypothesis_settings=hypothesis.settings(deadline=20)).execute())
+    # Then it should always be marked as an error, not a flaky failure
+    assert not after.result.is_flaky
+    assert after.result.errors
+    assert after.result.errors[0].exception.startswith("DeadlineExceeded: API response time is too slow!")
+
+
 @pytest.mark.operations("multipart")
 def test_form_data(any_app, any_app_schema):
     def is_ok(response, case):
