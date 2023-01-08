@@ -8,7 +8,7 @@ from ...exceptions import UsageError
 CUSTOM_SCALARS: Dict[str, st.SearchStrategy[graphql.ValueNode]] = {}
 
 
-def register_scalar(name: str, strategy: st.SearchStrategy[graphql.ValueNode]) -> None:
+def scalar(name: str, strategy: st.SearchStrategy[graphql.ValueNode]) -> None:
     """Register a new strategy for generating custom scalars.
 
     :param str name: Scalar name. It should correspond the one used in the schema.

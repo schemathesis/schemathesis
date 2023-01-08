@@ -11,7 +11,8 @@ Changelog
   This feature is also available as a hook in ``schemathesis.contrib.unique_data``.
 - ``schemathesis.checks.register`` as a new way to register checks.
 - ``schemathesis.targets.register`` as a new way to register targets.
-- ``schemathesis.openapi.format`` as a new way to register custom formats for Open API.
+- ``schemathesis.openapi.format`` as a new way to register custom formats for OpenAPI.
+- ``schemathesis.graphql.scalar`` as a new way to register custom scalars for GraphQL.
 
 **Changed**
 
@@ -25,6 +26,7 @@ Changelog
 - ``schemathesis.register_check`` in favor of ``schemathesis.checks.register``.
 - ``schemathesis.register_target`` in favor of ``schemathesis.targets.register``.
 - ``schemathesis.register_string_format`` in favor of ``schemathesis.openapi.format``.
+- ``schemathesis.graphql.register_scalar`` in favor of ``schemathesis.graphql.scalar``.
 
 **Fixed**
 
