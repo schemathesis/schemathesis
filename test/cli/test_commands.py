@@ -1063,7 +1063,7 @@ def test_conditional_checks(testdir, cli, hypothesis_max_examples, schema_url):
             import schemathesis
             import click
 
-            @schemathesis.checks.register
+            @schemathesis.check
             def conditional_check(response, case):
                 # skip this check
                 return True
@@ -1092,14 +1092,14 @@ def test_add_case(testdir, cli, hypothesis_max_examples, schema_url):
             import schemathesis
             import click
 
-            @schemathesis.hooks.register
+            @schemathesis.hook
             def add_case(context, case, response):
                 if not case.headers:
                     case.headers = {}
                 case.headers["copy"] = "this is a copied case"
                 return case
 
-            @schemathesis.checks.register
+            @schemathesis.check
             def add_case_check(response, case):
                 if case.headers and case.headers.get("copy") == "this is a copied case":
                     # we will look for this output
@@ -1130,11 +1130,11 @@ def test_add_case_returns_none(testdir, cli, hypothesis_max_examples, schema_url
             import schemathesis
             import click
 
-            @schemathesis.hooks.register
+            @schemathesis.hook
             def add_case(context, case, response):
                 return None
 
-            @schemathesis.checks.register
+            @schemathesis.check
             def add_case_check(response, case):
                 click.echo("Validating case.")
             """
@@ -1165,21 +1165,21 @@ def test_multiple_add_case_hooks(testdir, cli, hypothesis_max_examples, schema_u
             import schemathesis
             import click
 
-            @schemathesis.hooks.register("add_case")
+            @schemathesis.hook("add_case")
             def add_first_header(context, case, response):
                 if not case.headers:
                     case.headers = {}
                 case.headers["first"] = "first header"
                 return case
 
-            @schemathesis.hooks.register("add_case")
+            @schemathesis.hook("add_case")
             def add_second_header(context, case, response):
                 if not case.headers:
                     case.headers = {}
                 case.headers["second"] = "second header"
                 return case
 
-            @schemathesis.checks.register
+            @schemathesis.check
             def add_case_check(response, case):
                 if case.headers and case.headers.get("first") == "first header":
                     # we will look for this output
@@ -1213,21 +1213,21 @@ def test_add_case_output(testdir, cli, hypothesis_max_examples, schema_url):
             import schemathesis
             import click
 
-            @schemathesis.hooks.register("add_case")
+            @schemathesis.hook("add_case")
             def add_first_header(context, case, response):
                 if not case.headers:
                     case.headers = {}
                 case.headers["first"] = "first header"
                 return case
 
-            @schemathesis.hooks.register("add_case")
+            @schemathesis.hook("add_case")
             def add_second_header(context, case, response):
                 if not case.headers:
                     case.headers = {}
                 case.headers["second"] = "second header"
                 return case
 
-            @schemathesis.checks.register
+            @schemathesis.check
             def add_case_check(response, case):
                 if (
                     case.headers and
@@ -1269,7 +1269,7 @@ def new_check(request, testdir, cli):
         hook=f"""
             import schemathesis
 
-            @schemathesis.checks.register
+            @schemathesis.check
             def new_check(response, result):
                 raise {exception}
             """
@@ -2202,7 +2202,7 @@ import schemathesis
 
 note = print
 
-@schemathesis.checks.register
+@schemathesis.check
 def data_generation_check(response, case):
     if case.data_generation_method:
         note("METHOD: {}".format(case.data_generation_method.name))

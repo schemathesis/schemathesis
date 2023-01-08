@@ -42,7 +42,7 @@ def register(check: "CheckFunction") -> "CheckFunction":
 
     .. code-block:: python
 
-        @schemathesis.checks.register
+        @schemathesis.check
         def new_check(response, case):
             # some awesome assertions!
             ...

@@ -113,6 +113,9 @@ class BaseSchema(Mapping):
     def __len__(self) -> int:
         return len(self.operations)
 
+    def hook(self, hook: Union[str, Callable]) -> Callable:
+        return self.hooks.register(hook)
+
     @property  # pragma: no mutate
     def verbose_name(self) -> str:
         raise NotImplementedError

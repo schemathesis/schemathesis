@@ -16,13 +16,13 @@ def reset_hooks():
 def global_hook(request):
     if request.param == "direct":
 
-        @schemathesis.hooks.register
+        @schemathesis.hook
         def before_generate_query(context, strategy):
             return strategy.filter(lambda x: x["id"].isdigit())
 
     if request.param == "named":
 
-        @schemathesis.hooks.register("before_generate_query")
+        @schemathesis.hook("before_generate_query")
         def hook(context, strategy):
             return strategy.filter(lambda x: x["id"].isdigit())
 
@@ -54,7 +54,7 @@ def test_global_query_hook(schema, schema_url):
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("payload")
 def test_global_body_hook(schema):
-    @schemathesis.hooks.register
+    @schemathesis.hook
     def before_generate_body(context, strategy):
         return strategy.filter(lambda x: len(x["name"]) == 5)
 
@@ -81,7 +81,7 @@ def test_case_hook(schema):
 
         return strategy.map(tune_case)
 
-    @schemathesis.hooks.register
+    @schemathesis.hook
     def before_generate_case(context, strategy):
         def tune_case(case):
             case.body["first_name"] = case.body["last_name"]
@@ -103,7 +103,7 @@ def test_case_hook(schema):
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("custom_format")
 def test_schema_query_hook(schema, schema_url):
-    @schema.hooks.register
+    @schema.hook
     def before_generate_query(context, strategy):
         return strategy.filter(lambda x: x["id"].isdigit())
 
@@ -121,7 +121,7 @@ def test_schema_query_hook(schema, schema_url):
 @pytest.mark.usefixtures("global_hook")
 @pytest.mark.operations("custom_format")
 def test_hooks_combination(schema, schema_url):
-    @schema.hooks.register("before_generate_query")
+    @schema.hook("before_generate_query")
     def extra(context, st):
         assert context.operation == schema["/custom_format"]["GET"]
         return st.filter(lambda x: int(x["id"]) % 2 == 0)
@@ -186,7 +186,7 @@ def test_d(case):
 def test_hooks_via_parametrize(testdir, simple_openapi):
     testdir.make_test(
         """
-@schema.hooks.register("before_generate_query")
+@schema.hook("before_generate_query")
 def extra(context, st):
     return st.filter(lambda x: x["id"].isdigit() and int(x["id"]) % 2 == 0)
 
@@ -233,7 +233,7 @@ def test_local_dispatcher(schema, apply_first):
     assert schema.hooks.scope == HookScope.SCHEMA
 
     # When there are schema-level hooks
-    @schema.hooks.register("before_generate_query")
+    @schema.hook("before_generate_query")
     def schema_hook(context, strategy):
         return strategy
 
@@ -267,11 +267,11 @@ def test_local_dispatcher(schema, apply_first):
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("custom_format")
 def test_multiple_hooks_per_spec(schema):
-    @schema.hooks.register("before_generate_query")
+    @schema.hook("before_generate_query")
     def first_hook(context, strategy):
         return strategy.filter(lambda x: x["id"].isdigit())
 
-    @schema.hooks.register("before_generate_query")
+    @schema.hook("before_generate_query")
     def second_hook(context, strategy):
         return strategy.filter(lambda x: int(x["id"]) % 2 == 0)
 
@@ -291,7 +291,7 @@ def test_multiple_hooks_per_spec(schema):
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("custom_format")
 def test_before_process_path_hook(schema):
-    @schema.hooks.register
+    @schema.hook
     def before_process_path(context, path, methods):
         methods["get"]["parameters"][0]["name"] = "foo"
         methods["get"]["parameters"][0]["enum"] = ["bar"]
@@ -314,7 +314,7 @@ def test_register_wrong_scope(schema):
         r"Use a dispatcher with GLOBAL scope\(s\) instead",
     ):
 
-        @schema.hooks.register
+        @schema.hook
         def before_load_schema(ctx, raw_schema):
             pass
 
@@ -322,7 +322,7 @@ def test_register_wrong_scope(schema):
 def test_before_add_examples(testdir, simple_openapi):
     testdir.make_test(
         """
-@schema.hooks.register
+@schema.hook
 def before_add_examples(context, examples):
     new = schemathesis.models.Case(
         operation=context.operation,
@@ -374,7 +374,7 @@ def test_deprecated_attribute():
 def test_before_init_operation(testdir, simple_openapi):
     testdir.make_test(
         """
-@schema.hooks.register
+@schema.hook
 def before_init_operation(context, operation):
     operation.query[0].definition["schema"] = {"enum": [42]}
 
@@ -397,7 +397,7 @@ KEY = "userId"
 EXPRESSION = "$response.body#/id"
 PARAMETERS = {KEY: EXPRESSION}
 
-@schemathesis.hooks.register
+@schemathesis.hook
 def after_load_schema(
     context: schemathesis.hooks.HookContext,
     schema: schemathesis.schemas.BaseSchema,

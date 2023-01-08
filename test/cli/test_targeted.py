@@ -12,7 +12,7 @@ def new_target(testdir, cli):
             import schemathesis
             import click
 
-            @schemathesis.targets.register
+            @schemathesis.target
             def new_target(context) -> float:
                 click.echo("NEW TARGET IS CALLED")
                 assert context.case.data_generation_method is not None, "Empty data_generation_method"
@@ -62,7 +62,7 @@ def test_custom_target_graphql(cli, new_target, graphql_url):
 
 @pytest.fixture
 def target_function():
-    @schemathesis.targets.register
+    @schemathesis.target
     def new_target(context):
         return 0.5
 
@@ -72,7 +72,7 @@ def target_function():
 
 
 def test_register_returns_a_value(target_function):
-    # When a function is registered via the `schemathesis.targets.register` decorator
+    # When a function is registered via the `schemathesis.target` decorator
     # Then this function should be available for further usage
     # See #721
     assert target_function is not None

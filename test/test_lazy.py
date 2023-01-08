@@ -406,7 +406,7 @@ def test_hooks_with_lazy_schema(testdir, simple_openapi, decorators):
         f"""
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 
-@lazy_schema.hooks.register
+@lazy_schema.hook
 def before_generate_query(context, strategy):
     return strategy.filter(lambda x: x["id"].isdigit())
 
@@ -650,7 +650,7 @@ def before_generate_case_first(ctx, strategy):
 @pytest.fixture()
 def api_schema():
     loaded = schemathesis.from_dict(raw_schema)
-    loaded.hooks.register("before_generate_case")(before_generate_case_first)
+    loaded.hook("before_generate_case")(before_generate_case_first)
     return loaded
 
 
@@ -668,7 +668,7 @@ def before_generate_case_second(ctx, strategy):
 
     return strategy.map(change)
 
-lazy_schema.hooks.register("before_generate_case")(before_generate_case_second)
+lazy_schema.hook("before_generate_case")(before_generate_case_second)
 
 @lazy_schema.parametrize()
 @settings(max_examples=1)

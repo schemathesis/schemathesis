@@ -28,6 +28,10 @@ from_wsgi = openapi.from_wsgi
 
 # Public API
 auth = auths.register
+check = checks.register
+hook = hooks.register
+serializer = serializers.register
+target = targets.register
 
 # Backward compatibility
 register_check = checks.register

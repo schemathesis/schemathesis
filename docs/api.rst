@@ -4,7 +4,7 @@ Public API reference
 Checks
 ~~~~~~
 
-.. autofunction:: schemathesis.checks.register
+.. autofunction:: schemathesis.check
 
 Fixups
 ~~~~~~
@@ -38,7 +38,7 @@ Hooks
 
 These functions affect Schemathesis behavior globally:
 
-.. autofunction:: schemathesis.hooks.register
+.. autofunction:: schemathesis.hook
 .. autofunction:: schemathesis.hooks.unregister
 .. autofunction:: schemathesis.hooks.unregister_all
 
@@ -71,7 +71,7 @@ Serializers
 
 .. autoclass:: schemathesis.serializers.SerializerContext
    :members:
-.. autofunction:: schemathesis.serializers.register
+.. autofunction:: schemathesis.serializer
 .. autofunction:: schemathesis.serializers.unregister
 
 Targeted testing
@@ -79,7 +79,7 @@ Targeted testing
 
 .. autoclass:: schemathesis.targets.TargetContext
    :members:
-.. autofunction:: schemathesis.targets.register
+.. autofunction:: schemathesis.target
 
 Custom strategies for Open API "format" keyword
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

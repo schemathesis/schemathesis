@@ -30,7 +30,7 @@ RECURSIVE_REFERENCE_ERROR_MESSAGE = (
     "this issue - https://github.com/schemathesis/schemathesis/issues/947"
 )
 SERIALIZERS_SUGGESTION_MESSAGE = (
-    "You can register your own serializer with `schemathesis.serializers.register` "
+    "You can register your own serializer with `schemathesis.serializer` "
     "and Schemathesis will be able to make API calls with this media type. \n"
     "See https://schemathesis.readthedocs.io/en/stable/how.html#payload-serialization for more information."
 )

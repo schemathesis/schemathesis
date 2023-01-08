@@ -80,14 +80,14 @@ Hypothesis `documentation <https://hypothesis.readthedocs.io/en/latest/details.h
 Custom targets
 ~~~~~~~~~~~~~~
 
-You can register your own targets with the ``schemathesis.targets.register`` decorator. The function should accept ``schemathesis.targets.TargetContext`` and return a float value:
+You can register your own targets with the ``schemathesis.target`` decorator. The function should accept ``schemathesis.targets.TargetContext`` and return a float value:
 
 .. code:: python
 
     import schemathesis
 
 
-    @schemathesis.targets.register
+    @schemathesis.target
     def new_target(context) -> float:
         return float(len(context.response.content))
 

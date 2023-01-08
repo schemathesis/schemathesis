@@ -111,7 +111,7 @@ def unique_hook(testdir):
 
         seen = set()
 
-        @schemathesis.checks.register
+        @schemathesis.check
         def unique_test_cases(response, case):
             command = case.as_curl_command({**response.request.headers, "X-Schemathesis-TestCaseId": "0"})
             assert command not in seen, f"Test case already seen! {command}"

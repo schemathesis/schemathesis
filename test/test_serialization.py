@@ -23,7 +23,7 @@ def to_csv(data):
 
 @pytest.fixture
 def csv_serializer():
-    @schemathesis.serializers.register("text/csv", aliases=["text/tsv"])
+    @schemathesis.serializer("text/csv", aliases=["text/tsv"])
     class CSVSerializer:
         def as_requests(self, context, value):
             return {"data": to_csv(value)}
@@ -80,7 +80,7 @@ def test_register_incomplete_serializer():
     # Then you'll have a TypeError
     with pytest.raises(TypeError, match="`CSVSerializer` is not a valid serializer."):
 
-        @schemathesis.serializers.register("text/csv")
+        @schemathesis.serializer("text/csv")
         class CSVSerializer:
             def as_requests(self, context, value):
                 pass

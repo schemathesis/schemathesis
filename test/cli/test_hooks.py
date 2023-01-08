@@ -28,7 +28,7 @@ def test_custom_cli_handlers(testdir, cli, schema_url, app):
             if isinstance(event, events.Finished):
                 click.echo("Done!")
 
-    @schemathesis.hooks.register
+    @schemathesis.hook
     def after_init_cli_run_handlers(
         context,
         handlers,
@@ -56,7 +56,7 @@ import schemathesis
 
 note = print  # To avoid linting error
 
-@schemathesis.hooks.register
+@schemathesis.hook
 def before_call(context, case):
     note("\\nBefore!")
     case.query = {"q": "42"}
@@ -78,7 +78,7 @@ def test_after_call(testdir, cli, cli_args):
 import schemathesis
 import requests
 
-@schemathesis.hooks.register
+@schemathesis.hook
 def after_call(context, case, response):
     data = b'{"wrong": 42}'
     if isinstance(response, requests.Response):
@@ -103,7 +103,7 @@ def test_process_call_kwargs(testdir, cli, cli_args, mocker, app_type):
 import schemathesis
 import requests
 
-@schemathesis.hooks.register
+@schemathesis.hook
 def process_call_kwargs(context, case, kwargs):
     if case.app is not None:
         kwargs["follow_redirects"] = False

@@ -64,7 +64,7 @@ class HookDispatcher:
 
         .. code-block:: python
 
-            @schemathesis.hooks.register
+            @schemathesis.hook
             def before_generate_query(context, strategy):
                 ...
 
@@ -72,7 +72,7 @@ class HookDispatcher:
 
         .. code-block:: python
 
-            @schemathesis.hooks.register("before_generate_query")
+            @schemathesis.hook("before_generate_query")
             def hook(context, strategy):
                 ...
         """

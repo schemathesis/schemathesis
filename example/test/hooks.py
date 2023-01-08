@@ -16,19 +16,19 @@ def fullname(draw):
 schemathesis.openapi.format("fullname", fullname())
 
 
-@schemathesis.hooks.register
+@schemathesis.hook
 def before_generate_body(context, strategy):
     """Modification over the default strategy for payload generation."""
     return strategy.filter(lambda x: x.get("id", 10001) > 10000)
 
 
-@schemathesis.checks.register
+@schemathesis.check
 def not_so_slow(response, case):
     """Custom response check."""
     assert response.elapsed < timedelta(milliseconds=100), "Response is slow!"
 
 
-@schemathesis.targets.register
+@schemathesis.target
 def big_response(context):
     """Custom data generation target."""
     return float(len(context.response.content))

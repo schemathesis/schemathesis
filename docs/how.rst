@@ -148,7 +148,7 @@ First, let's define a function that will transform lists of dictionaries to CSV 
 
     You can take a look at the official `csv module documentation <https://docs.python.org/3/library/csv.html>`_ for more examples of CSV serialization.
 
-Second, register a serializer class via the ``schemathesis.serializers.register`` decorator:
+Second, register a serializer class via the ``schemathesis.serializer`` decorator:
 
 .. code-block:: python
    :emphasize-lines: 4
@@ -156,7 +156,7 @@ Second, register a serializer class via the ``schemathesis.serializers.register`
     import schemathesis
 
 
-    @schemathesis.serializers.register("text/csv")
+    @schemathesis.serializer("text/csv")
     class CSVSerializer:
         ...
 
