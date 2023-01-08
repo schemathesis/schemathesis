@@ -9,6 +9,7 @@ Changelog
 - Extra information to VCR cassettes.
 - The ``--data-generation-unique`` CLI option that forces Schemathesis to generate unique test cases only.
   This feature is also available as a hook in ``schemathesis.contrib.unique_data``.
+- ``schemathesis.checks.register`` as a new way to register checks.
 
 **Changed**
 
@@ -16,6 +17,10 @@ Changelog
 - Set ``starlette>=0.13,<0.21``.
 - Relax requirements for ``attrs``. `#1643`_
 - Avoid occasional empty lines in cassettes.
+
+**Deprecated**
+
+- ``schemathesis.register_check`` in favor of ``schemathesis.checks.register``.
 
 **Fixed**
 
