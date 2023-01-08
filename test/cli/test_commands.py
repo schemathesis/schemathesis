@@ -994,7 +994,7 @@ def test_pre_run_hook_valid(testdir, cli, schema_url, app):
     import schemathesis
     from hypothesis import strategies as st
 
-    schemathesis.register_string_format(
+    schemathesis.openapi.format(
         "digits",
         st.text(
             min_size=1,

@@ -6,7 +6,7 @@ from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis import Case, DataGenerationMethod, register_string_format
+from schemathesis import Case, DataGenerationMethod
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.models import APIOperation, OperationDefinition
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
@@ -153,7 +153,7 @@ def test_invalid_body_in_get_disable_validation(simple_schema):
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_custom_strategies(swagger_20):
-    register_string_format("even_4_digits", st.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
+    schemathesis.openapi.format("even_4_digits", st.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
     operation = make_operation(
         swagger_20,
         query=ParameterSet(
@@ -223,7 +223,7 @@ def test_default_strategies_bytes(swagger_20):
 )
 def test_invalid_custom_strategy(values, error):
     with pytest.raises(TypeError) as exc:
-        register_string_format(*values)
+        schemathesis.openapi.format(*values)
     assert error in str(exc.value)
 
 

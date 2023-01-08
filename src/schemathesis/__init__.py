@@ -8,7 +8,7 @@ from . import auth, checks, contrib, fixups, graphql, hooks, runner, serializers
 from .constants import DataGenerationMethod, __version__
 from .models import Case
 from .specs import openapi
-from .specs.openapi._hypothesis import init_default_strategies, register_string_format
+from .specs.openapi._hypothesis import init_default_strategies
 from .utils import GenericResponse
 
 init_default_strategies()
@@ -29,3 +29,4 @@ from_wsgi = openapi.from_wsgi
 # Backward compatibility
 register_check = checks.register
 register_target = targets.register
+register_string_format = openapi.format

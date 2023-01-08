@@ -406,7 +406,7 @@ For example, you may use the ``card_number`` format and validate input with the 
 You can teach Schemathesis to generate values that fit this format by registering a custom Hypothesis strategy:
 
 1. Create a Hypothesis strategy that generates valid string values
-2. Register it via ``schemathesis.register_string_format``
+2. Register it via ``schemathesis.openapi.format``
 
 .. code-block:: python
 
@@ -414,7 +414,7 @@ You can teach Schemathesis to generate values that fit this format by registerin
     import schemathesis
 
     strategy = st.from_regex(r"\A4[0-9]{15}\Z").filter(luhn_validator)
-    schemathesis.register_string_format("visa_cards", strategy)
+    schemathesis.openapi.format("visa_cards", strategy)
 
 Schemathesis test runner
 ------------------------

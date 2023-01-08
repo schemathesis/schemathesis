@@ -13,7 +13,7 @@ def fullname(draw):
     return f"{first} {last}"
 
 
-schemathesis.register_string_format("fullname", fullname())
+schemathesis.openapi.format("fullname", fullname())
 
 
 @schemathesis.hooks.register
