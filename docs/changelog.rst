@@ -13,6 +13,7 @@ Changelog
 - ``schemathesis.targets.register`` as a new way to register targets.
 - ``schemathesis.openapi.format`` as a new way to register custom formats for OpenAPI.
 - ``schemathesis.graphql.scalar`` as a new way to register custom scalars for GraphQL.
+- ``schemathesis.auth()`` as a new way to register custom authentication providers.
 
 **Changed**
 
@@ -27,6 +28,7 @@ Changelog
 - ``schemathesis.register_target`` in favor of ``schemathesis.targets.register``.
 - ``schemathesis.register_string_format`` in favor of ``schemathesis.openapi.format``.
 - ``schemathesis.graphql.register_scalar`` in favor of ``schemathesis.graphql.scalar``.
+- ``schemathesis.auth.register`` in favor of ``schemathesis.auth``.
 
 **Fixed**
 

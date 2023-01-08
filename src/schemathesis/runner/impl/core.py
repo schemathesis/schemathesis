@@ -19,7 +19,7 @@ from requests.auth import HTTPDigestAuth, _basic_auth_str
 
 from ... import failures, hooks
 from ..._compat import MultipleFailures
-from ...auth import unregister as unregister_auth
+from ...auths import unregister as unregister_auth
 from ...constants import (
     DEFAULT_STATEFUL_RECURSION_LIMIT,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,

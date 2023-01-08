@@ -32,7 +32,7 @@ type Query {
 @pytest.mark.parametrize(
     "class_decorator, pre_parametrize_decorator, post_parametrize_decorator",
     (
-        ("@schemathesis.auth.register()", "", ""),
+        ("@schemathesis.auth()", "", ""),
         ("@schema.auth.register()", "", ""),
         ("", f"@schema.auth.apply({AUTH_CLASS_NAME})", ""),
         ("", "", f"@schema.auth.apply({AUTH_CLASS_NAME})"),

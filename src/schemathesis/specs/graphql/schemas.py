@@ -13,8 +13,8 @@ from hypothesis.strategies import SearchStrategy
 from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
-from ... import auth
-from ...auth import AuthStorage
+from ... import auths
+from ...auths import AuthStorage
 from ...checks import not_a_server_error
 from ...constants import DataGenerationMethod
 from ...exceptions import InvalidSchema
@@ -227,9 +227,9 @@ def get_case_strategy(
     }[definition.root_type]
     body = draw(strategy(client_schema, fields=[definition.field_name], custom_scalars=CUSTOM_SCALARS))
     instance = GraphQLCase(body=body, operation=operation, data_generation_method=data_generation_method)  # type: ignore
-    context = auth.AuthContext(
+    context = auths.AuthContext(
         operation=operation,
         app=operation.app,
     )
-    auth.set_on_case(instance, context, auth_storage)
+    auths.set_on_case(instance, context, auth_storage)
     return instance
