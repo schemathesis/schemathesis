@@ -17,7 +17,7 @@ def clear_custom_scalars():
 def test_custom_scalar_graphql():
     # When a custom scalar strategy is registered
     expected = "2022-04-27"
-    schemathesis.graphql.register_scalar("Date", st.just(expected).map(nodes.String))
+    schemathesis.graphql.scalar("Date", st.just(expected).map(nodes.String))
     raw_schema = """
 scalar Date
 
@@ -44,4 +44,4 @@ type Query {
 )
 def test_invalid_strategy(name, value, expected):
     with pytest.raises(UsageError, match=expected):
-        schemathesis.graphql.register_scalar(name, value)
+        schemathesis.graphql.scalar(name, value)

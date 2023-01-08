@@ -90,7 +90,7 @@ Custom strategies for Open API "format" keyword
 Custom scalars for GraphQL
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autofunction:: schemathesis.graphql.register_scalar
+.. autofunction:: schemathesis.graphql.scalar
 
 Loaders
 ~~~~~~~

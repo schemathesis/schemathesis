@@ -43,7 +43,7 @@ Standard scalars work out of the box, for custom ones you need to pass custom st
     import schemathesis
     from schemathesis.graphql import nodes
 
-    schemathesis.graphql.register_scalar("Date", st.dates().map(nodes.String))
+    schemathesis.graphql.scalar("Date", st.dates().map(nodes.String))
 
 Such a strategy generates valid dates as strings, for example:
 
