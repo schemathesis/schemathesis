@@ -31,6 +31,7 @@ def create_app(
     app.config["incoming_requests"] = []
     app.config["schema_requests"] = []
     app.config["internal_exception"] = False
+    app.config["random_delay"] = False
     app.config["users"] = {}
 
     @app.before_request
@@ -126,6 +127,9 @@ def create_app(
 
     @app.route("/api/path_variable/<key>", methods=["GET"])
     def path_variable(key):
+        if app.config["random_delay"]:
+            sleep(app.config["random_delay"])
+            app.config["random_delay"] = False
         return jsonify({"success": True})
 
     @app.route("/api/unsatisfiable", methods=["POST"])
