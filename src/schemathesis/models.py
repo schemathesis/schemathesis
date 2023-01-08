@@ -41,7 +41,7 @@ from requests.structures import CaseInsensitiveDict
 from starlette.testclient import TestClient as ASGIClient
 
 from . import failures, serializers
-from .auth import AuthStorage
+from .auths import AuthStorage
 from .constants import (
     DEFAULT_RESPONSE_TIMEOUT,
     SCHEMATHESIS_TEST_CASE_HEADER,

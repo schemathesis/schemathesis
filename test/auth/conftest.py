@@ -6,4 +6,4 @@ import schemathesis
 @pytest.fixture(autouse=True)
 def unregister_global():
     yield
-    schemathesis.auth.unregister()
+    schemathesis.auths.unregister()

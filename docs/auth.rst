@@ -98,7 +98,7 @@ Depending on the level of granularity you need in your tests, you use this class
     import schemathesis
 
 
-    @schemathesis.auth.register()
+    @schemathesis.auth()
     class Auth:
         ...
 
@@ -155,7 +155,7 @@ It expects the number of seconds for which the results will be cached after a no
     import schemathesis
 
 
-    @schemathesis.auth.register(refresh_interval=600)
+    @schemathesis.auth(refresh_interval=600)
     class Auth:
         ...
 
@@ -225,7 +225,7 @@ For example, you can use refresh tokens for authentication.
     import schemathesis
 
 
-    @schemathesis.auth.register()
+    @schemathesis.auth()
     class TokenAuth:
         def __init__(self):
             self.refresh_token = None
