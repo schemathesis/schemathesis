@@ -9,11 +9,14 @@ Changelog
 - Extra information to VCR cassettes.
 - The ``--data-generation-unique`` CLI option that forces Schemathesis to generate unique test cases only.
   This feature is also available as a hook in ``schemathesis.contrib.unique_data``.
-- ``schemathesis.checks.register`` as a new way to register checks.
-- ``schemathesis.targets.register`` as a new way to register targets.
-- ``schemathesis.openapi.format`` as a new way to register custom formats for OpenAPI.
-- ``schemathesis.graphql.scalar`` as a new way to register custom scalars for GraphQL.
-- ``schemathesis.auth()`` as a new way to register custom authentication providers.
+- A few decorators & functions that provide a simpler API to extend Schemathesis:
+    - ``schemathesis.auth()`` for authentication providers;
+    - ``schemathesis.check`` for checks;
+    - ``schemathesis.hook`` & ``BaseSchema.hook`` for hooks;
+    - ``schemathesis.serializer`` for serializers;
+    - ``schemathesis.target`` for targets;
+    - ``schemathesis.openapi.format`` for custom OpenAPI formats.
+    - ``schemathesis.graphql.scalar`` for GraphQL scalars.
 
 **Changed**
 
@@ -24,8 +27,8 @@ Changelog
 
 **Deprecated**
 
-- ``schemathesis.register_check`` in favor of ``schemathesis.checks.register``.
-- ``schemathesis.register_target`` in favor of ``schemathesis.targets.register``.
+- ``schemathesis.register_check`` in favor of ``schemathesis.check``.
+- ``schemathesis.register_target`` in favor of ``schemathesis.target``.
 - ``schemathesis.register_string_format`` in favor of ``schemathesis.openapi.format``.
 - ``schemathesis.graphql.register_scalar`` in favor of ``schemathesis.graphql.scalar``.
 - ``schemathesis.auth.register`` in favor of ``schemathesis.auth``.

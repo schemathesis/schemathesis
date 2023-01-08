@@ -90,7 +90,7 @@ def test_error_in_another_handler(testdir, cli, schema_url, service):
             def handle_event(self, context, event):
                 1 / 0
 
-        @schemathesis.hooks.register
+        @schemathesis.hook
         def after_init_cli_run_handlers(
             context,
             handlers,

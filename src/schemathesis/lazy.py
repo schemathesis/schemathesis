@@ -48,6 +48,9 @@ class LazySchema:
     data_generation_methods: Union[DataGenerationMethodInput, NotSet] = attr.ib(default=NOT_SET)
     code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate
 
+    def hook(self, hook: Union[str, Callable]) -> Callable:
+        return self.hooks.register(hook)
+
     def parametrize(
         self,
         method: Optional[Filter] = NOT_SET,

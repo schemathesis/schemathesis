@@ -82,7 +82,7 @@ def test_collect_out_of_cli_context():
 def test_collect_hooks():
     cli_runner = CliRunner()
 
-    @schemathesis.hooks.register
+    @schemathesis.hook
     def before_generate_query(context, strategy):
         # This is noop
         return strategy

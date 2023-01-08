@@ -515,7 +515,7 @@ def filter_path_parameters():
             lambda x: x["key"] not in ("..", ".", "", "/") and not (isinstance(x["key"], str) and "/" in x["key"])
         )
 
-    schemathesis.hooks.register(before_generate_path_parameters)
+    schemathesis.hook(before_generate_path_parameters)
     yield
     schemathesis.hooks.unregister_all()
 
