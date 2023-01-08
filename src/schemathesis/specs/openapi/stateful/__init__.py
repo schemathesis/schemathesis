@@ -1,5 +1,3 @@
-import functools
-import operator
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Dict, Generator, List, Tuple, Type
 
