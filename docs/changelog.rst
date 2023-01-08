@@ -40,6 +40,7 @@ Changelog
 - Invalid cassettes when headers contain characters with a special meaning in YAML.
 - Properly display flaky deadline errors.
 - Internal error when the ``utf8_bom`` fixup is used for WSGI apps.
+- Printing header that are set explicitly via ``get_call_kwargs`` in stateful testing. `#828`_
 
 .. _v3.17.5:
 
@@ -3321,6 +3322,7 @@ Deprecated
 .. _#836: https://github.com/schemathesis/schemathesis/issues/836
 .. _#832: https://github.com/schemathesis/schemathesis/issues/832
 .. _#830: https://github.com/schemathesis/schemathesis/issues/830
+.. _#828: https://github.com/schemathesis/schemathesis/issues/828
 .. _#824: https://github.com/schemathesis/schemathesis/issues/824
 .. _#822: https://github.com/schemathesis/schemathesis/issues/822
 .. _#816: https://github.com/schemathesis/schemathesis/issues/816
