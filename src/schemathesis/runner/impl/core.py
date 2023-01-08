@@ -348,9 +348,13 @@ def run_test(  # pylint: disable=too-many-locals
         # Schemathesis may detect multiple errors that come from different check results
         # They raise different "grouped" exceptions
         status = Status.failure
-    except hypothesis.errors.Flaky:
-        status = Status.failure
-        result.mark_flaky()
+    except hypothesis.errors.Flaky as exc:
+        if isinstance(exc.__cause__, hypothesis.errors.DeadlineExceeded):
+            status = Status.error
+            result.add_error(DeadlineExceeded.from_exc(exc.__cause__))
+        else:
+            status = Status.failure
+            result.mark_flaky()
     except hypothesis.errors.Unsatisfiable:
         # We need more clear error message here
         status = Status.error
