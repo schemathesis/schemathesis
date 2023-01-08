@@ -20,14 +20,14 @@ Fixups
 Authentication
 ~~~~~~~~~~~~~~
 
-.. automodule:: schemathesis.auth
+.. automodule:: schemathesis.auths
 
-.. autofunction:: schemathesis.auth.register
+.. autofunction:: schemathesis.auth
 
-.. autoclass:: schemathesis.auth.AuthProvider
+.. autoclass:: schemathesis.auths.AuthProvider
    :members:
 
-.. autoclass:: schemathesis.auth.AuthContext
+.. autoclass:: schemathesis.auths.AuthContext
    :members:
 
 Hooks

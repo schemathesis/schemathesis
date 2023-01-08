@@ -11,7 +11,7 @@ from hypothesis.internal.reflection import impersonate
 from pytest_subtests import SubTests, nullcontext
 
 from ._compat import MultipleFailures
-from .auth import AuthStorage
+from .auths import AuthStorage
 from .constants import FLAKY_FAILURE_MESSAGE, CodeSampleStyle
 from .exceptions import CheckFailed, InvalidSchema, SkipTest, get_grouped_exception
 from .hooks import HookDispatcher, HookScope

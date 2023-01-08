@@ -18,7 +18,7 @@ TOKEN = "{TOKEN}"
 
 note = print
 
-@schemathesis.auth.register()
+@schemathesis.auth()
 class TokenAuth:
     def get(self, context):
         return TOKEN
@@ -92,7 +92,7 @@ def test_multiple_threads(testdir, cli, schema_url):
 
     TOKEN = "{TOKEN}"
 
-    @schemathesis.auth.register()
+    @schemathesis.auth()
     class TokenAuth:
 
         def __init__(self):
@@ -108,7 +108,7 @@ def test_multiple_threads(testdir, cli, schema_url):
 
     @schemathesis.hooks.register
     def after_call(context, case, response):
-        provider = schemathesis.auth.GLOBAL_AUTH_STORAGE.provider.provider
+        provider = schemathesis.auths.GLOBAL_AUTH_STORAGE.provider.provider
         assert provider.get_calls == 1, provider.get_calls
     """
     )

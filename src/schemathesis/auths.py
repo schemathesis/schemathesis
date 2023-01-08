@@ -106,7 +106,7 @@ class AuthStorage(Generic[Auth]):
 
         .. code-block:: python
 
-            @schemathesis.auth.register()
+            @schemathesis.auth()
             class TokenAuth:
                 def get(self, context):
                     # This is a real endpoint, try it out!
@@ -126,7 +126,7 @@ class AuthStorage(Generic[Auth]):
             if not issubclass(provider_class, AuthProvider):
                 raise TypeError(
                     f"`{provider_class.__name__}` is not a valid auth provider. "
-                    f"Check `schemathesis.auth.AuthProvider` documentation for examples."
+                    f"Check `schemathesis.auths.AuthProvider` documentation for examples."
                 )
             # Apply caching if desired
             if refresh_interval is not None:

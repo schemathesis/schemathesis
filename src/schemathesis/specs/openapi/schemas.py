@@ -32,7 +32,7 @@ from hypothesis.strategies import SearchStrategy
 from requests.structures import CaseInsensitiveDict
 
 from ... import failures
-from ...auth import AuthStorage
+from ...auths import AuthStorage
 from ...constants import HTTP_METHODS, DataGenerationMethod
 from ...exceptions import (
     InvalidSchema,

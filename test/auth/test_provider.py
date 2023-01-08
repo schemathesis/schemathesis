@@ -1,7 +1,7 @@
 import pytest
 
 from schemathesis import Case
-from schemathesis.auth import AuthContext, AuthStorage, CachingAuthProvider
+from schemathesis.auths import AuthContext, AuthStorage, CachingAuthProvider
 from schemathesis.exceptions import UsageError
 
 TOKEN = "EXAMPLE-TOKEN"

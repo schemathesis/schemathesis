@@ -33,7 +33,7 @@ from hypothesis.strategies import SearchStrategy
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import create_test
-from .auth import AuthStorage
+from .auths import AuthStorage
 from .constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
 from .exceptions import InvalidSchema, UsageError
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
