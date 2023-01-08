@@ -84,7 +84,7 @@ Targeted testing
 Custom strategies for Open API "format" keyword
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. autofunction:: schemathesis.register_string_format
+.. autofunction:: schemathesis.openapi.format
 
 
 Custom scalars for GraphQL
