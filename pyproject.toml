@@ -64,10 +64,14 @@ tests = [
     "strawberry-graphql[fastapi]>=0.109.0",
     "trustme>=0.9.0,<1.0"
 ]
+cov = [
+    "coverage-enable-subprocess",
+    "coverage[toml]>=5.3",
+]
 docs = [
     "sphinx",
 ]
-dev = ["schemathesis[tests,docs]"]
+dev = ["schemathesis[tests,cov,docs]"]
 
 [project.urls]
 Documentation = "https://schemathesis.readthedocs.io/en/stable/"
@@ -100,6 +104,25 @@ xfail_strict = true
 testpaths = "tests"
 asyncio_mode = "auto"
 norecursedirs = ".hypothesis .idea .git src docs .pytest_cache .mypy_cache .tox"
+
+[tool.coverage.run]
+parallel = true
+branch = true
+source_pkgs = ["schemathesis"]
+
+[tool.coverage.paths]
+source = ["src", ".tox/*/site-packages"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+precision = 2
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "pass"
+]
 
 [build-system]
 requires = ["hatchling"]
