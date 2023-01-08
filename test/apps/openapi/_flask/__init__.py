@@ -10,6 +10,8 @@ import yaml
 from flask import Flask, Response, jsonify, request
 from werkzeug.exceptions import BadRequest, GatewayTimeout, InternalServerError
 
+from schemathesis.constants import BOM_MARK
+
 from ..schema import PAYLOAD_VALIDATOR, OpenAPIVersion, make_openapi_schema
 
 SUCCESS_RESPONSE = {"read": "success!"}
@@ -32,6 +34,7 @@ def create_app(
     app.config["schema_requests"] = []
     app.config["internal_exception"] = False
     app.config["random_delay"] = False
+    app.config["prefix_with_bom"] = False
     app.config["users"] = {}
 
     @app.before_request
@@ -52,6 +55,8 @@ def create_app(
     def success():
         if app.config["internal_exception"]:
             1 / 0
+        if app.config["prefix_with_bom"]:
+            return Response((BOM_MARK + '{"success": true}').encode(), content_type="application/json")
         return jsonify({"success": True})
 
     @app.route("/api/foo:bar", methods=["GET"])
