@@ -35,7 +35,7 @@ def test_custom_auth(testdir, cli, schema_url, app):
     module = testdir.make_importable_pyfile(
         hook=f"""
 {AUTH_PROVIDER_MODULE_CODE}
-@schemathesis.hooks.register
+@schemathesis.hook
 def after_call(context, case, response):
     assert case.headers["Authorization"] ==  f"Bearer {TOKEN}", case.headers["Authorization"]
     request_authorization = response.request.headers["Authorization"]
@@ -66,7 +66,7 @@ def test_explicit_auth_precedence(testdir, cli, schema_url, args, expected):
     module = testdir.make_importable_pyfile(
         hook=f"""
 {AUTH_PROVIDER_MODULE_CODE}
-@schemathesis.hooks.register
+@schemathesis.hook
 def after_call(context, case, response):
     request_authorization = response.request.headers["Authorization"]
     assert request_authorization == "{expected}", request_authorization
@@ -106,7 +106,7 @@ def test_multiple_threads(testdir, cli, schema_url):
         def set(self, case, data, context):
             case.headers = {{"Authorization": f"Bearer {{data}}"}}
 
-    @schemathesis.hooks.register
+    @schemathesis.hook
     def after_call(context, case, response):
         provider = schemathesis.auths.GLOBAL_AUTH_STORAGE.provider.provider
         assert provider.get_calls == 1, provider.get_calls

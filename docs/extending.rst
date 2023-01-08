@@ -20,7 +20,7 @@ To register a new hook function, you need to use special decorators - ``register
     import schemathesis
 
 
-    @schemathesis.hooks.register
+    @schemathesis.hook
     def before_generate_query(context, strategy):
         return strategy.filter(lambda x: x["id"].isdigit())
 
@@ -28,7 +28,7 @@ To register a new hook function, you need to use special decorators - ``register
     schema = schemathesis.from_uri("http://0.0.0.0:8080/swagger.json")
 
 
-    @schema.hooks.register("before_generate_query")
+    @schema.hook("before_generate_query")
     def schema_hook(context, strategy):
         return strategy.filter(lambda x: int(x["id"]) % 2 == 0)
 
@@ -249,7 +249,7 @@ This hook allows you to extend or redefine a list of CLI handlers that will be u
                 click.echo("Done!")
 
 
-    @schemathesis.hooks.register
+    @schemathesis.hook
     def after_init_cli_run_handlers(
         context: HookContext,
         handlers: List[EventHandler],
@@ -320,7 +320,7 @@ Called right before any test request during CLI runs. With this hook, you can mo
     import schemathesis
 
 
-    @schemathesis.hooks.register
+    @schemathesis.hook
     def before_call(context, case):
         case.query = {"q": "42"}
 
@@ -335,7 +335,7 @@ Called right after any successful test request during CLI runs. With this hook, 
     import schemathesis
 
 
-    @schemathesis.hooks.register
+    @schemathesis.hook
     def after_call(context, case, response):
         parsed = response.json()
         response._content = json.dumps({"my-wrapper": parsed}).encode()
@@ -355,7 +355,7 @@ If you want to modify what keyword arguments will be given to ``case.call`` / ``
     import schemathesis
 
 
-    @schemathesis.hooks.register
+    @schemathesis.hook
     def process_call_kwargs(context, case, kwargs):
         kwargs["allow_redirects"] = False
 

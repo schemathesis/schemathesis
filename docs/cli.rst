@@ -444,14 +444,14 @@ The passed value will be treated as an importable Python path and imported befor
 Registering custom checks
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To use your custom checks with Schemathesis CLI, you need to register them via the ``schemathesis.checks.register`` decorator:
+To use your custom checks with Schemathesis CLI, you need to register them via the ``schemathesis.check`` decorator:
 
 .. code:: python
 
     import schemathesis
 
 
-    @schemathesis.checks.register
+    @schemathesis.check
     def new_check(response, case):
         # some awesome assertions!
         pass
@@ -474,7 +474,7 @@ response code is ``200``.
     import schemathesis
 
 
-    @schemathesis.checks.register
+    @schemathesis.check
     def conditional_check(response, case):
         if response.status_code == 200:
             ...  # some awesome assertions!
