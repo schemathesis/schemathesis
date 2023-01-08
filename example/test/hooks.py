@@ -28,7 +28,7 @@ def not_so_slow(response, case):
     assert response.elapsed < timedelta(milliseconds=100), "Response is slow!"
 
 
-@schemathesis.register_target
+@schemathesis.targets.register
 def big_response(context):
     """Custom data generation target."""
     return float(len(context.response.content))

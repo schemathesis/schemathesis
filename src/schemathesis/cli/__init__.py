@@ -83,16 +83,6 @@ DEPRECATED_CASSETTE_PATH_OPTION_WARNING = (
 CASSETTES_PATH_INVALID_USAGE_MESSAGE = "Can't use `--store-network-log` and `--cassette-path` simultaneously"
 
 
-def register_target(function: Target) -> Target:
-    """Register a new testing target for schemathesis CLI.
-
-    :param function: A function that will be called to calculate a metric passed to ``hypothesis.target``.
-    """
-    targets_module.ALL_TARGETS += (function,)
-    TARGETS_TYPE.choices += (function.__name__,)  # type: ignore
-    return function
-
-
 def reset_checks() -> None:
     """Get checks list to their default state."""
     # Useful in tests

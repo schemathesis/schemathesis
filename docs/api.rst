@@ -79,7 +79,7 @@ Targeted testing
 
 .. autoclass:: schemathesis.targets.TargetContext
    :members:
-.. autofunction:: schemathesis.register_target
+.. autofunction:: schemathesis.targets.register
 
 Custom strategies for Open API "format" keyword
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
