@@ -22,7 +22,7 @@ def before_generate_body(context, strategy):
     return strategy.filter(lambda x: x.get("id", 10001) > 10000)
 
 
-@schemathesis.register_check
+@schemathesis.checks.register
 def not_so_slow(response, case):
     """Custom response check."""
     assert response.elapsed < timedelta(milliseconds=100), "Response is slow!"

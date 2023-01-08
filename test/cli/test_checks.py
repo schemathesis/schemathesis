@@ -6,7 +6,7 @@ from schemathesis.cli import reset_checks
 
 @pytest.fixture
 def new_check():
-    @schemathesis.register_check
+    @schemathesis.checks.register
     def check_function(response, case):
         pass
 
@@ -16,7 +16,7 @@ def new_check():
 
 
 def test_register_returns_a_value(new_check):
-    # When a function is registered via the `register_check` decorator
+    # When a function is registered via the `schemathesis.checks.register` decorator
     # Then this function should be available for further usage
     # See #721
     assert new_check is not None
