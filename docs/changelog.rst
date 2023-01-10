@@ -41,6 +41,7 @@ Changelog
 - Properly display flaky deadline errors.
 - Internal error when the ``utf8_bom`` fixup is used for WSGI apps.
 - Printing header that are set explicitly via ``get_call_kwargs`` in stateful testing. `#828`_
+- Display all explicitly defined headers in the generated cURL command.
 
 .. _v3.17.5:
 

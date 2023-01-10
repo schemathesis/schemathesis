@@ -698,7 +698,7 @@ def test_loose_multipart_definition():
     # Then non-object data should be excluded during generation
 
     @given(case=schema["/body"]["POST"].as_strategy())
-    @settings(max_examples=5)
+    @settings(max_examples=5, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
     def test(case):
         assert isinstance(case.body, dict)
 

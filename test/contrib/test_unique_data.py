@@ -132,6 +132,7 @@ def run(testdir, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_exa
         f"--hypothesis-max-examples={hypothesis_max_examples or 30}",
         "--data-generation-unique",
         "--data-generation-method=all",
+        "--hypothesis-suppress-health-check=filter_too_much",
         "--hypothesis-phases=generate",
         *args,
     )

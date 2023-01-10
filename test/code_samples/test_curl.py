@@ -26,6 +26,18 @@ def test_non_utf_8_body():
     assert command == f"curl -X GET -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {case.id}' -d '42�' http://localhost/users"
 
 
+def test_explicit_headers():
+    # When the generated case contains a header from the list of headers that are ignored by default
+    name = "Accept"
+    value = "application/json"
+    case = Case(operation=schema["/users"]["GET"], headers={name: value})
+    command = case.as_curl_command()
+    assert (
+        command
+        == f"curl -X GET -H '{name}: {value}' -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {case.id}' http://localhost/users"
+    )
+
+
 @pytest.mark.operations("failure")
 def test_cli_output(cli, base_url, schema_url, mock_case_id):
     result = cli.run(schema_url, "--code-sample-style=curl")
