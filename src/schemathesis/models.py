@@ -264,7 +264,7 @@ class Case:  # pylint: disable=too-many-public-methods
             # Note, it may be not sufficient to reproduce the error :(
             prepared.body = prepared.body.decode("utf-8", errors="replace")
         for header in tuple(prepared.headers):
-            if header in IGNORED_HEADERS:
+            if header in IGNORED_HEADERS and header not in (self.headers or {}):
                 del prepared.headers[header]
         return curlify.to_curl(prepared)
 
