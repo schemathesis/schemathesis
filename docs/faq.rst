@@ -259,6 +259,17 @@ By adding these keywords, any ``Cat`` instance will always require the ``hunts``
 
 As an alternative, you could use the ``anyOf`` keyword instead.
 
+Why Schemathesis does not generate UUIDs for Open API 2.0 / 3.0 even if ``format: uuid`` is specified?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Open API 2.0 / 3.0 do not declare the ``uuid`` format as built-in, hence it is available as an extension:
+
+.. code:: python
+
+    from schemathesis.contrib.openapi import formats
+
+    formats.uuid.install()
+
 Working with API schemas
 ------------------------
 
