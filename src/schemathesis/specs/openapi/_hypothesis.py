@@ -46,6 +46,14 @@ def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
     STRING_FORMATS[name] = strategy
 
 
+def unregister_string_format(name: str) -> None:
+    """Remove format strategy from the registry."""
+    try:
+        del STRING_FORMATS[name]
+    except KeyError as exc:
+        raise ValueError(f"Unknown Open API format: {name}") from exc
+
+
 def init_default_strategies() -> None:
     """Register all default "format" strategies."""
     register_string_format("binary", st.binary())
