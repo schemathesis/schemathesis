@@ -2,6 +2,7 @@ import json
 
 import pytest
 from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.specs.openapi import _hypothesis
@@ -363,3 +364,16 @@ def test_missing_header_filter(empty_open_api_3_schema, mocker):
 )
 def test_is_valid_header(value, expected):
     assert is_valid_header({"foo": value}) is expected
+
+
+def test_unregister_string_format_valid():
+    name = "example"
+    schemathesis.openapi.format(name, st.text())
+    assert name in _hypothesis.STRING_FORMATS
+    _hypothesis.unregister_string_format(name)
+    assert name not in _hypothesis.STRING_FORMATS
+
+
+def test_unregister_string_format_invalid():
+    with pytest.raises(ValueError, match="Unknown Open API format: unknown"):
+        _hypothesis.unregister_string_format("unknown")

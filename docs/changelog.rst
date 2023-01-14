@@ -17,6 +17,7 @@ Changelog
     - ``schemathesis.target`` for targets;
     - ``schemathesis.openapi.format`` for custom OpenAPI formats.
     - ``schemathesis.graphql.scalar`` for GraphQL scalars.
+- Open API: UUID format generation via the ``schemathesis.contrib.openapi.formats.uuid`` extension.
 
 **Changed**
 

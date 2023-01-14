@@ -32,3 +32,14 @@ Uniqueness is determined by the following parts of the generated data:
 - ``cookies``
 - ``query``
 - ``body``
+
+UUID data for ``format: uuid`` in Open API
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Open API 2.0 / 3.0 do not declare the ``uuid`` format as built-in, hence it is available as an extension:
+
+.. code:: python
+
+    from schemathesis.contrib.openapi import formats
+
+    formats.uuid.install()
