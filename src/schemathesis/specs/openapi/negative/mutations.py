@@ -80,7 +80,7 @@ class MutationContext:
 
     def mutate(self, draw: Draw) -> Schema:
         # On the top level, Schemathesis creates "object" schemas for all parameter "in" values except "body", which is
-        # taken as-is. Therefore we can only apply mutations that won't change the Open API semantics of the schema.
+        # taken as-is. Therefore, we can only apply mutations that won't change the Open API semantics of the schema.
         mutations: List[Mutation]
         if self.location in ("header", "cookie", "query"):
             # These objects follow this pattern:
@@ -106,9 +106,12 @@ class MutationContext:
         # Deep copy all keywords to avoid modifying the original schema
         new_schema = deepcopy(self.keywords)
         enabled_mutations = draw(st.shared(FeatureStrategy(), key="mutations"))  # type: ignore
-        result = MutationResult.FAILURE
+        # Always apply at least one mutation, otherwise everything is rejected, and we'd like to avoid it
+        # for performance reasons
+        always_applied_mutation = draw(st.sampled_from(mutations))
+        result = always_applied_mutation(self, draw, new_schema)
         for mutation in mutations:
-            if enabled_mutations.is_enabled(mutation.__name__):
+            if mutation is not always_applied_mutation and enabled_mutations.is_enabled(mutation.__name__):
                 result |= mutation(self, draw, new_schema)
         if result == MutationResult.FAILURE:
             # If we failed to apply anything, then reject the whole case
