@@ -1,4 +1,5 @@
 import io
+import json
 import pathlib
 from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import urljoin
@@ -20,14 +21,30 @@ from ...lazy import LazySchema
 from ...types import DataGenerationMethodInput, Filter, NotSet, PathLike
 from ...utils import (
     NOT_SET,
+    GenericResponse,
     StringDatesYAMLLoader,
     WSGIResponse,
+    is_json_media_type,
     prepare_data_generation_methods,
     require_relative_url,
     setup_headers,
 )
 from . import definitions, validation
 from .schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
+
+
+def _is_json_response(response: GenericResponse) -> bool:
+    """Guess if the response contains JSON."""
+    content_type = response.headers.get("Content-Type")
+    if content_type is not None:
+        return is_json_media_type(content_type)
+    return False
+
+
+def _is_json_path(path: PathLike) -> bool:
+    if isinstance(path, str):
+        return path.endswith(".json")
+    return path.suffix == ".json"
 
 
 def from_path(
@@ -66,6 +83,7 @@ def from_path(
             data_generation_methods=data_generation_methods,
             code_sample_style=code_sample_style,
             location=pathlib.Path(path).absolute().as_uri(),
+            __expects_json=_is_json_path(path),
         )
 
 
@@ -126,6 +144,7 @@ def from_uri(
             data_generation_methods=data_generation_methods,
             code_sample_style=code_sample_style,
             location=uri,
+            __expects_json=_is_json_response(response),
         )
     except SchemaLoadingError as exc:
         content_type = response.headers.get("Content-Type")
@@ -134,10 +153,17 @@ def from_uri(
         raise
 
 
-YAML_LOADING_ERROR = (
+SCHEMA_LOADING_ERROR = (
     "It seems like the schema you are trying to load is malformed. "
     "Schemathesis expects API schemas in JSON or YAML formats"
 )
+
+
+def _load_yaml(data: str) -> Dict[str, Any]:
+    try:
+        return yaml.load(data, StringDatesYAMLLoader)
+    except yaml.YAMLError as exc:
+        raise SchemaLoadingError(SCHEMA_LOADING_ERROR) from exc
 
 
 def from_file(
@@ -155,31 +181,42 @@ def from_file(
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     location: Optional[str] = None,
+    __expects_json: bool = False,
     **kwargs: Any,  # needed in the runner to have compatible API across all loaders
 ) -> BaseOpenAPISchema:
     """Load Open API schema from a file descriptor, string or bytes.
 
     :param file: Could be a file descriptor, string or bytes.
     """
-    try:
-        raw = yaml.load(file, StringDatesYAMLLoader)
-        return from_dict(
-            raw,
-            app=app,
-            base_url=base_url,
-            method=method,
-            endpoint=endpoint,
-            tag=tag,
-            operation_id=operation_id,
-            skip_deprecated_operations=skip_deprecated_operations,
-            validate_schema=validate_schema,
-            force_schema_version=force_schema_version,
-            data_generation_methods=data_generation_methods,
-            code_sample_style=code_sample_style,
-            location=location,
-        )
-    except yaml.YAMLError as exc:
-        raise SchemaLoadingError(YAML_LOADING_ERROR) from exc
+    if hasattr(file, "read"):
+        data = file.read()  # type: ignore
+    else:
+        data = file
+    if __expects_json:
+        try:
+            raw = json.loads(data)
+        except json.JSONDecodeError:
+            # Fallback to a slower YAML loader. This way we'll still load schemas from responses with
+            # invalid `Content-Type` headers or YAML files that have the `.json` extension.
+            # This is a rare case, and it will be slower but trying JSON first improves a more common use case
+            raw = _load_yaml(data)
+    else:
+        raw = _load_yaml(data)
+    return from_dict(
+        raw,
+        app=app,
+        base_url=base_url,
+        method=method,
+        endpoint=endpoint,
+        tag=tag,
+        operation_id=operation_id,
+        skip_deprecated_operations=skip_deprecated_operations,
+        validate_schema=validate_schema,
+        force_schema_version=force_schema_version,
+        data_generation_methods=data_generation_methods,
+        code_sample_style=code_sample_style,
+        location=location,
+    )
 
 
 def from_dict(
@@ -379,6 +416,7 @@ def from_wsgi(
         data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
         location=schema_path,
+        __expects_json=_is_json_response(response),
     )
 
 
@@ -472,4 +510,5 @@ def from_asgi(
         data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
         location=schema_path,
+        __expects_json=_is_json_response(response),
     )
