@@ -25,7 +25,6 @@ Changelog
 - Set ``starlette>=0.13,<0.21``.
 - Relax requirements for ``attrs``. `#1643`_
 - Avoid occasional empty lines in cassettes.
-- Performance: Running negative tests filters out less data.
 
 **Deprecated**
 
@@ -44,6 +43,11 @@ Changelog
 - Internal error when the ``utf8_bom`` fixup is used for WSGI apps.
 - Printing header that are set explicitly via ``get_call_kwargs`` in stateful testing. `#828`_
 - Display all explicitly defined headers in the generated cURL command.
+
+**Performance**
+
+- Running negative tests filters out less data.
+- Schema loading: Try a faster loader first if an HTTP response or a file is expected to be JSON.
 
 .. _v3.17.5:
 

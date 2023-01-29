@@ -1,5 +1,6 @@
 """OpenAPI specific loader behavior."""
 import json
+from pathlib import Path
 
 import pytest
 from flask import Response
@@ -7,7 +8,7 @@ from flask import Response
 import schemathesis
 from schemathesis.exceptions import SchemaLoadingError
 from schemathesis.specs.openapi import loaders
-from schemathesis.specs.openapi.loaders import NON_STRING_OBJECT_KEY, NUMERIC_STATUS_CODES_MESSAGE, YAML_LOADING_ERROR
+from schemathesis.specs.openapi.loaders import NON_STRING_OBJECT_KEY, NUMERIC_STATUS_CODES_MESSAGE, SCHEMA_LOADING_ERROR
 from schemathesis.specs.openapi.schemas import OpenApi30, SwaggerV20
 
 
@@ -83,8 +84,8 @@ def test_unsupported_type():
         loaders.from_dict({})
 
 
-@pytest.mark.parametrize("without_content_type", (True, False))
-def test_invalid_content_type(httpserver, without_content_type):
+@pytest.mark.parametrize("content_type", (True, None, "application/json", "application/x-yaml"))
+def test_invalid_content_type(httpserver, content_type):
     # When the user tries to load an HTML as a schema
     content = """
 <html>
@@ -97,19 +98,33 @@ def test_invalid_content_type(httpserver, without_content_type):
 <html>
     """
     response = Response(response=content)
-    if without_content_type:
+    if content_type is None:
         del response.headers["Content-Type"]
+    elif content_type is not True:
+        response.headers["Content-Type"] = content_type
     path = "/openapi/"
     handler = httpserver.expect_request(path)
     handler.respond_with_response(response)
     schema_url = httpserver.url_for(path)
     # And loading cause an error
     # Then it should be suggested to the user that they should provide JSON or YAML
-    with pytest.raises(ValueError, match=YAML_LOADING_ERROR) as exc:
+    with pytest.raises(ValueError, match=SCHEMA_LOADING_ERROR) as exc:
         schemathesis.from_uri(schema_url)
-    if not without_content_type:
+    if content_type is True:
         # And list the actual response content type
         assert "The actual response has `text/html; charset=utf-8` Content-Type" in exc.value.args[0]
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    (
+        ("file.json", True),
+        ("file.txt", False),
+    ),
+)
+@pytest.mark.parametrize("type_", (Path, str))
+def test_is_json_path(type_, value, expected):
+    assert loaders._is_json_path(type_(value)) == expected
 
 
 def test_numeric_status_codes(empty_open_api_3_schema):
