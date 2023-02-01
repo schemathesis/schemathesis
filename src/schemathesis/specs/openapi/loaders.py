@@ -10,7 +10,7 @@ import requests
 import yaml
 from jsonschema import ValidationError
 from starlette.applications import Starlette
-from starlette.testclient import TestClient as ASGIClient
+from starlette_testclient import TestClient as ASGIClient
 from werkzeug.test import Client
 from yarl import URL
 

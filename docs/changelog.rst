@@ -23,7 +23,6 @@ Changelog
 **Changed**
 
 - Build: Switch the build backend to `Hatch <https://hatch.pypa.io/>`_.
-- Set ``starlette>=0.13,<0.21``.
 - Relax requirements for ``attrs``. `#1643`_
 - Avoid occasional empty lines in cassettes.
 
@@ -44,6 +43,8 @@ Changelog
 - Internal error when the ``utf8_bom`` fixup is used for WSGI apps.
 - Printing header that are set explicitly via ``get_call_kwargs`` in stateful testing. `#828`_
 - Display all explicitly defined headers in the generated cURL command.
+- Replace ``starlette.testclient.TestClient`` with ``starlette_testclient.TestClient`` to keep compatibility with newer
+  ``starlette`` versions. `#1637`_
 
 **Performance**
 
@@ -3177,6 +3178,7 @@ Deprecated
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#1643: https://github.com/schemathesis/schemathesis/issues/1643
+.. _#1637: https://github.com/schemathesis/schemathesis/issues/1637
 .. _#1632: https://github.com/schemathesis/schemathesis/issues/1632
 .. _#1631: https://github.com/schemathesis/schemathesis/issues/1631
 .. _#1625: https://github.com/schemathesis/schemathesis/issues/1625

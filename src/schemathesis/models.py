@@ -38,7 +38,7 @@ import werkzeug
 from hypothesis import event, note, reject
 from hypothesis import strategies as st
 from requests.structures import CaseInsensitiveDict
-from starlette.testclient import TestClient as ASGIClient
+from starlette_testclient import TestClient as ASGIClient
 
 from . import failures, serializers
 from .auths import AuthStorage
