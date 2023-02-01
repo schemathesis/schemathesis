@@ -222,14 +222,6 @@ REPORT_TO_SERVICE = object()
     show_default=True,
 )
 @click.option(
-    "--data-generation-unique",
-    "data_generation_unique",
-    help="Forces Schemathesis to generate unique test cases.",
-    is_flag=True,
-    default=False,
-    show_default=True,
-)
-@click.option(
     "--max-response-time",
     help="A custom check that will fail if the response time is greater than the specified one in milliseconds.",
     type=click.IntRange(min=1),
@@ -468,6 +460,22 @@ REPORT_TO_SERVICE = object()
     type=click.Choice(["20", "30"]),
 )
 @click.option(
+    "--contrib-unique-data",
+    "contrib_unique_data",
+    help="Forces Schemathesis to generate unique test cases.",
+    is_flag=True,
+    default=False,
+    show_default=True,
+)
+@click.option(
+    "--contrib-openapi-formats-uuid",
+    "contrib_openapi_formats_uuid",
+    help="Forces Schemathesis to generate unique test cases.",
+    is_flag=True,
+    default=False,
+    show_default=True,
+)
+@click.option(
     "--hypothesis-database",
     help="A way to store found examples in Hypothesis' database. "
     "You can either disable it completely with `none`, "
@@ -574,7 +582,6 @@ def run(
     headers: Dict[str, str],
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
     data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
-    data_generation_unique: bool = False,
     max_response_time: Optional[int] = None,
     targets: Iterable[str] = DEFAULT_TARGETS_NAMES,
     exit_first: bool = False,
@@ -605,6 +612,8 @@ def run(
     stateful: Optional[Stateful] = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     force_schema_version: Optional[str] = None,
+    contrib_unique_data: bool = False,
+    contrib_openapi_formats_uuid: bool = False,
     hypothesis_database: Optional[str] = None,
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
     hypothesis_derandomize: Optional[bool] = None,
@@ -693,8 +702,10 @@ def run(
         else:
             _fixups.install(fixups)
 
-    if data_generation_unique:
+    if contrib_unique_data:
         contrib.unique_data.install()
+    if contrib_openapi_formats_uuid:
+        contrib.openapi.formats.uuid.install()
 
     hypothesis_settings = prepare_hypothesis_settings(
         database=hypothesis_database,

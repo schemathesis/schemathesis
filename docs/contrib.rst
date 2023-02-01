@@ -13,7 +13,7 @@ In CLI:
 
 .. code:: text
 
-    $ st run --data-generation-unique https://example.schemathesis.io/openapi.json
+    $ st run --contrib-unique-data https://example.schemathesis.io/openapi.json
 
 In Python tests:
 
@@ -43,3 +43,5 @@ Open API 2.0 / 3.0 do not declare the ``uuid`` format as built-in, hence it is a
     from schemathesis.contrib.openapi import formats
 
     formats.uuid.install()
+
+You could also enable it via the ``--contrib-openapi-formats-uuid`` CLI option.
