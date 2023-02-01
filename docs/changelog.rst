@@ -7,7 +7,7 @@ Changelog
 **Added**
 
 - Extra information to VCR cassettes.
-- The ``--data-generation-unique`` CLI option that forces Schemathesis to generate unique test cases only.
+- The ``--contrib-unique-data`` CLI option that forces Schemathesis to generate unique test cases only.
   This feature is also available as a hook in ``schemathesis.contrib.unique_data``.
 - A few decorators & functions that provide a simpler API to extend Schemathesis:
     - ``schemathesis.auth()`` for authentication providers;
@@ -17,7 +17,8 @@ Changelog
     - ``schemathesis.target`` for targets;
     - ``schemathesis.openapi.format`` for custom OpenAPI formats.
     - ``schemathesis.graphql.scalar`` for GraphQL scalars.
-- Open API: UUID format generation via the ``schemathesis.contrib.openapi.formats.uuid`` extension.
+- Open API: UUID format generation via the ``schemathesis.contrib.openapi.formats.uuid`` extension
+  You could enable it via the ``--contrib-openapi-formats-uuid`` CLI option.
 
 **Changed**
 
