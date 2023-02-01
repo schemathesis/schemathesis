@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.18.0:
+
+`3.18.0`_ - 2023-02-01
+----------------------
+
 **Added**
 
 - Extra information to VCR cassettes.
@@ -2960,7 +2965,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.17.5...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.18.0...HEAD
+.. _3.18.0: https://github.com/schemathesis/schemathesis/compare/v3.17.5...v3.18.0
 .. _3.17.5: https://github.com/schemathesis/schemathesis/compare/v3.17.4...v3.17.5
 .. _3.17.4: https://github.com/schemathesis/schemathesis/compare/v3.17.3...v3.17.4
 .. _3.17.3: https://github.com/schemathesis/schemathesis/compare/v3.17.2...v3.17.3
