@@ -76,13 +76,12 @@ jobs:
         with:
           python-version: "3.8"
 
-      - run: pip install hatch
+      - run: pip install "hatchling==1.12.*"
 
       - name: Build package
-        run: hatch build
+        run: hatchling build
 
-      - name: Publish package
-        run: hatch publish --no-interaction
-        env:
-          HATCH_INDEX_USER: ${{ secrets.PYPI_USERNAME }}
-          HATCH_INDEX_AUTH: ${{ secrets.PYPI_PASSWORD }}
+      - name: Publish distribution package to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
