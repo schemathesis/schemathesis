@@ -6,7 +6,7 @@ import graphql
 import requests
 from graphql import ExecutionResult
 from starlette.applications import Starlette
-from starlette.testclient import TestClient as ASGIClient
+from starlette_testclient import TestClient as ASGIClient
 from werkzeug import Client
 from yarl import URL
 

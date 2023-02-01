@@ -98,7 +98,7 @@ class Auth:
 """
     if python_app_type == "asgi":
         return """
-from starlette.testclient import TestClient
+from starlette_testclient import TestClient
 
 @schema.auth.register()
 class Auth:
