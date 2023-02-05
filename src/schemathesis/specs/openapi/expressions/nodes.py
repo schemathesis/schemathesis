@@ -6,7 +6,7 @@ import attr
 from requests.structures import CaseInsensitiveDict
 
 from ....utils import WSGIResponse
-from . import pointers
+from .. import references
 from .context import ExpressionContext
 
 
@@ -95,7 +95,7 @@ class BodyRequest(Node):
         document = context.case.body
         if self.pointer is None:
             return document
-        return pointers.resolve(document, self.pointer[1:])
+        return references.resolve_pointer(document, self.pointer[1:])
 
 
 @attr.s(slots=True)  # pragma: no mutate
@@ -122,4 +122,4 @@ class BodyResponse(Node):
         if self.pointer is None:
             # We need the parsed document - data will be serialized before sending to the application
             return document
-        return pointers.resolve(document, self.pointer[1:])
+        return references.resolve_pointer(document, self.pointer[1:])

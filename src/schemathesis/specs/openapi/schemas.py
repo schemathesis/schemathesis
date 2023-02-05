@@ -75,7 +75,7 @@ from .parameters import (
     OpenAPI30Parameter,
     OpenAPIParameter,
 )
-from .references import RECURSION_DEPTH_LIMIT, ConvertingResolver, InliningResolver
+from .references import RECURSION_DEPTH_LIMIT, ConvertingResolver, InliningResolver, resolve_pointer
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
@@ -539,6 +539,8 @@ class BaseOpenAPISchema(BaseSchema):
                         break
                 else:
                     target.update(traverse_schema(deepcopy(schema), callback, self.nullable_name))
+            if self._inline_reference_cache:
+                components[INLINED_REFERENCES_KEY] = self._inline_reference_cache
             self._rewritten_components = components
         return self._rewritten_components
 
@@ -549,11 +551,33 @@ class BaseOpenAPISchema(BaseSchema):
         """
         schema = deepcopy(schema)
         schema = traverse_schema(schema, self._rewrite_references, self.resolver)
-        schema.update(self.rewritten_components)
-        # If there are any cached references - add them to the resulting schema.
-        # Note that not all of them might be used for data generation, but at this point it is the simplest way to go
-        if self._inline_reference_cache:
-            schema[INLINED_REFERENCES_KEY] = self._inline_reference_cache
+        # Only add definitions that are reachable from the schema via references
+        stack = [schema]
+        seen = set()
+        while stack:
+            item = stack.pop()
+            if isinstance(item, dict):
+                if "$ref" in item:
+                    reference = item["$ref"]
+                    if isinstance(reference, str) and reference.startswith("#/") and reference not in seen:
+                        seen.add(reference)
+                        # Resolve the component and add it to the proper place in the schema
+                        pointer = reference[1:]
+                        resolved = resolve_pointer(self.rewritten_components, pointer)
+                        container = schema
+                        for key in pointer.split("/")[1:]:
+                            container = container.setdefault(key, {})
+                        container.update(resolved)
+                        # Explore the resolved value too
+                        stack.append(resolved)
+                # Still explore other values as they may have nested references in other keys
+                for value in item.values():
+                    if isinstance(value, (dict, list)):
+                        stack.append(value)
+            elif isinstance(item, list):
+                for sub_item in item:
+                    if isinstance(sub_item, (dict, list)):
+                        stack.append(sub_item)
         return schema
 
     def _rewrite_references(self, schema: Dict[str, Any], resolver: InliningResolver) -> Dict[str, Any]:
@@ -584,7 +608,7 @@ def _make_reference_key(scopes: List[str], reference: str) -> str:
     digest = sha1()
     for scope in scopes:
         digest.update(scope.encode("utf-8"))
-        # Separator to avoid collissions like this: ["a"], "bc" vs. ["ab"], "c". Otherwise, the resulting digest
+        # Separator to avoid collisions like this: ["a"], "bc" vs. ["ab"], "c". Otherwise, the resulting digest
         # will be the same for both cases
         digest.update(b"#")
     digest.update(reference.encode("utf-8"))
