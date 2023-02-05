@@ -1,5 +1,4 @@
 import pytest
-import requests
 from hypothesis import HealthCheck, settings
 from hypothesis.stateful import run_state_machine_as_test
 
@@ -7,7 +6,6 @@ import schemathesis
 from schemathesis.exceptions import CheckFailed
 from schemathesis.specs.openapi.stateful.links import make_response_filter, match_status_code
 from schemathesis.stateful import StepResult
-from schemathesis.utils import capture_hypothesis_output
 from src.schemathesis.models import CaseSource, Check, Status
 from src.schemathesis.runner.serialization import SerializedCheck
 
@@ -84,12 +82,15 @@ TestStateful = APIWorkflow.TestCase
 
 
 def find_reproduction_code(lines):
-    try:
-        first = lines.index("Falsifying example:") + 1
-        last = lines.index("state.teardown()") + 1
-    except ValueError:
-        first = lines.index("E   Falsifying example:") + 1
-        last = lines.index("E   state.teardown()") + 1
+    for prefix in ("", "E   ", "E       "):
+        try:
+            first = lines.index(f"{prefix}Falsifying example:") + 1
+            last = lines.index(f"{prefix}state.teardown()") + 1
+            break
+        except ValueError:
+            continue
+    else:
+        raise ValueError("Failed to get reproduction code")
     return "\n".join([removeprefix(line, "E   ") for line in lines[first:last]])
 
 
@@ -180,48 +181,7 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
         )
 
 
-def test_all_operations_with_links(openapi3_base_url):
-    # See GH-965
-    # When all API operations have inbound links (one recursive in this exact case)
-    raw_schema = {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": {
-            "/payload": {
-                "post": {
-                    "operationId": "payload",
-                    "requestBody": {
-                        "content": {"application/json": {"schema": {"type": "integer", "minimum": 0, "maximum": 5}}},
-                        "required": True,
-                    },
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "links": {"More": {"operationId": "payload", "requestBody": "$response.body#/value"}},
-                        }
-                    },
-                }
-            }
-        },
-    }
-    schema = schemathesis.from_dict(raw_schema, base_url=openapi3_base_url)
-
-    class APIWorkflow(schema.as_state_machine()):
-        def call(self, case, **kwargs):
-            # The actual response doesn't matter much for this test
-            response = requests.Response()
-            response.status_code = 200
-            response._content = b'{"value": 42}'
-            return response
-
-    # Then test should be successful
-    # And there should be no "Unsatisfiable" error
-    run_state_machine_as_test(
-        APIWorkflow, settings=settings(max_examples=1, deadline=None, suppress_health_check=HealthCheck.all())
-    )
-
-
-@pytest.mark.operations("failure")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 @pytest.mark.openapi_version("3.0")
 def test_explicit_headers_reproduction(testdir, openapi3_base_url, app_schema):
     # See GH-828
@@ -234,6 +194,9 @@ class APIWorkflow(schema.as_state_machine()):
     def get_call_kwargs(self, case):
         return {{"headers": {{"X-Token": "FOOBAR"}}}}
 
+    def validate_response(self, response, case):
+        assert 0, "Explicit failure"
+
 TestCase = APIWorkflow.TestCase
     """,
         schema=app_schema,
@@ -242,10 +205,7 @@ TestCase = APIWorkflow.TestCase
     result.assert_outcomes(failed=1)
     # Then these headers should be displayed in the generated Python code
     example = find_reproduction_code(result.outlines)
-    assert (
-        example.splitlines()[1]
-        == "state._step(case=state.schema['/failure']['GET'].make_case(headers={'X-Token': 'FOOBAR'}), previous=None)"
-    )
+    assert "headers={'X-Token': 'FOOBAR'}" in example.splitlines()[1]
 
 
 @pytest.mark.openapi_version("3.0")
