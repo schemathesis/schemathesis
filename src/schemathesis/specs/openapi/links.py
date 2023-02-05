@@ -2,7 +2,6 @@
 
 Based on https://swagger.io/docs/specification/links/
 """
-from copy import deepcopy
 from difflib import get_close_matches
 from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tuple, Union
 
@@ -12,7 +11,7 @@ from ...models import APIOperation, Case
 from ...parameters import ParameterSet
 from ...stateful import Direction, ParsedData, StatefulTest
 from ...types import NotSet
-from ...utils import NOT_SET, GenericResponse
+from ...utils import NOT_SET, GenericResponse, fast_deepcopy
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPI20Body, OpenAPI30Body, OpenAPIParameter
@@ -95,7 +94,7 @@ class Link(StatefulTest):
             for name, parameter_data in parameters.items():
                 parameter = parameter_data["parameter"]
                 if parameter_data["options"]:
-                    definition = deepcopy(parameter.definition)
+                    definition = fast_deepcopy(parameter.definition)
                     if "schema" in definition:
                         # The actual schema doesn't matter since we have a list of allowed values
                         definition["schema"] = {"enum": parameter_data["options"]}

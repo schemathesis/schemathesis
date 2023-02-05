@@ -2,7 +2,6 @@ import re
 import string
 from base64 import b64encode
 from contextlib import suppress
-from copy import deepcopy
 from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Union
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
@@ -18,7 +17,7 @@ from ...exceptions import InvalidSchema, SerializationNotPossible
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ...models import APIOperation, Case, cant_serialize
 from ...types import NotSet
-from ...utils import NOT_SET, compose, skip
+from ...utils import NOT_SET, compose, fast_deepcopy, skip
 from .constants import LOCATION_TO_CONTAINER
 from .negative import negative_schema
 from .negative.utils import can_negate
@@ -257,8 +256,9 @@ def get_parameters_value(
     strategy = apply_hooks(operation, context, hooks, strategy, location)
     new = draw(strategy)
     if new is not None:
-        value = deepcopy(value)
-        value.update(new)
+        copied = fast_deepcopy(value)
+        copied.update(new)
+        return copied
     return value
 
 
