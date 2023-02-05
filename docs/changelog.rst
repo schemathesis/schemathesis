@@ -8,6 +8,7 @@ Changelog
 
 - Do not merge component schemas into the currently tested schema if they are not referenced by it. Originally all
   schemas were merged to make them visible to ``hypothesis-jsonschema``, but they imply significant overhead. `#1180`_
+- Use a faster, specialized version of ``deepcopy``.
 
 .. _v3.18.0:
 

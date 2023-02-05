@@ -1,8 +1,7 @@
-from copy import deepcopy
 from itertools import chain
 from typing import Any, Callable, Dict, List
 
-from ...utils import traverse_schema
+from ...utils import fast_deepcopy, traverse_schema
 
 
 def to_json_schema(
@@ -14,7 +13,7 @@ def to_json_schema(
     See a recursive version below.
     """
     if copy:
-        schema = deepcopy(schema)
+        schema = fast_deepcopy(schema)
     if schema.get(nullable_name) is True:
         del schema[nullable_name]
         schema = {"anyOf": [schema, {"type": "null"}]}
