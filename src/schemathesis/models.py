@@ -5,7 +5,6 @@ import http
 import json
 from collections import Counter
 from contextlib import contextmanager
-from copy import deepcopy
 from enum import Enum
 from itertools import chain
 from logging import LogRecord
@@ -69,6 +68,7 @@ from .utils import (
     WSGIResponse,
     copy_response,
     deprecated_property,
+    fast_deepcopy,
     get_response_payload,
     maybe_set_assertion_message,
 )
@@ -513,11 +513,11 @@ class Case:  # pylint: disable=too-many-public-methods
             data_generation_method=self.data_generation_method,
             media_type=self.media_type,
             source=self.source if self.source is None else self.source.partial_deepcopy(),
-            path_parameters=deepcopy(self.path_parameters),
-            headers=deepcopy(self.headers),
-            cookies=deepcopy(self.cookies),
-            query=deepcopy(self.query),
-            body=deepcopy(self.body),
+            path_parameters=fast_deepcopy(self.path_parameters),
+            headers=fast_deepcopy(self.headers),
+            cookies=fast_deepcopy(self.cookies),
+            query=fast_deepcopy(self.query),
+            body=fast_deepcopy(self.body),
         )
 
 
@@ -708,16 +708,16 @@ class APIOperation(Generic[P, C]):
         return self.__class__(
             path=self.path,  # string, immutable
             method=self.method,  # string, immutable
-            definition=deepcopy(self.definition),
+            definition=fast_deepcopy(self.definition),
             schema=self.schema.clone(),  # shallow copy
             verbose_name=self.verbose_name,  # string, immutable
             app=self.app,  # not deepcopyable
             base_url=self.base_url,  # string, immutable
-            path_parameters=deepcopy(self.path_parameters),
-            headers=deepcopy(self.headers),
-            cookies=deepcopy(self.cookies),
-            query=deepcopy(self.query),
-            body=deepcopy(self.body),
+            path_parameters=fast_deepcopy(self.path_parameters),
+            headers=fast_deepcopy(self.headers),
+            cookies=fast_deepcopy(self.cookies),
+            query=fast_deepcopy(self.query),
+            body=fast_deepcopy(self.body),
         )
 
     def clone(self, **components: Any) -> "APIOperation":

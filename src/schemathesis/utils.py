@@ -506,3 +506,19 @@ def combine_strategies(strategies: List[st.SearchStrategy]) -> st.SearchStrategy
 
 def skip(operation_name: str) -> NoReturn:
     raise SkipTest(f"It is not possible to generate negative test cases for `{operation_name}`")
+
+
+def fast_deepcopy(value: Any) -> Any:
+    """A specialized version of `deepcopy` that copies only `dict` and `list`.
+
+    It is on average 3x faster than `deepcopy` and given the amount of calls, it is an important optimization.
+    """
+    return _fast_deepcopy(value)
+
+
+def _fast_deepcopy(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _fast_deepcopy(v) for key, v in value.items()}
+    if isinstance(value, list):
+        return [_fast_deepcopy(v) for v in value]
+    return value
