@@ -92,7 +92,6 @@ def test_get_code_sample_code_validity(empty_open_api_2_schema):
         ("http://example.com", "http://example.com"),
         ("http://example.com'", "http://example.com\\'"),
         ("http://example.com\\'", "http://example.com\\'"),
-        ("http://example.com\\'", "http://example.com\\'"),
         ("http://example.com\\\\'", "http://example.com\\\\\\'"),
     ),
 )
