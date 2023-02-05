@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Stateful testing: Only make stateful requests when stateful data is available from another operation.
+  This change significantly reduces the number of API calls that likely will fail because of absense of stateful data. `#1669`_
+
 **Performance**
 
 - Do not merge component schemas into the currently tested schema if they are not referenced by it. Originally all
@@ -3188,6 +3193,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1669: https://github.com/schemathesis/schemathesis/issues/1669
 .. _#1643: https://github.com/schemathesis/schemathesis/issues/1643
 .. _#1637: https://github.com/schemathesis/schemathesis/issues/1637
 .. _#1632: https://github.com/schemathesis/schemathesis/issues/1632
