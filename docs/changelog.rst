@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Performance**
+
+- Do not merge component schemas into the currently tested schema if they are not referenced by it. Originally all
+  schemas were merged to make them visible to ``hypothesis-jsonschema``, but they imply significant overhead. `#1180`_
+
 .. _v3.18.0:
 
 `3.18.0`_ - 2023-02-01
@@ -3246,6 +3251,7 @@ Deprecated
 .. _#1194: https://github.com/schemathesis/schemathesis/issues/1194
 .. _#1190: https://github.com/schemathesis/schemathesis/issues/1190
 .. _#1189: https://github.com/schemathesis/schemathesis/issues/1189
+.. _#1180: https://github.com/schemathesis/schemathesis/issues/1180
 .. _#1173: https://github.com/schemathesis/schemathesis/issues/1173
 .. _#1167: https://github.com/schemathesis/schemathesis/issues/1167
 .. _#1166: https://github.com/schemathesis/schemathesis/issues/1166
