@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.18.1:
+
+`3.18.1`_ - 2023-02-06
+----------------------
+
 **Changed**
 
 - Stateful testing: Only make stateful requests when stateful data is available from another operation.
@@ -2976,7 +2981,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.18.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.18.1...HEAD
+.. _3.18.1: https://github.com/schemathesis/schemathesis/compare/v3.18.0...v3.18.1
 .. _3.18.0: https://github.com/schemathesis/schemathesis/compare/v3.17.5...v3.18.0
 .. _3.17.5: https://github.com/schemathesis/schemathesis/compare/v3.17.4...v3.17.5
 .. _3.17.4: https://github.com/schemathesis/schemathesis/compare/v3.17.3...v3.17.4
