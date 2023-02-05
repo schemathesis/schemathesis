@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Callable, Dict, List, Tuple
 
+import attr
 import hypothesis.strategies as st
 from requests.structures import CaseInsensitiveDict
 
@@ -13,10 +14,19 @@ if TYPE_CHECKING:
 FilterFunction = Callable[[StepResult], bool]
 
 
+@attr.s(slots=True)
+class Connection:
+    source: str = attr.ib()
+    strategy: st.SearchStrategy[Tuple[StepResult, OpenAPILink]] = attr.ib()
+
+
+APIOperationConnections = Dict[str, List[Connection]]
+
+
 def apply(
     operation: "APIOperation",
     bundles: Dict[str, CaseInsensitiveDict],
-    connections: Dict[str, List[st.SearchStrategy[Tuple[StepResult, OpenAPILink]]]],
+    connections: APIOperationConnections,
 ) -> None:
     """Gather all connections based on Open API links definitions."""
     all_status_codes = list(operation.definition.resolved["responses"])
@@ -25,7 +35,8 @@ def apply(
         strategy = bundles[operation.path][operation.method.upper()].filter(
             make_response_filter(status_code, all_status_codes)
         )
-        connections[target_operation.verbose_name].append(_convert_strategy(strategy, link))
+        connection = Connection(source=operation.verbose_name, strategy=_convert_strategy(strategy, link))
+        connections[target_operation.verbose_name].append(connection)
 
 
 def _convert_strategy(

@@ -125,8 +125,8 @@ def test_common_parameters_with_references_stateful(empty_open_api_2_schema):
     # Then state machine should be successfully generated
     state_machine = schema.as_state_machine()
     assert len(state_machine.bundles) == 2
-    # 3 fallbacks for each operation (there are 3 operations) + 2 links
-    assert len(state_machine.rules()) == 5
+    # 1 operation that creates data for other operations + 2 links
+    assert len(state_machine.rules()) == 3
 
 
 def test_common_parameters_multiple_tests(testdir):
