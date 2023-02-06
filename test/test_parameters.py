@@ -1,5 +1,4 @@
 import datetime
-from copy import deepcopy
 
 import pytest
 import yaml
@@ -9,6 +8,7 @@ from hypothesis.errors import NoSuchExample
 import schemathesis
 from schemathesis.exceptions import InvalidSchema
 from schemathesis.specs.openapi._hypothesis import STRING_FORMATS, is_valid_header
+from schemathesis.utils import fast_deepcopy
 
 from .utils import as_param
 
@@ -158,9 +158,9 @@ def schema_spec(request):
 @pytest.fixture
 def base_schema(request, schema_spec):
     if schema_spec == "swagger":
-        return deepcopy(request.getfixturevalue("simple_schema"))
+        return fast_deepcopy(request.getfixturevalue("simple_schema"))
     if schema_spec == "openapi":
-        return deepcopy(request.getfixturevalue("simple_openapi"))
+        return fast_deepcopy(request.getfixturevalue("simple_openapi"))
 
 
 @pytest.fixture(params=["header", "query"])
@@ -202,7 +202,7 @@ def test_(case):
 
 @pytest.fixture
 def cookie_schema(simple_openapi):
-    schema = deepcopy(simple_openapi)
+    schema = fast_deepcopy(simple_openapi)
     components = schema.setdefault("components", {})
     components["securitySchemes"] = {"api_key": {"type": "apiKey", "name": "api_key", "in": "cookie"}}
     schema["security"] = [{"api_key": []}]
@@ -322,7 +322,7 @@ def test_(case):
 
 def test_security_definitions_bearer_auth(testdir, simple_openapi):
     # When schema is using HTTP Bearer Auth scheme
-    schema = deepcopy(simple_openapi)
+    schema = fast_deepcopy(simple_openapi)
     components = schema.setdefault("components", {})
     components["securitySchemes"] = {"bearer_auth": {"type": "http", "scheme": "bearer"}}
     schema["security"] = [{"bearer_auth": []}]
