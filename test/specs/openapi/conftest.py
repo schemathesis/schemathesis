@@ -1,9 +1,8 @@
-from copy import deepcopy
-
 import pytest
 
 import schemathesis
 from schemathesis.specs.openapi.definitions import OPENAPI_30_VALIDATOR, SWAGGER_20_VALIDATOR
+from schemathesis.utils import fast_deepcopy
 
 
 def make_object_schema(is_loose=False, **properties):
@@ -81,7 +80,7 @@ def open_api_2_user_form_with_file_parameters(open_api_2_user_form_parameters):
 @pytest.fixture
 def make_openapi_2_schema(empty_open_api_2_schema):
     def maker(consumes, parameters):
-        schema = deepcopy(empty_open_api_2_schema)
+        schema = fast_deepcopy(empty_open_api_2_schema)
         schema["paths"]["/users"] = {
             "post": {
                 "summary": "Test operation",
@@ -115,7 +114,7 @@ def open_api_3_user_with_file():
 @pytest.fixture
 def make_openapi_3_schema(empty_open_api_3_schema):
     def maker(body=None, parameters=None):
-        schema = deepcopy(empty_open_api_3_schema)
+        schema = fast_deepcopy(empty_open_api_3_schema)
         definition = {
             "summary": "Test operation",
             "description": "Test",

@@ -1,4 +1,3 @@
-from copy import deepcopy
 from test.utils import assert_requests_call
 from urllib.parse import urlparse
 
@@ -26,6 +25,7 @@ from schemathesis.specs.openapi.negative.mutations import (
     remove_required_property,
 )
 from schemathesis.specs.openapi.utils import is_header_location
+from schemathesis.utils import fast_deepcopy
 
 MAX_EXAMPLES = 15
 SUPPRESSED_HEALTH_CHECKS = [HealthCheck.too_slow, HealthCheck.filter_too_much, HealthCheck.data_too_large]
@@ -75,7 +75,7 @@ def test_top_level_strategy(data, location, schema):
         schema["additionalProperties"] = False
     validate_schema(schema)
     validator = Draft4Validator(schema)
-    schema = deepcopy(schema)
+    schema = fast_deepcopy(schema)
     instance = data.draw(
         negative_schema(
             schema,
@@ -123,7 +123,7 @@ def test_top_level_strategy(data, location, schema):
 def test_failing_mutations(data, mutation, schema, validate):
     if validate:
         validate_schema(schema)
-    original_schema = deepcopy(schema)
+    original_schema = fast_deepcopy(schema)
     # When mutation can't be applied
     # Then it returns "failure"
     assert (
@@ -138,7 +138,7 @@ def test_failing_mutations(data, mutation, schema, validate):
 def test_change_type_urlencoded(data):
     # When `application/x-www-form-urlencoded` media type is passed to `change_type`
     schema = {"type": "object"}
-    original_schema = deepcopy(schema)
+    original_schema = fast_deepcopy(schema)
     context = MutationContext(schema, {}, "body", "application/x-www-form-urlencoded")
     # Then it should not be mutated
     assert change_type(context, data.draw, schema) == MutationResult.FAILURE
@@ -183,7 +183,7 @@ def test_change_type_urlencoded(data):
 def test_successful_mutations(data, mutation, schema):
     validate_schema(schema)
     validator = Draft4Validator(schema)
-    schema = deepcopy(schema)
+    schema = fast_deepcopy(schema)
     # When mutation can be applied
     # Then it returns "success"
     assert (
@@ -225,7 +225,7 @@ def test_successful_mutations(data, mutation, schema):
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_path_parameters_are_string(data, schema):
     validator = Draft4Validator(schema)
-    new_schema = deepcopy(schema)
+    new_schema = fast_deepcopy(schema)
     # When path parameters are mutated
     new_schema = data.draw(mutated(new_schema, {}, "path", None))
     assert new_schema["type"] == "object"
@@ -282,7 +282,7 @@ def test_mutation_result_success(left, right, expected):
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_negate_constraints_keep_dependencies(data, schema):
     # When `negate_constraints` is used
-    schema = deepcopy(schema)
+    schema = fast_deepcopy(schema)
     negate_constraints(MutationContext(schema, {}, "body", "application/json"), data.draw, schema)
     # Then it should always produce valid schemas
     validate_schema(schema)
