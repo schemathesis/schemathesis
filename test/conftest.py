@@ -9,7 +9,7 @@ import pytest
 import requests
 import yaml
 from click.testing import CliRunner
-from hypothesis import Phase, settings
+from hypothesis import settings
 from packaging import version
 from urllib3 import HTTPResponse
 
@@ -34,9 +34,6 @@ pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
 # Register Hypothesis profile. Could be used as
 # `pytest test -m hypothesis --hypothesis-profile <profile-name>`
 settings.register_profile("CI", max_examples=1000)
-# Disable shrinking in tests for speed
-settings.register_profile("tests", phases=[Phase.explicit, Phase.reuse, Phase.generate])
-settings.load_profile("tests")
 
 
 @pytest.fixture(autouse=True)

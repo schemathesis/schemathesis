@@ -90,7 +90,6 @@ def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, c
         f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
         "--hypothesis-seed=1",
-        "--hypothesis-phases=generate,shrink",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     cassette = load_cassette(cassette_path)

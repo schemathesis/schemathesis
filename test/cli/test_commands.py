@@ -508,11 +508,7 @@ def test_hypothesis_database_report(cli, schema_url):
     result = cli.run(schema_url, "--hypothesis-database=:memory:", "-v")
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
-    assert (
-        lines[3] == "Hypothesis: database=InMemoryExampleDatabase({}), "
-        "deadline=timedelta(milliseconds=15000), "
-        "phases=(Phase.explicit, Phase.reuse, Phase.generate)"
-    )
+    assert lines[3] == "Hypothesis: database=InMemoryExampleDatabase({}), deadline=timedelta(milliseconds=15000)"
 
 
 @pytest.mark.openapi_version("3.0")
@@ -909,9 +905,7 @@ def test_headers_conformance_valid(cli, cli_args):
 
 @pytest.mark.operations("multiple_failures")
 def test_multiple_failures_single_check(cli, schema_url):
-    result = cli.run(
-        schema_url, "--hypothesis-seed=1", "--hypothesis-derandomize", "--hypothesis-phases=generate,shrink"
-    )
+    result = cli.run(schema_url, "--hypothesis-seed=1", "--hypothesis-derandomize")
 
     assert "= HYPOTHESIS OUTPUT =" not in result.stdout
     assert "Hypothesis found 2 distinct failures" not in result.stdout
@@ -932,7 +926,6 @@ def test_multiple_failures_different_check(cli, schema_url):
         "not_a_server_error",
         "--hypothesis-derandomize",
         "--hypothesis-seed=1",
-        "--hypothesis-phases=generate,shrink",
     )
 
     assert "= HYPOTHESIS OUTPUT =" not in result.stdout
