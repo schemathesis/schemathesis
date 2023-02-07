@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Performance**
+
+- Modify values in-place inside built-in ``map`` functions as there is no need to copy them.
+
 .. _v3.18.1:
 
 `3.18.1`_ - 2023-02-06

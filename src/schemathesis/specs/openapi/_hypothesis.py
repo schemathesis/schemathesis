@@ -89,13 +89,14 @@ def is_valid_header(headers: Dict[str, Any]) -> bool:
     return True
 
 
-def is_illegal_surrogate(item: Any) -> bool:
-    def check(value: Any) -> bool:
-        return isinstance(value, str) and bool(re.search(r"[\ud800-\udfff]", value))
+SURROGATE_PAIR_RE = re.compile(r"[\ud800-\udfff]")
+has_surrogate_pair = SURROGATE_PAIR_RE.search
 
+
+def is_illegal_surrogate(item: Any) -> bool:
     if isinstance(item, list):
-        return any(check(item_) for item_ in item)
-    return check(item)
+        return any(isinstance(item_, str) and bool(has_surrogate_pair(item_)) for item_ in item)
+    return isinstance(item, str) and bool(has_surrogate_pair(item))
 
 
 def is_valid_query(query: Dict[str, Any]) -> bool:
@@ -319,22 +320,24 @@ def get_parameters_strategy(
     return st.none()
 
 
-def _jsonify_leaves(value: Any) -> Any:
-    if isinstance(value, dict):
-        for key, sub_item in value.items():
-            value[key] = _jsonify_leaves(sub_item)
-    elif isinstance(value, list):
-        value = [_jsonify_leaves(sub_item) for sub_item in value]
-    elif isinstance(value, bool):
-        return "true" if value else "false"
-    elif value is None:
-        return "null"
-    return value
-
-
 def jsonify_python_specific_types(value: Dict[str, Any]) -> Dict[str, Any]:
     """Convert Python-specific values to their JSON equivalents."""
-    return _jsonify_leaves(value)
+    stack: list = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            for key, sub_item in item.items():
+                if isinstance(sub_item, bool):
+                    item[key] = "true" if sub_item else "false"
+                elif sub_item is None:
+                    item[key] = "null"
+                elif isinstance(sub_item, dict):
+                    stack.append(sub_item)
+                elif isinstance(sub_item, list):
+                    stack.extend(item)
+        elif isinstance(item, list):
+            stack.extend(item)
+    return value
 
 
 def make_positive_strategy(
@@ -408,15 +411,15 @@ def quote_all(parameters: Dict[str, Any]) -> Dict[str, Any]:
     #   - http://localhost/foo/../ -> http://localhost/
     # Which is not desired as we need to test precisely the original path structure.
 
-    def quote(value: str) -> str:
-        quoted = quote_plus(value)
-        if quoted == ".":
-            return "%2E"
-        if quoted == "..":
-            return "%2E%2E"
-        return quoted
-
-    return {key: quote(value) if isinstance(value, str) else value for key, value in parameters.items()}
+    for key, value in parameters.items():
+        if isinstance(value, str):
+            if value == ".":
+                parameters[key] = "%2E"
+            elif value == "..":
+                parameters[key] = "%2E%2E"
+            else:
+                parameters[key] = quote_plus(value)
+    return parameters
 
 
 def apply_hooks(

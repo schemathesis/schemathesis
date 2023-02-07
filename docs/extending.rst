@@ -13,7 +13,7 @@ The hook mechanism is similar to pytest's. Depending on the scope of the changes
 - Schema. Used only for specific schema instance;
 - Test. Used only for a particular test function;
 
-To register a new hook function, you need to use special decorators - ``register`` for global and schema-local hooks and ``apply`` for test-specific ones:
+To register a new hook function, you need to use special decorators - ``hook`` for global and schema-local hooks and ``hooks.apply`` for test-specific ones:
 
 .. code:: python
 
