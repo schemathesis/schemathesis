@@ -7,6 +7,7 @@ Changelog
 **Performance**
 
 - Modify values in-place inside built-in ``map`` functions as there is no need to copy them.
+- Update ``hypothesis-jsonschema`` to ``0.22.1`` for up to 30% faster data generation in some workflows.
 
 .. _v3.18.1:
 
