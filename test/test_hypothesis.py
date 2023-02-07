@@ -17,6 +17,7 @@ from schemathesis.specs.openapi._hypothesis import (
     get_case_strategy,
     is_valid_path,
     is_valid_query,
+    jsonify_python_specific_types,
     make_positive_strategy,
     quote_all,
 )
@@ -479,3 +480,17 @@ def test_date_format(data):
     strategy = schema["/data"]["POST"].as_strategy()
     case = data.draw(strategy)
     datetime.datetime.strptime(case.body, "%Y-%m-%d")
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    (
+        ({"foo": True}, {"foo": "true"}),
+        ({"foo": False}, {"foo": "false"}),
+        ({"foo": None}, {"foo": "null"}),
+        ([{"foo": None}], [{"foo": "null"}]),
+        ([{"foo": {"bar": True}}], [{"foo": {"bar": "true"}}]),
+    ),
+)
+def test_jsonify_python_specific_types(value, expected):
+    assert jsonify_python_specific_types(value) == expected
