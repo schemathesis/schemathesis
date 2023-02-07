@@ -795,7 +795,7 @@ def api_schema():
 lazy_schema = schemathesis.from_pytest_fixture("api_schema")
 
 @lazy_schema.parametrize()
-@settings(derandomize=True)
+@settings(derandomize=True, phases=[Phase.generate, Phase.shrink])
 @seed(1)
 def test_(case):
     case.call_and_validate()""",
@@ -824,7 +824,7 @@ def api_schema():
 lazy_schema = schemathesis.from_pytest_fixture("api_schema")
 
 @lazy_schema.parametrize()
-@settings(derandomize=True)
+@settings(derandomize=True, phases=[Phase.generate, Phase.shrink])
 @seed(1)
 def test_(case):
     if case.query["id"] < 0:
