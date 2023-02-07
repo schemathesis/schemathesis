@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.18.2:
+
+`3.18.2`_ - 2023-02-08
+----------------------
+
 **Performance**
 
 - Modify values in-place inside built-in ``map`` functions as there is no need to copy them.
@@ -2986,7 +2991,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.18.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.18.2...HEAD
+.. _3.18.2: https://github.com/schemathesis/schemathesis/compare/v3.18.1...v3.18.2
 .. _3.18.1: https://github.com/schemathesis/schemathesis/compare/v3.18.0...v3.18.1
 .. _3.18.0: https://github.com/schemathesis/schemathesis/compare/v3.17.5...v3.18.0
 .. _3.17.5: https://github.com/schemathesis/schemathesis/compare/v3.17.4...v3.17.5
