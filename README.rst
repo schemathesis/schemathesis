@@ -111,6 +111,16 @@ Both examples above will run hundreds of requests against the API under test and
 
 💡 See a complete working example project in the ``/example`` directory. 💡
 
+Let's make it better together 🤝
+--------------------------------
+
+We're always looking to make Schemathesis better, and your feedback is a crucial part of that journey!
+If you've got a few minutes, we'd love to hear your thoughts on your experience using Schemathesis.
+
+Just follow `this link <https://forms.gle/kJ4hSxc1Yp6Ga96t5>`_ to let us know what you think 💬
+
+Thanks for helping us make Schemathesis even better! 👍
+
 Support
 -------
 
