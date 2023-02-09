@@ -7,7 +7,7 @@ authors = [{ name = "Dmitry Dygalo", email = "dadygalo@gmail.com" }]
 maintainers = [{ name = "Dmitry Dygalo", email = "dadygalo@gmail.com" }]
 requires-python = ">=3.7"
 license = "MIT"
-readme = "README.rst"
+readme = "README.md"
 include = ["src/schemathesis/py.typed"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",

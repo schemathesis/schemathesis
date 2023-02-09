@@ -7,7 +7,7 @@ WORKDIR /app
 RUN addgroup --gid 1000 -S schemathesis && \
     adduser --uid 1000 -D -S schemathesis -G schemathesis -s /sbin/nologin
 
-COPY --chown=1000:1000 pyproject.toml README.rst src ./
+COPY --chown=1000:1000 pyproject.toml README.md src ./
 
 RUN apk add --no-cache --virtual=.build-deps build-base libffi-dev curl openssl-dev && \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
