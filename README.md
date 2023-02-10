@@ -199,7 +199,7 @@ to Schemathesis, see the [contributing guidelines](https://github.com/schemathes
 
 ## Additional content
 
-- Research paper: [Deriving Semantics-Aware Fuzzers from Web API Schemas](https://arxiv.org/abs/2112.10328) by **@Zac-HD** and **@Stranger6667**
+- [Deriving Semantics-Aware Fuzzers from Web API Schemas](https://arxiv.org/abs/2112.10328) by **@Zac-HD** and **@Stranger6667**
 - [An article](https://dygalo.dev/blog/schemathesis-property-based-testing-for-api-schemas/) about Schemathesis by **@Stranger6667**
 - [Effective API schemas testing](https://youtu.be/VVLZ25JgjD4) from DevConf.cz by **@Stranger6667**
 - [How to use Schemathesis to test Flask API in GitHub Actions](https://notes.lina-is-here.com/2022/08/04/schemathesis-docker-compose.html) by **@lina-is-here**
