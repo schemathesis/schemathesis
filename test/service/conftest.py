@@ -57,7 +57,8 @@ def service_setup(request, setup_server):
         status = marker.kwargs["status"]
         method = marker.kwargs["method"]
         path = marker.kwargs["path"]
-        setup_server(lambda h: h.respond_with_json(data, status=status), method, path)
+        # Use default args to bind variables early
+        setup_server(lambda h, d=data, s=status: h.respond_with_json(d, status=s), method, path)
 
 
 @pytest.fixture

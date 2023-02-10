@@ -1,4 +1,3 @@
-# pylint: disable=too-many-statements,too-many-branches
 import logging
 import threading
 import time
@@ -283,7 +282,7 @@ def handle_schema_error(
         results.generic_errors.append(error)
 
 
-def run_test(  # pylint: disable=too-many-locals
+def run_test(
     operation: APIOperation,
     test: Callable,
     checks: Iterable[CheckFunction],

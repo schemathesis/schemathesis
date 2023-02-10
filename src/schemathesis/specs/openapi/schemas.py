@@ -1,4 +1,3 @@
-# pylint: disable=too-many-ancestors
 import itertools
 import json
 from collections import defaultdict
@@ -168,7 +167,7 @@ class BaseOpenAPISchema(BaseSchema):
         operations and show errors for invalid ones.
         """
         try:
-            paths = self.raw_schema["paths"]  # pylint: disable=unsubscriptable-object
+            paths = self.raw_schema["paths"]
         except KeyError as exc:
             # Missing `paths` is not recoverable
             raise InvalidSchema(SCHEMA_ERROR_MESSAGE) from exc
@@ -261,7 +260,6 @@ class BaseOpenAPISchema(BaseSchema):
     @property
     def resolver(self) -> InliningResolver:
         if not hasattr(self, "_resolver"):
-            # pylint: disable=attribute-defined-outside-init
             self._resolver = InliningResolver(self.location or "", self.raw_schema)
         return self._resolver
 
@@ -525,7 +523,6 @@ class BaseOpenAPISchema(BaseSchema):
                 _schema = to_json_schema(_schema, nullable_name=nullable_name, copy=False)
                 return self._rewrite_references(_schema, self.resolver)
 
-            # pylint: disable=attribute-defined-outside-init
             # Different spec versions allow different keywords to store possible reference targets
             components: Dict[str, Any] = {}
             for path in self.component_locations:
@@ -814,7 +811,7 @@ class SwaggerV20(BaseOpenAPISchema):
         return consumes
 
 
-class OpenApi30(SwaggerV20):  # pylint: disable=too-many-ancestors
+class OpenApi30(SwaggerV20):
     nullable_name = "nullable"
     example_field = "example"
     examples_field = "examples"

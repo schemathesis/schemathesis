@@ -93,7 +93,7 @@ class LazySchema:
 
             def wrapped_test(request: FixtureRequest) -> None:
                 """The actual test, which is executed by pytest."""
-                __tracebackhide__ = True  # pylint: disable=unused-variable
+                __tracebackhide__ = True
                 if hasattr(wrapped_test, "_schemathesis_hooks"):
                     test._schemathesis_hooks = wrapped_test._schemathesis_hooks  # type: ignore
                 schema = get_schema(
@@ -182,7 +182,7 @@ def run_subtest(
     subtests: SubTests,
 ) -> None:
     """Run the given subtest with pytest fixtures."""
-    __tracebackhide__ = True  # pylint: disable=unused-variable
+    __tracebackhide__ = True
 
     # Deduplicate found checks in case of Hypothesis finding multiple of them
     failed_checks = {}
@@ -191,7 +191,7 @@ def run_subtest(
 
     @impersonate(inner_test)  # type: ignore
     def collecting_wrapper(*args: Any, **kwargs: Any) -> None:
-        __tracebackhide__ = True  # pylint: disable=unused-variable
+        __tracebackhide__ = True
         try:
             inner_test(*args, **kwargs)
         except CheckFailed as failed:

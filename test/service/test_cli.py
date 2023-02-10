@@ -68,7 +68,7 @@ def test_server_error(cli, schema_url, service):
     result = cli.run(*args)
     assert result.exit_code == ExitCode.OK, result.stdout
     assert len(service.server.log) == 1
-    service.assert_call(0, f"/reports/upload/", 500)
+    service.assert_call(0, "/reports/upload/", 500)
     # And it should be noted in the output
     lines = get_stdout_lines(result.stdout)
     assert "Upload: ERROR" in lines

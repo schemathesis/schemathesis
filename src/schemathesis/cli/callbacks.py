@@ -118,7 +118,7 @@ def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value
                 "\nAdd this option to your command line parameters to see full tracebacks: --show-errors-tracebacks",
                 fg="red",
             )
-        raise click.exceptions.Exit(1)
+        raise click.exceptions.Exit(1)  # noqa: B904
 
 
 def validate_hypothesis_database(
@@ -175,7 +175,7 @@ def validate_regex(ctx: click.core.Context, param: click.core.Parameter, raw_val
         try:
             re.compile(value)
         except (re.error, OverflowError, RuntimeError) as exc:
-            raise click.BadParameter(f"Invalid regex: {exc.args[0]}")
+            raise click.BadParameter(f"Invalid regex: {exc.args[0]}")  # noqa: B904
     return raw_value
 
 

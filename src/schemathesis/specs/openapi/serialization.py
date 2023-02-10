@@ -51,7 +51,6 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Optional[Calla
 def _serialize_path_openapi3(
     name: str, type_: str, style: Optional[str], explode: Optional[bool]
 ) -> Generator[Optional[Callable], None, None]:
-    # pylint: disable=too-many-branches
     if style == "simple":
         if type_ == "object":
             if explode is False:

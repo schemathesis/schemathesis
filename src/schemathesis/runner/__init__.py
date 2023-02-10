@@ -85,8 +85,6 @@ def prepare(
     hypothesis_verbosity: Optional[hypothesis.Verbosity] = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Prepare a generator that will run test cases against the given API definition."""
-    # pylint: disable=too-many-locals
-
     validate_loader(loader, schema_uri)
 
     if auth is None:
@@ -195,7 +193,6 @@ def execute_from_schema(
 
     Provides the main testing loop and preparation step.
     """
-    # pylint: disable=too-many-locals
     try:
         if app is not None:
             app = import_app(app)

@@ -48,7 +48,7 @@ class Link(StatefulTest):
             # Pylint can't detect that the API operation is always defined at this point
             # E.g. if there is no matching operation or no operations at all, then a ValueError will be risen
             name=name,
-            operation=operation,  # pylint: disable=undefined-loop-variable
+            operation=operation,
             parameters=definition.get("parameters", {}),
             request_body=definition.get("requestBody", NOT_SET),  # `None` might be a valid value - `null`
         )
@@ -91,7 +91,7 @@ class Link(StatefulTest):
         }
         # Here are all components that are filled with parameters
         for location, parameters in containers.items():
-            for name, parameter_data in parameters.items():
+            for parameter_data in parameters.values():
                 parameter = parameter_data["parameter"]
                 if parameter_data["options"]:
                     definition = fast_deepcopy(parameter.definition)
