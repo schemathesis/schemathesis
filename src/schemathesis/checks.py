@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from .models import Case, CheckFunction
 
 
-def not_a_server_error(response: GenericResponse, case: "Case") -> Optional[bool]:  # pylint: disable=useless-return
+def not_a_server_error(response: GenericResponse, case: "Case") -> Optional[bool]:
     """A check to verify that the response is not a server-side error."""
     if response.status_code >= 500:
         exc_class = get_server_error(response.status_code)
@@ -47,9 +47,9 @@ def register(check: "CheckFunction") -> "CheckFunction":
             # some awesome assertions!
             ...
     """
-    from . import cli  # pylint: disable=import-outside-toplevel
+    from . import cli
 
-    global ALL_CHECKS  # pylint: disable=global-statement
+    global ALL_CHECKS
 
     ALL_CHECKS += (check,)
     cli.CHECKS_TYPE.choices += (check.__name__,)  # type: ignore

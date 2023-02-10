@@ -82,7 +82,7 @@ def test_case_hook(schema):
         return strategy.map(tune_case)
 
     @schemathesis.hook
-    def before_generate_case(context, strategy):
+    def before_generate_case(context, strategy):  # noqa: F811
         def tune_case(case):
             case.body["first_name"] = case.body["last_name"]
             return case
@@ -245,9 +245,14 @@ def test_local_dispatcher(schema, apply_first):
     apply = schema.hooks.apply(local_hook, name="before_generate_cookies")
     parametrize = schema.parametrize()
     if apply_first:
-        wrap = lambda x: parametrize(apply(x))
+
+        def wrap(x):
+            return parametrize(apply(x))
+
     else:
-        wrap = lambda x: apply(parametrize(x))
+
+        def wrap(x):
+            return apply(parametrize(x))
 
     @wrap
     def test(case):
@@ -307,7 +312,6 @@ def test_before_process_path_hook(schema):
 
 
 def test_register_wrong_scope(schema):
-
     with pytest.raises(
         ValueError,
         match=r"Cannot register hook 'before_load_schema' on SCHEMA scope dispatcher. "

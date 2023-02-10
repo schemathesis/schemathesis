@@ -769,7 +769,7 @@ def test_trimmed_output(testdir):
     # When `from_pytest_fixture` is used
     # And tests are failing
     testdir.make_test(
-        f"""
+        """
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 
 @lazy_schema.parametrize()

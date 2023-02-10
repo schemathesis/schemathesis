@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 try:
     from yaml import CSafeDumper as SafeDumper
 except ImportError:
-    # pylint: disable=unused-import
     from yaml import SafeDumper  # type: ignore
 
 

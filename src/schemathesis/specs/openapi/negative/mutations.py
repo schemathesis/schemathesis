@@ -142,7 +142,6 @@ class MutationContext:
 
 def for_types(*allowed_types: str) -> Callable[[Mutation], Mutation]:
     """Immediately return FAILURE for schemas with types not from ``allowed_types``."""
-
     _allowed_types = set(allowed_types)
 
     def wrapper(mutation: Mutation) -> Mutation:
@@ -288,7 +287,7 @@ def change_properties(context: MutationContext, draw: Draw, schema: Schema) -> M
     enabled_mutations = draw(st.shared(FeatureStrategy(), key="mutations"))  # type: ignore
     for name, property_schema in properties:
         # Skip already mutated property
-        if name == property_name:  # pylint: disable=undefined-loop-variable
+        if name == property_name:
             # Pylint: `properties` variable has at least one element as it is checked at the beginning of the function
             # Then those properties are ordered and iterated over, therefore `property_name` is always defined
             continue

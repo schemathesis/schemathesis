@@ -154,7 +154,6 @@ class BaseSchema(Mapping):
     @property
     def operations(self) -> Dict[str, MethodsDict]:
         if not hasattr(self, "_operations"):
-            # pylint: disable=attribute-defined-outside-init
             operations = self.get_all_operations()
             self._operations = operations_to_dict(operations)
         return self._operations

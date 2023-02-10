@@ -49,7 +49,6 @@ from .types import DataGenerationMethodInput, Filter, GenericTest, NotSet, RawAu
 try:
     from yaml import CSafeLoader as SafeLoader
 except ImportError:
-    # pylint: disable=unused-import
     from yaml import SafeLoader  # type: ignore
 
 
@@ -95,7 +94,7 @@ def has_invalid_characters(name: str, value: str) -> bool:
 def is_schemathesis_test(func: Callable) -> bool:
     """Check whether test is parametrized with schemathesis."""
     try:
-        from .schemas import BaseSchema  # pylint: disable=import-outside-toplevel
+        from .schemas import BaseSchema
 
         item = getattr(func, PARAMETRIZE_MARKER, None)
         # Comparison is needed to avoid false-positives when mocks are collected by pytest
@@ -244,7 +243,7 @@ def make_loader(*tags_to_remove: str) -> Type[yaml.SafeLoader]:
 StringDatesYAMLLoader = make_loader("tag:yaml.org,2002:timestamp")
 
 
-class WSGIResponse(BaseResponse, JSONMixin):  # pylint: disable=too-many-ancestors
+class WSGIResponse(BaseResponse, JSONMixin):
     # We store "requests" request to build a reproduction code
     request: requests.PreparedRequest
 
@@ -273,7 +272,7 @@ def copy_response(response: GenericResponse) -> GenericResponse:
         copied_response = deepcopy(response)
         if hooks is not None:
             copied_response.request.hooks["response"] = hooks
-        setattr(copied_response, "raw", response.raw)
+        copied_response.raw = response.raw
         return copied_response
     # Can't deepcopy WSGI response due to generators inside (`response.freeze` doesn't completely help)
     response.freeze()

@@ -1,5 +1,3 @@
-# Pylint bug - `Callable` is used below
-# pylint: disable=unused-import
 import enum
 from enum import unique
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
@@ -105,7 +103,6 @@ class GraphQLSchema(BaseSchema):
     @property
     def client_schema(self) -> graphql.GraphQLSchema:
         if not hasattr(self, "_client_schema"):
-            # pylint: disable=attribute-defined-outside-init
             self._client_schema = graphql.build_client_schema(self.raw_schema)
         return self._client_schema
 

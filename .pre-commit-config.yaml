@@ -29,11 +29,6 @@ repos:
     hooks:
       - id: yamllint
 
-  - repo: https://github.com/PyCQA/pydocstyle
-    rev: 6.1.1
-    hooks:
-      - id: pydocstyle
-
   - repo: https://github.com/codingjoe/relint
     rev: 1.2.1
     hooks:
@@ -67,14 +62,10 @@ repos:
         additional_dependencies:
           [types-attrs, types-click, types-requests, types-PyYAML]
 
-  - repo: https://github.com/pre-commit/mirrors-pylint
-    rev: v3.0.0a4
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: "v0.0.244"
     hooks:
-      - id: pylint
-        additional_dependencies: ["isort[pyproject]"]
-        exclude: ^(docs/|test/|test-corpus/|example/).*$
-        # disabled import-error as may be run out of environment with deps
-        args: ["--disable=import-error"]
+      - id: ruff
 
   - repo: https://github.com/myint/rstcheck
     rev: v5.0.0

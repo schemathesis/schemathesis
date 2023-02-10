@@ -44,8 +44,8 @@ from schemathesis.stateful import Stateful
 from schemathesis.targets import DEFAULT_TARGETS
 from schemathesis.utils import current_datetime
 
-PHASES = ", ".join(map(lambda x: x.name, Phase))
-HEALTH_CHECKS = "|".join(map(lambda x: x.name, HealthCheck))
+PHASES = ", ".join((x.name for x in Phase))
+HEALTH_CHECKS = "|".join((x.name for x in HealthCheck))
 
 
 def test_commands_help(cli):
@@ -1161,7 +1161,6 @@ def test_add_case_returns_none(testdir, cli, hypothesis_max_examples, schema_url
 @pytest.mark.usefixtures("reset_hooks")
 def test_multiple_add_case_hooks(testdir, cli, hypothesis_max_examples, schema_url):
     """add_case hooks that mutate the case in place should not affect other cases."""
-
     module = testdir.make_importable_pyfile(
         hook="""
             import schemathesis
@@ -1821,7 +1820,7 @@ def test_exit_first(cli, schema_url, workers_num, mocker):
     if workers_num == 1:
         lines = result.stdout.split("\n")
         # And the execution should stop on the first failure
-        for idx, line in enumerate(lines):
+        for idx, line in enumerate(lines):  # noqa: B007
             if line.startswith("GET /api/failure F"):
                 assert line.endswith("[ 50%]")
                 break
@@ -1919,7 +1918,7 @@ def test_unsupported_regex(testdir, cli, empty_open_api_3_schema):
     # And if it is not then there should be an error with a descriptive error message
     assert "POST /foo E" in result.stdout
     lines = result.stdout.splitlines()
-    for idx, line in enumerate(lines):
+    for idx, line in enumerate(lines):  # noqa: B007
         if "__ POST /foo __" in line:
             break
     else:

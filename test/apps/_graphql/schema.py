@@ -48,7 +48,7 @@ class Query:
 
 
 def get_or_create_author(name: str) -> Tuple[int, Author]:
-    for author_id, author in AUTHORS.items():
+    for author_id, author in AUTHORS.items():  # noqa: B007
         if author.name == name:
             break
     else:
