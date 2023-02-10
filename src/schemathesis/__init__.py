@@ -4,12 +4,12 @@ _install_hypothesis_jsonschema_compatibility_shim()
 
 del _install_hypothesis_jsonschema_compatibility_shim
 
-from . import auths, checks, contrib, fixups, graphql, hooks, runner, serializers, targets
-from .constants import DataGenerationMethod, __version__
-from .models import Case
-from .specs import openapi
-from .specs.openapi._hypothesis import init_default_strategies
-from .utils import GenericResponse
+from . import auths, checks, contrib, fixups, graphql, hooks, runner, serializers, targets  # noqa: E402
+from .constants import DataGenerationMethod, __version__  # noqa: E402
+from .models import Case  # noqa: E402
+from .specs import openapi  # noqa: E402
+from .specs.openapi._hypothesis import init_default_strategies  # noqa: E402
+from .utils import GenericResponse  # noqa: E402
 
 init_default_strategies()
 

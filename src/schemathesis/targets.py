@@ -37,9 +37,9 @@ def register(target: Target) -> Target:
 
     :param target: A function that will be called to calculate a metric passed to ``hypothesis.target``.
     """
-    from . import cli  # pylint: disable=import-outside-toplevel
+    from . import cli
 
-    global ALL_TARGETS  # pylint: disable=global-statement
+    global ALL_TARGETS
 
     ALL_TARGETS += (target,)
     cli.TARGETS_TYPE.choices += (target.__name__,)  # type: ignore

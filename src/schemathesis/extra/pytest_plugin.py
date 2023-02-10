@@ -38,7 +38,7 @@ def create(cls: Type[T], *args: Any, **kwargs: Any) -> T:
     return cls(*args, **kwargs)
 
 
-class SchemathesisFunction(Function):  # pylint: disable=too-many-ancestors
+class SchemathesisFunction(Function):
     def __init__(
         self,
         *args: Any,

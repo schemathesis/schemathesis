@@ -62,7 +62,7 @@ def create_app(operations=("root",), version=OpenAPIVersion("3.0")):
                 except TypeError:
                     # We test it via out ASGI integration and `TypeError` will be propagated otherwise.
                     # To keep the same behavior across all test server implementations we reraise it as a server error
-                    raise HTTPException(status_code=500, detail="We got a problem!")
+                    raise HTTPException(status_code=500, detail="We got a problem!")  # noqa: B904
                 return {"id": user["id"], "full_name": full_name}
             except KeyError as exc:
                 raise HTTPException(status_code=404, detail="Not found") from exc
@@ -77,6 +77,6 @@ def create_app(operations=("root",), version=OpenAPIVersion("3.0")):
                     user[field] = getattr(update, field)
                 return user
             except KeyError:
-                raise HTTPException(status_code=404, detail="Not found")
+                raise HTTPException(status_code=404, detail="Not found")  # noqa: B904
 
     return app

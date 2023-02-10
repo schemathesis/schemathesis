@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines,redefined-outer-name
 import base64
 import enum
 import os
@@ -56,7 +55,6 @@ from .options import CsvChoice, CsvEnumChoice, CustomHelpMessageChoice, NotSet, 
 try:
     from yaml import CSafeLoader as SafeLoader
 except ImportError:
-    # pylint: disable=unused-import
     from yaml import SafeLoader  # type: ignore
 
 
@@ -637,7 +635,6 @@ def run(
 
     API_NAME is an API identifier to upload data to Schemathesis.io.
     """
-    # pylint: disable=too-many-locals,too-many-branches
     started_at = current_datetime()
     maybe_disable_color(ctx, no_color)
     check_auth(auth, headers)
@@ -917,7 +914,7 @@ def _try_load_schema(
             return second(config)
         except (HTTPError, SchemaLoadingError):
             # Raise the first loader's error
-            raise exc  # pylint: disable=raise-missing-from
+            raise exc
 
 
 def _load_graphql_schema(config: LoaderConfig) -> GraphQLSchema:
@@ -1056,7 +1053,6 @@ def execute(
     started_at: str,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
-    # pylint: disable=too-many-branches
     handlers: List[EventHandler] = []
     report_context: Optional[Union[ServiceReportContext, FileReportContext]] = None
     report_queue: Queue
@@ -1247,6 +1243,7 @@ def login(token: str, hostname: str, hosts_file: str, protocol: str, request_tls
     """Authenticate with a Schemathesis.io host.
 
     Example:
+    -------
         st auth login MY_TOKEN
 
     """

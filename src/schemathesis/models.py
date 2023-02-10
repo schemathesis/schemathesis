@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 import base64
 import datetime
 import http
@@ -112,7 +111,7 @@ def serialize(value: Any) -> str:
 
 
 @attr.s(slots=True, repr=False, hash=False)  # pragma: no mutate
-class Case:  # pylint: disable=too-many-public-methods
+class Case:
     """A single test case parameters."""
 
     operation: "APIOperation" = attr.ib()  # pragma: no mutate
@@ -193,7 +192,6 @@ class Case:  # pylint: disable=too-many-public-methods
 
     @property
     def formatted_path(self) -> str:
-        # pylint: disable=not-a-mapping
         try:
             return self.path.format(**self.path_parameters or {})
         except KeyError as exc:
@@ -443,8 +441,8 @@ class Case:  # pylint: disable=too-many-public-methods
             argument.
         :param code_sample_style: Controls the style of code samples for failure reproduction.
         """
-        __tracebackhide__ = True  # pylint: disable=unused-variable
-        from .checks import ALL_CHECKS  # pylint: disable=import-outside-toplevel
+        __tracebackhide__ = True
+        from .checks import ALL_CHECKS
 
         checks = checks or ALL_CHECKS
         failed_checks = []
@@ -494,7 +492,7 @@ class Case:  # pylint: disable=too-many-public-methods
         code_sample_style: Optional[str] = None,
         **kwargs: Any,
     ) -> requests.Response:
-        __tracebackhide__ = True  # pylint: disable=unused-variable
+        __tracebackhide__ = True
         response = self.call(base_url, session, headers, **kwargs)
         self.validate_response(response, checks, code_sample_style=code_sample_style)
         return response

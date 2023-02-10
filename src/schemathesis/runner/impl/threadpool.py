@@ -84,7 +84,7 @@ def _run_task(
                 items = Ok((operation, test_function))
                 # This lambda ignores the input arguments to support the same interface for
                 # `feedback.get_stateful_tests`
-                _run_tests(lambda *_, **__: (items,))
+                _run_tests(lambda *_, **__: (items,))  # noqa: B023
             else:
                 for event in handle_schema_error(result.err(), results, data_generation_methods, 0):
                     events_queue.put(event)

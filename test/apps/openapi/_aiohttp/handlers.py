@@ -56,7 +56,7 @@ async def payload(request: web.Request) -> web.Response:
         try:
             PAYLOAD_VALIDATOR.validate(data)
         except jsonschema.ValidationError as exc:
-            raise web.HTTPBadRequest(text=str(exc))
+            raise web.HTTPBadRequest(text=str(exc))  # noqa: B904
         return web.json_response(body=body)
     return web.json_response({"name": "Nothing!"})
 
@@ -151,9 +151,9 @@ async def multiple_failures(request: web.Request) -> web.Response:
     try:
         id_value = int(request.query["id"])
     except KeyError:
-        raise web.HTTPBadRequest(text='{"detail": "Missing `id`"}')
+        raise web.HTTPBadRequest(text='{"detail": "Missing `id`"}')  # noqa: B904
     except ValueError:
-        raise web.HTTPBadRequest(text='{"detail": "Invalid `id`"}')
+        raise web.HTTPBadRequest(text='{"detail": "Invalid `id`"}')  # noqa: B904
     if id_value == 0:
         raise web.HTTPInternalServerError
     if id_value > 0:
@@ -250,7 +250,7 @@ def get_user_id(request: web.Request) -> str:
     try:
         return request.match_info["user_id"]
     except KeyError:
-        raise web.HTTPBadRequest(text='{"detail": "Missing `user_id`"}')
+        raise web.HTTPBadRequest(text='{"detail": "Missing `user_id`"}')  # noqa: B904
 
 
 async def get_user(request: web.Request) -> web.Response:

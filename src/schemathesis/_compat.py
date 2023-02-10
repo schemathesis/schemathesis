@@ -1,4 +1,3 @@
-# pylint: disable=ungrouped-imports
 import hypothesis
 import hypothesis_jsonschema._from_schema
 import jsonschema
@@ -6,8 +5,6 @@ import werkzeug
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument
 from packaging import version
-
-# pylint: disable=unused-import
 
 try:
     from importlib import metadata

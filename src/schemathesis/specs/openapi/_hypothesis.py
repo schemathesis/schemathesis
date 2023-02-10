@@ -111,7 +111,7 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
 
 
 @st.composite  # type: ignore
-def get_case_strategy(  # pylint: disable=too-many-locals
+def get_case_strategy(
     draw: Callable,
     operation: APIOperation,
     hooks: Optional[HookDispatcher] = None,

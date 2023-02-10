@@ -115,7 +115,6 @@ class HookDispatcher:
                 ...
 
         """
-
         if name is None:
             hook_name = hook.__name__
         else:

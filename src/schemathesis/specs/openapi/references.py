@@ -53,16 +53,13 @@ class InliningResolver(jsonschema.RefResolver):
         super().__init__(*args, **kwargs)
 
     @overload  # pragma: no mutate
-    def resolve_all(
-        self, item: Dict[str, Any], recursion_level: int = 0
-    ) -> Dict[str, Any]:  # pylint: disable=function-redefined
+    def resolve_all(self, item: Dict[str, Any], recursion_level: int = 0) -> Dict[str, Any]:
         pass
 
     @overload  # pragma: no mutate
-    def resolve_all(self, item: List, recursion_level: int = 0) -> List:  # pylint: disable=function-redefined
+    def resolve_all(self, item: List, recursion_level: int = 0) -> List:
         pass
 
-    # pylint: disable=function-redefined
     def resolve_all(self, item: JSONType, recursion_level: int = 0) -> JSONType:
         """Recursively resolve all references in the given object."""
         if isinstance(item, dict):

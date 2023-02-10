@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 # These schemas are copied from https://github.com/OAI/OpenAPI-Specification/tree/master/schemas
 import jsonschema
 

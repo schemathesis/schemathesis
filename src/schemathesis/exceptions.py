@@ -156,7 +156,7 @@ class InvalidSchema(Exception):
         """
 
         def actual_test(*args: Any, **kwargs: Any) -> NoReturn:
-            __tracebackhide__ = True  # pylint: disable=unused-variable
+            __tracebackhide__ = True
             raise self
 
         return actual_test

@@ -1,5 +1,6 @@
 from hypothesis import settings
 
-from .hooks import *  # load Schemathesis hooks
+# Load Schemathesis hooks
+from .hooks import *  # noqa: F403
 
 settings.register_profile("CI", max_examples=1000)

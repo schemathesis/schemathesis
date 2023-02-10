@@ -66,6 +66,7 @@ def make_openapi_schema(operations: Tuple[str, ...], version: OpenAPIVersion = O
     """Generate an OAS 2/3 schemas with the given API operations.
 
     Example:
+    -------
         If `operations` is ("success", "failure")
         then the app will contain GET /success and GET /failure
 

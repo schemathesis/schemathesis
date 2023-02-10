@@ -449,7 +449,7 @@ def from_aiohttp(
     :param str schema_path: An in-app relative URL to the schema.
     :param app: An AioHTTP app instance.
     """
-    from ...extra._aiohttp import run_server  # pylint: disable=import-outside-toplevel
+    from ...extra._aiohttp import run_server
 
     port = run_server(app)
     app_url = f"http://127.0.0.1:{port}/"

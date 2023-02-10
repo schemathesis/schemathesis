@@ -100,7 +100,7 @@ class Feedback:
         as_strategy_kwargs: Optional[Dict[str, Any]],
     ) -> Generator[Result[Tuple[APIOperation, Callable], InvalidSchema], None, None]:
         """Generate additional tests that use data from the previous ones."""
-        from ._hypothesis import create_test  # pylint: disable=import-outside-toplevel
+        from ._hypothesis import create_test
 
         for data in self.stateful_tests.values():
             operation = data.make_operation()
@@ -204,7 +204,7 @@ class APIStateMachine(RuleBasedStateMachine):
         # This method is a proxy that is used under the hood during the state machine initialization.
         # The whole point of having it is to make it possible to override `step`; otherwise, custom "step" is ignored.
         # It happens because, at the point of initialization, the final class is not yet created.
-        __tracebackhide__ = True  # pylint: disable=unused-variable
+        __tracebackhide__ = True
         return self.step(case, previous)
 
     def step(self, case: Case, previous: Optional[Tuple[StepResult, Direction]] = None) -> StepResult:
@@ -216,7 +216,7 @@ class APIStateMachine(RuleBasedStateMachine):
         Schemathesis prepares data, makes a call and validates the received response.
         It is the most high-level point to extend the testing process. You probably don't need it in most cases.
         """
-        __tracebackhide__ = True  # pylint: disable=unused-variable
+        __tracebackhide__ = True
         if previous is not None:
             result, direction = previous
             case = self.transform(result, direction, case)
@@ -359,7 +359,7 @@ class APIStateMachine(RuleBasedStateMachine):
         In this case, all checks will be executed, and you'll receive a grouped exception that contains results from
         all provided checks rather than only the first encountered exception.
         """
-        __tracebackhide__ = True  # pylint: disable=unused-variable
+        __tracebackhide__ = True
         case.validate_response(response, additional_checks=additional_checks)
 
     def store_result(self, response: GenericResponse, case: Case, elapsed: float) -> StepResult:
