@@ -4,6 +4,16 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- ``APIStateMachine.run`` method to simplify running stateful tests.
+
+**Changed**
+
+- Improved quality of generated test sequences by updating state machines in Schemathesis to always run a minimum of two steps during testing. `#1627`_
+  If you use ``hypothesis.stateful.run_state_machine_as_test`` to run your stateful tests, please use the ``run`` method on your state machine class instead.
+  This change requires upgrading ``Hypothesis`` to at least version ``6.68.1``.
+
 .. _v3.18.2:
 
 `3.18.2`_ - 2023-02-08
@@ -3216,6 +3226,7 @@ Deprecated
 .. _#1637: https://github.com/schemathesis/schemathesis/issues/1637
 .. _#1632: https://github.com/schemathesis/schemathesis/issues/1632
 .. _#1631: https://github.com/schemathesis/schemathesis/issues/1631
+.. _#1627: https://github.com/schemathesis/schemathesis/issues/1627
 .. _#1625: https://github.com/schemathesis/schemathesis/issues/1625
 .. _#1614: https://github.com/schemathesis/schemathesis/issues/1614
 .. _#1592: https://github.com/schemathesis/schemathesis/issues/1592

@@ -1,14 +1,16 @@
 import enum
 import json
 import time
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, Generator, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, Generator, List, Optional, Tuple, Type
 
 import attr
 import hypothesis
 from hypothesis.stateful import RuleBasedStateMachine
+from hypothesis.stateful import run_state_machine_as_test as _run_state_machine_as_test
 from requests.structures import CaseInsensitiveDict
 from starlette.applications import Starlette
 
+from ._compat import IS_HYPOTHESIS_ABOVE_6_68_1
 from .exceptions import InvalidSchema
 from .models import APIOperation, Case, CheckFunction
 from .utils import NOT_SET, GenericResponse, Ok, Result
@@ -158,6 +160,19 @@ class _DirectionWrapper:
         return f"state.schema['{path}']['{method}'].links['{self.direction.status_code}']['{self.direction.name}']"
 
 
+def run_state_machine_as_test(
+    state_machine_factory: Type["APIStateMachine"], *, settings: Optional[hypothesis.settings] = None
+) -> None:
+    """Run a state machine as a test.
+
+    It automatically adds the `_min_steps` argument if ``Hypothesis`` is recent enough.
+    """
+    if IS_HYPOTHESIS_ABOVE_6_68_1:
+        # Newer Hypothesis contains an argument to set the minimum number of steps for a state machine execution
+        return _run_state_machine_as_test(state_machine_factory, settings=settings, _min_steps=2)
+    return _run_state_machine_as_test(state_machine_factory, settings=settings)
+
+
 class APIStateMachine(RuleBasedStateMachine):
     """The base class for state machines generated from API schemas.
 
@@ -184,6 +199,11 @@ class APIStateMachine(RuleBasedStateMachine):
             wrapper = _DirectionWrapper(direction)
             return super()._pretty_print((result, wrapper))  # type: ignore
         return super()._pretty_print(value)  # type: ignore
+
+    @classmethod
+    def run(cls, *, settings: Optional[hypothesis.settings] = None) -> None:
+        """Run state machine as a test."""
+        return run_state_machine_as_test(cls, settings=settings)
 
     def setup(self) -> None:
         """Hook method that runs unconditionally in the beginning of each test scenario.
