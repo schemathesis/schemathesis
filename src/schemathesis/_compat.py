@@ -22,6 +22,7 @@ else:
 HYPOTHESIS_VERSION = version.parse(hypothesis.__version__)
 IS_HYPOTHESIS_ABOVE_6_49 = HYPOTHESIS_VERSION >= version.parse("6.49.0")
 IS_HYPOTHESIS_ABOVE_6_54 = HYPOTHESIS_VERSION >= version.parse("6.54.0")
+IS_HYPOTHESIS_ABOVE_6_68_1 = HYPOTHESIS_VERSION >= version.parse("6.68.1")
 
 try:
     from hypothesis.utils.conventions import InferType

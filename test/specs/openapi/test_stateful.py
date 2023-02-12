@@ -1,6 +1,5 @@
 import pytest
 from hypothesis import HealthCheck, settings
-from hypothesis.stateful import run_state_machine_as_test
 
 import schemathesis
 from schemathesis.exceptions import CheckFailed
@@ -170,14 +169,13 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
     state_machine = schema.as_state_machine()
 
     with pytest.raises(CheckFailed, match="Received a response with 5xx status code: 500"):
-        run_state_machine_as_test(
-            state_machine,
+        state_machine.run(
             settings=settings(
                 max_examples=2000,
                 deadline=None,
                 suppress_health_check=HealthCheck.all(),
                 stateful_step_count=3,
-            ),
+            )
         )
 
 
