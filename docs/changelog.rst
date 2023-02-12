@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.18.3:
+
+`3.18.3`_ - 2023-02-12
+----------------------
+
 **Added**
 
 - ``APIStateMachine.run`` method to simplify running stateful tests.
@@ -3001,7 +3006,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.18.2...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.18.3...HEAD
+.. _3.18.3: https://github.com/schemathesis/schemathesis/compare/v3.18.2...v3.18.3
 .. _3.18.2: https://github.com/schemathesis/schemathesis/compare/v3.18.1...v3.18.2
 .. _3.18.1: https://github.com/schemathesis/schemathesis/compare/v3.18.0...v3.18.1
 .. _3.18.0: https://github.com/schemathesis/schemathesis/compare/v3.17.5...v3.18.0
