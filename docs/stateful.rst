@@ -107,11 +107,10 @@ Lazy schema loading
 It is also possible to use stateful testing without loading the API schema during test collection. For example, if your
 application depends on some test fixtures, you might want to avoid loading the schema too early.
 
-To do so, you need to create the state machine inside a ``pytest`` fixture and run it via :func:`run_state_machine_as_test` inside a test function:
+To do so, you need to create the state machine inside a ``pytest`` fixture and run it via :func:`run` inside a test function:
 
 .. code-block:: python
 
-    from hypothesis.stateful import run_state_machine_as_test
     import pytest
     import schemathesis
 
@@ -125,9 +124,7 @@ To do so, you need to create the state machine inside a ``pytest`` fixture and r
 
 
     def test_statefully(state_machine):
-        run_state_machine_as_test(
-            state_machine,
-        )
+        state_machine.run()
 
 How it works behind the scenes?
 -------------------------------
@@ -251,7 +248,6 @@ If you load your schema lazily:
 
 .. code-block:: python
 
-    from hypothesis.stateful import run_state_machine_as_test
     from hypothesis import settings
     import pytest
 
@@ -262,12 +258,11 @@ If you load your schema lazily:
 
 
     def test_statefully(state_machine):
-        run_state_machine_as_test(
-            state_machine,
+        state_machine.run(
             settings=settings(
                 max_examples=200,
                 stateful_step_count=5,
-            ),
+            )
         )
 
 With this configuration, there will be twice more test cases with a maximum of five steps in each one.
