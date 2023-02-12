@@ -5,6 +5,7 @@ import re
 import sys
 from typing import Generator, List, Optional
 
+PYPROJECT_PATH = "pyproject.toml"
 CHANGELOG_PATH = "docs/changelog.rst"
 COMPARE_URL_PREFIX = "https://github.com/schemathesis/schemathesis/compare/"
 
@@ -57,6 +58,19 @@ def bump(new_version: str) -> None:
     # Write the updated changelog back to the file
     with open(CHANGELOG_PATH, "w") as f:
         f.writelines(changelog)
+
+    # Update `pyproject.toml`
+    with open(PYPROJECT_PATH) as f:
+        pyproject = f.readlines()
+
+    version_idx = _find_line_by_prefix(pyproject, f'version = "{old_version}"')
+    if version_idx is None:
+        raise RuntimeError("`pyproject.toml` has no `version` field")
+
+    pyproject[version_idx] = f'version = "{new_version}"\n'
+
+    with open(PYPROJECT_PATH, "w") as f:
+        f.writelines(pyproject)
 
 
 def to_markdown(version: str) -> None:
