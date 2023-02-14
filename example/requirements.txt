@@ -133,7 +133,7 @@ sniffio==1.2.0
     # via anyio
 sortedcontainers==2.4.0
     # via hypothesis
-starlette==0.20.4
+starlette==0.25.0
     # via schemathesis
 swagger-ui-bundle==0.0.9
     # via connexion
