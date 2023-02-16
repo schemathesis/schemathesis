@@ -40,7 +40,7 @@ def test_no_failures(cli, schema_url, service, next_url, upload_message):
     # Then it should receive requests
     assert len(service.server.log) == 2, service.server.log
     # And all requests should have the proper User-Agent
-    for (request, _) in service.server.log:
+    for request, _ in service.server.log:
         assert request.headers["User-Agent"] == USER_AGENT
     service.assert_call(0, "/apis/my-api/", 200)
     service.assert_call(1, "/reports/upload/", 202)
