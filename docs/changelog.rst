@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Support any Werkzeug 2.x in order to allow mitigation of CVE-2023-25577.
+
 .. _v3.18.3:
 
 `3.18.3`_ - 2023-02-12
