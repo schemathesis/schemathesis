@@ -33,7 +33,7 @@ class AuthContext:
 class AuthProvider(Protocol):
     """Get authentication data for an API and set it on the generated test cases."""
 
-    def get(self, context: AuthContext) -> Auth:
+    def get(self, context: AuthContext) -> Auth:  # type: ignore
         """Get the authentication data.
 
         :param AuthContext context: Holds state relevant for the authentication process.

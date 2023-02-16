@@ -306,7 +306,6 @@ def filter_cassette(
     uri: Optional[str] = None,
     method: Optional[str] = None,
 ) -> Iterator[Dict[str, Any]]:
-
     filters = []
 
     def id_filter(item: Dict[str, Any]) -> bool:

@@ -12,7 +12,6 @@ def pythonpath_fix(monkeypatch):
 
 
 def test_unittest_success(testdir):
-
     module = testdir.make_test(
         """
 from unittest import TestCase

@@ -69,6 +69,7 @@ The basic version of such a class might look like this:
 
     import requests
 
+
     # Some details are skipped in this example
     class TokenAuth:
         def get(self, context):
