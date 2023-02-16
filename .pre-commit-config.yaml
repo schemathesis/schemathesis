@@ -3,7 +3,7 @@ default_language_version:
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.2.0
+    rev: v4.4.0
     hooks:
       - id: check-yaml
       - id: end-of-file-fixer
@@ -15,36 +15,36 @@ repos:
       - id: check-merge-conflict
 
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v2.7.1
+    rev: v3.0.0-alpha.4
     hooks:
       - id: prettier
 
   - repo: https://github.com/jorisroovers/gitlint
-    rev: v0.17.0
+    rev: v0.19.0dev
     hooks:
       - id: gitlint
 
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.26.3
+    rev: v1.29.0
     hooks:
       - id: yamllint
 
   - repo: https://github.com/codingjoe/relint
-    rev: 1.2.1
+    rev: 2.1.1
     hooks:
       - id: relint
 
   - repo: https://github.com/ambv/black
-    rev: 22.3.0
+    rev: 23.1.0
     hooks:
       - id: black
         types: [python]
 
   - repo: https://github.com/asottile/blacken-docs
-    rev: v1.12.1
+    rev: 1.13.0
     hooks:
       - id: blacken-docs
-        additional_dependencies: [black==22.3.0]
+        additional_dependencies: [black==23.1.0]
 
   - repo: https://github.com/pre-commit/mirrors-isort
     rev: v5.10.1
@@ -54,7 +54,7 @@ repos:
         additional_dependencies: ["isort[pyproject]"]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v0.950
+    rev: v1.0.0
     hooks:
       - id: mypy
         exclude: ^(docs/|test/|test-corpus/|example/).*$
@@ -63,12 +63,12 @@ repos:
           [types-attrs, types-click, types-requests, types-PyYAML]
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: "v0.0.244"
+    rev: "v0.0.247"
     hooks:
       - id: ruff
 
   - repo: https://github.com/myint/rstcheck
-    rev: v5.0.0
+    rev: v6.1.1
     hooks:
       - id: rstcheck
         additional_dependencies:

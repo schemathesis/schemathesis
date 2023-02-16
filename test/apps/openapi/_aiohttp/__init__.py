@@ -36,7 +36,6 @@ def create_app(
         return response
 
     def wrapper(handler_name: str) -> Callable:
-
         handler = getattr(handlers, handler_name)
 
         @wraps(handler)
