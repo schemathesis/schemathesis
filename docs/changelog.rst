@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.18.4:
+
+`3.18.4`_ - 2023-02-16
+----------------------
+
 **Changed**
 
 - Support any Werkzeug 2.x in order to allow mitigation of `CVE-2023-25577 <https://github.com/advisories/GHSA-xg9f-g7g7-2323>`_. `#1695`_
@@ -3010,7 +3015,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.18.3...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.18.4...HEAD
+.. _3.18.4: https://github.com/schemathesis/schemathesis/compare/v3.18.3...v3.18.4
 .. _3.18.3: https://github.com/schemathesis/schemathesis/compare/v3.18.2...v3.18.3
 .. _3.18.2: https://github.com/schemathesis/schemathesis/compare/v3.18.1...v3.18.2
 .. _3.18.1: https://github.com/schemathesis/schemathesis/compare/v3.18.0...v3.18.1
