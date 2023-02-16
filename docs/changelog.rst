@@ -6,7 +6,7 @@ Changelog
 
 **Changed**
 
-- Support any Werkzeug 2.x in order to allow mitigation of CVE-2023-25577.
+- Support any Werkzeug 2.x in order to allow mitigation of `CVE-2023-25577 <https://github.com/advisories/GHSA-xg9f-g7g7-2323>`_. `#1695`_
 
 .. _v3.18.3:
 
@@ -3231,6 +3231,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1695: https://github.com/schemathesis/schemathesis/issues/1695
 .. _#1669: https://github.com/schemathesis/schemathesis/issues/1669
 .. _#1643: https://github.com/schemathesis/schemathesis/issues/1643
 .. _#1637: https://github.com/schemathesis/schemathesis/issues/1637
