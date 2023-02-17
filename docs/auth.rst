@@ -103,6 +103,7 @@ Here's an example of a simple custom authentication class. However, please note 
     USERNAME = "demo"
     PASSWORD = "test"
 
+
     class MyAuth:
         def get(self, context):
             response = requests.post(
@@ -233,8 +234,7 @@ It could be done by using the ``context`` to get the application instance:
         def get(self, context):
             client = TestClient(context.app)
             response = client.post(
-                TOKEN_ENDPOINT,
-                json={"username": USERNAME, "password": PASSWORD}
+                TOKEN_ENDPOINT, json={"username": USERNAME, "password": PASSWORD}
             )
             return response.json()["access_token"]
 
@@ -261,8 +261,7 @@ It could be done by using the ``context`` to get the application instance:
         def get(self, context):
             client = werkzeug.Client(context.app)
             response = client.post(
-                TOKEN_ENDPOINT,
-                json={"username": USERNAME, "password": PASSWORD}
+                TOKEN_ENDPOINT, json={"username": USERNAME, "password": PASSWORD}
             )
             return response.json["access_token"]
 
@@ -353,6 +352,7 @@ Sometimes you need to reuse the same test client across multiple tests to share 
     from starlette_testclient import TestClient
 
     schema = schemathesis.from_asgi("/openapi.json", app=app)
+
 
     @schema.parametrize()
     def test_api(case):
