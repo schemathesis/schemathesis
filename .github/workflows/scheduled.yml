@@ -17,7 +17,7 @@ jobs:
 
       - uses: actions/setup-python@v3.1.0
         with:
-          python-version: "3.8"
+          python-version: "3.11"
 
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends sqlite3
 
@@ -50,7 +50,7 @@ jobs:
 
       - uses: actions/setup-python@v3.1.0
         with:
-          python-version: 3.8
+          python-version: "3.11"
 
       - run: pip install ".[tests]"
       - run: pytest -m hypothesis -m hypothesis_nested --hypothesis-profile CI test
@@ -66,7 +66,7 @@ jobs:
 
       - uses: actions/setup-python@v3.1.0
         with:
-          python-version: 3.8
+          python-version: "3.11"
 
       - run: pip install ".[tests]"
       # Azure.com APIs take >50% of all APIs in the test corpus
@@ -83,7 +83,7 @@ jobs:
 
       - uses: actions/setup-python@v3.1.0
         with:
-          python-version: 3.8
+          python-version: "3.11"
 
       - run: pip install ".[tests]"
       # It matches 'microsoft.com/graph/1.0.1/openapi.yaml' that has >5000 API operations.
@@ -101,7 +101,7 @@ jobs:
 
       - uses: actions/setup-python@v3.1.0
         with:
-          python-version: 3.8
+          python-version: "3.11"
 
       - run: pip install ".[tests]"
       # It matches all Amazon APIs
@@ -118,7 +118,7 @@ jobs:
 
       - uses: actions/setup-python@v3.1.0
         with:
-          python-version: 3.8
+          python-version: "3.11"
 
       - run: pip install ".[tests]"
       # It matches all Google APIs
@@ -135,7 +135,7 @@ jobs:
 
       - uses: actions/setup-python@v3.1.0
         with:
-          python-version: 3.8
+          python-version: "3.11"
 
       - run: pip install ".[tests]"
       # It matches everything except that large MS API and all Azure.com | Amazon | Google APIs
