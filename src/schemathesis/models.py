@@ -337,6 +337,8 @@ class Case:
         base_url: Optional[str] = None,
         session: Optional[requests.Session] = None,
         headers: Optional[Dict[str, Any]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        cookies: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> requests.Response:
         """Make a network call with `requests`."""
@@ -344,6 +346,10 @@ class Case:
         dispatch("before_call", hook_context, self)
         data = self.as_requests_kwargs(base_url, headers)
         data.update(kwargs)
+        if params is not None:
+            _merge_dict_to(data, "params", params)
+        if cookies is not None:
+            _merge_dict_to(data, "cookies", cookies)
         data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
         if session is None:
             validate_vanilla_requests_kwargs(data)
@@ -387,7 +393,13 @@ class Case:
             **extra,
         }
 
-    def call_wsgi(self, app: Any = None, headers: Optional[Dict[str, str]] = None, **kwargs: Any) -> WSGIResponse:
+    def call_wsgi(
+        self,
+        app: Any = None,
+        headers: Optional[Dict[str, str]] = None,
+        query_string: Optional[Dict[str, str]] = None,
+        **kwargs: Any,
+    ) -> WSGIResponse:
         application = app or self.app
         if application is None:
             raise RuntimeError(
@@ -397,6 +409,8 @@ class Case:
         hook_context = HookContext(operation=self.operation)
         dispatch("before_call", hook_context, self)
         data = self.as_werkzeug_kwargs(headers)
+        if query_string is not None:
+            _merge_dict_to(data, "query_string", query_string)
         client = werkzeug.Client(application, WSGIResponse)
         with cookie_handler(client, self.cookies):
             response = client.open(**data, **kwargs)
@@ -517,6 +531,13 @@ class Case:
             query=fast_deepcopy(self.query),
             body=fast_deepcopy(self.body),
         )
+
+
+def _merge_dict_to(data: Dict[str, Any], key: str, new: Dict[str, Any]) -> None:
+    original = data[key] or {}
+    for key, value in new.items():
+        original[key] = value
+    data[key] = original
 
 
 def validate_vanilla_requests_kwargs(data: Dict[str, Any]) -> None:
