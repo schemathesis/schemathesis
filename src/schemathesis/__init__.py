@@ -27,7 +27,7 @@ from_uri = openapi.from_uri
 from_wsgi = openapi.from_wsgi
 
 # Public API
-auth = auths.register
+auth = auths.GLOBAL_AUTH_STORAGE
 check = checks.register
 hook = hooks.register
 serializer = serializers.register
@@ -37,5 +37,3 @@ target = targets.register
 register_check = checks.register
 register_target = targets.register
 register_string_format = openapi.format
-
-auth.__dict__["register"] = auths.register
