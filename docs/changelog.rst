@@ -4,6 +4,18 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Schemathesis now supports custom authentication mechanisms from the ``requests`` library.
+  You can use ``schemathesis.auth.set_from_requests`` to set up Schemathesis CLI with any third-party authentication implementation that works with ``requests``. `#1700`_
+
+.. code:: python
+
+    import schemathesis
+    from requests_ntlm import HttpNtlmAuth
+
+    schemathesis.auth.set_from_requests(HttpNtlmAuth("domain\\username", "password"))
+
 **Changed**
 
 - Unified Schemathesis custom authentication usage via the ``schema.auth`` decorator, replacing the previous ``schema.auth.register`` and ``schema.auth.apply`` methods:
@@ -3285,6 +3297,7 @@ Deprecated
 
 .. _#1705: https://github.com/schemathesis/schemathesis/issues/1705
 .. _#1702: https://github.com/schemathesis/schemathesis/issues/1702
+.. _#1700: https://github.com/schemathesis/schemathesis/issues/1700
 .. _#1695: https://github.com/schemathesis/schemathesis/issues/1695
 .. _#1669: https://github.com/schemathesis/schemathesis/issues/1669
 .. _#1643: https://github.com/schemathesis/schemathesis/issues/1643

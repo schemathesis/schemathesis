@@ -205,3 +205,24 @@ def test(case):
     result = testdir.runpytest("-s")
     # Then there should be a way to get auth from them
     result.assert_outcomes(passed=1)
+
+
+def test_requests_auth(testdir):
+    # When the user registers auth from `requests`
+    testdir.make_test(
+        """
+from requests.auth import HTTPBasicAuth
+
+auth = HTTPBasicAuth("user", "pass")
+
+schema.auth.set_from_requests(auth)
+
+@schema.parametrize()
+@settings(max_examples=2)
+def test(case):
+    assert case.as_requests_kwargs()["auth"] is auth
+        """,
+    )
+    result = testdir.runpytest("-s")
+    # Then auth should be present in `as_requests_kwargs` output
+    result.assert_outcomes(passed=1)

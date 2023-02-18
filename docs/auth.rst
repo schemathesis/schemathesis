@@ -324,7 +324,26 @@ Third-party implementation
 
 If you'd like to use an authentication mechanism that is not natively supported by Schemathesis, you can use third-party extensions to the ``requests`` library inside Schemathesis tests.
 
+You can pass a ``requests.auth.AuthBase`` subclass instance to ``auth.set_from_requests`` and Schemathesis will use it automatically for every request it makes during testing.
+
+.. important::
+
+    Note, that this feature works only over HTTP and Python's WSGI transport is not supported.
+
 Here is an example that uses the `requests-ntlm <https://github.com/requests/requests-ntlm>`_ library that supports the `NTLM HTTP Authentication <https://datatracker.ietf.org/doc/html/rfc4559>`_ protocol.
+
+.. code:: python
+
+    import schemathesis
+    from requests_ntlm import HttpNtlmAuth
+
+    schemathesis.auth.set_from_requests(HttpNtlmAuth("domain\\username", "password"))
+
+.. note::
+
+    You'll need to load this code as any other hook for CLI.
+
+For Python tests it works similarly:
 
 .. code-block:: python
 
@@ -333,14 +352,12 @@ Here is an example that uses the `requests-ntlm <https://github.com/requests/req
 
     schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
 
+    schema.auth.set_from_requests(HttpNtlmAuth("domain\\username", "password"))
+
 
     @schema.parametrize()
     def test_api(case):
-        case.call_and_validate(auth=HttpNtlmAuth("domain\\username", "password"))
-
-.. note::
-
-    These extensions are not supported in Schemathesis CLI yet.
+        ...
 
 Custom test client in Python tests
 ----------------------------------

@@ -30,7 +30,7 @@ from uuid import uuid4
 
 import attr
 import curlify
-import requests
+import requests.auth
 import werkzeug
 from hypothesis import event, note, reject
 from hypothesis import strategies as st
@@ -130,6 +130,7 @@ class Case:
     data_generation_method: Optional[DataGenerationMethod] = attr.ib(default=None)  # pragma: no mutate
     # Unique test case identifier
     id: str = attr.ib(factory=lambda: uuid4().hex, eq=False)  # pragma: no mutate
+    _auth: Optional[requests.auth.AuthBase] = attr.ib(default=None)  # pragma: no mutate
 
     def __repr__(self) -> str:
         parts = [f"{self.__class__.__name__}("]
@@ -318,6 +319,8 @@ class Case:
             extra = serializer.as_requests(context, self.body)
         else:
             extra = {}
+        if self._auth is not None:
+            extra["auth"] = self._auth
         additional_headers = extra.pop("headers", None)
         if additional_headers:
             # Additional headers, needed for the serializer
