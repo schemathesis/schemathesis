@@ -1070,7 +1070,6 @@ def test_conditional_checks(testdir, cli, hypothesis_max_examples, schema_url):
     module = testdir.make_importable_pyfile(
         hook="""
             import schemathesis
-            import click
 
             @schemathesis.check
             def conditional_check(response, case):
