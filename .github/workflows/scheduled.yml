@@ -52,7 +52,7 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install .
+      - run: pip install ".[tests]"
       - run: pytest -m hypothesis -m hypothesis_nested --hypothesis-profile CI test
 
   test-corpus-part-1:
@@ -68,7 +68,7 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install .
+      - run: pip install ".[tests]"
       # Azure.com APIs take >50% of all APIs in the test corpus
       - run: pytest test-corpus -k 'azure.com'
 
@@ -85,7 +85,7 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install .
+      - run: pip install ".[tests]"
       # It matches 'microsoft.com/graph/1.0.1/openapi.yaml' that has >5000 API operations.
       # Running tests only for this API takes a lot of time and worth having a separate job due to the max time limit
       - run: pytest test-corpus -k 'microsoft.com and graph'
@@ -103,7 +103,7 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install .
+      - run: pip install ".[tests]"
       # It matches all Amazon APIs
       - run: pytest test-corpus -k 'amazonaws.com'
 
@@ -120,7 +120,7 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install .
+      - run: pip install ".[tests]"
       # It matches all Google APIs
       - run: pytest test-corpus -k 'googleapis.com'
 
@@ -137,6 +137,6 @@ jobs:
         with:
           python-version: 3.8
 
-      - run: pip install .
+      - run: pip install ".[tests]"
       # It matches everything except that large MS API and all Azure.com | Amazon | Google APIs
       - run: pytest test-corpus -k 'not (microsoft.com and graph) and not azure.com and not amazonaws.com and not googleapis.com'
