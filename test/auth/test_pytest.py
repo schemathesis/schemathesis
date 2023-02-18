@@ -33,9 +33,9 @@ type Query {
     "class_decorator, pre_parametrize_decorator, post_parametrize_decorator",
     (
         ("@schemathesis.auth()", "", ""),
-        ("@schema.auth.register()", "", ""),
-        ("", f"@schema.auth.apply({AUTH_CLASS_NAME})", ""),
-        ("", "", f"@schema.auth.apply({AUTH_CLASS_NAME})"),
+        ("@schema.auth()", "", ""),
+        ("", f"@schema.auth({AUTH_CLASS_NAME})", ""),
+        ("", "", f"@schema.auth({AUTH_CLASS_NAME})"),
     ),
     ids=("global", "schema", "test-pre-parametrize", "test-post-parametrize"),
 )
@@ -84,7 +84,7 @@ def python_app_auth(python_app_type):
         return """
 import werkzeug
 
-@schema.auth.register()
+@schema.auth()
 class Auth:
 
     def get(self, context):
@@ -100,7 +100,7 @@ class Auth:
         return """
 from starlette_testclient import TestClient
 
-@schema.auth.register()
+@schema.auth()
 class Auth:
 
     def get(self, context):
@@ -185,7 +185,7 @@ lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 
 TOKEN = "Foo"
 
-@lazy_schema.auth.register()
+@lazy_schema.auth()
 class {AUTH_CLASS_NAME}:
 
     def get(self, context):
