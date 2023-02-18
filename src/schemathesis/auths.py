@@ -1,7 +1,7 @@
 """Support for custom API authentication mechanisms."""
 import threading
 import time
-from typing import TYPE_CHECKING, Any, Callable, Generic, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Generic, Optional, Type, TypeVar, Union
 
 import attr
 from typing_extensions import Protocol, runtime_checkable
@@ -99,8 +99,18 @@ class AuthStorage(Generic[Auth]):
         """Whether there is an auth provider set."""
         return self.provider is not None
 
+    def __call__(
+        self,
+        provider_class: Optional[Type[AuthProvider]] = None,
+        *,
+        refresh_interval: Optional[int] = DEFAULT_REFRESH_INTERVAL,
+    ) -> Union[Callable[[Type[AuthProvider]], Type[AuthProvider]], Callable[[GenericTest], GenericTest]]:
+        if provider_class is not None:
+            return self.apply(provider_class, refresh_interval=refresh_interval)
+        return self.register(refresh_interval=refresh_interval)
+
     def register(
-        self, refresh_interval: Optional[int] = DEFAULT_REFRESH_INTERVAL
+        self, *, refresh_interval: Optional[int] = DEFAULT_REFRESH_INTERVAL
     ) -> Callable[[Type[AuthProvider]], Type[AuthProvider]]:
         """Register a new auth provider.
 
@@ -158,7 +168,7 @@ class AuthStorage(Generic[Auth]):
                 ...
 
 
-            @schema.auth.apply(Auth)
+            @schema.auth(Auth)
             @schema.parametrize()
             def test_api(case):
                 ...

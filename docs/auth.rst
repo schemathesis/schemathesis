@@ -166,7 +166,7 @@ The following example shows how to use auth only tests generated via the ``schem
     schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
 
 
-    @schema.auth.register()
+    @schema.auth()
     class MyAuth:
         # Here goes your implementation
         ...
@@ -185,7 +185,7 @@ And this one shows auth applied only to the ``test_api`` function:
         ...
 
 
-    @schema.auth.apply(MyAuth)
+    @schema.auth(MyAuth)
     @schema.parametrize()
     def test_api(case):
         ...
@@ -230,7 +230,7 @@ It could be done by using the ``context`` to get the application instance:
     PASSWORD = "test"
 
 
-    @schema.auth.register()
+    @schema.auth()
     class MyAuth:
         def get(self, context):
             client = TestClient(context.app)
@@ -257,7 +257,7 @@ It could be done by using the ``context`` to get the application instance:
     PASSWORD = "test"
 
 
-    @schema.auth.register()
+    @schema.auth()
     class MyAuth:
         def get(self, context):
             client = werkzeug.Client(context.app)

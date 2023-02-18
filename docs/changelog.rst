@@ -4,6 +4,33 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Unified Schemathesis custom authentication usage via the ``schema.auth`` decorator, replacing the previous ``schema.auth.register`` and ``schema.auth.apply`` methods:
+
+Before:
+
+.. code:: python
+
+    import schemathesis
+
+    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+
+
+    # Schema-level auth
+    # Before: @schema.auth.register()
+    @schema.auth()
+    class MyAuth:
+        ...
+
+
+    # Test-level auth
+    # Before: @schema.auth.apply(MyAuth)
+    @schema.auth(MyAuth)
+    @schema.parametrize()
+    def test_api(case):
+        ...
+
 .. _v3.18.5:
 
 `3.18.5`_ - 2023-02-18

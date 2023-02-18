@@ -72,8 +72,8 @@ def test_apply_twice(openapi3_schema, auth_provider_class):
     # Then it is an error
     with pytest.raises(UsageError, match="`test` has already been decorated with `apply`"):
 
-        @openapi3_schema.auth.apply(auth_provider_class)
-        @openapi3_schema.auth.apply(auth_provider_class)
+        @openapi3_schema.auth(auth_provider_class)
+        @openapi3_schema.auth(auth_provider_class)
         def test(case):
             pass
 
