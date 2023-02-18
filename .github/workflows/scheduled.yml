@@ -22,10 +22,10 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends sqlite3
 
       - run: pip install mutmut
+      - run: pip install ".[tests]"
 
       - name: Run mutmut tests
         run: mutmut run
-          --backup
           --paths-to-mutate "src/"
           --tests-dir "test/"
           --paths-to-exclude=definitions.py
