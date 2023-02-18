@@ -539,3 +539,48 @@ def test_checks_errors_deduplication(empty_open_api_3_schema):
         case.validate_response(response, checks=(content_type_conformance, response_schema_conformance))
     # Then the resulting output should be deduplicated
     assert "2. " not in str(exc.value)
+
+
+def _assert_override(spy, arg, original, overridden):
+    # Then it should override generated value
+    # And keep other values of the same kind intact
+    for key, value in {**original, **overridden}.items():
+        assert spy.call_args[1][arg][key] == value
+
+
+@pytest.mark.parametrize("arg", ("headers", "cookies", "params"))
+def test_call_overrides(mocker, arg, openapi_30):
+    spy = mocker.patch("requests.Session.request", side_effect=ValueError)
+    original = {"A": "X", "B": "X"}
+    case = Case(
+        openapi_30["/users"]["GET"],
+        headers=original,
+        cookies=original,
+        query=original,
+    )
+    # When user passes header / cookie / query explicitly
+    overridden = {"B": "Y"}
+    try:
+        case.call(**{arg: overridden}, base_url="http://127.0.0.1")
+    except ValueError:
+        pass
+    _assert_override(spy, arg, original, overridden)
+
+
+@pytest.mark.parametrize("arg", ("headers", "query_string"))
+def test_call_wsgi_overrides(mocker, arg, openapi_30):
+    spy = mocker.patch("werkzeug.Client.open", side_effect=ValueError)
+    original = {"A": "X", "B": "X"}
+    case = Case(
+        openapi_30["/users"]["GET"],
+        headers=original,
+        query=original,
+    )
+    # NOTE: Werkzeug does not accept cookies, so no override
+    # When user passes header / query explicitly
+    overridden = {"B": "Y"}
+    try:
+        case.call_wsgi(**{arg: overridden}, base_url="http://127.0.0.1", app=42)
+    except ValueError:
+        pass
+    _assert_override(spy, arg, original, overridden)
