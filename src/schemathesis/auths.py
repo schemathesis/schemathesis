@@ -4,6 +4,7 @@ import time
 from typing import TYPE_CHECKING, Any, Callable, Generic, Optional, Type, TypeVar, Union
 
 import attr
+import requests.auth
 from typing_extensions import Protocol, runtime_checkable
 
 from .exceptions import UsageError
@@ -58,6 +59,19 @@ class CacheEntry(Generic[Auth]):
 
 
 @attr.s(slots=True)
+class RequestsAuth(Generic[Auth]):
+    """Provider that sets auth data via `requests` auth instance."""
+
+    auth: requests.auth.AuthBase = attr.ib()
+
+    def get(self, _: AuthContext) -> Auth:
+        return None  # type: ignore[return-value]
+
+    def set(self, case: "Case", _: Auth, __: AuthContext) -> None:
+        case._auth = self.auth
+
+
+@attr.s(slots=True)
 class CachingAuthProvider(Generic[Auth]):
     """Caches the underlying auth provider."""
 
@@ -108,6 +122,10 @@ class AuthStorage(Generic[Auth]):
         if provider_class is not None:
             return self.apply(provider_class, refresh_interval=refresh_interval)
         return self.register(refresh_interval=refresh_interval)
+
+    def set_from_requests(self, auth: requests.auth.AuthBase) -> None:
+        """Use `requests` auth instance as an auth provider."""
+        self.provider = RequestsAuth(auth)
 
     def register(
         self, *, refresh_interval: Optional[int] = DEFAULT_REFRESH_INTERVAL

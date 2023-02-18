@@ -123,3 +123,34 @@ def test_multiple_threads(testdir, cli, schema_url):
     )
     # Then CLI should run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_requests_auth(testdir, cli, schema_url):
+    # When the user registers auth from `requests`
+    expected = "Basic dXNlcjpwYXNz"
+    module = testdir.make_importable_pyfile(
+        hook=f"""
+import schemathesis
+
+from requests.auth import HTTPBasicAuth
+
+schemathesis.auth.set_from_requests(HTTPBasicAuth("user", "pass"))
+
+note = print
+
+@schemathesis.hook
+def after_call(context, case, response):
+    request_authorization = response.request.headers["Authorization"]
+    assert request_authorization == "{expected}", request_authorization
+    note()
+    note(request_authorization)
+    note()
+"""
+    )
+    result = cli.main("run", schema_url, hooks=module.purebasename)
+    # Then CLI should run successfully
+    assert result.exit_code == ExitCode.OK, result.stdout
+    # And the auth should be used
+    assert expected in result.stdout.splitlines()
