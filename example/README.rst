@@ -70,7 +70,7 @@ Here are examples of how you can run Schemathesis CLI:
     st run -c status_code_conformance $SCHEMA_URL
 
     # Include your own checks. They should be registered in the `test/hooks.py` module
-    st --pre-run test.hooks run $SCHEMA_URL
+    SCHEMATHESIS_HOOKS=test.hooks st run $SCHEMA_URL
 
     # Provide custom headers
     st run -H "Authorization: Bearer <token>" $SCHEMA_URL
