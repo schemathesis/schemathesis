@@ -123,8 +123,6 @@ def unique_hook(testdir):
 def run(testdir, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_examples, *args):
     schema_file = testdir.makefile(".json", schema=json.dumps(schema))
     return cli.main(
-        "--pre-run",
-        unique_hook.purebasename,
         "run",
         str(schema_file),
         f"--base-url={openapi3_base_url}",
@@ -135,6 +133,7 @@ def run(testdir, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_exa
         "--hypothesis-suppress-health-check=filter_too_much",
         "--hypothesis-phases=generate",
         *args,
+        hooks=unique_hook.purebasename,
     )
 
 

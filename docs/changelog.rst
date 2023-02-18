@@ -4,6 +4,14 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Support for specifying the path to load hooks from via the ``SCHEMATHESIS_HOOKS`` environment variable. `#1702`.
+
+**Deprecated**
+
+- Use of the ``--pre-run`` CLI option for loading hooks. Use the ``SCHEMATHESIS_HOOKS`` environment variable instead.
+
 .. _v3.18.4:
 
 `3.18.4`_ - 2023-02-16
@@ -3237,6 +3245,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1702: https://github.com/schemathesis/schemathesis/issues/1702
 .. _#1695: https://github.com/schemathesis/schemathesis/issues/1695
 .. _#1669: https://github.com/schemathesis/schemathesis/issues/1669
 .. _#1643: https://github.com/schemathesis/schemathesis/issues/1643

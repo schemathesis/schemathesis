@@ -221,12 +221,13 @@ With this hook, you can add additional test cases that will be executed in Hypot
     ) -> None:
         examples.append(Case(operation=context.operation, query={"foo": "bar"}))
 
-To load CLI hooks, you need to put them into a separate module and pass an importable path in the ``--pre-run`` CLI option.
+To load CLI hooks, you need to put them into a separate module and pass an importable path via the ``SCHEMATHESIS_HOOKS`` environment variable.
 For example, you have your hooks definition in ``myproject/hooks.py``, and ``myproject`` is importable:
 
 .. code:: bash
 
-    st --pre-run myproject.hooks run http://127.0.0.1/openapi.yaml
+    SCHEMATHESIS_HOOKS=myproject.hooks
+    st run http://127.0.0.1/openapi.yaml
 
 ``after_init_cli_run_handlers``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

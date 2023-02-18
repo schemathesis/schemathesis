@@ -425,11 +425,12 @@ Extending CLI
 -------------
 
 To fit Schemathesis to your workflows, you might want to extend it with your custom checks or setup environment before the test run.
-Schemathesis can load your Python code via the ``--pre-run`` option:
+Schemathesis can load your Python code via the ``SCHEMATHESIS_HOOKS`` environment variable:
 
 .. code:: bash
 
-    $ st --pre-run test.setup run https://example.com/api/swagger.json
+    $ SCHEMATHESIS_HOOKS=test.setup
+    $ st run https://example.com/api/swagger.json
 
 **NOTE**. This option should be passed before the ``run`` subcommand.
 
@@ -437,7 +438,9 @@ Also, depending on your setup, you might need to run this command with a custom 
 
 .. code:: bash
 
-    $ PYTHONPATH=$(pwd) st --pre-run test.setup run https://example.com/api/swagger.json
+    $ PYTHONPATH=$(pwd)
+    $ SCHEMATHESIS_HOOKS=test.setup
+    $ st run https://example.com/api/swagger.json
 
 The passed value will be treated as an importable Python path and imported before the test run.
 
@@ -457,14 +460,14 @@ To use your custom checks with Schemathesis CLI, you need to register them via t
         pass
 
 The registered check should accept a ``response`` with ``requests.Response`` / ``schemathesis.utils.WSGIResponse`` type and
-``case`` with ``schemathesis.models.Case`` type. This code should be placed in the module you pass to the ``--pre-run`` option.
+``case`` with ``schemathesis.models.Case`` type. This code should be placed in the module you pass to the ``SCHEMATHESIS_HOOKS`` environment variable.
 
 Then your checks will be available in Schemathesis CLI, and you can use them via the ``-c`` command-line option.
 
 .. code:: bash
 
-    $ st --pre-run module.with.checks run \
-          -c new_check https://example.com/api/swagger.json
+    $ SCHEMATHESIS_HOOKS=module.with.checks
+    $ st run -c new_check https://example.com/api/swagger.json
 
 Additionally, checks may return ``True`` to skip the check under certain conditions. For example, you may only want to run checks when the
 response code is ``200``.

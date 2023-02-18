@@ -16,6 +16,7 @@ from urllib3 import HTTPResponse
 import schemathesis.cli
 from schemathesis._compat import IS_HYPOTHESIS_ABOVE_6_54, metadata
 from schemathesis.cli import reset_checks
+from schemathesis.constants import HOOKS_MODULE_ENV_VAR
 from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.hooks import unregister_all
@@ -253,7 +254,10 @@ def cli():
             return cli_runner.invoke(schemathesis.cli.replay, args, **kwargs)
 
         @staticmethod
-        def main(*args, **kwargs):
+        def main(*args, hooks=None, **kwargs):
+            if hooks is not None:
+                env = kwargs.setdefault("env", {})
+                env[HOOKS_MODULE_ENV_VAR] = hooks
             return cli_runner.invoke(schemathesis.cli.schemathesis, args, **kwargs)
 
         @property

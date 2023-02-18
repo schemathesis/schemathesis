@@ -45,7 +45,7 @@ def after_call(context, case, response):
     note()
 """
     )
-    result = cli.main("--pre-run", module.purebasename, "run", schema_url)
+    result = cli.main("run", schema_url, hooks=module.purebasename)
     # Then CLI should run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
     # And the auth should be used
@@ -76,7 +76,7 @@ def after_call(context, case, response):
 """
     )
     # Then it overrides the one from the auth provider
-    result = cli.main("--pre-run", module.purebasename, "run", schema_url, "--show-errors-tracebacks", *args)
+    result = cli.main("run", schema_url, "--show-errors-tracebacks", *args, hooks=module.purebasename)
     assert result.exit_code == ExitCode.OK, result.stdout
     # And the auth should be used
     assert expected in result.stdout.splitlines()
@@ -113,14 +113,13 @@ def test_multiple_threads(testdir, cli, schema_url):
     """
     )
     result = cli.main(
-        "--pre-run",
-        module.purebasename,
         "run",
         schema_url,
         "--workers",
         "2",
         "--hypothesis-max-examples=1",
         "--show-errors-tracebacks",
+        hooks=module.purebasename,
     )
     # Then CLI should run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
