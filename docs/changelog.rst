@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.18.5:
+
+`3.18.5`_ - 2023-02-18
+----------------------
+
 **Added**
 
 - Support for specifying the path to load hooks from via the ``SCHEMATHESIS_HOOKS`` environment variable. `#1702`.
@@ -3023,7 +3028,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.18.4...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.18.5...HEAD
+.. _3.18.5: https://github.com/schemathesis/schemathesis/compare/v3.18.4...v3.18.5
 .. _3.18.4: https://github.com/schemathesis/schemathesis/compare/v3.18.3...v3.18.4
 .. _3.18.3: https://github.com/schemathesis/schemathesis/compare/v3.18.2...v3.18.3
 .. _3.18.2: https://github.com/schemathesis/schemathesis/compare/v3.18.1...v3.18.2
