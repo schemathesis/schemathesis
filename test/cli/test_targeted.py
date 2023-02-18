@@ -30,9 +30,9 @@ def new_target(testdir, cli):
 @pytest.mark.usefixtures("new_target")
 @pytest.mark.operations("success")
 def test_custom_target(cli, new_target, openapi3_schema_url):
-    # When `--pre-run` hook is passed to the CLI call
+    # When hooks are passed to the CLI call
     # And it contains registering a new target
-    result = cli.main("--pre-run", new_target.purebasename, "run", "-t", "new_target", openapi3_schema_url)
+    result = cli.main("run", "-t", "new_target", openapi3_schema_url, hooks=new_target.purebasename)
     # Then the test run should be successful
     assert result.exit_code == ExitCode.OK, result.stdout
     # And the specified target is called
@@ -42,17 +42,16 @@ def test_custom_target(cli, new_target, openapi3_schema_url):
 @pytest.mark.usefixtures("new_target")
 @pytest.mark.operations("success")
 def test_custom_target_graphql(cli, new_target, graphql_url):
-    # When `--pre-run` hook is passed to the CLI call
+    # When hooks are passed to the CLI call
     # And it contains registering a new target
     result = cli.main(
-        "--pre-run",
-        new_target.purebasename,
         "run",
         "-t",
         "new_target",
         graphql_url,
         "--hypothesis-suppress-health-check=too_slow,filter_too_much",
         "--hypothesis-max-examples=1",
+        hooks=new_target.purebasename,
     )
     # Then the test run should be successful
     assert result.exit_code == ExitCode.OK, result.stdout

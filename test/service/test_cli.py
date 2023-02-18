@@ -101,13 +101,12 @@ def test_error_in_another_handler(testdir, cli, schema_url, service):
         """
     )
     result = cli.main(
-        "--pre-run",
-        module.purebasename,
         "run",
         schema_url,
         "my-api",
         f"--schemathesis-io-token={service.token}",
         f"--schemathesis-io-url={service.base_url}",
+        hooks=module.purebasename,
     )
     # And all handlers are shutdown forcefully
     # And the run fails

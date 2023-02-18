@@ -26,6 +26,7 @@ from ..constants import (
     DEFAULT_DATA_GENERATION_METHODS,
     DEFAULT_RESPONSE_TIMEOUT,
     DEFAULT_STATEFUL_RECURSION_LIMIT,
+    HOOKS_MODULE_ENV_VAR,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     WAIT_FOR_SCHEMA_ENV_VAR,
     CodeSampleStyle,
@@ -78,6 +79,10 @@ DEPRECATED_CASSETTE_PATH_OPTION_WARNING = (
     "Warning: Option `--store-network-log` is deprecated and will be removed in Schemathesis 4.0. "
     "Use `--cassette-path` instead."
 )
+DEPRECATED_PRE_RUN_OPTION_WARNING = (
+    "Warning: Option `--pre-run` is deprecated and will be removed in Schemathesis 4.0. "
+    f"Use the `{HOOKS_MODULE_ENV_VAR}` environment variable instead"
+)
 CASSETTES_PATH_INVALID_USAGE_MESSAGE = "Can't use `--store-network-log` and `--cassette-path` simultaneously"
 
 
@@ -112,12 +117,19 @@ class DeprecatedOption(click.Option):
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
-@click.option("--pre-run", help="A module to execute before the running the tests.", type=str)
+@click.option("--pre-run", help="A module to execute before running the tests.", type=str)
 @click.version_option()
 def schemathesis(pre_run: Optional[str] = None) -> None:
-    """Command line tool for testing your web application built with Open API / GraphQL specifications."""
+    """Specification-based testing tool for OpenAPI and GraphQL apps."""
+    # Don't use `envvar=HOOKS_MODULE_ENV_VAR` arg to raise a deprecation warning for hooks
+    hooks: Optional[str]
     if pre_run:
-        load_hook(pre_run)
+        click.secho(DEPRECATED_PRE_RUN_OPTION_WARNING, fg="yellow")
+        hooks = pre_run
+    else:
+        hooks = os.getenv(HOOKS_MODULE_ENV_VAR)
+    if hooks:
+        load_hook(hooks)
 
 
 class ParameterGroup(enum.Enum):
@@ -1016,7 +1028,7 @@ def load_hook(module_name: str) -> None:
         sys.path.append(os.getcwd())  # fix ModuleNotFoundError module in cwd
         __import__(module_name)
     except Exception as exc:
-        click.secho("An exception happened during the hook loading:\n", fg="red")
+        click.secho("An exception happened during hooks loading:\n", fg="red")
         message = traceback.format_exc()
         click.secho(message, fg="red")
         raise click.Abort() from exc

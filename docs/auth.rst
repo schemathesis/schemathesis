@@ -140,11 +140,12 @@ To use your custom authentication mechanism in the Schemathesis CLI, you need to
         # Here goes your implementation
         ...
 
-Put the code above to the ``hooks.py`` file and extend your command with the ``--pre-run`` CLI option:
+Put the code above to the ``hooks.py`` file and extend your command via the ``SCHEMATHESIS_HOOKS`` environment variable:
 
 .. code:: bash
 
-    $ st --pre-run hooks run ...
+    $ SCHEMATHESIS_HOOKS=hooks
+    $ st run ...
 
 .. note::
 

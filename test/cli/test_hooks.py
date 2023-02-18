@@ -38,7 +38,7 @@ def test_custom_cli_handlers(testdir, cli, schema_url, app):
     """
     )
 
-    result = cli.main("--pre-run", module.purebasename, "run", schema_url)
+    result = cli.main("run", schema_url, hooks=module.purebasename)
 
     # Then CLI should run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -62,7 +62,7 @@ def before_call(context, case):
     case.query = {"q": "42"}
         """
     )
-    result = cli.main("--pre-run", module.purebasename, "run", *cli_args)
+    result = cli.main("run", *cli_args, hooks=module.purebasename)
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then it should be called before each `case.call`
     assert "Before!" in result.stdout.splitlines()
@@ -87,7 +87,7 @@ def after_call(context, case, response):
         response.set_data(data)
         """
     )
-    result = cli.main("--pre-run", module.purebasename, "run", *cli_args, "-c", "all")
+    result = cli.main("run", *cli_args, "-c", "all", hooks=module.purebasename)
     # Then the tests should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert 'Response payload: `{"wrong": 42}`' in result.stdout.splitlines()
@@ -115,7 +115,7 @@ def process_call_kwargs(context, case, kwargs):
         spy = mocker.spy(requests.Session, "request")
     else:
         spy = mocker.spy(werkzeug.Client, "open")
-    result = cli.main("--pre-run", module.purebasename, "run", *cli_args)
+    result = cli.main("run", *cli_args, hooks=module.purebasename)
     assert result.exit_code == ExitCode.OK, result.stdout
     if app_type == "real":
         assert spy.call_args[1]["allow_redirects"] is False

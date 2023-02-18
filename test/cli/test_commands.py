@@ -24,7 +24,7 @@ from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDa
 from schemathesis import Case, DataGenerationMethod, fixups
 from schemathesis._compat import IS_HYPOTHESIS_ABOVE_6_54
 from schemathesis.checks import ALL_CHECKS, not_a_server_error
-from schemathesis.cli import LoaderConfig, execute, get_exit_code, reset_checks
+from schemathesis.cli import DEPRECATED_PRE_RUN_OPTION_WARNING, LoaderConfig, execute, get_exit_code, reset_checks
 from schemathesis.cli.callbacks import INVALID_SCHEMA_MESSAGE
 from schemathesis.constants import (
     DEFAULT_RESPONSE_TIMEOUT,
@@ -39,6 +39,7 @@ from schemathesis.extra._flask import run_server
 from schemathesis.models import APIOperation
 from schemathesis.runner import DEFAULT_CHECKS, from_schema
 from schemathesis.runner.impl import threadpool
+from schemathesis.specs.openapi import unregister_string_format
 from schemathesis.specs.openapi.checks import status_code_conformance
 from schemathesis.stateful import Stateful
 from schemathesis.targets import DEFAULT_TARGETS
@@ -53,9 +54,9 @@ def test_commands_help(cli):
 
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
-    assert lines[11] == "  auth    Authenticate Schemathesis.io."
-    assert lines[12] == "  replay  Replay requests from a saved cassette."
-    assert lines[13] == "  run     Perform schemathesis test."
+    assert lines[10] == "  auth    Authenticate Schemathesis.io."
+    assert lines[11] == "  replay  Replay requests from a saved cassette."
+    assert lines[12] == "  run     Perform schemathesis test."
 
     result_help = cli.main("--help")
     result_h = cli.main("-h")
@@ -987,9 +988,8 @@ def test_schema_not_available_wsgi(cli, loadable_flask_app):
     assert lines[0] == "Schema was not found at unknown.yaml"
 
 
-@pytest.mark.operations("custom_format")
-def test_pre_run_hook_valid(testdir, cli, schema_url, app):
-    # When `--pre-run` hook is passed to the CLI call
+@pytest.fixture
+def digits_format(testdir):
     module = testdir.make_importable_pyfile(
         hook="""
     import string
@@ -1008,29 +1008,44 @@ def test_pre_run_hook_valid(testdir, cli, schema_url, app):
     )
     """
     )
+    yield module
+    unregister_string_format("digits")
 
-    result = cli.main(
-        "--pre-run", module.purebasename, "run", "--hypothesis-suppress-health-check=filter_too_much", schema_url
-    )
+
+@pytest.mark.parametrize(
+    "prepare_args_kwargs",
+    (
+        lambda module: (("--pre-run", module.purebasename), {}),
+        lambda module: ((), {"hooks": module.purebasename}),
+    ),
+)
+@pytest.mark.operations("custom_format")
+def test_hooks_valid(cli, schema_url, app, digits_format, prepare_args_kwargs):
+    # When a hook is passed to the CLI call
+    args, kwargs = prepare_args_kwargs(digits_format)
+    result = cli.main(*args, "run", "--hypothesis-suppress-health-check=filter_too_much", schema_url, **kwargs)
 
     # Then CLI should run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
     # And all registered new string format should produce digits as expected
     assert all(request.query["id"].isdigit() for request in app["incoming_requests"])
+    # And the `--pre-run` version raises a deprecation warning
+    if args:
+        assert DEPRECATED_PRE_RUN_OPTION_WARNING in result.stdout
 
 
-def test_pre_run_hook_invalid(testdir, cli):
-    # When `--pre-run` hook is passed to the CLI call
+def test_hooks_invalid(testdir, cli):
+    # When hooks are passed to the CLI call
     # And its importing causes an exception
     module = testdir.make_importable_pyfile(hook="1 / 0")
 
-    result = cli.main("--pre-run", module.purebasename, "run", "http://127.0.0.1:1")
+    result = cli.main("run", "http://127.0.0.1:1", hooks=module.purebasename)
 
     # Then CLI run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And a helpful message should be displayed in the output
     lines = result.stdout.strip().split("\n")
-    assert lines[0] == "An exception happened during the hook loading:"
+    assert lines[0] == "An exception happened during hooks loading:"
     if sys.version_info >= (3, 11):
         idx = (8, 10)
     else:
@@ -1039,23 +1054,15 @@ def test_pre_run_hook_invalid(testdir, cli):
     assert lines[idx[1]] == "Aborted!"
 
 
-def test_pre_run_hook_module_not_found(testdir, cli):
-    testdir.makepyfile(hook="1 / 0")
-    result = cli.main("--pre-run", "hook", "run", "http://127.0.0.1:1")
+def test_hooks_module_not_found(cli):
+    # When an unknown hook module is passed to CLI
+    result = cli.main("run", "http://127.0.0.1:1", hooks="hook")
 
     assert os.getcwd() in sys.path
 
     # Then CLI run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    assert "ModuleNotFoundError" not in result.stdout
-    lines = result.stdout.strip().split("\n")
-    assert lines[0] == "An exception happened during the hook loading:"
-    if sys.version_info >= (3, 11):
-        idx = (8, 10)
-    else:
-        idx = (7, 9)
-    assert lines[idx[0]] == "ZeroDivisionError: division by zero"
-    assert lines[idx[1]] == "Aborted!"
+    assert "ModuleNotFoundError" in result.stdout
 
 
 @pytest.mark.usefixtures("reset_hooks")
@@ -1073,13 +1080,12 @@ def test_conditional_checks(testdir, cli, hypothesis_max_examples, schema_url):
     )
 
     result = cli.main(
-        "--pre-run",
-        module.purebasename,
         "run",
         "-c",
         "conditional_check",
         schema_url,
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        hooks=module.purebasename,
     )
 
     assert result.exit_code == ExitCode.OK
@@ -1110,13 +1116,12 @@ def test_add_case(testdir, cli, hypothesis_max_examples, schema_url):
     )
 
     result = cli.main(
-        "--pre-run",
-        module.purebasename,
         "run",
         "-c",
         "add_case_check",
         schema_url,
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        hooks=module.purebasename,
     )
 
     assert result.exit_code == ExitCode.OK
@@ -1143,13 +1148,12 @@ def test_add_case_returns_none(testdir, cli, hypothesis_max_examples, schema_url
     )
 
     result = cli.main(
-        "--pre-run",
-        module.purebasename,
         "run",
         "-c",
         "add_case_check",
         schema_url,
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        hooks=module.purebasename,
     )
 
     assert result.exit_code == ExitCode.OK
@@ -1192,13 +1196,12 @@ def test_multiple_add_case_hooks(testdir, cli, hypothesis_max_examples, schema_u
     )
 
     result = cli.main(
-        "--pre-run",
-        module.purebasename,
         "run",
         "-c",
         "add_case_check",
         schema_url,
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        hooks=module.purebasename,
     )
 
     assert result.exit_code == ExitCode.OK
@@ -1241,13 +1244,12 @@ def test_add_case_output(testdir, cli, hypothesis_max_examples, schema_url):
     )
 
     result = cli.main(
-        "--pre-run",
-        module.purebasename,
         "run",
         "-c",
         "add_case_check",
         schema_url,
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        hooks=module.purebasename,
     )
 
     assert result.exit_code == ExitCode.TESTS_FAILED
@@ -1289,9 +1291,9 @@ def new_check(request, testdir, cli):
 @pytest.mark.operations("success")
 def test_register_check(new_check, cli, schema_url):
     new_check, message = new_check
-    # When `--pre-run` hook is passed to the CLI call
+    # When hooks are passed to the CLI call
     # And it contains registering a new check, which always fails for the testing purposes
-    result = cli.main("--pre-run", new_check.purebasename, "run", "-c", "new_check", schema_url)
+    result = cli.main("run", "-c", "new_check", schema_url, hooks=new_check.purebasename)
 
     # Then CLI run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
@@ -2210,8 +2212,6 @@ def data_generation_check(response, case):
 """
     )
     result = cli.main(
-        "--pre-run",
-        module.purebasename,
         "run",
         "-c",
         "data_generation_check",
@@ -2222,6 +2222,7 @@ def data_generation_check(response, case):
         "--hypothesis-suppress-health-check=data_too_large,filter_too_much,too_slow",
         "-D",
         "all",
+        hooks=module.purebasename,
     )
     # Then there should be cases generated from different methods
     assert result.exit_code == ExitCode.OK, result.stdout
