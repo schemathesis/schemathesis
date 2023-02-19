@@ -105,7 +105,7 @@ class LazySchema:
                     tag=tag,
                     operation_id=operation_id,
                     hooks=self.hooks,
-                    auth=self.auth if self.auth.provider is not None else NOT_SET,
+                    auth=self.auth if self.auth.providers is not None else NOT_SET,
                     test_function=test,
                     validate_schema=validate_schema,
                     skip_deprecated_operations=skip_deprecated_operations,

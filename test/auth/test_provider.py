@@ -82,17 +82,17 @@ def test_register_valid(auth_storage, auth_provider_class):
     # When the class implementation is valid
     # Then it should be possible to register it without issues
     auth_storage.register(refresh_interval=None)(auth_provider_class)
-    assert auth_storage.provider is not None
-    assert isinstance(auth_storage.provider, auth_provider_class)
+    assert auth_storage.providers
+    assert isinstance(auth_storage.providers[0], auth_provider_class)
 
 
 def test_register_cached(auth_storage, auth_provider_class):
     # When the `refresh_interval` is not None
     auth_storage.register()(auth_provider_class)
     # Then the actual provider should be cached
-    assert auth_storage.provider is not None
-    assert isinstance(auth_storage.provider, CachingAuthProvider)
-    assert isinstance(auth_storage.provider.provider, auth_provider_class)
+    assert auth_storage.providers
+    assert isinstance(auth_storage.providers[0], CachingAuthProvider)
+    assert isinstance(auth_storage.providers[0].provider, auth_provider_class)
 
 
 def test_set_noop(auth_storage, mocker):

@@ -16,6 +16,18 @@ Changelog
 
     schemathesis.auth.set_from_requests(HttpNtlmAuth("domain\\username", "password"))
 
+- Ability to apply authentication conditionally to specific API operations using a combination of ``@schemathesis.auth.apply_to()`` and ``@schemathesis.auth.skip_for()`` decorators.
+
+.. code:: python
+
+    import schemathesis
+
+
+    # Apply auth only for operations that path starts with `/users/` but not the `POST` method
+    @schemathesis.auth().apply_to(path_regex="^/users/").skip_for(method="POST")
+    class MyAuth:
+        ...
+
 **Changed**
 
 - Unified Schemathesis custom authentication usage via the ``schema.auth`` decorator, replacing the previous ``schema.auth.register`` and ``schema.auth.apply`` methods:
