@@ -6,12 +6,6 @@ from schemathesis.hooks import HookContext, HookDispatcher, HookScope
 from schemathesis.utils import PARAMETRIZE_MARKER
 
 
-@pytest.fixture(autouse=True)
-def reset_hooks():
-    yield
-    schemathesis.hooks.unregister_all()
-
-
 @pytest.fixture(params=["direct", "named"])
 def global_hook(request):
     if request.param == "direct":

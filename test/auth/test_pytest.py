@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 AUTH_CLASS_NAME = "TokenAuth"
@@ -207,22 +209,86 @@ def test(case):
     result.assert_outcomes(passed=1)
 
 
-def test_requests_auth(testdir):
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success", "text")
+def test_requests_auth(testdir, app_schema, openapi3_base_url):
     # When the user registers auth from `requests`
     testdir.make_test(
-        """
+        f"""
 from requests.auth import HTTPBasicAuth
 
+schema.base_url = "{openapi3_base_url}"
 auth = HTTPBasicAuth("user", "pass")
 
-schema.auth.set_from_requests(auth)
+schema.auth.set_from_requests(auth).apply_to(method="GET", path="/success")
 
 @schema.parametrize()
 @settings(max_examples=2)
 def test(case):
-    assert case.as_requests_kwargs()["auth"] is auth
+    case_auth = case.as_requests_kwargs().get("auth")
+    if case.operation.path == "/success":
+        assert case_auth is auth
+    if case.operation.path == "/text":
+        assert case_auth is None
         """,
+        schema=app_schema,
     )
     result = testdir.runpytest("-s")
     # Then auth should be present in `as_requests_kwargs` output
-    result.assert_outcomes(passed=1)
+    result.assert_outcomes(passed=2)
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success", "text")
+def test_conditional(testdir, app_schema, openapi3_base_url):
+    # When the user sets up multiple auths applied to different API operations
+    if sys.version_info < (3, 9):
+        dec1 = """
+auth = schema.auth()
+@auth.apply_to(method="GET", path="/text")"""
+        dec2 = """
+auth = schema.auth()
+@auth.apply_to(method="GET", path="/success")"""
+    else:
+        dec1 = '@schema.auth().apply_to(method="GET", path="/text")'
+        dec2 = '@schema.auth().apply_to(method="GET", path="/success")'
+    testdir.make_test(
+        f"""
+schema.base_url = "{openapi3_base_url}"
+
+TOKEN_1 = "ABC"
+
+{dec1}
+class TokenAuth1:
+    def get(self, context):
+        return TOKEN_1
+
+    def set(self, case, data, context):
+        case.headers = {{"Authorization": f"Bearer {{data}}"}}
+
+
+TOKEN_2 = "DEF"
+
+{dec2}
+class TokenAuth2:
+    def get(self, context):
+        return TOKEN_2
+
+    def set(self, case, data, context):
+        case.headers = {{"Authorization": f"Bearer {{data}}"}}
+
+
+@schema.parametrize()
+@settings(max_examples=2)
+def test(case):
+    assert case.headers is not None
+    if case.operation.path == "/text":
+        expected = f"Bearer {{TOKEN_1}}"
+    if case.operation.path == "/success":
+        expected = f"Bearer {{TOKEN_2}}"
+    assert case.headers["Authorization"] == expected
+""",
+        schema=app_schema,
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=2)
