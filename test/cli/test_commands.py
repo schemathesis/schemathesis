@@ -1065,7 +1065,6 @@ def test_hooks_module_not_found(cli):
     assert "ModuleNotFoundError" in result.stdout
 
 
-@pytest.mark.usefixtures("reset_hooks")
 def test_conditional_checks(testdir, cli, hypothesis_max_examples, schema_url):
     module = testdir.make_importable_pyfile(
         hook="""
@@ -1092,7 +1091,6 @@ def test_conditional_checks(testdir, cli, hypothesis_max_examples, schema_url):
     assert "No checks were performed." in result.stdout
 
 
-@pytest.mark.usefixtures("reset_hooks")
 def test_add_case(testdir, cli, hypothesis_max_examples, schema_url):
     module = testdir.make_importable_pyfile(
         hook="""
@@ -1128,7 +1126,6 @@ def test_add_case(testdir, cli, hypothesis_max_examples, schema_url):
     assert result.stdout.count("The case was added!") == 2
 
 
-@pytest.mark.usefixtures("reset_hooks")
 def test_add_case_returns_none(testdir, cli, hypothesis_max_examples, schema_url):
     """Tests that no additional test case created when the add_case hook returns None."""
     module = testdir.make_importable_pyfile(
@@ -1161,7 +1158,6 @@ def test_add_case_returns_none(testdir, cli, hypothesis_max_examples, schema_url
     assert result.stdout.count("Validating case.") == 2
 
 
-@pytest.mark.usefixtures("reset_hooks")
 def test_multiple_add_case_hooks(testdir, cli, hypothesis_max_examples, schema_url):
     """add_case hooks that mutate the case in place should not affect other cases."""
     module = testdir.make_importable_pyfile(
@@ -1209,7 +1205,6 @@ def test_multiple_add_case_hooks(testdir, cli, hypothesis_max_examples, schema_u
     assert result.stdout.count("Second case added!") == 2
 
 
-@pytest.mark.usefixtures("reset_hooks")
 def test_add_case_output(testdir, cli, hypothesis_max_examples, schema_url):
     module = testdir.make_importable_pyfile(
         hook="""

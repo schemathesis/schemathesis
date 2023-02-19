@@ -6,7 +6,6 @@ import pytest
 from _pytest.main import ExitCode
 from requests import Timeout
 
-import schemathesis
 from schemathesis.cli.output.default import SERVICE_ERROR_MESSAGE, wait_for_report_handler
 from schemathesis.constants import USER_AGENT
 from schemathesis.service import ci, events
@@ -14,12 +13,6 @@ from schemathesis.service.constants import CI_PROVIDER_HEADER, REPORT_CORRELATIO
 from schemathesis.service.hosts import load_for_host
 
 from ..utils import strip_style_win32
-
-
-@pytest.fixture(autouse=True)
-def reset_hooks():
-    yield
-    schemathesis.hooks.unregister_all()
 
 
 def get_stdout_lines(stdout):

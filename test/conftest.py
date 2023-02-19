@@ -19,7 +19,6 @@ from schemathesis.cli import reset_checks
 from schemathesis.constants import HOOKS_MODULE_ENV_VAR
 from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
-from schemathesis.hooks import unregister_all
 from schemathesis.service import HOSTS_PATH_ENV_VAR
 from schemathesis.specs.openapi import loaders as oas_loaders
 from schemathesis.utils import WSGIResponse
@@ -46,10 +45,11 @@ def setup(tmp_path_factory):
     os.environ[HOSTS_PATH_ENV_VAR] = str(hosts_path)
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def reset_hooks():
     yield
-    unregister_all()
+    schemathesis.hooks.unregister_all()
+    schemathesis.auth.unregister()
     reset_checks()
 
 

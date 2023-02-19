@@ -190,6 +190,106 @@ And this one shows auth applied only to the ``test_api`` function:
     def test_api(case):
         ...
 
+Conditional Authentication
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Schemathesis offers a way to apply authentication to only a specific set of API operations during testing.
+This is helpful when you need to test different authentication types for different API operations or when the API has a combination of authenticated and unauthenticated endpoints.
+
+Multiple filters can be combined and applied to include or exclude API operations based on exact values, regular expressions, or custom functions.
+Here is how you can apply auth to all API operations with the ``/users/`` path, but exclude the ``POST`` method.
+
+.. code:: python
+
+    import schemathesis
+
+
+    @schemathesis.auth().apply_to(path="/users/").skip_for(method="POST")
+    class MyAuth:
+        # Here goes your implementation
+        ...
+
+
+    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+
+
+    @schema.auth(MyAuth).apply_to(path="/users/").skip_for(method="POST")
+    @schema.parametrize()
+    def test_api(case):
+        ...
+
+.. note::
+
+    This decorator syntax is supported only on Python 3.9+. For older Python versions you need to bind separate variables for each term.
+
+Basic rules:
+
+- ``apply_to`` applies authentication to all API operations that match the filter term
+- ``skip_for`` skips authentication for all API operations that match the filter term
+- All conditions within a filter term are combined with the ``AND`` logic
+- Each ``apply_to`` and ``skip_for`` term is combined with the ``OR`` logic
+- Both ``apply_to`` and ``skip_for`` use the same set of conditions as arguments
+
+Conditions:
+
+- ``path``: the path of the API operation without its ``basePath``.
+- ``method``: the upper-cased HTTP method of the API operation
+- ``name``: the name of the API operation, such as ``GET /users/`` or ``Query.getUsers``
+- Each condition can take either a single string or a list of options as input
+- You can also use a regular expression to match the conditions by adding ``_regex`` to the end of the condition and passing a string or a compiled regex.
+
+Here are some examples for ``path``, other conditions works the same:
+
+.. code:: python
+
+    import re
+    import schemathesis
+
+    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+
+
+    # Only `/users/`
+    @schema.auth().apply_to(path="/users/")
+    # Only `/users/` and `/orders/`
+    @schema.auth().apply_to(path=["/users/", "/orders/"])
+    # Only paths starting with `/u`
+    @schema.auth().apply_to(path_regex="^/u")
+    # Only paths starting with `/u` case insensitive
+    @schema.auth().apply_to(path_regex=re.compile("^/u", re.IGNORECASE))
+    # Only `GET /users/` or `POST /orders/`
+    @schema.auth().apply_to(
+        method="GET",
+        path="/users/",
+    ).apply_to(
+        method="POST",
+        path="/orders/",
+    )
+    class MyAuth:
+        # Here goes your implementation
+        ...
+
+You can also use a custom function to determine whether to apply or skip authentication for a given operation.
+The function should take an ``AuthContext`` instance and return a boolean value.
+
+To use a custom function with ``apply_to`` or ``skip_for``, simply pass it as the first argument. For example:
+
+.. code:: python
+
+    import schemathesis
+
+    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+
+
+    def is_deprecated(ctx):
+        return ctx.operation.definition.resolved.get("deprecated") is True
+
+
+    # Skip auth for all deprecated API operations
+    @schema.auth().skip_for(is_deprecated)
+    class MyAuth:
+        # Here goes your implementation
+        ...
+
 Refreshing credentials
 ~~~~~~~~~~~~~~~~~~~~~~
 

@@ -8,12 +8,6 @@ from schemathesis.service import usage
 SCHEMA = "http://127.0.0.1:/schema.json"
 
 
-@pytest.fixture(autouse=True)
-def reset_hooks():
-    yield
-    schemathesis.hooks.unregister_all()
-
-
 @pytest.mark.parametrize(
     "args, expected",
     (

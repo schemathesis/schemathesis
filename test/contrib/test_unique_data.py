@@ -137,14 +137,12 @@ def run(testdir, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_exa
     )
 
 
-@pytest.mark.usefixtures("reset_hooks")
 def test_cli(testdir, unique_hook, raw_schema, cli, openapi3_base_url, hypothesis_max_examples):
     result = run(testdir, cli, unique_hook, raw_schema, openapi3_base_url, hypothesis_max_examples)
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
 @pytest.mark.parametrize("workers", (1, 2))
-@pytest.mark.usefixtures("reset_hooks")
 def test_explicit_headers(
     testdir, unique_hook, empty_open_api_3_schema, cli, openapi3_base_url, hypothesis_max_examples, workers
 ):
