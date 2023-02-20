@@ -281,7 +281,7 @@ To use a custom function with ``apply_to`` or ``skip_for``, simply pass it as th
 
 
     def is_deprecated(ctx):
-        return ctx.operation.definition.resolved.get("deprecated") is True
+        return ctx.operation.definition.get("deprecated") is True
 
 
     # Skip auth for all deprecated API operations

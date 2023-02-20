@@ -20,7 +20,7 @@ def test_hashable(parameters, body):
 
 def add_link(schema, target, **kwargs):
     schema.add_link(source=schema["/users/"]["POST"], target=target, status_code="201", **kwargs)
-    return schema["/users/"]["POST"].definition.resolved["responses"]["201"]["links"]
+    return schema["/users/"]["POST"].definition["responses"]["201"]["links"]
 
 
 EXPECTED_LINK_PARAMETERS = {"parameters": {"userId": "$response.body#/id"}}
@@ -58,7 +58,7 @@ def test_add_link_no_operations_cache(schema_url, status_code):
     )
     # Then it should be added without errors
     # And the cache cleanup should be no-op
-    links = schema["/users/"]["POST"].definition.resolved["responses"]["201"]["links"]
+    links = schema["/users/"]["POST"].definition["responses"]["201"]["links"]
     assert links[f"{target.method.upper()} {target.path}"] == {
         "operationId": "getUser",
         **EXPECTED_LINK_PARAMETERS,
@@ -118,7 +118,7 @@ def test_add_link_behind_a_reference(schema_url):
     add_link(schema, schema["/users/{user_id}"]["GET"], parameters={"userId": "$response.body#/id"})
     # Then the source API operation should have the new link
     operation = schema["/users/"]["POST"]
-    links = operation.definition.resolved["responses"]["201"]["links"]
+    links = operation.definition["responses"]["201"]["links"]
     assert len(links) == 3
     assert links["GET /users/{user_id}"] == {"parameters": {"userId": "$response.body#/id"}, "operationId": "getUser"}
 

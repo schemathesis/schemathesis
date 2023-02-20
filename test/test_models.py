@@ -9,7 +9,7 @@ from hypothesis import given, settings
 import schemathesis
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT, DataGenerationMethod
 from schemathesis.exceptions import CheckFailed, UsageError
-from schemathesis.models import APIOperation, Case, CaseSource, Request, Response
+from schemathesis.models import APIOperation, Case, CaseSource, OperationDefinition, Request, Response
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 
 
@@ -584,3 +584,11 @@ def test_call_wsgi_overrides(mocker, arg, openapi_30):
     except ValueError:
         pass
     _assert_override(spy, arg, original, overridden)
+
+
+def test_operation_definition_as_dict():
+    definition = OperationDefinition({"A": 1, "B": 2}, {"A": 1, "B": 2, "C": 3}, "", [])
+    assert definition["C"] == 3
+    assert definition.get("C") == 3
+    assert definition.get("D") is None
+    assert "C" in definition
