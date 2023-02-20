@@ -23,7 +23,7 @@ def test_csv_enum_choice(value):
 
 @given(options=st.lists(st.text()), value=st.text() | st.lists(st.text()).map(",".join))
 def test_csv_choice(options, value):
-    assume(v not in options for v in value.split(","))
+    assume(all(v not in options for v in value.split(",")))
     option = CsvChoice(options)
     with pytest.raises(click.BadParameter):
         option.convert(value, None, None)
