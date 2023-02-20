@@ -593,7 +593,7 @@ def cookie_handler(client: werkzeug.Client, cookies: Optional[Cookies]) -> Gener
 
 
 P = TypeVar("P", bound=Parameter)
-D = TypeVar("D")
+D = TypeVar("D", bound=dict)
 
 
 @attr.s  # pragma: no mutate
@@ -609,6 +609,15 @@ class OperationDefinition(Generic[P, D]):
     resolved: D = attr.ib()  # pragma: no mutate
     scope: str = attr.ib()  # pragma: no mutate
     parameters: Sequence[P] = attr.ib()  # pragma: no mutate
+
+    def __contains__(self, item: Union[str, int]) -> bool:
+        return item in self.resolved
+
+    def __getitem__(self, item: Union[str, int]) -> Union[None, bool, float, str, list, Dict[str, Any]]:
+        return self.resolved[item]
+
+    def get(self, item: Union[str, int], default: Any = None) -> Union[None, bool, float, str, list, Dict[str, Any]]:
+        return self.resolved.get(item, default)
 
 
 C = TypeVar("C", bound=Case)
