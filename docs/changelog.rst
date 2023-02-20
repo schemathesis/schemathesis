@@ -28,6 +28,8 @@ Changelog
     class MyAuth:
         ...
 
+- Add a convenience mapping-like interface to ``OperationDefinition`` including indexing access, the ``get`` method, and "in" support.
+
 **Changed**
 
 - Unified Schemathesis custom authentication usage via the ``schema.auth`` decorator, replacing the previous ``schema.auth.register`` and ``schema.auth.apply`` methods:
