@@ -2,7 +2,7 @@
 
 These are basic entities that describe what data could be sent to the API.
 """
-from typing import TYPE_CHECKING, Any, Dict, Generator, Generic, List, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, Generator, Generic, List, Optional, TypeVar
 
 import attr
 
@@ -61,6 +61,12 @@ class ParameterSet(Generic[P]):
     def add(self, parameter: P) -> None:
         """Add a new parameter."""
         self.items.append(parameter)
+
+    def get(self, name: str) -> Optional[P]:
+        for parameter in self:
+            if parameter.name == name:
+                return parameter
+        return None
 
     @property
     def example(self) -> Dict[str, Any]:

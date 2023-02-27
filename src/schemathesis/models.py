@@ -669,26 +669,34 @@ class APIOperation(Generic[P, C]):
         """Iterate over all operation's parameters."""
         return chain(self.path_parameters, self.headers, self.cookies, self.query)
 
+    def _lookup_container(self, location: str) -> Union[ParameterSet[P], PayloadAlternatives[P], None]:
+        return {
+            "path": self.path_parameters,
+            "header": self.headers,
+            "cookie": self.cookies,
+            "query": self.query,
+            "body": self.body,
+        }.get(location)
+
     def add_parameter(self, parameter: P) -> None:
         """Add a new processed parameter to an API operation.
 
         :param parameter: A parameter that will be used with this operation.
         :rtype: None
         """
-        lookup_table = {
-            "path": self.path_parameters,
-            "header": self.headers,
-            "cookie": self.cookies,
-            "query": self.query,
-            "body": self.body,
-        }
         # If the parameter has a typo, then by default, there will be an error from `jsonschema` earlier.
         # But if the user wants to skip schema validation, we choose to ignore a malformed parameter.
         # In this case, we still might generate some tests for an API operation, but without this parameter,
         # which is better than skip the whole operation from testing.
-        if parameter.location in lookup_table:
-            container = lookup_table[parameter.location]
+        container = self._lookup_container(parameter.location)
+        if container is not None:
             container.add(parameter)
+
+    def get_parameter(self, name: str, location: str) -> Optional[P]:
+        container = self._lookup_container(location)
+        if container is not None:
+            return container.get(name)
+        return None
 
     def as_strategy(
         self,

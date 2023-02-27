@@ -592,3 +592,58 @@ def test_operation_definition_as_dict():
     assert definition.get("C") == 3
     assert definition.get("D") is None
     assert "C" in definition
+
+
+@pytest.mark.parametrize(
+    "name, location, exists",
+    (
+        ("X-Key", "header", True),
+        ("X-Key2", "header", False),
+        ("X-Key", "cookie", False),
+        ("X-Key", "query", False),
+        ("key", "query", True),
+        ("bla", "body", False),
+        ("body", "body", True),
+        ("unknown", "unknown", False),
+    ),
+)
+def test_get_parameter(empty_open_api_3_schema, name, location, exists):
+    empty_open_api_3_schema["paths"] = {
+        "/data/": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": name,
+                        "in": location,
+                        "required": True,
+                        "schema": {"type": "string"},
+                    }
+                    for name, location in (
+                        ("X-Key", "header"),
+                        ("key", "query"),
+                    )
+                ],
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "text/plain": {"schema": {"type": "string"}},
+                        "application/json": {"schema": {"type": "array"}},
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    empty_open_api_3_schema["components"] = {
+        "securitySchemes": {
+            "ApiKeyAuth": {"type": "apiKey", "name": "X-Key", "in": "header"},
+        }
+    }
+    empty_open_api_3_schema["security"] = [{"ApiKeyAuth": []}]
+    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
+
+    parameter = schema["/data/"]["GET"].get_parameter(name, location)
+    assert (parameter is not None) is exists
+    if exists:
+        assert parameter.name == name
+        assert parameter.location == location
