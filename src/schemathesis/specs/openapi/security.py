@@ -17,6 +17,11 @@ class BaseSecurityProcessor:
     def process_definitions(self, schema: Dict[str, Any], operation: APIOperation, resolver: RefResolver) -> None:
         """Add relevant security parameters to data generation."""
         for definition in self._get_active_definitions(schema, operation, resolver):
+            name = definition.get("name")
+            location = definition.get("in")
+            if name is not None and location is not None and operation.get_parameter(name, location) is not None:
+                # Such parameter is already defined
+                continue
             if definition["type"] == "apiKey":
                 self.process_api_key_security_definition(definition, operation)
             self.process_http_security_definition(definition, operation)
