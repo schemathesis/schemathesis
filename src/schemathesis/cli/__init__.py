@@ -449,6 +449,13 @@ REPORT_TO_SERVICE = object()
     type=click.Choice(list(ALL_FIXUPS) + ["all"]),
 )
 @click.option(
+    "--rate-limit",
+    help="The maximum rate of requests to send to the tested API in the format of `<limit>/<duration>`. "
+    "Example - `100/m` for 100 requests per minute.",
+    type=str,
+    callback=callbacks.validate_rate_limit,
+)
+@click.option(
     "--stateful",
     help="Utilize stateful testing capabilities.",
     type=click.Choice([item.name for item in Stateful]),
@@ -480,7 +487,7 @@ REPORT_TO_SERVICE = object()
 @click.option(
     "--contrib-openapi-formats-uuid",
     "contrib_openapi_formats_uuid",
-    help="Forces Schemathesis to generate unique test cases.",
+    help="Enable support for the `uuid` string format.",
     is_flag=True,
     default=False,
     show_default=True,
@@ -619,6 +626,7 @@ def run(
     store_network_log: Optional[click.utils.LazyFile] = None,
     wait_for_schema: Optional[float] = None,
     fixups: Tuple[str] = (),  # type: ignore
+    rate_limit: Optional[str] = None,
     stateful: Optional[Stateful] = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     force_schema_version: Optional[str] = None,
@@ -755,6 +763,7 @@ def run(
         max_response_time=max_response_time,
         targets=selected_targets,
         workers_num=workers_num,
+        rate_limit=rate_limit,
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,
         hypothesis_settings=hypothesis_settings,
@@ -763,6 +772,7 @@ def run(
         event_stream,
         hypothesis_settings=hypothesis_settings,
         workers_num=workers_num,
+        rate_limit=rate_limit,
         show_errors_tracebacks=show_errors_tracebacks,
         validate_schema=validate_schema,
         cassette_path=cassette_path,
@@ -806,6 +816,7 @@ class LoaderConfig:
     request_tls_verify: Union[bool, str] = attr.ib()  # pragma: no mutate
     request_cert: Optional[RequestCert] = attr.ib()  # pragma: no mutate
     wait_for_schema: Optional[float] = attr.ib()  # pragma: no mutate
+    rate_limit: Optional[str] = attr.ib()
     # Network request parameters
     auth: Optional[Tuple[str, str]] = attr.ib()  # pragma: no mutate
     auth_type: Optional[str] = attr.ib()  # pragma: no mutate
@@ -849,6 +860,7 @@ def into_event_stream(
     seed: Optional[int],
     exit_first: bool,
     max_failures: Optional[int],
+    rate_limit: Optional[str],
     dry_run: bool,
     store_interactions: bool,
     stateful: Optional[Stateful],
@@ -868,6 +880,7 @@ def into_event_stream(
             request_tls_verify=request_tls_verify,
             request_cert=request_cert,
             wait_for_schema=wait_for_schema,
+            rate_limit=rate_limit,
             auth=auth,
             auth_type=auth_type,
             headers=headers,
@@ -968,6 +981,7 @@ def get_loader_kwargs(loader: Callable, config: LoaderConfig) -> Dict[str, Any]:
         "validate_schema": config.validate_schema,
         "force_schema_version": config.force_schema_version,
         "data_generation_methods": config.data_generation_methods,
+        "rate_limit": config.rate_limit,
     }
     if loader is not oas_loaders.from_path:
         kwargs["headers"] = config.headers
@@ -986,6 +1000,7 @@ def get_graphql_loader_kwargs(
         "app": config.app,
         "base_url": config.base_url,
         "data_generation_methods": config.data_generation_methods,
+        "rate_limit": config.rate_limit,
     }
     if loader is not gql_loaders.from_path:
         kwargs["headers"] = config.headers
@@ -1046,6 +1061,7 @@ def execute(
     *,
     hypothesis_settings: hypothesis.settings,
     workers_num: int,
+    rate_limit: Optional[str],
     show_errors_tracebacks: bool,
     validate_schema: bool,
     cassette_path: Optional[click.utils.LazyFile],
@@ -1111,6 +1127,7 @@ def execute(
     execution_context = ExecutionContext(
         hypothesis_settings=hypothesis_settings,
         workers_num=workers_num,
+        rate_limit=rate_limit,
         show_errors_tracebacks=show_errors_tracebacks,
         validate_schema=validate_schema,
         cassette_path=cassette_path.name if cassette_path is not None else None,

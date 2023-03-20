@@ -487,6 +487,8 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     click.secho(f"Base URL: {event.base_url}", bold=True)
     click.secho(f"Specification version: {event.specification_name}", bold=True)
     click.secho(f"Workers: {context.workers_num}", bold=True)
+    if context.rate_limit is not None:
+        click.secho(f"Rate limit: {context.rate_limit}", bold=True)
     click.secho(f"Collected API operations: {context.operations_count}", bold=True)
     if isinstance(context.report, ServiceReportContext):
         click.secho("Report to Schemathesis.io: ENABLED", bold=True)
