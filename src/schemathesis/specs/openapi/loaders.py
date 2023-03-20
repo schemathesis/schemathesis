@@ -110,8 +110,10 @@ def from_uri(
     :param str uri: Schema URL.
     """
     setup_headers(kwargs)
-    if not base_url and port:
-        base_url = str(URL(uri).with_port(port))
+    if port:
+        uri = str(URL(uri).with_port(port))
+        if not base_url:
+            base_url = uri
 
     if wait_for_schema is not None:
 
