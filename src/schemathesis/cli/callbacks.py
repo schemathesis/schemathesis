@@ -10,7 +10,7 @@ import hypothesis
 from click.types import LazyFile  # type: ignore
 from requests import PreparedRequest, RequestException
 
-from .. import utils
+from .. import exceptions, throttling, utils
 from ..constants import CodeSampleStyle, DataGenerationMethod
 from ..service.hosts import get_temporary_hosts_file
 from ..stateful import Stateful
@@ -90,6 +90,18 @@ def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_
     if raw_value and not netloc:
         raise click.UsageError("Invalid base URL")
     return raw_value
+
+
+def validate_rate_limit(
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]
+) -> Optional[str]:
+    if raw_value is None:
+        return raw_value
+    try:
+        throttling.parse_units(raw_value)
+        return raw_value
+    except exceptions.UsageError as exc:
+        raise click.UsageError(exc.args[0]) from exc
 
 
 APPLICATION_FORMAT_MESSAGE = (

@@ -29,6 +29,7 @@ Changelog
         ...
 
 - Add a convenience mapping-like interface to ``OperationDefinition`` including indexing access, the ``get`` method, and "in" support.
+- Request throttling via the ``--rate-limit`` CLI option. `#910`_
 
 **Changed**
 
@@ -3447,6 +3448,7 @@ Deprecated
 .. _#916: https://github.com/schemathesis/schemathesis/issues/916
 .. _#914: https://github.com/schemathesis/schemathesis/issues/914
 .. _#911: https://github.com/schemathesis/schemathesis/issues/911
+.. _#910: https://github.com/schemathesis/schemathesis/issues/910
 .. _#908: https://github.com/schemathesis/schemathesis/issues/908
 .. _#907: https://github.com/schemathesis/schemathesis/issues/907
 .. _#905: https://github.com/schemathesis/schemathesis/issues/905

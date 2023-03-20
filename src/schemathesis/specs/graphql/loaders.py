@@ -5,6 +5,7 @@ import backoff
 import graphql
 import requests
 from graphql import ExecutionResult
+from pyrate_limiter import Limiter
 from starlette.applications import Starlette
 from starlette_testclient import TestClient as ASGIClient
 from werkzeug import Client
@@ -13,6 +14,7 @@ from yarl import URL
 from ...constants import DEFAULT_DATA_GENERATION_METHODS, WAIT_FOR_SCHEMA_INTERVAL, CodeSampleStyle
 from ...exceptions import HTTPError
 from ...hooks import HookContext, dispatch
+from ...throttling import build_limiter
 from ...types import DataGenerationMethodInput, PathLike
 from ...utils import WSGIResponse, prepare_data_generation_methods, require_relative_url, setup_headers
 from .schemas import GraphQLSchema
@@ -28,6 +30,7 @@ def from_path(
     base_url: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
+    rate_limit: Optional[str] = None,
     encoding: str = "utf8",
 ) -> GraphQLSchema:
     """Load GraphQL schema via a file from an OS path.
@@ -43,6 +46,7 @@ def from_path(
             data_generation_methods=data_generation_methods,
             code_sample_style=code_sample_style,
             location=pathlib.Path(path).absolute().as_uri(),
+            rate_limit=rate_limit,
         )
 
 
@@ -55,6 +59,7 @@ def from_url(
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     wait_for_schema: Optional[float] = None,
+    rate_limit: Optional[str] = None,
     **kwargs: Any,
 ) -> GraphQLSchema:
     """Load GraphQL schema from the network.
@@ -96,6 +101,7 @@ def from_url(
         app=app,
         data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
+        rate_limit=rate_limit,
     )
 
 
@@ -107,6 +113,7 @@ def from_file(
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     location: Optional[str] = None,
+    rate_limit: Optional[str] = None,
 ) -> GraphQLSchema:
     """Load GraphQL schema from a file descriptor or a string.
 
@@ -132,6 +139,7 @@ def from_file(
         data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
         location=location,
+        rate_limit=rate_limit,
     )
 
 
@@ -143,6 +151,7 @@ def from_dict(
     location: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
+    rate_limit: Optional[str] = None,
 ) -> GraphQLSchema:
     """Load GraphQL schema from a Python dictionary.
 
@@ -155,6 +164,9 @@ def from_dict(
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     hook_context = HookContext()
     dispatch("before_load_schema", hook_context, raw_schema)
+    rate_limiter: Optional[Limiter] = None
+    if rate_limit is not None:
+        rate_limiter = build_limiter(rate_limit)
     instance = GraphQLSchema(
         raw_schema,
         location=location,
@@ -162,6 +174,7 @@ def from_dict(
         app=app,
         data_generation_methods=prepare_data_generation_methods(data_generation_methods),
         code_sample_style=_code_sample_style,
+        rate_limiter=rate_limiter,
     )  # type: ignore
     dispatch("after_load_schema", hook_context, instance)
     return instance
@@ -174,6 +187,7 @@ def from_wsgi(
     base_url: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
+    rate_limit: Optional[str] = None,
     **kwargs: Any,
 ) -> GraphQLSchema:
     """Load GraphQL schema from a WSGI app.
@@ -196,6 +210,7 @@ def from_wsgi(
         app=app,
         data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
+        rate_limit=rate_limit,
     )
 
 
@@ -206,6 +221,7 @@ def from_asgi(
     base_url: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
+    rate_limit: Optional[str] = None,
     **kwargs: Any,
 ) -> GraphQLSchema:
     """Load GraphQL schema from an ASGI app.
@@ -227,6 +243,7 @@ def from_asgi(
         app=app,
         data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
+        rate_limit=rate_limit,
     )
 
 

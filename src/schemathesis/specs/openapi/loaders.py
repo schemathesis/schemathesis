@@ -9,6 +9,7 @@ import jsonschema
 import requests
 import yaml
 from jsonschema import ValidationError
+from pyrate_limiter import Limiter
 from starlette.applications import Starlette
 from starlette_testclient import TestClient as ASGIClient
 from werkzeug.test import Client
@@ -18,6 +19,7 @@ from ...constants import DEFAULT_DATA_GENERATION_METHODS, WAIT_FOR_SCHEMA_INTERV
 from ...exceptions import HTTPError, SchemaLoadingError
 from ...hooks import HookContext, dispatch
 from ...lazy import LazySchema
+from ...throttling import build_limiter
 from ...types import DataGenerationMethodInput, Filter, NotSet, PathLike
 from ...utils import (
     NOT_SET,
@@ -61,6 +63,7 @@ def from_path(
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
+    rate_limit: Optional[str] = None,
     encoding: str = "utf8",
 ) -> BaseOpenAPISchema:
     """Load Open API schema via a file from an OS path.
@@ -83,6 +86,7 @@ def from_path(
             data_generation_methods=data_generation_methods,
             code_sample_style=code_sample_style,
             location=pathlib.Path(path).absolute().as_uri(),
+            rate_limit=rate_limit,
             __expects_json=_is_json_path(path),
         )
 
@@ -103,6 +107,7 @@ def from_uri(
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     wait_for_schema: Optional[float] = None,
+    rate_limit: Optional[str] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from the network.
@@ -146,6 +151,7 @@ def from_uri(
             data_generation_methods=data_generation_methods,
             code_sample_style=code_sample_style,
             location=uri,
+            rate_limit=rate_limit,
             __expects_json=_is_json_response(response),
         )
     except SchemaLoadingError as exc:
@@ -183,6 +189,7 @@ def from_file(
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     location: Optional[str] = None,
+    rate_limit: Optional[str] = None,
     __expects_json: bool = False,
     **kwargs: Any,  # needed in the runner to have compatible API across all loaders
 ) -> BaseOpenAPISchema:
@@ -218,6 +225,7 @@ def from_file(
         data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
         location=location,
+        rate_limit=rate_limit,
     )
 
 
@@ -236,6 +244,7 @@ def from_dict(
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     location: Optional[str] = None,
+    rate_limit: Optional[str] = None,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from a Python dictionary.
 
@@ -244,6 +253,9 @@ def from_dict(
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     hook_context = HookContext()
     dispatch("before_load_schema", hook_context, raw_schema)
+    rate_limiter: Optional[Limiter] = None
+    if rate_limit is not None:
+        rate_limiter = build_limiter(rate_limit)
 
     def init_openapi_2() -> SwaggerV20:
         _maybe_validate_schema(raw_schema, definitions.SWAGGER_20_VALIDATOR, validate_schema)
@@ -260,6 +272,7 @@ def from_dict(
             data_generation_methods=prepare_data_generation_methods(data_generation_methods),
             code_sample_style=_code_sample_style,
             location=location,
+            rate_limiter=rate_limiter,
         )
         dispatch("after_load_schema", hook_context, instance)
         return instance
@@ -279,6 +292,7 @@ def from_dict(
             data_generation_methods=prepare_data_generation_methods(data_generation_methods),
             code_sample_style=_code_sample_style,
             location=location,
+            rate_limiter=rate_limiter,
         )
         dispatch("after_load_schema", hook_context, instance)
         return instance
@@ -346,6 +360,7 @@ def from_pytest_fixture(
     validate_schema: bool = False,
     data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
     code_sample_style: str = CodeSampleStyle.default().name,
+    rate_limit: Optional[str] = None,
 ) -> LazySchema:
     """Load schema from a ``pytest`` fixture.
 
@@ -363,6 +378,9 @@ def from_pytest_fixture(
         _data_generation_methods = prepare_data_generation_methods(data_generation_methods)
     else:
         _data_generation_methods = data_generation_methods
+    rate_limiter: Optional[Limiter] = None
+    if rate_limit is not None:
+        rate_limiter = build_limiter(rate_limit)
     return LazySchema(
         fixture_name,
         app=app,
@@ -375,6 +393,7 @@ def from_pytest_fixture(
         validate_schema=validate_schema,
         data_generation_methods=_data_generation_methods,
         code_sample_style=_code_sample_style,
+        rate_limiter=rate_limiter,
     )
 
 
@@ -392,6 +411,7 @@ def from_wsgi(
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
+    rate_limit: Optional[str] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from a WSGI app.
@@ -418,6 +438,7 @@ def from_wsgi(
         data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
         location=schema_path,
+        rate_limit=rate_limit,
         __expects_json=_is_json_response(response),
     )
 
@@ -444,6 +465,7 @@ def from_aiohttp(
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
+    rate_limit: Optional[str] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from an AioHTTP app.
@@ -468,6 +490,7 @@ def from_aiohttp(
         force_schema_version=force_schema_version,
         data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
+        rate_limit=rate_limit,
         **kwargs,
     )
 
@@ -486,6 +509,7 @@ def from_asgi(
     force_schema_version: Optional[str] = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
+    rate_limit: Optional[str] = None,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from an ASGI app.
@@ -512,5 +536,6 @@ def from_asgi(
         data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
         location=schema_path,
+        rate_limit=rate_limit,
         __expects_json=_is_json_response(response),
     )

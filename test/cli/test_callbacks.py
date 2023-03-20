@@ -90,3 +90,17 @@ def test_convert_request_tls_verify(value, expected):
 @pytest.mark.parametrize("value, expected", (("2", 2), ("auto", callbacks.get_workers_count())))
 def test_convert_workers(value, expected):
     assert callbacks.convert_workers(None, None, value) == expected
+
+
+@pytest.mark.parametrize("value", ("1", "1/g", "f/g"))
+def test_validate_rate_limit_invalid(value):
+    with pytest.raises(click.UsageError) as exc:
+        callbacks.validate_rate_limit(None, None, value)
+    assert (
+        str(exc.value) == f"Invalid rate limit value: `{value}`. Should be in form `limit/interval`. "
+        "Example: `10/m` for 10 requests per minute."
+    )
+
+
+def test_validate_rate_limit_valid():
+    assert callbacks.validate_rate_limit(None, None, "10/m") == "10/m"
