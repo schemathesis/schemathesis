@@ -68,8 +68,10 @@ def from_url(
     """
     setup_headers(kwargs)
     kwargs.setdefault("json", {"query": INTROSPECTION_QUERY})
-    if not base_url and port:
-        base_url = str(URL(url).with_port(port))
+    if port:
+        url = str(URL(url).with_port(port))
+        if not base_url:
+            base_url = url
 
     if wait_for_schema is not None:
 

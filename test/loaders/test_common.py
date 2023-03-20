@@ -4,6 +4,7 @@ import platform
 from contextlib import suppress
 
 import pytest
+import requests.exceptions
 from requests import Response
 from yarl import URL
 
@@ -36,20 +37,25 @@ def test_invalid_code_sample_style(loader):
         loader({}, code_sample_style="ruby")
 
 
+@pytest.fixture
+def default_schema_url():
+    return "http://127.0.0.1/schema.yaml"
+
+
 @pytest.mark.parametrize(
     "loader, url_fixture, expected",
     (
         (schemathesis.openapi.from_uri, "openapi3_schema_url", "http://127.0.0.1:8081/schema.yaml"),
+        (schemathesis.openapi.from_uri, "default_schema_url", "http://127.0.0.1:8081/schema.yaml"),
         (schemathesis.graphql.from_url, "graphql_url", "http://127.0.0.1:8081/graphql"),
     ),
 )
 def test_port_override(request, loader, url_fixture, expected):
     url = request.getfixturevalue(url_fixture)
     # When the user overrides `port`
-    schema = loader(url, port=8081)
-    operation = next(schema.get_all_operations()).ok()
-    # Then the base_url should be taken from `url` and the port should be overridden
-    assert operation.base_url == expected
+    with pytest.raises(requests.exceptions.ConnectionError) as exc:
+        loader(url, port=8081)
+    assert "host='127.0.0.1', port=8081" in str(exc)
 
 
 def to_ipv6(url):
