@@ -33,7 +33,7 @@ class BaseCsvChoice(click.Choice):
 class CsvEnumChoice(BaseCsvChoice):
     def __init__(self, choices: Type[Enum]):
         self.enum = choices
-        super().__init__(tuple(choices.__members__))
+        super().__init__(tuple(el.name for el in choices))
 
     def convert(  # type: ignore[return]
         self, value: str, param: Optional[click.core.Parameter], ctx: Optional[click.core.Context]
