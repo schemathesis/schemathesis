@@ -361,7 +361,8 @@ class Case:
         else:
             close_session = False
         try:
-            response = session.request(**data)  # type: ignore
+            with self.operation.schema.ratelimit():
+                response = session.request(**data)  # type: ignore
         except requests.Timeout as exc:
             timeout = 1000 * data["timeout"]  # It is defined and not empty, since the exception happened
             code_message = self._get_code_message(self.operation.schema.code_sample_style, exc.request)
@@ -415,7 +416,7 @@ class Case:
         if query_string is not None:
             _merge_dict_to(data, "query_string", query_string)
         client = werkzeug.Client(application, WSGIResponse)
-        with cookie_handler(client, self.cookies):
+        with cookie_handler(client, self.cookies), self.operation.schema.ratelimit():
             response = client.open(**data, **kwargs)
         requests_kwargs = self.as_requests_kwargs(base_url=self.get_full_base_url(), headers=headers)
         response.request = requests.Request(**requests_kwargs).prepare()

@@ -869,3 +869,25 @@ def test_(case):
     assert "def collecting_wrapper" not in stdout
     assert "def __flaky" not in stdout
     assert stdout.count("test_flaky.py:2") == 1
+
+
+@pytest.mark.operations("success")
+def test_rate_limit(testdir, openapi3_schema_url):
+    testdir.make_test(
+        f"""
+@pytest.fixture
+def api_schema():
+    return schemathesis.from_uri('{openapi3_schema_url}')
+
+lazy_schema = schemathesis.from_pytest_fixture("api_schema", rate_limit="1/s")
+
+@lazy_schema.parametrize()
+def test_(case):
+    limiter = case.operation.schema.rate_limiter
+    rate = limiter._rates[0]
+    assert rate.interval == 1
+    assert rate.limit == 1
+""",
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)

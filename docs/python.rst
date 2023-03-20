@@ -440,6 +440,29 @@ You only need to specify strategies for ``hypothesis.given``:
         def test_pets(self, case):
             case.call_and_validate()
 
+Rate limiting
+-------------
+
+APIs implement rate limiting to prevent misuse of their resources.
+Schema loaders accept the ``rate_limit`` argument that can be used to set the maximum number of requests per second, minute, hour, or day during testing to avoid hitting these limits.
+
+.. code-block:: python
+
+    import schemathesis
+
+    # 3 requests per second - `3/s`
+    # 100 requests per minute - `100/m`
+    # 1000 requests per hour - `1000/h`
+    # 10000 requests per day - `10000/d`
+    RATE_LIMIT = "3/s"
+
+    schema = schemathesis.from_uri(
+        "https://example.schemathesis.io/openapi.json",
+        rate_limit=RATE_LIMIT,
+    )
+
+    ...
+
 Anatomy of a test
 -----------------
 

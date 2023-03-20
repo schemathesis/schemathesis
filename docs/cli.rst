@@ -491,6 +491,23 @@ Skipped check calls will not be reported in the run summary.
 
     Learn more about writing custom checks :ref:`here <writing-custom-checks>`.
 
+Rate limiting
+-------------
+
+APIs implement rate limiting to prevent misuse of their resources.
+Schemathesis CLI's ``--rate-limit`` option can be used to set the maximum number of requests per second, minute, hour, or day during testing to avoid hitting these limits.
+
+.. code:: bash
+
+    # 3 requests per second
+    st run --rate-limit=3/s
+    # 100 requests per minute
+    st run --rate-limit=100/m
+    # 1000 requests per hour
+    st run --rate-limit=1000/h
+    # 10000 requests per day
+    st run --rate-limit=10000/d
+
 Debugging
 ---------
 

@@ -7,11 +7,13 @@ Their responsibilities:
 They give only static definitions of paths.
 """
 from collections.abc import Mapping
+from contextlib import nullcontext
 from difflib import get_close_matches
 from functools import lru_cache
 from typing import (
     Any,
     Callable,
+    ContextManager,
     Dict,
     Generator,
     Iterable,
@@ -25,11 +27,12 @@ from typing import (
     TypeVar,
     Union,
 )
-from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
 import attr
 import hypothesis
 from hypothesis.strategies import SearchStrategy
+from pyrate_limiter import Limiter
 from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import create_test
@@ -96,6 +99,7 @@ class BaseSchema(Mapping):
         default=DEFAULT_DATA_GENERATION_METHODS
     )  # pragma: no mutate
     code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate
+    rate_limiter: Optional[Limiter] = attr.ib(default=None)
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.operations)
@@ -271,6 +275,7 @@ class BaseSchema(Mapping):
         skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
         data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
         code_sample_style: Union[CodeSampleStyle, NotSet] = NOT_SET,
+        rate_limiter: Optional[Limiter] = NOT_SET,
     ) -> "BaseSchema":
         if base_url is NOT_SET:
             base_url = self.base_url
@@ -296,6 +301,8 @@ class BaseSchema(Mapping):
             data_generation_methods = self.data_generation_methods
         if code_sample_style is NOT_SET:
             code_sample_style = self.code_sample_style
+        if rate_limiter is NOT_SET:
+            rate_limiter = self.rate_limiter
 
         return self.__class__(
             self.raw_schema,
@@ -313,6 +320,7 @@ class BaseSchema(Mapping):
             skip_deprecated_operations=skip_deprecated_operations,  # type: ignore
             data_generation_methods=data_generation_methods,  # type: ignore
             code_sample_style=code_sample_style,  # type: ignore
+            rate_limiter=rate_limiter,  # type: ignore
         )
 
     def get_local_hook_dispatcher(self) -> Optional[HookDispatcher]:
@@ -382,6 +390,13 @@ class BaseSchema(Mapping):
 
     def prepare_schema(self, schema: Any) -> Any:
         raise NotImplementedError
+
+    def ratelimit(self) -> ContextManager:
+        """Limit the rate of sending generated requests."""
+        label = urlparse(self.base_url).netloc
+        if self.rate_limiter is not None:
+            return self.rate_limiter.ratelimit(label, delay=True, max_delay=0)
+        return nullcontext()
 
 
 def operations_to_dict(

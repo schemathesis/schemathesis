@@ -321,6 +321,10 @@ def test_commands_run_help(cli):
         "                                  a file.",
         "  --fixups [fast_api|utf8_bom|all]",
         "                                  Install specified compatibility fixups.",
+        "  --rate-limit TEXT               The maximum rate of requests to send to the",
+        "                                  tested API in the format of",
+        "                                  `<limit>/<duration>`. Example - `100/m` for",
+        "                                  100 requests per minute.",
         "  --stateful [none|links]         Utilize stateful testing capabilities.",
         "  --stateful-recursion-limit INTEGER RANGE",
         "                                  Limit recursion depth for stateful testing.",
@@ -329,8 +333,7 @@ def test_commands_run_help(cli):
         "                                  with the specified spec version.",
         "  --contrib-unique-data           Forces Schemathesis to generate unique test",
         "                                  cases.",
-        "  --contrib-openapi-formats-uuid  Forces Schemathesis to generate unique test",
-        "                                  cases.",
+        "  --contrib-openapi-formats-uuid  Enable support for the `uuid` string format.",
         "  --no-color                      Disable ANSI color escape codes.",
         "  --schemathesis-io-token TEXT    Schemathesis.io authentication token.",
         "  --schemathesis-io-url TEXT      Schemathesis.io base URL.",
@@ -445,6 +448,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
                 "app": None,
                 "base_url": None,
                 "wait_for_schema": None,
+                "rate_limit": None,
                 "auth": None,
                 "auth_type": "basic",
                 "endpoint": None,
@@ -2048,6 +2052,7 @@ def assert_exit_code(event_stream, code):
             event_stream,
             hypothesis_settings=hypothesis.settings(),
             workers_num=1,
+            rate_limit=None,
             show_errors_tracebacks=False,
             validate_schema=False,
             cassette_path=None,
@@ -2266,3 +2271,11 @@ def test_wait_for_schema(cli, schema_path, app_factory):
     run_server(app, port=port)
     result = cli.run(schema_url, "--wait-for-schema=1", "--hypothesis-max-examples=1")
     assert result.exit_code == ExitCode.OK, result.stdout
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_rate_limit(cli, schema_url):
+    result = cli.run(schema_url, "--rate-limit=1/s")
+    lines = result.stdout.splitlines()
+    assert lines[5] == "Rate limit: 1/s"

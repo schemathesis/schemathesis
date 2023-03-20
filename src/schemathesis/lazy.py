@@ -8,6 +8,7 @@ from hypothesis.core import HypothesisHandle
 from hypothesis.errors import Flaky
 from hypothesis.internal.escalation import format_exception, get_interesting_origin, get_trimmed_traceback
 from hypothesis.internal.reflection import impersonate
+from pyrate_limiter import Limiter
 from pytest_subtests import SubTests, nullcontext
 
 from ._compat import MultipleFailures
@@ -47,6 +48,7 @@ class LazySchema:
     skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
     data_generation_methods: Union[DataGenerationMethodInput, NotSet] = attr.ib(default=NOT_SET)
     code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate
+    rate_limiter: Optional[Limiter] = attr.ib(default=None)
 
     def hook(self, hook: Union[str, Callable]) -> Callable:
         return self.hooks.register(hook)
@@ -112,6 +114,7 @@ class LazySchema:
                     data_generation_methods=data_generation_methods,
                     code_sample_style=_code_sample_style,
                     app=self.app,
+                    rate_limiter=self.rate_limiter,
                 )
                 fixtures = get_fixtures(test, request, given_kwargs)
                 # Changing the node id is required for better reporting - the method and path will appear there
@@ -270,6 +273,7 @@ def get_schema(
     skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
     data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
     code_sample_style: CodeSampleStyle,
+    rate_limiter: Optional[Limiter],
 ) -> BaseSchema:
     """Loads a schema from the fixture."""
     schema = request.getfixturevalue(name)
@@ -289,6 +293,7 @@ def get_schema(
         skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
+        rate_limiter=rate_limiter,
     )
 
 
