@@ -1,11 +1,11 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 authors:
-- family-names: "Hatfield-Dodds"
-  given-names: "Zac"
-  orcid: "https://orcid.org/0000-0002-8646-8362"
-- family-names: "Dygalo"
-  given-names: "Dmitry"
+  - family-names: "Hatfield-Dodds"
+    given-names: "Zac"
+    orcid: "https://orcid.org/0000-0002-8646-8362"
+  - family-names: "Dygalo"
+    given-names: "Dmitry"
 title: "Schemathesis"
 version: 3.8.15
 date-released: 2023-02-18
@@ -13,11 +13,11 @@ url: "https://github.com/schemathesis/schemathesis"
 preferred-citation:
   type: article
   authors:
-  - family-names: "Hatfield-Dodds"
-    given-names: "Zac"
-    orcid: "https://orcid.org/0000-0002-8646-8362"
-  - family-names: "Dygalo"
-    given-names: "Dmitry"
+    - family-names: "Hatfield-Dodds"
+      given-names: "Zac"
+      orcid: "https://orcid.org/0000-0002-8646-8362"
+    - family-names: "Dygalo"
+      given-names: "Dmitry"
   title: "Deriving Semantics-Aware Fuzzers from Web API Schemas"
   doi: "10.48550/arXiv.2112.10328"
   date-released: 2021-12-20
