@@ -40,8 +40,6 @@ Changelog
 
 - Unified Schemathesis custom authentication usage via the ``schema.auth`` decorator, replacing the previous ``schema.auth.register`` and ``schema.auth.apply`` methods:
 
-Before:
-
 .. code:: python
 
     import schemathesis
