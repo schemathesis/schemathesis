@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Support ``requests<2.29``.
+
 .. _v3.19.0:
 
 `3.19.0`_ - 2023-03-22
