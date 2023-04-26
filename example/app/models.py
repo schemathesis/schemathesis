@@ -1,10 +1,10 @@
-import attr
+from dataclasses import dataclass, asdict as _asdict
 
 
-@attr.s(slots=True)
+@dataclass
 class Booking:
-    id: int = attr.ib()
-    name: str = attr.ib()
-    is_active: bool = attr.ib()
+    id: int
+    name: str
+    is_active: bool
 
-    asdict = attr.asdict
+    asdict = _asdict

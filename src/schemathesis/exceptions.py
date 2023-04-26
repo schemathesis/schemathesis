@@ -1,8 +1,8 @@
+from dataclasses import dataclass
 from hashlib import sha1
 from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, NoReturn, Optional, Tuple, Type, Union
 
-import attr
 import hypothesis.errors
 import requests
 from jsonschema import ValidationError
@@ -139,15 +139,15 @@ def get_timeout_error(deadline: Union[float, int]) -> Type[CheckFailed]:
     return _get_hashed_exception("TimeoutError", str(deadline))
 
 
-@attr.s(slots=True)
+@dataclass
 class InvalidSchema(Exception):
     """Schema associated with an API operation contains an error."""
 
     __module__ = "builtins"
-    message: Optional[str] = attr.ib(default=None)
-    path: Optional[str] = attr.ib(default=None)
-    method: Optional[str] = attr.ib(default=None)
-    full_path: Optional[str] = attr.ib(default=None)
+    message: Optional[str] = None
+    path: Optional[str] = None
+    method: Optional[str] = None
+    full_path: Optional[str] = None
 
     def as_failing_test_function(self) -> Callable:
         """Create a test function that will fail.
@@ -233,10 +233,10 @@ class InvalidRegularExpression(Exception):
     __module__ = "builtins"
 
 
-@attr.s  # pragma: no mutate
+@dataclass
 class HTTPError(Exception):
-    response: "GenericResponse" = attr.ib()  # pragma: no mutate
-    url: str = attr.ib()  # pragma: no mutate
+    response: "GenericResponse"
+    url: str
 
     @classmethod
     def raise_for_status(cls, response: requests.Response) -> None:

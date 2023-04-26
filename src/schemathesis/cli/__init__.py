@@ -4,12 +4,12 @@ import os
 import sys
 import traceback
 from collections import defaultdict
+from dataclasses import dataclass
 from enum import Enum
 from queue import Queue
 from typing import Any, Callable, Dict, Generator, Iterable, List, NoReturn, Optional, Tuple, Union, cast
 from urllib.parse import urlparse
 
-import attr
 import click
 import hypothesis
 import requests
@@ -799,33 +799,33 @@ def prepare_request_cert(cert: Optional[str], key: Optional[str]) -> Optional[Re
     return cert
 
 
-@attr.s(slots=True)
+@dataclass
 class LoaderConfig:
     """Container for API loader parameters.
 
     The main goal is to avoid too many parameters in function signatures.
     """
 
-    schema_location: str = attr.ib()  # pragma: no mutate
-    app: Any = attr.ib()  # pragma: no mutate
-    base_url: Optional[str] = attr.ib()  # pragma: no mutate
-    validate_schema: bool = attr.ib()  # pragma: no mutate
-    skip_deprecated_operations: bool = attr.ib()  # pragma: no mutate
-    data_generation_methods: Tuple[DataGenerationMethod, ...] = attr.ib()  # pragma: no mutate
-    force_schema_version: Optional[str] = attr.ib()  # pragma: no mutate
-    request_tls_verify: Union[bool, str] = attr.ib()  # pragma: no mutate
-    request_cert: Optional[RequestCert] = attr.ib()  # pragma: no mutate
-    wait_for_schema: Optional[float] = attr.ib()  # pragma: no mutate
-    rate_limit: Optional[str] = attr.ib()
+    schema_location: str
+    app: Any
+    base_url: Optional[str]
+    validate_schema: bool
+    skip_deprecated_operations: bool
+    data_generation_methods: Tuple[DataGenerationMethod, ...]
+    force_schema_version: Optional[str]
+    request_tls_verify: Union[bool, str]
+    request_cert: Optional[RequestCert]
+    wait_for_schema: Optional[float]
+    rate_limit: Optional[str]
     # Network request parameters
-    auth: Optional[Tuple[str, str]] = attr.ib()  # pragma: no mutate
-    auth_type: Optional[str] = attr.ib()  # pragma: no mutate
-    headers: Optional[Dict[str, str]] = attr.ib()  # pragma: no mutate
+    auth: Optional[Tuple[str, str]]
+    auth_type: Optional[str]
+    headers: Optional[Dict[str, str]]
     # Schema filters
-    endpoint: Optional[Filter] = attr.ib()  # pragma: no mutate
-    method: Optional[Filter] = attr.ib()  # pragma: no mutate
-    tag: Optional[Filter] = attr.ib()  # pragma: no mutate
-    operation_id: Optional[Filter] = attr.ib()  # pragma: no mutate
+    endpoint: Optional[Filter]
+    method: Optional[Filter]
+    tag: Optional[Filter]
+    operation_id: Optional[Filter]
 
 
 def into_event_stream(

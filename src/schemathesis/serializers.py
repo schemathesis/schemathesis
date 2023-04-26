@@ -1,9 +1,9 @@
 import binascii
 import os
+from dataclasses import dataclass
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Generator, Optional, Type
 
-import attr
 import yaml
 from typing_extensions import Protocol, runtime_checkable
 
@@ -22,14 +22,14 @@ except ImportError:
 SERIALIZERS: Dict[str, Type["Serializer"]] = {}
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class SerializerContext:
     """The context for serialization process.
 
     :ivar Case case: Generated example that is being processed.
     """
 
-    case: "Case" = attr.ib()  # pragma: no mutate
+    case: "Case"
 
 
 @runtime_checkable

@@ -1,9 +1,9 @@
 """Schema mutations."""
 import enum
+from dataclasses import dataclass
 from functools import wraps
 from typing import Any, Callable, List, Optional, Sequence, Set, Tuple, TypeVar
 
-import attr
 from hypothesis import reject
 from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
@@ -58,17 +58,17 @@ TYPE_SPECIFIC_KEYS = {
 }
 
 
-@attr.s(slots=True)
+@dataclass
 class MutationContext:
     """Meta information about the current mutation state."""
 
     # The original schema
-    keywords: Schema = attr.ib()  # only keywords
-    non_keywords: Schema = attr.ib()  # everything else
+    keywords: Schema  # only keywords
+    non_keywords: Schema  # everything else
     # Schema location within API operation (header, query, etc)
-    location: str = attr.ib()
+    location: str
     # Payload media type, if available
-    media_type: Optional[str] = attr.ib()
+    media_type: Optional[str]
 
     @property
     def is_header_location(self) -> bool:

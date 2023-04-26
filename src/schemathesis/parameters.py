@@ -2,15 +2,14 @@
 
 These are basic entities that describe what data could be sent to the API.
 """
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, Generator, Generic, List, Optional, TypeVar
-
-import attr
 
 if TYPE_CHECKING:
     from .models import APIOperation
 
 
-@attr.s(eq=False)  # pragma: no mutate
+@dataclass(eq=False)
 class Parameter:
     """A logically separate parameter bound to a location (e.g., to "query string").
 
@@ -19,7 +18,7 @@ class Parameter:
     """
 
     # The parameter definition in the language acceptable by the API
-    definition: Any = attr.ib()  # pragma: no mutate
+    definition: Any
 
     @property
     def location(self) -> str:
@@ -52,11 +51,11 @@ class Parameter:
 P = TypeVar("P", bound=Parameter)
 
 
-@attr.s  # pragma: no mutate
+@dataclass
 class ParameterSet(Generic[P]):
     """A set of parameters for the same location."""
 
-    items: List[P] = attr.ib(factory=list)  # pragma: no mutate
+    items: List[P] = field(default_factory=list)
 
     def add(self, parameter: P) -> None:
         """Add a new parameter."""

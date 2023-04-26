@@ -52,11 +52,11 @@ class InliningResolver(jsonschema.RefResolver):
         )
         super().__init__(*args, **kwargs)
 
-    @overload  # pragma: no mutate
+    @overload
     def resolve_all(self, item: Dict[str, Any], recursion_level: int = 0) -> Dict[str, Any]:
         pass
 
-    @overload  # pragma: no mutate
+    @overload
     def resolve_all(self, item: List, recursion_level: int = 0) -> List:
         pass
 

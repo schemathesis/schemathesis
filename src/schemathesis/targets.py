@@ -1,6 +1,5 @@
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Tuple
-
-import attr
 
 from .utils import GenericResponse
 
@@ -8,7 +7,7 @@ if TYPE_CHECKING:
     from .models import Case
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class TargetContext:
     """Context for targeted testing.
 
@@ -17,9 +16,9 @@ class TargetContext:
     :ivar float response_time: API response time.
     """
 
-    case: "Case" = attr.ib()  # pragma: no mutate
-    response: GenericResponse = attr.ib()  # pragma: no mutate
-    response_time: float = attr.ib()  # pragma: no mutate
+    case: "Case"
+    response: GenericResponse
+    response_time: float
 
 
 def response_time(context: TargetContext) -> float:

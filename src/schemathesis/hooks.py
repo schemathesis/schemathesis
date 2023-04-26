@@ -1,10 +1,10 @@
 import inspect
 from collections import defaultdict
 from copy import deepcopy
+from dataclasses import dataclass, field
 from enum import Enum, unique
-from typing import TYPE_CHECKING, Any, Callable, DefaultDict, Dict, List, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, DefaultDict, Dict, List, Optional, Union, cast
 
-import attr
 from hypothesis import strategies as st
 
 from .types import GenericTest
@@ -22,13 +22,13 @@ class HookScope(Enum):
     TEST = 3
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class RegisteredHook:
-    signature: inspect.Signature = attr.ib()  # pragma: no mutate
-    scopes: List[HookScope] = attr.ib()  # pragma: no mutate
+    signature: inspect.Signature
+    scopes: List[HookScope]
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class HookContext:
     """A context that is passed to some hook functions.
 
@@ -36,23 +36,23 @@ class HookContext:
                                             Might be absent in some cases.
     """
 
-    operation: Optional["APIOperation"] = attr.ib(default=None)  # pragma: no mutate
+    operation: Optional["APIOperation"] = None
 
     @deprecated_property(removed_in="4.0", replacement="operation")
     def endpoint(self) -> Optional["APIOperation"]:
         return self.operation
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class HookDispatcher:
     """Generic hook dispatcher.
 
     Provides a mechanism to extend Schemathesis in registered hook points.
     """
 
-    scope: HookScope = attr.ib()  # pragma: no mutate
-    _hooks: DefaultDict[str, List[Callable]] = attr.ib(factory=lambda: defaultdict(list))  # pragma: no mutate
-    _specs: Dict[str, RegisteredHook] = {}  # pragma: no mutate
+    scope: HookScope
+    _hooks: DefaultDict[str, List[Callable]] = field(default_factory=lambda: defaultdict(list))
+    _specs: ClassVar[Dict[str, RegisteredHook]] = {}
 
     def register(self, hook: Union[str, Callable]) -> Callable:
         """Register a new hook.

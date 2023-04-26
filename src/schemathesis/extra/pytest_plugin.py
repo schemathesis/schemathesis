@@ -222,7 +222,7 @@ def skip_unnecessary_hypothesis_output() -> Generator:
         yield
 
 
-@hookimpl(hookwrapper=True)  # pragma: no mutate
+@hookimpl(hookwrapper=True)
 def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     """It is possible to have a Hypothesis exception in runtime.
 

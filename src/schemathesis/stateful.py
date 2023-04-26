@@ -1,9 +1,9 @@
 import enum
 import json
 import time
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, Generator, List, Optional, Tuple, Type
 
-import attr
 import hypothesis
 from hypothesis.stateful import RuleBasedStateMachine
 from hypothesis.stateful import run_state_machine_as_test as _run_state_machine_as_test
@@ -25,15 +25,15 @@ class Stateful(enum.Enum):
     links = 2
 
 
-@attr.s(slots=True, hash=False)  # pragma: no mutate
+@dataclass
 class ParsedData:
     """A structure that holds information parsed from a test outcome.
 
     It is used later to create a new version of an API operation that will reuse this data.
     """
 
-    parameters: Dict[str, Any] = attr.ib()  # pragma: no mutate
-    body: Any = attr.ib(default=NOT_SET)  # pragma: no mutate
+    parameters: Dict[str, Any]
+    body: Any = NOT_SET
 
     def __hash__(self) -> int:
         """Custom hash simplifies deduplication of parsed data."""
@@ -48,11 +48,11 @@ class ParsedData:
         return value
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class StatefulTest:
     """A template for a test that will be executed after another one by reusing the outcomes from it."""
 
-    name: str = attr.ib()  # pragma: no mutate
+    name: str
 
     def parse(self, case: Case, response: GenericResponse) -> ParsedData:
         raise NotImplementedError
@@ -61,12 +61,12 @@ class StatefulTest:
         raise NotImplementedError
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class StatefulData:
     """Storage for data that will be used in later tests."""
 
-    stateful_test: StatefulTest = attr.ib()  # pragma: no mutate
-    container: List[ParsedData] = attr.ib(factory=list)  # pragma: no mutate
+    stateful_test: StatefulTest
+    container: List[ParsedData] = field(default_factory=list)
 
     def make_operation(self) -> APIOperation:
         return self.stateful_test.make_operation(self.container)
@@ -77,16 +77,16 @@ class StatefulData:
         self.container.append(parsed)
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class Feedback:
     """Handler for feedback from tests.
 
     Provides a way to control runner's behavior from tests.
     """
 
-    stateful: Optional[Stateful] = attr.ib()  # pragma: no mutate
-    operation: APIOperation = attr.ib(repr=False)  # pragma: no mutate
-    stateful_tests: Dict[str, StatefulData] = attr.ib(factory=dict, repr=False)  # pragma: no mutate
+    stateful: Optional[Stateful]
+    operation: APIOperation = field(repr=False)
+    stateful_tests: Dict[str, StatefulData] = field(default_factory=dict, repr=False)
 
     def add_test_case(self, case: Case, response: GenericResponse) -> None:
         """Store test data to reuse it in the future additional tests."""
@@ -117,13 +117,13 @@ class Feedback:
             yield Ok((operation, test_function))
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class StepResult:
     """Output from a single transition of a state machine."""
 
-    response: GenericResponse = attr.ib()  # pragma: no mutate
-    case: Case = attr.ib()  # pragma: no mutate
-    elapsed: float = attr.ib()  # pragma: no mutate
+    response: GenericResponse
+    case: Case
+    elapsed: float
 
 
 class Direction:
@@ -148,11 +148,11 @@ def _print_case(case: Case, kwargs: Dict[str, Any]) -> str:
     return f"{operation}.make_case({', '.join(data)})"
 
 
-@attr.s(slots=True, repr=False)  # pragma: no mutate
+@dataclass(repr=False)
 class _DirectionWrapper:
     """Purely to avoid modification of `Direction.__repr__`."""
 
-    direction: Direction = attr.ib()  # pragma: no mutate
+    direction: Direction
 
     def __repr__(self) -> str:
         path = self.direction.operation.path

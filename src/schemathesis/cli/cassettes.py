@@ -3,10 +3,10 @@ import json
 import re
 import sys
 import threading
+from dataclasses import dataclass, field
 from queue import Queue
 from typing import IO, Any, Dict, Generator, Iterator, List, Optional, cast
 
-import attr
 import click
 import requests
 from requests.cookies import RequestsCookieJar
@@ -25,7 +25,7 @@ from .handlers import EventHandler
 WRITER_WORKER_JOIN_TIMEOUT = 1
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class CassetteWriter(EventHandler):
     """Write interactions in a YAML cassette.
 
@@ -33,12 +33,12 @@ class CassetteWriter(EventHandler):
     the end of the test run.
     """
 
-    file_handle: click.utils.LazyFile = attr.ib()  # pragma: no mutate
-    preserve_exact_body_bytes: bool = attr.ib()  # pragma: no mutate
-    queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
-    worker: threading.Thread = attr.ib(init=False)  # pragma: no mutate
+    file_handle: click.utils.LazyFile
+    preserve_exact_body_bytes: bool
+    queue: Queue = field(default_factory=Queue)
+    worker: threading.Thread = field(init=False)
 
-    def __attrs_post_init__(self) -> None:
+    def __post_init__(self) -> None:
         self.worker = threading.Thread(
             target=worker,
             kwargs={
@@ -80,23 +80,23 @@ class CassetteWriter(EventHandler):
         self.worker.join(WRITER_WORKER_JOIN_TIMEOUT)
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class Initialize:
     """Start up, the first message to make preparations before proceeding the input data."""
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class Process:
     """A new chunk of data should be processed."""
 
-    seed: int = attr.ib()  # pragma: no mutate
-    correlation_id: str = attr.ib()  # pragma: no mutate
-    thread_id: int = attr.ib()  # pragma: no mutate
-    data_generation_method: constants.DataGenerationMethod = attr.ib()  # pragma: no mutate
-    interactions: List[SerializedInteraction] = attr.ib()  # pragma: no mutate
+    seed: int
+    correlation_id: str
+    thread_id: int
+    data_generation_method: constants.DataGenerationMethod
+    interactions: List[SerializedInteraction]
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class Finalize:
     """The work is done and there will be no more messages to process."""
 
@@ -274,10 +274,10 @@ def write_double_quoted(stream: IO, text: str) -> None:
     stream.write('"')
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class Replayed:
-    interaction: Dict[str, Any] = attr.ib()  # pragma: no mutate
-    response: requests.Response = attr.ib()  # pragma: no mutate
+    interaction: Dict[str, Any]
+    response: requests.Response
 
 
 def replay(

@@ -80,7 +80,7 @@ def is_latin_1_encodable(value: str) -> bool:
 
 
 # Adapted from http.client._is_illegal_header_value
-INVALID_HEADER_RE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])")  # pragma: no mutate
+INVALID_HEADER_RE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])")
 
 
 def has_invalid_characters(name: str, value: str) -> bool:
@@ -258,7 +258,7 @@ def get_requests_auth(auth: Optional[RawAuth], auth_type: Optional[str]) -> Opti
     return auth
 
 
-GenericResponse = Union[requests.Response, WSGIResponse]  # pragma: no mutate
+GenericResponse = Union[requests.Response, WSGIResponse]
 
 
 def copy_response(response: GenericResponse) -> GenericResponse:

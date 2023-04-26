@@ -1,26 +1,25 @@
 """Lexical analysis of runtime expressions."""
+from dataclasses import dataclass
 from enum import Enum, unique
 from typing import Callable, Generator
 
-import attr
 
-
-@unique  # pragma: no mutate
+@unique
 class TokenType(Enum):
-    VARIABLE = 1  # pragma: no mutate
-    STRING = 2  # pragma: no mutate
-    POINTER = 3  # pragma: no mutate
-    DOT = 4  # pragma: no mutate
-    LBRACKET = 5  # pragma: no mutate
-    RBRACKET = 6  # pragma: no mutate
+    VARIABLE = 1
+    STRING = 2
+    POINTER = 3
+    DOT = 4
+    LBRACKET = 5
+    RBRACKET = 6
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class Token:
     """Lexical token that may occur in a runtime expression."""
 
-    value: str = attr.ib()  # pragma: no mutate
-    type_: TokenType = attr.ib()  # pragma: no mutate
+    value: str
+    type_: TokenType
 
     # Helpers for cleaner instantiation
 

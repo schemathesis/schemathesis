@@ -2,10 +2,10 @@ import ctypes
 import queue
 import threading
 import time
+from dataclasses import dataclass
 from queue import Queue
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Union, cast
 
-import attr
 import hypothesis
 
 from ..._hypothesis import create_test
@@ -201,13 +201,13 @@ def stop_worker(thread_id: int) -> None:
     ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(thread_id), ctypes.py_object(SystemExit))
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class ThreadPoolRunner(BaseRunner):
     """Spread different tests among multiple worker threads."""
 
-    workers_num: int = attr.ib(default=2)  # pragma: no mutate
-    request_tls_verify: Union[bool, str] = attr.ib(default=True)  # pragma: no mutate
-    request_cert: Optional[RequestCert] = attr.ib(default=None)  # pragma: no mutate
+    workers_num: int = 2
+    request_tls_verify: Union[bool, str] = True
+    request_cert: Optional[RequestCert] = None
 
     def _execute(
         self, results: TestResultSet, stop_event: threading.Event

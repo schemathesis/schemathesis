@@ -1,15 +1,15 @@
 import json
+from dataclasses import dataclass
 
-import attr
 from click.utils import LazyFile
 
 from ..runner import events
 from .handlers import EventHandler, ExecutionContext
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class DebugOutputHandler(EventHandler):
-    file_handle: LazyFile = attr.ib()  # pragma: no mutate
+    file_handle: LazyFile
 
     def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
         stream = self.file_handle.open()

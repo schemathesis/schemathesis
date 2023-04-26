@@ -1,3 +1,5 @@
+from dataclasses import fields
+
 import pytest
 
 import schemathesis
@@ -135,9 +137,9 @@ def make_openapi_3_schema(empty_open_api_3_schema):
 def assert_parameters():
     def _compare(left, right):
         assert type(left) == type(right)
-        for attr in type(left).__attrs_attrs__:
-            left_attr = getattr(left, attr.name)
-            right_attr = getattr(right, attr.name)
+        for field in fields(left):
+            left_attr = getattr(left, field.name)
+            right_attr = getattr(right, field.name)
             if isinstance(left_attr, list):
                 assert len(left_attr) == len(right_attr)
                 for sub_left, sub_right in zip(left_attr, right_attr):

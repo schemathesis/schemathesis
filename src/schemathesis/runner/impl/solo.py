@@ -1,7 +1,6 @@
 import threading
+from dataclasses import dataclass
 from typing import Generator, Optional, Union
-
-import attr
 
 from ...models import TestResultSet
 from ...types import RequestCert
@@ -10,12 +9,12 @@ from .. import events
 from .core import BaseRunner, asgi_test, get_session, network_test, wsgi_test
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class SingleThreadRunner(BaseRunner):
     """Fast runner that runs tests sequentially in the main thread."""
 
-    request_tls_verify: Union[bool, str] = attr.ib(default=True)  # pragma: no mutate
-    request_cert: Optional[RequestCert] = attr.ib(default=None)  # pragma: no mutate
+    request_tls_verify: Union[bool, str] = True
+    request_cert: Optional[RequestCert] = None
 
     def _execute(
         self, results: TestResultSet, stop_event: threading.Event
@@ -47,7 +46,7 @@ class SingleThreadRunner(BaseRunner):
             )
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class SingleThreadWSGIRunner(SingleThreadRunner):
     def _execute_impl(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         yield from self._run_tests(
@@ -67,7 +66,7 @@ class SingleThreadWSGIRunner(SingleThreadRunner):
         )
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class SingleThreadASGIRunner(SingleThreadRunner):
     def _execute_impl(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         yield from self._run_tests(
