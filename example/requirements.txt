@@ -26,7 +26,6 @@ attrs==21.4.0
     #   hypothesis-graphql
     #   jsonschema
     #   pytest
-    #   schemathesis
 certifi==2022.12.7
     # via requests
 charset-normalizer==2.0.12

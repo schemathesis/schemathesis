@@ -1,17 +1,17 @@
 """Processing of ``securityDefinitions`` or ``securitySchemes`` keywords."""
+from dataclasses import dataclass
 from typing import Any, ClassVar, Dict, Generator, List, Tuple, Type
 
-import attr
 from jsonschema import RefResolver
 
 from ...models import APIOperation
 from .parameters import OpenAPI20Parameter, OpenAPI30Parameter, OpenAPIParameter
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class BaseSecurityProcessor:
-    api_key_locations: Tuple[str, ...] = ("header", "query")
-    http_security_name = "basic"
+    api_key_locations: ClassVar[Tuple[str, ...]] = ("header", "query")
+    http_security_name: ClassVar[str] = "basic"
     parameter_cls: ClassVar[Type[OpenAPIParameter]] = OpenAPI20Parameter
 
     def process_definitions(self, schema: Dict[str, Any], operation: APIOperation, resolver: RefResolver) -> None:
@@ -112,10 +112,10 @@ def make_api_key_schema(definition: Dict[str, Any], **kwargs: Any) -> Dict[str, 
 SwaggerSecurityProcessor = BaseSecurityProcessor
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class OpenAPISecurityProcessor(BaseSecurityProcessor):
-    api_key_locations = ("header", "cookie", "query")
-    http_security_name = "http"
+    api_key_locations: ClassVar[Tuple[str, ...]] = ("header", "cookie", "query")
+    http_security_name: ClassVar[str] = "http"
     parameter_cls: ClassVar[Type[OpenAPIParameter]] = OpenAPI30Parameter
 
     def get_security_definitions(self, schema: Dict[str, Any], resolver: RefResolver) -> Dict[str, Any]:

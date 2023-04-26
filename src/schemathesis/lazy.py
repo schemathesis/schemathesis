@@ -1,7 +1,7 @@
+from dataclasses import dataclass, field
 from inspect import signature
 from typing import Any, Callable, Dict, Generator, Optional, Type, Union
 
-import attr
 import pytest
 from _pytest.fixtures import FixtureRequest
 from hypothesis.core import HypothesisHandle
@@ -33,22 +33,22 @@ from .utils import (
 )
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class LazySchema:
-    fixture_name: str = attr.ib()  # pragma: no mutate
-    base_url: Union[Optional[str], NotSet] = attr.ib(default=NOT_SET)  # pragma: no mutate
-    method: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
-    endpoint: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
-    tag: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
-    operation_id: Optional[Filter] = attr.ib(default=NOT_SET)  # pragma: no mutate
-    app: Any = attr.ib(default=NOT_SET)  # pragma: no mutate
-    hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
-    auth: AuthStorage = attr.ib(factory=AuthStorage)  # pragma: no mutate
-    validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
-    skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
-    data_generation_methods: Union[DataGenerationMethodInput, NotSet] = attr.ib(default=NOT_SET)
-    code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate
-    rate_limiter: Optional[Limiter] = attr.ib(default=None)
+    fixture_name: str
+    base_url: Union[Optional[str], NotSet] = NOT_SET
+    method: Optional[Filter] = NOT_SET
+    endpoint: Optional[Filter] = NOT_SET
+    tag: Optional[Filter] = NOT_SET
+    operation_id: Optional[Filter] = NOT_SET
+    app: Any = NOT_SET
+    hooks: HookDispatcher = field(default_factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))
+    auth: AuthStorage = field(default_factory=AuthStorage)
+    validate_schema: bool = True
+    skip_deprecated_operations: bool = False
+    data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET
+    code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
+    rate_limiter: Optional[Limiter] = None
 
     def hook(self, hook: Union[str, Callable]) -> Callable:
         return self.hooks.register(hook)

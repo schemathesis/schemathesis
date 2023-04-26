@@ -1,10 +1,10 @@
 """Filtering system that allows users to filter API operations based on certain criteria."""
 import re
+from dataclasses import dataclass, field
 from functools import partial
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Callable, List, Optional, Set, Tuple, Union
 
-import attr
 from typing_extensions import Protocol
 
 from .exceptions import UsageError
@@ -25,15 +25,15 @@ ERROR_EMPTY_FILTER = "Filter can not be empty"
 ERROR_FILTER_EXISTS = "Filter already exists"
 
 
-@attr.s(slots=True, repr=False, frozen=True)
+@dataclass(repr=False, frozen=True)
 class Matcher:
     """Encapsulates matching logic by various criteria."""
 
-    func: Callable[..., bool] = attr.ib(hash=False, eq=False)
+    func: Callable[..., bool] = field(hash=False, compare=False)
     # A short description of a matcher. Primarily exists for debugging purposes
-    label: str = attr.ib(hash=False, eq=False)
+    label: str = field(hash=False, compare=False)
     # Compare & hash matchers by a pre-computed hash value
-    _hash: int = attr.ib()
+    _hash: int
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self.label}>"
@@ -41,7 +41,7 @@ class Matcher:
     @classmethod
     def for_function(cls, func: MatcherFunc) -> "Matcher":
         """Matcher that uses the given function for matching operations."""
-        return cls(func, label=func.__name__, hash=hash(func))
+        return cls(func, label=func.__name__, _hash=hash(func))
 
     @classmethod
     def for_value(cls, attribute: str, expected: FilterValue) -> "Matcher":
@@ -51,7 +51,7 @@ class Matcher:
         else:
             func = partial(by_value, attribute=attribute, expected=expected)
         label = f"{attribute}={repr(expected)}"
-        return cls(func, label=label, hash=hash(label))
+        return cls(func, label=label, _hash=hash(label))
 
     @classmethod
     def for_regex(cls, attribute: str, regex: RegexValue) -> "Matcher":
@@ -60,7 +60,7 @@ class Matcher:
             regex = re.compile(regex)
         func = partial(by_regex, attribute=attribute, regex=regex)
         label = f"{attribute}_regex={repr(regex)}"
-        return cls(func, label=label, hash=hash(label))
+        return cls(func, label=label, _hash=hash(label))
 
     def match(self, ctx: HasAPIOperation) -> bool:
         """Whether matcher matches the given operation."""
@@ -88,11 +88,11 @@ def by_regex(ctx: HasAPIOperation, attribute: str, regex: re.Pattern) -> bool:
     return bool(regex.match(value))
 
 
-@attr.s(slots=True, repr=False, frozen=True)
+@dataclass(repr=False, frozen=True)
 class Filter:
     """Match API operations against a list of matchers."""
 
-    matchers: Tuple[Matcher, ...] = attr.ib()
+    matchers: Tuple[Matcher, ...]
 
     def __repr__(self) -> str:
         inner = " && ".join(matcher.label for matcher in self.matchers)
@@ -106,12 +106,12 @@ class Filter:
         return all(matcher.match(ctx) for matcher in self.matchers)
 
 
-@attr.s(slots=True)
+@dataclass
 class FilterSet:
     """Combines multiple filters to apply inclusion and exclusion rules on API operations."""
 
-    _includes: Set[Filter] = attr.ib(factory=set)
-    _excludes: Set[Filter] = attr.ib(factory=set)
+    _includes: Set[Filter] = field(default_factory=set)
+    _excludes: Set[Filter] = field(default_factory=set)
 
     def apply_to(self, operations: List["APIOperation"]) -> List["APIOperation"]:
         """Get a filtered list of the given operations that match the filters."""

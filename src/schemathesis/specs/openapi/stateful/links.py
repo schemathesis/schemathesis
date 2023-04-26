@@ -1,6 +1,6 @@
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Dict, List, Tuple
 
-import attr
 import hypothesis.strategies as st
 from requests.structures import CaseInsensitiveDict
 
@@ -14,10 +14,10 @@ if TYPE_CHECKING:
 FilterFunction = Callable[[StepResult], bool]
 
 
-@attr.s(slots=True)
+@dataclass
 class Connection:
-    source: str = attr.ib()
-    strategy: st.SearchStrategy[Tuple[StepResult, OpenAPILink]] = attr.ib()
+    source: str
+    strategy: st.SearchStrategy[Tuple[StepResult, OpenAPILink]]
 
 
 APIOperationConnections = Dict[str, List[Connection]]

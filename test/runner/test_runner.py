@@ -1,9 +1,9 @@
 import base64
 import json
+from dataclasses import asdict
 from typing import Dict, Optional
 from unittest.mock import ANY
 
-import attr
 import hypothesis
 import pytest
 import requests
@@ -128,7 +128,7 @@ def test_interactions(request, any_app_schema, workers):
     ][0].result.interactions
     assert len(interactions) == 2
     failure = interactions[0]
-    assert attr.asdict(failure.request) == {
+    assert asdict(failure.request) == {
         "uri": f"{base_url}/failure",
         "method": "GET",
         "body": None,
@@ -157,7 +157,7 @@ def test_interactions(request, any_app_schema, workers):
     ][0].result.interactions
     assert len(interactions) == 1
     success = interactions[0]
-    assert attr.asdict(success.request) == {
+    assert asdict(success.request) == {
         "uri": f"{base_url}/success",
         "method": "GET",
         "body": None,

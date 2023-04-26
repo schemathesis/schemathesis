@@ -5,11 +5,11 @@ import tarfile
 import threading
 import time
 from contextlib import suppress
+from dataclasses import asdict, dataclass, field
 from io import BytesIO
 from queue import Queue
 from typing import Any, Dict, Optional
 
-import attr
 import click
 
 from ..cli.context import ExecutionContext
@@ -23,15 +23,15 @@ from .models import UploadResponse
 from .serialization import serialize_event
 
 
-@attr.s(slots=True)
+@dataclass
 class ReportWriter:
     """Schemathesis.io test run report.
 
     Simplifies adding new files to the archive.
     """
 
-    _tar: tarfile.TarFile = attr.ib()
-    _events_count: int = attr.ib(default=0)
+    _tar: tarfile.TarFile
+    _events_count: int = 0
 
     def add_json_file(self, name: str, data: Any) -> None:
         buffer = BytesIO()
@@ -63,7 +63,7 @@ class ReportWriter:
             # The time that the test run began
             "started_at": started_at,
             # Metadata about CLI environment
-            "environment": attr.asdict(metadata),
+            "environment": asdict(metadata),
             # Environment variables specific for CI providers
             "ci": ci_environment.asdict() if ci_environment is not None else None,
             # CLI usage statistic
@@ -80,7 +80,6 @@ class ReportWriter:
         self.add_json_file(filename, serialize_event(event))
 
 
-@attr.s(slots=True)  # pragma: no mutate
 class BaseReportHandler(EventHandler):
     in_queue: Queue
     worker: threading.Thread
@@ -96,20 +95,20 @@ class BaseReportHandler(EventHandler):
         self.worker.join(WORKER_JOIN_TIMEOUT)
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class ServiceReportHandler(BaseReportHandler):
-    client: ServiceClient = attr.ib()  # pragma: no mutate
-    host_data: HostData = attr.ib()  # pragma: no mutate
-    api_name: Optional[str] = attr.ib()  # pragma: no mutate
-    location: str = attr.ib()  # pragma: no mutate
-    base_url: Optional[str] = attr.ib()  # pragma: no mutate
-    started_at: str = attr.ib()  # pragma: no mutate
-    telemetry: bool = attr.ib()  # pragma: no mutate
-    out_queue: Queue = attr.ib()  # pragma: no mutate
-    in_queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
-    worker: threading.Thread = attr.ib(init=False)  # pragma: no mutate
+    client: ServiceClient
+    host_data: HostData
+    api_name: Optional[str]
+    location: str
+    base_url: Optional[str]
+    started_at: str
+    telemetry: bool
+    out_queue: Queue
+    in_queue: Queue = field(default_factory=Queue)
+    worker: threading.Thread = field(init=False)
 
-    def __attrs_post_init__(self) -> None:
+    def __post_init__(self) -> None:
         self.worker = threading.Thread(
             target=write_remote,
             kwargs={
@@ -191,19 +190,19 @@ def write_remote(
         out_queue.put(events.Error(exc))
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class FileReportHandler(BaseReportHandler):
-    file_handle: click.utils.LazyFile = attr.ib()  # pragma: no mutate
-    api_name: Optional[str] = attr.ib()  # pragma: no mutate
-    location: str = attr.ib()  # pragma: no mutate
-    base_url: Optional[str] = attr.ib()  # pragma: no mutate
-    started_at: str = attr.ib()  # pragma: no mutate
-    telemetry: bool = attr.ib()  # pragma: no mutate
-    out_queue: Queue = attr.ib()  # pragma: no mutate
-    in_queue: Queue = attr.ib(factory=Queue)  # pragma: no mutate
-    worker: threading.Thread = attr.ib(init=False)  # pragma: no mutate
+    file_handle: click.utils.LazyFile
+    api_name: Optional[str]
+    location: str
+    base_url: Optional[str]
+    started_at: str
+    telemetry: bool
+    out_queue: Queue
+    in_queue: Queue = field(default_factory=Queue)
+    worker: threading.Thread = field(init=False)
 
-    def __attrs_post_init__(self) -> None:
+    def __post_init__(self) -> None:
         self.worker = threading.Thread(
             target=write_file,
             kwargs={

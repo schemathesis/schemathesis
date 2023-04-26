@@ -1,8 +1,8 @@
 import threading
 import time
+from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Union
 
-import attr
 from requests import exceptions
 
 from ..constants import USE_WAIT_FOR_SCHEMA_SUGGESTION_MESSAGE, DataGenerationMethod
@@ -13,7 +13,7 @@ from ..utils import current_datetime, format_exception
 from .serialization import SerializedError, SerializedTestResult
 
 
-@attr.s()  # pragma: no mutate
+@dataclass
 class ExecutionEvent:
     """Generic execution event."""
 
@@ -21,31 +21,31 @@ class ExecutionEvent:
     is_terminal = False
 
     def asdict(self, **kwargs: Any) -> Dict[str, Any]:
-        data = attr.asdict(self, **kwargs)
+        data = asdict(self, **kwargs)
         # An internal tag for simpler type identification
         data["event_type"] = self.__class__.__name__
         return data
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class Initialized(ExecutionEvent):
     """Runner is initialized, settings are prepared, requests session is ready."""
 
-    schema: Dict[str, Any] = attr.ib()  # pragma: no mutate
+    schema: Dict[str, Any]
     # Total number of operations in the schema
-    operations_count: Optional[int] = attr.ib()  # pragma: no mutate
+    operations_count: Optional[int]
     # The place, where the API schema is located
-    location: Optional[str] = attr.ib()  # pragma: no mutate
+    location: Optional[str]
     # The base URL against which the tests are running
-    base_url: str = attr.ib()  # pragma: no mutate
+    base_url: str
     # API schema specification name
-    specification_name: str = attr.ib()  # pragma: no mutate
+    specification_name: str
     # Monotonic clock value when the test run started. Used to properly calculate run duration, since this clock
     # can't go backwards.
-    start_time: float = attr.ib(factory=time.monotonic)  # pragma: no mutate
+    start_time: float = field(default_factory=time.monotonic)
     # Datetime of the test run start
-    started_at: str = attr.ib(factory=current_datetime)  # pragma: no mutate
-    thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
+    started_at: str = field(default_factory=current_datetime)
+    thread_id: int = field(default_factory=threading.get_ident)
 
     @classmethod
     def from_schema(
@@ -71,7 +71,7 @@ class CurrentOperationMixin:
         return f"{self.method} {self.path}"
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
     """Happens before each tested API operation.
 
@@ -79,21 +79,21 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
     """
 
     # HTTP method
-    method: str = attr.ib()  # pragma: no mutate
+    method: str
     # Full path, including the base path
-    path: str = attr.ib()  # pragma: no mutate
+    path: str
     # Specification-specific operation name
-    verbose_name: str = attr.ib()  # pragma: no mutate
+    verbose_name: str
     # Path without the base path
-    relative_path: str = attr.ib()  # pragma: no mutate
+    relative_path: str
     # The current level of recursion during stateful testing
-    recursion_level: int = attr.ib()  # pragma: no mutate
+    recursion_level: int
     # The way data will be generated
-    data_generation_method: List[DataGenerationMethod] = attr.ib()  # pragma: no mutate
+    data_generation_method: List[DataGenerationMethod]
     # A unique ID which connects events that happen during testing of the same API operation
     # It may be useful when multiple threads are involved where incoming events are not ordered
-    correlation_id: str = attr.ib()  # pragma: no mutate
-    thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
+    correlation_id: str
+    thread_id: int = field(default_factory=threading.get_ident)
 
     @classmethod
     def from_operation(
@@ -114,27 +114,27 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
         )
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class AfterExecution(CurrentOperationMixin, ExecutionEvent):
     """Happens after each tested API operation."""
 
-    method: str = attr.ib()  # pragma: no mutate
-    path: str = attr.ib()  # pragma: no mutate
-    relative_path: str = attr.ib()  # pragma: no mutate
+    method: str
+    path: str
+    relative_path: str
     # Specification-specific operation name
-    verbose_name: str = attr.ib()  # pragma: no mutate
+    verbose_name: str
 
     # APIOperation test status - success / failure / error
-    status: Status = attr.ib()  # pragma: no mutate
+    status: Status
     # The way data was generated
-    data_generation_method: List[DataGenerationMethod] = attr.ib()  # pragma: no mutate
-    result: SerializedTestResult = attr.ib()  # pragma: no mutate
+    data_generation_method: List[DataGenerationMethod]
+    result: SerializedTestResult
     # Test running time
-    elapsed_time: float = attr.ib()  # pragma: no mutate
-    correlation_id: str = attr.ib()  # pragma: no mutate
-    thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
+    elapsed_time: float
+    correlation_id: str
+    thread_id: int = field(default_factory=threading.get_ident)
     # Captured hypothesis stdout
-    hypothesis_output: List[str] = attr.ib(factory=list)  # pragma: no mutate
+    hypothesis_output: List[str] = field(default_factory=list)
 
     @classmethod
     def from_result(
@@ -161,24 +161,24 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
         )
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class Interrupted(ExecutionEvent):
     """If execution was interrupted by Ctrl-C, or a received SIGTERM."""
 
-    thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
+    thread_id: int = field(default_factory=threading.get_ident)
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class InternalError(ExecutionEvent):
     """An error that happened inside the runner."""
 
     is_terminal = True
 
-    message: str = attr.ib()  # pragma: no mutate
-    exception_type: str = attr.ib()  # pragma: no mutate
-    exception: Optional[str] = attr.ib(default=None)  # pragma: no mutate
-    exception_with_traceback: Optional[str] = attr.ib(default=None)  # pragma: no mutate
-    thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
+    message: str
+    exception_type: str
+    exception: Optional[str] = None
+    exception_with_traceback: Optional[str] = None
+    thread_id: int = field(default_factory=threading.get_ident)
 
     @classmethod
     def from_exc(cls, exc: Exception, wait_for_schema: Optional[float] = None) -> "InternalError":
@@ -205,7 +205,7 @@ class InternalError(ExecutionEvent):
         )
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class Finished(ExecutionEvent):
     """The final event of the run.
 
@@ -214,23 +214,23 @@ class Finished(ExecutionEvent):
 
     is_terminal = True
 
-    passed_count: int = attr.ib()  # pragma: no mutate
-    skipped_count: int = attr.ib()  # pragma: no mutate
-    failed_count: int = attr.ib()  # pragma: no mutate
-    errored_count: int = attr.ib()  # pragma: no mutate
+    passed_count: int
+    skipped_count: int
+    failed_count: int
+    errored_count: int
 
-    has_failures: bool = attr.ib()  # pragma: no mutate
-    has_errors: bool = attr.ib()  # pragma: no mutate
-    has_logs: bool = attr.ib()  # pragma: no mutate
-    is_empty: bool = attr.ib()  # pragma: no mutate
-    generic_errors: List[SerializedError] = attr.ib()  # pragma: no mutate
-    warnings: List[str] = attr.ib()  # pragma: no mutate
+    has_failures: bool
+    has_errors: bool
+    has_logs: bool
+    is_empty: bool
+    generic_errors: List[SerializedError]
+    warnings: List[str]
 
-    total: Dict[str, Dict[Union[str, Status], int]] = attr.ib()  # pragma: no mutate
+    total: Dict[str, Dict[Union[str, Status], int]]
 
     # Total test run execution time
-    running_time: float = attr.ib()  # pragma: no mutate
-    thread_id: int = attr.ib(factory=threading.get_ident)  # pragma: no mutate
+    running_time: float
+    thread_id: int = field(default_factory=threading.get_ident)
 
     @classmethod
     def from_results(cls, results: TestResultSet, running_time: float) -> "Finished":

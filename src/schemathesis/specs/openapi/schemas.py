@@ -2,6 +2,7 @@ import itertools
 import json
 from collections import defaultdict
 from contextlib import ExitStack, contextmanager
+from dataclasses import dataclass, field
 from difflib import get_close_matches
 from hashlib import sha1
 from json import JSONDecodeError
@@ -23,7 +24,6 @@ from typing import (
 )
 from urllib.parse import urlsplit
 
-import attr
 import jsonschema
 import requests
 from hypothesis.strategies import SearchStrategy
@@ -82,24 +82,20 @@ SCHEMA_ERROR_MESSAGE = "Schema parsing failed. Please check your schema."
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError)
 
 
-@attr.s(eq=False, repr=False)
+@dataclass(eq=False, repr=False)
 class BaseOpenAPISchema(BaseSchema):
-    nullable_name: str
-    links_field: str
-    header_required_field: str
-    security: BaseSecurityProcessor
-    component_locations: ClassVar[Tuple[Tuple[str, ...], ...]] = ()
-    _operations_by_id: Dict[str, APIOperation]
-    _inline_reference_cache: Dict[str, Any]
+    nullable_name: ClassVar[str] = ""
+    links_field: ClassVar[str] = ""
+    header_required_field: ClassVar[str] = ""
+    security: ClassVar[BaseSecurityProcessor] = None  # type: ignore
+    _operations_by_id: Dict[str, APIOperation] = field(init=False)
+    _inline_reference_cache: Dict[str, Any] = field(default_factory=dict)
     # Inline references cache can be populated from multiple threads, therefore we need some synchronisation to avoid
     # excessive resolving
-    _inline_reference_cache_lock: RLock
+    _inline_reference_cache_lock: RLock = field(default_factory=RLock)
+    component_locations: ClassVar[Tuple[Tuple[str, ...], ...]] = ()
 
-    def __attrs_post_init__(self) -> None:
-        self._inline_reference_cache = {}
-        self._inline_reference_cache_lock = RLock()
-
-    @property  # pragma: no mutate
+    @property
     def spec_version(self) -> str:
         raise NotImplementedError
 

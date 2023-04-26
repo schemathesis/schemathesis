@@ -1,7 +1,6 @@
 import json
+from dataclasses import dataclass
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple
-
-import attr
 
 from ...exceptions import InvalidSchema
 from ...models import APIOperation
@@ -9,7 +8,7 @@ from ...parameters import Parameter
 from .converter import to_json_schema_recursive
 
 
-@attr.s(eq=False)
+@dataclass(eq=False)
 class OpenAPIParameter(Parameter):
     """A single Open API operation parameter."""
 
@@ -122,7 +121,7 @@ class OpenAPIParameter(Parameter):
         return json.dumps(self.as_json_schema(operation), sort_keys=True)
 
 
-@attr.s(eq=False)
+@dataclass(eq=False)
 class OpenAPI20Parameter(OpenAPIParameter):
     """Open API 2.0 parameter.
 
@@ -167,7 +166,7 @@ class OpenAPI20Parameter(OpenAPIParameter):
         return None
 
 
-@attr.s(eq=False)
+@dataclass(eq=False)
 class OpenAPI30Parameter(OpenAPIParameter):
     """Open API 3.0 parameter.
 
@@ -217,9 +216,9 @@ class OpenAPI30Parameter(OpenAPIParameter):
         return super().from_open_api_to_json_schema(operation, open_api_schema)
 
 
-@attr.s(eq=False)
+@dataclass(eq=False)
 class OpenAPIBody(OpenAPIParameter):
-    media_type: str = attr.ib()
+    media_type: str
 
     @property
     def location(self) -> str:
@@ -231,7 +230,7 @@ class OpenAPIBody(OpenAPIParameter):
         return "body"
 
 
-@attr.s(slots=True, eq=False)
+@dataclass(eq=False)
 class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
     """Open API 2.0 body variant."""
 
@@ -280,7 +279,7 @@ class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
 FORM_MEDIA_TYPES = ("multipart/form-data", "application/x-www-form-urlencoded")
 
 
-@attr.s(slots=True, eq=False)
+@dataclass(eq=False)
 class OpenAPI30Body(OpenAPIBody, OpenAPI30Parameter):
     """Open API 3.0 body variant.
 
@@ -290,8 +289,8 @@ class OpenAPI30Body(OpenAPIBody, OpenAPI30Parameter):
 
     # The `required` keyword is located above the schema for concrete media-type;
     # Therefore, it is passed here explicitly
-    required: bool = attr.ib(default=False)
-    description: Optional[str] = attr.ib(default=None)
+    required: bool = False
+    description: Optional[str] = None
 
     def as_json_schema(self, operation: APIOperation) -> Dict[str, Any]:
         """Convert body definition to JSON Schema."""
@@ -315,11 +314,11 @@ class OpenAPI30Body(OpenAPIBody, OpenAPI30Parameter):
         return self.required
 
 
-@attr.s(slots=True, eq=False)
+@dataclass(eq=False)
 class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
     """A special container to abstract over multiple `formData` parameters."""
 
-    definition: List[OpenAPI20Parameter] = attr.ib()
+    definition: List[OpenAPI20Parameter]
 
     @classmethod
     def from_parameters(cls, *parameters: Dict[str, Any], media_type: str) -> "OpenAPI20CompositeBody":

@@ -1,9 +1,9 @@
 """Support for custom API authentication mechanisms."""
 import threading
 import time
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Generic, List, Optional, Type, TypeVar, Union
 
-import attr
 import requests.auth
 from typing_extensions import Protocol, runtime_checkable
 
@@ -19,7 +19,7 @@ AUTH_STORAGE_ATTRIBUTE_NAME = "_schemathesis_auth"
 Auth = TypeVar("Auth")
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class AuthContext:
     """Holds state relevant for the authentication process.
 
@@ -27,8 +27,8 @@ class AuthContext:
     :ivar app: Optional Python application if the WSGI / ASGI integration is used.
     """
 
-    operation: "APIOperation" = attr.ib()  # pragma: no mutate
-    app: Optional[Any] = attr.ib()  # pragma: no mutate
+    operation: "APIOperation"
+    app: Optional[Any]
 
 
 @runtime_checkable
@@ -51,19 +51,19 @@ class AuthProvider(Protocol):
         """
 
 
-@attr.s(slots=True)
+@dataclass
 class CacheEntry(Generic[Auth]):
     """Cached auth data."""
 
-    data: Auth = attr.ib()
-    expires: float = attr.ib()
+    data: Auth
+    expires: float
 
 
-@attr.s(slots=True)
+@dataclass
 class RequestsAuth(Generic[Auth]):
     """Provider that sets auth data via `requests` auth instance."""
 
-    auth: requests.auth.AuthBase = attr.ib()
+    auth: requests.auth.AuthBase
 
     def get(self, _: AuthContext) -> Optional[Auth]:
         return self.auth  # type: ignore[return-value]
@@ -72,16 +72,16 @@ class RequestsAuth(Generic[Auth]):
         case._auth = self.auth
 
 
-@attr.s(slots=True)
+@dataclass
 class CachingAuthProvider(Generic[Auth]):
     """Caches the underlying auth provider."""
 
-    provider: AuthProvider = attr.ib()
-    refresh_interval: int = attr.ib(default=DEFAULT_REFRESH_INTERVAL)
-    cache_entry: Optional[CacheEntry[Auth]] = attr.ib(default=None)
+    provider: AuthProvider
+    refresh_interval: int = DEFAULT_REFRESH_INTERVAL
+    cache_entry: Optional[CacheEntry[Auth]] = None
     # The timer exists here to simplify testing
-    timer: Callable[[], float] = attr.ib(default=time.monotonic)
-    _refresh_lock: threading.Lock = attr.ib(factory=threading.Lock)
+    timer: Callable[[], float] = time.monotonic
+    _refresh_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def get(self, context: AuthContext) -> Optional[Auth]:
         """Get cached auth value."""
@@ -200,12 +200,12 @@ class FilterableRequestsAuth(Protocol):
         pass
 
 
-@attr.s(slots=True)
+@dataclass
 class SelectiveAuthProvider(Generic[Auth]):
     """Applies auth depending on the configured filters."""
 
-    provider: AuthProvider = attr.ib()
-    filter_set: FilterSet = attr.ib()
+    provider: AuthProvider
+    filter_set: FilterSet
 
     def get(self, context: AuthContext) -> Optional[Auth]:
         if self.filter_set.match(context):
@@ -216,11 +216,11 @@ class SelectiveAuthProvider(Generic[Auth]):
         self.provider.set(case, data, context)
 
 
-@attr.s(slots=True)
+@dataclass
 class AuthStorage(Generic[Auth]):
     """Store and manage API authentication."""
 
-    providers: List[AuthProvider] = attr.ib(factory=list)
+    providers: List[AuthProvider] = field(default_factory=list)
 
     @property
     def is_defined(self) -> bool:

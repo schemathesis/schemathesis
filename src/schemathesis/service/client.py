@@ -1,9 +1,9 @@
 import hashlib
 import http
+from dataclasses import asdict
 from typing import Any, Optional, Union
 from urllib.parse import urljoin
 
-import attr
 import requests
 from requests.adapters import HTTPAdapter, Retry
 
@@ -51,7 +51,7 @@ class ServiceClient(requests.Session):
 
     def login(self, metadata: Metadata) -> AuthResponse:
         """Send a login request."""
-        response = self.post("/auth/cli/login/", json={"metadata": attr.asdict(metadata)})
+        response = self.post("/auth/cli/login/", json={"metadata": asdict(metadata)})
         data = response.json()
         return AuthResponse(username=data["username"])
 

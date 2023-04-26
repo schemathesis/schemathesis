@@ -5,7 +5,7 @@ from . import lexer, nodes
 from .errors import RuntimeExpressionError, UnknownToken
 
 
-@lru_cache()  # pragma: no mutate
+@lru_cache()
 def parse(expr: str) -> List[nodes.Node]:
     """Parse lexical tokens into concrete expression nodes."""
     return list(_parse(expr))

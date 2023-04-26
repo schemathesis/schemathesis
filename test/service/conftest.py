@@ -1,10 +1,10 @@
 import re
 import tarfile
 from contextlib import contextmanager
+from dataclasses import dataclass
 from io import BytesIO
 from queue import Queue
 
-import attr
 import click
 import pytest
 from pytest_httpserver.pytest_plugin import PluginHTTPServer
@@ -100,11 +100,11 @@ def report_upload(setup_server, next_url, upload_message, correlation_id):
     )
 
 
-@attr.s()
+@dataclass
 class Service:
-    server = attr.ib()
-    hostname = attr.ib()
-    token = attr.ib()
+    server: PluginHTTPServer
+    hostname: str
+    token: str
 
     @property
     def base_url(self) -> str:

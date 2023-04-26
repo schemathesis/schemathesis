@@ -1,26 +1,25 @@
+from dataclasses import dataclass
 from typing import Optional
 
-import attr
 
-
-@attr.s(slots=True)
+@dataclass
 class ApiDetails:
-    location: str = attr.ib()
-    base_url: Optional[str] = attr.ib()
+    location: str
+    base_url: Optional[str]
 
 
-@attr.s(slots=True)
+@dataclass
 class AuthResponse:
-    username: str = attr.ib()
+    username: str
 
 
-@attr.s(slots=True)
+@dataclass
 class UploadResponse:
-    message: str = attr.ib()
-    next_url: str = attr.ib()
-    correlation_id: str = attr.ib()
+    message: str
+    next_url: str
+    correlation_id: str
 
 
-@attr.s(slots=True)
+@dataclass
 class FailedUploadResponse:
-    detail: str = attr.ib()
+    detail: str

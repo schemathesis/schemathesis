@@ -1,8 +1,8 @@
 import enum
 import os
+from dataclasses import asdict, dataclass
 from typing import Dict, Optional
 
-import attr
 from typing_extensions import Protocol, runtime_checkable
 
 
@@ -54,52 +54,52 @@ def detect() -> Optional[CIProvider]:
     return None
 
 
-def asdict(env: Environment) -> Dict[str, Optional[str]]:
-    data = attr.asdict(env)
+def _asdict(env: Environment) -> Dict[str, Optional[str]]:
+    data = asdict(env)
     data["provider"] = env.provider.value
     return data
 
 
-@attr.s(slots=True)
+@dataclass
 class GitHubActionsEnvironment:
     """Useful data to capture from GitHub Actions environment."""
 
     provider = CIProvider.GITHUB
     variable_name = "GITHUB_ACTIONS"
     verbose_name = "GitHub Actions"
-    asdict = asdict
+    asdict = _asdict
 
     # GitHub API URL.
     # For example, `https://api.github.com`
-    api_url: str = attr.ib()
+    api_url: str
     # The owner and repository name.
     # For example, `schemathesis/schemathesis`.
-    repository: str = attr.ib()
+    repository: str
     # The name of the person or app that initiated the workflow.
     # For example, `Stranger6667`
-    actor: str = attr.ib()
+    actor: str
     # The commit SHA that triggered the workflow.
     # For example, `e56e13224f08469841e106449f6467b769e2afca`
-    sha: str = attr.ib()
+    sha: str
     # A unique number for each workflow run within a repository.
     # For example, `1658821493`.
-    run_id: str = attr.ib()
+    run_id: str
     # The name of the workflow.
     # For example, `My test workflow`.
-    workflow: str = attr.ib()
+    workflow: str
     # The head ref or source branch of the pull request in a workflow run.
     # For example, `dd/report-ci`.
-    head_ref: Optional[str] = attr.ib()
+    head_ref: Optional[str]
     # The name of the base ref or target branch of the pull request in a workflow run.
     # For example, `main`.
-    base_ref: Optional[str] = attr.ib()
+    base_ref: Optional[str]
     # The branch or tag ref that triggered the workflow run.
     # This is only set if a branch or tag is available for the event type.
     # For example, `refs/pull/1533/merge`
-    ref: Optional[str] = attr.ib()
+    ref: Optional[str]
     # The Schemathesis GitHub Action version.
     # For example `v1.0.1`
-    action_ref: Optional[str] = attr.ib()
+    action_ref: Optional[str]
 
     @classmethod
     def is_set(cls) -> bool:
@@ -135,42 +135,42 @@ class GitHubActionsEnvironment:
         }
 
 
-@attr.s(slots=True)
+@dataclass
 class GitLabCIEnvironment:
     """Useful data to capture from GitLab CI environment."""
 
     provider = CIProvider.GITLAB
     variable_name = "GITLAB_CI"
     verbose_name = "GitLab CI"
-    asdict = asdict
+    asdict = _asdict
 
     # GitLab API URL
     # For example, `https://gitlab.com/api/v4`
-    api_v4_url: str = attr.ib()
+    api_v4_url: str
     # The ID of the current project.
     # For example, `12345678`
-    project_id: str = attr.ib()
+    project_id: str
     # The username of the user who started the job.
     # For example, `Stranger6667`
-    user_login: str = attr.ib()
+    user_login: str
     # The commit revision the project is built for.
     # For example, `e56e13224f08469841e106449f6467b769e2afca`
-    commit_sha: str = attr.ib()
+    commit_sha: str
     # NOTE: `commit_branch` and `merge_request_source_branch_name` may mean the same thing, but they are available
     # in different context. There are also a couple of `CI_BUILD_*` variables that could be used, but they are
     # not documented.
     # The commit branch name. Not available in merge request pipelines or tag pipelines.
     # For example, `dd/report-ci`.
-    commit_branch: Optional[str] = attr.ib()
+    commit_branch: Optional[str]
     # The source branch name of the merge request. Only available in merge request pipelines.
     # For example, `dd/report-ci`.
-    merge_request_source_branch_name: Optional[str] = attr.ib()
+    merge_request_source_branch_name: Optional[str]
     # The target branch name of the merge request.
     # For example, `main`.
-    merge_request_target_branch_name: Optional[str] = attr.ib()
+    merge_request_target_branch_name: Optional[str]
     # The project-level internal ID of the merge request.
     # For example, `42`.
-    merge_request_iid: Optional[str] = attr.ib()
+    merge_request_iid: Optional[str]
 
     @classmethod
     def is_set(cls) -> bool:

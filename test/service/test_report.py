@@ -1,10 +1,10 @@
 import json
 import os
 import tarfile
+from dataclasses import asdict
 from io import BytesIO
 from unittest import mock
 
-import attr
 import pytest
 
 import schemathesis
@@ -54,7 +54,7 @@ def test_metadata(read_report):
     data = payload.getvalue()
     with read_report(data) as tar:
         assert len(tar.getmembers()) == 1
-        assert attr.asdict(metadata.Metadata()) == json.load(tar.extractfile("metadata.json"))["environment"]
+        assert asdict(metadata.Metadata()) == json.load(tar.extractfile("metadata.json"))["environment"]
 
 
 def generate_events(schema_url):

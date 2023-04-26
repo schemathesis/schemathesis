@@ -1,6 +1,5 @@
+from dataclasses import asdict
 from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
-
-import attr
 
 from ..models import Response
 from ..runner import events
@@ -70,7 +69,7 @@ def serialize_after_execution(event: events.AfterExecution) -> Optional[Dict[str
                     "response": _serialize_response(check.response) if check.response is not None else None,
                     "example": _serialize_case(check.example),
                     "message": check.message,
-                    "context": attr.asdict(check.context) if check.context is not None else None,
+                    "context": asdict(check.context) if check.context is not None else None,
                     "history": [
                         {"case": _serialize_case(entry.case), "response": _serialize_response(entry.response)}
                         for entry in check.history
@@ -138,7 +137,6 @@ def serialize_event(
     extra: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Optional[Dict[str, Any]]]:
     """Turn an event into JSON-serializable structure."""
-    # Due to https://github.com/python-attrs/attrs/issues/864 it is easier to implement filtration manually
     # Use the explicitly provided serializer for this event and fallback to default one if it is not provided
     serializer = {
         events.Initialized: on_initialized,

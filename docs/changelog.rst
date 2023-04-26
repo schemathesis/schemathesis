@@ -12,6 +12,10 @@ Changelog
 
 - Passing ``params`` / ``cookies`` to ``case.call`` causing ``TypeError``. `#1734`_
 
+**Removed**
+
+- Direct dependency on `attrs`.
+
 .. _v3.19.0:
 
 `3.19.0`_ - 2023-03-22
