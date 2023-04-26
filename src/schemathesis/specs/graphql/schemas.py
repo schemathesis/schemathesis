@@ -1,9 +1,9 @@
 import enum
+from dataclasses import dataclass
 from enum import unique
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
 from urllib.parse import urlsplit
 
-import attr
 import graphql
 import requests
 from hypothesis import strategies as st
@@ -31,7 +31,7 @@ class RootType(enum.Enum):
     MUTATION = enum.auto()
 
 
-@attr.s(slots=True, repr=False)  # pragma: no mutate
+@dataclass(repr=False)
 class GraphQLCase(Case):
     def as_requests_kwargs(
         self, base_url: Optional[str] = None, headers: Optional[Dict[str, str]] = None
@@ -84,19 +84,19 @@ class GraphQLCase(Case):
 C = TypeVar("C", bound=Case)
 
 
-@attr.s()
+@dataclass
 class GraphQLOperationDefinition(OperationDefinition):
-    field_name: str = attr.ib()
-    type_: graphql.GraphQLType = attr.ib()
-    root_type: RootType = attr.ib()
+    field_name: str
+    type_: graphql.GraphQLType
+    root_type: RootType
 
 
-@attr.s()  # pragma: no mutate
+@dataclass
 class GraphQLSchema(BaseSchema):
     def get_full_path(self, path: str) -> str:
         return self.base_path
 
-    @property  # pragma: no mutate
+    @property
     def verbose_name(self) -> str:
         return "GraphQL"
 

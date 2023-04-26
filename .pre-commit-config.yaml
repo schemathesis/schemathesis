@@ -59,8 +59,7 @@ repos:
       - id: mypy
         exclude: ^(docs/|test/|test-corpus/|example/).*$
         args: ["--ignore-missing-imports"]
-        additional_dependencies:
-          [types-attrs, types-click, types-requests, types-PyYAML]
+        additional_dependencies: [types-click, types-requests, types-PyYAML]
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
     rev: "v0.0.248"

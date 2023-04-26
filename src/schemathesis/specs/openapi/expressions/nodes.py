@@ -1,8 +1,8 @@
 """Expression nodes description and evaluation logic."""
+from dataclasses import dataclass
 from enum import Enum, unique
 from typing import Any, Dict, Optional, Union
 
-import attr
 from requests.structures import CaseInsensitiveDict
 
 from ....utils import WSGIResponse
@@ -10,7 +10,7 @@ from .. import references
 from .context import ExpressionContext
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class Node:
     """Generic expression node."""
 
@@ -27,11 +27,11 @@ class NodeType(Enum):
     RESPONSE = "$response"
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class String(Node):
     """A simple string that is not evaluated somehow specifically."""
 
-    value: str = attr.ib()  # pragma: no mutate
+    value: str
 
     def evaluate(self, context: ExpressionContext) -> str:
         """String tokens are passed as they are.
@@ -43,7 +43,7 @@ class String(Node):
         return self.value
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class URL(Node):
     """A node for `$url` expression."""
 
@@ -51,7 +51,7 @@ class URL(Node):
         return context.case.get_full_url()
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class Method(Node):
     """A node for `$method` expression."""
 
@@ -59,7 +59,7 @@ class Method(Node):
         return context.case.operation.method.upper()
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class StatusCode(Node):
     """A node for `$statusCode` expression."""
 
@@ -67,12 +67,12 @@ class StatusCode(Node):
         return str(context.response.status_code)
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class NonBodyRequest(Node):
     """A node for `$request` expressions where location is not `body`."""
 
-    location: str = attr.ib()  # pragma: no mutate
-    parameter: str = attr.ib()  # pragma: no mutate
+    location: str
+    parameter: str
 
     def evaluate(self, context: ExpressionContext) -> str:
         container: Union[Dict, CaseInsensitiveDict] = {
@@ -85,11 +85,11 @@ class NonBodyRequest(Node):
         return container[self.parameter]
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class BodyRequest(Node):
     """A node for `$request` expressions where location is `body`."""
 
-    pointer: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    pointer: Optional[str] = None
 
     def evaluate(self, context: ExpressionContext) -> Any:
         document = context.case.body
@@ -98,21 +98,21 @@ class BodyRequest(Node):
         return references.resolve_pointer(document, self.pointer[1:])
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class HeaderResponse(Node):
     """A node for `$response.header` expressions."""
 
-    parameter: str = attr.ib()  # pragma: no mutate
+    parameter: str
 
     def evaluate(self, context: ExpressionContext) -> str:
         return context.response.headers[self.parameter]
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class BodyResponse(Node):
     """A node for `$response.body` expressions."""
 
-    pointer: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    pointer: Optional[str] = None
 
     def evaluate(self, context: ExpressionContext) -> Any:
         if isinstance(context.response, WSGIResponse):

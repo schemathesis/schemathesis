@@ -2,10 +2,9 @@
 
 Based on https://swagger.io/docs/specification/links/
 """
+from dataclasses import dataclass, field
 from difflib import get_close_matches
 from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tuple, Union
-
-import attr
 
 from ...models import APIOperation, Case
 from ...parameters import ParameterSet
@@ -17,15 +16,14 @@ from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPI20Body, OpenAPI30Body, OpenAPIParameter
 
 
-@attr.s(slots=True, repr=False)  # pragma: no mutate
+@dataclass(repr=False)
 class Link(StatefulTest):
-    operation: APIOperation = attr.ib()  # pragma: no mutate
-    parameters: Dict[str, Any] = attr.ib()  # pragma: no mutate
-    request_body: Any = attr.ib(default=NOT_SET)  # pragma: no mutate
+    operation: APIOperation
+    parameters: Dict[str, Any]
+    request_body: Any = NOT_SET
 
-    @request_body.validator
-    def is_defined(self, attribute: attr.Attribute, value: Any) -> None:
-        if value is not NOT_SET and not self.operation.body:
+    def __post_init__(self) -> None:
+        if self.request_body is not NOT_SET and not self.operation.body:
             # Link defines `requestBody` for a parameter that does not accept one
             raise ValueError(
                 f"Request body is not defined in API operation {self.operation.method.upper()} {self.operation.path}"
@@ -159,21 +157,21 @@ def get_links(response: GenericResponse, operation: APIOperation, field: str) ->
     return [Link.from_definition(name, definition, operation) for name, definition in links.items()]
 
 
-@attr.s(slots=True, repr=False)  # pragma: no mutate
+@dataclass(repr=False)
 class OpenAPILink(Direction):
     """Alternative approach to link processing.
 
     NOTE. This class will replace `Link` in the future.
     """
 
-    name: str = attr.ib()  # pragma: no mutate
-    status_code: str = attr.ib()  # pragma: no mutate
-    definition: Dict[str, Any] = attr.ib()  # pragma: no mutate
-    operation: APIOperation = attr.ib()  # pragma: no mutate
-    parameters: List[Tuple[Optional[str], str, str]] = attr.ib(init=False)  # pragma: no mutate
-    body: Union[Dict[str, Any], NotSet] = attr.ib(init=False)  # pragma: no mutate
+    name: str
+    status_code: str
+    definition: Dict[str, Any]
+    operation: APIOperation
+    parameters: List[Tuple[Optional[str], str, str]] = field(init=False)
+    body: Union[Dict[str, Any], NotSet] = field(init=False)
 
-    def __attrs_post_init__(self) -> None:
+    def __post_init__(self) -> None:
         self.parameters = [
             normalize_parameter(parameter, expression)
             for parameter, expression in self.definition.get("parameters", {}).items()

@@ -1,6 +1,5 @@
+from dataclasses import dataclass
 from typing import Optional
-
-import attr
 
 from ..utils import format_exception
 from . import ci
@@ -17,40 +16,40 @@ class Event:
         return self.__class__.__name__.upper()
 
 
-@attr.s(slots=True)
+@dataclass
 class Metadata(Event):
     """Meta-information about the report."""
 
-    size: int = attr.ib()
-    ci_environment: Optional[ci.Environment] = attr.ib()
+    size: int
+    ci_environment: Optional[ci.Environment]
 
 
-@attr.s(slots=True)
+@dataclass
 class Completed(Event):
     """Report uploaded successfully."""
 
-    message: str = attr.ib()
-    next_url: str = attr.ib()
+    message: str
+    next_url: str
 
 
-@attr.s(slots=True)
+@dataclass
 class Error(Event):
     """Internal error inside the Schemathesis.io handler."""
 
-    exception: Exception = attr.ib()
+    exception: Exception
 
     def get_message(self, include_traceback: bool = False) -> str:
         return format_exception(self.exception, include_traceback=include_traceback)
 
 
-@attr.s(slots=True)
+@dataclass
 class Failed(Event):
     """A client-side error which should be displayed to the user."""
 
-    detail: str = attr.ib()
+    detail: str
 
 
-@attr.s(slots=True)
+@dataclass
 class Timeout(Event):
     """The handler did not finish its work in time.
 

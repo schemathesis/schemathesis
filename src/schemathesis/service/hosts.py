@@ -1,10 +1,10 @@
 """Work with stored auth data."""
 import enum
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import attr
 import tomli
 import tomli_w
 
@@ -12,12 +12,12 @@ from ..types import PathLike
 from .constants import DEFAULT_HOSTNAME, DEFAULT_HOSTS_PATH, HOSTS_FORMAT_VERSION
 
 
-@attr.s(slots=True)
+@dataclass
 class HostData:
     """Stored data related to a host."""
 
-    hostname: str = attr.ib()
-    hosts_file: PathLike = attr.ib()
+    hostname: str
+    hosts_file: PathLike
 
     def load(self) -> Dict[str, Any]:
         return load(self.hosts_file).get(self.hostname, {})

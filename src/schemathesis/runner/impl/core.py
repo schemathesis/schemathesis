@@ -4,11 +4,11 @@ import time
 import unittest
 import uuid
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from types import TracebackType
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Type, Union, cast
 from warnings import WarningMessage, catch_warnings
 
-import attr
 import hypothesis
 import requests
 from _pytest.logging import LogCaptureHandler, catching_logs
@@ -58,27 +58,27 @@ def _should_count_towards_stop(event: events.ExecutionEvent) -> bool:
     return isinstance(event, events.AfterExecution) and event.status in (Status.error, Status.failure)
 
 
-@attr.s  # pragma: no mutate
+@dataclass
 class BaseRunner:
-    schema: BaseSchema = attr.ib()  # pragma: no mutate
-    checks: Iterable[CheckFunction] = attr.ib()  # pragma: no mutate
-    max_response_time: Optional[int] = attr.ib()  # pragma: no mutate
-    targets: Iterable[Target] = attr.ib()  # pragma: no mutate
-    hypothesis_settings: hypothesis.settings = attr.ib()  # pragma: no mutate
-    auth: Optional[RawAuth] = attr.ib(default=None)  # pragma: no mutate
-    auth_type: Optional[str] = attr.ib(default=None)  # pragma: no mutate
-    headers: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
-    request_timeout: Optional[int] = attr.ib(default=None)  # pragma: no mutate
-    store_interactions: bool = attr.ib(default=False)  # pragma: no mutate
-    seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
-    exit_first: bool = attr.ib(default=False)  # pragma: no mutate
-    max_failures: Optional[int] = attr.ib(default=None)  # pragma: no mutate
-    started_at: str = attr.ib(factory=current_datetime)  # pragma: no mutate
-    dry_run: bool = attr.ib(default=False)  # pragma: no mutate
-    stateful: Optional[Stateful] = attr.ib(default=None)  # pragma: no mutate
-    stateful_recursion_limit: int = attr.ib(default=DEFAULT_STATEFUL_RECURSION_LIMIT)  # pragma: no mutate
-    count_operations: bool = attr.ib(default=True)  # pragma: no mutate
-    _failures_counter: int = attr.ib(default=0)
+    schema: BaseSchema
+    checks: Iterable[CheckFunction]
+    max_response_time: Optional[int]
+    targets: Iterable[Target]
+    hypothesis_settings: hypothesis.settings
+    auth: Optional[RawAuth] = None
+    auth_type: Optional[str] = None
+    headers: Optional[Dict[str, Any]] = None
+    request_timeout: Optional[int] = None
+    store_interactions: bool = False
+    seed: Optional[int] = None
+    exit_first: bool = False
+    max_failures: Optional[int] = None
+    started_at: str = field(default_factory=current_datetime)
+    dry_run: bool = False
+    stateful: Optional[Stateful] = None
+    stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT
+    count_operations: bool = True
+    _failures_counter: int = 0
 
     def execute(self) -> "EventStream":
         """Common logic for all runners."""
@@ -199,15 +199,15 @@ class BaseRunner:
                 )
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class EventStream:
     """Schemathesis event stream.
 
     Provides an API to control the execution flow.
     """
 
-    generator: Generator[events.ExecutionEvent, None, None] = attr.ib()  # pragma: no mutate
-    stop_event: threading.Event = attr.ib()  # pragma: no mutate
+    generator: Generator[events.ExecutionEvent, None, None]
+    stop_event: threading.Event
 
     def __next__(self) -> events.ExecutionEvent:
         return next(self.generator)
@@ -553,7 +553,7 @@ def add_cases(case: Case, response: GenericResponse, test: Callable, *args: Any)
             test(_case, *args)
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class ErrorCollector:
     """Collect exceptions that are not related to failed checks.
 
@@ -566,7 +566,7 @@ class ErrorCollector:
     function signatures, which are used by Hypothesis.
     """
 
-    errors: List[Exception] = attr.ib()  # pragma: no mutate
+    errors: List[Exception]
 
     def __enter__(self) -> "ErrorCollector":
         return self

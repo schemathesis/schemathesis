@@ -20,9 +20,9 @@ SCHEMATHESIS_TEST_CASE_HEADER = "X-Schemathesis-TestCaseId"
 HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER = ":memory:"
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
 # Maximum test running time
-DEFAULT_DEADLINE = 15000  # pragma: no mutate
-DEFAULT_RESPONSE_TIMEOUT = 10000  # pragma: no mutate
-DEFAULT_STATEFUL_RECURSION_LIMIT = 5  # pragma: no mutate
+DEFAULT_DEADLINE = 15000
+DEFAULT_RESPONSE_TIMEOUT = 10000
+DEFAULT_STATEFUL_RECURSION_LIMIT = 5
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 RECURSIVE_REFERENCE_ERROR_MESSAGE = (
     "Currently, Schemathesis can't generate data for this operation due to "

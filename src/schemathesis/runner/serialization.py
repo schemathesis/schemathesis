@@ -3,9 +3,9 @@
 They all consist of primitive types and don't have references to schemas, app, etc.
 """
 import logging
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-import attr
 import requests
 
 from ..exceptions import FailureContext, InternalError, make_unique_by_key
@@ -13,17 +13,17 @@ from ..models import Case, Check, Interaction, Request, Response, Status, TestRe
 from ..utils import IGNORED_HEADERS, WSGIResponse, format_exception
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class SerializedCase:
-    requests_code: str = attr.ib()
-    curl_code: str = attr.ib()
-    path_template: str = attr.ib()
-    path_parameters: Optional[Dict[str, Any]] = attr.ib()
-    query: Optional[Dict[str, Any]] = attr.ib()
-    cookies: Optional[Dict[str, Any]] = attr.ib()
-    verbose_name: str = attr.ib()
-    data_generation_method: Optional[str] = attr.ib()
-    media_type: Optional[str] = attr.ib()
+    requests_code: str
+    curl_code: str
+    path_template: str
+    path_parameters: Optional[Dict[str, Any]]
+    query: Optional[Dict[str, Any]]
+    cookies: Optional[Dict[str, Any]]
+    verbose_name: str
+    data_generation_method: Optional[str]
+    media_type: Optional[str]
 
     @classmethod
     def from_case(cls, case: Case, headers: Optional[Dict[str, Any]]) -> "SerializedCase":
@@ -42,21 +42,21 @@ class SerializedCase:
         )
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class SerializedCheck:
     # Check name
-    name: str = attr.ib()  # pragma: no mutate
+    name: str
     # Check result
-    value: Status = attr.ib()  # pragma: no mutate
-    request: Request = attr.ib()  # pragma: no mutate
-    response: Optional[Response] = attr.ib()  # pragma: no mutate
+    value: Status
+    request: Request
+    response: Optional[Response]
     # Generated example
-    example: SerializedCase = attr.ib()  # pragma: no mutate
-    message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    example: SerializedCase
+    message: Optional[str] = None
     # Failure-specific context
-    context: Optional[FailureContext] = attr.ib(default=None)  # pragma: no mutate
+    context: Optional[FailureContext] = None
     # Cases & responses that were made before this one
-    history: List["SerializedHistoryEntry"] = attr.ib(factory=list)  # pragma: no mutate
+    history: List["SerializedHistoryEntry"] = field(default_factory=list)
 
     @classmethod
     def from_check(cls, check: Check) -> "SerializedCheck":
@@ -100,18 +100,18 @@ class SerializedCheck:
         )
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class SerializedHistoryEntry:
-    case: SerializedCase = attr.ib()
-    response: Response = attr.ib()
+    case: SerializedCase
+    response: Response
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class SerializedError:
-    exception: str = attr.ib()  # pragma: no mutate
-    exception_with_traceback: str = attr.ib()  # pragma: no mutate
-    example: Optional[SerializedCase] = attr.ib()  # pragma: no mutate
-    title: Optional[str] = attr.ib()  # pragma: no mutate
+    exception: str
+    exception_with_traceback: str
+    example: Optional[SerializedCase]
+    title: Optional[str]
 
     @classmethod
     def from_error(
@@ -125,13 +125,13 @@ class SerializedError:
         )
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class SerializedInteraction:
-    request: Request = attr.ib()  # pragma: no mutate
-    response: Response = attr.ib()  # pragma: no mutate
-    checks: List[SerializedCheck] = attr.ib()  # pragma: no mutate
-    status: Status = attr.ib()  # pragma: no mutate
-    recorded_at: str = attr.ib()  # pragma: no mutate
+    request: Request
+    response: Response
+    checks: List[SerializedCheck]
+    status: Status
+    recorded_at: str
 
     @classmethod
     def from_interaction(cls, interaction: Interaction) -> "SerializedInteraction":
@@ -144,23 +144,23 @@ class SerializedInteraction:
         )
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class SerializedTestResult:
-    method: str = attr.ib()  # pragma: no mutate
-    path: str = attr.ib()  # pragma: no mutate
-    verbose_name: str = attr.ib()  # pragma: no mutate
-    has_failures: bool = attr.ib()  # pragma: no mutate
-    has_errors: bool = attr.ib()  # pragma: no mutate
-    has_logs: bool = attr.ib()  # pragma: no mutate
-    is_errored: bool = attr.ib()  # pragma: no mutate
-    is_flaky: bool = attr.ib()  # pragma: no mutate
-    is_skipped: bool = attr.ib()  # pragma: no mutate
-    seed: Optional[int] = attr.ib()  # pragma: no mutate
-    data_generation_method: List[str] = attr.ib()  # pragma: no mutate
-    checks: List[SerializedCheck] = attr.ib()  # pragma: no mutate
-    logs: List[str] = attr.ib()  # pragma: no mutate
-    errors: List[SerializedError] = attr.ib()  # pragma: no mutate
-    interactions: List[SerializedInteraction] = attr.ib()  # pragma: no mutate
+    method: str
+    path: str
+    verbose_name: str
+    has_failures: bool
+    has_errors: bool
+    has_logs: bool
+    is_errored: bool
+    is_flaky: bool
+    is_skipped: bool
+    seed: Optional[int]
+    data_generation_method: List[str]
+    checks: List[SerializedCheck]
+    logs: List[str]
+    errors: List[SerializedError]
+    interactions: List[SerializedInteraction]
 
     @classmethod
     def from_test_result(cls, result: TestResult) -> "SerializedTestResult":

@@ -1,7 +1,7 @@
 import platform
+from dataclasses import dataclass, field
 from typing import List
 
-import attr
 from click.utils import LazyFile
 from junit_xml import TestCase, TestSuite, to_xml_report_file
 
@@ -11,10 +11,10 @@ from ..runner.serialization import deduplicate_failures
 from .handlers import EventHandler, ExecutionContext
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class JunitXMLHandler(EventHandler):
-    file_handle: LazyFile = attr.ib()  # pragma: no mutate
-    test_cases: List = attr.ib(factory=list)  # pragma: no mutate
+    file_handle: LazyFile
+    test_cases: List = field(default_factory=list)
 
     def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
         if isinstance(event, events.AfterExecution):

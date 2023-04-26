@@ -4,6 +4,7 @@ import http
 import json
 from collections import Counter
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from enum import Enum
 from itertools import chain
 from logging import LogRecord
@@ -28,7 +29,6 @@ from typing import (
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 from uuid import uuid4
 
-import attr
 import curlify
 import requests.auth
 import werkzeug
@@ -77,13 +77,13 @@ if TYPE_CHECKING:
     from .stateful import Stateful, StatefulTest
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class CaseSource:
     """Data sources, used to generate a test case."""
 
-    case: "Case" = attr.ib()  # pragma: no mutate
-    response: GenericResponse = attr.ib()  # pragma: no mutate
-    elapsed: float = attr.ib()  # pragma: no mutate
+    case: "Case"
+    response: GenericResponse
+    elapsed: float
 
     def partial_deepcopy(self) -> "CaseSource":
         return self.__class__(
@@ -110,27 +110,27 @@ def serialize(value: Any) -> str:
     return json.dumps(value, sort_keys=True, default=_serialize_unknown)
 
 
-@attr.s(slots=True, repr=False, hash=False)  # pragma: no mutate
+@dataclass(repr=False)
 class Case:
     """A single test case parameters."""
 
-    operation: "APIOperation" = attr.ib()  # pragma: no mutate
-    path_parameters: Optional[PathParameters] = attr.ib(default=None)  # pragma: no mutate
-    headers: Optional[CaseInsensitiveDict] = attr.ib(default=None)  # pragma: no mutate
-    cookies: Optional[Cookies] = attr.ib(default=None)  # pragma: no mutate
-    query: Optional[Query] = attr.ib(default=None)  # pragma: no mutate
+    operation: "APIOperation"
+    path_parameters: Optional[PathParameters] = None
+    headers: Optional[CaseInsensitiveDict] = None
+    cookies: Optional[Cookies] = None
+    query: Optional[Query] = None
     # By default, there is no body, but we can't use `None` as the default value because it clashes with `null`
     # which is a valid payload.
-    body: Union[Body, NotSet] = attr.ib(default=NOT_SET)  # pragma: no mutate
+    body: Union[Body, NotSet] = NOT_SET
 
-    source: Optional[CaseSource] = attr.ib(default=None)  # pragma: no mutate
+    source: Optional[CaseSource] = None
     # The media type for cases with a payload. For example, "application/json"
-    media_type: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    media_type: Optional[str] = None
     # The way the case was generated (None for manually crafted ones)
-    data_generation_method: Optional[DataGenerationMethod] = attr.ib(default=None)  # pragma: no mutate
+    data_generation_method: Optional[DataGenerationMethod] = None
     # Unique test case identifier
-    id: str = attr.ib(factory=lambda: uuid4().hex, eq=False)  # pragma: no mutate
-    _auth: Optional[requests.auth.AuthBase] = attr.ib(default=None)  # pragma: no mutate
+    id: str = field(default_factory=lambda: uuid4().hex, compare=False)
+    _auth: Optional[requests.auth.AuthBase] = None
 
     def __repr__(self) -> str:
         parts = [f"{self.__class__.__name__}("]
@@ -308,7 +308,7 @@ class Case:
             if "content-type" not in {header.lower() for header in final_headers}:
                 final_headers["Content-Type"] = self.media_type
         base_url = self._get_base_url(base_url)
-        formatted_path = self.formatted_path.lstrip("/")  # pragma: no mutate
+        formatted_path = self.formatted_path.lstrip("/")
         if not base_url.endswith("/"):
             base_url += "/"
         url = unquote(urljoin(base_url, quote(formatted_path)))
@@ -597,7 +597,7 @@ P = TypeVar("P", bound=Parameter)
 D = TypeVar("D", bound=dict)
 
 
-@attr.s  # pragma: no mutate
+@dataclass
 class OperationDefinition(Generic[P, D]):
     """A wrapper to store not resolved API operation definitions.
 
@@ -606,10 +606,10 @@ class OperationDefinition(Generic[P, D]):
     scope change to have a proper reference resolving later.
     """
 
-    raw: D = attr.ib()  # pragma: no mutate
-    resolved: D = attr.ib()  # pragma: no mutate
-    scope: str = attr.ib()  # pragma: no mutate
-    parameters: Sequence[P] = attr.ib()  # pragma: no mutate
+    raw: D
+    resolved: D
+    scope: str
+    parameters: Sequence[P]
 
     def __contains__(self, item: Union[str, int]) -> bool:
         return item in self.resolved
@@ -624,7 +624,7 @@ class OperationDefinition(Generic[P, D]):
 C = TypeVar("C", bound=Case)
 
 
-@attr.s(eq=False)  # pragma: no mutate
+@dataclass(eq=False)
 class APIOperation(Generic[P, C]):
     """A single operation defined in an API.
 
@@ -640,23 +640,23 @@ class APIOperation(Generic[P, C]):
     # `path` does not contain `basePath`
     # Example <scheme>://<host>/<basePath>/users - "/users" is path
     # https://swagger.io/docs/specification/2-0/api-host-and-base-path/
-    path: str = attr.ib()  # pragma: no mutate
-    method: str = attr.ib()  # pragma: no mutate
-    definition: OperationDefinition = attr.ib(repr=False)  # pragma: no mutate
-    schema: "BaseSchema" = attr.ib()  # pragma: no mutate
-    verbose_name: str = attr.ib()  # pragma: no mutate
-    app: Any = attr.ib(default=None)  # pragma: no mutate
-    base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
-    path_parameters: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
-    headers: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
-    cookies: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
-    query: ParameterSet[P] = attr.ib(factory=ParameterSet)  # pragma: no mutate
-    body: PayloadAlternatives[P] = attr.ib(factory=PayloadAlternatives)  # pragma: no mutate
-    case_cls: Type[C] = attr.ib(default=Case)  # type: ignore
+    path: str
+    method: str
+    definition: OperationDefinition = field(repr=False)
+    schema: "BaseSchema"
+    verbose_name: str = None  # type: ignore
+    app: Any = None
+    base_url: Optional[str] = None
+    path_parameters: ParameterSet[P] = field(default_factory=ParameterSet)
+    headers: ParameterSet[P] = field(default_factory=ParameterSet)
+    cookies: ParameterSet[P] = field(default_factory=ParameterSet)
+    query: ParameterSet[P] = field(default_factory=ParameterSet)
+    body: PayloadAlternatives[P] = field(default_factory=PayloadAlternatives)
+    case_cls: Type[C] = Case  # type: ignore
 
-    @verbose_name.default
-    def _verbose_name_default(self) -> str:
-        return f"{self.method.upper()} {self.full_path}"
+    def __post_init__(self) -> None:
+        if self.verbose_name is None:
+            self.verbose_name = f"{self.method.upper()} {self.full_path}"  # type: ignore
 
     @property
     def full_path(self) -> str:
@@ -830,35 +830,35 @@ Endpoint = APIOperation
 class Status(str, Enum):
     """Status of an action or multiple actions."""
 
-    success = "success"  # pragma: no mutate
-    failure = "failure"  # pragma: no mutate
-    error = "error"  # pragma: no mutate
-    skip = "skip"  # pragma: no mutate
+    success = "success"
+    failure = "failure"
+    error = "error"
+    skip = "skip"
 
 
-@attr.s(slots=True, repr=False)  # pragma: no mutate
+@dataclass(repr=False)
 class Check:
     """Single check run result."""
 
-    name: str = attr.ib()  # pragma: no mutate
-    value: Status = attr.ib()  # pragma: no mutate
-    response: Optional[GenericResponse] = attr.ib()  # pragma: no mutate
-    elapsed: float = attr.ib()  # pragma: no mutate
-    example: Case = attr.ib()  # pragma: no mutate
-    message: Optional[str] = attr.ib(default=None)  # pragma: no mutate
+    name: str
+    value: Status
+    response: Optional[GenericResponse]
+    elapsed: float
+    example: Case
+    message: Optional[str] = None
     # Failure-specific context
-    context: Optional[FailureContext] = attr.ib(default=None)  # pragma: no mutate
-    request: Optional[requests.PreparedRequest] = attr.ib(default=None)  # pragma: no mutate
+    context: Optional[FailureContext] = None
+    request: Optional[requests.PreparedRequest] = None
 
 
-@attr.s(slots=True, repr=False)  # pragma: no mutate
+@dataclass(repr=False)
 class Request:
     """Request data extracted from `Case`."""
 
-    method: str = attr.ib()  # pragma: no mutate
-    uri: str = attr.ib()  # pragma: no mutate
-    body: Optional[str] = attr.ib()  # pragma: no mutate
-    headers: Headers = attr.ib()  # pragma: no mutate
+    method: str
+    uri: str
+    body: Optional[str]
+    headers: Headers
 
     @classmethod
     def from_case(cls, case: Case, session: requests.Session) -> "Request":
@@ -893,17 +893,17 @@ def serialize_payload(payload: bytes) -> str:
     return base64.b64encode(payload).decode()
 
 
-@attr.s(slots=True, repr=False)  # pragma: no mutate
+@dataclass(repr=False)
 class Response:
     """Unified response data."""
 
-    status_code: int = attr.ib()  # pragma: no mutate
-    message: str = attr.ib()  # pragma: no mutate
-    headers: Dict[str, List[str]] = attr.ib()  # pragma: no mutate
-    body: Optional[str] = attr.ib()  # pragma: no mutate
-    encoding: Optional[str] = attr.ib()  # pragma: no mutate
-    http_version: str = attr.ib()  # pragma: no mutate
-    elapsed: float = attr.ib()  # pragma: no mutate
+    status_code: int
+    message: str
+    headers: Dict[str, List[str]]
+    body: Optional[str]
+    encoding: Optional[str]
+    http_version: str
+    elapsed: float
 
     @classmethod
     def from_requests(cls, response: requests.Response) -> "Response":
@@ -953,16 +953,16 @@ class Response:
         )
 
 
-@attr.s(slots=True)  # pragma: no mutate
+@dataclass
 class Interaction:
     """A single interaction with the target app."""
 
-    request: Request = attr.ib()  # pragma: no mutate
-    response: Response = attr.ib()  # pragma: no mutate
-    checks: List[Check] = attr.ib()  # pragma: no mutate
-    status: Status = attr.ib()  # pragma: no mutate
-    data_generation_method: DataGenerationMethod = attr.ib()  # pragma: no mutate
-    recorded_at: str = attr.ib(factory=lambda: datetime.datetime.now().isoformat())  # pragma: no mutate
+    request: Request
+    response: Response
+    checks: List[Check]
+    status: Status
+    data_generation_method: DataGenerationMethod
+    recorded_at: str = field(default_factory=lambda: datetime.datetime.now().isoformat())
 
     @classmethod
     def from_requests(
@@ -997,28 +997,28 @@ class Interaction:
         )
 
 
-@attr.s(slots=True, repr=False)  # pragma: no mutate
+@dataclass(repr=False)
 class TestResult:
     """Result of a single test."""
 
     __test__ = False
 
-    method: str = attr.ib()  # pragma: no mutate
-    path: str = attr.ib()  # pragma: no mutate
-    verbose_name: str = attr.ib()  # pragma: no mutate
-    data_generation_method: List[DataGenerationMethod] = attr.ib()  # pragma: no mutate
-    checks: List[Check] = attr.ib(factory=list)  # pragma: no mutate
-    errors: List[Tuple[Exception, Optional[Case]]] = attr.ib(factory=list)  # pragma: no mutate
-    interactions: List[Interaction] = attr.ib(factory=list)  # pragma: no mutate
-    logs: List[LogRecord] = attr.ib(factory=list)  # pragma: no mutate
-    is_errored: bool = attr.ib(default=False)  # pragma: no mutate
-    is_flaky: bool = attr.ib(default=False)  # pragma: no mutate
-    is_skipped: bool = attr.ib(default=False)  # pragma: no mutate
-    is_executed: bool = attr.ib(default=False)  # pragma: no mutate
-    seed: Optional[int] = attr.ib(default=None)  # pragma: no mutate
+    method: str
+    path: str
+    verbose_name: str
+    data_generation_method: List[DataGenerationMethod]
+    checks: List[Check] = field(default_factory=list)
+    errors: List[Tuple[Exception, Optional[Case]]] = field(default_factory=list)
+    interactions: List[Interaction] = field(default_factory=list)
+    logs: List[LogRecord] = field(default_factory=list)
+    is_errored: bool = False
+    is_flaky: bool = False
+    is_skipped: bool = False
+    is_executed: bool = False
+    seed: Optional[int] = None
     # To show a proper reproduction code if an error happens and there is no way to get actual headers that were
     # sent over the network. Or there could be no actual requests at all
-    overridden_headers: Optional[Dict[str, Any]] = attr.ib(default=None)  # pragma: no mutate
+    overridden_headers: Optional[Dict[str, Any]] = None
 
     def mark_errored(self) -> None:
         self.is_errored = True
@@ -1094,15 +1094,15 @@ class TestResult:
         self.interactions.append(Interaction.from_wsgi(case, response, headers, elapsed, status, checks))
 
 
-@attr.s(slots=True, repr=False)  # pragma: no mutate
+@dataclass(repr=False)
 class TestResultSet:
     """Set of multiple test results."""
 
     __test__ = False
 
-    results: List[TestResult] = attr.ib(factory=list)  # pragma: no mutate
-    generic_errors: List[InvalidSchema] = attr.ib(factory=list)  # pragma: no mutate
-    warnings: List[str] = attr.ib(factory=list)  # pragma: no mutate
+    results: List[TestResult] = field(default_factory=list)
+    generic_errors: List[InvalidSchema] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
 
     def __iter__(self) -> Iterator[TestResult]:
         return iter(self.results)
@@ -1169,4 +1169,4 @@ class TestResultSet:
         self.warnings.append(warning)
 
 
-CheckFunction = Callable[[GenericResponse, Case], Optional[bool]]  # pragma: no mutate
+CheckFunction = Callable[[GenericResponse, Case], Optional[bool]]

@@ -8,6 +8,7 @@ They give only static definitions of paths.
 """
 from collections.abc import Mapping
 from contextlib import nullcontext
+from dataclasses import dataclass, field
 from difflib import get_close_matches
 from functools import lru_cache
 from typing import (
@@ -29,7 +30,6 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
-import attr
 import hypothesis
 from hypothesis.strategies import SearchStrategy
 from pyrate_limiter import Limiter
@@ -77,29 +77,29 @@ C = TypeVar("C", bound=Case)
 
 @lru_cache()
 def get_full_path(base_path: str, path: str) -> str:
-    return unquote(urljoin(base_path, quote(path.lstrip("/"))))  # pragma: no mutate
+    return unquote(urljoin(base_path, quote(path.lstrip("/"))))
 
 
-@attr.s(eq=False)  # pragma: no mutate
+@dataclass(eq=False)
 class BaseSchema(Mapping):
-    raw_schema: Dict[str, Any] = attr.ib()  # pragma: no mutate
-    location: Optional[str] = attr.ib(default=None)  # pragma: no mutate
-    base_url: Optional[str] = attr.ib(default=None)  # pragma: no mutate
-    method: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
-    endpoint: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
-    tag: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
-    operation_id: Optional[Filter] = attr.ib(default=None)  # pragma: no mutate
-    app: Any = attr.ib(default=None)  # pragma: no mutate
-    hooks: HookDispatcher = attr.ib(factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))  # pragma: no mutate
-    auth: AuthStorage = attr.ib(factory=AuthStorage)  # pragma: no mutate
-    test_function: Optional[GenericTest] = attr.ib(default=None)  # pragma: no mutate
-    validate_schema: bool = attr.ib(default=True)  # pragma: no mutate
-    skip_deprecated_operations: bool = attr.ib(default=False)  # pragma: no mutate
-    data_generation_methods: List[DataGenerationMethod] = attr.ib(
-        default=DEFAULT_DATA_GENERATION_METHODS
-    )  # pragma: no mutate
-    code_sample_style: CodeSampleStyle = attr.ib(default=CodeSampleStyle.default())  # pragma: no mutate
-    rate_limiter: Optional[Limiter] = attr.ib(default=None)
+    raw_schema: Dict[str, Any]
+    location: Optional[str] = None
+    base_url: Optional[str] = None
+    method: Optional[Filter] = None
+    endpoint: Optional[Filter] = None
+    tag: Optional[Filter] = None
+    operation_id: Optional[Filter] = None
+    app: Any = None
+    hooks: HookDispatcher = field(default_factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))
+    auth: AuthStorage = field(default_factory=AuthStorage)
+    test_function: Optional[GenericTest] = None
+    validate_schema: bool = True
+    skip_deprecated_operations: bool = False
+    data_generation_methods: List[DataGenerationMethod] = field(
+        default_factory=lambda: list(DEFAULT_DATA_GENERATION_METHODS)
+    )
+    code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
+    rate_limiter: Optional[Limiter] = None
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.operations)
@@ -120,7 +120,7 @@ class BaseSchema(Mapping):
     def hook(self, hook: Union[str, Callable]) -> Callable:
         return self.hooks.register(hook)
 
-    @property  # pragma: no mutate
+    @property
     def verbose_name(self) -> str:
         raise NotImplementedError
 
@@ -152,7 +152,7 @@ class BaseSchema(Mapping):
     def get_base_url(self) -> str:
         base_url = self.base_url
         if base_url is not None:
-            return base_url.rstrip("/")  # pragma: no mutate
+            return base_url.rstrip("/")
         return self._build_base_url()
 
     @property

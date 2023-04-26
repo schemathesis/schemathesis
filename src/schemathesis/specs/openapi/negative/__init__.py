@@ -1,8 +1,8 @@
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlencode
 
-import attr
 import jsonschema
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
@@ -12,16 +12,16 @@ from .mutations import MutationContext
 from .types import Draw, Schema
 
 
-@attr.s(slots=True, hash=False)
+@dataclass
 class CacheKey:
     """A cache key for API Operation / location.
 
     Carries the schema around but don't use it for hashing to simplify LRU cache usage.
     """
 
-    operation_name: str = attr.ib()
-    location: str = attr.ib()
-    schema: Schema = attr.ib()
+    operation_name: str
+    location: str
+    schema: Schema
 
     def __hash__(self) -> int:
         return hash((self.operation_name, self.location))
