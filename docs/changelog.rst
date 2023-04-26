@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.19.1:
+
+`3.19.1`_ - 2023-04-26
+----------------------
+
 **Changed**
 
 - Support ``requests<2.29``.
@@ -14,7 +19,7 @@ Changelog
 
 **Removed**
 
-- Direct dependency on `attrs`.
+- Direct dependency on ``attrs``.
 
 .. _v3.19.0:
 
@@ -3105,7 +3110,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.19.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.19.1...HEAD
+.. _3.19.1: https://github.com/schemathesis/schemathesis/compare/v3.19.0...v3.19.1
 .. _3.19.0: https://github.com/schemathesis/schemathesis/compare/v3.18.5...v3.19.0
 .. _3.18.5: https://github.com/schemathesis/schemathesis/compare/v3.18.4...v3.18.5
 .. _3.18.4: https://github.com/schemathesis/schemathesis/compare/v3.18.3...v3.18.4
