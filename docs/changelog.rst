@@ -8,6 +8,10 @@ Changelog
 
 - Support ``requests<2.29``.
 
+**Fixed**
+
+- Passing ``params`` / ``cookies`` to ``case.call`` causing ``TypeError``. `#1734`_
+
 .. _v3.19.0:
 
 `3.19.0`_ - 2023-03-22
@@ -3321,6 +3325,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1734: https://github.com/schemathesis/schemathesis/issues/1734
 .. _#1721: https://github.com/schemathesis/schemathesis/issues/1721
 .. _#1705: https://github.com/schemathesis/schemathesis/issues/1705
 .. _#1702: https://github.com/schemathesis/schemathesis/issues/1702

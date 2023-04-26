@@ -537,11 +537,11 @@ class Case:
         )
 
 
-def _merge_dict_to(data: Dict[str, Any], key: str, new: Dict[str, Any]) -> None:
-    original = data[key] or {}
+def _merge_dict_to(data: Dict[str, Any], data_key: str, new: Dict[str, Any]) -> None:
+    original = data[data_key] or {}
     for key, value in new.items():
         original[key] = value
-    data[key] = original
+    data[data_key] = original
 
 
 def validate_vanilla_requests_kwargs(data: Dict[str, Any]) -> None:

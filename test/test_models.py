@@ -9,7 +9,7 @@ from hypothesis import given, settings
 import schemathesis
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT, DataGenerationMethod
 from schemathesis.exceptions import CheckFailed, UsageError
-from schemathesis.models import APIOperation, Case, CaseSource, OperationDefinition, Request, Response
+from schemathesis.models import APIOperation, Case, CaseSource, OperationDefinition, Request, Response, _merge_dict_to
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 
 
@@ -545,7 +545,9 @@ def _assert_override(spy, arg, original, overridden):
     # Then it should override generated value
     # And keep other values of the same kind intact
     for key, value in {**original, **overridden}.items():
-        assert spy.call_args[1][arg][key] == value
+        kwargs = spy.call_args[1]
+        assert kwargs[arg][key] == value
+        assert all(key not in kwargs for key in overridden)
 
 
 @pytest.mark.parametrize("arg", ("headers", "cookies", "params"))
@@ -565,6 +567,12 @@ def test_call_overrides(mocker, arg, openapi_30):
     except ValueError:
         pass
     _assert_override(spy, arg, original, overridden)
+
+
+def test_merge_dict_to():
+    data = {"params": {"A": 1}}
+    _merge_dict_to(data, "params", {"B": 2})
+    assert data == {"params": {"A": 1, "B": 2}}
 
 
 @pytest.mark.parametrize("arg", ("headers", "query_string"))
