@@ -227,6 +227,8 @@ def test_commands_run_help(cli):
         "content_type_conformance|response_headers_conformance|response_schema_conformance|all]",
         "                                  Comma-separated list of checks to run.",
         "                                  [default: not_a_server_error]",
+        "  -e, --exclude-checks [not_a_server_error|status_code_conformance|content_type_conformance|response_headers_conformance|response_schema_conformance]",
+        "                                  Comma-separated list of checks to exclude.",
         "  --max-response-time INTEGER RANGE",
         "                                  A custom check that will fail if the response",
         "                                  time is greater than the specified one in",
@@ -587,6 +589,16 @@ def test_comma_separated_checks(cli, mocker, swagger_20):
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
     cli.run(SCHEMA_URI, "--checks=not_a_server_error,status_code_conformance")
     assert execute.call_args[1]["checks"] == (not_a_server_error, status_code_conformance)
+
+
+def test_comma_separated_exclude_checks(cli, mocker, swagger_20):
+    excluded_checks = "not_a_server_error,status_code_conformance"
+    mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
+    execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
+    cli.run(SCHEMA_URI, "--checks=all", f"--exclude-checks={excluded_checks}")
+    assert execute.call_args[1]["checks"] == tuple(
+        check for check in tuple(ALL_CHECKS) if check.__name__ not in excluded_checks.split(",")
+    )
 
 
 @pytest.mark.operations()

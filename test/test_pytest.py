@@ -332,6 +332,26 @@ def test(case):
     assert "CHECKING!" in result.stdout.str()
 
 
+def test_excluded_checks(testdir, openapi3_base_url):
+    # When the user would like to exclude a check
+    testdir.make_test(
+        f"""
+from schemathesis.checks import status_code_conformance, not_a_server_error
+
+schema.base_url = "{openapi3_base_url}"
+
+@schema.parametrize(endpoint="failure")
+def test(case):
+    response = case.call()
+    case.validate_response(response, excluded_checks=(status_code_conformance, not_a_server_error))
+""",
+        paths={"/failure": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    )
+    result = testdir.runpytest()
+    # We should skip checking for a server error
+    result.assert_outcomes(passed=1)
+
+
 @pytest.mark.parametrize(
     "body, expected",
     (

@@ -447,6 +447,7 @@ class Case:
         response: GenericResponse,
         checks: Tuple["CheckFunction", ...] = (),
         additional_checks: Tuple["CheckFunction", ...] = (),
+        excluded_checks: Tuple["CheckFunction", ...] = (),
         code_sample_style: Optional[str] = None,
     ) -> None:
         """Validate application response.
@@ -463,6 +464,8 @@ class Case:
         from .checks import ALL_CHECKS
 
         checks = checks or ALL_CHECKS
+        checks = tuple(check for check in checks if check not in excluded_checks)
+        additional_checks = tuple(check for check in additional_checks if check not in excluded_checks)
         failed_checks = []
         for check in chain(checks, additional_checks):
             copied_case = self.partial_deepcopy()

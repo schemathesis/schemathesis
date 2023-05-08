@@ -68,6 +68,7 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 DEFAULT_CHECKS_NAMES = _get_callable_names(checks_module.DEFAULT_CHECKS)
 ALL_CHECKS_NAMES = _get_callable_names(checks_module.ALL_CHECKS)
 CHECKS_TYPE = CsvChoice((*ALL_CHECKS_NAMES, "all"))
+EXCLUDE_CHECKS_TYPE = CsvChoice((*ALL_CHECKS_NAMES,))
 
 DEFAULT_TARGETS_NAMES = _get_callable_names(targets_module.DEFAULT_TARGETS)
 ALL_TARGETS_NAMES = _get_callable_names(targets_module.ALL_TARGETS)
@@ -216,6 +217,18 @@ REPORT_TO_SERVICE = object()
     help="Comma-separated list of checks to run.",
     type=CHECKS_TYPE,
     default=DEFAULT_CHECKS_NAMES,
+    cls=GroupedOption,
+    group=ParameterGroup.validation,
+    callback=callbacks.convert_checks,
+    show_default=True,
+)
+@click.option(
+    "--exclude-checks",
+    "-e",
+    multiple=True,
+    help="Comma-separated list of checks to exclude.",
+    type=EXCLUDE_CHECKS_TYPE,
+    default=[],
     cls=GroupedOption,
     group=ParameterGroup.validation,
     callback=callbacks.convert_checks,
@@ -598,6 +611,7 @@ def run(
     auth_type: str,
     headers: Dict[str, str],
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
+    exclude_checks: Iterable[str] = [],
     data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
     max_response_time: Optional[int] = None,
     targets: Iterable[str] = DEFAULT_TARGETS_NAMES,
@@ -708,10 +722,13 @@ def run(
         # Upload without connecting data to a certain API
         client = service.ServiceClient(base_url=schemathesis_io_url, token=token)
     host_data = service.hosts.HostData(schemathesis_io_hostname, hosts_file)
+
     if "all" in checks:
         selected_checks = checks_module.ALL_CHECKS
     else:
         selected_checks = tuple(check for check in checks_module.ALL_CHECKS if check.__name__ in checks)
+
+    selected_checks = tuple(check for check in selected_checks if check.__name__ not in exclude_checks)
 
     if fixups:
         if "all" in fixups:
