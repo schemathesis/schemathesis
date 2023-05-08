@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- You can now provide a tuple of checks to exclude when validating a response.
+
 .. _v3.19.1:
 
 `3.19.1`_ - 2023-04-26
