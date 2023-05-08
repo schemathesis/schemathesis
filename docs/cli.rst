@@ -137,6 +137,34 @@ To make Schemathesis perform all built-in checks use ``--checks all`` CLI option
 
     ======================= 3 passed in 1.69s =======================
 
+You can also define a list of checks to exlude using the ``--exclude-checks | -e`` CLI option:
+
+.. code:: text
+
+    $ st run --checks all --exclude-checks not_a_server_error https://example.schemathesis.io/openapi.json
+    ================ Schemathesis test session starts ===============
+    platform Linux -- Python 3.8.5, schemathesis-2.5.0, ...
+    rootdir: /
+    hypothesis profile 'default' -> ...
+    Schema location: https://example.schemathesis.io/openapi.json
+    Base URL: http://api.com/
+    Specification version: Swagger 2.0
+    Workers: 1
+    Collected API operations: 3
+
+    GET /api/path_variable/{key} .                             [ 33%]
+    GET /api/success .                                         [ 66%]
+    POST /api/users/ .                                         [100%]
+
+    ============================ SUMMARY ============================
+
+    Performed checks:
+        status_code_conformance         201 / 201 passed       PASSED
+        content_type_conformance        201 / 201 passed       PASSED
+        response_schema_conformance     201 / 201 passed       PASSED
+
+    ======================= 3 passed in 1.69s =======================
+
 Additionally, you can define the response time limit with ``--max-response-time``.
 If any response will take longer than the provided value (in milliseconds) than it will indicate a failure:
 

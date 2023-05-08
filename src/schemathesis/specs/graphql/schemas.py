@@ -65,10 +65,12 @@ class GraphQLCase(Case):
         response: GenericResponse,
         checks: Tuple[CheckFunction, ...] = (),
         additional_checks: Tuple[CheckFunction, ...] = (),
+        excluded_checks: Tuple[CheckFunction, ...] = (),
         code_sample_style: Optional[str] = None,
     ) -> None:
         checks = checks or (not_a_server_error,)
         checks += additional_checks
+        checks = tuple(check for check in checks if check not in excluded_checks)
         return super().validate_response(response, checks, code_sample_style=code_sample_style)
 
     def call_asgi(
