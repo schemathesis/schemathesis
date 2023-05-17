@@ -20,12 +20,12 @@ asyncpg==0.26.0
     # via -r requirements.in
 attrs==21.4.0
     # via
-    #   -r requirements.in
     #   aiohttp
     #   hypothesis
     #   hypothesis-graphql
     #   jsonschema
     #   pytest
+    #   schemathesis
 certifi==2022.12.7
     # via requests
 charset-normalizer==2.0.12
@@ -132,7 +132,7 @@ sniffio==1.2.0
     # via anyio
 sortedcontainers==2.4.0
     # via hypothesis
-starlette==0.25.0
+starlette==0.27.0
     # via schemathesis
 swagger-ui-bundle==0.0.9
     # via connexion
