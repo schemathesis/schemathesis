@@ -227,7 +227,7 @@ def test_commands_run_help(cli):
         "content_type_conformance|response_headers_conformance|response_schema_conformance|all]",
         "                                  Comma-separated list of checks to run.",
         "                                  [default: not_a_server_error]",
-        "  -e, --exclude-checks [not_a_server_error|status_code_conformance|content_type_conformance|response_headers_conformance|response_schema_conformance]",
+        "  --exclude-checks [not_a_server_error|status_code_conformance|content_type_conformance|response_headers_conformance|response_schema_conformance]",
         "                                  Comma-separated list of checks to exclude.",
         "  --max-response-time INTEGER RANGE",
         "                                  A custom check that will fail if the response",

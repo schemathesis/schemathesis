@@ -224,7 +224,6 @@ REPORT_TO_SERVICE = object()
 )
 @click.option(
     "--exclude-checks",
-    "-e",
     multiple=True,
     help="Comma-separated list of checks to exclude.",
     type=EXCLUDE_CHECKS_TYPE,
