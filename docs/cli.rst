@@ -137,7 +137,7 @@ To make Schemathesis perform all built-in checks use ``--checks all`` CLI option
 
     ======================= 3 passed in 1.69s =======================
 
-You can also define a list of checks to exlude using the ``--exclude-checks | -e`` CLI option:
+You can also define a list of checks to exclude using the ``--exclude-checks`` CLI option:
 
 .. code:: text
 
