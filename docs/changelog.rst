@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Support ``requests<3``.
+
 .. _v3.19.2:
 
 `3.19.2`_ - 2023-05-20

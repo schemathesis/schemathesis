@@ -46,7 +46,7 @@ dependencies = [
     "pytest-subtests>=0.2.1,<0.8.0",
     "pytest>=4.6.4,<8",
     "PyYAML>=5.1,<7.0",
-    "requests>=2.22,<2.29",
+    "requests>=2.22,<3",
     "starlette>=0.13,<1",
     "starlette-testclient==0.2.0",
     "tomli-w>=1.0.0,<2.0",
