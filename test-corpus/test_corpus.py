@@ -170,7 +170,7 @@ def test_runner(schema_path):
         dry_run=True,
         count_operations=False,
         hypothesis_settings=hypothesis.settings(
-            max_examples=1, suppress_health_check=HealthCheck.all(), phases=[Phase.explicit, Phase.generate]
+            max_examples=1, suppress_health_check=list(HealthCheck), phases=[Phase.explicit, Phase.generate]
         ),
     )
 

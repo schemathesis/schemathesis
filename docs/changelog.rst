@@ -8,6 +8,10 @@ Changelog
 
 - Support ``requests<3``.
 
+**Fixed**
+
+- ``HypothesisDeprecationWarning`` regarding deprecated ``HealthCheck.all()``
+
 .. _v3.19.2:
 
 `3.19.2`_ - 2023-05-20
