@@ -122,7 +122,7 @@ def get_single_example(strategy: st.SearchStrategy[Case]) -> Case:
         deadline=None,
         verbosity=hypothesis.Verbosity.quiet,
         phases=(hypothesis.Phase.generate,),
-        suppress_health_check=hypothesis.HealthCheck.all(),
+        suppress_health_check=list(hypothesis.HealthCheck),
     )
     def example_generating_inner_function(ex: Case) -> None:
         examples.append(ex)

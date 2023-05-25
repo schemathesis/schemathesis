@@ -78,7 +78,7 @@ def app():
     return app
 
 @schema.parametrize()
-@settings(max_examples=5, suppress_health_check=HealthCheck.all())
+@settings(max_examples=5, suppress_health_check=list(HealthCheck))
 async def test_(request, aiohttp_client, app, case):
     request.config.HYPOTHESIS_CASES += 1
     client = await aiohttp_client(app)

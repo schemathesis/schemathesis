@@ -103,7 +103,7 @@ TestStateful = schema.as_state_machine().TestCase
 TestStateful.settings = settings(
     max_examples=2000,
     deadline=None,
-    suppress_health_check=HealthCheck.all(),
+    suppress_health_check=list(HealthCheck),
     stateful_step_count=3  # There is no need for longer sequences to uncover the bug
 )
 """,
@@ -173,7 +173,7 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
             settings=settings(
                 max_examples=2000,
                 deadline=None,
-                suppress_health_check=HealthCheck.all(),
+                suppress_health_check=list(HealthCheck),
                 stateful_step_count=3,
             )
         )
@@ -225,7 +225,7 @@ TestStateful.settings = settings(
     max_examples=1,
     deadline=None,
     derandomize=True,
-    suppress_health_check=HealthCheck.all(),
+    suppress_health_check=list(HealthCheck),
 )
 """,
         schema=app_schema,
