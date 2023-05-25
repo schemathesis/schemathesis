@@ -7,6 +7,7 @@ Changelog
 **Changed**
 
 - Support ``requests<3``.
+- Bump the minimum supported ``Hypothesis`` version to ``6.31.6`` to reflect requirement from ``hypothesis-jsonschema``.
 
 **Fixed**
 
