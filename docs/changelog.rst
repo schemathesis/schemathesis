@@ -6,12 +6,12 @@ Changelog
 
 **Changed**
 
-- Support ``requests<3``.
+- Support ``requests<3``. `#1742`_
 - Bump the minimum supported ``Hypothesis`` version to ``6.31.6`` to reflect requirement from ``hypothesis-jsonschema``.
 
 **Fixed**
 
-- ``HypothesisDeprecationWarning`` regarding deprecated ``HealthCheck.all()``
+- ``HypothesisDeprecationWarning`` regarding deprecated ``HealthCheck.all()``. `#1739`_
 
 .. _v3.19.2:
 
@@ -3354,6 +3354,8 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1742: https://github.com/schemathesis/schemathesis/issues/1742
+.. _#1739: https://github.com/schemathesis/schemathesis/issues/1739
 .. _#1734: https://github.com/schemathesis/schemathesis/issues/1734
 .. _#1721: https://github.com/schemathesis/schemathesis/issues/1721
 .. _#1705: https://github.com/schemathesis/schemathesis/issues/1705
