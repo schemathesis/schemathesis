@@ -2,7 +2,8 @@ import re
 import string
 from base64 import b64encode
 from contextlib import suppress
-from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Union
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
 
@@ -116,7 +117,7 @@ def get_case_strategy(
     operation: APIOperation,
     hooks: Optional[HookDispatcher] = None,
     auth_storage: Optional[auths.AuthStorage] = None,
-    data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+    generator: DataGenerationMethod = DataGenerationMethod.default(),
     path_parameters: Union[NotSet, Dict[str, Any]] = NOT_SET,
     headers: Union[NotSet, Dict[str, Any]] = NOT_SET,
     cookies: Union[NotSet, Dict[str, Any]] = NOT_SET,
@@ -135,46 +136,32 @@ def get_case_strategy(
     The primary purpose of this behavior is to prevent sending incomplete explicit examples by generating missing parts
     as it works with `body`.
     """
-    to_strategy = DATA_GENERATION_METHOD_TO_STRATEGY_FACTORY[data_generation_method]
+    strategy_factory = DATA_GENERATION_METHOD_TO_STRATEGY_FACTORY[generator]
 
-    hook_context = HookContext(operation)
+    context = HookContext(operation)
 
-    if data_generation_method.is_negative:
-        if not can_generate_negative_case(operation, path_parameters, headers, cookies, query, body):
-            skip(operation.verbose_name)
-
-    path_parameters_value = get_parameters_value(
-        path_parameters, "path", draw, operation, hook_context, hooks, to_strategy
-    )
-    headers_value = get_parameters_value(headers, "header", draw, operation, hook_context, hooks, to_strategy)
-    cookies_value = get_parameters_value(cookies, "cookie", draw, operation, hook_context, hooks, to_strategy)
-    query_value = get_parameters_value(query, "query", draw, operation, hook_context, hooks, to_strategy)
-
-    has_generated_parameters = any(
-        component is not None for component in (query_value, cookies_value, headers_value, path_parameters_value)
-    )
-    has_generated_body = False
+    path_parameters_ = generate_parameter("path", path_parameters, operation, draw, context, hooks, generator)
+    headers_ = generate_parameter("header", headers, operation, draw, context, hooks, generator)
+    cookies_ = generate_parameter("cookie", cookies, operation, draw, context, hooks, generator)
+    query_ = generate_parameter("query", query, operation, draw, context, hooks, generator)
 
     media_type = None
     if body is NOT_SET:
         if operation.body:
-            if data_generation_method.is_negative:
+            body_generator = generator
+            if generator.is_negative:
                 # Consider only schemas that are possible to negate
                 candidates = [item for item in operation.body.items if can_negate(item.as_json_schema(operation))]
-                # Not possible to negate body
+                # Not possible to negate body, fallback to positive data generation
                 if not candidates:
-                    # If other components are negated, then generate body that matches the schema
-                    # Other components were negated, therefore the whole test case will be negative
-                    if has_generated_parameters:
-                        candidates = operation.body.items
-                        to_strategy = make_positive_strategy
-                    else:
-                        skip(operation.verbose_name)
+                    candidates = operation.body.items
+                    strategy_factory = make_positive_strategy
+                    body_generator = DataGenerationMethod.positive
             else:
                 candidates = operation.body.items
             parameter = draw(st.sampled_from(candidates))
-            strategy = _get_body_strategy(parameter, to_strategy, operation)
-            strategy = apply_hooks(operation, hook_context, hooks, strategy, "body")
+            strategy = _get_body_strategy(parameter, strategy_factory, operation)
+            strategy = apply_hooks(operation, context, hooks, strategy, "body")
             # Parameter may have a wildcard media type. In this case, choose any supported one
             possible_media_types = sorted(serializers.get_matching_media_types(parameter.media_type))
             if not possible_media_types:
@@ -185,8 +172,9 @@ def get_case_strategy(
                 # Other media types are possible - avoid choosing this media type in the future
                 cant_serialize(parameter.media_type)
             media_type = draw(st.sampled_from(possible_media_types))
-            body = draw(strategy)
-            has_generated_body = True
+            body_ = ValueContainer(value=draw(strategy), generator=body_generator)
+        else:
+            body_ = ValueContainer(value=body, generator=None)
     else:
         media_types = operation.get_request_payload_content_types() or ["application/json"]
         # Take the first available media type.
@@ -195,20 +183,22 @@ def get_case_strategy(
         #   - On Open API 3.0, media types are explicit, and each example has it.
         #     We can pass `OpenAPIBody.media_type` here from the examples handling code.
         media_type = media_types[0]
+        body_ = ValueContainer(value=body, generator=None)
 
     if operation.schema.validate_schema and operation.method.upper() == "GET" and operation.body:
         raise InvalidSchema("Body parameters are defined for GET request.")
-    if data_generation_method.is_negative and not has_generated_body and not has_generated_parameters:
+    # If we need to generate negative cases but no generated values were negated, then skip the whole test
+    if generator.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
         skip(operation.verbose_name)
     instance = Case(
         operation=operation,
         media_type=media_type,
-        path_parameters=path_parameters_value,
-        headers=CaseInsensitiveDict(headers_value) if headers_value is not None else headers_value,
-        cookies=cookies_value,
-        query=query_value,
-        body=body,
-        data_generation_method=data_generation_method,
+        path_parameters=path_parameters_.value,
+        headers=CaseInsensitiveDict(headers_.value) if headers_.value is not None else headers_.value,
+        cookies=cookies_.value,
+        query=query_.value,
+        body=body_.value,
+        data_generation_method=generator,
     )
     auth_context = auths.AuthContext(
         operation=operation,
@@ -270,43 +260,56 @@ def get_parameters_value(
 _PARAMETER_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()
 
 
-def _can_negate(operation: APIOperation, location: str) -> Optional[bool]:
-    if location == "body":
-        return not bool([item for item in operation.body.items if can_negate(item.as_json_schema(operation))])
-    parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
-    if parameters:
-        schema = parameters_to_json_schema(operation, parameters)
-        return any(
-            parameter_schema not in ({"type": "string"}, {}) for parameter_schema in schema["properties"].values()
-        )
-    return None
+@dataclass
+class ValueContainer:
+    """Container for a value generated by a data generator or explicitly provided."""
+
+    value: Any
+    generator: Optional[DataGenerationMethod]
+
+    @property
+    def is_generated(self) -> bool:
+        """If value was generated."""
+        return self.value is not None
 
 
-def can_generate_negative_case(
+def any_negated_values(values: List[ValueContainer]) -> bool:
+    """Check if any generated values are negated."""
+    return any(value.generator == DataGenerationMethod.negative for value in values if value.is_generated)
+
+
+def generate_parameter(
+    location: str,
+    explicit: Union[NotSet, Dict[str, Any]],
     operation: APIOperation,
-    path_parameters: Union[NotSet, Dict[str, Any]] = NOT_SET,
-    headers: Union[NotSet, Dict[str, Any]] = NOT_SET,
-    cookies: Union[NotSet, Dict[str, Any]] = NOT_SET,
-    query: Union[NotSet, Dict[str, Any]] = NOT_SET,
-    body: Any = NOT_SET,
-) -> bool:
-    # If we can't generate any negative part, then skip the whole test
-    negated = (
-        _can_negate(operation, location)
-        for explicit, location in (
-            (path_parameters, "path"),
-            (headers, "header"),
-            (cookies, "cookie"),
-            (query, "query"),
-            (body, "body"),
-        )
-        if explicit is NOT_SET
-    )
-    # TODO: Original type's constraints should be applied to stringified value
-    # TODO: Switch data generation methods
-    if not any(entry is True for entry in negated):
-        skip(operation.verbose_name)
-    return True
+    draw: Callable,
+    context: HookContext,
+    hooks: Optional[HookDispatcher],
+    generator: DataGenerationMethod,
+) -> ValueContainer:
+    """Generate a value for a parameter.
+
+    Fallback to positive data generator if parameter can not be negated.
+    """
+    if location == "path" and generator.is_negative and not can_negate_path_parameters(operation):
+        # If we can't negate any path parameter, generate positive ones
+        # If nothing else will be negated, then skip the test completely
+        to_strategy = make_positive_strategy
+        generator = DataGenerationMethod.positive
+    else:
+        to_strategy = DATA_GENERATION_METHOD_TO_STRATEGY_FACTORY[generator]
+    value = get_parameters_value(explicit, location, draw, operation, context, hooks, to_strategy)
+    return ValueContainer(value=value, generator=generator)
+
+
+def can_negate_path_parameters(operation: APIOperation) -> bool:
+    """Check if any path parameter can be negated."""
+    schema = parameters_to_json_schema(operation, operation.path_parameters)
+    # No path parameters to negate
+    parameters = schema["properties"]
+    if not parameters:
+        return True
+    return any(can_negate(parameter) for parameter in parameters.values())
 
 
 def get_parameters_strategy(

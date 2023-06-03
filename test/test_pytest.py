@@ -427,7 +427,7 @@ def test_(case):
 """,
     )
     # Then it should be skipped
-    result = testdir.runpytest("-v", "-rs")
+    result = testdir.runpytest("-v", "-rs", "-s")
     result.assert_outcomes(skipped=1)
     result.stdout.re_match_lines([r".*It is not possible to generate negative test cases for.*"])
 
@@ -466,7 +466,7 @@ def test_(case):
         schema_name="simple_openapi.yaml",
     )
     # Then it should be skipped
-    result = testdir.runpytest("-v", "-rs")
+    result = testdir.runpytest("-v", "-rs", "-s")
     result.assert_outcomes(skipped=1)
     result.stdout.re_match_lines([r".*It is not possible to generate negative test cases for.*"])
 
@@ -507,6 +507,80 @@ def test_(request, case):
     )
     # Then it should NOT be skipped
     result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+
+
+@pytest.mark.parametrize("location", ("header", "cookie", "query"))
+def test_path_parameters_allow_partial_negation(testdir, location):
+    # If path parameters can not be negated and other parameters can be negated
+    testdir.make_test(
+        """
+schema = schemathesis.from_dict(
+    raw_schema,
+    method="GET",
+    endpoint="/pets/{key}/",
+    data_generation_methods=DataGenerationMethod.negative
+)
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+""",
+        paths={
+            "/pets/{key}/": {
+                "get": {
+                    "parameters": [
+                        {"in": "path", "name": "key", "required": True, "schema": {}},
+                        {"in": location, "name": "foo", "required": True, "schema": {"type": "integer"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    # Then non-negated should be generated as positive
+    # And the ones that can be negated should be negated
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+
+
+def test_many_path_parameters_allow_partial_negation(testdir):
+    # If just one path parameter can not be negated and other parameters can be negated
+    testdir.make_test(
+        """
+schema = schemathesis.from_dict(
+    raw_schema,
+    method="GET",
+    endpoint="/pets/{key}/{value}/",
+    data_generation_methods=DataGenerationMethod.negative
+)
+
+@schema.parametrize()
+@settings(max_examples=1)
+def test_(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+""",
+        paths={
+            "/pets/{key}/{value}/": {
+                "get": {
+                    "parameters": [
+                        {"in": "path", "name": "key", "required": True, "schema": {}},
+                        {"in": "path", "name": "value", "required": True, "schema": {"type": "integer"}},
+                        {"in": "query", "name": "foo", "required": True, "schema": {"type": "integer"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    # Then non-negated should be generated as positive
+    # And the ones that can be negated should be negated
+    result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"Hypothesis calls: 1"])
 
