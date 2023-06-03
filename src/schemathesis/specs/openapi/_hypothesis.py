@@ -139,6 +139,10 @@ def get_case_strategy(
 
     hook_context = HookContext(operation)
 
+    if data_generation_method.is_negative:
+        if not can_generate_negative_case(operation, path_parameters, headers, cookies, query, body):
+            skip(operation.verbose_name)
+
     path_parameters_value = get_parameters_value(
         path_parameters, "path", draw, operation, hook_context, hooks, to_strategy
     )
@@ -264,6 +268,45 @@ def get_parameters_value(
 
 
 _PARAMETER_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()
+
+
+def _can_negate(operation: APIOperation, location: str) -> Optional[bool]:
+    if location == "body":
+        return not bool([item for item in operation.body.items if can_negate(item.as_json_schema(operation))])
+    parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
+    if parameters:
+        schema = parameters_to_json_schema(operation, parameters)
+        return any(
+            parameter_schema not in ({"type": "string"}, {}) for parameter_schema in schema["properties"].values()
+        )
+    return None
+
+
+def can_generate_negative_case(
+    operation: APIOperation,
+    path_parameters: Union[NotSet, Dict[str, Any]] = NOT_SET,
+    headers: Union[NotSet, Dict[str, Any]] = NOT_SET,
+    cookies: Union[NotSet, Dict[str, Any]] = NOT_SET,
+    query: Union[NotSet, Dict[str, Any]] = NOT_SET,
+    body: Any = NOT_SET,
+) -> bool:
+    # If we can't generate any negative part, then skip the whole test
+    negated = (
+        _can_negate(operation, location)
+        for explicit, location in (
+            (path_parameters, "path"),
+            (headers, "header"),
+            (cookies, "cookie"),
+            (query, "query"),
+            (body, "body"),
+        )
+        if explicit is NOT_SET
+    )
+    # TODO: Original type's constraints should be applied to stringified value
+    # TODO: Switch data generation methods
+    if not any(entry is True for entry in negated):
+        skip(operation.verbose_name)
+    return True
 
 
 def get_parameters_strategy(
