@@ -200,6 +200,7 @@ def change_type(context: MutationContext, draw: Draw, schema: Schema) -> Mutatio
     if context.media_type == "application/x-www-form-urlencoded":
         # Form data should be an object, do not change it
         return MutationResult.FAILURE
+    # Headers are always strings, can't negate this
     if context.is_header_location:
         return MutationResult.FAILURE
     candidates = _get_type_candidates(context, schema)
@@ -356,8 +357,10 @@ def negate_constraints(context: MutationContext, draw: Draw, schema: Schema) -> 
     schema.clear()
     is_negated = False
 
-    def is_mutation_candidate(k: str) -> bool:
+    def is_mutation_candidate(k: str, v: Any) -> bool:
         # Should we negate this key?
+        if k == "required":
+            return v != []
         return not (
             k in ("type", "properties", "items", "minItems")
             or (k == "additionalProperties" and context.is_header_location)
@@ -365,16 +368,16 @@ def negate_constraints(context: MutationContext, draw: Draw, schema: Schema) -> 
 
     enabled_keywords = draw(st.shared(FeatureStrategy(), key="keywords"))  # type: ignore
     candidates = []
-    mutation_candidates = [key for key in copied if is_mutation_candidate(key)]
+    mutation_candidates = [key for key, value in copied.items() if is_mutation_candidate(key, value)]
     if mutation_candidates:
         # There should be at least one mutated keyword
-        candidate = draw(st.sampled_from([key for key in copied if is_mutation_candidate(key)]))
+        candidate = draw(st.sampled_from([key for key, value in copied.items() if is_mutation_candidate(key, value)]))
         candidates.append(candidate)
         # If the chosen candidate has dependency, then the dependency should also be present in the final schema
         if candidate in DEPENDENCIES:
             candidates.append(DEPENDENCIES[candidate])
     for key, value in copied.items():
-        if is_mutation_candidate(key):
+        if is_mutation_candidate(key, value):
             if key in candidates or enabled_keywords.is_enabled(key):
                 is_negated = True
                 negated = schema.setdefault("not", {})

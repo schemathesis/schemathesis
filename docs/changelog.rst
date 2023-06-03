@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Do not raise ``Unsatisfiable`` when explicit headers are provided for negative tests.
+- Do not raise ``Unsatisfiable`` when no headers can be negated.
 
 .. _v3.19.4:
 
