@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Do not raise ``Unsatisfiable`` when explicit headers are provided for negative tests.
+
 .. _v3.19.4:
 
 `3.19.4`_ - 2023-06-03
