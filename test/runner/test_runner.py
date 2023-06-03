@@ -1070,3 +1070,35 @@ def test_authorization_warning_missing_threshold(result):
     )
     # Then the warning should not be added
     assert not has_too_many_responses_with_status(result, 401)
+
+
+@pytest.mark.parametrize(
+    "parameters, expected",
+    (
+        ([{"in": "query", "name": "key", "required": True, "schema": {"type": "integer"}}], Status.success),
+        ([], Status.skip),
+    ),
+)
+def test_explicit_header_negative(empty_open_api_3_schema, parameters, expected):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "get": {
+                "parameters": parameters,
+                "security": [{"basicAuth": []}],
+                "responses": {"200": {"description": ""}},
+            }
+        }
+    }
+    empty_open_api_3_schema["components"] = {"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}}
+    schema = schemathesis.from_dict(empty_open_api_3_schema, data_generation_methods=DataGenerationMethod.negative)
+    _, _, event, finished = list(
+        from_schema(
+            schema,
+            headers={"Authorization": "TEST"},
+            dry_run=True,
+            hypothesis_settings=hypothesis.settings(max_examples=1),
+        ).execute()
+    )
+    # There should not be unsatisfiable
+    assert finished.errored_count == 0
+    assert event.status == expected
