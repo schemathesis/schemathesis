@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Improved handling of negative test scenarios by not raising ``Unsatisfiable`` when path parameters cannot be negated but other parameters can be negated.
+
 .. _v3.19.3:
 
 `3.19.3`_ - 2023-05-25
