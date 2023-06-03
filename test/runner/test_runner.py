@@ -1102,3 +1102,25 @@ def test_explicit_header_negative(empty_open_api_3_schema, parameters, expected)
     # There should not be unsatisfiable
     assert finished.errored_count == 0
     assert event.status == expected
+
+
+def test_skip_non_negated_headers(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "get": {
+                "parameters": [{"in": "header", "name": "If-Modified-Since", "schema": {"type": "string"}}],
+                "responses": {"200": {"description": ""}},
+            }
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema, data_generation_methods=DataGenerationMethod.negative)
+    _, _, event, finished = list(
+        from_schema(
+            schema,
+            dry_run=True,
+            hypothesis_settings=hypothesis.settings(max_examples=1),
+        ).execute()
+    )
+    # There should not be unsatisfiable
+    assert finished.errored_count == 0
+    assert event.status == Status.skip
