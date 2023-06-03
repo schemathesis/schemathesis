@@ -329,7 +329,7 @@ class BaseOpenAPISchema(BaseSchema):
             operation=operation,
             auth_storage=auth_storage,
             hooks=hooks,
-            data_generation_method=data_generation_method,
+            generator=data_generation_method,
             **kwargs,
         )
 
