@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.19.5:
+
+`3.19.5`_ - 2023-06-03
+----------------------
+
 **Fixed**
 
 - Do not raise ``Unsatisfiable`` when explicit headers are provided for negative tests.
@@ -3147,7 +3152,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.19.4...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.19.5...HEAD
+.. _3.19.5: https://github.com/schemathesis/schemathesis/compare/v3.19.4...v3.19.5
 .. _3.19.4: https://github.com/schemathesis/schemathesis/compare/v3.19.3...v3.19.4
 .. _3.19.3: https://github.com/schemathesis/schemathesis/compare/v3.19.2...v3.19.3
 .. _3.19.2: https://github.com/schemathesis/schemathesis/compare/v3.19.1...v3.19.2
