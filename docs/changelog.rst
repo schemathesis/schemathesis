@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.19.4:
+
+`3.19.4`_ - 2023-06-03
+----------------------
+
 **Fixed**
 
 - Improved handling of negative test scenarios by not raising ``Unsatisfiable`` when path parameters cannot be negated but other parameters can be negated.
@@ -3137,7 +3142,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.19.3...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.19.4...HEAD
+.. _3.19.4: https://github.com/schemathesis/schemathesis/compare/v3.19.3...v3.19.4
 .. _3.19.3: https://github.com/schemathesis/schemathesis/compare/v3.19.2...v3.19.3
 .. _3.19.2: https://github.com/schemathesis/schemathesis/compare/v3.19.1...v3.19.2
 .. _3.19.1: https://github.com/schemathesis/schemathesis/compare/v3.19.0...v3.19.1
