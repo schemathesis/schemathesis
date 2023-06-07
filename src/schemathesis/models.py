@@ -438,9 +438,9 @@ class Case:
             )
         if base_url is None:
             base_url = self.get_full_base_url()
-        client = ASGIClient(application)
 
-        return self.call(base_url=base_url, session=client, headers=headers, **kwargs)
+        with ASGIClient(application) as client:
+            return self.call(base_url=base_url, session=client, headers=headers, **kwargs)
 
     def validate_response(
         self,
