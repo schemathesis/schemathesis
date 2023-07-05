@@ -15,7 +15,7 @@ repos:
       - id: check-merge-conflict
 
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.0.0-alpha.4
+    rev: v3.0.0-alpha.9-for-vscode
     hooks:
       - id: prettier
 
@@ -25,23 +25,23 @@ repos:
       - id: gitlint
 
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.29.0
+    rev: v1.32.0
     hooks:
       - id: yamllint
 
   - repo: https://github.com/codingjoe/relint
-    rev: 2.1.1
+    rev: 3.1.0
     hooks:
       - id: relint
 
   - repo: https://github.com/ambv/black
-    rev: 23.1.0
+    rev: 23.3.0
     hooks:
       - id: black
         types: [python]
 
   - repo: https://github.com/asottile/blacken-docs
-    rev: 1.13.0
+    rev: 1.14.0
     hooks:
       - id: blacken-docs
         additional_dependencies: [black==23.1.0]
@@ -54,7 +54,7 @@ repos:
         additional_dependencies: ["isort[pyproject]"]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.0.1
+    rev: v1.4.1
     hooks:
       - id: mypy
         exclude: ^(docs/|test/|test-corpus/|example/).*$
@@ -62,12 +62,12 @@ repos:
         additional_dependencies: [types-click, types-requests, types-PyYAML]
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: "v0.0.248"
+    rev: "v0.0.277"
     hooks:
       - id: ruff
 
   - repo: https://github.com/myint/rstcheck
-    rev: v6.1.1
+    rev: v6.1.2
     hooks:
       - id: rstcheck
         additional_dependencies:

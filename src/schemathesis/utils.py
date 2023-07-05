@@ -336,6 +336,7 @@ def _warn_deprecation(*, thing: str, removed_in: str, replacement: str) -> None:
         f"Property `{thing}` is deprecated and will be removed in Schemathesis {removed_in}. "
         f"Use `{replacement}` instead.",
         DeprecationWarning,
+        stacklevel=2,
     )
 
 
