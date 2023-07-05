@@ -48,6 +48,8 @@ Here are the key features:
 - **Customization**: Tune data generation, API response verification, and testing process to fit your needs.
 - **CI Integration**: Run tests on every code change with Docker image
   and [GitHub Action](https://github.com/schemathesis/action).
+- **SaaS Platform**: Leverage an all-in-one solution with no setup or installation required.
+- **Commercial Support**: Benefit from prompt, professional guidance to maintain an optimal testing workflow.
 
 ## Testimonials
 
@@ -105,10 +107,11 @@ paper](https://arxiv.org/abs/2112.10328).
 
 ## Getting started
 
-Schemathesis can be used as a CLI, a Python library, or as a [SaaS](https://schemathesis.io/?utm_source=github).
+Schemathesis can be used as a CLI, a Python library, a [GitHub app](https://github.com/apps/schemathesis), or as a [SaaS](https://schemathesis.io/?utm_source=github).
 
 - **CLI**: Quick and easy way to get started, for those who prefer the command line.
 - **Python Library**: More control and customization, for developers integrating with their codebase.
+- **GitHub App**: Direct testing in your GitHub repositories with reports in your pull requests.
 - **SaaS**: No setup or installation, if you prefer an all-in-one solution with great visuals. Free tier included.
 
 ## Installation
@@ -125,7 +128,26 @@ You can also use our Docker image without installing Schemathesis as a Python pa
 docker pull schemathesis/schemathesis:stable
 ```
 
+If you use GitHub, there is a native [GitHub app](https://github.com/apps/schemathesis) that reports test results directly to your pull requests.
+
 ## Example
+
+### GitHub Actions
+
+```yaml
+api-tests:
+  runs-on: ubuntu-20.04
+  steps:
+    # Runs Schemathesis tests with all checks enabled
+    - uses: schemathesis/action@v1
+      with:
+        # Your API schema location
+        schema: "http://localhost:5000/api/openapi.json"
+        # OPTIONAL. Your Schemathesis.io token
+        token: ${{ secrets.SCHEMATHESIS_TOKEN }}
+```
+
+Check our [GitHub Action](https://github.com/schemathesis/action) for more details.
 
 ### Command line
 
@@ -135,7 +157,7 @@ st run --checks all https://example.schemathesis.io/openapi.json
 # Or
 
 docker run schemathesis/schemathesis:stable \
-    run --checks all https://example.schemathesis.io/openapi.json
+   run --checks all https://example.schemathesis.io/openapi.json
 ```
 
 ![image](https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/demo.gif)
@@ -156,25 +178,6 @@ def test_api(case):
 Choose CLI for simplicity or Python package for greater flexibility. Both options run extensive tests and report failures with reproduction instructions.
 
 💡 See a complete working example project in the [/example](https://github.com/schemathesis/schemathesis/tree/master/example) directory.💡
-
-## GitHub Actions
-
-If you use GitHub Actions, there is a native [GitHub app](https://github.com/apps/schemathesis) that reports test results directly to your pull requests.
-
-```yaml
-api-tests:
-  runs-on: ubuntu-20.04
-  steps:
-    # Runs Schemathesis tests with all checks enabled
-    - uses: schemathesis/action@v1
-      with:
-        # Your API schema location
-        schema: "http://localhost:5000/api/openapi.json"
-        # OPTIONAL. Your Schemathesis.io token
-        token: ${{ secrets.SCHEMATHESIS_TOKEN }}
-```
-
-Check our [GitHub Action](https://github.com/schemathesis/action) for more details.
 
 ## Let's make it better together 🤝
 
