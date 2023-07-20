@@ -4,7 +4,7 @@
 #
 #    pip-compile requirements.in
 #
-aiohttp==3.8.1
+aiohttp==3.8.5
     # via
     #   aiohttp-jinja2
     #   connexion
