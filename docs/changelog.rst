@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Add Python 3.12 compatibility.
+
 **Changed**
 
 - Generated binary data inside ``Case.body`` is wrapped with a custom wrapper - ``Binary`` in order to simplify
