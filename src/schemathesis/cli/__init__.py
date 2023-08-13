@@ -204,7 +204,13 @@ with_hosts_file = click.option(
     envvar=service.HOSTS_PATH_ENV_VAR,
     callback=callbacks.convert_hosts_file,
 )
-REPORT_TO_SERVICE = object()
+
+
+class ReportToService:
+    pass
+
+
+REPORT_TO_SERVICE = ReportToService()
 
 
 @schemathesis.command(short_help="Perform schemathesis test.", cls=CommandWithCustomHelp)
@@ -410,10 +416,10 @@ REPORT_TO_SERVICE = object()
 )
 @click.option(
     "--report",
+    "report_value",
     help="Upload test report to Schemathesis.io, or store in a file.",
     is_flag=False,
-    flag_value=REPORT_TO_SERVICE,
-    type=click.File("wb"),
+    flag_value="",
     envvar=service.REPORT_ENV_VAR,
     callback=callbacks.convert_report,  # type: ignore
 )
@@ -656,7 +662,7 @@ def run(
     hypothesis_verbosity: Optional[hypothesis.Verbosity] = None,
     verbosity: int = 0,
     no_color: bool = False,
-    report: Optional[click.utils.LazyFile] = None,
+    report_value: Optional[str] = None,
     schemathesis_io_token: Optional[str] = None,
     schemathesis_io_url: str = service.DEFAULT_URL,
     schemathesis_io_telemetry: bool = True,
@@ -668,6 +674,13 @@ def run(
 
     API_NAME is an API identifier to upload data to Schemathesis.io.
     """
+    report: Optional[Union[ReportToService, click.utils.LazyFile]]
+    if report_value is None:
+        report = None
+    elif report_value:
+        report = click.utils.LazyFile(report_value, mode="wb")
+    else:
+        report = REPORT_TO_SERVICE
     started_at = current_datetime()
     maybe_disable_color(ctx, no_color)
     check_auth(auth, headers)
@@ -688,7 +701,7 @@ def run(
     if schema_kind == callbacks.SchemaInputKind.NAME:
         api_name = schema
     if (
-        not (report and report.name is not REPORT_TO_SERVICE)
+        not isinstance(report, click.utils.LazyFile)
         and api_name is not None
         and schema_kind == callbacks.SchemaInputKind.NAME
     ):
@@ -717,7 +730,7 @@ def run(
                 base_url = base_url or details.base_url
             except requests.HTTPError as exc:
                 handle_service_error(exc, name)
-    if report and report.name is REPORT_TO_SERVICE and not client:
+    if report is REPORT_TO_SERVICE and not client:
         # Upload without connecting data to a certain API
         client = service.ServiceClient(base_url=schemathesis_io_url, token=token)
     host_data = service.hosts.HostData(schemathesis_io_hostname, hosts_file)
@@ -1089,7 +1102,7 @@ def execute(
     debug_output_file: Optional[click.utils.LazyFile],
     host_data: service.hosts.HostData,
     client: Optional[service.ServiceClient],
-    report: Optional[click.utils.LazyFile],
+    report: Optional[Union[ReportToService, click.utils.LazyFile]],
     telemetry: bool,
     api_name: Optional[str],
     location: str,
@@ -1116,7 +1129,7 @@ def execute(
                 telemetry=telemetry,
             )
         )
-    elif report and report.name is not REPORT_TO_SERVICE:
+    elif isinstance(report, click.utils.LazyFile):
         report_queue = Queue()
         report_context = FileReportContext(queue=report_queue, filename=report.name)
         handlers.append(

@@ -268,8 +268,8 @@ def convert_boolean_string(ctx: click.core.Context, param: click.core.Parameter,
 
 
 def convert_report(ctx: click.core.Context, param: click.core.Option, value: LazyFile) -> LazyFile:
-    if param.resolve_envvar_value(ctx) is not None and value.name.lower() in TRUE_VALUES:
-        value.name = param.flag_value
+    if param.resolve_envvar_value(ctx) is not None and value.lower() in TRUE_VALUES:
+        value = param.flag_value
     return value
 
 
