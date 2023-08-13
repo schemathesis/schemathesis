@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Broken ``--report`` CLI argument under ``click>=8.1.4``. `#1753`_
+
 .. _v3.19.5:
 
 `3.19.5`_ - 2023-06-03
@@ -3381,6 +3385,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1753: https://github.com/schemathesis/schemathesis/issues/1753
 .. _#1742: https://github.com/schemathesis/schemathesis/issues/1742
 .. _#1739: https://github.com/schemathesis/schemathesis/issues/1739
 .. _#1734: https://github.com/schemathesis/schemathesis/issues/1734
