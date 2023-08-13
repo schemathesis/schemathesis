@@ -307,7 +307,7 @@ def test_commands_run_help(cli):
         "                                  certificate.",
         "  --junit-xml FILENAME            Create junit-xml style report file at given",
         "                                  path.",
-        "  --report FILENAME               Upload test report to Schemathesis.io, or",
+        "  --report TEXT                   Upload test report to Schemathesis.io, or",
         "                                  store in a file.",
         "  --debug-output-file FILENAME    Save debug output as JSON lines in the given",
         "                                  file.",
