@@ -64,6 +64,7 @@ jobs:
           - os: ubuntu-20.04
             python: "3.9.16"
             tox_env: pytest53
+      fail-fast: false
 
     name: Tests (Python ${{ matrix.python }} on ${{ matrix.os }} ${{ matrix.tox_env }})
     runs-on: ${{ matrix.os }}
