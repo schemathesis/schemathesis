@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "schemathesis"
-version = "3.19.5"
+version = "3.19.6"
 description = "Property-based testing framework for Open API and GraphQL based apps"
 keywords = ["pytest", "hypothesis", "openapi", "swagger", "graphql", "testing"]
 authors = [{ name = "Dmitry Dygalo", email = "dadygalo@gmail.com" }]
