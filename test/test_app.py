@@ -35,9 +35,9 @@ def test_app(testdir, aiohttp_unused_port, framework, expected):
     # When the testing app is run from CMD
     port = aiohttp_unused_port()
     if platform.system() == "Windows":
-        timeout = 4.0
+        timeout = 5.0
     else:
-        timeout = 2.0
+        timeout = 3.0
     if os.getenv("COVERAGE_RUN") == "true":
         timeout *= 2
     with pytest.raises(TimeoutExpired):
