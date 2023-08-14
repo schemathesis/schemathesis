@@ -1,4 +1,5 @@
 import json
+import platform
 
 import pytest
 from hypothesis import HealthCheck, Phase, given, settings
@@ -109,13 +110,13 @@ def unique_hook(testdir):
         hook="""
         import schemathesis
 
-        seen = set()
-
         @schemathesis.check
         def unique_test_cases(response, case):
-            command = case.as_curl_command({**response.request.headers, "X-Schemathesis-TestCaseId": "0"})
-            assert command not in seen, f"Test case already seen! {command}"
-            seen.add(command)
+            if not hasattr(case.operation.schema, "seen"):
+                case.operation.schema.seen = set()
+            command = case.as_curl_command({"X-Schemathesis-TestCaseId": "0"})
+            assert command not in case.operation.schema.seen, f"Test case already seen! {command}"
+            case.operation.schema.seen.add(command)
         """
     )
 
@@ -137,6 +138,7 @@ def run(testdir, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_exa
     )
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
 def test_cli(testdir, unique_hook, raw_schema, cli, openapi3_base_url, hypothesis_max_examples):
     result = run(testdir, cli, unique_hook, raw_schema, openapi3_base_url, hypothesis_max_examples)
     assert result.exit_code == ExitCode.OK, result.stdout

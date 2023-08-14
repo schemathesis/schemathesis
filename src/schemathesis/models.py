@@ -1,7 +1,6 @@
 import base64
 import datetime
 import http
-import json
 from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -99,17 +98,6 @@ def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
     reject()  # type: ignore
 
 
-def _serialize_unknown(data: Any) -> str:
-    if isinstance(data, bytes):
-        return base64.b64encode(data).decode("utf8")
-    # Schemathesis does not generate other types
-    raise TypeError(f"Object of type {data.__class__.__name__} is not JSON serializable")  # pragma: no cover
-
-
-def serialize(value: Any) -> str:
-    return json.dumps(value, sort_keys=True, default=_serialize_unknown)
-
-
 @dataclass(repr=False)
 class Case:
     """A single test case parameters."""
@@ -146,23 +134,7 @@ class Case:
         return "".join(parts) + ")"
 
     def __hash__(self) -> int:
-        value = hash(
-            (
-                self.media_type,
-                ("path_parameters", serialize(dict(self.path_parameters)) if self.path_parameters else None),
-                ("headers", serialize(dict(self.headers)) if self.headers else None),
-                ("cookies", serialize(dict(self.cookies)) if self.cookies else None),
-                ("query", serialize(dict(self.query)) if self.query else None),
-            )
-        )
-        if self.body is not NOT_SET:
-            if isinstance(self.body, (dict, list)):
-                # The simplest way to get a hash of a potentially nested structure
-                value ^= hash(serialize(self.body))
-            else:
-                # These types should be hashable
-                value ^= hash(self.body)
-        return value
+        return hash(self.as_curl_command({SCHEMATHESIS_TEST_CASE_HEADER: "0"}))
 
     @deprecated_property(removed_in="4.0", replacement="operation")
     def endpoint(self) -> "APIOperation":
