@@ -2,7 +2,7 @@ import json
 
 import pytest
 import requests
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from schemathesis import Case
@@ -104,6 +104,7 @@ def test_invalid_expression(context, expr):
 
 
 @given(expr=(st.text() | (st.lists(st.sampled_from([".", "}", "{", "$"]) | st.text()).map("".join))))
+@settings(deadline=None)
 def test_random_expression(expr):
     try:
         expressions.evaluate(expr, context)
