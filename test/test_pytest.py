@@ -1,3 +1,5 @@
+import platform
+
 import pytest
 
 from schemathesis.constants import (
@@ -296,6 +298,7 @@ def test(case):
     )
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
 def test_skip_operations_with_recursive_references(testdir, schema_with_recursive_references):
     # When the test schema contains recursive references
     testdir.make_test(
