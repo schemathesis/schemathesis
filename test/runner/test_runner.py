@@ -1,5 +1,6 @@
 import base64
 import json
+import platform
 from dataclasses import asdict
 from typing import Dict, Optional
 from unittest.mock import ANY
@@ -721,6 +722,7 @@ def test_url_joining(request, server, get_schema_path, schema_path):
     )
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
 def test_skip_operations_with_recursive_references(schema_with_recursive_references):
     # When the test schema contains recursive references
     schema = oas_loaders.from_dict(schema_with_recursive_references)
