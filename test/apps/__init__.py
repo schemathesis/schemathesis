@@ -16,7 +16,7 @@ except ImportError as exc:
         import _graphql
         import openapi
     except ImportError:
-        raise exc
+        raise exc from None
 
 
 INVALID_OPERATIONS = ("invalid", "invalid_response", "invalid_path_parameter", "missing_path_parameter")

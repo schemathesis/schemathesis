@@ -391,8 +391,8 @@ def test_display_errors(swagger_20, capsys, results_set, execution_context, show
 def test_display_internal_error(capsys, execution_context, show_errors_tracebacks):
     execution_context.show_errors_tracebacks = show_errors_tracebacks
     try:
-        1 / 0
-    except ArithmeticError as exc:
+        raise ZeroDivisionError("division by zero")
+    except ZeroDivisionError as exc:
         event = InternalError.from_exc(exc)
         display_internal_error(execution_context, event)
         out = capsys.readouterr().out.strip()

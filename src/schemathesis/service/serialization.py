@@ -69,7 +69,7 @@ def serialize_after_execution(event: events.AfterExecution) -> Optional[Dict[str
                     "response": _serialize_response(check.response) if check.response is not None else None,
                     "example": _serialize_case(check.example),
                     "message": check.message,
-                    "context": asdict(check.context) if check.context is not None else None,
+                    "context": asdict(check.context) if check.context is not None else None,  # type: ignore
                     "history": [
                         {"case": _serialize_case(entry.case), "response": _serialize_response(entry.response)}
                         for entry in check.history
