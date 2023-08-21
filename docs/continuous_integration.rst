@@ -40,6 +40,23 @@ If you enabled PR comments via our `GitHub app`_, you'll see a test report once 
 
 .. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_github_report.png
 
+When interacting with APIs that require headers, use the ``-H`` option in the Schemathesis CLI. Ensure the entire header value is enclosed in quotes:
+
+.. code-block:: yaml
+
+    # Extract the access token from 'secret.json' and save it to $GITHUB_ENV as ACCESS_TOKEN.
+    - name: Set access token
+      run: cat apps/python/secret.json | python3 -c "import sys, json; print(f'ACCESS_TOKEN={json.load(sys.stdin)[\"access_token\"]}')" >> $GITHUB_ENV
+
+    # Use the saved access token in the Schemathesis GitHub action.
+    - uses: schemathesis/action@v1
+      with:
+        schema: 'https://example.schemathesis.io/openapi.json'
+        args: '-H "Authorization: Bearer ${{ env.ACCESS_TOKEN }}"'
+
+- Make sure any variables or dynamic content in the header value, like ``${{ env.ACCESS_TOKEN }}``, are correctly resolved in your CI environment.
+- Remember, the ``-H`` option allows you to pass other headers in a similar manner if needed.
+
 GitLab CI
 ~~~~~~~~~
 
