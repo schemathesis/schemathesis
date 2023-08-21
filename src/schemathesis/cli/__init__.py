@@ -417,7 +417,10 @@ REPORT_TO_SERVICE = ReportToService()
 @click.option(
     "--report",
     "report_value",
-    help="Upload test report to Schemathesis.io, or store in a file.",
+    help="""Specifies how the generated report should be handled.
+If used without an argument, the report data will automatically be uploaded to Schemathesis.io.
+If a file name is provided, the report will be stored in that file.
+The report data, consisting of a tar gz file with multiple JSON files, is subject to change.""",
     is_flag=False,
     flag_value="",
     envvar=service.REPORT_ENV_VAR,

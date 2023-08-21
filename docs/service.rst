@@ -94,6 +94,12 @@ Once all events are uploaded to Schemathesis.io you'll see a message at the end 
 
 To observe the test run results, follow the link from the output.
 
+Use the ``--report`` argument followed by a file name to save the report as a tar gz file. Inside, you'll find multiple JSON files that capture details like the API schema and test data.
+
+**Why save the report?** Developers might want to integrate this report into their systems, derive custom analytics, or generate their own formatted reports.
+
+**Note**: We don't officially document the exact structure or contents of these JSON files. The format might evolve even without a major version bump. Utilizing this report directly is for advanced users; proceed with caution.
+
 Step 3: Observe the results
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
