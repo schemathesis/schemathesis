@@ -289,7 +289,7 @@ def get_response_payload(response: GenericResponse) -> str:
 
 def import_app(path: str) -> Any:
     """Import an application from a string."""
-    path, name = (re.split(r":(?![\\/])", path, 1) + [""])[:2]
+    path, name = (re.split(r":(?![\\/])", path, maxsplit=1) + [""])[:2]
     __import__(path)
     # accessing the module from sys.modules returns a proper module, while `__import__`
     # may return a parent module (system dependent)
@@ -336,6 +336,7 @@ def _warn_deprecation(*, thing: str, removed_in: str, replacement: str) -> None:
         f"Property `{thing}` is deprecated and will be removed in Schemathesis {removed_in}. "
         f"Use `{replacement}` instead.",
         DeprecationWarning,
+        stacklevel=1,
     )
 
 

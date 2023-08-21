@@ -1502,10 +1502,9 @@ def test_wsgi_app_internal_exception(testdir, cli):
     assert "== APPLICATION LOGS ==" in lines[41], result.stdout.strip()
     assert "ERROR in app: Exception on /api/success [GET]" in lines[43]
     if sys.version_info >= (3, 11):
-        idx = 60
+        assert lines[59] == "ZeroDivisionError: division by zero"
     else:
-        idx = 55
-    assert lines[idx] == "ZeroDivisionError: division by zero"
+        assert lines[54] == '    raise ZeroDivisionError("division by zero")'
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
