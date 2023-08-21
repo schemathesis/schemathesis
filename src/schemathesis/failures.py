@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 
-# @dataclass(repr=False)
 class FailureContext:
     """Additional data specific to certain failure kind."""
 

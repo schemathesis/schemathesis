@@ -33,8 +33,8 @@ def test_serialize_interrupted(mocker, schema_url):
 
 def test_serialize_internal_error():
     try:
-        1 / 0
-    except ArithmeticError as exc:
+        raise ZeroDivisionError("division by zero")
+    except ZeroDivisionError as exc:
         event = InternalError.from_exc(exc)
         assert serialize_event(event) == {
             "InternalError": {

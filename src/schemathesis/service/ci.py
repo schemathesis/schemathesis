@@ -55,7 +55,7 @@ def detect() -> Optional[CIProvider]:
 
 
 def _asdict(env: Environment) -> Dict[str, Optional[str]]:
-    data = asdict(env)
+    data = asdict(env)  # type: ignore
     data["provider"] = env.provider.value
     return data
 

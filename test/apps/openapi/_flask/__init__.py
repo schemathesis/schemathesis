@@ -54,7 +54,7 @@ def create_app(
     @app.route("/api/success", methods=["GET"])
     def success():
         if app.config["internal_exception"]:
-            1 / 0
+            raise ZeroDivisionError("division by zero")
         if app.config["prefix_with_bom"]:
             return Response((BOM_MARK + '{"success": true}').encode(), content_type="application/json")
         return jsonify({"success": True})

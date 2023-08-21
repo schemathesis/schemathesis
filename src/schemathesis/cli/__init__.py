@@ -968,7 +968,7 @@ def _try_load_schema(
             return second(config)
         except (HTTPError, SchemaLoadingError):
             # Raise the first loader's error
-            raise exc
+            raise exc from None
 
 
 def _load_graphql_schema(config: LoaderConfig) -> GraphQLSchema:
