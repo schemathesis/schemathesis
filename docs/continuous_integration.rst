@@ -44,9 +44,9 @@ When interacting with APIs that require headers, use the ``-H`` option in the Sc
 
 .. code-block:: yaml
 
-    # Extract the access token from 'secret.json' and save it to $GITHUB_ENV as ACCESS_TOKEN.
+    # Save access token to $GITHUB_ENV as ACCESS_TOKEN.
     - name: Set access token
-      run: cat apps/python/secret.json | python3 -c "import sys, json; print(f'ACCESS_TOKEN={json.load(sys.stdin)[\"access_token\"]}')" >> $GITHUB_ENV
+      run: echo "ACCESS_TOKEN=super-secret" >> $GITHUB_ENV
 
     # Use the saved access token in the Schemathesis GitHub action.
     - uses: schemathesis/action@v1
