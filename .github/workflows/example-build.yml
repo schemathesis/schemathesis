@@ -56,3 +56,4 @@ jobs:
           # Set your token from secrets
           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
           max-examples: "10"
+          args: "-E does-not-exist"
