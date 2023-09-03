@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- ``Unsatisfiable`` error for multiple security schemes applied to the same API operation and an explicit ``Authorization`` header. `#1763_`
+
 .. _v3.19.6:
 
 `3.19.6`_ - 2023-08-14
@@ -3391,6 +3395,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1763: https://github.com/schemathesis/schemathesis/issues/1763
 .. _#1753: https://github.com/schemathesis/schemathesis/issues/1753
 .. _#1742: https://github.com/schemathesis/schemathesis/issues/1742
 .. _#1739: https://github.com/schemathesis/schemathesis/issues/1739

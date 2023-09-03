@@ -390,7 +390,8 @@ def parameters_to_json_schema(operation: APIOperation, parameters: Iterable[Open
     for parameter in parameters:
         name = parameter.name
         properties[name] = parameter.as_json_schema(operation)
-        if parameter.is_required:
+        # If parameter names are duplicated, we need to avoid duplicate entries in `required` anyway
+        if parameter.is_required and name not in required:
             required.append(name)
     return {"properties": properties, "additionalProperties": False, "type": "object", "required": required}
 
