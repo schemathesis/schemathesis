@@ -440,7 +440,7 @@ def has_all_not_found(results: TestResultSet) -> bool:
                 else:
                     # There are non-404 responses, no reason to check any other response
                     return False
-    # Only happens if all responses are 404, ot there are no responses at all.
+    # Only happens if all responses are 404, or there are no responses at all.
     # In the first case, it returns True, for the latter - False
     return has_not_found
 
