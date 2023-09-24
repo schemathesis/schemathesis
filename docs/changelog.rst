@@ -201,7 +201,7 @@ Changelog
 **Changed**
 
 - Stateful testing: Only make stateful requests when stateful data is available from another operation.
-  This change significantly reduces the number of API calls that likely will fail because of absense of stateful data. `#1669`_
+  This change significantly reduces the number of API calls that likely will fail because of absence of stateful data. `#1669`_
 
 **Performance**
 
