@@ -197,6 +197,12 @@ def is_plain_text_media_type(value: str) -> bool:
     return parse_content_type(value) == ("text", "plain")
 
 
+def is_xml_media_type(value: str) -> bool:
+    """Detect variations of the ``application/xml`` media type."""
+    _, sub = parse_content_type(value)
+    return sub == "xml" or sub.endswith("+xml")
+
+
 def make_loader(*tags_to_remove: str) -> Type[yaml.SafeLoader]:
     """Create a YAML loader, that doesn't parse specific tokens into Python objects."""
     cls: Type[yaml.SafeLoader] = type("YAMLLoader", (SafeLoader,), {})
