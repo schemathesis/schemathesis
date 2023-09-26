@@ -205,13 +205,35 @@ class SkipTest(BaseException):
 SERIALIZATION_NOT_POSSIBLE_MESSAGE = (
     f"Schemathesis can't serialize data to any of the defined media types: {{}} \n{SERIALIZERS_SUGGESTION_MESSAGE}"
 )
+NAMESPACE_DEFINITION_URL = "https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#xmlNamespace"
+UNBOUND_PREFIX_MESSAGE_TEMPLATE = (
+    "Unbound prefix: `{prefix}`. "
+    "You need to define this namespace in your API schema via the `xml.namespace` keyword. "
+    f"See more at {NAMESPACE_DEFINITION_URL}"
+)
 
 SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE = (
     f"Schemathesis can't serialize data to {{}} \n{SERIALIZERS_SUGGESTION_MESSAGE}"
 )
 
 
-class SerializationNotPossible(Exception):
+class SerializationError(Exception):
+    """Serialization can not be done."""
+
+    __module__ = "builtins"
+
+
+class UnboundPrefixError(SerializationError):
+    """XML serialization error.
+
+    It happens when the schema does not define a namespace that is used by some of its parts.
+    """
+
+    def __init__(self, prefix: str):
+        super().__init__(UNBOUND_PREFIX_MESSAGE_TEMPLATE.format(prefix=prefix))
+
+
+class SerializationNotPossible(SerializationError):
     """Not possible to serialize to any of the media types defined for some API operation.
 
     Usually, there is still `application/json` along with less common ones, but this error happens when there is no

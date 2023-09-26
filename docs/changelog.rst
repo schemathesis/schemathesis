@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Support for ``application/xml`` serialization based on Open API schema definitions. `#733_`
+
 .. _v3.19.7:
 
 `3.19.7`_ - 2023-09-03
@@ -3591,6 +3595,7 @@ Deprecated
 .. _#738: https://github.com/schemathesis/schemathesis/issues/738
 .. _#737: https://github.com/schemathesis/schemathesis/issues/737
 .. _#734: https://github.com/schemathesis/schemathesis/issues/734
+.. _#733: https://github.com/schemathesis/schemathesis/issues/733
 .. _#731: https://github.com/schemathesis/schemathesis/issues/731
 .. _#721: https://github.com/schemathesis/schemathesis/issues/721
 .. _#719: https://github.com/schemathesis/schemathesis/issues/719

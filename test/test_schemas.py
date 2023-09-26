@@ -179,3 +179,23 @@ def test_get_operation_by_id(operation_id, path, method):
     operation = schema.get_operation_by_id(operation_id)
     assert operation.path == path
     assert operation.method.upper() == method
+
+
+@pytest.mark.parametrize(
+    "fixture, path",
+    (
+        ("simple_schema", "/users"),
+        ("simple_openapi", "/query"),
+    ),
+)
+def test_missing_payload_schema(request, fixture, path):
+    raw_schema = request.getfixturevalue(fixture)
+    schema = schemathesis.from_dict(raw_schema)
+    operation = schema[path]["GET"]
+    assert operation.get_raw_payload_schema("application/xml") is None
+    assert operation.get_resolved_payload_schema("application/xml") is None
+
+
+def test_missing_payload_schema_media_type(open_api_3_schema_with_yaml_payload):
+    schema = schemathesis.from_dict(open_api_3_schema_with_yaml_payload)
+    assert schema["/yaml"]["POST"].get_raw_payload_schema("application/xml") is None

@@ -398,6 +398,9 @@ class BaseSchema(Mapping):
             return self.rate_limiter.ratelimit(label, delay=True, max_delay=0)
         return nullcontext()
 
+    def _get_payload_schema(self, definition: Dict[str, Any], media_type: str) -> Optional[Dict[str, Any]]:
+        raise NotImplementedError
+
 
 def operations_to_dict(
     operations: Generator[Result[APIOperation, InvalidSchema], None, None]
