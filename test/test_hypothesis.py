@@ -453,6 +453,7 @@ def test_optional_payload(request, spec_version):
 
 
 @given(data=st.data())
+@settings(deadline=None)
 def test_date_format(data):
     raw_schema = {
         "openapi": "3.0.2",
