@@ -23,7 +23,7 @@ def _to_xml(value: Any, raw_schema: Dict[str, Any], resolved_schema: Dict[str, A
     :param raw_schema: The payload definition with not resolved references.
     :param resolved_schema: The payload definition with all references resolved.
     """
-    if isinstance(value, bytes):
+    if isinstance(value, (bytes, str)):
         return {"data": value}
     tag = _get_xml_tag(raw_schema, resolved_schema)
     buffer = StringIO()

@@ -330,11 +330,12 @@ def test_serialize_xml(openapi_3_schema_with_xml, path, expected):
     @settings(max_examples=1)
     def test(case):
         # Then it should be correctly serialized
-        data = case.as_requests_kwargs()["data"]
-        assert data == expected
-        # Arrays may be serialized into multiple elements without root, therefore wrapping everything and check if
-        # it can be parsed.
-        ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{data.decode('utf8')}</root>")
+        for method in (case.as_requests_kwargs, case.as_werkzeug_kwargs):
+            data = method()["data"]
+            assert data == expected
+            # Arrays may be serialized into multiple elements without root, therefore wrapping everything and check if
+            # it can be parsed.
+            ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{data.decode('utf8')}</root>")
 
     original = fast_deepcopy(schema[path]["POST"].body[0].definition)
 
@@ -443,5 +444,29 @@ def test_serialize_xml_hypothesis(data, schema_object):
     # Arrays may be serialized into multiple elements without root, therefore wrapping everything and check if
     # it can be parsed.
     with suppress(SerializationError, UnboundPrefixError):
-        serialized_data = case.as_requests_kwargs()["data"].decode("utf8")
-        ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{serialized_data}</root>")
+        for method in (case.as_requests_kwargs, case.as_werkzeug_kwargs):
+            serialized_data = method()["data"].decode("utf8")
+            ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{serialized_data}</root>")
+
+
+def test_xml_with_binary(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "requestBody": {
+                    "content": {"application/xml": {"schema": {"type": "string", "format": "file"}}},
+                    "required": True,
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    @given(case=schema["/test"]["POST"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        assert case.as_requests_kwargs()["data"] == ""
+
+    test()

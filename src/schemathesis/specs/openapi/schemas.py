@@ -911,5 +911,6 @@ class OpenApi30(SwaggerV20):
                 body = self.resolver.resolve_all(definition["requestBody"], RECURSION_DEPTH_LIMIT)
             else:
                 body = definition["requestBody"]
-            return body["content"][media_type]["schema"]
+            if "content" in body and media_type in body["content"]:
+                return body["content"][media_type]["schema"]
         return None
