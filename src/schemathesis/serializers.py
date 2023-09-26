@@ -8,7 +8,7 @@ import yaml
 from typing_extensions import Protocol, runtime_checkable
 
 from ._xml import _to_xml
-from .utils import is_json_media_type, is_plain_text_media_type, parse_content_type, is_xml_media_type
+from .utils import is_json_media_type, is_plain_text_media_type, is_xml_media_type, parse_content_type
 
 if TYPE_CHECKING:
     from .models import Case

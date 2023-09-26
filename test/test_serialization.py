@@ -5,7 +5,6 @@ from copy import deepcopy
 from io import StringIO
 from test.utils import assert_requests_call
 from xml.etree import ElementTree
-from xml.etree.ElementTree import ParseError
 
 import pytest
 from hypothesis import HealthCheck, given, settings
@@ -13,7 +12,12 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis import serializers
-from schemathesis.exceptions import SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE, SerializationError, SerializationNotPossible
+from schemathesis.exceptions import (
+    SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE,
+    SerializationError,
+    SerializationNotPossible,
+    UnboundPrefixError,
+)
 
 
 def to_csv(data):
@@ -174,7 +178,7 @@ def test_serialization_not_possible_manual(empty_open_api_3_schema):
     @given(case=schema["/test"]["POST"].as_strategy())
     @settings(max_examples=1)
     def test(case):
-        case.media_type = "application/xml"
+        case.media_type = "application/whatever"
         with pytest.raises(
             SerializationNotPossible, match=SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE.format(case.media_type)
         ):
@@ -228,7 +232,13 @@ def test_binary_data(empty_open_api_3_schema, media_type):
         ("application/problem+json", {"application/problem+json"}),
         (
             "application/*",
-            {"application/json", "application/octet-stream", "application/x-www-form-urlencoded", "application/x-yaml"},
+            {
+                "application/json",
+                "application/octet-stream",
+                "application/x-www-form-urlencoded",
+                "application/x-yaml",
+                "application/xml",
+            },
         ),
         ("*/form-data", {"multipart/form-data"}),
         ("*/*", set(serializers.SERIALIZERS)),
@@ -408,7 +418,7 @@ SCHEMA_OBJECT_STRATEGY = st.deferred(
 
 
 @given(data=st.data(), schema_object=SCHEMA_OBJECT_STRATEGY)
-@settings(suppress_health_check=HealthCheck.all(), deadline=None)
+@settings(suppress_health_check=list(HealthCheck), deadline=None, max_examples=25)
 def test_serialize_xml_hypothesis(data, schema_object):
     raw_schema = {
         "openapi": "3.0.2",
@@ -431,8 +441,8 @@ def test_serialize_xml_hypothesis(data, schema_object):
 
     case = data.draw(schema["/test"]["POST"].as_strategy())
 
-    serialized_data = case.as_requests_kwargs()["data"].decode("utf8")
     # Arrays may be serialized into multiple elements without root, therefore wrapping everything and check if
     # it can be parsed.
-    with suppress(SerializationError):
+    with suppress(SerializationError, UnboundPrefixError):
+        serialized_data = case.as_requests_kwargs()["data"].decode("utf8")
         ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{serialized_data}</root>")

@@ -2,6 +2,9 @@
 from copy import deepcopy
 from io import StringIO
 from typing import Any, Dict, List, Union
+from xml.etree import ElementTree
+
+from hypothesis import reject
 
 from .exceptions import UnboundPrefixError
 
@@ -20,13 +23,26 @@ def _to_xml(value: Any, raw_schema: Dict[str, Any], resolved_schema: Dict[str, A
     """
     if isinstance(value, bytes):
         return {"data": value}
-    # TODO. Do not serialize data that leads to not valid XML - reject it
     tag = _get_xml_tag(raw_schema, resolved_schema)
     buffer = StringIO()
     # Collect all namespaces to ensure that all child nodes with prefixes have proper namespaces in their parent nodes
     namespace_stack: List[str] = []
     _write_xml(buffer, value, tag, resolved_schema, namespace_stack)
-    return {"data": buffer.getvalue().encode("utf8")}
+    data = buffer.getvalue()
+    if not is_valid_xml(data):
+        reject()
+    return {"data": data.encode("utf8")}
+
+
+_from_string = ElementTree.fromstring
+
+
+def is_valid_xml(data: str) -> bool:
+    try:
+        _from_string(f"<root xmlns:smp='http://example.com/schema'>{data}</root>")
+        return True
+    except ElementTree.ParseError:
+        return False
 
 
 def _get_xml_tag(raw_schema: Dict[str, Any], resolved_schema: Dict[str, Any]) -> str:
