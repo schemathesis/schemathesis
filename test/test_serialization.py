@@ -251,7 +251,6 @@ def test_get_matching_serializers(media_type, expected):
 @pytest.mark.parametrize(
     "path, expected",
     (
-        # TODO. check if `data` clashes with something in the default namespace
         ("/root-name", b"<data><id>42</id></data>"),
         ("/auto-name", b"<AutoName><id>42</id></AutoName>"),
         ("/explicit-name", b"<CustomName><id>42</id></CustomName>"),
