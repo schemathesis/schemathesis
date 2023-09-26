@@ -1,7 +1,6 @@
 import csv
 import string
 from contextlib import suppress
-from copy import deepcopy
 from io import StringIO
 from test.utils import assert_requests_call
 from xml.etree import ElementTree
@@ -18,6 +17,7 @@ from schemathesis.exceptions import (
     SerializationNotPossible,
     UnboundPrefixError,
 )
+from schemathesis.utils import fast_deepcopy
 
 
 def to_csv(data):
@@ -337,7 +337,7 @@ def test_serialize_xml(openapi_3_schema_with_xml, path, expected):
         # it can be parsed.
         ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{data.decode('utf8')}</root>")
 
-    original = deepcopy(schema[path]["POST"].body[0].definition)
+    original = fast_deepcopy(schema[path]["POST"].body[0].definition)
 
     test()
     # And serialization does not modify the original schema

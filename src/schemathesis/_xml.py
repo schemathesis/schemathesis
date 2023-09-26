@@ -1,5 +1,4 @@
 """XML serialization."""
-from copy import deepcopy
 from io import StringIO
 from typing import Any, Dict, List, Union
 from xml.etree import ElementTree
@@ -7,9 +6,12 @@ from xml.etree import ElementTree
 from hypothesis import reject
 
 from .exceptions import UnboundPrefixError
+from .utils import fast_deepcopy
 
 Primitive = Union[str, int, float, bool, None]
 JSON = Union[Primitive, List, Dict[str, Any]]
+DEFAULT_TAG_NAME = "data"
+NAMESPACE_URL = "http://example.com/schema"
 
 
 def _to_xml(value: Any, raw_schema: Dict[str, Any], resolved_schema: Dict[str, Any]) -> Dict[str, Any]:
@@ -39,7 +41,7 @@ _from_string = ElementTree.fromstring
 
 def is_valid_xml(data: str) -> bool:
     try:
-        _from_string(f"<root xmlns:smp='http://example.com/schema'>{data}</root>")
+        _from_string(f"<root xmlns:smp='{NAMESPACE_URL}'>{data}</root>")
         return True
     except ElementTree.ParseError:
         return False
@@ -49,11 +51,13 @@ def _get_xml_tag(raw_schema: Dict[str, Any], resolved_schema: Dict[str, Any]) ->
     # On the top level we need to detect the proper XML tag, in other cases it is known from object properties
     if resolved_schema.get("xml", {}).get("name"):
         return resolved_schema["xml"]["name"]
+
+    # Check if the name can be derived from a reference in the raw schema
     if "$ref" in raw_schema:
         return _get_tag_name_from_reference(raw_schema["$ref"])
-    # TODO. what in this case?
+
     # Here we don't have any name for the payload schema - no reference or the `xml` property
-    return "data"
+    return DEFAULT_TAG_NAME
 
 
 def _write_xml(buffer: StringIO, value: JSON, tag: str, schema: Dict[str, Any], namespace_stack: List[str]) -> None:
@@ -74,78 +78,78 @@ def _validate_prefix(options: Dict[str, Any], namespace_stack: List[str]) -> Non
         pass
 
 
-def _write_object(
-    buffer: StringIO, obj: Dict[str, JSON], tag: str, schema: Dict[str, Any], namespace_stack: List[str]
-) -> None:
-    xml_options = schema.get("xml", {})
-    if "namespace" in xml_options and "prefix" in xml_options:
-        namespace_stack.append(xml_options["prefix"])
-    if "prefix" in xml_options:
-        tag = f"{xml_options['prefix']}:{tag}"
+def push_namespace_if_any(namespace_stack: List[str], options: Dict[str, Any]) -> None:
+    if "namespace" in options and "prefix" in options:
+        namespace_stack.append(options["prefix"])
+
+
+def pop_namespace_if_any(namespace_stack: List[str], options: Dict[str, Any]) -> None:
+    if "namespace" in options and "prefix" in options:
+        namespace_stack.pop()
+
+
+def _write_object(buffer: StringIO, obj: Dict[str, JSON], tag: str, schema: Dict[str, Any], stack: List[str]) -> None:
+    options = schema.get("xml", {})
+    push_namespace_if_any(stack, options)
+    if "prefix" in options:
+        tag = f"{options['prefix']}:{tag}"
     buffer.write(f"<{tag}")
-    if "namespace" in xml_options:
-        _write_namespace(buffer, xml_options)
+    if "namespace" in options:
+        _write_namespace(buffer, options)
     attributes = []
-    children_buffed = StringIO()
+    children_buffer = StringIO()
     properties = schema.get("properties", {})
     for child_name, value in obj.items():
         property_schema = properties.get(child_name, {})
-        child_xml_options = property_schema.get("xml", {})
-        if "namespace" in child_xml_options and "prefix" in child_xml_options:
-            namespace_stack.append(child_xml_options["prefix"])
-        child_tag = child_xml_options.get("name", child_name)
-        if child_xml_options.get("prefix"):
-            _validate_prefix(child_xml_options, namespace_stack)
-            prefix = child_xml_options["prefix"]
+        child_options = property_schema.get("xml", {})
+        push_namespace_if_any(stack, child_options)
+        child_tag = child_options.get("name", child_name)
+        if child_options.get("prefix"):
+            _validate_prefix(child_options, stack)
+            prefix = child_options["prefix"]
             child_tag = f"{prefix}:{child_tag}"
-        if child_xml_options.get("attribute", False):
+        if child_options.get("attribute", False):
             attributes.append(f'{child_tag}="{value}"')
             continue
-        _write_xml(children_buffed, value, child_tag, property_schema, namespace_stack)
-        if "namespace" in child_xml_options and "prefix" in child_xml_options:
-            namespace_stack.pop()
+        _write_xml(children_buffer, value, child_tag, property_schema, stack)
+        pop_namespace_if_any(stack, child_options)
 
     if attributes:
         buffer.write(f" {' '.join(attributes)}")
     buffer.write(">")
-    buffer.write(children_buffed.getvalue())
+    buffer.write(children_buffer.getvalue())
     buffer.write(f"</{tag}>")
-    if "namespace" in xml_options and "prefix" in xml_options:
-        namespace_stack.pop()
+    pop_namespace_if_any(stack, options)
 
 
-def _write_array(
-    buffer: StringIO, obj: List[JSON], tag: str, schema: Dict[str, Any], namespace_stack: List[str]
-) -> None:
-    xml_options = schema.get("xml", {})
-    if "namespace" in xml_options and "prefix" in xml_options:
-        namespace_stack.append(xml_options["prefix"])
-    if xml_options.get("prefix"):
-        tag = f"{xml_options['prefix']}:{tag}"
-    wrapped = xml_options.get("wrapped", False)
+def _write_array(buffer: StringIO, obj: List[JSON], tag: str, schema: Dict[str, Any], stack: List[str]) -> None:
+    options = schema.get("xml", {})
+    push_namespace_if_any(stack, options)
+    if options.get("prefix"):
+        tag = f"{options['prefix']}:{tag}"
+    wrapped = options.get("wrapped", False)
     is_namespace_specified = False
     if wrapped:
         buffer.write(f"<{tag}")
-        if "namespace" in xml_options:
+        if "namespace" in options:
             is_namespace_specified = True
-            _write_namespace(buffer, xml_options)
+            _write_namespace(buffer, options)
         buffer.write(">")
     # In Open API `items` value should be an object and not an array
-    items = deepcopy(schema.get("items", {}))
-    child_xml_options = items.get("xml", {})
-    child_tag = child_xml_options.get("name", tag)
-    if not is_namespace_specified and "namespace" in xml_options:
-        child_xml_options.setdefault("namespace", xml_options["namespace"])
-    if "prefix" in xml_options:
-        child_xml_options.setdefault("prefix", xml_options["prefix"])
-    items["xml"] = child_xml_options
-    _validate_prefix(child_xml_options, namespace_stack)
+    items = fast_deepcopy(schema.get("items", {}))
+    child_options = items.get("xml", {})
+    child_tag = child_options.get("name", tag)
+    if not is_namespace_specified and "namespace" in options:
+        child_options.setdefault("namespace", options["namespace"])
+    if "prefix" in options:
+        child_options.setdefault("prefix", options["prefix"])
+    items["xml"] = child_options
+    _validate_prefix(child_options, stack)
     for item in obj:
-        _write_xml(buffer, item, child_tag, items, namespace_stack)
+        _write_xml(buffer, item, child_tag, items, stack)
     if wrapped:
         buffer.write(f"</{tag}>")
-    if "namespace" in xml_options and "prefix" in xml_options:
-        namespace_stack.pop()
+    pop_namespace_if_any(stack, options)
 
 
 def _write_primitive(
@@ -153,7 +157,7 @@ def _write_primitive(
 ) -> None:
     xml_options = schema.get("xml", {})
     # There is no need for modifying the namespace stack, as we know that this function is terminal - it do not recurse
-    # and this element don't have any children. Therefore checking the prefix is enough
+    # and this element don't have any children. Therefore, checking the prefix is enough
     _validate_prefix(xml_options, namespace_stack)
     buffer.write(f"<{tag}")
     if "namespace" in xml_options:
@@ -170,5 +174,4 @@ def _write_namespace(buffer: StringIO, options: Dict[str, Any]) -> None:
 
 def _get_tag_name_from_reference(reference: str) -> str:
     """Extract object name from a reference."""
-    # TODO. is it possible to have a list of 1 element here?
     return reference.rsplit("/", maxsplit=1)[1]
