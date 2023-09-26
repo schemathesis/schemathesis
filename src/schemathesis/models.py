@@ -337,7 +337,8 @@ class Case:
                 response = session.request(**data)  # type: ignore
         except requests.Timeout as exc:
             timeout = 1000 * data["timeout"]  # It is defined and not empty, since the exception happened
-            code_message = self._get_code_message(self.operation.schema.code_sample_style, exc.request)
+            request = cast(requests.PreparedRequest, exc.request)
+            code_message = self._get_code_message(self.operation.schema.code_sample_style, request)
             raise get_timeout_error(timeout)(
                 f"\n\n1. Request timed out after {timeout:.2f}ms\n\n----------\n\n{code_message}",
                 context=failures.RequestTimeout(timeout=timeout),

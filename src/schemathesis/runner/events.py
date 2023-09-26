@@ -1,8 +1,9 @@
 import threading
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
+import requests
 from requests import exceptions
 
 from ..constants import USE_WAIT_FOR_SCHEMA_SUGGESTION_MESSAGE, DataGenerationMethod
@@ -192,7 +193,8 @@ class InternalError(ExecutionEvent):
         exception = format_exception(exc)
         exception_with_traceback = format_exception(exc, include_traceback=True)
         if isinstance(exc, exceptions.ConnectionError):
-            message = f"Failed to load schema from {exc.request.url}"
+            request = cast(requests.PreparedRequest, exc.request)
+            message = f"Failed to load schema from {request.url}"
             if wait_for_schema is None:
                 message += f"\n{USE_WAIT_FOR_SCHEMA_SUGGESTION_MESSAGE}"
         else:
