@@ -7,13 +7,124 @@ sending, and so on. Schemathesis offers multiple extension mechanisms.
 Hooks
 -----
 
-The hook mechanism is similar to pytest's. Depending on the scope of the changes, there are three scopes of hooks:
+Hooks in Schemathesis allow you to influence the generation of test data, enabling you to create more relevant and targeted tests. 
+They can be used to limit the test input to certain criteria, modify the generated values, or establish relationships between different pieces of generated data.
 
-- Global. These hooks applied to all schemas in the test run;
-- Schema. Used only for specific schema instance;
-- Test. Used only for a particular test function;
+Hooks are identified and applied based on their function name, utilized through a decorator, like ``@schemathesis.hook``. 
+The function name, such as ``filter_query``, indicates it's a hook to filter query parameters. 
+When dealing with multiple hooks that serve similar purposes, especially across different schemas within the same file, custom names can be assigned as the first argument in the decorator to avoid conflicts and maintain clarity.
 
-To register a new hook function, you need to use special decorators - ``hook`` for global and schema-local hooks and ``hooks.apply`` for test-specific ones:
+.. code:: python
+
+    import schemathesis
+
+
+    @schemathesis.hook
+    def filter_query(context, query):
+        return query["key"] != "41"
+
+
+    @schemathesis.hook("filter_query")
+    def avoid_42(context, query):
+        return query["key"] != "42"
+
+
+    @schemathesis.hook("filter_query")
+    def avoid_43(context, query):
+        return query["key"] != "43"
+
+
+In the code snippet above, the function names ``avoid_42`` and ``avoid_43`` don't directly indicate their role as hooks. 
+However, by providing "filter_query" as an argument in the ``@schemathesis.hook`` decorator, both functions will serve as ``filter_query`` hooks, ensuring the right application while maintaining unique function names.
+
+Hooks are applied at different scopes: global, schema-specific, and test-specific. 
+They execute in the order they are defined, with globally defined hooks executing first, followed by schema-specific hooks, and finally test-specific hooks.
+ 
+**Note**: hooks in different scopes do not override each other but are applied sequentially.
+
+.. code:: python
+
+    import schemathesis
+
+
+    @schemathesis.hook("filter_query")
+    def global_hook(context, query):
+        return query["key"] != "42"
+
+
+    schema = schemathesis.from_uri("http://0.0.0.0:8080/swagger.json")
+
+
+    @schema.hook("filter_query")
+    def schema_hook(context, query):
+        return query["key"] != "43"
+
+
+    def function_hook(context, query):
+        return query["key"] != "44"
+
+
+    @schema.hooks.apply(function_hook)
+    @schema.parametrize()
+    def test_api(case):
+        ...
+
+Filtering Data
+~~~~~~~~~~~~~~
+
+Use ``filter`` hooks to exclude certain data values, creating tests that focus on more interesting or relevant inputs. 
+For instance, to avoid testing with data that is known to be invalid or uninteresting:
+
+.. code:: python
+
+    @schemathesis.hook
+    def filter_query(context, query):
+        # Excluding a known test user ID from tests
+        return query["user_id"] != 1
+
+Modifying Data
+~~~~~~~~~~~~~~
+
+``map`` hooks alter generated data, useful for ensuring that tests include specific, predefined values. Note that you need to explicitly return the modified data.
+
+.. code:: python
+
+    @schemathesis.hook
+    def map_query(context, query):
+        # Always test with known test user ID
+        query["user_id"] = 101
+        return query
+
+Generating Dependent Data
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``flatmap`` hooks generate data with dependencies between different pieces, which can help produce more realistic data and enable deeper testing into the application logic:
+
+.. code:: python
+
+    import schemathesis
+    from hypothesis import strategies as st
+
+
+    @schemathesis.hook
+    def flatmap_body(context, body):
+        # Ensure 'permissions' align with 'role'
+        role = body["role"]
+        if role == "admin":
+            permissions = [
+                ["project:admin", "project:read"],
+                ["organization:admin", "organization:read"],
+            ]
+        else:
+            permissions = [["project:read"], ["organization:read"]]
+        return st.sampled_from(permissions).map(lambda p: {"role": role, "permissions": p})
+
+In this example, if the role is "admin", permissions might be chosen only from a specific set that is valid for admins.
+
+Further customization
+~~~~~~~~~~~~~~~~~~~~~
+
+``before_generate`` hooks provide a means to apply intricate logic to data generation, allowing the combination of multiple maps, filters, and more within the same function, which can enhance readability and organization.
 
 .. code:: python
 
@@ -22,92 +133,48 @@ To register a new hook function, you need to use special decorators - ``hook`` f
 
     @schemathesis.hook
     def before_generate_query(context, strategy):
-        return strategy.filter(lambda x: x["id"].isdigit())
+        # Only even 'id' values during test generation
+        return strategy.filter(lambda x: x["id"] % 2 == 0).map(
+            lambda x: {"id": x["id"] ** 2}
+        )
 
+Hook locations
+~~~~~~~~~~~~~~
 
-    schema = schemathesis.from_uri("http://0.0.0.0:8080/swagger.json")
+Hooks can be applied to various parts of a test case:
 
-
-    @schema.hook("before_generate_query")
-    def schema_hook(context, strategy):
-        return strategy.filter(lambda x: int(x["id"]) % 2 == 0)
-
-
-    def before_generate_headers(context, strategy):
-        return strategy.filter(lambda x: len(x["id"]) > 5)
-
-
-    @schema.hooks.apply(before_generate_headers)
-    @schema.parametrize()
-    def test_api(case):
-        ...
-
-By default, ``register`` functions will check the registered hook name to determine when to run it
-(see all hook specifications in the section below). Still, to avoid name collisions, you can provide a hook name as an argument to ``register``.
-
-Also, these decorators will check the signature of your hook function to match the specification.
-Each hook should accept ``context`` as the first argument, that provides additional context for hook execution.
+- ``query``: Affects the query parameters of a request.
+- ``headers``: Affects the headers of a request.
+- ``cookies``: Affects the cookies sent with a request.
+- ``path_parameters``: Affects the parameters within the URL path.
+- ``body``: Affects the body of a request.
+- ``case``: Affects the entire test case, combining all the above.
 
 .. important::
 
-    Do not mutate ``context.operation`` in hook functions as Schemathesis relies on its immutability for caching purposes.
-    Mutating it may lead to unpredictable problems.
+    Keep ``context.operation`` immutable in hooks due to its use in internal caching mechanisms.
 
-Hooks registered on the same scope will be applied in the order of registration. When there are multiple hooks in the same hook location, then the global ones will be applied first.
+Applying Hooks to Specific API Operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-These hooks can be applied both in CLI and in-code use cases.
-
-``before_generate_*``
-~~~~~~~~~~~~~~~~~~~~~
-
-This group of six hooks shares the same purpose - adjust data generation for specific request's part or the whole request.
-
-- ``before_generate_path_parameters``
-- ``before_generate_headers``
-- ``before_generate_cookies``
-- ``before_generate_query``
-- ``before_generate_body``
-- ``before_generate_case``
-
-They have the same signature that looks like this:
+To fine-tune data generation for specific API operations, you can incorporate conditional logic within the hook function. 
+This ensures the hook applies only to relevant scenarios.
 
 .. code:: python
 
-    import hypothesis
     import schemathesis
 
 
-    def before_generate_query(
-        context: schemathesis.hooks.HookContext,
-        strategy: hypothesis.strategies.SearchStrategy,
-    ) -> hypothesis.strategies.SearchStrategy:
-        pass
-
-The ``strategy`` argument is a Hypothesis strategy that will generate a certain request part or the whole request (in case of the ``before_generate_case`` hook). For example, your API operation under test
-expects ``id`` query parameter that is a number, and you'd like to have only values that have at least three occurrences of "1".
-Then your hook might look like this:
-
-.. code:: python
-
-    def before_generate_query(context, strategy):
-        return strategy.filter(lambda x: str(x["id"]).count("1") >= 3)
-
-To filter or modify the whole request:
-
-.. code:: python
-
-    def before_generate_case(context, strategy):
+    @schemathesis.hook
+    def map_case(context, case):
         op = context.operation
+        # If the operation is `PATCH /items/{item_id}/`,
+        # set `item_id` path parameter to match the body `id`.
+        if op.method == "PATCH" and op.path == "/items/{item_id}/":
+            case.path_parameters["item_id"] = case.body["data"]["id"]
+        return case
 
-        def tune_case(case):
-            if op.method == "PATCH" and op.path == "/users/{user_id}/":
-                case.path_parameters["user_id"] = case.body["data"]["id"]
-            return case
-
-        return strategy.map(tune_case)
-
-The example above will modify generated test cases for ``PATCH /users/{user_id}/`` by setting the ``user_id`` path parameter
-to the value generated for payload.
+In this example, the ``item_id`` path parameter is synchronized with the ``id`` value from the request body, but only for test cases targeting ``PATCH /items/{item_id}/``.
 
 ``before_process_path``
 ~~~~~~~~~~~~~~~~~~~~~~~

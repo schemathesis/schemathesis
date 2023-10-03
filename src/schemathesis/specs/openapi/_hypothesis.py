@@ -3,6 +3,7 @@ import string
 from base64 import b64encode
 from contextlib import suppress
 from dataclasses import dataclass
+from functools import partial
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
@@ -510,10 +511,19 @@ def apply_hooks(
 def _apply_hooks(
     context: HookContext, hooks: HookDispatcher, strategy: st.SearchStrategy, location: str
 ) -> st.SearchStrategy:
-    """Apply all `before_generate_` hooks related to the given location & dispatcher."""
+    """Apply all hooks related to the given location & dispatcher."""
     container = LOCATION_TO_CONTAINER[location]
     for hook in hooks.get_all_by_name(f"before_generate_{container}"):
         strategy = hook(context, strategy)
+    for hook in hooks.get_all_by_name(f"filter_{container}"):
+        hook = partial(hook, context)
+        strategy = strategy.filter(hook)
+    for hook in hooks.get_all_by_name(f"map_{container}"):
+        hook = partial(hook, context)
+        strategy = strategy.map(hook)
+    for hook in hooks.get_all_by_name(f"flatmap_{container}"):
+        hook = partial(hook, context)
+        strategy = strategy.flatmap(hook)
     return strategy
 
 
