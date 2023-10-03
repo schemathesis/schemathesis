@@ -8,6 +8,10 @@ Changelog
 
 - Support for ``application/xml`` serialization based on Open API schema definitions. `#733_`
 
+**Changed**
+
+- Pin ``Werkzeug`` to ``<3.0``.
+
 .. _v3.19.7:
 
 `3.19.7`_ - 2023-09-03
