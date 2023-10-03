@@ -12,6 +12,10 @@ Changelog
 
 - Pin ``Werkzeug`` to ``<3.0``.
 
+**Fixed**
+
+- Fixed type hint for ``AuthProvider``. `#1776_`
+
 .. _v3.19.7:
 
 `3.19.7`_ - 2023-09-03
@@ -3409,6 +3413,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1776: https://github.com/schemathesis/schemathesis/issues/1776
 .. _#1763: https://github.com/schemathesis/schemathesis/issues/1763
 .. _#1753: https://github.com/schemathesis/schemathesis/issues/1753
 .. _#1742: https://github.com/schemathesis/schemathesis/issues/1742

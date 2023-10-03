@@ -32,7 +32,7 @@ class AuthContext:
 
 
 @runtime_checkable
-class AuthProvider(Protocol):
+class AuthProvider(Generic[Auth], Protocol):
     """Get authentication data for an API and set it on the generated test cases."""
 
     def get(self, context: AuthContext) -> Optional[Auth]:
