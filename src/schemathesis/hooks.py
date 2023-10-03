@@ -203,6 +203,18 @@ class HookDispatcher:
 all_scopes = HookDispatcher.register_spec(list(HookScope))
 
 
+for action in ("filter", "map", "flatmap"):
+    for target in ("path_parameters", "query", "headers", "cookies", "body", "case"):
+        exec(
+            f"""
+@all_scopes
+def {action}_{target}(context: HookContext, {target}: Any) -> Any:
+    pass
+""",
+            globals(),
+        )
+
+
 @all_scopes
 def before_generate_path_parameters(context: HookContext, strategy: st.SearchStrategy) -> st.SearchStrategy:
     """Called on a strategy that generates values for ``path_parameters``."""

@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Support for ``application/xml`` serialization based on Open API schema definitions. `#733_`
+- Hook shortcuts (``filter_query``, ``map_header``, etc.) to minimize boilerplate in extensions.
 
 **Changed**
 

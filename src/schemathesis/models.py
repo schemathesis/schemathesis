@@ -5,6 +5,7 @@ from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
+from functools import partial
 from itertools import chain
 from logging import LogRecord
 from typing import (
@@ -686,8 +687,18 @@ class APIOperation(Generic[P, C]):
         strategy = self.schema.get_case_strategy(self, hooks, auth_storage, data_generation_method, **kwargs)
 
         def _apply_hooks(dispatcher: HookDispatcher, _strategy: st.SearchStrategy[Case]) -> st.SearchStrategy[Case]:
+            context = HookContext(self)
             for hook in dispatcher.get_all_by_name("before_generate_case"):
-                _strategy = hook(HookContext(self), _strategy)
+                _strategy = hook(context, _strategy)
+            for hook in dispatcher.get_all_by_name("filter_case"):
+                hook = partial(hook, context)
+                _strategy = _strategy.filter(hook)
+            for hook in dispatcher.get_all_by_name("map_case"):
+                hook = partial(hook, context)
+                _strategy = _strategy.map(hook)
+            for hook in dispatcher.get_all_by_name("flatmap_case"):
+                hook = partial(hook, context)
+                _strategy = _strategy.flatmap(hook)
             return _strategy
 
         strategy = _apply_hooks(GLOBAL_HOOK_DISPATCHER, strategy)
