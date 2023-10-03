@@ -1,29 +1,41 @@
 import pytest
 from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.hooks import HookContext, HookDispatcher, HookScope
 from schemathesis.utils import PARAMETRIZE_MARKER
 
 
-@pytest.fixture(params=["direct", "named"])
+def integer_id(query):
+    return query["id"].isdigit()
+
+
+@pytest.fixture(params=["default-direct", "default-named", "generate-direct", "generate-named"])
 def global_hook(request):
-    if request.param == "direct":
+    if request.param == "default-direct":
+
+        @schemathesis.hook
+        def filter_query(context, query):
+            return integer_id(query)
+
+    if request.param == "default-named":
+
+        @schemathesis.hook("filter_query")
+        def hook(context, query):
+            return integer_id(query)
+
+    if request.param == "generate-direct":
 
         @schemathesis.hook
         def before_generate_query(context, strategy):
-            return strategy.filter(lambda x: x["id"].isdigit())
+            return strategy.filter(integer_id)
 
-    if request.param == "named":
+    if request.param == "generate-named":
 
         @schemathesis.hook("before_generate_query")
         def hook(context, strategy):
-            return strategy.filter(lambda x: x["id"].isdigit())
-
-
-@pytest.fixture
-def schema(flask_app):
-    return schemathesis.from_wsgi("/schema.yaml", flask_app)
+            return strategy.filter(integer_id)
 
 
 @pytest.fixture()
@@ -34,8 +46,8 @@ def dispatcher():
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("custom_format")
 @pytest.mark.usefixtures("global_hook")
-def test_global_query_hook(schema, schema_url):
-    strategy = schema["/custom_format"]["GET"].as_strategy()
+def test_global_query_hook(wsgi_app_schema, schema_url):
+    strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow])
@@ -47,12 +59,12 @@ def test_global_query_hook(schema, schema_url):
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("payload")
-def test_global_body_hook(schema):
+def test_global_body_hook(wsgi_app_schema):
     @schemathesis.hook
-    def before_generate_body(context, strategy):
-        return strategy.filter(lambda x: len(x["name"]) == 5)
+    def filter_body(context, body):
+        return len(body["name"]) == 5
 
-    strategy = schema["/payload"]["POST"].as_strategy()
+    strategy = wsgi_app_schema["/payload"]["POST"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow])
@@ -64,26 +76,20 @@ def test_global_body_hook(schema):
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("create_user")
-def test_case_hook(schema):
+def test_case_hook(wsgi_app_schema):
     dispatcher = HookDispatcher(scope=HookScope.TEST)
 
     @dispatcher.register
-    def before_generate_case(context, strategy):
-        def tune_case(case):
-            case.body["extra"] = 42
-            return case
-
-        return strategy.map(tune_case)
+    def map_case(context, case):
+        case.body["extra"] = 42
+        return case
 
     @schemathesis.hook
-    def before_generate_case(context, strategy):  # noqa: F811
-        def tune_case(case):
-            case.body["first_name"] = case.body["last_name"]
-            return case
+    def map_case(context, case):  # noqa: F811
+        case.body["first_name"] = case.body["last_name"]
+        return case
 
-        return strategy.map(tune_case)
-
-    strategy = schema["/users/"]["POST"].as_strategy(hooks=dispatcher)
+    strategy = wsgi_app_schema["/users/"]["POST"].as_strategy(hooks=dispatcher)
 
     @given(case=strategy)
     @settings(max_examples=10, suppress_health_check=[HealthCheck.filter_too_much])
@@ -96,12 +102,12 @@ def test_case_hook(schema):
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("custom_format")
-def test_schema_query_hook(schema, schema_url):
-    @schema.hook
-    def before_generate_query(context, strategy):
-        return strategy.filter(lambda x: x["id"].isdigit())
+def test_schema_query_hook(wsgi_app_schema, schema_url):
+    @wsgi_app_schema.hook
+    def filter_query(context, query):
+        return query["id"].isdigit()
 
-    strategy = schema["/custom_format"]["GET"].as_strategy()
+    strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -114,13 +120,13 @@ def test_schema_query_hook(schema, schema_url):
 @pytest.mark.hypothesis_nested
 @pytest.mark.usefixtures("global_hook")
 @pytest.mark.operations("custom_format")
-def test_hooks_combination(schema, schema_url):
-    @schema.hook("before_generate_query")
-    def extra(context, st):
-        assert context.operation == schema["/custom_format"]["GET"]
-        return st.filter(lambda x: int(x["id"]) % 2 == 0)
+def test_hooks_combination(wsgi_app_schema):
+    @wsgi_app_schema.hook("filter_query")
+    def extra(context, query):
+        assert context.operation == wsgi_app_schema["/custom_format"]["GET"]
+        return int(query["id"]) % 2 == 0
 
-    strategy = schema["/custom_format"]["GET"].as_strategy()
+    strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -136,31 +142,31 @@ def test_per_test_hooks(testdir, simple_openapi):
         """
 from hypothesis import strategies as st
 
-def replacement(context, strategy):
-    return st.just({"id": "foobar"})
+def replacement(context, query):
+    return {"id": "foobar"}
 
-@schema.hooks.apply(replacement, name="before_generate_query")
+@schema.hooks.apply(replacement, name="map_query")
 @schema.parametrize()
 @settings(max_examples=1)
 def test_a(case):
     assert case.query["id"] == "foobar"
 
 @schema.parametrize()
-@schema.hooks.apply(replacement, name="before_generate_query")
+@schema.hooks.apply(replacement, name="map_query")
 @settings(max_examples=1)
 def test_b(case):
     assert case.query["id"] == "foobar"
 
-def another_replacement(context, strategy):
-    return st.just({"id": "foobaz"})
+def another_replacement(context, query):
+    return {"id": "foobaz"}
 
-def before_generate_headers(context, strategy):
-    return st.just({"value": "spam"})
+def map_headers(context, headers):
+    return {"value": "spam"}
 
 @schema.parametrize()
-@schema.hooks.apply(another_replacement, name="before_generate_query")  # Higher priority
-@schema.hooks.apply(replacement, name="before_generate_query")
-@schema.hooks.apply(before_generate_headers)
+@schema.hooks.apply(another_replacement, name="map_query")  # Higher priority
+@schema.hooks.apply(replacement, name="map_query")
+@schema.hooks.apply(map_headers)
 @settings(max_examples=1)
 def test_c(case):
     assert case.query["id"] == "foobaz"
@@ -180,14 +186,14 @@ def test_d(case):
 def test_hooks_via_parametrize(testdir, simple_openapi):
     testdir.make_test(
         """
-@schema.hook("before_generate_query")
-def extra(context, st):
-    return st.filter(lambda x: x["id"].isdigit() and int(x["id"]) % 2 == 0)
+@schema.hook("filter_query")
+def extra(context, query):
+    return query["id"].isdigit() and int(query["id"]) % 2 == 0
 
 @schema.parametrize()
 @settings(max_examples=1)
 def test(case):
-    assert case.operation.schema.hooks.get_all_by_name("before_generate_query")[0] is extra
+    assert case.operation.schema.hooks.get_all_by_name("filter_query")[0] is extra
     assert int(case.query["id"]) % 2 == 0
     """,
         schema=simple_openapi,
@@ -205,17 +211,17 @@ def test_register_invalid_hook_name(dispatcher):
 
 
 def test_register_invalid_hook_spec(dispatcher):
-    with pytest.raises(TypeError, match="Hook 'before_generate_query' takes 2 arguments but 3 is defined"):
+    with pytest.raises(TypeError, match="Hook 'filter_query' takes 2 arguments but 3 is defined"):
 
         @dispatcher.register
-        def before_generate_query(a, b, c):
+        def filter_query(a, b, c):
             pass
 
 
-def test_save_test_function(schema):
-    assert schema.test_function is None
+def test_save_test_function(wsgi_app_schema):
+    assert wsgi_app_schema.test_function is None
 
-    @schema.parametrize()
+    @wsgi_app_schema.parametrize()
     def test(case):
         pass
 
@@ -223,21 +229,21 @@ def test_save_test_function(schema):
 
 
 @pytest.mark.parametrize("apply_first", (True, False))
-def test_local_dispatcher(schema, apply_first):
-    assert schema.hooks.scope == HookScope.SCHEMA
+def test_local_dispatcher(wsgi_app_schema, apply_first):
+    assert wsgi_app_schema.hooks.scope == HookScope.SCHEMA
 
     # When there are schema-level hooks
-    @schema.hook("before_generate_query")
-    def schema_hook(context, strategy):
-        return strategy
+    @wsgi_app_schema.hook("map_query")
+    def schema_hook(context, query):
+        return query
 
     # And per-test hooks are applied
-    def local_hook(context, strategy):
-        return strategy
+    def local_hook(context, cookies):
+        return cookies
 
     # And order of decorators is any
-    apply = schema.hooks.apply(local_hook, name="before_generate_cookies")
-    parametrize = schema.parametrize()
+    apply = wsgi_app_schema.hooks.apply(local_hook, name="map_cookies")
+    parametrize = wsgi_app_schema.parametrize()
     if apply_first:
 
         def wrap(x):
@@ -256,27 +262,27 @@ def test_local_dispatcher(schema, apply_first):
     assert isinstance(test._schemathesis_hooks, HookDispatcher)
     assert test._schemathesis_hooks.scope == HookScope.TEST
     # And this dispatcher contains only local hooks
-    assert test._schemathesis_hooks.get_all_by_name("before_generate_cookies") == [local_hook]
-    assert test._schemathesis_hooks.get_all_by_name("before_generate_query") == []
+    assert test._schemathesis_hooks.get_all_by_name("map_cookies") == [local_hook]
+    assert test._schemathesis_hooks.get_all_by_name("map_query") == []
     # And the schema-level dispatcher still contains only schema-level hooks
-    assert getattr(test, PARAMETRIZE_MARKER).hooks.get_all_by_name("before_generate_query") == [schema_hook]
-    assert getattr(test, PARAMETRIZE_MARKER).hooks.get_all_by_name("before_generate_cookies") == []
+    assert getattr(test, PARAMETRIZE_MARKER).hooks.get_all_by_name("map_query") == [schema_hook]
+    assert getattr(test, PARAMETRIZE_MARKER).hooks.get_all_by_name("map_cookies") == []
 
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("custom_format")
-def test_multiple_hooks_per_spec(schema):
-    @schema.hook("before_generate_query")
-    def first_hook(context, strategy):
-        return strategy.filter(lambda x: x["id"].isdigit())
+def test_multiple_hooks_per_spec(wsgi_app_schema):
+    @wsgi_app_schema.hook("filter_query")
+    def first_hook(context, query):
+        return query["id"].isdigit()
 
-    @schema.hook("before_generate_query")
-    def second_hook(context, strategy):
-        return strategy.filter(lambda x: int(x["id"]) % 2 == 0)
+    @wsgi_app_schema.hook("filter_query")
+    def second_hook(context, query):
+        return int(query["id"]) % 2 == 0
 
-    assert schema.hooks.get_all_by_name("before_generate_query") == [first_hook, second_hook]
+    assert wsgi_app_schema.hooks.get_all_by_name("filter_query") == [first_hook, second_hook]
 
-    strategy = schema["/custom_format"]["GET"].as_strategy()
+    strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -289,13 +295,66 @@ def test_multiple_hooks_per_spec(schema):
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("custom_format")
-def test_before_process_path_hook(schema):
-    @schema.hook
+def test_flatmap(wsgi_app_schema):
+    @wsgi_app_schema.hook
+    def filter_query(context, query):
+        return query["id"].isdigit()
+
+    @wsgi_app_schema.hook
+    def flatmap_query(context, query):
+        value = query["id"]
+        return st.fixed_dictionaries({"id": st.just(value), "square": st.just(int(value) ** 2)})
+
+    strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
+
+    @given(case=strategy)
+    @settings(max_examples=3)
+    def test(case):
+        value = case.query["id"]
+        assert value.isdigit()
+        assert case.query["square"] == int(value) ** 2
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.operations("custom_format")
+def test_case_hooks(wsgi_app_schema):
+    @wsgi_app_schema.hook
+    def filter_case(context, case):
+        return case.query["id"].isdigit()
+
+    @wsgi_app_schema.hook
+    def map_case(context, case):
+        case.query["id"] += "42"
+        case.query["square"] = int(case.query["id"]) ** 2
+        return case
+
+    @wsgi_app_schema.hook
+    def flatmap_case(context, case):
+        return st.just(case)
+
+    strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
+
+    @given(case=strategy)
+    @settings(max_examples=3)
+    def test(case):
+        value = case.query["id"]
+        assert value.isdigit()
+        assert case.query["square"] == int(value) ** 2
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.operations("custom_format")
+def test_before_process_path_hook(wsgi_app_schema):
+    @wsgi_app_schema.hook
     def before_process_path(context, path, methods):
         methods["get"]["parameters"][0]["name"] = "foo"
         methods["get"]["parameters"][0]["enum"] = ["bar"]
 
-    strategy = schema["/custom_format"]["GET"].as_strategy()
+    strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3)
@@ -305,14 +364,14 @@ def test_before_process_path_hook(schema):
     test()
 
 
-def test_register_wrong_scope(schema):
+def test_register_wrong_scope(wsgi_app_schema):
     with pytest.raises(
         ValueError,
         match=r"Cannot register hook 'before_load_schema' on SCHEMA scope dispatcher. "
         r"Use a dispatcher with GLOBAL scope\(s\) instead",
     ):
 
-        @schema.hook
+        @wsgi_app_schema.hook
         def before_load_schema(ctx, raw_schema):
             pass
 
