@@ -1,14 +1,27 @@
 Extending Schemathesis
 ======================
 
-Often you need to modify certain aspects of Schemathesis behavior, adjust data generation, modify requests before
-sending, and so on. Schemathesis offers multiple extension mechanisms.
+Schemathesis provides various extension mechanisms to adapt its default behavior to your specific testing needs. 
+This might involve customizing data generation, modifying requests, or introducing new validation checks. 
+In this section, we explore different ways to leverage these mechanisms to adjust Schemathesis to your API testing requirements.
 
 Hooks
 -----
 
+Need to customize the data used in your tests?
+
 Hooks in Schemathesis allow you to influence the generation of test data, enabling you to create more relevant and targeted tests. 
 They can be used to limit the test input to certain criteria, modify the generated values, or establish relationships between different pieces of generated data.
+
+.. code:: python
+
+    import schemathesis
+
+
+    @schemathesis.hook
+    def filter_query(context, query):
+        # Simple filtering to avoid a specific query parameter value
+        return query["key"] != "42"
 
 Hooks are identified and applied based on their function name, utilized through a decorator, like ``@schemathesis.hook``. 
 The function name, such as ``filter_query``, indicates it's a hook to filter query parameters. 
@@ -68,6 +81,26 @@ They execute in the order they are defined, with globally defined hooks executin
     @schema.parametrize()
     def test_api(case):
         ...
+
+.. tip::
+
+    Be mindful of the sequence in which hooks are applied. The order can significantly impact the generated test data and subsequent API calls during testing. 
+    Always validate the test data and requests to ensure that hooks are applied in the intended order and manner.
+
+Enabling and Organizing Hooks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For Schemathesis to utilize your custom hooks, they need to be properly organized and enabled.
+
+For **CLI** usage, hooks should be placed in a separate module. 
+Schemathesis should be directed to this module through the ``SCHEMATHESIS_HOOKS`` environment variable:
+
+.. code:: bash
+
+    SCHEMATHESIS_HOOKS=myproject.tests.hooks
+    st run http://127.0.0.1/openapi.yaml
+
+If you're using Schemathesis in Python tests, ensure to define your hooks in the test setup code.
 
 Filtering Data
 ~~~~~~~~~~~~~~
@@ -287,14 +320,6 @@ With this hook, you can add additional test cases that will be executed in Hypot
         examples: List[Case],
     ) -> None:
         examples.append(Case(operation=context.operation, query={"foo": "bar"}))
-
-To load CLI hooks, you need to put them into a separate module and pass an importable path via the ``SCHEMATHESIS_HOOKS`` environment variable.
-For example, you have your hooks definition in ``myproject/hooks.py``, and ``myproject`` is importable:
-
-.. code:: bash
-
-    SCHEMATHESIS_HOOKS=myproject.hooks
-    st run http://127.0.0.1/openapi.yaml
 
 ``after_init_cli_run_handlers``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
