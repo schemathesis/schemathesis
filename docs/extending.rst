@@ -437,33 +437,41 @@ For WSGI integration, the keywords are different. See the documentation for ``we
 Checks
 ------
 
-Schemathesis provides a way to check app responses via user-defined functions called "checks".
-Each check is a function that accepts two arguments:
+Checks in Schemathesis allow you to validate responses from your API, ensuring they adhere to both general and application-specific expectations. 
+They can be particularly useful for checking behaviors that are specific to your application and go beyond the built-in checks provided by Schemathesis.
+
+Define a check as a function taking two parameters: ``response`` and ``case``, and register it using the ``@schemathesis.check`` decorator.
 
 .. code-block:: python
 
-    def my_check(response, case):
+    import schemathesis
+
+
+    @schemathesis.check
+    def my_check(response, case) -> None:
         ...
 
-The first one is the app response, which is ``requests.Response`` or ``schemathesis.utils.WSGIResponse``, depending on
-whether you used the WSGI integration or not. The second one is the :class:`~schemathesis.Case` instance that was used to
-send data to the tested application.
+- ``response`` is the API response, an instance of ``requests.Response`` or ``schemathesis.utils.WSGIResponse``, based on your integration method.
+- ``case`` is the ``schemathesis.Case`` instance used to send data to the application.
 
-To indicate a failure, you need to raise ``AssertionError`` explicitly:
+Here’s an example of a check that ensures that when an ``item_id`` of 42 is used, the response contains the text "Answer to the Ultimate Question":
 
 .. code-block:: python
 
-    def my_check(response, case):
-        if response.text == "I am a teapot":
-            raise AssertionError("It is a teapot!")
+    import schemathesis
 
-If the assertion fails, you'll see the assertion message in Schemathesis output. In the case of missing
-assertion message, Schemathesis will report "Check `my_check` failed".
+    ANSWER = "Answer to the Ultimate Question" 
+
+    @schemathesis.check
+    def my_check(response, case) -> None:
+        if case.path_parameters.get("item_id") == 42 and ANSWER not in response.text:
+            raise AssertionError("The ultimate answer not found!")
+
+To signify a check failure, raise an ``AssertionError``. If the assertion fails, Schemathesis will report the assertion message in the output.
 
 .. note::
 
-    If you use the ``assert`` statement and ``pytest`` as the test runner, then ``pytest`` may rewrite assertions which
-    affects error messages.
+    Explicitly raising ``AssertionError`` prevents ``pytest`` from altering assertion messages through its rewriting mechanism which is relevant in Python tests.
 
 Generating strings for custom Open API formats
 ----------------------------------------------
