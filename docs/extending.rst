@@ -485,7 +485,8 @@ Here’s an example of a check that ensures that when an ``item_id`` of 42 is us
 
     import schemathesis
 
-    ANSWER = "Answer to the Ultimate Question" 
+    ANSWER = "Answer to the Ultimate Question"
+
 
     @schemathesis.check
     def my_check(response, case) -> None:
@@ -515,15 +516,17 @@ If a format is unrecognized, regular strings will be generated.
 
     from hypothesis import strategies as st
     import schemathesis
-    
+
+
     # Example Luhn algorithm validator
     def luhn_validator(card_number: str) -> bool:
         # Actual validation logic is omitted for brevity
         return True
-    
+
+
     # Strategy generating a 16-digit number, starting with "4"
     strategy = st.from_regex(r"\A4[0-9]{15}\Z").filter(luhn_validator)
-    
+
     # Registering the strategy for "card_number" format
     schemathesis.openapi.format("card_number", strategy)
 
