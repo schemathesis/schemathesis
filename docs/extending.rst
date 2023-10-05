@@ -465,24 +465,38 @@ assertion message, Schemathesis will report "Check `my_check` failed".
     If you use the ``assert`` statement and ``pytest`` as the test runner, then ``pytest`` may rewrite assertions which
     affects error messages.
 
-Custom string strategies
-------------------------
+Generating strings for custom Open API formats
+----------------------------------------------
 
-Open API allows you to set a custom string format for a property via the ``format`` keyword.
-For example, you may use the ``card_number`` format and validate input with the Luhn algorithm.
+In Open API, you may define custom string formats using the ``format`` keyword, specifying the expected format of a string property value. 
+Schemathesis allows you to manage the generation of values for these custom formats by registering Hypothesis strategies.
 
-You can teach Schemathesis to generate values that fit this format by registering a custom Hypothesis strategy:
+While Schemathesis supports all built-in Open API formats out of the box, creating strategies for custom string formats enhances the precision of your generated test data.
+When Schemathesis encounters a known custom format in the API schema, it utilizes the registered strategy to generate test data.
+If a format is unrecognized, regular strings will be generated.
 
-1. Create a Hypothesis strategy that generates valid string values
-2. Register it via ``schemathesis.openapi.format``
+- **Create a Hypothesis Strategy**: Create a strategy that generates strings compliant with your custom format.
+- **Register the Strategy**: Make it known to Schemathesis using ``schemathesis.openapi.format``.
 
 .. code-block:: python
 
     from hypothesis import strategies as st
     import schemathesis
-
+    
+    # Example Luhn algorithm validator
+    def luhn_validator(card_number: str) -> bool:
+        # Actual validation logic is omitted for brevity
+        return True
+    
+    # Strategy generating a 16-digit number, starting with "4"
     strategy = st.from_regex(r"\A4[0-9]{15}\Z").filter(luhn_validator)
-    schemathesis.openapi.format("visa_cards", strategy)
+    
+    # Registering the strategy for "card_number" format
+    schemathesis.openapi.format("card_number", strategy)
+
+In the example above, when Schemathesis detects a string with the "card_number" format in the API schema, it uses the registered strategy to generate appropriate test data.
+
+For more details about creating strategies, refer to the `Hypothesis documentation <https://hypothesis.readthedocs.io/en/latest/data.html>`_.
 
 Schemathesis test runner
 ------------------------
