@@ -2,7 +2,7 @@
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Generic, List, Optional, Type, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, Generic, List, Optional, Type, TypeVar, Union, overload
 
 import requests.auth
 from typing_extensions import Protocol, runtime_checkable
@@ -226,6 +226,23 @@ class AuthStorage(Generic[Auth]):
     def is_defined(self) -> bool:
         """Whether there is an auth provider set."""
         return bool(self.providers)
+
+    @overload
+    def __call__(
+        self,
+        *,
+        refresh_interval: Optional[int] = DEFAULT_REFRESH_INTERVAL,
+    ) -> FilterableRegisterAuth:
+        ...
+
+    @overload
+    def __call__(
+        self,
+        provider_class: Type[AuthProvider],
+        *,
+        refresh_interval: Optional[int] = DEFAULT_REFRESH_INTERVAL,
+    ) -> FilterableApplyAuth:
+        ...
 
     def __call__(
         self,
