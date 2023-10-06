@@ -344,6 +344,8 @@ def test_commands_run_help(cli):
         "                                  cases.",
         "  --contrib-openapi-formats-uuid  Enable support for the `uuid` string format.",
         "  --no-color                      Disable ANSI color escape codes.",
+        "  --force-color                   Explicitly tells to enable ANSI color escape",
+        "                                  codes.",
         "  --schemathesis-io-token TEXT    Schemathesis.io authentication token.",
         "  --schemathesis-io-url TEXT      Schemathesis.io base URL.",
         "  --schemathesis-io-telemetry TEXT",

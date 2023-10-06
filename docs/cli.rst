@@ -571,6 +571,9 @@ If your API spec is stored in a file, you could use it too by specifying a Docke
 In the example above, the ``spec.json`` file from the current working directory is shared with the Schemathesis container.
 Note, that ``$(pwd)`` is shell-specific and works in ``sh`` / ``bash`` / ``zsh``, but could be different in e.g. ``PowerShell``.
 
+When running from Docker, by default color output is not present. You can use ``--force-color`` if you know that the host's terminal supports colors. 
+Note that ``--force-color`` and ``--no-color`` are not compatible with each other.
+
 .. note:: See Docker volumes `documentation <https://docs.docker.com/storage/volumes/>`_ for more information.
 
 Full list of CLI options
