@@ -1,7 +1,7 @@
 import pytest
 
 import schemathesis
-from schemathesis.exceptions import InvalidSchema, SchemaLoadingError
+from schemathesis.exceptions import InvalidSchema, SchemaError
 from schemathesis.specs.openapi.parameters import OpenAPI20Body
 from schemathesis.specs.openapi.schemas import InliningResolver
 from schemathesis.utils import Err, Ok
@@ -125,7 +125,7 @@ def test_schema_parsing_error(simple_schema):
     assert oks[0].method == "post"
 
 
-@pytest.mark.parametrize("validate_schema, expected_exception", ((False, InvalidSchema), (True, SchemaLoadingError)))
+@pytest.mark.parametrize("validate_schema, expected_exception", ((False, InvalidSchema), (True, SchemaError)))
 def test_not_recoverable_schema_error(simple_schema, validate_schema, expected_exception):
     # When there is an error in the API schema that leads to inability to generate any tests
     del simple_schema["paths"]
@@ -139,7 +139,7 @@ def test_schema_error_on_path(simple_schema):
     # When there is an error that affects only a subset of paths
     simple_schema["paths"] = {None: "", "/foo": {"post": RESPONSES}}
     # Then it should be rejected during loading if schema validation is enabled
-    with pytest.raises(SchemaLoadingError):
+    with pytest.raises(SchemaError):
         schemathesis.from_dict(simple_schema, validate_schema=True)
     # And should produce an `Err` instance on operation parsing
     schema = schemathesis.from_dict(simple_schema, validate_schema=False)
@@ -199,3 +199,10 @@ def test_missing_payload_schema(request, fixture, path):
 def test_missing_payload_schema_media_type(open_api_3_schema_with_yaml_payload):
     schema = schemathesis.from_dict(open_api_3_schema_with_yaml_payload)
     assert schema["/yaml"]["POST"].get_raw_payload_schema("application/xml") is None
+
+
+def test_ssl_error(openapi3_schema_url, server):
+    with pytest.raises(SchemaError) as exc:
+        schemathesis.from_uri(f"https://127.0.0.1:{server['port']}")
+    assert exc.value.message == "SSL verification problem"
+    assert exc.value.extras[0].startswith("[SSL: WRONG_VERSION_NUMBER] wrong version number")

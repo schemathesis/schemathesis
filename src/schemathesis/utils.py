@@ -170,7 +170,7 @@ def format_exception(error: Exception, include_traceback: bool = False) -> str:
         lines = traceback.format_exception(error_type, error, error.__traceback__)
     else:
         lines = traceback.format_exception_only(error_type, error)
-    return "".join(lines)
+    return "".join(lines).strip()
 
 
 def parse_content_type(content_type: str) -> Tuple[str, str]:

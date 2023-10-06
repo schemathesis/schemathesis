@@ -13,6 +13,7 @@ from ..constants import (
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     DataGenerationMethod,
 )
+from ..exceptions import SchemaError
 from ..models import CheckFunction
 from ..schemas import BaseSchema
 from ..specs.graphql import loaders as gql_loaders
@@ -236,6 +237,8 @@ def execute_from_schema(
             stateful_recursion_limit=stateful_recursion_limit,
             count_operations=count_operations,
         ).execute()
+    except SchemaError as error:
+        yield events.InternalError.from_schema_error(error)
     except Exception as exc:
         yield events.InternalError.from_exc(exc)
 

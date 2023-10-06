@@ -31,6 +31,7 @@ class ExecutionContext:
     workers_num: int = 1
     rate_limit: Optional[str] = None
     show_errors_tracebacks: bool = False
+    wait_for_schema: Optional[float] = None
     validate_schema: bool = True
     operations_processed: int = 0
     # It is set in runtime, from a `Initialized` event

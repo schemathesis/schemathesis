@@ -1,13 +1,11 @@
+import enum
 import threading
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, List, Optional, Union
 
-import requests
-from requests import exceptions
-
-from ..constants import USE_WAIT_FOR_SCHEMA_SUGGESTION_MESSAGE, DataGenerationMethod
-from ..exceptions import HTTPError
+from ..constants import DataGenerationMethod
+from ..exceptions import SchemaError, SchemaErrorType
 from ..models import APIOperation, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
 from ..utils import current_datetime, format_exception
@@ -169,38 +167,73 @@ class Interrupted(ExecutionEvent):
     thread_id: int = field(default_factory=threading.get_ident)
 
 
+@enum.unique
+class InternalErrorType(str, enum.Enum):
+    SCHEMA = "schema"
+    OTHER = "other"
+
+
 @dataclass
 class InternalError(ExecutionEvent):
     """An error that happened inside the runner."""
 
     is_terminal = True
 
+    # Main error info
+    type: InternalErrorType
+    subtype: Optional[SchemaErrorType]
+    title: str
     message: str
+    extras: List[str]
+
+    # Exception info
     exception_type: str
-    exception: Optional[str] = None
-    exception_with_traceback: Optional[str] = None
+    exception: str
+    exception_with_traceback: str
+    # Auxiliary data
     thread_id: int = field(default_factory=threading.get_ident)
 
     @classmethod
-    def from_exc(cls, exc: Exception, wait_for_schema: Optional[float] = None) -> "InternalError":
+    def from_schema_error(cls, error: SchemaError) -> "InternalError":
+        return cls.with_exception(
+            error,
+            type_=InternalErrorType.SCHEMA,
+            subtype=error.type,
+            title="Schema Loading Error",
+            message=error.message,
+            extra=error.extras,
+        )
+
+    @classmethod
+    def from_exc(cls, exc: Exception) -> "InternalError":
+        return cls.with_exception(
+            exc,
+            type_=InternalErrorType.OTHER,
+            subtype=None,
+            title="Test Execution Error",
+            message="An internal error occurred during the test run",
+            extra=[],
+        )
+
+    @classmethod
+    def with_exception(
+        cls,
+        exc: Exception,
+        type_: InternalErrorType,
+        subtype: Optional[SchemaErrorType],
+        title: str,
+        message: str,
+        extra: List[str],
+    ) -> "InternalError":
         exception_type = f"{exc.__class__.__module__}.{exc.__class__.__qualname__}"
-        if isinstance(exc, HTTPError):
-            if exc.response.status_code == 404:
-                message = f"Schema was not found at {exc.url}"
-            else:
-                message = f"Failed to load schema, code {exc.response.status_code} was returned from {exc.url}"
-            return cls(message=message, exception_type=exception_type)
         exception = format_exception(exc)
         exception_with_traceback = format_exception(exc, include_traceback=True)
-        if isinstance(exc, exceptions.ConnectionError):
-            request = cast(requests.PreparedRequest, exc.request)
-            message = f"Failed to load schema from {request.url}"
-            if wait_for_schema is None:
-                message += f"\n{USE_WAIT_FOR_SCHEMA_SUGGESTION_MESSAGE}"
-        else:
-            message = "An internal error happened during a test run"
         return cls(
+            type=type_,
+            subtype=subtype,
+            title=title,
             message=message,
+            extras=extra,
             exception_type=exception_type,
             exception=exception,
             exception_with_traceback=exception_with_traceback,

@@ -42,7 +42,6 @@ from schemathesis.constants import (
     IS_PYTEST_ABOVE_54,
     REPORT_SUGGESTION_ENV_VAR,
     SCHEMATHESIS_TEST_CASE_HEADER,
-    USE_WAIT_FOR_SCHEMA_SUGGESTION_MESSAGE,
     CodeSampleStyle,
 )
 from schemathesis.extra._flask import run_server
@@ -731,8 +730,8 @@ def test_cli_run_changed_base_url(cli, server, cli_args, workers):
 @pytest.mark.parametrize(
     "url, message",
     (
-        ("/doesnt_exist", "Schema was not found at http://127.0.0.1"),
-        ("/failure", "Failed to load schema, code 500 was returned from http://127.0.0.1"),
+        ("/doesnt_exist", "Failed to load schema due to client error (HTTP 404 Not Found)"),
+        ("/failure", "Failed to load schema due to server error (HTTP 500 Internal Server Error)"),
     ),
 )
 @pytest.mark.operations("failure")
@@ -888,9 +887,7 @@ def test_invalid_operation_suggestion(cli, cli_args):
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And there should be a suggestion to disable schema validation
-    expected = """You can disable input schema validation with --validate-schema=false command-line option
-In this case, Schemathesis cannot guarantee proper behavior during the test run
-"""
+    expected = "Tip: Bypass validation using `--validate-schema=false`. Caution: May cause unexpected errors."
     assert expected in result.stdout
 
 
@@ -1006,12 +1003,20 @@ def test_schema_not_available(cli, workers):
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And error message is displayed
-    lines = result.stdout.split("\n")
-    assert lines[0] == "Failed to load schema from http://127.0.0.1:1/schema.yaml"
-    assert lines[1] == USE_WAIT_FOR_SCHEMA_SUGGESTION_MESSAGE
-    assert lines[3].startswith(
-        "Error: requests.exceptions.ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=1): "
-        "Max retries exceeded with url: /schema.yaml"
+    if platform.system() == "Windows":
+        detail = "[WinError 10061] No connection could be made because the target machine actively refused it"
+    else:
+        detail = "[Errno 111] Connection refused"
+    assert (
+        result.stdout
+        == f"""Schema Loading Error
+
+Connection failed
+
+    Failed to establish a new connection: {detail}
+
+Tip: Use `--wait-for-schema=NUM` to wait up to NUM seconds for schema availability.
+"""
     )
 
 
@@ -1021,8 +1026,15 @@ def test_schema_not_available_wsgi(cli, loadable_flask_app):
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And error message is displayed
-    lines = result.stdout.split("\n")
-    assert lines[0] == "Schema was not found at unknown.yaml"
+    assert (
+        result.stdout
+        == """Schema Loading Error
+
+Failed to load schema due to client error (HTTP 404 Not Found)
+
+Tip: Verify that the URL points directly to the Open API schema
+"""
+    )
 
 
 @pytest.fixture
@@ -2104,6 +2116,7 @@ def assert_exit_code(event_stream, code):
             workers_num=1,
             rate_limit=None,
             show_errors_tracebacks=False,
+            wait_for_schema=None,
             validate_schema=False,
             cassette_path=None,
             cassette_preserve_exact_body_bytes=False,
@@ -2321,6 +2334,26 @@ def test_wait_for_schema(cli, schema_path, app_factory):
     run_server(app, port=port)
     result = cli.run(schema_url, "--wait-for-schema=1", "--hypothesis-max-examples=1")
     assert result.exit_code == ExitCode.OK, result.stdout
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
+def test_wait_for_schema_not_enough(cli):
+    app = create_openapi_app(operations=("success",))
+    original_run = app.run
+
+    def run_with_delay(*args, **kwargs):
+        time.sleep(2)
+        return original_run(*args, **kwargs)
+
+    app.run = run_with_delay
+    port = unused_port()
+    schema_url = f"http://127.0.0.1:{port}/schema.yaml"
+    run_server(app, port=port)
+
+    result = cli.run(schema_url, "--wait-for-schema=1", "--hypothesis-max-examples=1")
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # No suggestion is shown
+    assert "--wait-for-schema" not in result.stdout
 
 
 @pytest.mark.openapi_version("3.0")

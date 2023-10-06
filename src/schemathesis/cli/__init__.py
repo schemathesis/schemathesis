@@ -4,6 +4,7 @@ import os
 import sys
 import traceback
 from collections import defaultdict
+from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum
 from queue import Queue
@@ -32,7 +33,7 @@ from ..constants import (
     CodeSampleStyle,
     DataGenerationMethod,
 )
-from ..exceptions import HTTPError, SchemaLoadingError
+from ..exceptions import SchemaError
 from ..fixups import ALL_FIXUPS
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..models import Case, CheckFunction
@@ -814,6 +815,7 @@ def run(
         workers_num=workers_num,
         rate_limit=rate_limit,
         show_errors_tracebacks=show_errors_tracebacks,
+        wait_for_schema=wait_for_schema,
         validate_schema=validate_schema,
         cassette_path=cassette_path,
         cassette_preserve_exact_body_bytes=cassette_preserve_exact_body_bytes,
@@ -952,8 +954,10 @@ def into_event_stream(
             stateful_recursion_limit=stateful_recursion_limit,
             hypothesis_settings=hypothesis_settings,
         ).execute()
+    except SchemaError as error:
+        yield events.InternalError.from_schema_error(error)
     except Exception as exc:
-        yield events.InternalError.from_exc(exc, wait_for_schema)
+        yield events.InternalError.from_exc(exc)
 
 
 def load_schema(config: LoaderConfig) -> BaseSchema:
@@ -969,17 +973,22 @@ def load_schema(config: LoaderConfig) -> BaseSchema:
     return _try_load_schema(config, first, second)
 
 
+def should_try_more(exc: SchemaError) -> bool:
+    # We should not try other loaders for cases when we can't even establish connection
+    return not isinstance(exc.__cause__, requests.exceptions.ConnectionError)
+
+
 def _try_load_schema(
     config: LoaderConfig, first: Callable[[LoaderConfig], BaseSchema], second: Callable[[LoaderConfig], BaseSchema]
 ) -> BaseSchema:
     try:
         return first(config)
-    except (HTTPError, SchemaLoadingError) as exc:
-        try:
-            return second(config)
-        except (HTTPError, SchemaLoadingError):
-            # Raise the first loader's error
-            raise exc from None
+    except SchemaError as exc:
+        if should_try_more(exc):
+            with suppress(Exception):
+                return second(config)
+        # Re-raise the original error
+        raise exc
 
 
 def _load_graphql_schema(config: LoaderConfig) -> GraphQLSchema:
@@ -1103,6 +1112,7 @@ def execute(
     workers_num: int,
     rate_limit: Optional[str],
     show_errors_tracebacks: bool,
+    wait_for_schema: Optional[float],
     validate_schema: bool,
     cassette_path: Optional[click.utils.LazyFile],
     cassette_preserve_exact_body_bytes: bool,
@@ -1169,6 +1179,7 @@ def execute(
         workers_num=workers_num,
         rate_limit=rate_limit,
         show_errors_tracebacks=show_errors_tracebacks,
+        wait_for_schema=wait_for_schema,
         validate_schema=validate_schema,
         cassette_path=cassette_path.name if cassette_path is not None else None,
         junit_xml_file=junit_xml.name if junit_xml is not None else None,
