@@ -4,12 +4,12 @@ import platform
 from contextlib import suppress
 
 import pytest
-import requests.exceptions
 from requests import Response
 from yarl import URL
 
 import schemathesis
 from schemathesis.constants import USER_AGENT
+from schemathesis.exceptions import SchemaError
 from schemathesis.runner import events, prepare
 
 
@@ -53,9 +53,13 @@ def default_schema_url():
 def test_port_override(request, loader, url_fixture, expected):
     url = request.getfixturevalue(url_fixture)
     # When the user overrides `port`
-    with pytest.raises(requests.exceptions.ConnectionError) as exc:
+    with pytest.raises(SchemaError) as exc:
         loader(url, port=8081)
-    assert "host='127.0.0.1', port=8081" in str(exc)
+    if platform.system() == "Windows":
+        detail = "[WinError 10061] No connection could be made because the target machine actively refused it"
+    else:
+        detail = "[Errno 111] Connection refused"
+    assert exc.value.extras == [f"Failed to establish a new connection: {detail}"]
 
 
 def to_ipv6(url):

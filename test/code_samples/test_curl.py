@@ -6,7 +6,7 @@ import schemathesis
 from schemathesis import Case
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
 
-schema = schemathesis.from_dict(app.openapi())
+schema = schemathesis.from_dict(app.openapi(), force_schema_version="30")
 
 
 @pytest.mark.parametrize("headers", (None, {"X-Key": "42"}))

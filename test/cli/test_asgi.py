@@ -20,7 +20,7 @@ def test_wsgi_app(testdir, cli):
             return {"failure": True}
         """
     )
-    result = cli.run("/openapi.json", "--app", f"{module.purebasename}:app")
+    result = cli.run("/openapi.json", "--app", f"{module.purebasename}:app", "--force-schema-version=30")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert "1 passed, 1 failed in" in result.stdout
 
@@ -41,7 +41,12 @@ def test_cli_run_output_success(testdir, cli, workers):
             """
     )
     result = cli.run(
-        "/openapi.json", "--app", f"{module.purebasename}:app", f"--workers={workers}", "--show-errors-tracebacks"
+        "/openapi.json",
+        "--app",
+        f"{module.purebasename}:app",
+        f"--workers={workers}",
+        "--show-errors-tracebacks",
+        "--force-schema-version=30",
     )
 
     assert result.exit_code == ExitCode.OK, result.stdout

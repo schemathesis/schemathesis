@@ -6,15 +6,15 @@ import pytest
 from flask import Response
 
 import schemathesis
-from schemathesis.exceptions import SchemaLoadingError
+from schemathesis.exceptions import SchemaError
 from schemathesis.specs.openapi import loaders
-from schemathesis.specs.openapi.loaders import NON_STRING_OBJECT_KEY, NUMERIC_STATUS_CODES_MESSAGE, SCHEMA_LOADING_ERROR
+from schemathesis.specs.openapi.loaders import NON_STRING_OBJECT_KEY_MESSAGE, SCHEMA_LOADING_ERROR
 from schemathesis.specs.openapi.schemas import OpenApi30, SwaggerV20
 
 
 def test_openapi_asgi_loader(fastapi_app, run_asgi_test):
     # When an ASGI app is loaded via `from_asgi`
-    schema = loaders.from_asgi("/openapi.json", fastapi_app)
+    schema = loaders.from_asgi("/openapi.json", fastapi_app, force_schema_version="30")
     strategy = schema["/users"]["GET"].as_strategy()
     # Then it should successfully make calls via `call_asgi`
     run_asgi_test(strategy)
@@ -29,20 +29,24 @@ def test_openapi_wsgi_loader(flask_app, run_wsgi_test):
 
 
 @pytest.mark.parametrize(
-    "version, expected",
+    "version, schema, expected",
     (
-        ("20", SwaggerV20),
-        ("30", OpenApi30),
+        ("20", {"swagger": "3.0.0"}, SwaggerV20),
+        ("30", {"openapi": "2.0"}, OpenApi30),
+        ("30", {"openapi": "3.1.0"}, OpenApi30),
     ),
 )
-def test_force_open_api_version(version, expected):
-    schema = {
-        # Invalid schema, but it happens in real applications
-        "swagger": "2.0",
-        "openapi": "3.0.0",
-    }
+def test_force_open_api_version(version, schema, expected):
     loaded = loaders.from_dict(schema, force_schema_version=version, validate_schema=False)
     assert isinstance(loaded, expected)
+
+
+def test_unsupported_openapi_version():
+    version = "3.1.0"
+    with pytest.raises(
+        SchemaError, match=f"The provided schema uses Open API {version}, which is currently not supported."
+    ):
+        loaders.from_dict({"openapi": version}, validate_schema=False)
 
 
 def test_number_deserializing(testdir):
@@ -79,7 +83,9 @@ def test_number_deserializing(testdir):
 
 def test_unsupported_type():
     # When Schemathesis can't detect the Open API spec version
-    with pytest.raises(ValueError, match="^Unsupported schema type$"):
+    with pytest.raises(
+        SchemaError, match="Unable to determine the Open API version as it's not specified in the document."
+    ):
         # Then it raises an error
         loaders.from_dict({})
 
@@ -108,11 +114,8 @@ def test_invalid_content_type(httpserver, content_type):
     schema_url = httpserver.url_for(path)
     # And loading cause an error
     # Then it should be suggested to the user that they should provide JSON or YAML
-    with pytest.raises(ValueError, match=SCHEMA_LOADING_ERROR) as exc:
+    with pytest.raises(SchemaError, match=SCHEMA_LOADING_ERROR):
         schemathesis.from_uri(schema_url)
-    if content_type is True:
-        # And list the actual response content type
-        assert "The actual response has `text/html; charset=utf-8` Content-Type" in exc.value.args[0]
 
 
 @pytest.mark.parametrize(
@@ -142,16 +145,16 @@ def test_numeric_status_codes(empty_open_api_3_schema):
     }
     # And schema validation is enabled
     # Then Schemathesis reports an error about numeric status codes
-    with pytest.raises(SchemaLoadingError, match=NUMERIC_STATUS_CODES_MESSAGE) as exc:
+    with pytest.raises(SchemaError, match="Numeric HTTP status codes detected in your YAML schema") as exc:
         schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
     # And shows all locations of these keys
-    assert " - 200 at schema['paths']['/foo']['get']['responses']" in exc.value.args[0]
-    assert " - 201 at schema['paths']['/foo']['post']['responses']" in exc.value.args[0]
+    assert " - 200 at schema['paths']['/foo']['get']['responses']" in exc.value.message
+    assert " - 201 at schema['paths']['/foo']['post']['responses']" in exc.value.message
 
 
 def test_non_string_keys(empty_open_api_3_schema):
     # If API schema contains a non-string key
     empty_open_api_3_schema[True] = 42
     # Then it should be reported with a proper message
-    with pytest.raises(SchemaLoadingError, match=NON_STRING_OBJECT_KEY):
+    with pytest.raises(SchemaError, match=NON_STRING_OBJECT_KEY_MESSAGE):
         schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)

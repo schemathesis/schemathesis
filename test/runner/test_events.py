@@ -6,5 +6,5 @@ def test_unknown_exception():
         raise ZeroDivisionError("division by zero")
     except ZeroDivisionError as exc:
         event = events.InternalError.from_exc(exc)
-        assert event.message == "An internal error happened during a test run"
+        assert event.message == "An internal error occurred during the test run"
         assert event.exception.strip() == "ZeroDivisionError: division by zero"

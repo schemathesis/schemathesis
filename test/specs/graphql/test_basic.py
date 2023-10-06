@@ -1,3 +1,4 @@
+import platform
 from test.utils import assert_requests_call
 from unittest.mock import ANY
 
@@ -7,7 +8,8 @@ from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
-from schemathesis.specs.graphql.loaders import INTROSPECTION_QUERY
+from schemathesis.exceptions import SchemaError
+from schemathesis.specs.graphql.loaders import INTROSPECTION_QUERY, extract_schema_from_response
 from schemathesis.specs.graphql.schemas import GraphQLCase
 
 
@@ -49,9 +51,13 @@ def test_as_werkzeug_kwargs(graphql_strategy):
 def test_custom_base_url(graphql_url, kwargs, base_path, expected):
     # When a custom Base URL is specified
     if "port" in kwargs:
-        with pytest.raises(requests.exceptions.ConnectionError) as exc:
+        with pytest.raises(SchemaError) as exc:
             schemathesis.graphql.from_url(graphql_url, **kwargs)
-        assert "host='127.0.0.1', port=8888" in str(exc)
+        if platform.system() == "Windows":
+            detail = "[WinError 10061] No connection could be made because the target machine actively refused it"
+        else:
+            detail = "[Errno 111] Connection refused"
+        assert exc.value.extras == [f"Failed to establish a new connection: {detail}"]
     else:
         schema = schemathesis.graphql.from_url(graphql_url, **kwargs)
         # Then the base path is changed, in this case it is the only available path
@@ -80,6 +86,23 @@ def test_no_query(graphql_url):
     # Then no operations should be collected
     assert list(schema.get_all_operations()) == []
     assert schema.operations_count == 0
+
+
+@pytest.mark.parametrize("with_data_key", (True, False))
+def test_data_key(graphql_url, with_data_key):
+    response = requests.post(graphql_url, json={"query": INTROSPECTION_QUERY}, timeout=1)
+    decoded = response.json()
+    if not with_data_key:
+        decoded = decoded["data"]
+    schema = schemathesis.graphql.from_dict(decoded)
+    assert schema.operations_count == 4
+
+
+def test_malformed_response(graphql_url):
+    response = requests.post(graphql_url, json={"query": INTROSPECTION_QUERY}, timeout=1)
+    response._content += b"42"
+    with pytest.raises(SchemaError, match="Received unsupported content while expecting a JSON payload for GraphQL"):
+        extract_schema_from_response(response)
 
 
 def test_operations_count(graphql_url):

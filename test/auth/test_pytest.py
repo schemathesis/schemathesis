@@ -155,7 +155,7 @@ def token(data: AuthInput):
         return {{"access_token": "{APP_TEST_TOKEN}"}}
     raise HTTPException(status_code=401, detail="Unauthorized")
 
-schema = schemathesis.from_asgi("/openapi.json", app=app)
+schema = schemathesis.from_asgi("/openapi.json", app=app, force_schema_version="30")
 """
 
 

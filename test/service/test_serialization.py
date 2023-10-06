@@ -1,5 +1,3 @@
-from unittest.mock import ANY
-
 import pytest
 
 import schemathesis
@@ -38,9 +36,14 @@ def test_serialize_internal_error():
         event = InternalError.from_exc(exc)
         assert serialize_event(event) == {
             "InternalError": {
-                "message": "An internal error happened during a test run",
-                "exception_type": "builtins.ZeroDivisionError",
-                "exception_with_traceback": ANY,
+                "type": event.type.value,
+                "subtype": None,
+                "title": event.title,
+                "message": event.message,
+                "extras": event.extras,
+                "exception_type": event.exception_type,
+                "exception": event.exception,
+                "exception_with_traceback": event.exception_with_traceback,
             }
         }
 
