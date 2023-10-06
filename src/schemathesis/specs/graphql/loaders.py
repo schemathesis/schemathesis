@@ -1,4 +1,5 @@
 import pathlib
+from json import JSONDecodeError
 from typing import IO, Any, Callable, Dict, Optional, Union, cast
 
 import backoff
@@ -12,11 +13,12 @@ from werkzeug import Client
 from yarl import URL
 
 from ...constants import DEFAULT_DATA_GENERATION_METHODS, WAIT_FOR_SCHEMA_INTERVAL, CodeSampleStyle
-from ...exceptions import HTTPError
+from ...exceptions import SchemaError, SchemaErrorType
 from ...hooks import HookContext, dispatch
+from ...loaders import load_schema_from_url
 from ...throttling import build_limiter
 from ...types import DataGenerationMethodInput, PathLike
-from ...utils import WSGIResponse, prepare_data_generation_methods, require_relative_url, setup_headers
+from ...utils import GenericResponse, WSGIResponse, prepare_data_generation_methods, require_relative_url, setup_headers
 from .schemas import GraphQLSchema
 
 INTROSPECTION_QUERY = graphql.get_introspection_query()
@@ -48,6 +50,20 @@ def from_path(
             location=pathlib.Path(path).absolute().as_uri(),
             rate_limit=rate_limit,
         )
+
+
+def extract_schema_from_response(response: GenericResponse) -> Dict[str, Any]:
+    try:
+        if isinstance(response, requests.Response):
+            decoded = response.json()
+        else:
+            decoded = response.json
+    except JSONDecodeError as exc:
+        raise SchemaError(
+            SchemaErrorType.UNEXPECTED_CONTENT_TYPE,
+            "Received unsupported content while expecting a JSON payload for GraphQL",
+        ) from exc
+    return decoded
 
 
 def from_url(
@@ -91,11 +107,11 @@ def from_url(
 
     else:
         _load_schema = requests.post
-    response = _load_schema(url, **kwargs)
-    HTTPError.raise_for_status(response)
-    decoded = response.json()
+
+    response = load_schema_from_url(lambda: _load_schema(url, **kwargs))
+    raw_schema = extract_schema_from_response(response)
     return from_dict(
-        raw_schema=decoded["data"],
+        raw_schema=raw_schema,
         location=url,
         base_url=base_url,
         app=app,
@@ -163,6 +179,8 @@ def from_dict(
     """
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     hook_context = HookContext()
+    if "data" in raw_schema:
+        raw_schema = raw_schema["data"]
     dispatch("before_load_schema", hook_context, raw_schema)
     rate_limiter: Optional[Limiter] = None
     if rate_limit is not None:
@@ -201,10 +219,10 @@ def from_wsgi(
     setup_headers(kwargs)
     kwargs.setdefault("json", {"query": INTROSPECTION_QUERY})
     client = Client(app, WSGIResponse)
-    response = client.post(schema_path, **kwargs)
-    HTTPError.check_response(response, schema_path)
+    response = load_schema_from_url(lambda: client.post(schema_path, **kwargs))
+    raw_schema = extract_schema_from_response(response)
     return from_dict(
-        raw_schema=response.json["data"],
+        raw_schema=raw_schema,
         location=schema_path,
         base_url=base_url,
         app=app,
@@ -234,10 +252,10 @@ def from_asgi(
     setup_headers(kwargs)
     kwargs.setdefault("json", {"query": INTROSPECTION_QUERY})
     client = ASGIClient(app)
-    response = client.post(schema_path, **kwargs)
-    HTTPError.check_response(response, schema_path)
+    response = load_schema_from_url(lambda: client.post(schema_path, **kwargs))
+    raw_schema = extract_schema_from_response(response)
     return from_dict(
-        response.json()["data"],
+        raw_schema=raw_schema,
         location=schema_path,
         base_url=base_url,
         app=app,

@@ -14,16 +14,12 @@ from ..._compat import metadata
 from ...constants import DISCORD_LINK, FLAKY_FAILURE_MESSAGE, REPORT_SUGGESTION_ENV_VAR, CodeSampleStyle, __version__
 from ...models import Response, Status
 from ...runner import events
+from ...runner.events import InternalErrorType, SchemaErrorType
 from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult, deduplicate_failures
 from ..callbacks import FALSE_VALUES
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
 
-DISABLE_SCHEMA_VALIDATION_MESSAGE = (
-    "\nYou can disable input schema validation with --validate-schema=false "
-    "command-line option\nIn this case, Schemathesis cannot guarantee proper"
-    " behavior during the test run"
-)
 ISSUE_TRACKER_URL = (
     "https://github.com/schemathesis/schemathesis/issues/new?"
     "labels=Status%3A+Review+Needed%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D"
@@ -171,8 +167,6 @@ def _display_error(context: ExecutionContext, error: SerializedError, seed: Opti
         message = error.exception_with_traceback
     else:
         message = error.exception
-    if error.exception.startswith("InvalidSchema") and context.validate_schema:
-        message += DISABLE_SCHEMA_VALIDATION_MESSAGE + "\n"
     if error.exception.startswith("DeadlineExceeded"):
         message += (
             "Consider extending the deadline with the `--hypothesis-deadline` CLI option.\n"
@@ -451,23 +445,62 @@ def display_check_result(check_name: str, results: Dict[Union[str, Status], int]
     click.echo(template.format(check_name, f"{success} / {total} passed", click.style(verdict, fg=color, bold=True)))
 
 
+VERIFY_URL_SUGGESTION = "Verify that the URL points directly to the Open API schema"
+
+
+def bold(option: str) -> str:
+    return click.style(option, bold=True)
+
+
+SCHEMA_ERROR_SUGGESTIONS = {
+    # SSL-specific connection issue
+    SchemaErrorType.CONNECTION_SSL: f"Bypass SSL verification with {bold('`--request-tls-verify=false`')}.",
+    # Other connection problems
+    SchemaErrorType.CONNECTION_OTHER: f"Use {bold('`--wait-for-schema=NUM`')} to wait up to NUM seconds for schema availability.",
+    # Response issues
+    SchemaErrorType.UNEXPECTED_CONTENT_TYPE: VERIFY_URL_SUGGESTION,
+    SchemaErrorType.HTTP_FORBIDDEN: "Verify your API keys or authentication headers.",
+    SchemaErrorType.HTTP_NOT_FOUND: VERIFY_URL_SUGGESTION,
+    # OpenAPI specification issues
+    SchemaErrorType.OPEN_API_UNSPECIFIED_VERSION: f"Include the version in the schema or manually set it with {bold('`--force-schema-version`')}.",
+    SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION: f"Proceed with {bold('`--force-schema-version`')}. Caution: May not be fully supported.",
+    SchemaErrorType.OPEN_API_INVALID_SCHEMA: f"Bypass validation using {bold('`--validate-schema=false`')}. Caution: May cause unexpected errors.",
+    # YAML specific issues
+    SchemaErrorType.YAML_NUMERIC_STATUS_CODES: "Convert numeric status codes to strings.",
+    SchemaErrorType.YAML_NON_STRING_KEYS: "Convert non-string keys to strings.",
+    # Unclassified
+    SchemaErrorType.UNCLASSIFIED: f"If you suspect this is a Schemathesis issue and the schema is valid, please report it and include the schema if you can: {ISSUE_TRACKER_URL}",
+}
+
+
+def should_skip_suggestion(context: ExecutionContext, event: events.InternalError) -> bool:
+    return event.subtype == SchemaErrorType.CONNECTION_OTHER and context.wait_for_schema is not None
+
+
 def display_internal_error(context: ExecutionContext, event: events.InternalError) -> None:
-    click.secho(event.message, fg="red")
+    click.secho(event.title, fg="red", bold=True)
     click.echo()
-    if event.exception:
-        if context.show_errors_tracebacks:
-            message = (
-                f"Error: {event.exception_with_traceback}\n"
-                f"Please, consider reporting the traceback below it to our issue tracker: {ISSUE_TRACKER_URL}"
-            )
+    click.secho(event.message)
+    if event.type == InternalErrorType.SCHEMA:
+        extras = event.extras
+    elif context.show_errors_tracebacks:
+        extras = [entry for entry in event.exception_with_traceback.splitlines() if entry]
+    else:
+        extras = [event.exception]
+    if extras:
+        click.echo()
+    for extra in extras:
+        click.secho(f"    {extra}")
+    if not should_skip_suggestion(context, event):
+        if event.type == InternalErrorType.SCHEMA and isinstance(event.subtype, SchemaErrorType):
+            suggestion = SCHEMA_ERROR_SUGGESTIONS.get(event.subtype)
+        elif context.show_errors_tracebacks:
+            suggestion = f"Please consider reporting the traceback above to our issue tracker: {ISSUE_TRACKER_URL}."
         else:
-            message = (
-                f"Error: {event.exception}\n"
-                f"Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks\n"
-            )
-        if event.exception_type == "schemathesis.exceptions.SchemaLoadingError":
-            message += "\n" + DISABLE_SCHEMA_VALIDATION_MESSAGE
-        click.secho(message, fg="red")
+            suggestion = f"To see full tracebacks, add {bold('`--show-errors-tracebacks`')} to your CLI options"
+        # Display suggestion if any
+        if suggestion is not None:
+            click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")
 
 
 def handle_initialized(context: ExecutionContext, event: events.Initialized) -> None:

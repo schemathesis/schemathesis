@@ -95,8 +95,13 @@ def serialize_interrupted(_: events.Interrupted) -> Optional[Dict[str, Any]]:
 
 def serialize_internal_error(event: events.InternalError) -> Optional[Dict[str, Any]]:
     return {
+        "type": event.type.value,
+        "subtype": event.subtype.value if event.subtype else event.subtype,
+        "title": event.title,
         "message": event.message,
+        "extras": event.extras,
         "exception_type": event.exception_type,
+        "exception": event.exception,
         "exception_with_traceback": event.exception_with_traceback,
     }
 

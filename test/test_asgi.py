@@ -9,7 +9,7 @@ from schemathesis.specs.openapi.loaders import from_asgi
 
 @pytest.fixture()
 def schema(fastapi_app):
-    return from_asgi("/openapi.json", fastapi_app)
+    return from_asgi("/openapi.json", fastapi_app, force_schema_version="30")
 
 
 @pytest.mark.hypothesis_nested

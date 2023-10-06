@@ -310,17 +310,17 @@ def test_display_single_error(capsys, swagger_20, operation, execution_context, 
     lines = capsys.readouterr().out.strip().split("\n")
     # Then it should be correctly formatted and displayed in red color
     if sys.version_info >= (3, 10):
-        expected = '  File "<string>", line 1\n    some invalid code\n         ^^^^^^^\nSyntaxError: invalid syntax\n'
+        expected = 'File "<string>", line 1\n    some invalid code\n         ^^^^^^^\nSyntaxError: invalid syntax'
     elif sys.version_info <= (3, 8):
-        expected = '  File "<string>", line 1\n    some invalid code\n               ^\nSyntaxError: invalid syntax\n'
+        expected = 'File "<string>", line 1\n    some invalid code\n               ^\nSyntaxError: invalid syntax'
     else:
-        expected = '  File "<string>", line 1\n    some invalid code\n         ^\nSyntaxError: invalid syntax\n'
+        expected = 'File "<string>", line 1\n    some invalid code\n         ^\nSyntaxError: invalid syntax'
     if show_errors_tracebacks:
         lines = click.unstyle("\n".join(lines)).split("\n")
         assert lines[1] == "Traceback (most recent call last):"
         # There is a path on the next line, it is simpler to not check it since it doesn't give much value
         # But presence of traceback itself is checked
-        expected = f'    exec("some invalid code")\n{expected}'
+        expected = f'    exec("some invalid code")\n  {expected}'
         assert "\n".join(lines[3:8]) == expected.strip("\n")
     else:
         assert "\n".join(lines[1:6]) == strip_style_win32(click.style(expected, fg="red")).rstrip("\n")

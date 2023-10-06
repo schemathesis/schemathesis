@@ -1,6 +1,7 @@
 import io
 import json
 import pathlib
+import re
 from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import urljoin
 
@@ -16,9 +17,10 @@ from werkzeug.test import Client
 from yarl import URL
 
 from ...constants import DEFAULT_DATA_GENERATION_METHODS, WAIT_FOR_SCHEMA_INTERVAL, CodeSampleStyle
-from ...exceptions import HTTPError, SchemaLoadingError
+from ...exceptions import SchemaError, SchemaErrorType
 from ...hooks import HookContext, dispatch
 from ...lazy import LazySchema
+from ...loaders import load_schema_from_url
 from ...throttling import build_limiter
 from ...types import DataGenerationMethodInput, Filter, NotSet, PathLike
 from ...utils import (
@@ -134,44 +136,34 @@ def from_uri(
     else:
         _load_schema = requests.get
 
-    response = _load_schema(uri, **kwargs)
-    HTTPError.raise_for_status(response)
-    try:
-        return from_file(
-            response.text,
-            app=app,
-            base_url=base_url,
-            method=method,
-            endpoint=endpoint,
-            tag=tag,
-            operation_id=operation_id,
-            skip_deprecated_operations=skip_deprecated_operations,
-            validate_schema=validate_schema,
-            force_schema_version=force_schema_version,
-            data_generation_methods=data_generation_methods,
-            code_sample_style=code_sample_style,
-            location=uri,
-            rate_limit=rate_limit,
-            __expects_json=_is_json_response(response),
-        )
-    except SchemaLoadingError as exc:
-        content_type = response.headers.get("Content-Type")
-        if content_type is not None:
-            raise SchemaLoadingError(f"{exc.args[0]}. The actual response has `{content_type}` Content-Type") from exc
-        raise
+    response = load_schema_from_url(lambda: _load_schema(uri, **kwargs))
+    return from_file(
+        response.text,
+        app=app,
+        base_url=base_url,
+        method=method,
+        endpoint=endpoint,
+        tag=tag,
+        operation_id=operation_id,
+        skip_deprecated_operations=skip_deprecated_operations,
+        validate_schema=validate_schema,
+        force_schema_version=force_schema_version,
+        data_generation_methods=data_generation_methods,
+        code_sample_style=code_sample_style,
+        location=uri,
+        rate_limit=rate_limit,
+        __expects_json=_is_json_response(response),
+    )
 
 
-SCHEMA_LOADING_ERROR = (
-    "It seems like the schema you are trying to load is malformed. "
-    "Schemathesis expects API schemas in JSON or YAML formats"
-)
+SCHEMA_LOADING_ERROR = "Received unsupported content while expecting a JSON or YAML payload for Open API"
 
 
 def _load_yaml(data: str) -> Dict[str, Any]:
     try:
         return yaml.load(data, StringDatesYAMLLoader)
     except yaml.YAMLError as exc:
-        raise SchemaLoadingError(SCHEMA_LOADING_ERROR) from exc
+        raise SchemaError(SchemaErrorType.UNEXPECTED_CONTENT_TYPE, SCHEMA_LOADING_ERROR) from exc
 
 
 def from_file(
@@ -277,7 +269,13 @@ def from_dict(
         dispatch("after_load_schema", hook_context, instance)
         return instance
 
-    def init_openapi_3() -> OpenApi30:
+    def init_openapi_3(forced: bool) -> OpenApi30:
+        version = raw_schema["openapi"]
+        if not forced and not OPENAPI_30_VERSION_RE.match(version):
+            raise SchemaError(
+                SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION,
+                f"The provided schema uses Open API {version}, which is currently not supported.",
+            )
         _maybe_validate_schema(raw_schema, definitions.OPENAPI_30_VALIDATOR, validate_schema)
         instance = OpenApi30(
             raw_schema,
@@ -300,22 +298,31 @@ def from_dict(
     if force_schema_version == "20":
         return init_openapi_2()
     if force_schema_version == "30":
-        return init_openapi_3()
+        return init_openapi_3(forced=True)
     if "swagger" in raw_schema:
         return init_openapi_2()
     if "openapi" in raw_schema:
-        return init_openapi_3()
-    raise SchemaLoadingError("Unsupported schema type")
+        return init_openapi_3(forced=False)
+    raise SchemaError(
+        SchemaErrorType.OPEN_API_UNSPECIFIED_VERSION,
+        "Unable to determine the Open API version as it's not specified in the document.",
+    )
 
+
+OPENAPI_30_VERSION_RE = re.compile(r"^3\.0\.\d(-.+)?$")
 
 # It is a common case when API schemas are stored in the YAML format and HTTP status codes are numbers
 # The Open API spec requires HTTP status codes as strings
 DOC_ENTRY = "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.3.md#patterned-fields-1"
-NUMERIC_STATUS_CODES_MESSAGE = f"""The input schema contains HTTP status codes as numbers.
-The Open API spec requires them to be strings:
-{DOC_ENTRY}
+NUMERIC_STATUS_CODES_MESSAGE = f"""Numeric HTTP status codes detected in your YAML schema.
+According to the Open API specification, status codes must be strings, not numbers.
+For more details, check the Open API documentation: {DOC_ENTRY}
+
 Please, stringify the following status codes:"""
-NON_STRING_OBJECT_KEY = "The input schema contains non-string keys in sub-schemas"
+NON_STRING_OBJECT_KEY_MESSAGE = (
+    "The Open API specification requires all keys in the schema to be strings. "
+    "You have some keys that are not strings."
+)
 
 
 def _format_status_codes(status_codes: List[Tuple[int, List[Union[str, int]]]]) -> str:
@@ -339,12 +346,18 @@ def _maybe_validate_schema(
                 status_codes = validation.find_numeric_http_status_codes(instance)
                 if status_codes:
                     message = _format_status_codes(status_codes)
-                    raise SchemaLoadingError(f"{NUMERIC_STATUS_CODES_MESSAGE}\n{message}") from exc
+                    raise SchemaError(
+                        SchemaErrorType.YAML_NUMERIC_STATUS_CODES, f"{NUMERIC_STATUS_CODES_MESSAGE}\n{message}"
+                    ) from exc
                 # Some other pattern error
-                raise SchemaLoadingError(NON_STRING_OBJECT_KEY) from exc
-            raise SchemaLoadingError("Invalid schema") from exc
+                raise SchemaError(SchemaErrorType.YAML_NON_STRING_KEYS, NON_STRING_OBJECT_KEY_MESSAGE) from exc
+            raise SchemaError(SchemaErrorType.UNCLASSIFIED, "Unknown error") from exc
         except ValidationError as exc:
-            raise SchemaLoadingError("The input schema is not a valid Open API schema") from exc
+            raise SchemaError(
+                SchemaErrorType.OPEN_API_INVALID_SCHEMA,
+                "The provided API schema does not appear to be a valid OpenAPI schema",
+                extras=[entry for entry in str(exc).splitlines() if entry],
+            ) from exc
 
 
 def from_pytest_fixture(
@@ -422,8 +435,7 @@ def from_wsgi(
     require_relative_url(schema_path)
     setup_headers(kwargs)
     client = Client(app, WSGIResponse)
-    response = client.get(schema_path, **kwargs)
-    HTTPError.check_response(response, schema_path)
+    response = load_schema_from_url(lambda: client.get(schema_path, **kwargs))
     return from_file(
         response.data,
         app=app,
@@ -520,8 +532,7 @@ def from_asgi(
     require_relative_url(schema_path)
     setup_headers(kwargs)
     client = ASGIClient(app)
-    response = client.get(schema_path, **kwargs)
-    HTTPError.check_response(response, schema_path)
+    response = load_schema_from_url(lambda: client.get(schema_path, **kwargs))
     return from_file(
         response.text,
         app=app,

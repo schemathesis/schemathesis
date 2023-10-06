@@ -205,7 +205,7 @@ def test_call_and_validate(openapi3_schema_url):
 
 @pytest.mark.operations("success")
 def test_call_asgi_and_validate(fastapi_app):
-    api_schema = schemathesis.from_dict(fastapi_app.openapi())
+    api_schema = schemathesis.from_dict(fastapi_app.openapi(), force_schema_version="30")
 
     @given(case=api_schema["/users"]["GET"].as_strategy())
     @settings(max_examples=1)

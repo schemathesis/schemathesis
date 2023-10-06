@@ -55,7 +55,14 @@ def test_exclude_checks(
         """
     )
     result = cli.run(
-        "/openapi.json", "--checks", "all", "--exclude-checks", exclude_checks, "--app", f"{module.purebasename}:app"
+        "/openapi.json",
+        "--checks",
+        "all",
+        "--exclude-checks",
+        exclude_checks,
+        "--app",
+        f"{module.purebasename}:app",
+        "--force-schema-version=30",
     )
 
     for check in exclude_checks.split(","):

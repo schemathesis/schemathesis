@@ -182,7 +182,7 @@ def test_interactions(request, any_app_schema, workers):
 
 @pytest.mark.operations("root")
 def test_asgi_interactions(fastapi_app):
-    schema = oas_loaders.from_asgi("/openapi.json", fastapi_app)
+    schema = oas_loaders.from_asgi("/openapi.json", fastapi_app, force_schema_version="30")
     _, *ev, _ = from_schema(schema, store_interactions=True).execute()
     interaction = ev[1].result.interactions[0]
     assert interaction.status == Status.success
@@ -256,7 +256,7 @@ def test_root_url():
         assert case.as_requests_kwargs()["url"] == "/"
         assert response.status_code == 200
 
-    schema = oas_loaders.from_asgi("/openapi.json", app=app)
+    schema = oas_loaders.from_asgi("/openapi.json", app=app, force_schema_version="30")
     finished = execute(schema, checks=(check,))
     assert not finished.has_failures
 
@@ -796,7 +796,7 @@ def test_dry_run_asgi(fastapi_app):
         called = True
 
     # When the user passes `dry_run=True`
-    schema = oas_loaders.from_asgi("/openapi.json", fastapi_app)
+    schema = oas_loaders.from_asgi("/openapi.json", fastapi_app, force_schema_version="30")
     execute(schema, checks=(check,), dry_run=True)
     # Then no requests should be sent & no responses checked
     assert not called
@@ -1035,7 +1035,7 @@ def test_malformed_path_template(empty_open_api_3_schema):
     # And should produce the proper error message
     assert (
         event.result.errors[0].exception == f"InvalidSchema: Malformed path template: `{path}`\n\n  "
-        f"Single '}}' encountered in format string\n"
+        f"Single '}}' encountered in format string"
     )
 
 

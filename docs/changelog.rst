@@ -14,6 +14,30 @@ Changelog
 **Changed**
 
 - Pin ``Werkzeug`` to ``<3.0``.
+- Enhance CLI output for schema loading and internal errors. `#1781`_
+
+Before:
+
+.. code:: text
+
+    Failed to load schema from https://localhost:6423/openapi.json
+    You can use `--wait-for-schema=NUM` to wait for a maximum of NUM seconds on the API schema availability.
+
+    Error: requests.exceptions.SSLError: HTTPSConnectionPool(host='localhost', port=6423): Max retries exceeded with url: /openapi.json (Caused by SSLError(SSLCertVerificationError(1, '[SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:992)')))
+
+    Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks
+
+After:
+
+.. code:: text
+
+    Schema Loading Error
+
+    SSL verification problem
+
+        [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:992)
+
+    Tip: Bypass SSL verification with `--request-tls-verify=false`.
 
 **Fixed**
 
@@ -3418,6 +3442,7 @@ Deprecated
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#1802: https://github.com/schemathesis/schemathesis/issues/1802
+.. _#1781: https://github.com/schemathesis/schemathesis/issues/1781
 .. _#1776: https://github.com/schemathesis/schemathesis/issues/1776
 .. _#1763: https://github.com/schemathesis/schemathesis/issues/1763
 .. _#1753: https://github.com/schemathesis/schemathesis/issues/1753

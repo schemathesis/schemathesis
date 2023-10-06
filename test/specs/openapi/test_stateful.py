@@ -140,7 +140,7 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
     app = factory(operations=("create_user", "get_user", "update_user"), version=open_api_3)
 
     if factory_name == "asgi_app_factory":
-        schema = schemathesis.from_asgi("/openapi.json", app=app)
+        schema = schemathesis.from_asgi("/openapi.json", app=app, force_schema_version="30")
         schema.add_link(
             source=schema["/users/"]["POST"],
             target=schema["/users/{user_id}"]["GET"],

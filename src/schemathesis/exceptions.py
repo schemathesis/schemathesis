@@ -1,10 +1,10 @@
-from dataclasses import dataclass
+import enum
+from dataclasses import dataclass, field
 from hashlib import sha1
 from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, NoReturn, Optional, Tuple, Type, Union
 
 import hypothesis.errors
-import requests
 from jsonschema import ValidationError
 
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE
@@ -176,8 +176,42 @@ class DeadlineExceeded(Exception):
         )
 
 
-class SchemaLoadingError(ValueError):
+@enum.unique
+class SchemaErrorType(enum.Enum):
+    # Connection related issues
+    CONNECTION_SSL = "connection_ssl"
+    CONNECTION_OTHER = "connection_other"
+    NETWORK_OTHER = "network_other"
+
+    # HTTP error codes
+    HTTP_SERVER_ERROR = "http_server_error"
+    HTTP_CLIENT_ERROR = "http_client_error"
+    HTTP_NOT_FOUND = "http_not_found"
+    HTTP_FORBIDDEN = "http_forbidden"
+
+    # Content decoding issues
+    UNEXPECTED_CONTENT_TYPE = "unexpected_content_type"
+    YAML_NUMERIC_STATUS_CODES = "yaml_numeric_status_codes"
+    YAML_NON_STRING_KEYS = "yaml_non_string_keys"
+
+    # Open API validation
+    OPEN_API_INVALID_SCHEMA = "open_api_invalid_schema"
+    OPEN_API_UNSPECIFIED_VERSION = "open_api_unspecified_version"
+    OPEN_API_UNSUPPORTED_VERSION = "open_api_unsupported_version"
+
+    # Unclassified
+    UNCLASSIFIED = "unclassified"
+
+
+@dataclass
+class SchemaError(RuntimeError):
     """Failed to load an API schema."""
+
+    type: SchemaErrorType
+    message: str
+    url: Optional[str] = None
+    response: Optional["GenericResponse"] = None
+    extras: List[str] = field(default_factory=list)
 
 
 class NonCheckError(Exception):
@@ -253,26 +287,6 @@ class SerializationNotPossible(SerializationError):
 
 class InvalidRegularExpression(Exception):
     __module__ = "builtins"
-
-
-@dataclass
-class HTTPError(Exception):
-    response: "GenericResponse"
-    url: str
-
-    @classmethod
-    def raise_for_status(cls, response: requests.Response) -> None:
-        try:
-            response.raise_for_status()
-        except requests.HTTPError as exc:
-            raise cls(response=response, url=response.url) from exc
-
-    @classmethod
-    def check_response(cls, response: requests.Response, schema_path: str) -> None:
-        # Raising exception to provide unified behavior
-        # E.g. it will be handled in CLI - a proper error message will be shown
-        if 400 <= response.status_code < 600:
-            raise cls(response=response, url=schema_path)
 
 
 class UsageError(Exception):
