@@ -85,6 +85,7 @@ DEPRECATED_PRE_RUN_OPTION_WARNING = (
     f"Use the `{HOOKS_MODULE_ENV_VAR}` environment variable instead"
 )
 CASSETTES_PATH_INVALID_USAGE_MESSAGE = "Can't use `--store-network-log` and `--cassette-path` simultaneously"
+COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
 
 
 def reset_checks() -> None:
@@ -586,6 +587,7 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     group=ParameterGroup.hypothesis,
 )
 @click.option("--no-color", help="Disable ANSI color escape codes.", type=bool, is_flag=True)
+@click.option("--force-color", help="Explicitly tells to enable ANSI color escape codes.", type=bool, is_flag=True)
 @click.option(
     "--schemathesis-io-token",
     help="Schemathesis.io authentication token.",
@@ -670,6 +672,7 @@ def run(
     schemathesis_io_url: str = service.DEFAULT_URL,
     schemathesis_io_telemetry: bool = True,
     hosts_file: PathLike = service.DEFAULT_HOSTS_PATH,
+    force_color: bool = False,
 ) -> None:
     """Perform schemathesis test against an API specified by SCHEMA.
 
@@ -685,7 +688,12 @@ def run(
     else:
         report = REPORT_TO_SERVICE
     started_at = current_datetime()
-    maybe_disable_color(ctx, no_color)
+
+    if no_color and force_color:
+        error_message(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
+        sys.exit(1)
+    decide_color_output(ctx, no_color, force_color)
+
     check_auth(auth, headers)
     selected_targets = tuple(target for target in targets_module.ALL_TARGETS if target.__name__ in targets)
 
@@ -1221,6 +1229,7 @@ def get_exit_code(event: events.ExecutionEvent) -> int:
 @click.option("--uri", help="A regexp that filters interactions by their request URI.", type=str)
 @click.option("--method", help="A regexp that filters interactions by their request method.", type=str)
 @click.option("--no-color", help="Disable ANSI color escape codes.", type=bool, is_flag=True)
+@click.option("--force-color", help="Explicitly tells to enable ANSI color escape codes.", type=bool, is_flag=True)
 @click.option("--verbosity", "-v", help="Increase verbosity of the output.", count=True)
 @with_request_tls_verify
 @with_request_cert
@@ -1238,13 +1247,18 @@ def replay(
     request_tls_verify: bool = True,
     request_cert: Optional[str] = None,
     request_cert_key: Optional[str] = None,
+    force_color: bool = False,
 ) -> None:
     """Replay a cassette.
 
     Cassettes in VCR-compatible format can be replayed.
     For example, ones that are recorded with ``store-network-log`` option of `st run` command.
     """
-    maybe_disable_color(ctx, no_color)
+    if no_color and force_color:
+        error_message(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
+        sys.exit(1)
+    decide_color_output(ctx, no_color, force_color)
+
     click.secho(f"{bold('Replaying cassette')}: {cassette_path}")
     with open(cassette_path, "rb") as fd:
         cassette = yaml.load(fd, Loader=SafeLoader)
@@ -1358,8 +1372,10 @@ def bold(message: str) -> str:
     return click.style(message, bold=True)
 
 
-def maybe_disable_color(ctx: click.Context, no_color: bool) -> None:
-    if no_color or "NO_COLOR" in os.environ:
+def decide_color_output(ctx: click.Context, no_color: bool, force_color: bool) -> None:
+    if force_color:
+        ctx.color = True
+    elif no_color or "NO_COLOR" in os.environ:
         ctx.color = False
 
 
