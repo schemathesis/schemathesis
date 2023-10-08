@@ -52,7 +52,7 @@ TOKEN = "Foo"
 {class_decorator}
 class {AUTH_CLASS_NAME}:
 
-    def get(self, context):
+    def get(self, case, context):
         return TOKEN
 
     def set(self, case, data, context):
@@ -89,7 +89,7 @@ import werkzeug
 @schema.auth()
 class Auth:
 
-    def get(self, context):
+    def get(self, case, context):
         client = werkzeug.Client(context.app)
         response = client.post("/auth/token/", json={"username": "test", "password": "pass"})
         return response.json["access_token"]
@@ -105,7 +105,7 @@ from starlette_testclient import TestClient
 @schema.auth()
 class Auth:
 
-    def get(self, context):
+    def get(self, case, context):
         client = TestClient(context.app)
         response = client.post("/auth/token/", json={"username": "test", "password": "pass"})
         return response.json()["access_token"]
@@ -190,7 +190,7 @@ TOKEN = "Foo"
 @lazy_schema.auth()
 class {AUTH_CLASS_NAME}:
 
-    def get(self, context):
+    def get(self, case, context):
         return TOKEN
 
     def set(self, case, data, context):
@@ -260,7 +260,7 @@ TOKEN_1 = "ABC"
 
 {dec1}
 class TokenAuth1:
-    def get(self, context):
+    def get(self, case, context):
         return TOKEN_1
 
     def set(self, case, data, context):
@@ -271,7 +271,7 @@ TOKEN_2 = "DEF"
 
 {dec2}
 class TokenAuth2:
-    def get(self, context):
+    def get(self, case, context):
         return TOKEN_2
 
     def set(self, case, data, context):

@@ -23,7 +23,7 @@ note = print
 
 @schemathesis.auth()
 class TokenAuth:
-    def get(self, context):
+    def get(self, case, context):
         return TOKEN
 
     def set(self, case, data, context):
@@ -134,7 +134,7 @@ def test_multiple_threads(testdir, cli, schema_url):
         def __init__(self):
             self.get_calls = 0
 
-        def get(self, context):
+        def get(self, case, context):
             self.get_calls += 1
             time.sleep(0.05)
             return TOKEN
@@ -217,7 +217,7 @@ TOKEN_1 = "ABC"
 
 {dec1}
 class TokenAuth1:
-    def get(self, context):
+    def get(self, case, context):
         return TOKEN_1
 
     def set(self, case, data, context):
@@ -228,7 +228,7 @@ TOKEN_2 = "DEF"
 
 {dec2}
 class TokenAuth2:
-    def get(self, context):
+    def get(self, case, context):
         return TOKEN_2
 
     def set(self, case, data, context):

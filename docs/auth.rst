@@ -98,14 +98,13 @@ Here's an example of a simple custom authentication class. However, please note 
 
     import requests
 
-    # This is a real endpoint, try it out!
     TOKEN_ENDPOINT = "https://example.schemathesis.io/api/token/"
     USERNAME = "demo"
     PASSWORD = "test"
 
 
     class MyAuth:
-        def get(self, context):
+        def get(self, case, context):
             response = requests.post(
                 TOKEN_ENDPOINT,
                 json={"username": USERNAME, "password": PASSWORD},
@@ -332,7 +331,7 @@ It could be done by using the ``context`` to get the application instance:
 
     @schema.auth()
     class MyAuth:
-        def get(self, context):
+        def get(self, case, context):
             client = TestClient(context.app)
             response = client.post(
                 TOKEN_ENDPOINT, json={"username": USERNAME, "password": PASSWORD}
@@ -359,7 +358,7 @@ It could be done by using the ``context`` to get the application instance:
 
     @schema.auth()
     class MyAuth:
-        def get(self, context):
+        def get(self, case, context):
             client = werkzeug.Client(context.app)
             response = client.post(
                 TOKEN_ENDPOINT, json={"username": USERNAME, "password": PASSWORD}
@@ -392,7 +391,7 @@ For example, you can use refresh tokens for authentication.
         def __init__(self):
             self.refresh_token = None
 
-        def get(self, context):
+        def get(self, case, context):
             if self.refresh_token is not None:
                 return self.refresh(context)
             return self.login(context)
