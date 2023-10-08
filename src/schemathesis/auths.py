@@ -233,7 +233,7 @@ class AuthStorage(Generic[Auth]):
         *,
         refresh_interval: Optional[int] = DEFAULT_REFRESH_INTERVAL,
     ) -> FilterableRegisterAuth:
-        ...
+        pass
 
     @overload
     def __call__(
@@ -242,7 +242,7 @@ class AuthStorage(Generic[Auth]):
         *,
         refresh_interval: Optional[int] = DEFAULT_REFRESH_INTERVAL,
     ) -> FilterableApplyAuth:
-        ...
+        pass
 
     def __call__(
         self,
