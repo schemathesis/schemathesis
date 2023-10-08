@@ -1,3 +1,5 @@
+import warnings
+
 import pytest
 
 from schemathesis import Case
@@ -17,16 +19,29 @@ def auth_storage():
     return AuthStorage()
 
 
+@pytest.fixture(params=["old", "new"])
+def calling_convention(request):
+    return request.param
+
+
 @pytest.fixture
-def auth_provider_class(token):
+def auth_provider_class(calling_convention, token):
     class Auth:
         def __init__(self):
             self.get_calls = 0
             self.set_calls = 0
 
-        def get(self, context):
-            self.get_calls += 1
-            return token
+        if calling_convention == "old":
+
+            def get(self, context):
+                self.get_calls += 1
+                return token
+
+        else:
+
+            def get(self, case, context):
+                self.get_calls += 1
+                return token
 
         def set(self, case, data, context):
             self.set_calls += 1
@@ -35,7 +50,7 @@ def auth_provider_class(token):
     return Auth
 
 
-def test_cache(auth_provider_class, token, mocker):
+def test_cache(calling_convention, auth_provider_class, token, mocker):
     current_time = 0.0
 
     def timer():
@@ -44,16 +59,25 @@ def test_cache(auth_provider_class, token, mocker):
     context = mocker.create_autospec(AuthContext)
     # When caching provider is used
     provider = CachingAuthProvider(auth_provider_class(), timer=timer)
-    # Then all `get` calls are cached
-    assert provider.get(context) == token
-    assert provider.get(context) == token
-    assert provider.provider.get_calls == 1
-    # And refresh happens when the refresh period has passed
-    current_time += provider.refresh_interval
-    assert provider.get(context) == token
-    assert provider.provider.get_calls == 2
-    assert provider.get(context) == token
-    assert provider.provider.get_calls == 2  # No increase
+    with warnings.catch_warnings(record=True) as logs:
+        # Then all `get` calls are cached
+        assert provider.get(None, context) == token
+        assert provider.get(None, context) == token
+        assert provider.provider.get_calls == 1
+        # And refresh happens when the refresh period has passed
+        current_time += provider.refresh_interval
+        assert provider.get(None, context) == token
+        assert provider.provider.get_calls == 2
+        assert provider.get(None, context) == token
+        assert provider.provider.get_calls == 2  # No increase
+
+    if calling_convention == "old":
+        assert len(logs) == 2
+        expected = (
+            "The method 'get' of your AuthProvider is using the old calling convention, which is deprecated and "
+            "will be removed in Schemathesis 4.0. Please update it to accept both 'case' and 'context' as arguments."
+        )
+        assert str(logs[0].message) == str(logs[1].message) == expected
 
 
 def test_register_invalid(auth_storage):

@@ -1,6 +1,8 @@
 """Support for custom API authentication mechanisms."""
+import inspect
 import threading
 import time
+import warnings
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Generic, List, Optional, Type, TypeVar, Union, overload
 
@@ -35,9 +37,10 @@ class AuthContext:
 class AuthProvider(Generic[Auth], Protocol):
     """Get authentication data for an API and set it on the generated test cases."""
 
-    def get(self, context: AuthContext) -> Optional[Auth]:
+    def get(self, case: "Case", context: AuthContext) -> Optional[Auth]:
         """Get the authentication data.
 
+        :param Case case: Generated test case.
         :param AuthContext context: Holds state relevant for the authentication process.
         :return: Any authentication data you find useful for your use case. For example, it could be an access token.
         """
@@ -65,7 +68,7 @@ class RequestsAuth(Generic[Auth]):
 
     auth: requests.auth.AuthBase
 
-    def get(self, _: AuthContext) -> Optional[Auth]:
+    def get(self, _: "Case", __: AuthContext) -> Optional[Auth]:
         return self.auth  # type: ignore[return-value]
 
     def set(self, case: "Case", _: Auth, __: AuthContext) -> None:
@@ -83,7 +86,7 @@ class CachingAuthProvider(Generic[Auth]):
     timer: Callable[[], float] = time.monotonic
     _refresh_lock: threading.Lock = field(default_factory=threading.Lock)
 
-    def get(self, context: AuthContext) -> Optional[Auth]:
+    def get(self, case: "Case", context: AuthContext) -> Optional[Auth]:
         """Get cached auth value."""
         if self.cache_entry is None or self.timer() >= self.cache_entry.expires:
             with self._refresh_lock:
@@ -91,7 +94,7 @@ class CachingAuthProvider(Generic[Auth]):
                     # Another thread updated the cache
                     return self.cache_entry.data
                 # We know that optional auth is possible only inside a higher-level wrapper
-                data: Auth = self.provider.get(context)  # type: ignore[assignment]
+                data: Auth = _provider_get(self.provider, case, context)  # type: ignore[assignment]
                 self.cache_entry = CacheEntry(data=data, expires=self.timer() + self.refresh_interval)
                 return data
         return self.cache_entry.data
@@ -207,9 +210,9 @@ class SelectiveAuthProvider(Generic[Auth]):
     provider: AuthProvider
     filter_set: FilterSet
 
-    def get(self, context: AuthContext) -> Optional[Auth]:
+    def get(self, case: "Case", context: AuthContext) -> Optional[Auth]:
         if self.filter_set.match(context):
-            return self.provider.get(context)
+            return _provider_get(self.provider, case, context)
         return None
 
     def set(self, case: "Case", data: Auth, context: AuthContext) -> None:
@@ -298,7 +301,6 @@ class AuthStorage(Generic[Auth]):
             @schemathesis.auth()
             class TokenAuth:
                 def get(self, context):
-                    # This is a real endpoint, try it out!
                     response = requests.post(
                         "https://example.schemathesis.io/api/token/",
                         json={"username": "demo", "password": "test"},
@@ -376,10 +378,29 @@ class AuthStorage(Generic[Auth]):
         if not self.is_defined:
             raise UsageError("No auth provider is defined.")
         for provider in self.providers:
-            data: Optional[Auth] = provider.get(context)
+            data: Optional[Auth] = _provider_get(provider, case, context)
             if data is not None:
                 provider.set(case, data, context)
                 break
+
+
+def _provider_get(auth_provider: AuthProvider, case: "Case", context: AuthContext) -> Optional[Auth]:
+    # A shim to provide a compatibility layer between previously used convention for `AuthProvider.get`
+    # where it used to accept a single `context` argument
+    method = auth_provider.get
+    parameters = inspect.signature(method).parameters
+    if len(parameters) == 1:
+        # Old calling convention
+        warnings.warn(
+            "The method 'get' of your AuthProvider is using the old calling convention, "
+            "which is deprecated and will be removed in Schemathesis 4.0. "
+            "Please update it to accept both 'case' and 'context' as arguments.",
+            DeprecationWarning,
+            stacklevel=1,
+        )
+        return method(context)  # type: ignore
+    # New calling convention
+    return method(case, context)
 
 
 def set_on_case(case: "Case", context: AuthContext, auth_storage: Optional[AuthStorage]) -> None:
