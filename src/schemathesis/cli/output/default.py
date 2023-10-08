@@ -11,10 +11,11 @@ import requests
 
 from ... import service
 from ..._compat import metadata
-from ...constants import DISCORD_LINK, FLAKY_FAILURE_MESSAGE, CodeSampleStyle, __version__
+from ...constants import DISCORD_LINK, FLAKY_FAILURE_MESSAGE, REPORT_SUGGESTION_ENV_VAR, CodeSampleStyle, __version__
 from ...models import Response, Status
 from ...runner import events
 from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult, deduplicate_failures
+from ..callbacks import FALSE_VALUES
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
 
@@ -304,6 +305,9 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
             click.echo()
             handle_service_integration(context.report)
     else:
+        env_var = os.getenv(REPORT_SUGGESTION_ENV_VAR)
+        if env_var is not None and env_var.lower() in FALSE_VALUES:
+            return
         click.echo()
         category = click.style("Hint", bold=True)
         click.echo(

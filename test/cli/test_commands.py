@@ -40,6 +40,7 @@ from schemathesis.constants import (
     FLAKY_FAILURE_MESSAGE,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     IS_PYTEST_ABOVE_54,
+    REPORT_SUGGESTION_ENV_VAR,
     SCHEMATHESIS_TEST_CASE_HEADER,
     USE_WAIT_FOR_SCHEMA_SUGGESTION_MESSAGE,
     CodeSampleStyle,
@@ -2328,3 +2329,11 @@ def test_rate_limit(cli, schema_url):
     result = cli.run(schema_url, "--rate-limit=1/s")
     lines = result.stdout.splitlines()
     assert lines[5] == "Rate limit: 1/s"
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_disable_report_suggestion(monkeypatch, cli, schema_url):
+    monkeypatch.setenv(REPORT_SUGGESTION_ENV_VAR, "no")
+    result = cli.run(schema_url)
+    assert "You can visualize" not in result.stdout

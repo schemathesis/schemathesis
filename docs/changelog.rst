@@ -9,6 +9,7 @@ Changelog
 - Support for ``application/xml`` serialization based on Open API schema definitions. `#733`_
 - Hook shortcuts (``filter_query``, ``map_header``, etc.) to minimize boilerplate in extensions.
 - Support for colored output from docker container `#1170`_
+- A way to disable suggestion for visualizing test results via the ``SCHEMATHESIS_REPORT_SUGGESTION=0`` environment variable. `#1802`_
 
 **Changed**
 
@@ -3416,6 +3417,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1802: https://github.com/schemathesis/schemathesis/issues/1802
 .. _#1776: https://github.com/schemathesis/schemathesis/issues/1776
 .. _#1763: https://github.com/schemathesis/schemathesis/issues/1763
 .. _#1753: https://github.com/schemathesis/schemathesis/issues/1753

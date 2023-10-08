@@ -100,6 +100,10 @@ Use the ``--report`` argument followed by a file name to save the report as a ta
 
 **Note**: We don't officially document the exact structure or contents of these JSON files. The format might evolve even without a major version bump. Utilizing this report directly is for advanced users; proceed with caution.
 
+.. note::
+
+    If you'd like to disable the suggestion to visualize test reports, then set the ``SCHEMATHESIS_REPORT_SUGGESTION`` environment variable to ``false``.
+
 Step 3: Observe the results
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
