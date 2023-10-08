@@ -1,6 +1,7 @@
 import json
 import os
 import pathlib
+import platform
 import sys
 import time
 from test.apps._graphql._flask import create_app as create_graphql_app
@@ -20,6 +21,7 @@ from aiohttp.test_utils import unused_port
 from hypothesis import HealthCheck, Phase, Verbosity
 from hypothesis.configuration import set_hypothesis_home_dir, storage_directory
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
+from packaging import version
 
 from schemathesis import Case, DataGenerationMethod, fixups
 from schemathesis._compat import IS_HYPOTHESIS_ABOVE_6_54
@@ -560,6 +562,10 @@ def tmp_hypothesis_dir(tmp_path):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
+@pytest.mark.xfail(
+    version.parse(hypothesis.__version__) >= version.parse("6.87.3") and platform.system() != "Windows",
+    reason="PermissionError due to the usage of `Path.exists`",
+)
 def test_hypothesis_settings_no_warning_on_unusable_dir(tmp_hypothesis_dir, cli, schema_url):
     # When the `.hypothesis` directory is unusable
     # And an in-memory DB version is used
