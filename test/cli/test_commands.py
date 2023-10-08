@@ -26,7 +26,14 @@ from packaging import version
 from schemathesis import Case, DataGenerationMethod, fixups
 from schemathesis._compat import IS_HYPOTHESIS_ABOVE_6_54
 from schemathesis.checks import ALL_CHECKS, not_a_server_error
-from schemathesis.cli import DEPRECATED_PRE_RUN_OPTION_WARNING, LoaderConfig, execute, get_exit_code, reset_checks
+from schemathesis.cli import (
+    COLOR_OPTIONS_INVALID_USAGE_MESSAGE,
+    DEPRECATED_PRE_RUN_OPTION_WARNING,
+    LoaderConfig,
+    execute,
+    get_exit_code,
+    reset_checks,
+)
 from schemathesis.cli.callbacks import INVALID_SCHEMA_MESSAGE
 from schemathesis.constants import (
     DEFAULT_RESPONSE_TIMEOUT,
@@ -2047,6 +2054,24 @@ def test_no_color(monkeypatch, cli, schema_url, kind):
     result = cli.run(*args, color=True)
     assert result.exit_code == ExitCode.OK, result.stdout
     assert "[1m" not in result.stdout
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+@pytest.mark.skipif(platform.system() == "Windows", reason="ANSI colors are not properly supported in Windows tests")
+def test_force_color(cli, schema_url):
+    # Using `--force-color` adds ANSI escape codes forcefully
+    result = cli.run(schema_url, "--force-color", color=False)
+    assert result.exit_code == ExitCode.OK, result.stdout
+    assert "[1m" in result.stdout
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_force_color_nocolor(cli, schema_url):
+    result = cli.run(schema_url, "--force-color", "--no-color")
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    assert COLOR_OPTIONS_INVALID_USAGE_MESSAGE in result.stdout
 
 
 @pytest.mark.parametrize("graphql_path", ("/graphql", "/foo"))
