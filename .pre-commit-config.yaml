@@ -3,7 +3,7 @@ default_language_version:
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v4.5.0
     hooks:
       - id: check-yaml
       - id: end-of-file-fixer
@@ -62,7 +62,7 @@ repos:
         additional_dependencies: [types-click, types-requests, types-PyYAML]
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: "v0.0.291"
+    rev: "v0.0.292"
     hooks:
       - id: ruff
 
