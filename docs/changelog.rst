@@ -6,7 +6,7 @@ Changelog
 
 **Added**
 
-- Support for ``application/xml`` serialization based on Open API schema definitions. `#733_`
+- Support for ``application/xml`` serialization based on Open API schema definitions. `#733`_
 - Hook shortcuts (``filter_query``, ``map_header``, etc.) to minimize boilerplate in extensions.
 
 **Changed**
@@ -15,7 +15,8 @@ Changelog
 
 **Fixed**
 
-- Fixed type hint for ``AuthProvider``. `#1776_`
+- Fixed type hint for ``AuthProvider``. `#1776`_
+- Do not skip negative tests if the generated value is ``None``
 
 .. _v3.19.7:
 
