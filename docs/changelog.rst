@@ -36,7 +36,7 @@ After:
 
     SSL verification problem
 
-        [SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:992)
+        [SSL: WRONG_VERSION_NUMBER] wrong version number
 
     Tip: Bypass SSL verification with `--request-tls-verify=false`.
 
