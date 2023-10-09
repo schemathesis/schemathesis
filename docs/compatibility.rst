@@ -27,6 +27,10 @@ To use it, you need to add this code before you load your schema with Schemathes
 
 If you use the Command Line Interface, then you can utilize the ``--fixups=all`` option.
 
+.. note::
+
+    This fix-up is automatically loaded if you pass your FastAPI app to other loaders
+
 UTF-8 BOM
 ---------
 
