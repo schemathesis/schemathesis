@@ -591,7 +591,6 @@ def test_hypothesis_do_not_print_blob(testdir, monkeypatch, cli, schema_url):
     # When runs in CI
     monkeypatch.setenv("CI", "1")
     result = testdir.run("schemathesis", "run", schema_url)
-    # result = cli.run(schema_url)
     assert result.ret == ExitCode.TESTS_FAILED, result.stdout
     # Then there are no reports about the `reproduce_failure` decorator
     assert "You can reproduce this example by temporarily adding @reproduce_failure" not in result.stdout.str()

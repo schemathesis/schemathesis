@@ -14,6 +14,7 @@ Changelog
 **Changed**
 
 - Pin ``Werkzeug`` to ``<3.0``.
+- Disabled the 'explain' phase in Hypothesis to improve performance. `#1808`_
 - Enhance CLI output for schema loading and internal errors. `#1781`_
 
 Before:
@@ -3441,6 +3442,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1808: https://github.com/schemathesis/schemathesis/issues/1808
 .. _#1802: https://github.com/schemathesis/schemathesis/issues/1802
 .. _#1781: https://github.com/schemathesis/schemathesis/issues/1781
 .. _#1776: https://github.com/schemathesis/schemathesis/issues/1776
