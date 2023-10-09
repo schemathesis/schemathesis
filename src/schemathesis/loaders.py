@@ -1,4 +1,5 @@
 import http.client
+import re
 from typing import Callable, TypeVar, cast
 
 import requests
@@ -9,6 +10,10 @@ from .utils import GenericResponse
 R = TypeVar("R", bound=GenericResponse)
 
 
+def remove_ssl_line_number(text: str) -> str:
+    return re.sub(r"\(_ssl\.c:\d+\)", "", text)
+
+
 def load_schema_from_url(loader: Callable[[], R]) -> R:
     try:
         response = loader()
@@ -17,7 +22,8 @@ def load_schema_from_url(loader: Callable[[], R]) -> R:
         if isinstance(exc, requests.exceptions.SSLError):
             message = "SSL verification problem"
             type_ = SchemaErrorType.CONNECTION_SSL
-            extra = [str(exc.args[0].reason)]
+            reason = str(exc.args[0].reason)
+            extra = [remove_ssl_line_number(reason)]
         elif isinstance(exc, requests.exceptions.ConnectionError):
             message = "Connection failed"
             type_ = SchemaErrorType.CONNECTION_OTHER
