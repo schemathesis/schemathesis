@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import HealthCheck, settings
+from hypothesis import HealthCheck, Phase, settings
 
 import schemathesis
 from schemathesis.exceptions import CheckFailed
@@ -104,6 +104,7 @@ TestStateful.settings = settings(
     max_examples=2000,
     deadline=None,
     suppress_health_check=list(HealthCheck),
+    phases=[Phase.generate],
     stateful_step_count=3  # There is no need for longer sequences to uncover the bug
 )
 """,
@@ -174,6 +175,7 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
                 max_examples=2000,
                 deadline=None,
                 suppress_health_check=list(HealthCheck),
+                phases=[Phase.generate],
                 stateful_step_count=3,
             )
         )

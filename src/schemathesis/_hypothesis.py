@@ -63,21 +63,36 @@ def create_test(
     setup_default_deadline(wrapped_test)
     if settings is not None:
         wrapped_test = settings(wrapped_test)
-    existing_settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
-    if existing_settings and Phase.explicit in existing_settings.phases:
-        wrapped_test = add_examples(wrapped_test, operation, hook_dispatcher=hook_dispatcher)
+    existing_settings = _get_hypothesis_settings(wrapped_test)
+    if existing_settings is not None:
+        existing_settings = remove_explain_phase(existing_settings)
+        wrapped_test._hypothesis_internal_use_settings = existing_settings  # type: ignore
+        if Phase.explicit in existing_settings.phases:
+            wrapped_test = add_examples(wrapped_test, operation, hook_dispatcher=hook_dispatcher)
     return wrapped_test
 
 
 def setup_default_deadline(wrapped_test: Callable) -> None:
     # Quite hacky, but it is the simplest way to set up the default deadline value without affecting non-Schemathesis
     # tests globally
-    existing_settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
+    existing_settings = _get_hypothesis_settings(wrapped_test)
     if existing_settings is not None and existing_settings.deadline == hypothesis.settings.default.deadline:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", HypothesisWarning)
             new_settings = hypothesis.settings(existing_settings, deadline=DEFAULT_DEADLINE)
         wrapped_test._hypothesis_internal_use_settings = new_settings  # type: ignore
+
+
+def remove_explain_phase(settings: hypothesis.settings) -> hypothesis.settings:
+    # The "explain" phase is not supported
+    if Phase.explain in settings.phases:
+        phases = tuple(phase for phase in settings.phases if phase != Phase.explain)
+        return hypothesis.settings(settings, phases=phases)
+    return settings
+
+
+def _get_hypothesis_settings(test: Callable) -> Optional[hypothesis.settings]:
+    return getattr(test, "_hypothesis_internal_use_settings", None)
 
 
 def make_async_test(test: Callable) -> Callable:
