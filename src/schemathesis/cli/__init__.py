@@ -3,6 +3,7 @@ import enum
 import os
 import sys
 import traceback
+import warnings
 from collections import defaultdict
 from contextlib import suppress
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ import click
 import hypothesis
 import requests
 import yaml
+from urllib3.exceptions import InsecureRequestWarning
 
 from .. import checks as checks_module
 from .. import contrib
@@ -981,14 +983,16 @@ def should_try_more(exc: SchemaError) -> bool:
 def _try_load_schema(
     config: LoaderConfig, first: Callable[[LoaderConfig], BaseSchema], second: Callable[[LoaderConfig], BaseSchema]
 ) -> BaseSchema:
-    try:
-        return first(config)
-    except SchemaError as exc:
-        if should_try_more(exc):
-            with suppress(Exception):
-                return second(config)
-        # Re-raise the original error
-        raise exc
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", InsecureRequestWarning)
+        try:
+            return first(config)
+        except SchemaError as exc:
+            if should_try_more(exc):
+                with suppress(Exception):
+                    return second(config)
+            # Re-raise the original error
+            raise exc
 
 
 def _load_graphql_schema(config: LoaderConfig) -> GraphQLSchema:
