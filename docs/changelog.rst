@@ -8,13 +8,14 @@ Changelog
 
 - Support for ``application/xml`` serialization based on Open API schema definitions. `#733`_
 - Hook shortcuts (``filter_query``, ``map_header``, etc.) to minimize boilerplate in extensions.
-- Support for colored output from docker container `#1170`_
+- Support for colored output from docker container. `#1170`_
 - A way to disable suggestion for visualizing test results via the ``SCHEMATHESIS_REPORT_SUGGESTION=0`` environment variable. `#1802`_
 
 **Changed**
 
 - Pin ``Werkzeug`` to ``<3.0``.
 - Disabled the 'explain' phase in Hypothesis to improve performance. `#1808`_
+- Do not display ``InsecureRequestWarning`` in CLI output if the user explicitly provided ``--request-tls-verify=false``. `#1780`_
 - Enhance CLI output for schema loading and internal errors. `#1781`_
 
 Before:
@@ -3445,6 +3446,7 @@ Deprecated
 .. _#1808: https://github.com/schemathesis/schemathesis/issues/1808
 .. _#1802: https://github.com/schemathesis/schemathesis/issues/1802
 .. _#1781: https://github.com/schemathesis/schemathesis/issues/1781
+.. _#1780: https://github.com/schemathesis/schemathesis/issues/1780
 .. _#1776: https://github.com/schemathesis/schemathesis/issues/1776
 .. _#1763: https://github.com/schemathesis/schemathesis/issues/1763
 .. _#1753: https://github.com/schemathesis/schemathesis/issues/1753
