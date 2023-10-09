@@ -1,6 +1,8 @@
 from typing import Any, Dict
 
-from ..hooks import HookContext, register, unregister
+from ..hooks import HookContext
+from ..hooks import is_installed as global_is_installed
+from ..hooks import register, unregister
 from ..utils import traverse_schema
 
 
@@ -12,7 +14,15 @@ def uninstall() -> None:
     unregister(before_load_schema)
 
 
+def is_installed() -> bool:
+    return global_is_installed("before_load_schema", before_load_schema)
+
+
 def before_load_schema(context: HookContext, schema: Dict[str, Any]) -> None:
+    adjust_schema(schema)
+
+
+def adjust_schema(schema: Dict[str, Any]) -> None:
     traverse_schema(schema, _handle_boundaries)
 
 

@@ -27,3 +27,8 @@ def uninstall(fixups: Optional[Iterable[str]] = None) -> None:
     fixups = fixups or list(ALL_FIXUPS.keys())
     for name in fixups:
         ALL_FIXUPS[name].uninstall()  # type: ignore
+
+
+def is_installed(name: str) -> bool:
+    """Check whether fixup is installed."""
+    return ALL_FIXUPS[name].is_installed()

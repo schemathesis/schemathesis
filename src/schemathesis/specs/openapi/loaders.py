@@ -16,6 +16,7 @@ from starlette_testclient import TestClient as ASGIClient
 from werkzeug.test import Client
 from yarl import URL
 
+from ... import fixups
 from ...constants import DEFAULT_DATA_GENERATION_METHODS, WAIT_FOR_SCHEMA_INTERVAL, CodeSampleStyle
 from ...exceptions import SchemaError, SchemaErrorType
 from ...hooks import HookContext, dispatch
@@ -221,6 +222,13 @@ def from_file(
     )
 
 
+def _is_fast_api(app: Any) -> bool:
+    for cls in app.__class__.__mro__:
+        if f"{cls.__module__}.{cls.__qualname__}" == "fastapi.applications.FastAPI":
+            return True
+    return False
+
+
 def from_dict(
     raw_schema: Dict[str, Any],
     *,
@@ -244,6 +252,8 @@ def from_dict(
     """
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     hook_context = HookContext()
+    if _is_fast_api(app) and not fixups.is_installed("fast_api"):
+        fixups.fast_api.adjust_schema(raw_schema)
     dispatch("before_load_schema", hook_context, raw_schema)
     rate_limiter: Optional[Limiter] = None
     if rate_limit is not None:

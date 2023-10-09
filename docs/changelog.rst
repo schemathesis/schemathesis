@@ -10,6 +10,7 @@ Changelog
 - Hook shortcuts (``filter_query``, ``map_header``, etc.) to minimize boilerplate in extensions.
 - Support for colored output from docker container. `#1170`_
 - A way to disable suggestion for visualizing test results via the ``SCHEMATHESIS_REPORT_SUGGESTION=0`` environment variable. `#1802`_
+- Automatic FastAPI fixup injecting for ASGI loaders. `#1797`_
 
 **Changed**
 
@@ -3445,6 +3446,7 @@ Deprecated
 
 .. _#1808: https://github.com/schemathesis/schemathesis/issues/1808
 .. _#1802: https://github.com/schemathesis/schemathesis/issues/1802
+.. _#1797: https://github.com/schemathesis/schemathesis/issues/1797
 .. _#1781: https://github.com/schemathesis/schemathesis/issues/1781
 .. _#1780: https://github.com/schemathesis/schemathesis/issues/1780
 .. _#1776: https://github.com/schemathesis/schemathesis/issues/1776
