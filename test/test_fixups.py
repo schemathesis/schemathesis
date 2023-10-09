@@ -78,6 +78,7 @@ def test_bom_json(app_args, cli):
     # When server responds with JSON that contains BOM
     # And the `utf8_bom` fixup is enabled
     result = cli.run(*app_args, "--fixups=utf8_bom", "--checks=response_schema_conformance")
+    assert fixups.is_installed("utf8_bom")
     # Then the data should be properly decoded
     assert result.exit_code == ExitCode.OK, result.stdout
     assert "Unexpected UTF-8 BOM (decode using utf-8-sig)" not in result.stdout

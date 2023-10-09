@@ -3,7 +3,9 @@ from typing import TYPE_CHECKING
 import requests
 
 from ..constants import BOM_MARK
-from ..hooks import HookContext, register, unregister
+from ..hooks import HookContext
+from ..hooks import is_installed as global_is_installed
+from ..hooks import register, unregister
 
 if TYPE_CHECKING:
     from .. import Case, GenericResponse
@@ -15,6 +17,10 @@ def install() -> None:
 
 def uninstall() -> None:
     unregister(after_call)
+
+
+def is_installed() -> bool:
+    return global_is_installed("after_call", after_call)
 
 
 def after_call(context: HookContext, case: "Case", response: "GenericResponse") -> None:

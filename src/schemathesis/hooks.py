@@ -178,6 +178,12 @@ class HookDispatcher:
         """Get a list of hooks registered for a name."""
         return self._hooks.get(name, [])
 
+    def is_installed(self, name: str, needle: Callable) -> bool:
+        for hook in self.get_all_by_name(name):
+            if hook is needle:
+                return True
+        return False
+
     def dispatch(self, name: str, context: HookContext, *args: Any, **kwargs: Any) -> None:
         """Run all hooks for the given name."""
         for hook in self.get_all_by_name(name):
@@ -306,6 +312,7 @@ def after_call(context: HookContext, case: "Case", response: GenericResponse) ->
 GLOBAL_HOOK_DISPATCHER = HookDispatcher(scope=HookScope.GLOBAL)
 dispatch = GLOBAL_HOOK_DISPATCHER.dispatch
 get_all_by_name = GLOBAL_HOOK_DISPATCHER.get_all_by_name
+is_installed = GLOBAL_HOOK_DISPATCHER.is_installed
 collect_statistic = GLOBAL_HOOK_DISPATCHER.collect_statistic
 register = GLOBAL_HOOK_DISPATCHER.register
 unregister = GLOBAL_HOOK_DISPATCHER.unregister
