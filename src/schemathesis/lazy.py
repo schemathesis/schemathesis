@@ -120,7 +120,7 @@ class LazySchema:
                 # Changing the node id is required for better reporting - the method and path will appear there
                 node_id = request.node._nodeid
                 settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
-                tests = list(schema.get_all_tests(test, settings, _given_kwargs=given_kwargs))
+                tests = list(schema.get_all_tests(test, settings, hooks=self.hooks, _given_kwargs=given_kwargs))
                 if not tests:
                     fail_on_no_matches(node_id)
                 request.session.testscollected += len(tests)

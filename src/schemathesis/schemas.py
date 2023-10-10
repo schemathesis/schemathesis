@@ -166,7 +166,9 @@ class BaseSchema(Mapping):
     def operations_count(self) -> int:
         raise NotImplementedError
 
-    def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+    def get_all_operations(
+        self, hooks: Optional[HookDispatcher] = None
+    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         raise NotImplementedError
 
     def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
@@ -193,10 +195,11 @@ class BaseSchema(Mapping):
         settings: Optional[hypothesis.settings] = None,
         seed: Optional[int] = None,
         as_strategy_kwargs: Optional[Dict[str, Any]] = None,
+        hooks: Optional[HookDispatcher] = None,
         _given_kwargs: Optional[Dict[str, GivenInput]] = None,
     ) -> Generator[Result[Tuple[APIOperation, Callable], InvalidSchema], None, None]:
         """Generate all operations and Hypothesis tests for them."""
-        for result in self.get_all_operations():
+        for result in self.get_all_operations(hooks=hooks):
             if isinstance(result, Ok):
                 test = create_test(
                     operation=result.ok(),

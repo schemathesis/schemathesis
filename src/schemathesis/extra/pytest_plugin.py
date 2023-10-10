@@ -183,7 +183,11 @@ class SchemathesisCase(PyCollector):
         """Generate different test items for all API operations available in the given schema."""
         try:
             items = [
-                item for operation in self.schemathesis_case.get_all_operations() for item in self._gen_items(operation)
+                item
+                for operation in self.schemathesis_case.get_all_operations(
+                    hooks=getattr(self.test_function, "_schemathesis_hooks", None)
+                )
+                for item in self._gen_items(operation)
             ]
             if not items:
                 fail_on_no_matches(self.nodeid)

@@ -12,6 +12,7 @@ Changelog
 - A way to disable suggestion for visualizing test results via the ``SCHEMATHESIS_REPORT_SUGGESTION=0`` environment variable. `#1802`_
 - Automatic FastAPI fixup injecting for ASGI loaders. `#1797`_
 - Support ``body`` hooks for GraphQL schemas. `#1464`_
+- New ``filter_operations`` hook to conditionally include or exclude specific API operations from being tested.
 
 **Changed**
 

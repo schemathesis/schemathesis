@@ -68,4 +68,4 @@ They exist because classes like ``graphql.StringValueNode`` can't be directly us
 Limitations
 ~~~~~~~~~~~
 
-At the moment it is not possible to select API operations to test.
+At the moment it is only possible to select API operations to test via hooks.
