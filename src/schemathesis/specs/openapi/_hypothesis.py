@@ -3,7 +3,6 @@ import string
 from base64 import b64encode
 from contextlib import suppress
 from dataclasses import dataclass
-from functools import partial
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
@@ -16,7 +15,7 @@ from requests.structures import CaseInsensitiveDict
 from ... import auths, serializers, utils
 from ...constants import DataGenerationMethod
 from ...exceptions import InvalidSchema, SerializationNotPossible
-from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
+from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...models import APIOperation, Case, cant_serialize
 from ...types import NotSet
 from ...utils import NOT_SET, compose, fast_deepcopy, skip
@@ -501,31 +500,9 @@ def apply_hooks(
     strategy: st.SearchStrategy,
     location: str,
 ) -> st.SearchStrategy:
-    """Apply all `before_generate_` hooks related to the given location."""
-    strategy = _apply_hooks(context, GLOBAL_HOOK_DISPATCHER, strategy, location)
-    strategy = _apply_hooks(context, operation.schema.hooks, strategy, location)
-    if hooks is not None:
-        strategy = _apply_hooks(context, hooks, strategy, location)
-    return strategy
-
-
-def _apply_hooks(
-    context: HookContext, hooks: HookDispatcher, strategy: st.SearchStrategy, location: str
-) -> st.SearchStrategy:
-    """Apply all hooks related to the given location & dispatcher."""
+    """Apply all hooks related to the given location."""
     container = LOCATION_TO_CONTAINER[location]
-    for hook in hooks.get_all_by_name(f"before_generate_{container}"):
-        strategy = hook(context, strategy)
-    for hook in hooks.get_all_by_name(f"filter_{container}"):
-        hook = partial(hook, context)
-        strategy = strategy.filter(hook)
-    for hook in hooks.get_all_by_name(f"map_{container}"):
-        hook = partial(hook, context)
-        strategy = strategy.map(hook)
-    for hook in hooks.get_all_by_name(f"flatmap_{container}"):
-        hook = partial(hook, context)
-        strategy = strategy.flatmap(hook)
-    return strategy
+    return apply_to_all_dispatchers(operation, context, hooks, strategy, container)
 
 
 def clear_cache() -> None:

@@ -16,7 +16,7 @@ from ...auths import AuthStorage
 from ...checks import not_a_server_error
 from ...constants import DataGenerationMethod
 from ...exceptions import InvalidSchema
-from ...hooks import HookDispatcher
+from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...models import APIOperation, Case, CheckFunction, OperationDefinition
 from ...schemas import BaseSchema
 from ...stateful import Stateful, StatefulTest
@@ -220,11 +220,16 @@ def get_case_strategy(
     **kwargs: Any,
 ) -> Any:
     definition = cast(GraphQLOperationDefinition, operation.definition)
-    strategy = {
+    strategy_factory = {
         RootType.QUERY: gql_st.queries,
         RootType.MUTATION: gql_st.mutations,
     }[definition.root_type]
-    body = draw(strategy(client_schema, fields=[definition.field_name], custom_scalars=CUSTOM_SCALARS))
+    hook_context = HookContext(operation)
+    strategy = strategy_factory(
+        client_schema, fields=[definition.field_name], custom_scalars=CUSTOM_SCALARS, print_ast=_noop  # type: ignore
+    )
+    strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body").map(graphql.print_ast)
+    body = draw(strategy)
     instance = GraphQLCase(body=body, operation=operation, data_generation_method=data_generation_method)  # type: ignore
     context = auths.AuthContext(
         operation=operation,
@@ -232,3 +237,7 @@ def get_case_strategy(
     )
     auths.set_on_case(instance, context, auth_storage)
     return instance
+
+
+def _noop(node: graphql.Node) -> graphql.Node:
+    return node
