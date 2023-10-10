@@ -10,17 +10,17 @@ Changelog
 - Hook shortcuts (``filter_query``, ``map_header``, etc.) to minimize boilerplate in extensions.
 - Support for colored output from docker container. `#1170`_
 - A way to disable suggestion for visualizing test results via the ``SCHEMATHESIS_REPORT_SUGGESTION=0`` environment variable. `#1802`_
-- Automatic FastAPI fixup injecting for ASGI loaders. `#1797`_
-- Support ``body`` hooks for GraphQL schemas. `#1464`_
+- Automatic FastAPI fixup injecting for ASGI loaders, eliminating the need for manual setup. `#1797`_
+- Support for ``body`` hooks in GraphQL schemas, enabling custom filtering or modification of queries and mutations. #1464_
 - New ``filter_operations`` hook to conditionally include or exclude specific API operations from being tested.
 
 **Changed**
 
 - Pin ``Werkzeug`` to ``<3.0``.
 - Add ``case`` as the first argument to ``AuthContext.set``. Previous calling convention is still supported. `#1788`_
-- Disabled the 'explain' phase in Hypothesis to improve performance. `#1808`_
+- Disable the 'explain' phase in Hypothesis to improve performance. `#1808`_
 - Do not display ``InsecureRequestWarning`` in CLI output if the user explicitly provided ``--request-tls-verify=false``. `#1780`_
-- Enhance CLI output for schema loading and internal errors. `#1781`_
+- Enhance CLI output for schema loading and internal errors, providing clearer diagnostics and guidance. `#1781`_
 
 Before:
 
@@ -44,6 +44,10 @@ After:
         [SSL: WRONG_VERSION_NUMBER] wrong version number
 
     Tip: Bypass SSL verification with `--request-tls-verify=false`.
+
+**Deprecated**
+
+- Defining ``AuthProvider.get`` with a single ``context`` argument. The support will be removed in Schemathesis ``4.0``.
 
 **Fixed**
 
