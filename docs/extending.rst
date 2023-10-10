@@ -50,6 +50,10 @@ When dealing with multiple hooks that serve similar purposes, especially across 
 In the code snippet above, the function names ``avoid_42`` and ``avoid_43`` don't directly indicate their role as hooks. 
 However, by providing "filter_query" as an argument in the ``@schemathesis.hook`` decorator, both functions will serve as ``filter_query`` hooks, ensuring the right application while maintaining unique function names.
 
+Many Schemathesis hooks accept a ``context`` argument, an instance of the ``HookContext`` class.
+This context provides optional information about the API operation currently being tested, accessible via ``context.operation``.
+This can be useful for conditional logic within your hooks.
+
 Hooks are applied at different scopes: global, schema-specific, and test-specific. 
 They execute in the order they are defined, with globally defined hooks executing first, followed by schema-specific hooks, and finally test-specific hooks.
  
@@ -183,9 +187,68 @@ Hooks can be applied to various parts of a test case:
 - ``body``: Affects the body of a request.
 - ``case``: Affects the entire test case, combining all the above.
 
-.. important::
+GraphQL hooks
+~~~~~~~~~~~~~
 
-    Keep ``context.operation`` immutable in hooks due to its use in internal caching mechanisms.
+Hooks in Schemathesis can be applied to GraphQL schemas for customizing test data.
+For each hook type — ``map``, ``filter``, ``flatmap``, and ``before_generate`` — you have the option to target either the ``body`` of the GraphQL query or the entire ``case``.
+These hooks allow you to manipulate, filter, or generate dependent data, providing greater flexibility in how your tests interact with the GraphQL API.
+
+In these hooks, the ``body`` parameter refers to a ``graphql.DocumentNode`` object from Python's ``graphql`` library that represents the GraphQL query,
+which you can modify as needed. The ``case`` parameter is an instance of Schemathesis' ``Case`` class.
+
+Here's an example using ``map_body`` to modify the GraphQL query:
+
+.. code:: python
+
+    @schema.hook
+    def map_body(context, body):
+        # Access the first node in the GraphQL query
+        node = body.definitions[0].selection_set.selections[0]
+
+        # Change the field name
+        node.name.value = "addedViaHook"
+
+        # Return the modified body
+        return body
+
+In this example, the ``map_body`` function modifies the GraphQL query by changing one of the field names to "addedViaHook".
+
+You can also filter out certain queries:
+
+.. code:: python
+
+    @schema.hook
+    def filter_body(context, body):
+        node = body.definitions[0].selection_set.selections[0]
+        return node.name.value != "excludeThisField"
+
+For more complex scenarios, you can use ``flatmap_body`` to generate dependent data.
+
+.. code:: python
+
+    from hypothesis import strategies as st
+
+
+    @schema.hook
+    def flatmap_body(context, body):
+        node = body.definitions[0].selection_set.selections[0]
+        if node.name.value == "someField":
+            return st.just(body).map(lambda b: modify_body(b, "someDependentField"))
+        return body
+
+
+    def modify_body(body, new_field_name):
+        # Create a new field
+        new_field = ...  # Create a new field node
+        new_field.name.value = new_field_name
+
+        # Add the new field to the query
+        body.definitions[0].selection_set.selections.append(new_field)
+
+        return body
+
+Remember to return the modified ``body`` or ``case`` object from your hook functions for the changes to take effect.
 
 Applying Hooks to Specific API Operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

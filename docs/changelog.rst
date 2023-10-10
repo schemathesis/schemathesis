@@ -11,6 +11,7 @@ Changelog
 - Support for colored output from docker container. `#1170`_
 - A way to disable suggestion for visualizing test results via the ``SCHEMATHESIS_REPORT_SUGGESTION=0`` environment variable. `#1802`_
 - Automatic FastAPI fixup injecting for ASGI loaders. `#1797`_
+- Support ``body`` hooks for GraphQL schemas. `#1464`_
 
 **Changed**
 
@@ -3480,6 +3481,7 @@ Deprecated
 .. _#1518: https://github.com/schemathesis/schemathesis/issues/1518
 .. _#1514: https://github.com/schemathesis/schemathesis/issues/1514
 .. _#1485: https://github.com/schemathesis/schemathesis/issues/1485
+.. _#1464: https://github.com/schemathesis/schemathesis/issues/1464
 .. _#1463: https://github.com/schemathesis/schemathesis/issues/1463
 .. _#1452: https://github.com/schemathesis/schemathesis/issues/1452
 .. _#1445: https://github.com/schemathesis/schemathesis/issues/1445

@@ -3,6 +3,7 @@ from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum, unique
+from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, DefaultDict, Dict, List, Optional, Union, cast
 
 from hypothesis import strategies as st
@@ -184,6 +185,22 @@ class HookDispatcher:
                 return True
         return False
 
+    def apply_to_container(
+        self, strategy: st.SearchStrategy, container: str, context: HookContext
+    ) -> st.SearchStrategy:
+        for hook in self.get_all_by_name(f"before_generate_{container}"):
+            strategy = hook(context, strategy)
+        for hook in self.get_all_by_name(f"filter_{container}"):
+            hook = partial(hook, context)
+            strategy = strategy.filter(hook)
+        for hook in self.get_all_by_name(f"map_{container}"):
+            hook = partial(hook, context)
+            strategy = strategy.map(hook)
+        for hook in self.get_all_by_name(f"flatmap_{container}"):
+            hook = partial(hook, context)
+            strategy = strategy.flatmap(hook)
+        return strategy
+
     def dispatch(self, name: str, context: HookContext, *args: Any, **kwargs: Any) -> None:
         """Run all hooks for the given name."""
         for hook in self.get_all_by_name(name):
@@ -204,6 +221,21 @@ class HookDispatcher:
         Useful in tests.
         """
         self._hooks = defaultdict(list)
+
+
+def apply_to_all_dispatchers(
+    operation: "APIOperation",
+    context: HookContext,
+    hooks: Optional[HookDispatcher],
+    strategy: st.SearchStrategy,
+    container: str,
+) -> st.SearchStrategy:
+    """Apply all hooks related to the given location."""
+    strategy = GLOBAL_HOOK_DISPATCHER.apply_to_container(strategy, container, context)
+    strategy = operation.schema.hooks.apply_to_container(strategy, container, context)
+    if hooks is not None:
+        strategy = hooks.apply_to_container(strategy, container, context)
+    return strategy
 
 
 all_scopes = HookDispatcher.register_spec(list(HookScope))
