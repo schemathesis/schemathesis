@@ -272,6 +272,35 @@ This ensures the hook applies only to relevant scenarios.
 
 In this example, the ``item_id`` path parameter is synchronized with the ``id`` value from the request body, but only for test cases targeting ``PATCH /items/{item_id}/``.
 
+Filtering API Operations
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Schemathesis provides a ``filter_operations`` hook that allows you to selectively test specific API operations based on their attributes.
+This hook can help you focus your tests on the most relevant parts of your API.
+
+The hook should return a boolean value:
+- Return ``True`` to include the operation in the tests
+- Return ``False`` to skip the operation
+
+Here's an Open API example that includes all operations except those using the POST method:
+
+.. code:: python
+
+    @schemathesis.hook
+    def filter_operations(context):
+        return context.operation.method != "POST"
+
+Here's a GraphQL example that includes all queries:
+
+.. code:: python
+
+    @graphql_schema.hook
+    def filter_operations(context):
+        return context.operation.definition.is_query
+
+In these examples, the ``filter_operations`` hook skips all ``POST`` methods in Open API and all mutations in GraphQL.
+You can implement any custom logic within the ``filter_operations`` function to include or exclude specific API operations.
+
 ``before_process_path``
 ~~~~~~~~~~~~~~~~~~~~~~~
 

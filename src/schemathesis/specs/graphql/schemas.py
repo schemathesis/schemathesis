@@ -16,7 +16,13 @@ from ...auths import AuthStorage
 from ...checks import not_a_server_error
 from ...constants import DataGenerationMethod
 from ...exceptions import InvalidSchema
-from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
+from ...hooks import (
+    GLOBAL_HOOK_DISPATCHER,
+    HookContext,
+    HookDispatcher,
+    apply_to_all_dispatchers,
+    should_skip_operation,
+)
 from ...models import APIOperation, Case, CheckFunction, OperationDefinition
 from ...schemas import BaseSchema
 from ...stateful import Stateful, StatefulTest
@@ -92,6 +98,14 @@ class GraphQLOperationDefinition(OperationDefinition):
     type_: graphql.GraphQLType
     root_type: RootType
 
+    @property
+    def is_query(self) -> bool:
+        return self.root_type == RootType.QUERY
+
+    @property
+    def is_mutation(self) -> bool:
+        return self.root_type == RootType.MUTATION
+
 
 @dataclass
 class GraphQLSchema(BaseSchema):
@@ -130,7 +144,9 @@ class GraphQLSchema(BaseSchema):
                         total += len(type_def["fields"])
         return total
 
-    def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+    def get_all_operations(
+        self, hooks: Optional[HookDispatcher] = None
+    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         schema = self.client_schema
         for root_type, operation_type in (
             (RootType.QUERY, schema.query_type),
@@ -139,27 +155,33 @@ class GraphQLSchema(BaseSchema):
             if operation_type is None:
                 continue
             for field_name, definition in operation_type.fields.items():
-                yield Ok(
-                    APIOperation(
-                        base_url=self.get_base_url(),
-                        path=self.base_path,
-                        verbose_name=f"{operation_type.name}.{field_name}",
-                        method="POST",
-                        app=self.app,
-                        schema=self,
-                        # Parameters are not yet supported
-                        definition=GraphQLOperationDefinition(
-                            raw=definition,
-                            resolved=definition,
-                            scope="",
-                            parameters=[],
-                            type_=operation_type,
-                            field_name=field_name,
-                            root_type=root_type,
-                        ),
-                        case_cls=GraphQLCase,
-                    )
+                operation: APIOperation = APIOperation(
+                    base_url=self.get_base_url(),
+                    path=self.base_path,
+                    verbose_name=f"{operation_type.name}.{field_name}",
+                    method="POST",
+                    app=self.app,
+                    schema=self,
+                    # Parameters are not yet supported
+                    definition=GraphQLOperationDefinition(
+                        raw=definition,
+                        resolved=definition,
+                        scope="",
+                        parameters=[],
+                        type_=operation_type,
+                        field_name=field_name,
+                        root_type=root_type,
+                    ),
+                    case_cls=GraphQLCase,
                 )
+                context = HookContext(operation=operation)
+                if (
+                    should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
+                    or should_skip_operation(self.hooks, context)
+                    or (hooks and should_skip_operation(hooks, context))
+                ):
+                    continue
+                yield Ok(operation)
 
     def get_case_strategy(
         self,
