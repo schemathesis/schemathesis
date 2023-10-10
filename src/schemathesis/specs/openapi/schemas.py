@@ -39,7 +39,7 @@ from ...exceptions import (
     get_response_parsing_error,
     get_schema_validation_error,
 )
-from ...hooks import HookContext, HookDispatcher
+from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, should_skip_operation
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import BaseSchema
 from ...stateful import APIStateMachine, Stateful, StatefulTest
@@ -146,7 +146,9 @@ class BaseOpenAPISchema(BaseSchema):
                 continue
         return total
 
-    def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+    def get_all_operations(
+        self, hooks: Optional[HookDispatcher] = None
+    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         """Iterate over all operations defined in the API.
 
         Each yielded item is either `Ok` or `Err`, depending on the presence of errors during schema processing.
@@ -199,7 +201,15 @@ class BaseOpenAPISchema(BaseSchema):
                         raw_definition = OperationDefinition(
                             raw_methods[method], resolved_definition, scope, parameters
                         )
-                        yield Ok(self.make_operation(path, method, parameters, raw_definition))
+                        operation = self.make_operation(path, method, parameters, raw_definition)
+                        context = HookContext(operation=operation)
+                        if (
+                            should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
+                            or should_skip_operation(self.hooks, context)
+                            or (hooks and should_skip_operation(hooks, context))
+                        ):
+                            continue
+                        yield Ok(operation)
                     except SCHEMA_PARSING_ERRORS as exc:
                         yield self._into_err(exc, path, method)
             except SCHEMA_PARSING_ERRORS as exc:
