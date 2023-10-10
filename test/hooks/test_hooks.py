@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
@@ -478,3 +478,23 @@ def test_a(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+
+
+def test_graphql(graphql_schema):
+    @graphql_schema.hook
+    def map_body(context, body):
+        node = body.definitions[0].selection_set.selections[0]
+        node.name.value = "addedViaHook"
+        node.arguments = ()
+        node.selection_set = ()
+        return body
+
+    strategy = graphql_schema["/graphql"]["POST"].as_strategy()
+
+    @given(case=strategy)
+    @settings(max_examples=3, phases=[Phase.generate])
+    def test(case):
+        # Not necessarily valid GraphQL, but it is simpler to check the hook this way
+        assert case.body == "mutation {\n  addedViaHook\n}"
+
+    test()
