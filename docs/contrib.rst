@@ -45,3 +45,7 @@ Open API 2.0 / 3.0 do not declare the ``uuid`` format as built-in, hence it is a
     formats.uuid.install()
 
 You could also enable it via the ``--contrib-openapi-formats-uuid`` CLI option.
+
+.. note::
+
+    If you enable the OpenAPI 3.1 experimental feature, the UUID format support is automatically enabled. Refer to the :ref:`Experimental Features <experimental-openapi-31>` section for more details.

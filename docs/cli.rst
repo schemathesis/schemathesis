@@ -420,7 +420,7 @@ Base URL configuration
 ----------------------
 
 If your Open API schema defines ``servers`` (or ``basePath`` in Open API 2.0), these values will be used to
-construct a full operation URL during testing. In the case of Open API 3.0, the first value from ``servers`` will be used.
+construct a full operation URL during testing. In the case of Open API 3, the first value from ``servers`` will be used.
 
 However, you may want to run tests against a different base URL. To do this, you need to pass the ``--base-url`` option in CLI
 or provide ``base_url`` argument to a loader/runner if you use Schemathesis in your code:

@@ -96,20 +96,10 @@ The ``case`` object that is injected in each test can be modified, assuming your
 Why does Schemathesis fail to parse my API schema generate by FastAPI?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Because FastAPI uses JSON Draft 7 under the hood (via ``pydantic``), which is not compatible with JSON drafts defined by
-the Open API 2 / 3.0.x versions. It is a `known issue <https://github.com/tiangolo/fastapi/issues/240>`_ on the FastAPI side.
-Schemathesis is more strict in schema handling by default, but we provide optional fixups for this case:
+`FastAPI <https://github.com/tiangolo/fastapi>`_ uses `pydantic <https://github.com/samuelcolvin/pydantic>`_, which in turn uses JSON Schema Draft 7.
+This can lead to compatibility issues as OpenAPI 2.0 and 3.0.x use earlier versions of JSON Schema.
 
-.. code:: python
-
-    import schemathesis
-
-    # will install all available compatibility fixups.
-    schemathesis.fixups.install()
-    # You can also provide a list of fixup names as the first argument
-    # schemathesis.fixups.install(["fast_api"])
-
-For more information, take a look into the "Compatibility" section.
+For detailed solutions, please refer to the :ref:`Compatibility section <compatibility-fastapi>`.
 
 Why Schemathesis generates uniform data for my API schema?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -262,13 +252,17 @@ As an alternative, you could use the ``anyOf`` keyword instead.
 Why Schemathesis does not generate UUIDs for Open API 2.0 / 3.0 even if ``format: uuid`` is specified?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Open API 2.0 / 3.0 do not declare the ``uuid`` format as built-in, hence it is available as an extension:
+Open API 2.0 / 3.0 do not declare the ``uuid`` format as built-in. You have two options to enable UUID generation:
+
+1. Use an extension:
 
 .. code:: python
 
     from schemathesis.contrib.openapi import formats
 
     formats.uuid.install()
+
+2. Enable experimental support for OpenAPI 3.1, which also activates UUID generation. See the :ref:`Experimental Features <experimental-openapi-31>` section for details.
 
 Working with API schemas
 ------------------------

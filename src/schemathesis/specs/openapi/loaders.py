@@ -16,7 +16,7 @@ from starlette_testclient import TestClient as ASGIClient
 from werkzeug.test import Client
 from yarl import URL
 
-from ... import fixups
+from ... import experimental, fixups
 from ...constants import DEFAULT_DATA_GENERATION_METHODS, WAIT_FOR_SCHEMA_INTERVAL, CodeSampleStyle
 from ...exceptions import SchemaError, SchemaErrorType
 from ...hooks import HookContext, dispatch
@@ -252,7 +252,11 @@ def from_dict(
     """
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     hook_context = HookContext()
-    if _is_fast_api(app) and not fixups.is_installed("fast_api"):
+    is_openapi_31 = raw_schema.get("openapi", "").startswith("3.1")
+    is_fast_api_fixup_installed = fixups.is_installed("fast_api")
+    if is_fast_api_fixup_installed and is_openapi_31:
+        fixups.fast_api.uninstall()
+    elif _is_fast_api(app):
         fixups.fast_api.adjust_schema(raw_schema)
     dispatch("before_load_schema", hook_context, raw_schema)
     rate_limiter: Optional[Limiter] = None
@@ -281,7 +285,11 @@ def from_dict(
 
     def init_openapi_3(forced: bool) -> OpenApi30:
         version = raw_schema["openapi"]
-        if not forced and not OPENAPI_30_VERSION_RE.match(version):
+        if (
+            not (is_openapi_31 and experimental.OPEN_API_3_1.is_enabled)
+            and not forced
+            and not OPENAPI_30_VERSION_RE.match(version)
+        ):
             raise SchemaError(
                 SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION,
                 f"The provided schema uses Open API {version}, which is currently not supported.",

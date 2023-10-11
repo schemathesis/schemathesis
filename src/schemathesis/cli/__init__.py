@@ -19,7 +19,7 @@ import yaml
 from urllib3.exceptions import InsecureRequestWarning
 
 from .. import checks as checks_module
-from .. import contrib
+from .. import contrib, experimental
 from .. import fixups as _fixups
 from .. import runner, service
 from .. import targets as targets_module
@@ -592,6 +592,13 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 @click.option("--no-color", help="Disable ANSI color escape codes.", type=bool, is_flag=True)
 @click.option("--force-color", help="Explicitly tells to enable ANSI color escape codes.", type=bool, is_flag=True)
 @click.option(
+    "--experimental",
+    help="Enable experimental support for specific features.",
+    type=click.Choice([experimental.OPEN_API_3_1.name]),
+    callback=callbacks.convert_experimental,
+    multiple=True,
+)
+@click.option(
     "--schemathesis-io-token",
     help="Schemathesis.io authentication token.",
     type=str,
@@ -623,6 +630,7 @@ def run(
     auth: Optional[Tuple[str, str]],
     auth_type: str,
     headers: Dict[str, str],
+    experimental: list,
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
     exclude_checks: Iterable[str] = [],
     data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
@@ -683,6 +691,10 @@ def run(
 
     API_NAME is an API identifier to upload data to Schemathesis.io.
     """
+    # Enable selected experiments
+    for experiment in experimental:
+        experiment.enable()
+
     report: Optional[Union[ReportToService, click.utils.LazyFile]]
     if report_value is None:
         report = None

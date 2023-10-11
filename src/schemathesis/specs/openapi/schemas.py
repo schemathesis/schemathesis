@@ -29,7 +29,7 @@ import requests
 from hypothesis.strategies import SearchStrategy
 from requests.structures import CaseInsensitiveDict
 
-from ... import failures
+from ... import experimental, failures
 from ...auths import AuthStorage
 from ...constants import HTTP_METHODS, DataGenerationMethod
 from ...exceptions import (
@@ -504,9 +504,13 @@ class BaseOpenAPISchema(BaseSchema):
         resolver = ConvertingResolver(
             self.location or "", self.raw_schema, nullable_name=self.nullable_name, is_response_schema=True
         )
+        if self.spec_version.startswith("3.1") and experimental.OPEN_API_3_1.is_enabled:
+            cls = jsonschema.Draft202012Validator
+        else:
+            cls = jsonschema.Draft4Validator
         with in_scopes(resolver, scopes):
             try:
-                jsonschema.validate(data, schema, cls=jsonschema.Draft4Validator, resolver=resolver)
+                jsonschema.validate(data, schema, cls=cls, resolver=resolver)
             except jsonschema.ValidationError as exc:
                 exc_class = get_schema_validation_error(exc)
                 raise exc_class(
