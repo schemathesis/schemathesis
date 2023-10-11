@@ -66,6 +66,7 @@ User's Guide
    cli
    python
    continuous_integration
+   experimental
    service
    auth
    contrib

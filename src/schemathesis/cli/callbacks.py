@@ -10,7 +10,7 @@ import hypothesis
 from click.types import LazyFile  # type: ignore
 from requests import PreparedRequest, RequestException
 
-from .. import exceptions, throttling, utils
+from .. import exceptions, experimental, throttling, utils
 from ..constants import CodeSampleStyle, DataGenerationMethod
 from ..service.hosts import get_temporary_hosts_file
 from ..stateful import Stateful
@@ -222,6 +222,12 @@ def convert_stateful(ctx: click.core.Context, param: click.core.Parameter, value
     if value == "none":
         return None
     return Stateful[value]
+
+
+def convert_experimental(
+    ctx: click.core.Context, param: click.core.Parameter, value: Tuple[str, ...]
+) -> List[experimental.Experiment]:
+    return [feature for feature in experimental.GLOBAL_EXPERIMENTS.available if feature.name in value]
 
 
 def convert_checks(ctx: click.core.Context, param: click.core.Parameter, value: Tuple[List[str]]) -> List[str]:

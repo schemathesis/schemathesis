@@ -353,6 +353,8 @@ def test_commands_run_help(cli):
         "  --no-color                      Disable ANSI color escape codes.",
         "  --force-color                   Explicitly tells to enable ANSI color escape",
         "                                  codes.",
+        "  --experimental [openapi-3.1]    Enable experimental support for specific",
+        "                                  features.",
         "  --schemathesis-io-token TEXT    Schemathesis.io authentication token.",
         "  --schemathesis-io-url TEXT      Schemathesis.io base URL.",
         "  --schemathesis-io-telemetry TEXT",

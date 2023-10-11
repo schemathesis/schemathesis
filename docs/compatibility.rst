@@ -1,38 +1,75 @@
 Compatibility
 =============
 
-By default, Schemathesis is strict on Open API spec interpretation, but other 3rd-party tools often are more flexible
-and not always comply with the spec.
+This section aims to help you resolve issues you may encounter due to the strict Open API specification adherence in Schemathesis and its interaction with other tools that might not be as strict.
+
+.. _compatibility-fastapi:
 
 Using FastAPI
 -------------
 
-`FastAPI <https://github.com/tiangolo/fastapi>`_ uses `pydantic <https://github.com/samuelcolvin/pydantic>`_ for JSON Schema
-generation, and it produces Draft 7 compatible schemas. But Open API 2 / 3.0.x use earlier versions of JSON Schema (Draft 4 and Wright Draft 00 respectively), which leads
-to incompatibilities when Schemathesis parses input schema.
+`FastAPI <https://github.com/tiangolo/fastapi>`_ uses `pydantic <https://github.com/samuelcolvin/pydantic>`_ for JSON Schema generation.
+Depending on your FastAPI version, you may need to adjust your Schemathesis setup:
 
-It is a `known issue <https://github.com/tiangolo/fastapi/issues/240>`_ on the FastAPI side,
-and Schemathesis provides a way to handle such schemas. The idea is to convert Draft 7 keywords syntax to Draft 4.
+For Recent FastAPI Versions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To use it, you need to add this code before you load your schema with Schemathesis:
+If you're using FastAPI versions that generate OpenAPI 3.1 schemas, activate Schemathesis' experimental support for OpenAPI 3.1.
+
+**CLI**
+
+.. code:: bash
+
+    st run https://example.schemathesis.io/openapi.json --experimental=openapi-3.1
+
+**Python**
 
 .. code:: python
 
     import schemathesis
 
-    # will install all available compatibility fixups.
-    schemathesis.fixups.install()
-    # You can provide a list of fixup names as the first argument
-    # schemathesis.fixups.install(["fast_api"])
+    # Globally enable OpenAPI 3.1 experimental feature
+    schemathesis.experimental.openapi_3_1.enable()
 
-If you use the Command Line Interface, then you can utilize the ``--fixups=all`` option.
+For Older FastAPI Versions
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For older versions generating OpenAPI 3.0.x or 2.0, you may encounter compatibility issues. Schemathesis provides "fixups" to address these incompatibilities. Fixups are small adjustments that make these versions compatible with Schemathesis.
+
+**CLI**
+
+.. code:: bash
+
+    st run https://example.schemathesis.io/openapi.json --fixups=fast_api
+
+**Python**
+
+.. code:: python
+
+    import schemathesis
+
+    schemathesis.fixups.fast_api.install()
 
 .. note::
 
-    This fix-up is automatically loaded if you pass your FastAPI app to other loaders
+    This fix-up is automatically loaded if you use the ASGI integration
 
 UTF-8 BOM
 ---------
 
-Some web servers may prefix JSON with UTF-8 Byte Order Mark - ``\ufeff``, which is explicitly forbidden by RFC 7159 (JSON).
-Enabling the ``utf8_bom`` fixup allows Schemathesis to process such responses by removing this mark from responses.
+Some web servers prefix JSON with a UTF-8 Byte Order Mark (BOM), which is not compliant with the JSON specification.
+If your server does this, you can enable a fixup to remove it.
+
+**CLI**
+
+.. code:: bash
+
+    st run https://example.schemathesis.io/openapi.json --fixups=utf8_bom
+
+**Python**
+
+.. code:: python
+
+    import schemathesis
+
+    schemathesis.fixups.utf8_bom.install()
