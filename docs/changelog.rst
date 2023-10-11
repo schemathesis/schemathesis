@@ -13,6 +13,9 @@ Changelog
 - Automatic FastAPI fixup injecting for ASGI loaders, eliminating the need for manual setup. `#1797`_
 - Support for ``body`` hooks in GraphQL schemas, enabling custom filtering or modification of queries and mutations. `#1464`_
 - New ``filter_operations`` hook to conditionally include or exclude specific API operations from being tested.
+- Introduced a new CLI option ``--experimental=openapi-3.1`` for experimental support of OpenAPI 3.1. This enables compatible JSON Schema validation for responses, while data generation remains OpenAPI 3.0-compatible. `#1820`_
+
+**Note**: Experimental features can change or be removed in any minor version release.
 
 **Changed**
 
@@ -3453,6 +3456,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1820: https://github.com/schemathesis/schemathesis/issues/1820
 .. _#1808: https://github.com/schemathesis/schemathesis/issues/1808
 .. _#1802: https://github.com/schemathesis/schemathesis/issues/1802
 .. _#1797: https://github.com/schemathesis/schemathesis/issues/1797

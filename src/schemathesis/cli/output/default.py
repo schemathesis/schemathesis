@@ -12,6 +12,7 @@ import requests
 from ... import service
 from ..._compat import metadata
 from ...constants import DISCORD_LINK, FLAKY_FAILURE_MESSAGE, REPORT_SUGGESTION_ENV_VAR, CodeSampleStyle, __version__
+from ...experimental import GLOBAL_EXPERIMENTS
 from ...models import Response, Status
 from ...runner import events
 from ...runner.events import InternalErrorType, SchemaErrorType
@@ -289,6 +290,18 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
             click.secho("WARNINGS:", bold=True, fg="yellow")
             for warning in event.warnings:
                 click.secho(f"  - {warning}", fg="yellow")
+
+    if len(GLOBAL_EXPERIMENTS.enabled) > 0:
+        click.echo()
+        click.secho("Experimental Features:", bold=True)
+        for experiment in sorted(GLOBAL_EXPERIMENTS.enabled, key=lambda e: e.name):
+            click.secho(f"  - {experiment.verbose_name}: {experiment.description}")
+            click.secho(f"    Feedback: {experiment.discussion_url}")
+        click.echo()
+        click.echo(
+            "Your feedback is crucial for experimental features. "
+            "Please visit the provided URL(s) to share your thoughts."
+        )
 
     if context.report is not None and not context.is_interrupted:
         if isinstance(context.report, FileReportContext):
