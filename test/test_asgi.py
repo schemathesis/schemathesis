@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 import pytest
 from fastapi import Cookie, FastAPI
 from hypothesis import HealthCheck, given, settings
@@ -138,3 +140,55 @@ def test_automatic_fixup(empty_open_api_3_schema, with_existing_fixup, uninstall
         "exclusiveMaximum": True,
         "maximum": 5,
     }
+
+
+def with_lifespan(data: dict):
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        data.setdefault("startup", 0)
+        data["startup"] += 1
+        yield
+        data.setdefault("shutdown", 0)
+        data["shutdown"] += 1
+
+    return FastAPI(lifespan=lifespan)
+
+
+def with_on_event(data: dict):
+    app = FastAPI()
+
+    @app.on_event("startup")
+    async def startup():
+        data.setdefault("startup", 0)
+        data["startup"] += 1
+
+    @app.on_event("shutdown")
+    async def shutdown():
+        data.setdefault("shutdown", 0)
+        data["shutdown"] += 1
+
+    return app
+
+
+@pytest.mark.parametrize("setup", (with_lifespan, with_on_event))
+def test_events(setup):
+    data = {}
+    app = setup(data)
+
+    @app.get("/health")
+    async def find_secret():
+        return {"status": "OK"}
+
+    schema = schemathesis.from_asgi("/openapi.json", app, force_schema_version="30")
+
+    @given(case=schema["/health"]["GET"].as_strategy())
+    @settings(max_examples=3)
+    def test(case):
+        response = case.call_asgi()
+        assert response.status_code == 200
+        assert response.json() == {"status": "OK"}
+
+    test()
+
+    assert data["startup"] == 1
+    assert data["shutdown"] == 1

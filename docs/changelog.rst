@@ -11,7 +11,7 @@ Changelog
 - Support for colored output from docker container. `#1170`_
 - A way to disable suggestion for visualizing test results via the ``SCHEMATHESIS_REPORT_SUGGESTION=0`` environment variable. `#1802`_
 - Automatic FastAPI fixup injecting for ASGI loaders, eliminating the need for manual setup. `#1797`_
-- Support for ``body`` hooks in GraphQL schemas, enabling custom filtering or modification of queries and mutations. #1464_
+- Support for ``body`` hooks in GraphQL schemas, enabling custom filtering or modification of queries and mutations. `#1464`_
 - New ``filter_operations`` hook to conditionally include or exclude specific API operations from being tested.
 
 **Changed**
@@ -52,7 +52,8 @@ After:
 **Fixed**
 
 - Fixed type hint for ``AuthProvider``. `#1776`_
-- Do not skip negative tests if the generated value is ``None``
+- Do not skip negative tests if the generated value is ``None``.
+- Lack of execution for ASGI events during testing. `#1305`_, `#1727`_
 
 .. _v3.19.7:
 
@@ -3463,6 +3464,7 @@ Deprecated
 .. _#1742: https://github.com/schemathesis/schemathesis/issues/1742
 .. _#1739: https://github.com/schemathesis/schemathesis/issues/1739
 .. _#1734: https://github.com/schemathesis/schemathesis/issues/1734
+.. _#1727: https://github.com/schemathesis/schemathesis/issues/1727
 .. _#1721: https://github.com/schemathesis/schemathesis/issues/1721
 .. _#1705: https://github.com/schemathesis/schemathesis/issues/1705
 .. _#1702: https://github.com/schemathesis/schemathesis/issues/1702
@@ -3516,6 +3518,7 @@ Deprecated
 .. _#1326: https://github.com/schemathesis/schemathesis/issues/1326
 .. _#1325: https://github.com/schemathesis/schemathesis/issues/1325
 .. _#1323: https://github.com/schemathesis/schemathesis/issues/1323
+.. _#1305: https://github.com/schemathesis/schemathesis/issues/1305
 .. _#1303: https://github.com/schemathesis/schemathesis/issues/1303
 .. _#1292: https://github.com/schemathesis/schemathesis/issues/1292
 .. _#1290: https://github.com/schemathesis/schemathesis/issues/1290
