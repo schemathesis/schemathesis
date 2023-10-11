@@ -70,6 +70,11 @@ def file_exists(path: str) -> bool:
         return False
 
 
+def is_filename(value: str) -> bool:
+    """Detect if the input string is a filename by checking its extension."""
+    return bool(pathlib.Path(value).suffix)
+
+
 def is_latin_1_encodable(value: str) -> bool:
     """Header values are encoded to latin-1 before sending."""
     try:

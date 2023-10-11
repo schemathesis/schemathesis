@@ -21,6 +21,7 @@ MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE = (
     'Missing argument, "--cassette-path" should be specified as well if you use "--cassette-preserve-exact-body-bytes".'
 )
 INVALID_SCHEMA_MESSAGE = "Invalid SCHEMA, must be a valid URL, file path or an API name from Schemathesis.io."
+FILE_DOES_NOT_EXIST_MESSAGE = "The specified file does not exist. Please provide a valid path to an existing file."
 
 
 @enum.unique
@@ -47,7 +48,7 @@ def parse_schema_kind(schema: str, app: Optional[str]) -> SchemaInputKind:
         raise click.UsageError(INVALID_SCHEMA_MESSAGE)
     if netloc:
         return SchemaInputKind.URL
-    if utils.file_exists(schema):
+    if utils.file_exists(schema) or utils.is_filename(schema):
         return SchemaInputKind.PATH
     if app is not None:
         return SchemaInputKind.APP_PATH
@@ -69,7 +70,11 @@ def validate_schema(
     if kind == SchemaInputKind.PATH:
         # Base URL is required if it is not a dry run
         if app is None and base_url is None and not dry_run:
-            raise click.UsageError('Missing argument, "--base-url" is required for SCHEMA specified by file.')
+            if not utils.file_exists(schema):
+                message = FILE_DOES_NOT_EXIST_MESSAGE
+            else:
+                message = 'Missing argument, "--base-url" is required for SCHEMA specified by file.'
+            raise click.UsageError(message)
     if kind == SchemaInputKind.NAME:
         if api_name is not None:
             raise click.UsageError(f"Got unexpected extra argument ({api_name})")

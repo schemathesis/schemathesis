@@ -34,7 +34,7 @@ from schemathesis.cli import (
     get_exit_code,
     reset_checks,
 )
-from schemathesis.cli.callbacks import INVALID_SCHEMA_MESSAGE
+from schemathesis.cli.callbacks import FILE_DOES_NOT_EXIST_MESSAGE, INVALID_SCHEMA_MESSAGE
 from schemathesis.constants import (
     DEFAULT_RESPONSE_TIMEOUT,
     FLAKY_FAILURE_MESSAGE,
@@ -2369,3 +2369,9 @@ def test_disable_report_suggestion(monkeypatch, cli, schema_url):
     monkeypatch.setenv(REPORT_SUGGESTION_ENV_VAR, "no")
     result = cli.run(schema_url)
     assert "You can visualize" not in result.stdout
+
+
+def test_non_existing_file(cli):
+    result = cli.run("unknown.json")
+    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
+    assert FILE_DOES_NOT_EXIST_MESSAGE in result.stdout
