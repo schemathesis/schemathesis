@@ -54,6 +54,7 @@ After:
 - Fixed type hint for ``AuthProvider``. `#1776`_
 - Do not skip negative tests if the generated value is ``None``.
 - Lack of execution for ASGI events during testing. `#1305`_, `#1727`_
+- Confusing error message when trying to load schema from a non-existing file. `#1602`_
 
 .. _v3.19.7:
 
@@ -3479,6 +3480,7 @@ Deprecated
 .. _#1627: https://github.com/schemathesis/schemathesis/issues/1627
 .. _#1625: https://github.com/schemathesis/schemathesis/issues/1625
 .. _#1614: https://github.com/schemathesis/schemathesis/issues/1614
+.. _#1602: https://github.com/schemathesis/schemathesis/issues/1602
 .. _#1592: https://github.com/schemathesis/schemathesis/issues/1592
 .. _#1591: https://github.com/schemathesis/schemathesis/issues/1591
 .. _#1584: https://github.com/schemathesis/schemathesis/issues/1584
