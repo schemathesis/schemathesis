@@ -17,6 +17,8 @@ Experimental features offer a glimpse into upcoming functionalities and enhancem
 Enabling Experimental Features
 ------------------------------
 
+Schemathesis provides a few ways to enable experimental features: via the CLI, Python tests, and environment variables.
+
 .. _experimental-cli:
 
 In CLI
@@ -52,6 +54,18 @@ By doing this, all schemas loaded afterwards will automatically use the enabled 
 
     Enabling an experimental feature globally will affect all your tests. Use this feature with caution.
 
+Using Environment Variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can also enable experimental features through environment variables. This is particularly useful for CI/CD pipelines or when you don't have direct control over CLI arguments or test code.
+
+For example, to enable experimental support for OpenAPI 3.1:
+
+.. code-block:: bash
+
+    export SCHEMATHESIS_EXPERIMENTAL_OPENAPI_3_1=true
+
+This will enable the OpenAPI 3.1 experimental feature for any Schemathesis runs in the same environment.
 
 Current Experimental Features
 -----------------------------
@@ -86,6 +100,17 @@ In Python Tests
 
     # Globally enable OpenAPI 3.1 experimental feature
     schemathesis.experimental.openapi_3_1.enable()
+
+.. _openapi-31-env-vars:
+
+Using Environment Variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To enable OpenAPI 3.1 support via environment variables, you can set:
+
+.. code-block:: bash
+
+    export SCHEMATHESIS_EXPERIMENTAL_OPENAPI_3_1=true
 
 For more details, join the `GitHub Discussion <https://github.com/schemathesis/schemathesis/discussions/1822>`_.
 

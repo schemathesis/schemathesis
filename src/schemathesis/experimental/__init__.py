@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 class Experiment:
     name: str
     verbose_name: str
+    env_var: str
     description: str
     discussion_url: str
     _storage: "ExperimentSet" = field(repr=False)
@@ -25,9 +26,16 @@ class ExperimentSet:
     available: set = field(default_factory=set)
     enabled: set = field(default_factory=set)
 
-    def create_experiment(self, name: str, verbose_name: str, description: str, discussion_url: str) -> Experiment:
+    def create_experiment(
+        self, name: str, verbose_name: str, env_var: str, description: str, discussion_url: str
+    ) -> Experiment:
         instance = Experiment(
-            name=name, verbose_name=verbose_name, description=description, discussion_url=discussion_url, _storage=self
+            name=name,
+            verbose_name=verbose_name,
+            env_var=f"{ENV_PREFIX}_{env_var}",
+            description=description,
+            discussion_url=discussion_url,
+            _storage=self,
         )
         self.available.add(instance)
         return instance
@@ -45,11 +53,13 @@ class ExperimentSet:
         return feature in self.enabled
 
 
+ENV_PREFIX = "SCHEMATHESIS_EXPERIMENTAL"
 GLOBAL_EXPERIMENTS = ExperimentSet()
 
 OPEN_API_3_1 = GLOBAL_EXPERIMENTS.create_experiment(
     name="openapi-3.1",
     verbose_name="OpenAPI 3.1",
+    env_var="OPENAPI_3_1",
     description="Support for response validation",
     discussion_url="https://github.com/schemathesis/schemathesis/discussions/1822",
 )
