@@ -10,7 +10,7 @@ Sometimes, during testing, it is needed to disable TLS verification of the servi
 
 .. code-block:: text
 
-    st run http://localhost/schema.json --request-tls-verify
+    st run http://127.0.0.1/schema.json --request-tls-verify
 
 **Python**
 
@@ -18,7 +18,7 @@ Sometimes, during testing, it is needed to disable TLS verification of the servi
 
     import schemathesis
 
-    schema = schemathesis.from_uri("http://localhost/schema.json")
+    schema = schemathesis.from_uri("http://127.0.0.1/schema.json")
 
 
     @schema.parametrize()
@@ -50,7 +50,7 @@ Sometimes you need to send your traffic to some other tools. You could set up a 
 
     $ export HTTP_PROXY="http://10.10.1.10:3128"
     $ export HTTPS_PROXY="http://10.10.1.10:1080"
-    $ st run http://localhost/schema.json
+    $ st run http://127.0.0.1/schema.json
 
 Per-route request timeouts
 --------------------------
@@ -62,7 +62,7 @@ Different API operations may need different timeouts during testing. You could a
     import schemathesis
 
     DEFAULT_TIMEOUT = 10  # in seconds
-    SCHEMA_URL = "http://localhost/schema.json"
+    SCHEMA_URL = "http://127.0.0.1/schema.json"
     schema = schemathesis.from_uri(SCHEMA_URL)
 
 

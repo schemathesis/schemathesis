@@ -264,6 +264,18 @@ Open API 2.0 / 3.0 do not declare the ``uuid`` format as built-in. You have two 
 
 2. Enable experimental support for OpenAPI 3.1, which also activates UUID generation. See the :ref:`Experimental Features <experimental-openapi-31>` section for details.
 
+Why is Schemathesis slower on Windows when using ``localhost``?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When Schemathesis send a request to ``http://localhost/``, an attempt to use IPv6 is made first,
+which can be refused if your server is listening on IPv4 only. However, for Windows only,
+there is an unavoidable 1 sec timeout for refused TCP connections, while the OS retries
+the connection up to 3 times. On Linux, the connection fails immediately if it
+is refused and, an attempt to use IPv4 can be done without any delay.
+
+To fix that, you can just point to ``http://127.0.0.1/`` instead of ``http://localhost/``.that
+way Schemathesis use IPv4 directly.
+
 Working with API schemas
 ------------------------
 

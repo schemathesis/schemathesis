@@ -26,8 +26,8 @@ GitHub Actions
       # Runs Schemathesis tests with all checks enabled
       - uses: schemathesis/action@v1
         with:
-          # Your API schema location
-          schema: 'http://localhost:5000/api/openapi.json'
+          # Your API schema locationW
+          schema: 'http://127.0.0.1:5000/api/openapi.json'
           # OPTIONAL. Your Schemathesis.io token
           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
 
@@ -70,7 +70,7 @@ GitLab CI
 
     variables:
       # API Schema location
-      API_SCHEMA: 'http://localhost:5000/api/openapi.json'
+      API_SCHEMA: 'http://127.0.0.1:5000/api/openapi.json'
       # OPTIONAL. Your Schemathesis.io token
       SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
 
@@ -117,13 +117,13 @@ Here is a GitHub Actions workflow for a sample `Python app`_:
       - uses: schemathesis/action@v1
         with:
           # Your API schema location
-          schema: 'http://localhost:5000/api/openapi.json'
+          schema: 'http://127.0.0.1:5000/api/openapi.json'
           # OPTIONAL. Your Schemathesis.io token
           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
 
 .. note::
 
-   This example expects the API schema available at ``http://localhost:5000/api/openapi.json`` inside the CI environment.
+   This example expects the API schema available at ``http://127.0.0.1:5000/api/openapi.json`` inside the CI environment.
 
 For the fully working example, check |build.yml|_ in the repository.
 
