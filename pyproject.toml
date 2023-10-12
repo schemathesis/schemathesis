@@ -75,6 +75,8 @@ cov = [
 ]
 docs = [
     "sphinx",
+    "sphinx_rtd_theme",
+    "sphinx-click",
 ]
 dev = ["schemathesis[tests,cov,docs]"]
 
