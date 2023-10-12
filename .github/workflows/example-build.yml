@@ -52,7 +52,7 @@ jobs:
         continue-on-error: true
         with:
           # A local API schema location
-          schema: "http://localhost:5000/api/openapi.json"
+          schema: "http://127.0.0.1:5000/api/openapi.json"
           # Set your token from secrets
           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
           max-examples: "10"
