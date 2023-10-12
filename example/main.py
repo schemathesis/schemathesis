@@ -4,7 +4,7 @@ import os
 from app.app import create_app
 
 logging.basicConfig(level=logging.INFO)
-DEFAULT_DB_URL = "postgresql://test:test@localhost:5432/schemathesis-example"
+DEFAULT_DB_URL = "postgresql://test:test@127.0.0.1:5432/schemathesis-example"
 
 
 def main(port, db_url):

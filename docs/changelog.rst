@@ -29,7 +29,7 @@ Before:
 
 .. code:: text
 
-    Failed to load schema from https://localhost:6423/openapi.json
+    Failed to load schema from https://127.0.0.1:6423/openapi.json
     You can use `--wait-for-schema=NUM` to wait for a maximum of NUM seconds on the API schema availability.
 
     Error: requests.exceptions.SSLError: HTTPSConnectionPool(host='localhost', port=6423): Max retries exceeded with url: /openapi.json (Caused by SSLError(SSLCertVerificationError(1, '[SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:992)')))
@@ -1289,7 +1289,7 @@ After:
     import schemathesis
 
     # Load schema
-    schema = schemathesis.graphql.from_url("http://localhost:8000/graphql")
+    schema = schemathesis.graphql.from_url("http://127.0.0.1:8000/graphql")
     # Initialize runner
     runner = schemathesis.runner.from_schema(schema)
     # Emit events

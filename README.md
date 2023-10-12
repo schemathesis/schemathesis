@@ -142,7 +142,7 @@ api-tests:
     - uses: schemathesis/action@v1
       with:
         # Your API schema location
-        schema: "http://localhost:5000/api/openapi.json"
+        schema: "http://127.0.0.1:5000/api/openapi.json"
         # OPTIONAL. Your Schemathesis.io token
         token: ${{ secrets.SCHEMATHESIS_TOKEN }}
 ```

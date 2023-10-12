@@ -35,7 +35,7 @@ def service_token(request):
 @pytest.fixture
 def httpserver():
     # The default implementation doesn't play nice with pytest-xdist
-    server = PluginHTTPServer(host="localhost", port=0)
+    server = PluginHTTPServer(host="127.0.0.1", port=0)
     server.start()
     yield server
     if server.is_running():
