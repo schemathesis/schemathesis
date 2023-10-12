@@ -6,7 +6,7 @@ from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
-from schemathesis.models import _escape_single_quotes
+from schemathesis.models import Case, _escape_single_quotes
 from schemathesis.runner import from_schema
 
 
@@ -61,7 +61,7 @@ def test_code_sample_from_request(openapi_case):
 
 
 @pytest.mark.hypothesis_nested
-def test_get_code_sample_code_validity(empty_open_api_2_schema):
+def test_get_code_sample_code_validity(mocker, empty_open_api_2_schema):
     # See GH-1030
     # When the input schema is too loose
     empty_open_api_2_schema["paths"] = {
@@ -75,12 +75,22 @@ def test_get_code_sample_code_validity(empty_open_api_2_schema):
     schema = schemathesis.from_dict(empty_open_api_2_schema, base_url="http://127.0.0.1:1", validate_schema=False)
     strategy = schema["/test/{key}"]["POST"].as_strategy()
 
+    original = Case.as_requests_kwargs
+
+    def as_requests_kwargs(*args, **kwargs):
+        kwargs = original(*args, **kwargs)
+        # Add timeout in order to ensure fast execution on Windows
+        kwargs["timeout"] = 0.001
+        return kwargs
+
+    mocker.patch.object(Case, "as_requests_kwargs", as_requests_kwargs)
+
     @given(case=strategy)
     @settings(max_examples=30, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much], deadline=None)
     def test(case):
         code = case.get_code_to_reproduce()
         # Then generated code should always be syntactically valid
-        with pytest.raises(requests.exceptions.ConnectionError):
+        with pytest.raises((requests.exceptions.ConnectionError, requests.Timeout)):
             eval(code)
 
     test()

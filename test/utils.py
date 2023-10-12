@@ -11,6 +11,7 @@ import yaml
 
 import schemathesis
 from schemathesis import Case
+from schemathesis.exceptions import CheckFailed
 from schemathesis.schemas import BaseSchema
 from schemathesis.utils import StringDatesYAMLLoader, merge
 
@@ -72,8 +73,9 @@ def assert_list(value: Any, predicate: Callable = noop) -> None:
 
 def assert_requests_call(case: Case):
     """Verify that all generated input parameters are usable by requests."""
-    with pytest.raises((requests.exceptions.ConnectionError, urllib3.exceptions.NewConnectionError)):
-        case.call(base_url="http://127.0.0.1:1")
+    with pytest.raises((requests.exceptions.ConnectionError, urllib3.exceptions.NewConnectionError, CheckFailed)):
+        # On Windows it may take time to get the connection error, hence we set a timeout
+        case.call(base_url="http://127.0.0.1:1", timeout=0.001)
 
 
 def strip_style_win32(styled_output: str) -> str:

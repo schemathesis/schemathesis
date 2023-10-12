@@ -494,7 +494,7 @@ class Case:
 
     def get_full_url(self) -> str:
         """Make a full URL to the current API operation, including query parameters."""
-        base_url = self.base_url or "http://localhost"
+        base_url = self.base_url or "http://127.0.0.1"
         kwargs = self.as_requests_kwargs(base_url)
         request = requests.Request(**kwargs)
         prepared = requests.Session().prepare_request(request)  # type: ignore
