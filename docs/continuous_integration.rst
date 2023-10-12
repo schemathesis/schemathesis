@@ -26,7 +26,7 @@ GitHub Actions
       # Runs Schemathesis tests with all checks enabled
       - uses: schemathesis/action@v1
         with:
-          # Your API schema locationW
+          # Your API schema location
           schema: 'http://127.0.0.1:5000/api/openapi.json'
           # OPTIONAL. Your Schemathesis.io token
           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
