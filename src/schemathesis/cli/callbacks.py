@@ -227,7 +227,11 @@ def convert_stateful(ctx: click.core.Context, param: click.core.Parameter, value
 def convert_experimental(
     ctx: click.core.Context, param: click.core.Parameter, value: Tuple[str, ...]
 ) -> List[experimental.Experiment]:
-    return [feature for feature in experimental.GLOBAL_EXPERIMENTS.available if feature.name in value]
+    return [
+        feature
+        for feature in experimental.GLOBAL_EXPERIMENTS.available
+        if feature.name in value or os.getenv(feature.env_var, "").lower() in TRUE_VALUES
+    ]
 
 
 def convert_checks(ctx: click.core.Context, param: click.core.Parameter, value: Tuple[List[str]]) -> List[str]:
