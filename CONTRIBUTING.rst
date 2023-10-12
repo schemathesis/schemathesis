@@ -1,184 +1,110 @@
 Contributing to Schemathesis
 ============================
 
-Welcome! We are delighted that you're reading this!
-
-Your feedback and your experience are essential for the project :)
+Welcome! Thank you for considering contributing to Schemathesis. Your feedback and contributions are invaluable to us!
 
 .. contents::
    :depth: 2
    :backlinks: none
 
-Feature requests and feedback
+Prerequisites for Code Contributions
+------------------------------------
+
+**For code contributions**: Make sure you have the following installed:
+
+- Python 3.7 or higher
+- ``pre-commit``
+- ``tox``
+
+.. code:: bash
+
+    python -m pip install pre-commit tox
+
+**For documentation contributions**: No specific prerequisites are required.
+
+Feature Requests and Feedback
 -----------------------------
 
-If you'd like to suggest a feature, feel free to `submit an issue <https://github.com/schemathesis/schemathesis/issues>`_
-and:
+If you'd like to suggest a feature or provide feedback, feel free to `submit an issue <https://github.com/schemathesis/schemathesis/issues>`_. When submitting your issue, it helps to provide:
 
-* Write a simple and descriptive title to identify your suggestion.
-* Provide as many details as possible, explain your context, and how the feature should work.
-* Explain why this improvement would be useful.
-* Keep the scope narrow. It will make it easier to implement.
+- **Title**: Write a simple and descriptive title to identify your suggestion.
+- **Details**: Provide as many details as possible. Explain your context and how you envision the feature working.
+- **Usefulness**: Explain why this feature or improvement would be beneficial.
+- **Scope**: Keep the scope of the feature narrow to make it easier to implement. For example, focus on a specific use-case rather than a broad feature set.
 
-Report bugs
------------
+Reporting Bugs
+--------------
 
-Report bugs for Schemathesis in the `issue tracker <https://github.com/schemathesis/schemathesis/issues>`_.
+If you encounter a bug, please report it in the `issue tracker <https://github.com/schemathesis/schemathesis/issues>`_. When filing a bug report, please include:
 
-If you are reporting a bug, please:
+- **Title**: Write a simple and descriptive title to identify the problem.
+- **Reproduction Steps**: Describe the exact steps to reproduce the problem in as much detail as possible.
+- **Observed Behavior**: Describe the behavior you observed and what makes it a problem.
+- **Expected Behavior**: Explain which behavior you expected to see instead and why.
+- **Versions**: Include Python and Schemathesis versions. Also, confirm if the issue persists in the latest version of Schemathesis.
+- **Additional Context**: Logs, error messages, or screenshots are often very helpful.
 
-* Write a simple and descriptive title to identify the problem.
-* Describe the exact steps which reproduce the problem in as many details as possible.
-* Describe the behavior you observed after following the steps and point out the problem with that behavior.
-* Explain which behavior you expected to see instead and why.
-* Include Python / Schemathesis versions.
-
-It would be awesome if you can submit a failing test that demonstrates the problem.
+**What happens next?**: After you submit an issue, we aim to review and respond as soon as possible.
+If you don't receive a response within a few days, feel free to add a new comment to the thread to bring it to our attention again.
 
 Submitting Pull Requests
 ------------------------
 
-#. Fork the repository.
-#. Enable and install `pre-commit <https://pre-commit.com>`_ to ensure style-guides and code checks are followed.
-#. Target the ``master`` branch.
-#. Follow **PEP-8** for naming and `black <https://github.com/psf/black>`_ for formatting.
-#. Tests are run using ``tox``::
+We welcome contributions to the codebase! If you'd like to submit a pull request (PR), please follow these steps:
 
-    tox -e py37
-
-   The test environment above is usually enough to cover most cases locally.
-
-#. Write an entry to `changelog.rst <https://github.com/schemathesis/schemathesis/blob/master/docs/changelog.rst>`_
-#. Format your commit message according to the Conventional Commits `specification <https://www.conventionalcommits.org/en/>`_
-
-For each pull request, we aim to review it as soon as possible.
-If you wait a few days without a reply, please feel free to ping the thread by adding a new comment.
-
-Using a local test server
--------------------------
-
-Schemathesis provides a local test server to simplify the development of new features or fixing bugs.
-It allows you to configure the generated API schema to reflect various common scenarios of server-side behavior.
-
-To start using it, you need to prepare a virtual environment.
+1. **Fork the Repository**: Fork the Schemathesis repository on GitHub.
+2. **Install Development Tools**: Install the development dependencies using the following command:
 
 .. code:: bash
 
-    pip install
+    python -m pip install -e ".[dev]"
 
-To start the server, run the following command in your terminal:
+This will install all the necessary packages for development, including those for documentation and tests.
 
-.. code:: bash
-
-    ./test_server.sh 8081
-
-It will start the test server on the 8081 port with a simple Open API 2.0 schema.
-The local server supports three specs via the ``--spec`` command-line option - ``openapi2``, ``openapi3``, and ``graphql``.
-
-GraphQL
-~~~~~~~
-
-This spec serves a simple schema:
-
-.. code:: graphql
-
-    type Author {
-      name: String
-      books: [Book]
-    }
-
-    type Book {
-      title: String
-      author: Author
-    }
-
-    type Query {
-      getBooks: [Book]
-      getAuthors: [Author]
-    }
-
-OpenAPI
-~~~~~~~
-
-Both ``openapi2`` and ``openapi3`` expose semantically the same schema with version-specific keywords.
-By default, the server will generate an API schema with the following API operations:
-
-- ``GET /api/success`` - returns ``{"success": true}``
-- ``GET /api/failure`` - returns 500 with the ``text/plain`` content type
-- ``POST /api/payload`` - returns the request's payload
-- ``GET /api/get_payload`` - returns the request's payload, but accepts only GET requests
-- ``GET /api/multiple_failures`` - returns different response statuses, depending on the provided integer ``id`` parameter. For negative values returns 200 with ``{"result": "OK"}`` payload, 500 if ``id`` is 0, and 504 for positive ``id`` values.
-- ``GET /api/slow`` - always returns ``{"slow": true}`` after 100 ms delay
-- ``GET /api/path_variable/{key}`` - receives the ``key`` path parameter and unconditionally returns ``{"success": true}``
-- ``POST /api/unsatisfiable`` - parameters for this operation are impossible to generate
-- ``POST /api/performance`` - depending on the number of "0" in the input value, responds slower and if the input value has more than ten "0", returns 500
-- ``GET /api/flaky`` - returns 1:1 ratio of 200/500 responses
-- ``GET /api/recursive`` - accepts a recursive structure and responds with a recursive one
-- ``GET /api/basic`` - Requires HTTP basic auth (use `test` as username and password)
-- ``GET /api/empty`` - Returns an empty response
-- ``GET /api/empty_string`` - Returns a response with an empty string as a payload
-- ``POST /api/multipart`` - accepts two body parameters as multipart payload
-- ``POST /api/upload_file`` - accepts a file and a body parameter
-- ``POST /api/form`` - accepts ``application/x-www-form-urlencoded`` payload
-- ``POST /api/teapot`` - returns 418 status code that is not listed in the schema
-- ``GET /api/text`` - returns ``text/plain`` responses, which are not declared in the schema
-- ``GET /api/cp866`` - returns ``text/plain`` responses encoded with CP866. This content type is not expected by the schema
-- ``POST /api/text`` - expects payload as ``text/plain``
-- ``POST /api/csv`` - expects payload as ``text/csv`` and returns its equivalent in JSON.
-- ``GET /api/malformed_json`` - returns malformed JSON with ``application/json`` content type header
-- ``GET /api/custom_format`` - accepts a string in the custom "digits" format. This operation is used to verify custom string formats
-- ``GET /api/headers`` - returns the passed headers
-- ``POST /api/users/`` (``create_user``) - creates a user and stores it in memory. Provides Open API links to the operations below
-- ``GET /api/users/{user_id}`` (``get_user``) - returns a user stored in memory
-- ``PATCH /api/users/{user_id}`` (``update_user``) - updates a user stored in memory
-- ``GET /api/foo:bar`` (``reserved``) - contains ``:`` in its path
-- ``GET /api/read_only`` - includes `readOnly` properties in its schema
-- ``POST /api/write_only`` - includes `writeOnly` properties in its schema
-
-You can find the complete schema at ``http://127.0.0.1:8081/schema.yaml`` (replace 8081 with the port you chose in the start server command).
-
-There are also few operations with deliberately malformed schemas, that are not included by default:
-
-- ``POST /api/invalid`` - invalid parameter definition. Uses ``int`` instead of ``integer``
-- ``GET /api/invalid_response`` - response doesn't conform to the declared schema
-- ``GET /api/invalid_path_parameter/{id}`` - the parameter declaration is invalid (``required`` keyword is set to ``false``)
-- ``GET /api/missing_path_parameter/{id}`` - the ``id`` parameter is missing
-
-To select only a subset of the operations above, you could use the ``--operations`` command-line option and provide a
-list of names separated by a comma. Values in this list are either mentioned in parentheses or are the path part after ``/api/``.
-For example, to select the ``GET /api/success``, ``GET /api/path_variable/{key}``, and  ``POST /api/users/`` operations, you can run the following command:
+3. **Set Up Pre-commit Hooks**: Enable `pre-commit <https://pre-commit.com>`_.
 
 .. code:: bash
 
-    ./test_server.sh 8081 --operations=success,path_variable,create_user
+    pre-commit install
 
-To select all available operations, use ``--operations=all``.
+4. **Branching**: Create a new branch and switch to it. Target your pull request to the ``master`` branch of the main repository.
+5. **Coding Standards**: Follow `PEP-8 <https://pep8.org/>`_ for naming conventions and use `black <https://github.com/psf/black>`_ for code formatting.
+6. **Write Tests**: Preferably, write integration tests that run the whole Schemathesis CLI.
+7. **Run Tests**:
 
-Then you could use CLI against this server:
+.. code:: bash
 
-.. code::
+    tox -e py39
 
-    st run http://127.0.0.1:8081/schema.yaml
-    =========================================== Schemathesis test session starts ==========================================
-    platform Linux -- Python 3.8.5, schemathesis-2.5.0, hypothesis-5.23.0, hypothesis_jsonschema-0.17.3, jsonschema-3.2.0
-    rootdir: /
-    hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase('/.hypothesis/examples')
-    Schema location: http://127.0.0.1:8081/schema.yaml
-    Base URL: http://127.0.0.1:8081/api
-    Specification version: Swagger 2.0
-    Workers: 1
-    Collected API operations: 3
+8. **Update Changelog**: Add a corresponding entry to ``changelog.rst`` located in the ``docs`` directory.
+9. **Commit Your Changes**: Use the `Conventional Commits <https://www.conventionalcommits.org/en/>`_ format. For example, features could be ``feat: add new validation feature`` and bug fixes could be ``fix: resolve issue with validation``.
 
-    GET /api/path_variable/{key} .                                              [ 33%]
-    GET /api/success .                                                          [ 66%]
-    POST /api/users/ .                                                          [100%]
+**What happens next?**: After submitting, your pull request will be reviewed.
+If you don't hear back within a few days, feel free to add a comment to the pull request to draw our attention.
 
-    ======================================================= SUMMARY =======================================================
+Contributing to Documentation
+-----------------------------
 
-    Performed checks:
-        not_a_server_error                    201 / 201 passed          PASSED
+We recommend installing Schemathesis with the "docs" extra for all the dependencies needed for documentation:
 
-    ================================================== 3 passed in 1.77s ==================================================
+.. code:: bash
+
+    python -m pip install -e ".[docs]"
+
+To preview your changes:
+
+.. code:: bash
+
+    cd docs/
+    make html
+    python -m http.server -d _build/html/
+
+Then open ``http://0.0.0.0:8000/`` in your browser.
+
+Community and Support
+---------------------
+
+For more informal discussions or questions, join us on `Discord <https://discord.gg/R9ASRAmHnA>`_.
 
 Maintainers
 -----------
