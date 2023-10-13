@@ -67,6 +67,9 @@ class ParameterSet(Generic[P]):
                 return parameter
         return None
 
+    def contains(self, name: str) -> bool:
+        return self.get(name) is not None
+
     @property
     def example(self) -> Dict[str, Any]:
         """Composite example gathered from individual parameters."""
