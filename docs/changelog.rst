@@ -20,6 +20,7 @@ Changelog
 **Changed**
 
 - Pin ``Werkzeug`` to ``<3.0``.
+- Refined generated reproduction code and shortened ``X-Schemathesis-TestCaseId`` for easier debugging. `#1801`_
 - Add ``case`` as the first argument to ``AuthContext.set``. Previous calling convention is still supported. `#1788`_
 - Disable the 'explain' phase in Hypothesis to improve performance. `#1808`_
 - Do not display ``InsecureRequestWarning`` in CLI output if the user explicitly provided ``--request-tls-verify=false``. `#1780`_
@@ -3460,6 +3461,7 @@ Deprecated
 .. _#1820: https://github.com/schemathesis/schemathesis/issues/1820
 .. _#1808: https://github.com/schemathesis/schemathesis/issues/1808
 .. _#1802: https://github.com/schemathesis/schemathesis/issues/1802
+.. _#1801: https://github.com/schemathesis/schemathesis/issues/1801
 .. _#1797: https://github.com/schemathesis/schemathesis/issues/1797
 .. _#1788: https://github.com/schemathesis/schemathesis/issues/1788
 .. _#1781: https://github.com/schemathesis/schemathesis/issues/1781
