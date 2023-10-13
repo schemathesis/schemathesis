@@ -21,7 +21,7 @@ EXPECTED_OUTPUT_LINES = [
     # Operation-level error
     r".*test_\[POST /bar\] FAILED",
     # The error in both failing cases
-    ".*Unresolvable JSON pointer:.*",
+    ".*OperationSchemaError: Unresolvable JSON pointer in the schema.*",
 ]
 
 
@@ -69,7 +69,7 @@ def test_(case):
             # Operation-level error
             r".*test_\[POST /bar\] SUBFAIL",
             # The error in both failing cases
-            ".*Unresolvable JSON pointer:.*",
+            ".*Unresolvable JSON pointer in the schema.*",
         ]
     result.stdout.re_match_lines(expected)
 
@@ -111,11 +111,11 @@ def test_in_cli(testdir, cli, open_api_3_schema_with_recoverable_errors, workers
         assert lines[8].startswith("POST /bar E")
     else:
         assert lines[7] in ("E.", ".E")
-    error = "Unresolvable JSON pointer: 'components/UnknownParameter'"
+    error = "    JSON pointer: 'components/UnknownParameter'"
     assert len([line for line in lines if error in line]) == 1
     assert "1 passed, 2 errored" in lines[-1]
     assert "____ /foo ____" in result.stdout
-    assert "Unresolvable JSON pointer: 'components/UnknownMethods'" in result.stdout
+    assert "    JSON pointer: 'components/UnknownMethods'" in result.stdout
 
 
 def test_direct_access(schema):
