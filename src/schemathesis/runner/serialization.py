@@ -26,10 +26,10 @@ class SerializedCase:
     media_type: Optional[str]
 
     @classmethod
-    def from_case(cls, case: Case, headers: Optional[Dict[str, Any]]) -> "SerializedCase":
+    def from_case(cls, case: Case, headers: Optional[Dict[str, Any]], verify: bool) -> "SerializedCase":
         return cls(
-            requests_code=case.get_code_to_reproduce(headers),
-            curl_code=case.as_curl_command(headers),
+            requests_code=case.get_code_to_reproduce(headers, verify=verify),
+            curl_code=case.as_curl_command(headers, verify=verify),
             path_template=case.path,
             path_parameters=case.path_parameters,
             query=case.query,
@@ -81,17 +81,21 @@ class SerializedCheck:
         while case.source is not None:
             if isinstance(case.source.response, requests.Response):
                 history_response = Response.from_requests(case.source.response)
+                verify = history_response.verify
             else:
                 history_response = Response.from_wsgi(case.source.response, case.source.elapsed)
+                verify = True
             entry = SerializedHistoryEntry(
-                case=SerializedCase.from_case(case.source.case, headers), response=history_response
+                case=SerializedCase.from_case(case.source.case, headers, verify=verify), response=history_response
             )
             history.append(entry)
             case = case.source.case
         return cls(
             name=check.name,
             value=check.value,
-            example=SerializedCase.from_case(check.example, headers),
+            example=SerializedCase.from_case(
+                check.example, headers, verify=response.verify if response is not None else True
+            ),
             message=check.message,
             request=request,
             response=response,
@@ -115,12 +119,17 @@ class SerializedError:
 
     @classmethod
     def from_error(
-        cls, exception: Exception, case: Optional[Case], headers: Optional[Dict[str, Any]], title: Optional[str] = None
+        cls,
+        exception: Exception,
+        case: Optional[Case],
+        headers: Optional[Dict[str, Any]],
+        title: Optional[str] = None,
+        verify: bool = True,
     ) -> "SerializedError":
         return cls(
             exception=format_exception(exception),
             exception_with_traceback=format_exception(exception, True),
-            example=SerializedCase.from_case(case, headers) if case else None,
+            example=SerializedCase.from_case(case, headers, verify=verify) if case else None,
             title=title,
         )
 

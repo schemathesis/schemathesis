@@ -39,12 +39,22 @@ def test_explicit_headers():
 
 
 @pytest.mark.operations("failure")
+@pytest.mark.openapi_version("3.0")
 def test_cli_output(cli, base_url, schema_url, mock_case_id):
     result = cli.run(schema_url, "--code-sample-style=curl")
     lines = result.stdout.splitlines()
     assert "Run this cURL command to reproduce this failure: " in lines
     headers = f"-H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}'"
     assert f"    curl -X GET {headers} {base_url}/failure" in lines
+
+
+@pytest.mark.operations("failure")
+@pytest.mark.openapi_version("3.0")
+def test_cli_output_includes_insecure(cli, base_url, schema_url, mock_case_id):
+    result = cli.run(schema_url, "--code-sample-style=curl", "--request-tls-verify=false")
+    lines = result.stdout.splitlines()
+    headers = f"-H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}'"
+    assert f"    curl -X GET {headers} --insecure {base_url}/failure" in lines
 
 
 @pytest.mark.operations("failure")

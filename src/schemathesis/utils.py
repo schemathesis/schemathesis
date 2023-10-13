@@ -284,6 +284,7 @@ def copy_response(response: GenericResponse) -> GenericResponse:
         if hooks is not None:
             copied_response.request.hooks["response"] = hooks
         copied_response.raw = response.raw
+        copied_response.verify = getattr(response, "verify", True)  # type: ignore[union-attr]
         return copied_response
     # Can't deepcopy WSGI response due to generators inside (`response.freeze` doesn't completely help)
     response.freeze()

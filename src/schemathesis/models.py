@@ -186,7 +186,10 @@ class Case:
         return self.base_url
 
     def get_code_to_reproduce(
-        self, headers: Optional[Dict[str, Any]] = None, request: Optional[requests.PreparedRequest] = None
+        self,
+        headers: Optional[Dict[str, Any]] = None,
+        request: Optional[requests.PreparedRequest] = None,
+        verify: bool = True,
     ) -> str:
         """Construct a Python code to reproduce this case with `requests`."""
         if request is not None:
@@ -219,9 +222,11 @@ class Case:
         args_repr = f"'{url}'"
         if printed_kwargs:
             args_repr += f", {printed_kwargs}"
+        if not verify:
+            args_repr += ", verify=False"
         return f"requests.{method}({args_repr})"
 
-    def as_curl_command(self, headers: Optional[Dict[str, Any]] = None) -> str:
+    def as_curl_command(self, headers: Optional[Dict[str, Any]] = None, verify: bool = True) -> str:
         """Construct a curl command for a given case."""
         base_url = self.get_full_base_url()
         kwargs = self.as_requests_kwargs(base_url)
@@ -237,7 +242,7 @@ class Case:
         for header in tuple(prepared.headers):
             if header in IGNORED_HEADERS and header not in (self.headers or {}):
                 del prepared.headers[header]
-        return curlify.to_curl(prepared)
+        return curlify.to_curl(prepared, verify=verify)
 
     def _get_base_url(self, base_url: Optional[str] = None) -> str:
         if base_url is None:
@@ -333,17 +338,19 @@ class Case:
             close_session = True
         else:
             close_session = False
+        verify = data.get("verify", True)
         try:
             with self.operation.schema.ratelimit():
                 response = session.request(**data)  # type: ignore
         except requests.Timeout as exc:
             timeout = 1000 * data["timeout"]  # It is defined and not empty, since the exception happened
             request = cast(requests.PreparedRequest, exc.request)
-            code_message = self._get_code_message(self.operation.schema.code_sample_style, request)
+            code_message = self._get_code_message(self.operation.schema.code_sample_style, request, verify=verify)
             raise get_timeout_error(timeout)(
                 f"\n\n1. Request timed out after {timeout:.2f}ms\n\n----------\n\n{code_message}",
                 context=failures.RequestTimeout(timeout=timeout),
             ) from None
+        response.verify = verify  # type: ignore[attr-defined]
         dispatch("after_call", hook_context, self, response)
         if close_session:
             session.close()
@@ -432,6 +439,7 @@ class Case:
         :param checks: A tuple of check functions that accept ``response`` and ``case``.
         :param additional_checks: A tuple of additional checks that will be executed after ones from the ``checks``
             argument.
+        :param excluded_checks: Checks excluded from the default ones.
         :param code_sample_style: Controls the style of code samples for failure reproduction.
         """
         __tracebackhide__ = True
@@ -458,7 +466,8 @@ class Case:
                 if code_sample_style is not None
                 else self.operation.schema.code_sample_style
             )
-            code_message = self._get_code_message(code_sample_style, response.request)
+            verify = getattr(response, "verify", True)
+            code_message = self._get_code_message(code_sample_style, response.request, verify=verify)
             payload = get_response_payload(response)
             raise exception_cls(
                 f"\n\n{formatted_failures}\n\n"
@@ -469,12 +478,14 @@ class Case:
                 causes=tuple(failed_checks),
             )
 
-    def _get_code_message(self, code_sample_style: CodeSampleStyle, request: requests.PreparedRequest) -> str:
+    def _get_code_message(
+        self, code_sample_style: CodeSampleStyle, request: requests.PreparedRequest, verify: bool
+    ) -> str:
         if code_sample_style == CodeSampleStyle.python:
-            code = self.get_code_to_reproduce(request=request)
+            code = self.get_code_to_reproduce(request=request, verify=verify)
             return f"Run this Python code to reproduce this response: \n\n    {code}\n"
         if code_sample_style == CodeSampleStyle.curl:
-            code = self.as_curl_command(headers=dict(request.headers))
+            code = self.as_curl_command(headers=dict(request.headers), verify=verify)
             return f"Run this cURL command to reproduce this response: \n\n    {code}\n"
         raise ValueError(f"Unknown code sample style: {code_sample_style.name}")
 
@@ -897,6 +908,7 @@ class Response:
     encoding: Optional[str]
     http_version: str
     elapsed: float
+    verify: bool
 
     @classmethod
     def from_requests(cls, response: requests.Response) -> "Response":
@@ -920,6 +932,7 @@ class Response:
             headers=headers,
             http_version=http_version,
             elapsed=response.elapsed.total_seconds(),
+            verify=getattr(response, "verify", True),
         )
 
     @classmethod
@@ -943,6 +956,7 @@ class Response:
             headers=headers,
             http_version="1.1",
             elapsed=elapsed,
+            verify=True,
         )
 
 
