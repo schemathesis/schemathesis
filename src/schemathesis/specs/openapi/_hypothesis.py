@@ -14,7 +14,7 @@ from requests.structures import CaseInsensitiveDict
 
 from ... import auths, serializers, utils
 from ...constants import DataGenerationMethod
-from ...exceptions import InvalidSchema, SerializationNotPossible
+from ...exceptions import OperationSchemaError, SerializationNotPossible
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...models import APIOperation, Case, cant_serialize
 from ...types import NotSet
@@ -186,7 +186,7 @@ def get_case_strategy(
         body_ = ValueContainer(value=body, location="body", generator=None)
 
     if operation.schema.validate_schema and operation.method.upper() == "GET" and operation.body:
-        raise InvalidSchema("Body parameters are defined for GET request.")
+        raise OperationSchemaError("Body parameters are defined for GET request.")
     # If we need to generate negative cases but no generated values were negated, then skip the whole test
     if generator.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
         skip(operation.verbose_name)

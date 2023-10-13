@@ -14,6 +14,7 @@ import requests
 from _pytest.logging import LogCaptureHandler, catching_logs
 from hypothesis.errors import HypothesisException, InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
+from jsonschema.exceptions import ValidationError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
 from ... import failures, hooks
@@ -29,8 +30,8 @@ from ...exceptions import (
     CheckFailed,
     DeadlineExceeded,
     InvalidRegularExpression,
-    InvalidSchema,
     NonCheckError,
+    OperationSchemaError,
     SkipTest,
     get_grouped_exception,
 )
@@ -184,7 +185,7 @@ class BaseRunner:
                         headers=headers,
                         **kwargs,
                     )
-                except InvalidSchema as exc:
+                except OperationSchemaError as exc:
                     yield from handle_schema_error(
                         exc,
                         results,
@@ -229,7 +230,7 @@ class EventStream:
 
 
 def handle_schema_error(
-    error: InvalidSchema,
+    error: OperationSchemaError,
     results: TestResultSet,
     data_generation_methods: Iterable[DataGenerationMethod],
     recursion_level: int,
@@ -364,8 +365,8 @@ def run_test(
     except SkipTest:
         status = Status.skip
         result.mark_skipped()
-    except AssertionError as exc:  # comes from `hypothesis-jsonschema`
-        error = reraise(exc)
+    except AssertionError:  # comes from `hypothesis-jsonschema`
+        error = reraise(operation)
         status = Status.error
         result.add_error(error)
     except HypothesisRefResolutionError:
@@ -466,16 +467,14 @@ def get_invalid_regular_expression_message(warnings: List[WarningMessage]) -> Op
     return None
 
 
-def reraise(error: AssertionError) -> InvalidSchema:
-    traceback = format_exception(error, True)
-    if "assert type_ in TYPE_STRINGS" in traceback:
-        message = "Invalid type name"
-    else:
-        message = "Unknown schema error"
+def reraise(operation: APIOperation) -> OperationSchemaError:
     try:
-        raise InvalidSchema(message) from error
-    except InvalidSchema as exc:
-        return exc
+        operation.schema.validate()
+    except ValidationError as exc:
+        return OperationSchemaError.from_jsonschema_error(
+            exc, path=operation.path, method=operation.method, full_path=operation.schema.get_full_path(operation.path)
+        )
+    return OperationSchemaError("Unknown schema error")
 
 
 def deduplicate_errors(errors: List[Exception]) -> Generator[Exception, None, None]:

@@ -870,15 +870,19 @@ def test_invalid_operation(cli, cli_args, workers):
     assert "You can add @seed" not in result.stdout
     # And this operation should be marked as errored in the progress line
     lines = result.stdout.split("\n")
-    if workers == 1:
-        assert lines[7].startswith("POST /api/invalid E")
-    else:
-        assert lines[7] == "E"
+    assert lines[7].startswith("POST /api/invalid E")
     assert " POST /api/invalid " in lines[10]
-    # There shouldn't be a section end immediately after section start - there should be some error text
-    # An internal error happened during a test run
-    # Error: AssertionError
-    assert not lines[11].startswith("=")
+    # There shouldn't be a section end immediately after section start - there should be error text
+    assert (
+        """Invalid definition for element at index 0 in `parameters`
+
+Location:
+    paths -> /invalid -> post -> parameters -> 0
+
+Problematic definition:
+"""
+        in result.stdout
+    )
 
 
 @pytest.mark.operations("invalid")
@@ -1809,7 +1813,7 @@ def test_get_request_with_body(testdir, cli, base_url, hypothesis_max_examples, 
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
-    assert "InvalidSchema: Body parameters are defined for GET request." in lines
+    assert "OperationSchemaError: Body parameters are defined for GET request." in lines
 
 
 @pytest.mark.operations("slow")
@@ -2181,7 +2185,7 @@ def test_missing_content_and_schema(cli, base_url, tmp_path, testdir, empty_open
         assert lines[7].startswith("GET /apiv2/foo E")
         assert "_ GET /apiv2/foo _" in lines[10]
     assert (
-        lines[11] == f'InvalidSchema: Can not generate data for {location} parameter "X-Foo"! '
+        lines[11] == f'OperationSchemaError: Can not generate data for {location} parameter "X-Foo"! '
         "It should have either `schema` or `content` keywords defined"
     )
     # And emitted Before / After event pairs have the same correlation ids
@@ -2377,3 +2381,30 @@ def test_non_existing_file(cli):
     result = cli.run("unknown.json")
     assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
     assert FILE_DOES_NOT_EXIST_MESSAGE in result.stdout
+
+
+def test_invalid_schema_with_disabled_validation(testdir, cli, openapi_3_schema_with_invalid_security):
+    # When there is an error in the schema
+    schema_file = testdir.makefile(".json", schema=json.dumps(openapi_3_schema_with_invalid_security))
+    # And the validation is disabled (default)
+    result = cli.run(str(schema_file), "--dry-run")
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # Then we should show an error message derived from JSON Schema
+    assert (
+        """OperationSchemaError: Invalid `bearerAuth` definition
+
+Location:
+    components -> securitySchemes -> bearerAuth
+
+Problematic definition:
+{
+    "scheme": "bearer",
+    "bearerFormat": "uuid"
+}
+
+Error details:
+    The provided definition doesn't match any of the expected formats or types.
+
+Ensure that the definition complies with the OpenAPI specification"""
+        in result.stdout
+    )

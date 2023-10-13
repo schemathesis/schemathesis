@@ -15,7 +15,7 @@ from ... import auths
 from ...auths import AuthStorage
 from ...checks import not_a_server_error
 from ...constants import DataGenerationMethod
-from ...exceptions import InvalidSchema
+from ...exceptions import OperationSchemaError
 from ...hooks import (
     GLOBAL_HOOK_DISPATCHER,
     HookContext,
@@ -146,7 +146,7 @@ class GraphQLSchema(BaseSchema):
 
     def get_all_operations(
         self, hooks: Optional[HookDispatcher] = None
-    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+    ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
         schema = self.client_schema
         for root_type, operation_type in (
             (RootType.QUERY, schema.query_type),

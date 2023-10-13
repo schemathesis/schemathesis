@@ -14,7 +14,7 @@ from pytest_subtests import SubTests, nullcontext
 from ._compat import MultipleFailures
 from .auths import AuthStorage
 from .constants import FLAKY_FAILURE_MESSAGE, CodeSampleStyle
-from .exceptions import CheckFailed, InvalidSchema, SkipTest, get_grouped_exception
+from .exceptions import CheckFailed, OperationSchemaError, SkipTest, get_grouped_exception
 from .hooks import HookDispatcher, HookScope
 from .models import APIOperation
 from .schemas import BaseSchema
@@ -244,7 +244,7 @@ def run_subtest(
 SEPARATOR = "\n===================="
 
 
-def _schema_error(subtests: SubTests, error: InvalidSchema, node_id: str) -> None:
+def _schema_error(subtests: SubTests, error: OperationSchemaError, node_id: str) -> None:
     """Run a failing test, that will show the underlying problem."""
     sub_test = error.as_failing_test_function()
     # `full_path` is always available in this case
@@ -252,6 +252,7 @@ def _schema_error(subtests: SubTests, error: InvalidSchema, node_id: str) -> Non
     if error.method:
         kwargs["method"] = error.method.upper()
     subtests.item._nodeid = _get_partial_node_name(node_id, **kwargs)
+    __tracebackhide__ = True
     with subtests.test(**kwargs):
         sub_test()
 

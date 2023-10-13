@@ -1,4 +1,5 @@
 import enum
+import json
 from dataclasses import dataclass, field
 from hashlib import sha1
 from json import JSONDecodeError
@@ -140,7 +141,7 @@ def get_timeout_error(deadline: Union[float, int]) -> Type[CheckFailed]:
 
 
 @dataclass
-class InvalidSchema(Exception):
+class OperationSchemaError(Exception):
     """Schema associated with an API operation contains an error."""
 
     __module__ = "builtins"
@@ -148,6 +149,33 @@ class InvalidSchema(Exception):
     path: Optional[str] = None
     method: Optional[str] = None
     full_path: Optional[str] = None
+    jsonschema_error: Optional[ValidationError] = None
+
+    @classmethod
+    def from_jsonschema_error(
+        cls, error: ValidationError, path: Optional[str], method: Optional[str], full_path: Optional[str]
+    ) -> "OperationSchemaError":
+        if error.absolute_path:
+            part = error.absolute_path[-1]
+            if isinstance(part, int) and len(error.absolute_path) > 1:
+                parent = error.absolute_path[-2]
+                message = f"Invalid definition for element at index {part} in `{parent}`"
+            else:
+                message = f"Invalid `{part}` definition"
+        else:
+            message = "Invalid schema definition"
+        error_path = " -> ".join((str(entry) for entry in error.path)) or "[root]"
+        message += f"\n\nLocation:\n    {error_path}"
+        instance = truncated_json(error.instance)
+        message += f"\n\nProblematic definition:\n{instance}"
+        message += "\n\nError details:\n    "
+        # This default message contains the instance which we already printed
+        if "is not valid under any of the given schemas" in error.message:
+            message += "The provided definition doesn't match any of the expected formats or types."
+        else:
+            message += error.message
+        message += "\n\nEnsure that the definition complies with the OpenAPI specification"
+        return cls(message, path=path, method=method, full_path=full_path, jsonschema_error=error)
 
     def as_failing_test_function(self) -> Callable:
         """Create a test function that will fail.
@@ -160,6 +188,26 @@ class InvalidSchema(Exception):
             raise self
 
         return actual_test
+
+
+def truncated_json(data: Any, max_lines: int = 10, max_width: int = 80) -> str:
+    # Convert JSON to string with indentation
+    indent = 4
+    serialized = json.dumps(data, indent=indent)
+
+    # Split string by lines
+
+    lines = [line[: max_width - 3] + "..." if len(line) > max_width else line for line in serialized.split("\n")]
+
+    if len(lines) <= max_lines:
+        return "\n".join(lines)
+
+    truncated_lines = lines[: max_lines - 1]
+    indentation = " " * indent
+    truncated_lines.append(f"{indentation}// Output truncated...")
+    truncated_lines.append(lines[-1])
+
+    return "\n".join(truncated_lines)
 
 
 class DeadlineExceeded(Exception):
