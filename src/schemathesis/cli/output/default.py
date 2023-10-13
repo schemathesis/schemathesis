@@ -138,8 +138,7 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
             "Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks", fg="red"
         )
     click.secho(
-        f"\nIf you need assistance in solving this, feel free to join our Discord server and report it:\n\n"
-        f"  {DISCORD_LINK}\n",
+        f"\nNeed more help?\n" f"    Join our Discord server: {DISCORD_LINK}\n",
         fg="red",
     )
 
@@ -160,7 +159,7 @@ def display_generic_errors(context: ExecutionContext, errors: List[SerializedErr
 
 def display_full_traceback_message(exception: str) -> bool:
     # Some errors should not trigger the message that suggests to show full tracebacks to the user
-    return not exception.startswith("DeadlineExceeded")
+    return not exception.startswith(("DeadlineExceeded", "OperationSchemaError"))
 
 
 def _display_error(context: ExecutionContext, error: SerializedError, seed: Optional[int] = None) -> bool:

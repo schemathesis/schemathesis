@@ -50,7 +50,7 @@ from .constants import (
 from .exceptions import (
     CheckFailed,
     FailureContext,
-    InvalidSchema,
+    OperationSchemaError,
     SerializationNotPossible,
     deduplicate_failed_checks,
     get_grouped_exception,
@@ -172,10 +172,10 @@ class Case:
             # This may happen when a path template has a placeholder for variable "X", but parameter "X" is not defined
             # in the parameters list.
             # When `exc` is formatted, it is the missing key name in quotes. E.g. 'id'
-            raise InvalidSchema(f"Path parameter {exc} is not defined") from exc
+            raise OperationSchemaError(f"Path parameter {exc} is not defined") from exc
         except ValueError as exc:
             # A single unmatched `}` inside the path template may cause this
-            raise InvalidSchema(f"Malformed path template: `{self.path}`\n\n  {exc}") from exc
+            raise OperationSchemaError(f"Malformed path template: `{self.path}`\n\n  {exc}") from exc
 
     def get_full_base_url(self) -> Optional[str]:
         """Create a full base url, adding "localhost" for WSGI apps."""
@@ -1108,7 +1108,7 @@ class TestResultSet:
     __test__ = False
 
     results: List[TestResult] = field(default_factory=list)
-    generic_errors: List[InvalidSchema] = field(default_factory=list)
+    generic_errors: List[OperationSchemaError] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
 
     def __iter__(self) -> Iterator[TestResult]:

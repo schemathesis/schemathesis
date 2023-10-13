@@ -16,6 +16,7 @@ class BaseSecurityProcessor:
 
     def process_definitions(self, schema: Dict[str, Any], operation: APIOperation, resolver: RefResolver) -> None:
         """Add relevant security parameters to data generation."""
+        __tracebackhide__ = True
         for definition in self._get_active_definitions(schema, operation, resolver):
             name = definition.get("name")
             location = definition.get("in")

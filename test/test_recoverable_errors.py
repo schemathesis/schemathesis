@@ -74,6 +74,31 @@ def test_(case):
     result.stdout.re_match_lines(expected)
 
 
+def test_jsonschema_error(testdir, openapi_3_schema_with_invalid_security):
+    testdir.make_test(
+        """
+lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+
+@lazy_schema.parametrize()
+@settings(max_examples=1)
+def test_(case):
+    pass
+    """,
+        schema=openapi_3_schema_with_invalid_security,
+        validate_schema=False,
+    )
+    result = testdir.runpytest()
+    # Then valid operation should be tested
+    # And errors on the single operation error should be displayed
+    result.assert_outcomes(passed=1, failed=1)
+    result.stdout.re_match_lines(
+        [
+            ".*OperationSchemaError: Invalid `bearerAuth` definition.*",
+            ".*Ensure that the definition complies with the OpenAPI specification.*",
+        ]
+    )
+
+
 @pytest.mark.parametrize("workers", (1, 2))
 def test_in_cli(testdir, cli, open_api_3_schema_with_recoverable_errors, workers):
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(open_api_3_schema_with_recoverable_errors))

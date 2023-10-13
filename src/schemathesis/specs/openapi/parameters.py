@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple
 
-from ...exceptions import InvalidSchema
+from ...exceptions import OperationSchemaError
 from ...models import APIOperation
 from ...parameters import Parameter
 from .converter import to_json_schema_recursive
@@ -412,7 +412,7 @@ def get_parameter_schema(operation: APIOperation, data: Dict[str, Any]) -> Dict[
     try:
         content = data["content"]
     except KeyError as exc:
-        raise InvalidSchema(
+        raise OperationSchemaError(
             MISSING_SCHEMA_OR_CONTENT_MESSAGE.format(location=data.get("in", ""), name=data.get("name", "<UNKNOWN>")),
             path=operation.path,
             method=operation.method,

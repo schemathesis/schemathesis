@@ -6,7 +6,7 @@ from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis.errors import NoSuchExample
 
 import schemathesis
-from schemathesis.exceptions import InvalidSchema
+from schemathesis.exceptions import OperationSchemaError
 from schemathesis.specs.openapi._hypothesis import STRING_FORMATS, is_valid_header
 from schemathesis.utils import fast_deepcopy
 
@@ -423,7 +423,7 @@ def test_(case):
     )
     # Then an error should be propagated with a relevant error message
     result = testdir.run_and_assert(failed=1)
-    result.stdout.re_match_lines([r"E +InvalidSchema: Body parameters are defined for GET request."])
+    result.stdout.re_match_lines([r"E +OperationSchemaError: Body parameters are defined for GET request."])
 
 
 def test_json_media_type(testdir):
@@ -616,7 +616,7 @@ def test_missing_content_and_schema(empty_open_api_3_schema, location):
 
     # Then the proper error should be shown
     with pytest.raises(
-        InvalidSchema,
+        OperationSchemaError,
         match=f'Can not generate data for {location} parameter "X-Foo"! '
         "It should have either `schema` or `content` keywords defined",
     ):

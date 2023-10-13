@@ -7,7 +7,7 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis import Case, DataGenerationMethod
-from schemathesis.exceptions import InvalidSchema
+from schemathesis.exceptions import OperationSchemaError
 from schemathesis.models import APIOperation, OperationDefinition
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
 from schemathesis.specs.openapi._hypothesis import (
@@ -116,7 +116,7 @@ def test_invalid_body_in_get(swagger_20):
             ]
         ),
     )
-    with pytest.raises(InvalidSchema, match=r"^Body parameters are defined for GET request.$"):
+    with pytest.raises(OperationSchemaError, match=r"^Body parameters are defined for GET request.$"):
         get_case_strategy(operation).example()
 
 

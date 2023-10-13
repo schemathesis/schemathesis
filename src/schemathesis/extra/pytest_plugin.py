@@ -14,7 +14,7 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
 from .._hypothesis import create_test
 from ..constants import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54, RECURSIVE_REFERENCE_ERROR_MESSAGE
-from ..exceptions import InvalidSchema, SkipTest
+from ..exceptions import OperationSchemaError, SkipTest
 from ..models import APIOperation
 from ..utils import (
     PARAMETRIZE_MARKER,
@@ -87,7 +87,9 @@ class SchemathesisCase(PyCollector):
     def _get_test_name(self, operation: APIOperation) -> str:
         return f"{self.name}[{operation.verbose_name}]"
 
-    def _gen_items(self, result: Result[APIOperation, InvalidSchema]) -> Generator[SchemathesisFunction, None, None]:
+    def _gen_items(
+        self, result: Result[APIOperation, OperationSchemaError]
+    ) -> Generator[SchemathesisFunction, None, None]:
         """Generate all tests for the given API operation.
 
         Could produce more than one test item if
@@ -238,7 +240,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
         try:
             outcome.get_result()
         except InvalidArgument as exc:
-            raise InvalidSchema(exc.args[0]) from None
+            raise OperationSchemaError(exc.args[0]) from None
         except HypothesisRefResolutionError:
             pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)
         except SkipTest as exc:

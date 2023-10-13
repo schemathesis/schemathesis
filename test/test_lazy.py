@@ -389,7 +389,7 @@ def test_(request, case):
     )
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1, failed=1)
-    result.stdout.re_match_lines([r"E +InvalidSchema: Body parameters are defined for GET request."])
+    result.stdout.re_match_lines([r"E +OperationSchemaError: Body parameters are defined for GET request."])
 
 
 @pytest.mark.parametrize(

@@ -11,7 +11,7 @@ from requests.structures import CaseInsensitiveDict
 from starlette.applications import Starlette
 
 from ._compat import IS_HYPOTHESIS_ABOVE_6_68_1
-from .exceptions import InvalidSchema
+from .exceptions import OperationSchemaError
 from .models import APIOperation, Case, CheckFunction
 from .utils import NOT_SET, GenericResponse, Ok, Result
 
@@ -100,7 +100,7 @@ class Feedback:
         settings: Optional[hypothesis.settings],
         seed: Optional[int],
         as_strategy_kwargs: Optional[Dict[str, Any]],
-    ) -> Generator[Result[Tuple[APIOperation, Callable], InvalidSchema], None, None]:
+    ) -> Generator[Result[Tuple[APIOperation, Callable], OperationSchemaError], None, None]:
         """Generate additional tests that use data from the previous ones."""
         from ._hypothesis import create_test
 

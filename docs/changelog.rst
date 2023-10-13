@@ -23,7 +23,7 @@ Changelog
 - Add ``case`` as the first argument to ``AuthContext.set``. Previous calling convention is still supported. `#1788`_
 - Disable the 'explain' phase in Hypothesis to improve performance. `#1808`_
 - Do not display ``InsecureRequestWarning`` in CLI output if the user explicitly provided ``--request-tls-verify=false``. `#1780`_
-- Enhance CLI output for schema loading and internal errors, providing clearer diagnostics and guidance. `#1781`_
+- Enhance CLI output for schema loading and internal errors, providing clearer diagnostics and guidance. `#1781`_, `#1517`_
 
 Before:
 
@@ -3495,6 +3495,7 @@ Deprecated
 .. _#1538: https://github.com/schemathesis/schemathesis/issues/1538
 .. _#1526: https://github.com/schemathesis/schemathesis/issues/1526
 .. _#1518: https://github.com/schemathesis/schemathesis/issues/1518
+.. _#1517: https://github.com/schemathesis/schemathesis/issues/1517
 .. _#1514: https://github.com/schemathesis/schemathesis/issues/1514
 .. _#1485: https://github.com/schemathesis/schemathesis/issues/1485
 .. _#1464: https://github.com/schemathesis/schemathesis/issues/1464

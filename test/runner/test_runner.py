@@ -659,7 +659,7 @@ def test_missing_path_parameter(any_app_schema):
     ).execute()
     # Then it leads to an error
     assert finished.has_errors
-    assert "InvalidSchema: Path parameter 'id' is not defined" in others[1].result.errors[0].exception
+    assert "OperationSchemaError: Path parameter 'id' is not defined" in others[1].result.errors[0].exception
 
 
 def test_get_requests_auth():
@@ -696,11 +696,11 @@ def test_workers_num_regression(mocker, real_app_schema):
     assert spy.call_args[1]["workers_num"] == 5
 
 
-def test_reraise():
+def test_reraise(swagger_20):
     try:
         raise AssertionError("Foo")
-    except AssertionError as exc:
-        error = reraise(exc)
+    except AssertionError:
+        error = reraise(swagger_20["/users"]["GET"])
         assert error.args[0] == "Unknown schema error"
 
 
@@ -1034,7 +1034,7 @@ def test_malformed_path_template(empty_open_api_3_schema):
     assert event.status == Status.error
     # And should produce the proper error message
     assert (
-        event.result.errors[0].exception == f"InvalidSchema: Malformed path template: `{path}`\n\n  "
+        event.result.errors[0].exception == f"OperationSchemaError: Malformed path template: `{path}`\n\n  "
         f"Single '}}' encountered in format string"
     )
 

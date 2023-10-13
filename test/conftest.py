@@ -356,6 +356,34 @@ def open_api_3_schema_with_yaml_payload(empty_open_api_3_schema):
 
 
 @pytest.fixture
+def openapi_3_schema_with_invalid_security(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {"schema": {"type": "integer"}},
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    empty_open_api_3_schema["components"] = {
+        "securitySchemes": {
+            "bearerAuth": {
+                # Missing `type` key
+                "scheme": "bearer",
+                "bearerFormat": "uuid",
+            },
+        }
+    }
+    empty_open_api_3_schema["security"] = [{"bearerAuth": []}]
+    return empty_open_api_3_schema
+
+
+@pytest.fixture
 def openapi_3_schema_with_xml(empty_open_api_3_schema):
     id_schema = {"type": "integer", "enum": [42]}
 
