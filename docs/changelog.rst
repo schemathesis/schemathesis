@@ -58,6 +58,7 @@ After:
 - Do not skip negative tests if the generated value is ``None``.
 - Lack of execution for ASGI events during testing. `#1305`_, `#1727`_
 - Confusing error message when trying to load schema from a non-existing file. `#1602`_
+- Reflect disabled TLS verification in generated code samples. `#1054`_
 
 .. _v3.19.7:
 
@@ -66,7 +67,7 @@ After:
 
 **Fixed**
 
-- ``Unsatisfiable`` error for multiple security schemes applied to the same API operation and an explicit ``Authorization`` header. `#1763_`
+- ``Unsatisfiable`` error for multiple security schemes applied to the same API operation and an explicit ``Authorization`` header. `#1763`_
 
 .. _v3.19.6:
 
@@ -3568,6 +3569,7 @@ Deprecated
 .. _#1066: https://github.com/schemathesis/schemathesis/issues/1066
 .. _#1067: https://github.com/schemathesis/schemathesis/issues/1067
 .. _#1059: https://github.com/schemathesis/schemathesis/issues/1059
+.. _#1054: https://github.com/schemathesis/schemathesis/issues/1054
 .. _#1050: https://github.com/schemathesis/schemathesis/issues/1050
 .. _#1046: https://github.com/schemathesis/schemathesis/issues/1046
 .. _#1039: https://github.com/schemathesis/schemathesis/issues/1039
