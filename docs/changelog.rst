@@ -14,6 +14,7 @@ Changelog
 - Support for ``body`` hooks in GraphQL schemas, enabling custom filtering or modification of queries and mutations. `#1464`_
 - New ``filter_operations`` hook to conditionally include or exclude specific API operations from being tested.
 - Introduced a new CLI option ``--experimental=openapi-3.1`` for experimental support of OpenAPI 3.1. This enables compatible JSON Schema validation for responses, while data generation remains OpenAPI 3.0-compatible. `#1820`_
+- Added ``contains`` method to ``ParameterSet`` for easier parameter checks in hooks. `#1789`_
 
 **Note**: Experimental features can change or be removed in any minor version release.
 
@@ -3463,6 +3464,7 @@ Deprecated
 .. _#1802: https://github.com/schemathesis/schemathesis/issues/1802
 .. _#1801: https://github.com/schemathesis/schemathesis/issues/1801
 .. _#1797: https://github.com/schemathesis/schemathesis/issues/1797
+.. _#1789: https://github.com/schemathesis/schemathesis/issues/1789
 .. _#1788: https://github.com/schemathesis/schemathesis/issues/1788
 .. _#1781: https://github.com/schemathesis/schemathesis/issues/1781
 .. _#1780: https://github.com/schemathesis/schemathesis/issues/1780
