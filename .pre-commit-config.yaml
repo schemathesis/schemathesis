@@ -54,7 +54,7 @@ repos:
         additional_dependencies: ["isort[pyproject]"]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.5.1
+    rev: v1.6.0
     hooks:
       - id: mypy
         exclude: ^(docs/|test/|test-corpus/|example/).*$
