@@ -6,7 +6,7 @@ from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, NoReturn, Optional, Tuple, Type, Union
 
 import hypothesis.errors
-from jsonschema import ValidationError
+from jsonschema import RefResolutionError, ValidationError
 
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE
 from .failures import FailureContext
@@ -140,6 +140,9 @@ def get_timeout_error(deadline: Union[float, int]) -> Type[CheckFailed]:
     return _get_hashed_exception("TimeoutError", str(deadline))
 
 
+SCHEMA_ERROR_SUGGESTION = "Ensure that the definition complies with the OpenAPI specification"
+
+
 @dataclass
 class OperationSchemaError(Exception):
     """Schema associated with an API operation contains an error."""
@@ -149,7 +152,6 @@ class OperationSchemaError(Exception):
     path: Optional[str] = None
     method: Optional[str] = None
     full_path: Optional[str] = None
-    jsonschema_error: Optional[ValidationError] = None
 
     @classmethod
     def from_jsonschema_error(
@@ -174,8 +176,20 @@ class OperationSchemaError(Exception):
             message += "The provided definition doesn't match any of the expected formats or types."
         else:
             message += error.message
-        message += "\n\nEnsure that the definition complies with the OpenAPI specification"
-        return cls(message, path=path, method=method, full_path=full_path, jsonschema_error=error)
+        message += f"\n\n{SCHEMA_ERROR_SUGGESTION}"
+        return cls(message, path=path, method=method, full_path=full_path)
+
+    @classmethod
+    def from_reference_resolution_error(
+        cls, error: RefResolutionError, path: Optional[str], method: Optional[str], full_path: Optional[str]
+    ) -> "OperationSchemaError":
+        message = "Unresolvable JSON pointer in the schema"
+        # Get the pointer value from "Unresolvable JSON pointer: 'components/UnknownParameter'"
+        pointer = str(error).split(": ", 1)[-1]
+        message += f"\n\nError details:\n    JSON pointer: {pointer}"
+        message += "\n    This typically means that the schema is referencing a component that doesn't exist."
+        message += f"\n\n{SCHEMA_ERROR_SUGGESTION}"
+        return cls(message, path=path, method=method, full_path=full_path)
 
     def as_failing_test_function(self) -> Callable:
         """Create a test function that will fail.

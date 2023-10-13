@@ -2408,3 +2408,22 @@ Error details:
 Ensure that the definition complies with the OpenAPI specification"""
         in result.stdout
     )
+
+
+def test_unresolvable_reference_with_disabled_validation(testdir, cli, open_api_3_schema_with_recoverable_errors):
+    # When there is an error in the schema
+    schema_file = testdir.makefile(".json", schema=json.dumps(open_api_3_schema_with_recoverable_errors))
+    # And the validation is disabled (default)
+    result = cli.run(str(schema_file), "--dry-run")
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # Then we should show an error message derived from JSON Schema
+    assert (
+        """OperationSchemaError: Unresolvable JSON pointer in the schema
+
+Error details:
+    JSON pointer: 'components/UnknownMethods'
+    This typically means that the schema is referencing a component that doesn't exist.
+
+Ensure that the definition complies with the OpenAPI specification"""
+        in result.stdout
+    )

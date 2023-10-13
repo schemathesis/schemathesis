@@ -138,7 +138,7 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
             "Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks", fg="red"
         )
     click.secho(
-        f"\nNeed more help?\n" f"    Join our Discord server: {DISCORD_LINK}\n",
+        f"\nNeed more help?\n" f"    Join our Discord server: {DISCORD_LINK}",
         fg="red",
     )
 
