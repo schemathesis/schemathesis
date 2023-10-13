@@ -1230,9 +1230,10 @@ def execute(
 
 
 def handle_service_error(exc: requests.HTTPError, api_name: str) -> NoReturn:
-    if exc.response.status_code == 403:
-        error_message(exc.response.json()["detail"])
-    elif exc.response.status_code == 404:
+    response = cast(requests.Response, exc.response)
+    if response.status_code == 403:
+        error_message(response.json()["detail"])
+    elif response.status_code == 404:
         error_message(f"API with name `{api_name}` not found!")
     else:
         output.default.display_service_error(service.Error(exc))
@@ -1354,7 +1355,8 @@ def login(token: str, hostname: str, hosts_file: str, protocol: str, request_tls
         service.hosts.store(token, hostname, hosts_file)
         success_message(f"Logged in into {hostname} as " + bold(username))
     except requests.HTTPError as exc:
-        detail = exc.response.json()["detail"]
+        response = cast(requests.Response, exc.response)
+        detail = response.json()["detail"]
         error_message(f"Failed to login into {hostname}: " + bold(detail))
         sys.exit(1)
 

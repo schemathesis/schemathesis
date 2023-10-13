@@ -376,7 +376,8 @@ def display_report_metadata(meta: service.Metadata) -> None:
 def display_service_error(event: service.Error) -> None:
     """Show information about an error during communication with Schemathesis.io."""
     if isinstance(event.exception, requests.HTTPError):
-        status_code = event.exception.response.status_code
+        response = cast(requests.Response, event.exception.response)
+        status_code = response.status_code
         click.secho(f"Schemathesis.io responded with HTTP {status_code}", fg="red")
         if 500 <= status_code <= 599:
             # Server error, should be resolved soon
