@@ -12,7 +12,7 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
 from .auths import get_auth_storage_from_test
 from .constants import DEFAULT_DEADLINE, DataGenerationMethod
-from .exceptions import InvalidSchema
+from .exceptions import OperationSchemaError
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import APIOperation, Case
 from .utils import GivenInput, combine_strategies
@@ -109,7 +109,7 @@ def add_examples(test: Callable, operation: APIOperation, hook_dispatcher: Optio
     """Add examples to the Hypothesis test, if they are specified in the schema."""
     try:
         examples: List[Case] = [get_single_example(strategy) for strategy in operation.get_strategies_from_examples()]
-    except (InvalidSchema, HypothesisRefResolutionError, Unsatisfiable):
+    except (OperationSchemaError, HypothesisRefResolutionError, Unsatisfiable):
         # Invalid schema:
         # In this case, the user didn't pass `--validate-schema=false` and see an error in the output anyway,
         # and no tests will be executed. For this reason, examples can be skipped

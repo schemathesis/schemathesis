@@ -1,7 +1,7 @@
 import pytest
 
 import schemathesis
-from schemathesis.exceptions import InvalidSchema, SchemaError
+from schemathesis.exceptions import OperationSchemaError, SchemaError
 from schemathesis.specs.openapi.parameters import OpenAPI20Body
 from schemathesis.specs.openapi.schemas import InliningResolver
 from schemathesis.utils import Err, Ok
@@ -125,7 +125,7 @@ def test_schema_parsing_error(simple_schema):
     assert oks[0].method == "post"
 
 
-@pytest.mark.parametrize("validate_schema, expected_exception", ((False, InvalidSchema), (True, SchemaError)))
+@pytest.mark.parametrize("validate_schema, expected_exception", ((False, OperationSchemaError), (True, SchemaError)))
 def test_not_recoverable_schema_error(simple_schema, validate_schema, expected_exception):
     # When there is an error in the API schema that leads to inability to generate any tests
     del simple_schema["paths"]

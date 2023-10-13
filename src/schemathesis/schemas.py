@@ -38,7 +38,7 @@ from requests.structures import CaseInsensitiveDict
 from ._hypothesis import create_test
 from .auths import AuthStorage
 from .constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
-from .exceptions import InvalidSchema, UsageError
+from .exceptions import OperationSchemaError, UsageError
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import APIOperation, Case
 from .stateful import APIStateMachine, Stateful, StatefulTest
@@ -155,6 +155,9 @@ class BaseSchema(Mapping):
             return base_url.rstrip("/")
         return self._build_base_url()
 
+    def validate(self) -> None:
+        raise NotImplementedError
+
     @property
     def operations(self) -> Dict[str, MethodsDict]:
         if not hasattr(self, "_operations"):
@@ -168,7 +171,7 @@ class BaseSchema(Mapping):
 
     def get_all_operations(
         self, hooks: Optional[HookDispatcher] = None
-    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+    ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
         raise NotImplementedError
 
     def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
@@ -197,7 +200,7 @@ class BaseSchema(Mapping):
         as_strategy_kwargs: Optional[Dict[str, Any]] = None,
         hooks: Optional[HookDispatcher] = None,
         _given_kwargs: Optional[Dict[str, GivenInput]] = None,
-    ) -> Generator[Result[Tuple[APIOperation, Callable], InvalidSchema], None, None]:
+    ) -> Generator[Result[Tuple[APIOperation, Callable], OperationSchemaError], None, None]:
         """Generate all operations and Hypothesis tests for them."""
         for result in self.get_all_operations(hooks=hooks):
             if isinstance(result, Ok):
@@ -406,7 +409,7 @@ class BaseSchema(Mapping):
 
 
 def operations_to_dict(
-    operations: Generator[Result[APIOperation, InvalidSchema], None, None]
+    operations: Generator[Result[APIOperation, OperationSchemaError], None, None]
 ) -> Dict[str, MethodsDict]:
     output: Dict[str, MethodsDict] = {}
     for result in operations:

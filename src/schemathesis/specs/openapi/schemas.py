@@ -1,7 +1,7 @@
 import itertools
 import json
 from collections import defaultdict
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack, contextmanager, suppress
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from hashlib import sha1
@@ -15,6 +15,7 @@ from typing import (
     Generator,
     Iterable,
     List,
+    NoReturn,
     Optional,
     Sequence,
     Tuple,
@@ -33,7 +34,7 @@ from ... import experimental, failures
 from ...auths import AuthStorage
 from ...constants import HTTP_METHODS, DataGenerationMethod
 from ...exceptions import (
-    InvalidSchema,
+    OperationSchemaError,
     UsageError,
     get_missing_content_type_error,
     get_response_parsing_error,
@@ -58,6 +59,7 @@ from ...utils import (
 from . import links, serialization
 from ._hypothesis import get_case_strategy
 from .converter import to_json_schema, to_json_schema_recursive
+from .definitions import OPENAPI_30_VALIDATOR, SWAGGER_20_VALIDATOR
 from .examples import get_strategies_from_examples
 from .filters import (
     should_skip_by_operation_id,
@@ -78,7 +80,7 @@ from .references import RECURSION_DEPTH_LIMIT, ConvertingResolver, InliningResol
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
-SCHEMA_ERROR_MESSAGE = "Schema parsing failed. Please check your schema."
+SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError)
 
 
@@ -148,7 +150,7 @@ class BaseOpenAPISchema(BaseSchema):
 
     def get_all_operations(
         self, hooks: Optional[HookDispatcher] = None
-    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+    ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
         """Iterate over all operations defined in the API.
 
         Each yielded item is either `Ok` or `Err`, depending on the presence of errors during schema processing.
@@ -164,11 +166,12 @@ class BaseOpenAPISchema(BaseSchema):
         In both cases, Schemathesis lets the callee decide what to do with these variants. It allows it to test valid
         operations and show errors for invalid ones.
         """
+        __tracebackhide__ = True
         try:
             paths = self.raw_schema["paths"]
         except KeyError as exc:
             # Missing `paths` is not recoverable
-            raise InvalidSchema(SCHEMA_ERROR_MESSAGE) from exc
+            self._raise_invalid_schema(exc)
 
         context = HookContext()
         for path, methods in paths.items():
@@ -215,12 +218,36 @@ class BaseOpenAPISchema(BaseSchema):
             except SCHEMA_PARSING_ERRORS as exc:
                 yield self._into_err(exc, path, method)
 
-    def _into_err(self, error: Exception, path: Optional[str], method: Optional[str]) -> Err[InvalidSchema]:
+    def _into_err(self, error: Exception, path: Optional[str], method: Optional[str]) -> Err[OperationSchemaError]:
+        __tracebackhide__ = True
         try:
             full_path = self.get_full_path(path) if isinstance(path, str) else None
-            raise InvalidSchema(SCHEMA_ERROR_MESSAGE, path=path, method=method, full_path=full_path) from error
-        except InvalidSchema as exc:
+            self._raise_invalid_schema(error, full_path, path, method)
+        except OperationSchemaError as exc:
             return Err(exc)
+
+    def _raise_invalid_schema(
+        self,
+        error: Exception,
+        full_path: Optional[str] = None,
+        path: Optional[str] = None,
+        method: Optional[str] = None,
+    ) -> NoReturn:
+        __tracebackhide__ = True
+        try:
+            self.validate()
+        except jsonschema.ValidationError as exc:
+            raise OperationSchemaError.from_jsonschema_error(
+                exc, path=path, method=method, full_path=full_path
+            ) from None
+        raise OperationSchemaError(SCHEMA_ERROR_MESSAGE, path=path, method=method, full_path=full_path) from error
+
+    def validate(self) -> None:
+        with suppress(TypeError):
+            self._validate()
+
+    def _validate(self) -> None:
+        raise NotImplementedError
 
     def collect_parameters(
         self, parameters: Iterable[Dict[str, Any]], definition: Dict[str, Any]
@@ -248,6 +275,7 @@ class BaseOpenAPISchema(BaseSchema):
         raw_definition: OperationDefinition,
     ) -> APIOperation:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
+        __tracebackhide__ = True
         base_url = self.get_base_url()
         operation: APIOperation[OpenAPIParameter, Case] = APIOperation(
             path=path,
@@ -363,7 +391,9 @@ class BaseOpenAPISchema(BaseSchema):
             responses = operation.definition.resolved["responses"]
         except KeyError as exc:
             # Possible to get if `validate_schema=False` is passed during schema creation
-            raise InvalidSchema("Schema parsing failed. Please check your schema.") from exc
+            path = operation.path
+            full_path = self.get_full_path(path) if isinstance(path, str) else None
+            self._raise_invalid_schema(exc, full_path, path, operation.method)
         status_code = str(response.status_code)
         if status_code in responses:
             return responses[status_code]
@@ -670,6 +700,9 @@ class SwaggerV20(BaseOpenAPISchema):
     def verbose_name(self) -> str:
         return f"Swagger {self.spec_version}"
 
+    def _validate(self) -> None:
+        SWAGGER_20_VALIDATOR.validate(self.raw_schema)
+
     def _get_base_path(self) -> str:
         return self.raw_schema.get("basePath", "/")
 
@@ -843,6 +876,9 @@ class OpenApi30(SwaggerV20):
     @property
     def verbose_name(self) -> str:
         return f"Open API {self.spec_version}"
+
+    def _validate(self) -> None:
+        OPENAPI_30_VALIDATOR.validate(self.raw_schema)
 
     def _get_base_path(self) -> str:
         servers = self.raw_schema.get("servers", [])
