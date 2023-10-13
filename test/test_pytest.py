@@ -2,12 +2,7 @@ import platform
 
 import pytest
 
-from schemathesis.constants import (
-    DEFAULT_DEADLINE,
-    IS_PYTEST_ABOVE_54,
-    RECURSIVE_REFERENCE_ERROR_MESSAGE,
-    SCHEMATHESIS_TEST_CASE_HEADER,
-)
+from schemathesis.constants import DEFAULT_DEADLINE, IS_PYTEST_ABOVE_54, RECURSIVE_REFERENCE_ERROR_MESSAGE
 
 
 def test_pytest_parametrize_fixture(testdir):
@@ -262,7 +257,7 @@ def test(case):
 
 
 @pytest.mark.parametrize("style", ("python", "curl"))
-def test_failure_reproduction_message(testdir, openapi3_base_url, style, mock_case_id):
+def test_failure_reproduction_message(testdir, openapi3_base_url, style):
     # When a test fails
     testdir.make_test(
         f"""
@@ -281,12 +276,12 @@ def test(case):
     if style == "python":
         lines = [
             r".+Run this Python code to reproduce this response:",
-            rf".+requests.get\('{openapi3_base_url}/failure', headers={{",
+            rf".+requests.get\('{openapi3_base_url}/failure'",
         ]
     else:
         lines = [
             r".+Run this cURL command to reproduce this response:",
-            rf".+curl -X GET -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}' {openapi3_base_url}/failure",
+            rf".+curl -X GET {openapi3_base_url}/failure",
         ]
     result.stdout.re_match_lines(
         [

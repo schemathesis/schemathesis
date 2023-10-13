@@ -1,6 +1,5 @@
 import io
 import os
-import uuid
 from textwrap import dedent
 from types import SimpleNamespace
 from typing import Optional
@@ -868,13 +867,6 @@ def loadable_graphql_fastapi_app(testdir, graphql_path):
         """
     )
     return f"{module.purebasename}:app"
-
-
-@pytest.fixture
-def mock_case_id(mocker):
-    case_id = uuid.uuid4()
-    mocker.patch("schemathesis.models.uuid4", lambda: case_id)
-    return case_id
 
 
 @pytest.fixture(scope="session")

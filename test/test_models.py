@@ -278,7 +278,7 @@ def test_case_partial_deepcopy_source(swagger_20):
 
 def test_validate_response(testdir):
     testdir.make_test(
-        rf"""
+        r"""
 from requests import Response, Request
 from schemathesis.failures import UndefinedStatusCode
 
@@ -287,7 +287,7 @@ def test_(case):
     response = Response()
     response.headers["Content-Type"] = "application/json"
     response.status_code = 418
-    request = Request(method="GET", url="http://localhost/v1/users", headers={{}})
+    request = Request(method="GET", url="http://localhost/v1/users")
     response.request = request.prepare()
     try:
         case.validate_response(response)
@@ -308,7 +308,7 @@ def test_(case):
           "",
           "Run this cURL command to reproduce this response: ",
           "",
-          f"    curl -X GET -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {{case.id}}' http://localhost/v1/users",
+          f"    curl -X GET http://localhost/v1/users",
           "",
     ]
 """

@@ -2,6 +2,7 @@ import cgi
 import functools
 import operator
 import pathlib
+import random
 import re
 import sys
 import traceback
@@ -42,7 +43,7 @@ from requests.utils import CaseInsensitiveDict, check_header_validity, default_h
 from werkzeug.wrappers import Response as BaseResponse
 
 from ._compat import InferType, JSONMixin, get_signature
-from .constants import USER_AGENT, DataGenerationMethod
+from .constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT, DataGenerationMethod
 from .exceptions import SkipTest, UsageError
 from .types import DataGenerationMethodInput, Filter, GenericTest, NotSet, RawAuth
 
@@ -58,7 +59,13 @@ NOT_SET = NotSet()
 # These headers are added automatically by Schemathesis or `requests`.
 # Do not show them in code samples to make them more readable
 IGNORED_HEADERS = CaseInsensitiveDict(
-    {"Content-Length": None, "Transfer-Encoding": None, "Content-Type": None, **default_headers()}  # type: ignore
+    {
+        "Content-Length": None,
+        "Transfer-Encoding": None,
+        "Content-Type": None,
+        SCHEMATHESIS_TEST_CASE_HEADER: None,
+        **default_headers(),
+    }
 )
 
 
@@ -534,3 +541,18 @@ def _fast_deepcopy(value: Any) -> Any:
     if isinstance(value, list):
         return [_fast_deepcopy(v) for v in value]
     return value
+
+
+CASE_ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+BASE = len(CASE_ID_ALPHABET)
+# Separate `Random` as Hypothesis might interfere with the default one
+RANDOM = random.Random()
+
+
+def generate_random_case_id(length: int = 6) -> str:
+    number = RANDOM.randint(62 ** (length - 1), 62**length - 1)
+    output = ""
+    while number > 0:
+        number, rem = divmod(number, BASE)
+        output += CASE_ID_ALPHABET[rem]
+    return output

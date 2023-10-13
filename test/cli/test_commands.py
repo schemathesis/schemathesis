@@ -41,7 +41,6 @@ from schemathesis.constants import (
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     IS_PYTEST_ABOVE_54,
     REPORT_SUGGESTION_ENV_VAR,
-    SCHEMATHESIS_TEST_CASE_HEADER,
     CodeSampleStyle,
 )
 from schemathesis.extra._flask import run_server
@@ -1537,12 +1536,12 @@ def test_wsgi_app_internal_exception(testdir, cli):
     result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--hypothesis-derandomize")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
-    assert "== APPLICATION LOGS ==" in lines[41], result.stdout.strip()
-    assert "ERROR in app: Exception on /api/success [GET]" in lines[43]
+    assert "== APPLICATION LOGS ==" in lines[45], result.stdout.strip()
+    assert "ERROR in app: Exception on /api/success [GET]" in lines[47]
     if sys.version_info >= (3, 11):
-        assert lines[59] == "ZeroDivisionError: division by zero"
+        assert lines[63] == "ZeroDivisionError: division by zero"
     else:
-        assert lines[54] == '    raise ZeroDivisionError("division by zero")'
+        assert lines[58] == '    raise ZeroDivisionError("division by zero")'
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
@@ -1977,7 +1976,7 @@ def test_unsupported_regex(testdir, cli, empty_open_api_3_schema):
 
 @pytest.mark.parametrize("extra", ("--auth='test:wrong'", "-H Authorization: Basic J3Rlc3Q6d3Jvbmcn"))
 @pytest.mark.operations("basic")
-def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra, mock_case_id):
+def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra):
     # See GH-792
     # When the tested API operation has basic auth
     # And the auth is overridden (directly or via headers)
@@ -1986,10 +1985,7 @@ def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra, 
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
     # Then the code sample representation in the output should have the overridden value
-    assert (
-        lines[20] == f"    curl -X GET -H 'Authorization: Basic J3Rlc3Q6d3Jvbmcn' "
-        f"-H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}' {base_url}/basic"
-    )
+    assert lines[20] == f"    curl -X GET -H 'Authorization: Basic J3Rlc3Q6d3Jvbmcn' {base_url}/basic"
 
 
 @pytest.mark.openapi_version("3.0")

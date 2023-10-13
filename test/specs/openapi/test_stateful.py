@@ -114,7 +114,7 @@ TestStateful.settings = settings(
     # Then it should be able to find a hidden error:
     result.assert_outcomes(failed=1)
     # And there should be Python code to reproduce the error in the GET call
-    result.stdout.re_match_lines([rf"E +curl -X GET .+ '{openapi3_base_url}/users/\w+.+"])
+    result.stdout.re_match_lines([rf"E +curl -X GET '{openapi3_base_url}/users/\w+.+"])
     # And the reproducing example should work
     example = find_reproduction_code(result.outlines)
     testdir.make_test(

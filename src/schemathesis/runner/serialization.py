@@ -15,6 +15,7 @@ from ..utils import IGNORED_HEADERS, WSGIResponse, format_exception
 
 @dataclass
 class SerializedCase:
+    id: str
     requests_code: str
     curl_code: str
     path_template: str
@@ -28,6 +29,7 @@ class SerializedCase:
     @classmethod
     def from_case(cls, case: Case, headers: Optional[Dict[str, Any]], verify: bool) -> "SerializedCase":
         return cls(
+            id=case.id,
             requests_code=case.get_code_to_reproduce(headers, verify=verify),
             curl_code=case.as_curl_command(headers, verify=verify),
             path_template=case.path,

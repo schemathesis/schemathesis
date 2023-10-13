@@ -27,7 +27,6 @@ from typing import (
     cast,
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
-from uuid import uuid4
 
 import curlify
 import requests.auth
@@ -68,6 +67,7 @@ from .utils import (
     copy_response,
     deprecated_property,
     fast_deepcopy,
+    generate_random_case_id,
     get_response_payload,
     maybe_set_assertion_message,
 )
@@ -118,7 +118,7 @@ class Case:
     # The way the case was generated (None for manually crafted ones)
     data_generation_method: Optional[DataGenerationMethod] = None
     # Unique test case identifier
-    id: str = field(default_factory=lambda: uuid4().hex, compare=False)
+    id: str = field(default_factory=generate_random_case_id, compare=False)
     _auth: Optional[requests.auth.AuthBase] = None
 
     def __repr__(self) -> str:
