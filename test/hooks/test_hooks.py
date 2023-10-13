@@ -8,7 +8,8 @@ from schemathesis.utils import PARAMETRIZE_MARKER
 
 
 def integer_id(query):
-    return query["id"].isdigit()
+    value = query["id"]
+    return value.isdigit() and value.isascii()
 
 
 @pytest.fixture(params=["default-direct", "default-named", "generate-direct", "generate-named"])
