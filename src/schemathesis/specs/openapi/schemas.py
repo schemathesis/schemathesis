@@ -234,6 +234,10 @@ class BaseOpenAPISchema(BaseSchema):
         method: Optional[str] = None,
     ) -> NoReturn:
         __tracebackhide__ = True
+        if isinstance(error, jsonschema.exceptions.RefResolutionError):
+            raise OperationSchemaError.from_reference_resolution_error(
+                error, path=path, method=method, full_path=full_path
+            ) from None
         try:
             self.validate()
         except jsonschema.ValidationError as exc:
