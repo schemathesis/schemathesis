@@ -11,7 +11,14 @@ import requests
 
 from ... import service
 from ..._compat import metadata
-from ...constants import DISCORD_LINK, FLAKY_FAILURE_MESSAGE, REPORT_SUGGESTION_ENV_VAR, CodeSampleStyle, __version__
+from ...constants import (
+    DISCORD_LINK,
+    FLAKY_FAILURE_MESSAGE,
+    REPORT_SUGGESTION_ENV_VAR,
+    SCHEMATHESIS_TEST_CASE_HEADER,
+    CodeSampleStyle,
+    __version__,
+)
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...models import Response, Status
 from ...runner import events
@@ -238,6 +245,7 @@ def display_example(
         click.secho(f"Run this Python code to reproduce this failure: \n\n    {case.requests_code}\n", fg="red")
     if context.code_sample_style == CodeSampleStyle.curl:
         click.secho(f"Run this cURL command to reproduce this failure: \n\n    {case.curl_code}\n", fg="red")
+    click.secho(f"{SCHEMATHESIS_TEST_CASE_HEADER}: {case.id}\n", fg="red")
     if seed is not None:
         click.secho(f"Or add this option to your command line parameters: --hypothesis-seed={seed}", fg="red")
 
@@ -291,8 +299,7 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
                 click.secho(f"  - {warning}", fg="yellow")
 
     if len(GLOBAL_EXPERIMENTS.enabled) > 0:
-        click.echo()
-        click.secho("Experimental Features:", bold=True)
+        click.secho("\nExperimental Features:", bold=True)
         for experiment in sorted(GLOBAL_EXPERIMENTS.enabled, key=lambda e: e.name):
             click.secho(f"  - {experiment.verbose_name}: {experiment.description}")
             click.secho(f"    Feedback: {experiment.discussion_url}")
@@ -300,6 +307,11 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
         click.echo(
             "Your feedback is crucial for experimental features. "
             "Please visit the provided URL(s) to share your thoughts."
+        )
+
+    if event.failed_count > 0:
+        click.echo(
+            f"\n{bold('Note')}: The '{SCHEMATHESIS_TEST_CASE_HEADER}' header can be used to correlate test cases with server logs for debugging."
         )
 
     if context.report is not None and not context.is_interrupted:

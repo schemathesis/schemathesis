@@ -4,7 +4,6 @@ import pytest
 
 import schemathesis
 from schemathesis import Case
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
 
 schema = schemathesis.from_dict(app.openapi(), force_schema_version="30")
 
@@ -14,16 +13,13 @@ schema = schemathesis.from_dict(app.openapi(), force_schema_version="30")
 def test_as_curl_command(case: Case, headers):
     command = case.as_curl_command(headers)
     expected_headers = "" if not headers else " ".join(f" -H '{name}: {value}'" for name, value in headers.items())
-    assert (
-        command
-        == f"curl -X GET{expected_headers} -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {case.id}' http://localhost/users"
-    )
+    assert command == f"curl -X GET{expected_headers} http://localhost/users"
 
 
 def test_non_utf_8_body():
     case = Case(operation=schema["/users"]["GET"], body=b"42\xff", media_type="application/octet-stream")
     command = case.as_curl_command()
-    assert command == f"curl -X GET -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {case.id}' -d '42�' http://localhost/users"
+    assert command == "curl -X GET -d '42�' http://localhost/users"
 
 
 def test_explicit_headers():
@@ -32,29 +28,24 @@ def test_explicit_headers():
     value = "application/json"
     case = Case(operation=schema["/users"]["GET"], headers={name: value})
     command = case.as_curl_command()
-    assert (
-        command
-        == f"curl -X GET -H '{name}: {value}' -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {case.id}' http://localhost/users"
-    )
+    assert command == f"curl -X GET -H '{name}: {value}' http://localhost/users"
 
 
 @pytest.mark.operations("failure")
 @pytest.mark.openapi_version("3.0")
-def test_cli_output(cli, base_url, schema_url, mock_case_id):
+def test_cli_output(cli, base_url, schema_url):
     result = cli.run(schema_url, "--code-sample-style=curl")
     lines = result.stdout.splitlines()
     assert "Run this cURL command to reproduce this failure: " in lines
-    headers = f"-H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}'"
-    assert f"    curl -X GET {headers} {base_url}/failure" in lines
+    assert f"    curl -X GET {base_url}/failure" in lines
 
 
 @pytest.mark.operations("failure")
 @pytest.mark.openapi_version("3.0")
-def test_cli_output_includes_insecure(cli, base_url, schema_url, mock_case_id):
+def test_cli_output_includes_insecure(cli, base_url, schema_url):
     result = cli.run(schema_url, "--code-sample-style=curl", "--request-tls-verify=false")
     lines = result.stdout.splitlines()
-    headers = f"-H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}'"
-    assert f"    curl -X GET {headers} --insecure {base_url}/failure" in lines
+    assert f"    curl -X GET --insecure {base_url}/failure" in lines
 
 
 @pytest.mark.operations("failure")
@@ -73,5 +64,5 @@ def test_(case):
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1, failed=1)
     result.stdout.re_match_lines(
-        [r"E +Run this cURL command to reproduce this response:", rf"E + curl -X GET.+ {openapi3_base_url}/failure"]
+        [r"E +Run this cURL command to reproduce this response:", rf"E + curl -X GET {openapi3_base_url}/failure"]
     )

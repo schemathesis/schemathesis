@@ -5,7 +5,6 @@ from flask import Flask
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.models import Case, _escape_single_quotes
 from schemathesis.runner import from_schema
 
@@ -19,13 +18,10 @@ def openapi_case(request, swagger_20):
     return operation.make_case(media_type="application/json", **kwargs)
 
 
-def get_full_code(case_id, kwargs_repr=""):
+def get_full_code(kwargs_repr=""):
     if kwargs_repr:
         kwargs_repr = f", {kwargs_repr}"
-    return (
-        f"requests.get('http://127.0.0.1:1/users', "
-        f"headers={{'{SCHEMATHESIS_TEST_CASE_HEADER}': '{case_id}'}}{kwargs_repr})"
-    )
+    return f"requests.get('http://127.0.0.1:1/users'{kwargs_repr})"
 
 
 @pytest.mark.parametrize(
@@ -46,7 +42,7 @@ def get_full_code(case_id, kwargs_repr=""):
 def test_open_api_code_sample(openapi_case, kwargs_repr):
     # Custom request parts should be correctly displayed
     code = openapi_case.get_code_to_reproduce()
-    assert code == get_full_code(openapi_case.id, kwargs_repr), code
+    assert code == get_full_code(kwargs_repr), code
     # And the generated code should be valid Python
     with pytest.raises(requests.exceptions.ConnectionError):
         eval(code)
@@ -119,36 +115,25 @@ def test_escape_single_quotes(value, expected):
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_graphql_code_sample(graphql_url, graphql_schema, graphql_strategy):
     case = graphql_strategy.example()
-    assert (
-        case.get_code_to_reproduce() == f"requests.post('{graphql_url}', "
-        f"headers={{'{SCHEMATHESIS_TEST_CASE_HEADER}': '{case.id}'}}, json={{'query': {repr(case.body)}}})"
-    )
+    assert case.get_code_to_reproduce() == f"requests.post('{graphql_url}', json={{'query': {repr(case.body)}}})"
 
 
 @pytest.mark.operations("failure")
-def test_cli_output(cli, base_url, schema_url, mock_case_id):
+def test_cli_output(cli, base_url, schema_url):
     result = cli.run(schema_url, "--code-sample-style=python")
     lines = result.stdout.splitlines()
     assert "Run this Python code to reproduce this failure: " in lines
-    headers = f"{{'{SCHEMATHESIS_TEST_CASE_HEADER}': '{mock_case_id.hex}'}}"
-    assert f"    requests.get('{base_url}/failure', headers={headers})" in lines
+    assert f"    requests.get('{base_url}/failure')" in lines
 
 
 @pytest.mark.operations("failure")
-def test_reproduce_code_with_overridden_headers(any_app_schema, base_url, mock_case_id):
+def test_reproduce_code_with_overridden_headers(any_app_schema, base_url):
     # Note, headers are essentially the same, but keys are ordered differently due to implementation details of
     # real vs wsgi apps. It is the simplest solution, but not the most flexible one, though.
+    headers = {"X-Token": "test"}
     if isinstance(any_app_schema.app, Flask):
-        headers = {
-            SCHEMATHESIS_TEST_CASE_HEADER: mock_case_id.hex,
-            "X-Token": "test",
-        }
         expected = f"requests.get('http://localhost/api/failure', headers={headers})"
     else:
-        headers = {
-            SCHEMATHESIS_TEST_CASE_HEADER: mock_case_id.hex,
-            "X-Token": "test",
-        }
         expected = f"requests.get('{base_url}/failure', headers={headers})"
 
     *_, after, finished = from_schema(

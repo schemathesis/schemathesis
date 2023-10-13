@@ -14,7 +14,7 @@ import schemathesis.cli.context
 from schemathesis import models, runner, utils
 from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, DataGenerationMethod
+from schemathesis.constants import DataGenerationMethod
 from schemathesis.runner.events import Finished, InternalError
 from schemathesis.runner.serialization import SerializedTestResult
 from schemathesis.utils import NOT_SET
@@ -327,7 +327,7 @@ def test_display_single_error(capsys, swagger_20, operation, execution_context, 
 
 
 @pytest.mark.parametrize("verbosity", (0, 1))
-def test_display_failures(swagger_20, capsys, execution_context, results_set, verbosity, response, mock_case_id):
+def test_display_failures(swagger_20, capsys, execution_context, results_set, verbosity, response):
     execution_context.verbosity = verbosity
     # Given two test results - success and failure
     operation = models.APIOperation("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)
@@ -350,8 +350,7 @@ def test_display_failures(swagger_20, capsys, execution_context, results_set, ve
     assert " GET /v1/api/failure " in out
     assert "Message" in out
     assert "Run this cURL command to reproduce this failure:" in out
-    headers = f"-H '{SCHEMATHESIS_TEST_CASE_HEADER}: {mock_case_id.hex}'"
-    assert f"curl -X GET {headers} http://127.0.0.1:8080/api/failure" in out
+    assert "curl -X GET http://127.0.0.1:8080/api/failure" in out
 
 
 @pytest.mark.parametrize("show_errors_tracebacks", (True, False))
