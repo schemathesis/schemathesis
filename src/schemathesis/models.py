@@ -60,7 +60,6 @@ from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .serializers import Serializer, SerializerContext
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
 from .utils import (
-    IGNORED_HEADERS,
     NOT_SET,
     GenericResponse,
     WSGIResponse,
@@ -206,7 +205,9 @@ class Case:
             final_headers = kwargs["headers"] or {}
             final_headers.update(headers)
             kwargs["headers"] = final_headers
-        kwargs["headers"] = {key: value for key, value in kwargs["headers"].items() if key not in IGNORED_HEADERS}
+        kwargs["headers"] = {
+            key: value for key, value in kwargs["headers"].items() if key not in CodeSampleStyle.python.ignored_headers
+        }
         method = kwargs["method"].lower()
 
         def should_display(key: str, value: Any) -> bool:
@@ -240,7 +241,7 @@ class Case:
             # Note, it may be not sufficient to reproduce the error :(
             prepared.body = prepared.body.decode("utf-8", errors="replace")
         for header in tuple(prepared.headers):
-            if header in IGNORED_HEADERS and header not in (self.headers or {}):
+            if header in CodeSampleStyle.curl.ignored_headers and header not in (self.headers or {}):
                 del prepared.headers[header]
         return curlify.to_curl(prepared, verify=verify)
 

@@ -39,11 +39,11 @@ from hypothesis.reporting import with_reporter
 from hypothesis.strategies import SearchStrategy
 from requests.auth import HTTPDigestAuth
 from requests.exceptions import InvalidHeader  # type: ignore
-from requests.utils import CaseInsensitiveDict, check_header_validity, default_headers  # type: ignore
+from requests.utils import check_header_validity
 from werkzeug.wrappers import Response as BaseResponse
 
 from ._compat import InferType, JSONMixin, get_signature
-from .constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT, DataGenerationMethod
+from .constants import USER_AGENT, DataGenerationMethod
 from .exceptions import SkipTest, UsageError
 from .types import DataGenerationMethodInput, Filter, GenericTest, NotSet, RawAuth
 
@@ -54,19 +54,6 @@ except ImportError:
 
 
 NOT_SET = NotSet()
-
-
-# These headers are added automatically by Schemathesis or `requests`.
-# Do not show them in code samples to make them more readable
-IGNORED_HEADERS = CaseInsensitiveDict(
-    {
-        "Content-Length": None,
-        "Transfer-Encoding": None,
-        "Content-Type": None,
-        SCHEMATHESIS_TEST_CASE_HEADER: None,
-        **default_headers(),
-    }
-)
 
 
 def file_exists(path: str) -> bool:

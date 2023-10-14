@@ -1,3 +1,4 @@
+from test.apps.openapi._fastapi import create_app
 from test.apps.openapi._fastapi.app import app
 
 import pytest
@@ -19,7 +20,15 @@ def test_as_curl_command(case: Case, headers):
 def test_non_utf_8_body():
     case = Case(operation=schema["/users"]["GET"], body=b"42\xff", media_type="application/octet-stream")
     command = case.as_curl_command()
-    assert command == "curl -X GET -d '42�' http://localhost/users"
+    assert command == "curl -X GET -H 'Content-Type: application/octet-stream' -d '42�' http://localhost/users"
+
+
+def test_json_payload():
+    new_app = create_app(operations=["create_user"])
+    schema = schemathesis.from_dict(new_app.openapi(), force_schema_version="30")
+    case = Case(operation=schema["/users/"]["POST"], body={"foo": 42}, media_type="application/json")
+    command = case.as_curl_command()
+    assert command == "curl -X POST -H 'Content-Type: application/json' -d '{\"foo\": 42}' http://localhost/users/"
 
 
 def test_explicit_headers():

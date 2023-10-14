@@ -61,6 +61,7 @@ After:
 - Lack of execution for ASGI events during testing. `#1305`_, `#1727`_
 - Confusing error message when trying to load schema from a non-existing file. `#1602`_
 - Reflect disabled TLS verification in generated code samples. `#1054`_
+- Generated cURL commands now include the ``Content-Type`` header, which was previously omitted. `#1783`_
 
 .. _v3.19.7:
 
@@ -3466,6 +3467,7 @@ Deprecated
 .. _#1797: https://github.com/schemathesis/schemathesis/issues/1797
 .. _#1789: https://github.com/schemathesis/schemathesis/issues/1789
 .. _#1788: https://github.com/schemathesis/schemathesis/issues/1788
+.. _#1783: https://github.com/schemathesis/schemathesis/issues/1783
 .. _#1781: https://github.com/schemathesis/schemathesis/issues/1781
 .. _#1780: https://github.com/schemathesis/schemathesis/issues/1780
 .. _#1776: https://github.com/schemathesis/schemathesis/issues/1776
