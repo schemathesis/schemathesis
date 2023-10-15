@@ -4,13 +4,6 @@ from pytest import ExitCode
 from schemathesis import fixups
 
 
-@pytest.fixture(autouse=True)
-def reset_fixups():
-    fixups.uninstall()
-    yield
-    fixups.uninstall()
-
-
 def test_global_fixup(testdir, fast_api_schema):
     # When all fixups are enabled globally
     testdir.makepyfile(

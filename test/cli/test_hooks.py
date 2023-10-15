@@ -3,14 +3,6 @@ import requests
 import werkzeug
 from _pytest.main import ExitCode
 
-import schemathesis
-
-
-@pytest.fixture(autouse=True)
-def unregister_hooks():
-    yield
-    schemathesis.hooks.unregister_all()
-
 
 @pytest.mark.operations("success")
 def test_custom_cli_handlers(testdir, cli, schema_url, app):

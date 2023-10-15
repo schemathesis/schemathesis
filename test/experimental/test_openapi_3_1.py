@@ -3,16 +3,9 @@ from hypothesis import Phase, given, settings
 from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
-from schemathesis import fixups, from_asgi
-from schemathesis.exceptions import CheckFailed
+from schemathesis import fixups, from_asgi, from_dict
+from schemathesis.exceptions import CheckFailed, SchemaError
 from schemathesis.experimental import OPEN_API_3_1
-
-
-@pytest.fixture(autouse=True)
-def reset_fixups():
-    fixups.uninstall()
-    yield
-    fixups.uninstall()
 
 
 @pytest.mark.parametrize("with_fixup", (True, False))
@@ -80,3 +73,23 @@ def test_works_with_fastapi(fastapi_app, with_fixup):
         assert "Unevaluated properties are not allowed ('department' was unexpected)" in str(exc.value)
 
     test()
+
+
+def test_openapi_3_1_schema_validation():
+    raw_schema = {
+        "openapi": "3.1.0",
+        "info": {"title": 42, "version": "0.1.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "summary": "Root",
+                    "operationId": "root_users_get",
+                    "responses": {
+                        "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
+                    },
+                }
+            }
+        },
+    }
+    with pytest.raises(SchemaError):
+        from_dict(raw_schema, validate_schema=True, force_schema_version="30")

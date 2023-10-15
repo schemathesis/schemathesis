@@ -3,6 +3,7 @@ from typing import Iterable, Optional
 from . import fast_api, utf8_bom
 
 ALL_FIXUPS = {"fast_api": fast_api, "utf8_bom": utf8_bom}
+ALL_FIXUP_NAMES = list(ALL_FIXUPS.keys())
 
 
 def install(fixups: Optional[Iterable[str]] = None) -> None:
@@ -12,7 +13,7 @@ def install(fixups: Optional[Iterable[str]] = None) -> None:
 
     :param fixups: Names of fixups to install.
     """
-    fixups = fixups or list(ALL_FIXUPS.keys())
+    fixups = fixups or ALL_FIXUP_NAMES
     for name in fixups:
         ALL_FIXUPS[name].install()  # type: ignore
 
@@ -24,7 +25,7 @@ def uninstall(fixups: Optional[Iterable[str]] = None) -> None:
 
     :param fixups: Names of fixups to uninstall.
     """
-    fixups = fixups or list(ALL_FIXUPS.keys())
+    fixups = fixups or ALL_FIXUP_NAMES
     for name in fixups:
         ALL_FIXUPS[name].uninstall()  # type: ignore
 

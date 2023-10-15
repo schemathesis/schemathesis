@@ -1,3 +1,4 @@
+import threading
 from dataclasses import dataclass, field
 
 
@@ -23,8 +24,27 @@ class Experiment:
 
 @dataclass
 class ExperimentSet:
-    available: set = field(default_factory=set)
-    enabled: set = field(default_factory=set)
+    _local_data: threading.local = field(default_factory=threading.local, repr=False)
+
+    def __post_init__(self) -> None:
+        self.available = set()
+        self.enabled = set()
+
+    @property
+    def available(self) -> set:
+        return self._local_data.available
+
+    @available.setter
+    def available(self, value: set) -> None:
+        self._local_data.available = value
+
+    @property
+    def enabled(self) -> set:
+        return self._local_data.enabled
+
+    @enabled.setter
+    def enabled(self, value: set) -> None:
+        self._local_data.enabled = value
 
     def create_experiment(
         self, name: str, verbose_name: str, env_var: str, description: str, discussion_url: str

@@ -294,7 +294,11 @@ def from_dict(
                 SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION,
                 f"The provided schema uses Open API {version}, which is currently not supported.",
             )
-        _maybe_validate_schema(raw_schema, definitions.OPENAPI_30_VALIDATOR, validate_schema)
+        if is_openapi_31:
+            validator = definitions.OPENAPI_31_VALIDATOR
+        else:
+            validator = definitions.OPENAPI_30_VALIDATOR
+        _maybe_validate_schema(raw_schema, validator, validate_schema)
         instance = OpenApi30(
             raw_schema,
             app=app,

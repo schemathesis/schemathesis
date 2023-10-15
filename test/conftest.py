@@ -16,6 +16,7 @@ import schemathesis.cli
 from schemathesis._compat import IS_HYPOTHESIS_ABOVE_6_54, metadata
 from schemathesis.cli import reset_checks
 from schemathesis.constants import HOOKS_MODULE_ENV_VAR
+from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.service import HOSTS_PATH_ENV_VAR
@@ -46,7 +47,12 @@ def setup(tmp_path_factory):
 
 @pytest.fixture(autouse=True)
 def reset_hooks():
+    GLOBAL_EXPERIMENTS.disable_all()
+    schemathesis.hooks.unregister_all()
+    schemathesis.auth.unregister()
+    reset_checks()
     yield
+    GLOBAL_EXPERIMENTS.disable_all()
     schemathesis.hooks.unregister_all()
     schemathesis.auth.unregister()
     reset_checks()

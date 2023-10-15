@@ -96,19 +96,13 @@ def test_base_url():
     test()
 
 
-@pytest.fixture
-def uninstall_fixups():
-    yield
-    schemathesis.fixups.uninstall()
-
-
 class FastAPIExtended(FastAPI):
     pass
 
 
 @pytest.mark.parametrize("app_factory", (FastAPI, FastAPIExtended))
 @pytest.mark.parametrize("with_existing_fixup", (True, False))
-def test_automatic_fixup(empty_open_api_3_schema, with_existing_fixup, uninstall_fixups, app_factory):
+def test_automatic_fixup(empty_open_api_3_schema, with_existing_fixup, app_factory):
     if with_existing_fixup:
         # Install everything
         schemathesis.fixups.install()

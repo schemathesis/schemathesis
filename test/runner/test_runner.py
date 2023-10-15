@@ -530,7 +530,6 @@ def filter_path_parameters():
 
     schemathesis.hook(before_generate_path_parameters)
     yield
-    schemathesis.hooks.unregister_all()
 
 
 @pytest.mark.operations("path_variable")

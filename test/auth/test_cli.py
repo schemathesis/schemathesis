@@ -4,15 +4,6 @@ import sys
 import pytest
 from _pytest.main import ExitCode
 
-import schemathesis
-
-
-@pytest.fixture(autouse=True)
-def unregister_hooks():
-    yield
-    schemathesis.hooks.unregister_all()
-
-
 TOKEN = "FOO"
 AUTH_PROVIDER_MODULE_CODE = f"""
 import schemathesis
