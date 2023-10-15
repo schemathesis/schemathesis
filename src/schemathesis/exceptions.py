@@ -275,6 +275,9 @@ class SchemaError(RuntimeError):
     response: Optional["GenericResponse"] = None
     extras: List[str] = field(default_factory=list)
 
+    def __str__(self) -> str:
+        return self.message
+
 
 class NonCheckError(Exception):
     """An error happened in side the runner, but is not related to failed checks.

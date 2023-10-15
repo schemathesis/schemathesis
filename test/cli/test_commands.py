@@ -23,7 +23,7 @@ from hypothesis.configuration import set_hypothesis_home_dir, storage_directory
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 from packaging import version
 
-from schemathesis import Case, DataGenerationMethod, fixups
+from schemathesis import Case, DataGenerationMethod
 from schemathesis._compat import IS_HYPOTHESIS_ABOVE_6_54
 from schemathesis.checks import ALL_CHECKS, not_a_server_error
 from schemathesis.cli import (
@@ -1704,14 +1704,8 @@ def test_skip_deprecated_operations(testdir, cli, openapi3_base_url, options, ex
     assert expected in result.stdout.splitlines()
 
 
-@pytest.fixture()
-def fast_api_fixup():
-    yield
-    fixups.uninstall()
-
-
 @pytest.mark.parametrize("fixup", ("all", "fast_api"))
-def test_fast_api_fixup(testdir, cli, base_url, fast_api_schema, hypothesis_max_examples, fast_api_fixup, fixup):
+def test_fast_api_fixup(testdir, cli, base_url, fast_api_schema, hypothesis_max_examples, fixup):
     # When schema contains Draft 7 definitions as ones from FastAPI may contain
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(fast_api_schema))
     result = cli.run(
@@ -2379,27 +2373,37 @@ def test_non_existing_file(cli):
     assert FILE_DOES_NOT_EXIST_MESSAGE in result.stdout
 
 
-def test_invalid_schema_with_disabled_validation(testdir, cli, openapi_3_schema_with_invalid_security):
+@pytest.mark.parametrize(
+    "version, details",
+    (
+        ("3.0.2", "The provided definition doesn't match any of the expected formats or types."),
+        ("3.1.0", "'type' is a required property"),
+    ),
+)
+def test_invalid_schema_with_disabled_validation(
+    testdir, cli, openapi_3_schema_with_invalid_security, version, details
+):
     # When there is an error in the schema
+    openapi_3_schema_with_invalid_security["openapi"] = version
     schema_file = testdir.makefile(".json", schema=json.dumps(openapi_3_schema_with_invalid_security))
     # And the validation is disabled (default)
-    result = cli.run(str(schema_file), "--dry-run")
+    result = cli.run(str(schema_file), "--dry-run", "--experimental=openapi-3.1")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then we should show an error message derived from JSON Schema
     assert (
-        """OperationSchemaError: Invalid `bearerAuth` definition
+        f"""OperationSchemaError: Invalid `bearerAuth` definition
 
 Location:
     components -> securitySchemes -> bearerAuth
 
 Problematic definition:
-{
+{{
     "scheme": "bearer",
     "bearerFormat": "uuid"
-}
+}}
 
 Error details:
-    The provided definition doesn't match any of the expected formats or types.
+    {details}
 
 Ensure that the definition complies with the OpenAPI specification"""
         in result.stdout

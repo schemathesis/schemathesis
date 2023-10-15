@@ -59,7 +59,7 @@ from ...utils import (
 from . import links, serialization
 from ._hypothesis import get_case_strategy
 from .converter import to_json_schema, to_json_schema_recursive
-from .definitions import OPENAPI_30_VALIDATOR, SWAGGER_20_VALIDATOR
+from .definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
 from .examples import get_strategies_from_examples
 from .filters import (
     should_skip_by_operation_id,
@@ -882,7 +882,11 @@ class OpenApi30(SwaggerV20):
         return f"Open API {self.spec_version}"
 
     def _validate(self) -> None:
-        OPENAPI_30_VALIDATOR.validate(self.raw_schema)
+        if self.spec_version.startswith("3.1"):
+            # Currently we treat Open API 3.1 as 3.0 in some regard
+            OPENAPI_31_VALIDATOR.validate(self.raw_schema)
+        else:
+            OPENAPI_30_VALIDATOR.validate(self.raw_schema)
 
     def _get_base_path(self) -> str:
         servers = self.raw_schema.get("servers", [])
