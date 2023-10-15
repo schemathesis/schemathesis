@@ -92,8 +92,6 @@ docker run schemathesis/schemathesis:stable
 
 For more control and customization, integrate Schemathesis into your Python codebase.
 
-**How to Use**:
-
 1. Install via pip: `python -m pip install schemathesis`
 2. Add to your tests:
 
