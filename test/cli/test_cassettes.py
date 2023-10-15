@@ -1,6 +1,7 @@
 import base64
 import io
 import threading
+from unittest.mock import ANY
 from urllib.parse import parse_qsl, quote_plus, unquote_plus, urlencode, urlparse, urlunparse
 from uuid import UUID
 
@@ -312,7 +313,32 @@ def test_headers_serialization(cli, openapi2_schema_url, hypothesis_max_examples
     result = cli.replay(str(cassette_path))
     assert result.exit_code == ExitCode.OK, result.stdout
     # And should be loadable
-    load_cassette(cassette_path)
+
+
+@pytest.mark.parametrize("value", ("true", "false"))
+@pytest.mark.operations("headers")
+def test_sensitive_data_masking(cli, openapi2_schema_url, hypothesis_max_examples, cassette_path, value):
+    auth = "secret-auth"
+    result = cli.run(
+        openapi2_schema_url,
+        f"--cassette-path={cassette_path}",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
+        "--hypothesis-seed=1",
+        "--validate-schema=false",
+        f"-H Authorization: {auth}",
+        f"--mask-sensitive-output={value}",
+    )
+    assert result.exit_code == ExitCode.OK, result.stdout
+    cassette = load_cassette(cassette_path)
+
+    if value == "true":
+        expected = "[Masked]"
+    else:
+        expected = ANY
+    interactions = cassette["http_interactions"]
+    assert all(entry["request"]["headers"]["X-Token"] == [expected] for entry in interactions)
+    assert all(entry["request"]["headers"]["Authorization"] == [expected] for entry in interactions)
+    assert all(entry["response"]["headers"]["X-Token"] == [expected] for entry in interactions)
 
 
 def test_multiple_cookies(base_url):

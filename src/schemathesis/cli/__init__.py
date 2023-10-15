@@ -54,6 +54,7 @@ from .context import ExecutionContext, FileReportContext, ServiceReportContext
 from .debug import DebugOutputHandler
 from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
+from .masking import MaskingOutputHandler
 from .options import CsvChoice, CsvEnumChoice, CustomHelpMessageChoice, NotSet, OptionalInt
 
 try:
@@ -502,6 +503,13 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     type=click.Choice(["20", "30"]),
 )
 @click.option(
+    "--mask-sensitive-output",
+    type=bool,
+    default=True,
+    show_default=True,
+    help="Enable or disable automatic output sanitization to obscure sensitive data.",
+)
+@click.option(
     "--contrib-unique-data",
     "contrib_unique_data",
     help="Forces Schemathesis to generate unique test cases.",
@@ -665,6 +673,7 @@ def run(
     stateful: Optional[Stateful] = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     force_schema_version: Optional[str] = None,
+    mask_sensitive_output: bool = True,
     contrib_unique_data: bool = False,
     contrib_openapi_formats_uuid: bool = False,
     hypothesis_database: Optional[str] = None,
@@ -838,6 +847,7 @@ def run(
         code_sample_style=code_sample_style,
         data_generation_methods=data_generation_methods,
         debug_output_file=debug_output_file,
+        mask_sensitive_output=mask_sensitive_output,
         host_data=host_data,
         client=client,
         report=report,
@@ -1137,6 +1147,7 @@ def execute(
     code_sample_style: CodeSampleStyle,
     data_generation_methods: Tuple[DataGenerationMethod, ...],
     debug_output_file: Optional[click.utils.LazyFile],
+    mask_sensitive_output: bool,
     host_data: service.hosts.HostData,
     client: Optional[service.ServiceClient],
     report: Optional[Union[ReportToService, click.utils.LazyFile]],
@@ -1190,6 +1201,8 @@ def execute(
             cassettes.CassetteWriter(cassette_path, preserve_exact_body_bytes=cassette_preserve_exact_body_bytes)
         )
     handlers.append(get_output_handler(workers_num))
+    if mask_sensitive_output:
+        handlers.insert(0, MaskingOutputHandler())
     execution_context = ExecutionContext(
         hypothesis_settings=hypothesis_settings,
         workers_num=workers_num,

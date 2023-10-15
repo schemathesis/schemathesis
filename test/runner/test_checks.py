@@ -526,7 +526,14 @@ def test_deduplication(empty_open_api_3_schema):
     failures = []
     # When there are two checks that raise the same failure
     with pytest.raises(CheckFailed):
-        run_checks(case, (content_type_conformance, response_schema_conformance), failures, result, response, 0)
+        run_checks(
+            case=case,
+            checks=(content_type_conformance, response_schema_conformance),
+            check_results=failures,
+            result=result,
+            response=response,
+            elapsed_time=0,
+        )
     # Then the resulting output should be deduplicated
     assert len(deduplicate_failures(failures)) == 1
 
