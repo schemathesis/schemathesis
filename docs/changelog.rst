@@ -64,6 +64,10 @@ After:
 - Reflect disabled TLS verification in generated code samples. `#1054`_
 - Generated cURL commands now include the ``Content-Type`` header, which was previously omitted. `#1783`_
 
+**Performance**
+
+- Optimize event data emission by postponing code sample generation, resulting in a ``~4%`` reduction in the emitted events data size.
+
 .. _v3.19.7:
 
 `3.19.7`_ - 2023-09-03
