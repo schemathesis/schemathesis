@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import requests
+from requests.structures import CaseInsensitiveDict
 
 from ..code_samples import EXCLUDED_HEADERS
 from ..exceptions import FailureContext, InternalError, make_unique_by_key
@@ -101,21 +102,8 @@ class SerializedCheck:
             response = Response.from_wsgi(check.response, check.elapsed)
         else:
             response = None
-        headers = {key: value[0] for key, value in request.headers.items() if key not in EXCLUDED_HEADERS}
-        history = []
-        case = check.example
-        while case.source is not None:
-            if isinstance(case.source.response, requests.Response):
-                history_response = Response.from_requests(case.source.response)
-                verify = history_response.verify
-            else:
-                history_response = Response.from_wsgi(case.source.response, case.source.elapsed)
-                verify = True
-            entry = SerializedHistoryEntry(
-                case=SerializedCase.from_case(case.source.case, headers, verify=verify), response=history_response
-            )
-            history.append(entry)
-            case = case.source.case
+        headers = _get_headers(request.headers)
+        history = get_serialized_history(check.example)
         return cls(
             name=check.name,
             value=check.value,
@@ -130,10 +118,33 @@ class SerializedCheck:
         )
 
 
+def _get_headers(headers: Union[Dict[str, Any], CaseInsensitiveDict]) -> Dict[str, str]:
+    return {key: value[0] for key, value in headers.items() if key not in EXCLUDED_HEADERS}
+
+
 @dataclass
 class SerializedHistoryEntry:
     case: SerializedCase
     response: Response
+
+
+def get_serialized_history(case: Case) -> List[SerializedHistoryEntry]:
+    history = []
+    while case.source is not None:
+        history_request = case.source.response.request
+        headers = _get_headers(history_request.headers)
+        if isinstance(case.source.response, requests.Response):
+            history_response = Response.from_requests(case.source.response)
+            verify = history_response.verify
+        else:
+            history_response = Response.from_wsgi(case.source.response, case.source.elapsed)
+            verify = True
+        entry = SerializedHistoryEntry(
+            case=SerializedCase.from_case(case.source.case, headers, verify=verify), response=history_response
+        )
+        history.append(entry)
+        case = case.source.case
+    return history
 
 
 @dataclass

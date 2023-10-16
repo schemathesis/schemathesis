@@ -63,6 +63,7 @@ After:
 - Confusing error message when trying to load schema from a non-existing file. `#1602`_
 - Reflect disabled TLS verification in generated code samples. `#1054`_
 - Generated cURL commands now include the ``Content-Type`` header, which was previously omitted. `#1783`_
+- Improperly serialized headers in ``SerializedHistoryEntry.case.extra_headers``.
 
 **Performance**
 
