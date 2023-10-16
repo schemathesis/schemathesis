@@ -17,7 +17,8 @@ from werkzeug.test import Client
 from yarl import URL
 
 from ... import experimental, fixups
-from ...constants import DEFAULT_DATA_GENERATION_METHODS, WAIT_FOR_SCHEMA_INTERVAL, CodeSampleStyle
+from ...code_samples import CodeSampleStyle
+from ...constants import DEFAULT_DATA_GENERATION_METHODS, WAIT_FOR_SCHEMA_INTERVAL
 from ...exceptions import SchemaError, SchemaErrorType
 from ...hooks import HookContext, dispatch
 from ...lazy import LazySchema

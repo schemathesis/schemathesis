@@ -37,7 +37,8 @@ from requests.structures import CaseInsensitiveDict
 
 from ._hypothesis import create_test
 from .auths import AuthStorage
-from .constants import DEFAULT_DATA_GENERATION_METHODS, CodeSampleStyle, DataGenerationMethod
+from .code_samples import CodeSampleStyle
+from .constants import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from .exceptions import OperationSchemaError, UsageError
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import APIOperation, Case
