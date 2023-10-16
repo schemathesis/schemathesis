@@ -34,7 +34,6 @@ dependencies = [
     "backoff>=2.1.2,<3.0",
     "click>=7.0,<9.0",
     "colorama>=0.4,<1.0",
-    "curlify>=2.2.1,<3.0",
     "httpx>=0.22.0,<1.0",
     "hypothesis>=6.31.6,<7",
     "hypothesis_graphql>=0.9.0,<1",

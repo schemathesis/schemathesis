@@ -36,8 +36,7 @@ def test_explicit_headers():
     name = "Accept"
     value = "application/json"
     case = Case(operation=schema["/users"]["GET"], headers={name: value})
-    command = case.as_curl_command()
-    assert command == f"curl -X GET -H '{name}: {value}' http://localhost/users"
+    assert case.as_curl_command() == f"curl -X GET -H '{name}: {value}' http://localhost/users"
 
 
 @pytest.mark.operations("failure")

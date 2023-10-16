@@ -24,6 +24,7 @@ Changelog
 - Refined generated reproduction code and shortened ``X-Schemathesis-TestCaseId`` for easier debugging. `#1801`_
 - Add ``case`` as the first argument to ``AuthContext.set``. Previous calling convention is still supported. `#1788`_
 - Disable the 'explain' phase in Hypothesis to improve performance. `#1808`_
+- Simplify Python code samples for failure reproduction.
 - Do not display ``InsecureRequestWarning`` in CLI output if the user explicitly provided ``--request-tls-verify=false``. `#1780`_
 - Enhance CLI output for schema loading and internal errors, providing clearer diagnostics and guidance. `#1781`_, `#1517`_, `#1472`_
 

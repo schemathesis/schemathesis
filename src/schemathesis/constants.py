@@ -3,8 +3,6 @@ from typing import List
 
 import pytest
 from packaging import version
-from requests.structures import CaseInsensitiveDict
-from requests.utils import default_headers
 
 from ._compat import metadata
 
@@ -74,42 +72,3 @@ class DataGenerationMethod(str, Enum):
 
 
 DEFAULT_DATA_GENERATION_METHODS = (DataGenerationMethod.default(),)
-# These headers are added automatically by Schemathesis or `requests`.
-# Do not show them in code samples to make them more readable
-CURL_EXCLUDED_HEADERS = CaseInsensitiveDict(
-    {
-        "Content-Length": None,
-        "Transfer-Encoding": None,
-        SCHEMATHESIS_TEST_CASE_HEADER: None,
-        **default_headers(),
-    }
-)
-REQUESTS_EXCLUDED_HEADERS = CaseInsensitiveDict({"Content-Type": None, **CURL_EXCLUDED_HEADERS})
-
-
-class CodeSampleStyle(str, Enum):
-    """Controls the style of code samples for failure reproduction."""
-
-    python = "python"
-    curl = "curl"
-
-    @classmethod
-    def default(cls) -> "CodeSampleStyle":
-        return cls.curl
-
-    @classmethod
-    def from_str(cls, value: str) -> "CodeSampleStyle":
-        try:
-            return cls[value]
-        except KeyError:
-            available_styles = ", ".join(cls)
-            raise ValueError(
-                f"Invalid value for code sample style: {value}. Available styles: {available_styles}"
-            ) from None
-
-    @property
-    def ignored_headers(self) -> CaseInsensitiveDict:
-        return {
-            self.python: REQUESTS_EXCLUDED_HEADERS,
-            self.curl: CURL_EXCLUDED_HEADERS,
-        }[self]

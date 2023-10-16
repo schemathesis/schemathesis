@@ -23,6 +23,7 @@ from .. import contrib, experimental
 from .. import fixups as _fixups
 from .. import runner, service
 from .. import targets as targets_module
+from ..code_samples import CodeSampleStyle
 from ..constants import (
     API_NAME_ENV_VAR,
     BASE_URL_ENV_VAR,
@@ -32,7 +33,6 @@ from ..constants import (
     HOOKS_MODULE_ENV_VAR,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     WAIT_FOR_SCHEMA_ENV_VAR,
-    CodeSampleStyle,
     DataGenerationMethod,
 )
 from ..exceptions import SchemaError

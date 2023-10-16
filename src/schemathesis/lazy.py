@@ -13,7 +13,8 @@ from pytest_subtests import SubTests, nullcontext
 
 from ._compat import MultipleFailures
 from .auths import AuthStorage
-from .constants import FLAKY_FAILURE_MESSAGE, CodeSampleStyle
+from .code_samples import CodeSampleStyle
+from .constants import FLAKY_FAILURE_MESSAGE
 from .exceptions import CheckFailed, OperationSchemaError, SkipTest, get_grouped_exception
 from .hooks import HookDispatcher, HookScope
 from .models import APIOperation
