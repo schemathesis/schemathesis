@@ -1,11 +1,12 @@
 from enum import Enum
 from shlex import quote
-from typing import Any, Optional
+from typing import Optional, Union
 
 from requests.structures import CaseInsensitiveDict
 from requests.utils import default_headers
 
 from .constants import SCHEMATHESIS_TEST_CASE_HEADER, DataGenerationMethod
+from .types import Headers
 
 DEFAULT_DATA_GENERATION_METHODS = (DataGenerationMethod.default(),)
 # These headers are added automatically by Schemathesis or `requests`.
@@ -26,6 +27,13 @@ class CodeSampleStyle(str, Enum):
     python = "python"
     curl = "curl"
 
+    @property
+    def verbose_name(self) -> str:
+        return {
+            self.curl: "cURL command",
+            self.python: "Python code",
+        }[self]
+
     @classmethod
     def default(cls) -> "CodeSampleStyle":
         return cls.curl
@@ -45,10 +53,10 @@ class CodeSampleStyle(str, Enum):
         *,
         method: str,
         url: str,
-        body: Any,
-        headers: CaseInsensitiveDict,
+        body: Optional[Union[str, bytes]],
+        headers: Optional[Headers],
         verify: bool,
-        include_headers: Optional[CaseInsensitiveDict] = None,
+        extra_headers: Optional[Headers] = None,
     ) -> str:
         """Generate a code snippet for making HTTP requests."""
         handlers = {
@@ -56,27 +64,28 @@ class CodeSampleStyle(str, Enum):
             self.python: _generate_requests,
         }
         return handlers[self](
-            method=method, url=url, body=body, headers=_filter_headers(headers, include_headers), verify=verify
+            method=method, url=url, body=body, headers=_filter_headers(headers, extra_headers), verify=verify
         )
 
 
-def _filter_headers(
-    headers: CaseInsensitiveDict, include_headers: Optional[CaseInsensitiveDict] = None
-) -> CaseInsensitiveDict:
-    include_headers = include_headers or CaseInsensitiveDict({})
-    return CaseInsensitiveDict(
-        {key: val for key, val in headers.items() if key not in EXCLUDED_HEADERS or key in include_headers}
-    )
+def _filter_headers(headers: Optional[Headers], extra: Optional[Headers] = None) -> Headers:
+    headers = headers.copy() if headers else {}
+    if extra is not None:
+        for key, value in extra.items():
+            if key not in EXCLUDED_HEADERS:
+                headers[key] = value
+    return headers
 
 
 def _generate_curl(
     *,
     method: str,
     url: str,
-    body: Any,
-    headers: CaseInsensitiveDict,
+    body: Optional[Union[str, bytes]],
+    headers: Headers,
     verify: bool,
 ) -> str:
+    """Create a cURL command to reproduce an HTTP request."""
     command = f"curl -X {method}"
     for key, value in headers.items():
         header = f"{key}: {value}"
@@ -94,10 +103,11 @@ def _generate_requests(
     *,
     method: str,
     url: str,
-    body: Any,
-    headers: CaseInsensitiveDict,
+    body: Optional[Union[str, bytes]],
+    headers: Headers,
     verify: bool,
 ) -> str:
+    """Create a Python code to reproduce an HTTP request."""
     url = _escape_single_quotes(url)
     command = f"requests.{method.lower()}('{url}'"
     if body:

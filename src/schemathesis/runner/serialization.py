@@ -4,45 +4,68 @@ They all consist of primitive types and don't have references to schemas, app, e
 """
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import requests
 
 from ..code_samples import EXCLUDED_HEADERS
 from ..exceptions import FailureContext, InternalError, make_unique_by_key
-from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
+from ..models import Case, Check, Interaction, Request, Response, Status, TestResult, serialize_payload
 from ..utils import WSGIResponse, format_exception
 
 
 @dataclass
 class SerializedCase:
+    # Case data
     id: str
-    requests_code: str
-    curl_code: str
-    path_template: str
     path_parameters: Optional[Dict[str, Any]]
-    query: Optional[Dict[str, Any]]
+    headers: Optional[Dict[str, Any]]
     cookies: Optional[Dict[str, Any]]
-    verbose_name: str
-    data_generation_method: Optional[str]
+    query: Optional[Dict[str, Any]]
+    body: Optional[str]
     media_type: Optional[str]
+    data_generation_method: Optional[str]
+    # Operation data
+    method: str
+    url: str
+    path_template: str
+    verbose_name: str
+    # Transport info
+    verify: bool
+    # Headers coming from sources outside data generation
+    extra_headers: Dict[str, Any]
 
     @classmethod
     def from_case(cls, case: Case, headers: Optional[Dict[str, Any]], verify: bool) -> "SerializedCase":
+        # `headers` include not only explicitly provided headers but also ones added by hooks, custom auth, etc.
+        request_data = case.prepare_code_sample_data(headers)
+        serialized_body = _serialize_body(request_data.body)
         return cls(
             id=case.id,
-            requests_code=case.get_code_to_reproduce(headers, verify=verify),
-            curl_code=case.as_curl_command(headers, verify=verify),
-            path_template=case.path,
             path_parameters=case.path_parameters,
-            query=case.query,
+            headers=dict(case.headers) if case.headers is not None else None,
             cookies=case.cookies,
-            verbose_name=case.operation.verbose_name,
+            query=case.query,
+            body=serialized_body,
+            media_type=case.media_type,
             data_generation_method=case.data_generation_method.as_short_name()
             if case.data_generation_method is not None
             else None,
-            media_type=case.media_type,
+            method=case.method,
+            url=request_data.url,
+            path_template=case.path,
+            verbose_name=case.operation.verbose_name,
+            verify=verify,
+            extra_headers=request_data.headers,
         )
+
+
+def _serialize_body(body: Optional[Union[str, bytes]]) -> Optional[str]:
+    if body is None:
+        return None
+    if isinstance(body, str):
+        body = body.encode("utf-8")
+    return serialize_payload(body)
 
 
 @dataclass

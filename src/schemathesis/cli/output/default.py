@@ -11,7 +11,6 @@ import requests
 
 from ... import service
 from ..._compat import metadata
-from ...code_samples import CodeSampleStyle
 from ...constants import (
     DISCORD_LINK,
     FLAKY_FAILURE_MESSAGE,
@@ -241,10 +240,19 @@ def display_example(
     if response is not None and response.body is not None:
         payload = base64.b64decode(response.body).decode(response.encoding or "utf8", errors="replace")
         click.secho(f"Response status: {response.status_code}\nResponse payload: `{payload}`\n", fg="red")
-    if context.code_sample_style == CodeSampleStyle.python:
-        click.secho(f"Run this Python code to reproduce this failure: \n\n    {case.requests_code}\n", fg="red")
-    if context.code_sample_style == CodeSampleStyle.curl:
-        click.secho(f"Run this cURL command to reproduce this failure: \n\n    {case.curl_code}\n", fg="red")
+    request_body = base64.b64decode(case.body).decode() if case.body is not None else None
+    code_sample = context.code_sample_style.generate(
+        method=case.method,
+        url=case.url,
+        body=request_body,
+        headers=case.headers,
+        verify=case.verify,
+        extra_headers=case.extra_headers,
+    )
+    click.secho(
+        f"Run this {context.code_sample_style.verbose_name} to reproduce this failure: \n\n    {code_sample}\n",
+        fg="red",
+    )
     click.secho(f"{SCHEMATHESIS_TEST_CASE_HEADER}: {case.id}\n", fg="red")
     if seed is not None:
         click.secho(f"Or add this option to your command line parameters: --hypothesis-seed={seed}", fg="red")

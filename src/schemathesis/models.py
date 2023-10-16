@@ -101,20 +101,21 @@ def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
 REQUEST_SIGNATURE = inspect.signature(requests.Request)
 
 
-def prepare_request_data(kwargs: Dict[str, Any], headers: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+@dataclass()
+class PreparedRequestData:
+    method: str
+    url: str
+    body: Optional[Union[str, bytes]]
+    headers: Headers
+
+
+def prepare_request_data(kwargs: Dict[str, Any]) -> PreparedRequestData:
     """Prepare request data for generating code samples."""
-    if headers:
-        final_headers = kwargs["headers"] or {}
-        final_headers.update(headers)
-        kwargs["headers"] = final_headers
     kwargs = {key: value for key, value in kwargs.items() if key in REQUEST_SIGNATURE.parameters}
     request = requests.Request(**kwargs).prepare()
-    return {
-        "method": str(request.method),
-        "url": str(request.url),
-        "body": request.body,
-        "headers": request.headers,
-    }
+    return PreparedRequestData(
+        method=str(request.method), url=str(request.url), body=request.body, headers=dict(request.headers)
+    )
 
 
 @dataclass(repr=False)
@@ -122,6 +123,8 @@ class Case:
     """A single test case parameters."""
 
     operation: "APIOperation"
+    # Unique test case identifier
+    id: str = field(default_factory=generate_random_case_id, compare=False)
     path_parameters: Optional[PathParameters] = None
     headers: Optional[CaseInsensitiveDict] = None
     cookies: Optional[Cookies] = None
@@ -129,14 +132,12 @@ class Case:
     # By default, there is no body, but we can't use `None` as the default value because it clashes with `null`
     # which is a valid payload.
     body: Union[Body, NotSet] = NOT_SET
-
-    source: Optional[CaseSource] = None
     # The media type for cases with a payload. For example, "application/json"
     media_type: Optional[str] = None
+    source: Optional[CaseSource] = None
+
     # The way the case was generated (None for manually crafted ones)
     data_generation_method: Optional[DataGenerationMethod] = None
-    # Unique test case identifier
-    id: str = field(default_factory=generate_random_case_id, compare=False)
     _auth: Optional[requests.auth.AuthBase] = None
 
     def __repr__(self) -> str:
@@ -203,6 +204,11 @@ class Case:
             return urlunsplit(("http", "localhost", path or "", "", ""))
         return self.base_url
 
+    def prepare_code_sample_data(self, headers: Optional[Dict[str, Any]]) -> PreparedRequestData:
+        base_url = self.get_full_base_url()
+        kwargs = self.as_requests_kwargs(base_url, headers=headers)
+        return prepare_request_data(kwargs)
+
     def get_code_to_reproduce(
         self,
         headers: Optional[Dict[str, Any]] = None,
@@ -211,31 +217,35 @@ class Case:
     ) -> str:
         """Construct a Python code to reproduce this case with `requests`."""
         if request is not None:
-            kwargs: Dict[str, Any] = {
-                "method": request.method,
-                "url": request.url,
-                "headers": request.headers,
-                "data": request.body,
-            }
+            request_data = prepare_request_data(
+                {
+                    "method": request.method,
+                    "url": request.url,
+                    "headers": request.headers,
+                    "data": request.body,
+                }
+            )
         else:
-            base_url = self.get_full_base_url()
-            kwargs = self.as_requests_kwargs(base_url)
-        request_data = prepare_request_data(kwargs, headers)
+            request_data = self.prepare_code_sample_data(headers)
         return CodeSampleStyle.python.generate(
-            **request_data,
+            method=request_data.method,
+            url=request_data.url,
+            body=request_data.body,
+            headers=dict(self.headers) if self.headers is not None else None,
             verify=verify,
-            include_headers=self.headers,
+            extra_headers=request_data.headers,
         )
 
     def as_curl_command(self, headers: Optional[Dict[str, Any]] = None, verify: bool = True) -> str:
         """Construct a curl command for a given case."""
-        base_url = self.get_full_base_url()
-        kwargs = self.as_requests_kwargs(base_url)
-        request_data = prepare_request_data(kwargs, headers)
+        request_data = self.prepare_code_sample_data(headers)
         return CodeSampleStyle.curl.generate(
-            **request_data,
+            method=request_data.method,
+            url=request_data.url,
+            body=request_data.body,
+            headers=dict(self.headers) if self.headers is not None else None,
             verify=verify,
-            include_headers=self.headers,
+            extra_headers=request_data.headers,
         )
 
     def _get_base_url(self, base_url: Optional[str] = None) -> str:

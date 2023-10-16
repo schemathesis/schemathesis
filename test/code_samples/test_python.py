@@ -3,7 +3,6 @@ import json
 import hypothesis
 import pytest
 import requests
-from flask import Flask
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
@@ -138,16 +137,10 @@ def test_cli_output(cli, base_url, schema_url):
 
 @pytest.mark.operations("failure")
 def test_reproduce_code_with_overridden_headers(any_app_schema, base_url):
-    # Note, headers are essentially the same, but keys are ordered differently due to implementation details of
-    # real vs wsgi apps. It is the simplest solution, but not the most flexible one, though.
     headers = {"X-Token": "test"}
-    if isinstance(any_app_schema.app, Flask):
-        expected = f"requests.get('http://localhost/api/failure', headers={headers})"
-    else:
-        expected = f"requests.get('{base_url}/failure', headers={headers})"
-
     *_, after, finished = from_schema(
-        any_app_schema, headers=headers, hypothesis_settings=hypothesis.settings(max_examples=1)
+        any_app_schema, headers=headers.copy(), hypothesis_settings=hypothesis.settings(max_examples=1)
     ).execute()
     assert finished.has_failures
-    assert after.result.checks[1].example.requests_code == expected
+    for key, value in headers.items():
+        assert after.result.checks[1].example.headers[key] == value
