@@ -715,10 +715,7 @@ def test_url_joining(request, server, get_schema_path, schema_path):
         schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None)
     ).execute()
     assert after_execution.result.path == "/api/v3/pet/findByStatus"
-    assert (
-        f"http://127.0.0.1:{server['port']}/api/v3/pet/findByStatus"
-        in after_execution.result.checks[0].example.requests_code
-    )
+    assert after_execution.result.checks[0].example.url == f"http://127.0.0.1:{server['port']}/api/v3/pet/findByStatus"
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
@@ -998,8 +995,8 @@ def test_case_mutation(real_app_schema):
 
     _, _, event, _ = from_schema(real_app_schema, checks=[check1, check2]).execute()
     # Then these mutations should not interfere
-    assert "Foo: BAR" in event.result.checks[0].example.curl_code
-    assert "Foo: BAZ" in event.result.checks[1].example.curl_code
+    assert event.result.checks[0].example.headers["Foo"] == "BAR"
+    assert event.result.checks[1].example.headers["Foo"] == "BAZ"
 
 
 @pytest.mark.operations("success")
@@ -1017,9 +1014,9 @@ def test_response_mutation(any_app_schema):
 
     _, _, event, _ = from_schema(any_app_schema, checks=[check1, check2]).execute()
     # Then these mutations should not interfere
-    assert "Foo: BAR" in event.result.checks[0].example.curl_code
+    assert event.result.checks[0].example.extra_headers["Foo"] == "BAR"
     assert event.result.checks[0].request.headers["Foo"] == ["BAR"]
-    assert "Foo: BAZ" in event.result.checks[1].example.curl_code
+    assert event.result.checks[1].example.extra_headers["Foo"] == "BAZ"
     assert event.result.checks[1].request.headers["Foo"] == ["BAZ"]
 
 
