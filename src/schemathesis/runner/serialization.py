@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import requests
 
-from ..constants import REQUESTS_EXCLUDED_HEADERS
+from ..code_samples import EXCLUDED_HEADERS
 from ..exceptions import FailureContext, InternalError, make_unique_by_key
 from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
 from ..utils import WSGIResponse, format_exception
@@ -78,7 +78,7 @@ class SerializedCheck:
             response = Response.from_wsgi(check.response, check.elapsed)
         else:
             response = None
-        headers = {key: value[0] for key, value in request.headers.items() if key not in REQUESTS_EXCLUDED_HEADERS}
+        headers = {key: value[0] for key, value in request.headers.items() if key not in EXCLUDED_HEADERS}
         history = []
         case = check.example
         while case.source is not None:

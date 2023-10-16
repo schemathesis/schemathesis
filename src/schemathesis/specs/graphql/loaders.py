@@ -12,7 +12,8 @@ from starlette_testclient import TestClient as ASGIClient
 from werkzeug import Client
 from yarl import URL
 
-from ...constants import DEFAULT_DATA_GENERATION_METHODS, WAIT_FOR_SCHEMA_INTERVAL, CodeSampleStyle
+from ...code_samples import CodeSampleStyle
+from ...constants import DEFAULT_DATA_GENERATION_METHODS, WAIT_FOR_SCHEMA_INTERVAL
 from ...exceptions import SchemaError, SchemaErrorType
 from ...hooks import HookContext, dispatch
 from ...loaders import load_schema_from_url

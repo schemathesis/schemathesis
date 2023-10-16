@@ -11,12 +11,12 @@ import requests
 
 from ... import service
 from ..._compat import metadata
+from ...code_samples import CodeSampleStyle
 from ...constants import (
     DISCORD_LINK,
     FLAKY_FAILURE_MESSAGE,
     REPORT_SUGGESTION_ENV_VAR,
     SCHEMATHESIS_TEST_CASE_HEADER,
-    CodeSampleStyle,
     __version__,
 )
 from ...experimental import GLOBAL_EXPERIMENTS

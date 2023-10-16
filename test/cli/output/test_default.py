@@ -328,6 +328,7 @@ def test_display_single_error(capsys, swagger_20, operation, execution_context, 
 
 @pytest.mark.parametrize("verbosity", (0, 1))
 def test_display_failures(swagger_20, capsys, execution_context, results_set, verbosity, response):
+    del response.request.headers["Content-Type"]
     execution_context.verbosity = verbosity
     # Given two test results - success and failure
     operation = models.APIOperation("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)

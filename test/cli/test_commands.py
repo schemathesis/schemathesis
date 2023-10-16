@@ -35,13 +35,13 @@ from schemathesis.cli import (
     reset_checks,
 )
 from schemathesis.cli.callbacks import FILE_DOES_NOT_EXIST_MESSAGE, INVALID_SCHEMA_MESSAGE
+from schemathesis.code_samples import CodeSampleStyle
 from schemathesis.constants import (
     DEFAULT_RESPONSE_TIMEOUT,
     FLAKY_FAILURE_MESSAGE,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     IS_PYTEST_ABOVE_54,
     REPORT_SUGGESTION_ENV_VAR,
-    CodeSampleStyle,
 )
 from schemathesis.extra._flask import run_server
 from schemathesis.models import APIOperation

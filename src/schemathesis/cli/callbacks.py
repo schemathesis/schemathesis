@@ -11,7 +11,8 @@ from click.types import LazyFile  # type: ignore
 from requests import PreparedRequest, RequestException
 
 from .. import exceptions, experimental, throttling, utils
-from ..constants import CodeSampleStyle, DataGenerationMethod
+from ..code_samples import CodeSampleStyle
+from ..constants import DataGenerationMethod
 from ..service.hosts import get_temporary_hosts_file
 from ..stateful import Stateful
 from ..types import PathLike

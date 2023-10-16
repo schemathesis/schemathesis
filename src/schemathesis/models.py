@@ -1,6 +1,7 @@
 import base64
 import datetime
 import http
+import inspect
 from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -28,7 +29,6 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
-import curlify
 import requests.auth
 import werkzeug
 from hypothesis import event, note, reject
@@ -38,12 +38,12 @@ from starlette_testclient import TestClient as ASGIClient
 
 from . import failures, serializers
 from .auths import AuthStorage
+from .code_samples import CodeSampleStyle
 from .constants import (
     DEFAULT_RESPONSE_TIMEOUT,
     SCHEMATHESIS_TEST_CASE_HEADER,
     SERIALIZERS_SUGGESTION_MESSAGE,
     USER_AGENT,
-    CodeSampleStyle,
     DataGenerationMethod,
 )
 from .exceptions import (
@@ -96,6 +96,25 @@ def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
     note(f"{event_text} {SERIALIZERS_SUGGESTION_MESSAGE}")
     event(event_text)
     reject()  # type: ignore
+
+
+REQUEST_SIGNATURE = inspect.signature(requests.Request)
+
+
+def prepare_request_data(kwargs: Dict[str, Any], headers: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Prepare request data for generating code samples."""
+    if headers:
+        final_headers = kwargs["headers"] or {}
+        final_headers.update(headers)
+        kwargs["headers"] = final_headers
+    kwargs = {key: value for key, value in kwargs.items() if key in REQUEST_SIGNATURE.parameters}
+    request = requests.Request(**kwargs).prepare()
+    return {
+        "method": str(request.method),
+        "url": str(request.url),
+        "body": request.body,
+        "headers": request.headers,
+    }
 
 
 @dataclass(repr=False)
@@ -201,49 +220,23 @@ class Case:
         else:
             base_url = self.get_full_base_url()
             kwargs = self.as_requests_kwargs(base_url)
-        if headers:
-            final_headers = kwargs["headers"] or {}
-            final_headers.update(headers)
-            kwargs["headers"] = final_headers
-        kwargs["headers"] = {
-            key: value for key, value in kwargs["headers"].items() if key not in CodeSampleStyle.python.ignored_headers
-        }
-        method = kwargs["method"].lower()
-
-        def should_display(key: str, value: Any) -> bool:
-            if key in ("method", "url"):
-                return False
-            # Parameters are either absent because they are not defined or are optional
-            return value not in (None, {})
-
-        printed_kwargs = ", ".join(
-            f"{key}={repr(value)}" for key, value in kwargs.items() if should_display(key, value)
+        request_data = prepare_request_data(kwargs, headers)
+        return CodeSampleStyle.python.generate(
+            **request_data,
+            verify=verify,
+            include_headers=self.headers,
         )
-        url = _escape_single_quotes(kwargs["url"])
-        args_repr = f"'{url}'"
-        if printed_kwargs:
-            args_repr += f", {printed_kwargs}"
-        if not verify:
-            args_repr += ", verify=False"
-        return f"requests.{method}({args_repr})"
 
     def as_curl_command(self, headers: Optional[Dict[str, Any]] = None, verify: bool = True) -> str:
         """Construct a curl command for a given case."""
         base_url = self.get_full_base_url()
         kwargs = self.as_requests_kwargs(base_url)
-        if headers:
-            final_headers = kwargs["headers"] or {}
-            final_headers.update(headers)
-            kwargs["headers"] = final_headers
-        request = requests.Request(**kwargs)
-        prepared = request.prepare()
-        if isinstance(prepared.body, bytes):
-            # Note, it may be not sufficient to reproduce the error :(
-            prepared.body = prepared.body.decode("utf-8", errors="replace")
-        for header in tuple(prepared.headers):
-            if header in CodeSampleStyle.curl.ignored_headers and header not in (self.headers or {}):
-                del prepared.headers[header]
-        return curlify.to_curl(prepared, verify=verify)
+        request_data = prepare_request_data(kwargs, headers)
+        return CodeSampleStyle.curl.generate(
+            **request_data,
+            verify=verify,
+            include_headers=self.headers,
+        )
 
     def _get_base_url(self, base_url: Optional[str] = None) -> str:
         if base_url is None:
@@ -546,27 +539,6 @@ def validate_vanilla_requests_kwargs(data: Dict[str, Any]) -> None:
             f"If you use the ASGI integration, please supply your test client "
             f"as the `session` argument to `call`.\nURL: {url}"
         )
-
-
-def _escape_single_quotes(url: str) -> str:
-    """Escape single quotes in a string, so it is usable as in generated Python code.
-
-    The usual ``str.replace`` is not suitable as it may convert already escaped quotes to not-escaped.
-    """
-    result = []
-    escape = False
-    for char in url:
-        if escape:
-            result.append(char)
-            escape = False
-        elif char == "\\":
-            result.append(char)
-            escape = True
-        elif char == "'":
-            result.append("\\'")
-        else:
-            result.append(char)
-    return "".join(result)
 
 
 @contextmanager

@@ -8,7 +8,7 @@ from requests import Response
 
 from schemathesis import DataGenerationMethod
 from schemathesis.cli import ALL_CHECKS_NAMES, ALL_TARGETS_NAMES
-from schemathesis.constants import CodeSampleStyle
+from schemathesis.code_samples import CodeSampleStyle
 from schemathesis.fixups import ALL_FIXUPS
 from schemathesis.stateful import Stateful
 

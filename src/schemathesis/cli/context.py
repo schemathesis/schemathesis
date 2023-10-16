@@ -6,7 +6,7 @@ from typing import List, Optional, Union
 
 import hypothesis
 
-from ..constants import CodeSampleStyle
+from ..code_samples import CodeSampleStyle
 from ..runner.serialization import SerializedTestResult
 
 

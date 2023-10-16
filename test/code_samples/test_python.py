@@ -1,3 +1,5 @@
+import json
+
 import hypothesis
 import pytest
 import requests
@@ -5,7 +7,8 @@ from flask import Flask
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
-from schemathesis.models import Case, _escape_single_quotes
+from schemathesis.code_samples import _escape_single_quotes
+from schemathesis.models import Case
 from schemathesis.runner import from_schema
 
 
@@ -18,31 +21,33 @@ def openapi_case(request, swagger_20):
     return operation.make_case(media_type="application/json", **kwargs)
 
 
-def get_full_code(kwargs_repr=""):
-    if kwargs_repr:
-        kwargs_repr = f", {kwargs_repr}"
-    return f"requests.get('http://127.0.0.1:1/users'{kwargs_repr})"
+def get_full_code(url_params="", data=None):
+    url = f"http://127.0.0.1:1/users{url_params}"
+    if data:
+        data = json.dumps(data)
+        data = f", data=b'{data}', headers={{'Content-Type': 'application/json'}}"
+    return f"requests.get('{url}'{data})"
 
 
 @pytest.mark.parametrize(
-    "openapi_case, kwargs_repr",
+    "openapi_case, url_params, data_repr",
     (
         # Body can be of any primitive type supported by Open API
-        ({"body": {"test": 1}}, "json={'test': 1}"),
-        ({"body": ["foo"]}, "json=['foo']"),
-        ({"body": "foo"}, "json='foo'"),
-        ({"body": 1}, "json=1"),
-        ({"body": 1.1}, "json=1.1"),
-        ({"body": True}, "json=True"),
-        ({}, ""),
-        ({"query": {"a": 1}}, "params={'a': 1}"),
+        ({"body": {"test": 1}}, "", {"test": 1}),
+        ({"body": ["foo"]}, "", ["foo"]),
+        ({"body": "foo"}, "", "foo"),
+        ({"body": 1}, "", 1),
+        ({"body": 1.1}, "", 1.1),
+        ({"body": True}, "", True),
+        ({}, "", ""),
+        ({"query": {"a": 1}}, "?a=1", ""),
     ),
     indirect=["openapi_case"],
 )
-def test_open_api_code_sample(openapi_case, kwargs_repr):
+def test_open_api_code_sample(openapi_case, url_params, data_repr):
     # Custom request parts should be correctly displayed
     code = openapi_case.get_code_to_reproduce()
-    assert code == get_full_code(kwargs_repr), code
+    assert code == get_full_code(url_params, data_repr), code
     # And the generated code should be valid Python
     with pytest.raises(requests.exceptions.ConnectionError):
         eval(code)
@@ -115,7 +120,12 @@ def test_escape_single_quotes(value, expected):
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_graphql_code_sample(graphql_url, graphql_schema, graphql_strategy):
     case = graphql_strategy.example()
-    assert case.get_code_to_reproduce() == f"requests.post('{graphql_url}', json={{'query': {repr(case.body)}}})"
+    kwargs = case.as_requests_kwargs()
+    request = requests.Request(**kwargs).prepare()
+    assert (
+        case.get_code_to_reproduce()
+        == f"requests.post('{graphql_url}', data={repr(request.body)}, headers={{'Content-Type': 'application/json'}})"
+    )
 
 
 @pytest.mark.operations("failure")
