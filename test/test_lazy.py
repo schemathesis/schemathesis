@@ -873,7 +873,7 @@ def test_(case):
 
 @pytest.mark.operations("failure")
 @pytest.mark.parametrize("value", (True, False))
-def test_sensitive_data_masking(testdir, openapi3_schema_url, value):
+def test_sensitive_data_masking(testdir, openapi3_schema_url, openapi3_base_url, value):
     auth = "secret-auth"
     testdir.make_test(
         f"""
@@ -891,10 +891,10 @@ def test_(case):
     # We should skip checking for a server error
     result.assert_outcomes(passed=1, failed=1)
     if value:
-        expected = r"curl -X GET -H 'Authorization: [Masked]'"
+        expected = rf"E           curl -X GET -H 'Authorization: [Masked]' {openapi3_base_url}/failure"
     else:
-        expected = rf"curl -X GET -H 'Authorization: {auth}'"
-    assert expected in str(result.stdout)
+        expected = rf"E           curl -X GET -H 'Authorization: {auth}' {openapi3_base_url}/failure"
+    assert expected in result.stdout.lines
 
 
 @pytest.mark.operations("success")

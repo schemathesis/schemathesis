@@ -642,7 +642,7 @@ def test(case):
     # We should skip checking for a server error
     result.assert_outcomes(failed=1)
     if value:
-        expected = r"curl -X GET -H 'Authorization: [Masked]'"
+        expected = rf"E           curl -X GET -H 'Authorization: [Masked]' {openapi3_base_url}/failure"
     else:
-        expected = rf"curl -X GET -H 'Authorization: {auth}'"
-    assert expected in str(result.stdout)
+        expected = rf"E           curl -X GET -H 'Authorization: {auth}' {openapi3_base_url}/failure"
+    assert expected in result.stdout.lines

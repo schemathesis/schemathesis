@@ -7,6 +7,8 @@ from requests import Request, Response
 from schemathesis.masking import (
     DEFAULT_KEYS_TO_MASK,
     DEFAULT_REPLACEMENT,
+    DEFAULT_SENSITIVE_MARKERS,
+    MaskingConfig,
     mask_case,
     mask_history,
     mask_request,
@@ -36,7 +38,8 @@ def request_factory():
 def masked_case(case_factory):
     def factory(keys_to_mask=DEFAULT_KEYS_TO_MASK, default_replacement=DEFAULT_REPLACEMENT, **kwargs):
         case = case_factory(**kwargs)
-        mask_case(case, keys_to_mask=keys_to_mask, default_replacement=default_replacement)
+        config = MaskingConfig(keys_to_mask=keys_to_mask, default_replacement=default_replacement)
+        mask_case(case, config=config)
         return case
 
     return factory
@@ -262,3 +265,38 @@ def test_mask_serialized_interaction(serialized_check):
     assert interaction.request.uri == f"http://{DEFAULT_REPLACEMENT}@127.0.0.1/path"
     assert interaction.request.headers["X-Token"] == DEFAULT_REPLACEMENT
     assert interaction.response.headers["X-Token"] == [DEFAULT_REPLACEMENT]
+
+
+@pytest.fixture
+def masking_config():
+    return MaskingConfig()
+
+
+def test_with_keys_to_mask(masking_config):
+    new_keys = {"new_key1", "new_key2"}
+    updated_config = masking_config.with_keys_to_mask(*new_keys)
+    assert updated_config.keys_to_mask == DEFAULT_KEYS_TO_MASK.union(new_keys)
+
+
+def test_without_keys_to_mask(masking_config):
+    remove_keys = {"phpsessid", "xsrf-token"}
+    updated_config = masking_config.without_keys_to_mask(*remove_keys)
+    assert updated_config.keys_to_mask == DEFAULT_KEYS_TO_MASK.difference(remove_keys)
+
+
+def test_with_sensitive_markers(masking_config):
+    new_markers = {"new_marker1", "new_marker2"}
+    updated_config = masking_config.with_sensitive_markers(*new_markers)
+    assert updated_config.sensitive_markers == DEFAULT_SENSITIVE_MARKERS.union(new_markers)
+
+
+def test_without_sensitive_markers(masking_config):
+    remove_markers = {"token", "key"}
+    updated_config = masking_config.without_sensitive_markers(*remove_markers)
+    assert updated_config.sensitive_markers == DEFAULT_SENSITIVE_MARKERS.difference(remove_markers)
+
+
+def test_default_replacement_unchanged(masking_config):
+    new_keys = {"new_key1", "new_key2"}
+    updated_config = masking_config.with_keys_to_mask(*new_keys)
+    assert updated_config.default_replacement == DEFAULT_REPLACEMENT

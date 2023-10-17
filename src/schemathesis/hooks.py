@@ -12,6 +12,7 @@ from .types import GenericTest
 from .utils import GenericResponse, deprecated_property
 
 if TYPE_CHECKING:
+    from .masking import MaskingConfig
     from .models import APIOperation, Case
     from .schemas import BaseSchema
 
@@ -321,6 +322,11 @@ def before_add_examples(context: HookContext, examples: List["Case"]) -> None:
 @all_scopes
 def before_init_operation(context: HookContext, operation: "APIOperation") -> None:
     """Allows you to customize a newly created API operation."""
+
+
+@all_scopes
+def configure_sensitive_output_masking(context: HookContext) -> Optional["MaskingConfig"]:
+    """Configure masking settings for sensitive data obfuscation."""
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
