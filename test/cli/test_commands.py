@@ -2432,3 +2432,23 @@ Error details:
 Ensure that the definition complies with the OpenAPI specification"""
         in result.stdout
     )
+
+
+@pytest.mark.parametrize("value", ("true", "false"))
+@pytest.mark.operations("failure")
+def test_sensitive_data_masking(cli, openapi2_schema_url, hypothesis_max_examples, value):
+    auth = "secret-auth"
+    result = cli.run(
+        openapi2_schema_url,
+        f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
+        "--hypothesis-seed=1",
+        "--validate-schema=false",
+        f"-H Authorization: {auth}",
+        f"--mask-sensitive-output={value}",
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    if value == "false":
+        expected = f"curl -X GET -H 'Authorization: {auth}'"
+    else:
+        expected = "curl -X GET -H 'Authorization: [Masked]'"
+    assert expected in result.stdout
