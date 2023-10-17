@@ -101,6 +101,7 @@ class BaseSchema(Mapping):
     )
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
     rate_limiter: Optional[Limiter] = None
+    mask_sensitive_output: bool = True
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.operations)
@@ -283,6 +284,7 @@ class BaseSchema(Mapping):
         data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
         code_sample_style: Union[CodeSampleStyle, NotSet] = NOT_SET,
         rate_limiter: Optional[Limiter] = NOT_SET,
+        mask_sensitive_output: Optional[Union[bool, NotSet]] = NOT_SET,
     ) -> "BaseSchema":
         if base_url is NOT_SET:
             base_url = self.base_url
@@ -310,6 +312,8 @@ class BaseSchema(Mapping):
             code_sample_style = self.code_sample_style
         if rate_limiter is NOT_SET:
             rate_limiter = self.rate_limiter
+        if mask_sensitive_output is NOT_SET:
+            mask_sensitive_output = self.mask_sensitive_output
 
         return self.__class__(
             self.raw_schema,
@@ -328,6 +332,7 @@ class BaseSchema(Mapping):
             data_generation_methods=data_generation_methods,  # type: ignore
             code_sample_style=code_sample_style,  # type: ignore
             rate_limiter=rate_limiter,  # type: ignore
+            mask_sensitive_output=mask_sensitive_output,  # type: ignore
         )
 
     def get_local_hook_dispatcher(self) -> Optional[HookDispatcher]:

@@ -730,6 +730,7 @@ def testdir(testdir):
         tag=None,
         pytest_plugins=("aiohttp.pytest_plugin",),
         validate_schema=True,
+        mask_sensitive_output=True,
         schema=None,
         schema_name="simple_swagger.yaml",
         **kwargs,
@@ -752,13 +753,21 @@ def testdir(testdir):
         def simple_schema():
             return schema
 
-        schema = schemathesis.from_dict(raw_schema, method={method}, endpoint={endpoint}, tag={tag}, validate_schema={validate_schema})
+        schema = schemathesis.from_dict(
+            raw_schema,
+            method={method},
+            endpoint={endpoint},
+            tag={tag},
+            validate_schema={validate_schema},
+            mask_sensitive_output={mask_sensitive_output}
+        )
         """.format(
                 schema=schema,
                 method=repr(method),
                 endpoint=repr(endpoint),
                 tag=repr(tag),
                 validate_schema=repr(validate_schema),
+                mask_sensitive_output=repr(mask_sensitive_output),
             )
         )
         module = testdir.makepyfile(preparation, content)

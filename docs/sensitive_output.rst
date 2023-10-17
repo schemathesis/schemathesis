@@ -15,6 +15,12 @@ You can control this feature through the ``--mask-sensitive-output`` CLI option:
 
    schemathesis run --mask-sensitive-output=false ...
 
+Or in Python tests:
+
+.. code-block:: python
+
+    schema = schemathesis.from_dict({...}, mask_sensitive_output=False)
+
 Disabling this option will turn off the automatic masking of sensitive data in the output.
 
 For more advanced customization of the masking process, you can define a ``mask_sensitive_output`` hook.
