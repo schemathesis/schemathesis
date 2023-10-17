@@ -338,7 +338,12 @@ def test_sensitive_data_masking(cli, openapi2_schema_url, hypothesis_max_example
     interactions = cassette["http_interactions"]
     assert all(entry["request"]["headers"]["X-Token"] == [expected] for entry in interactions)
     assert all(entry["request"]["headers"]["Authorization"] == [expected] for entry in interactions)
-    assert all(entry["response"]["headers"]["X-Token"] == [expected] for entry in interactions)
+    # The app can reject requests, so the error won't contain this header
+    assert all(
+        entry["response"]["headers"]["X-Token"] == [expected]
+        for entry in interactions
+        if "X-Token" in entry["response"]["headers"]
+    )
 
 
 def test_multiple_cookies(base_url):
