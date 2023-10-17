@@ -1,64 +1,50 @@
 Continuous Integration
 ======================
 
-Welcome to the Schemathesis CI guide! This document provides all the necessary information to integrate Schemathesis
-into your Continuous Integration workflows.
-
-Quickstart
-----------
-
-You can use these code samples to test your API in a pull request or run tests against a publicly resolvable API.
-
-If you need to start your API server locally before testing, check out the `Preparing your App`_ section below.
+This guide outlines how to set up Schemathesis for automated API testing in your Continuous Integration workflows.
 
 GitHub Actions
-~~~~~~~~~~~~~~
+--------------
 
-.. important::
-
-    We have a native `GitHub app`_ that reports test results directly to your pull requests.
+For initial setup in a GitHub Actions workflow:
 
 .. code-block:: yaml
 
   api-tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-      # Runs Schemathesis tests with all checks enabled
       - uses: schemathesis/action@v1
         with:
-          # Your API schema location
           schema: 'http://127.0.0.1:5000/api/openapi.json'
-          # OPTIONAL. Your Schemathesis.io token
+          # Optional, for PR comments
           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
 
-For the fully working example, check |no-build.yml|_ in the repository.
-
-.. |no-build.yml| replace:: ``.github/workflows/example-no-build.yml``
-.. _no-build.yml: https://github.com/schemathesis/schemathesis/blob/master/.github/workflows/example-no-build.yml
-
-If you enabled PR comments via our `GitHub app`_, you'll see a test report once your pipeline is finished:
+To get test results as comments in your GitHub pull requests, both the ``token`` and the `GitHub app`_ are required.
+Obtain the token by signing up on `Schemathesis.io <https://app.schemathesis.io/auth/sign-up/?utm_source=oss_docs&utm_content=ci>`_.
 
 .. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_github_report.png
 
-When interacting with APIs that require headers, use the ``-H`` option in the Schemathesis CLI. Ensure the entire header value is enclosed in quotes:
+To add headers like ``Authorization``:
 
 .. code-block:: yaml
 
-    # Save access token to $GITHUB_ENV as ACCESS_TOKEN.
-    - name: Set access token
-      run: echo "ACCESS_TOKEN=super-secret" >> $GITHUB_ENV
+  # Save access token to $GITHUB_ENV as ACCESS_TOKEN.
+  - name: Set access token
+    run: echo "ACCESS_TOKEN=super-secret" >> $GITHUB_ENV
 
-    # Use the saved access token in the Schemathesis GitHub action.
-    - uses: schemathesis/action@v1
-      with:
-        schema: 'https://example.schemathesis.io/openapi.json'
-        args: '-H "Authorization: Bearer ${{ env.ACCESS_TOKEN }}"'
+  - uses: schemathesis/action@v1
+    with:
+      schema: 'http://example.com/api/openapi.json'
+      args: '-H "Authorization: Bearer ${{ env.ACCESS_TOKEN }}"'
 
-- Make sure any variables or dynamic content in the header value, like ``${{ env.ACCESS_TOKEN }}``, are correctly resolved in your CI environment.
-- Remember, the ``-H`` option allows you to pass other headers in a similar manner if needed.
+.. note::
+
+    For more details on using Schemathesis with GitHub Actions, refer to the `full documentation <https://github.com/schemathesis/action>`_
 
 GitLab CI
-~~~~~~~~~
+---------
+
+For GitLab users, here's how to set up Schemathesis in your CI pipeline:
 
 .. code-block:: yaml
 
@@ -68,88 +54,66 @@ GitLab CI
       name: schemathesis/schemathesis:stable
       entrypoint: [""]
 
-    variables:
-      # API Schema location
-      API_SCHEMA: 'http://127.0.0.1:5000/api/openapi.json'
-      # OPTIONAL. Your Schemathesis.io token
-      SCHEMATHESIS_TOKEN: ${{ secrets.SCHEMATHESIS_TOKEN }}
-
     script:
-      - st run $API_SCHEMA --checks=all --report
+      - st run http://127.0.0.1:5000/api/openapi.json --checks=all --report
 
-How does it work?
+Preparing Your App
 ------------------
 
-Schemathesis works over HTTP and expects that your application is reachable from the CI environment.
-You can prepare your application in the same CI as the previous step or run it against a staging environment.
-
-Preparing your App
-------------------
-
-Start API before testing
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-It is common to have a test suite as a part of the application repo. For this scenario, you will need to build your app first.
-
-The application could be built in **any programming language**, Schemathesis expects only its API schema.
-
-Here is a GitHub Actions workflow for a sample `Python app`_:
+In most cases, you'll want to set up your app in the CI environment. Here's a GitHub Actions example for a `Python app`_:
 
 .. code-block:: yaml
 
   api-tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-      # Gets a copy of the source code in your repository before running API tests
       - uses: actions/checkout@v3.0.0
-
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
-      # Installs project's dependencies
       - run: pip install -r requirements.txt
-
       # Start the API in the background
       - run: python main.py &
-
-      # Runs Schemathesis tests with all checks enabled
       - uses: schemathesis/action@v1
         with:
-          # Your API schema location
           schema: 'http://127.0.0.1:5000/api/openapi.json'
-          # OPTIONAL. Your Schemathesis.io token
+          # Optional, for PR comments
           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
 
-.. note::
+API Schema in a File
+--------------------
 
-   This example expects the API schema available at ``http://127.0.0.1:5000/api/openapi.json`` inside the CI environment.
-
-For the fully working example, check |build.yml|_ in the repository.
-
-.. |build.yml| replace:: ``.github/workflows/example-build.yml``
-.. _build.yml: https://github.com/schemathesis/schemathesis/blob/master/.github/workflows/example-build.yml
-
-API schema in a file
-~~~~~~~~~~~~~~~~~~~~
-
-If you store your API schema in a file, use its file path for the ``API_SCHEMA`` environment variable.
-Set your API base path to ``SCHEMATHESIS_BASE_URL``:
+If your API schema is maintained separately from the application, specify its path and set a base URL.
+This is useful in scenarios where the API schema undergoes independent versioning or resides in a separate repository.
 
 .. code-block:: yaml
 
   api-tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-      # Runs positive Schemathesis tests
       - uses: schemathesis/action@v1
         with:
-          # A local API schema location
           schema: './docs/openapi.json'
-          # API base URL
-          base-url: 'http://127.0.0.1:8080/api/v2/'
-          # OPTIONAL. Your Schemathesis.io token
-          token: ${{ secrets.SCHEMATHESIS_TOKEN }}
+          base-url: 'http://127.0.0.1:5000/api/v2/'
+
+Environment Variables
+---------------------
+
+You can configure Schemathesis behavior using the following environment variables:
+
+- **SCHEMATHESIS_HOOKS**: Points to a Python module with user-defined Schemathesis extensions. Example: ``my_module.my_hooks``
+
+- **SCHEMATHESIS_BASE_URL**: Set when using a file-based schema to specify the API's base URL. Example: ``http://127.0.0.1:5000/api/v2/``
+
+- **SCHEMATHESIS_WAIT_FOR_SCHEMA**: Time in seconds to wait for the schema to be accessible. Example: ``10``
+
+- **SCHEMATHESIS_REPORT_SUGGESTION**: Enable or disable report suggestions to upload to SaaS. Valid values: ``true``, ``false``
+
+- **SCHEMATHESIS_TOKEN**: For SaaS-based pull request comments.
+
+- **SCHEMATHESIS_TELEMETRY**: Toggle sending metadata to SaaS. Valid values: ``true``, ``false``
+
+- **SCHEMATHESIS_REPORT**: Enable or disable reporting. Valid values: ``true``, ``false``
 
 .. _Python app: https://github.com/schemathesis/schemathesis/tree/master/example
 .. _GitHub app: https://github.com/apps/schemathesis
