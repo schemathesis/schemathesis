@@ -153,7 +153,7 @@ def display_single_error(context: ExecutionContext, result: SerializedTestResult
     display_subsection(result)
     should_display_full_traceback_message = False
     for error in result.errors:
-        should_display_full_traceback_message |= _display_error(context, error, result.seed)
+        should_display_full_traceback_message |= _display_error(context, error)
     return should_display_full_traceback_message
 
 
@@ -168,7 +168,7 @@ def display_full_traceback_message(exception: str) -> bool:
     return not exception.startswith(("DeadlineExceeded", "OperationSchemaError"))
 
 
-def _display_error(context: ExecutionContext, error: SerializedError, seed: Optional[int] = None) -> bool:
+def _display_error(context: ExecutionContext, error: SerializedError) -> bool:
     if context.show_errors_tracebacks:
         message = error.exception_with_traceback
     else:
@@ -179,8 +179,6 @@ def _display_error(context: ExecutionContext, error: SerializedError, seed: Opti
             "You can disable it completely with `--hypothesis-deadline=None`.\n"
         )
     click.secho(message, fg="red")
-    if error.example is not None:
-        display_example(context, error.example, seed=seed)
     return display_full_traceback_message(error.exception)
 
 

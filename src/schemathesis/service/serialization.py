@@ -81,7 +81,6 @@ def serialize_after_execution(event: events.AfterExecution) -> Optional[Dict[str
                 {
                     "exception": error.exception,
                     "exception_with_traceback": error.exception_with_traceback,
-                    "example": None if error.example is None else _serialize_case(error.example),
                 }
                 for error in event.result.errors
             ],

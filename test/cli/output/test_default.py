@@ -365,7 +365,7 @@ def test_display_errors(swagger_20, capsys, results_set, execution_context, show
         data_generation_method=[DataGenerationMethod.default()],
         seed=123,
     )
-    error.add_error(ConnectionError("Connection refused!"), models.Case(operation, query={"a": 1}))
+    error.add_error(ConnectionError("Connection refused!"))
     results_set.append(error)
     execution_context.results.append(SerializedTestResult.from_test_result(error))
     event = Finished.from_results(results_set, 1.0)
@@ -384,7 +384,6 @@ def test_display_errors(swagger_20, capsys, results_set, execution_context, show
     assert " GET /v1/api/error " in out
     # And the error itself is displayed
     assert "ConnectionError: Connection refused!" in out
-    assert "Or add this option to your command line parameters: --hypothesis-seed=123" in out
 
 
 @pytest.mark.parametrize("show_errors_tracebacks", (True, False))
