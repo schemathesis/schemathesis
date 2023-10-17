@@ -151,22 +151,17 @@ def get_serialized_history(case: Case) -> List[SerializedHistoryEntry]:
 class SerializedError:
     exception: str
     exception_with_traceback: str
-    example: Optional[SerializedCase]
     title: Optional[str]
 
     @classmethod
     def from_error(
         cls,
         exception: Exception,
-        case: Optional[Case],
-        headers: Optional[Dict[str, Any]],
         title: Optional[str] = None,
-        verify: bool = True,
     ) -> "SerializedError":
         return cls(
             exception=format_exception(exception),
             exception_with_traceback=format_exception(exception, True),
-            example=SerializedCase.from_case(case, headers, verify=verify) if case else None,
             title=title,
         )
 
@@ -225,7 +220,7 @@ class SerializedTestResult:
             data_generation_method=[m.as_short_name() for m in result.data_generation_method],
             checks=[SerializedCheck.from_check(check) for check in result.checks],
             logs=[formatter.format(record) for record in result.logs],
-            errors=[SerializedError.from_error(*error, headers=result.overridden_headers) for error in result.errors],
+            errors=[SerializedError.from_error(error) for error in result.errors],
             interactions=[SerializedInteraction.from_interaction(interaction) for interaction in result.interactions],
         )
 
