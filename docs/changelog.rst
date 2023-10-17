@@ -69,6 +69,10 @@ After:
 
 - Optimize event data emission by postponing code sample generation, resulting in a ``~4%`` reduction in the emitted events data size.
 
+**Removed**
+
+- Unused ``SerializedError.example`` attribute. It used to be populated for flaky errors before they became regular failures.
+
 .. _v3.19.7:
 
 `3.19.7`_ - 2023-09-03

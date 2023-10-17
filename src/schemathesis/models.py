@@ -998,7 +998,7 @@ class TestResult:
     verbose_name: str
     data_generation_method: List[DataGenerationMethod]
     checks: List[Check] = field(default_factory=list)
-    errors: List[Tuple[Exception, Optional[Case]]] = field(default_factory=list)
+    errors: List[Exception] = field(default_factory=list)
     interactions: List[Interaction] = field(default_factory=list)
     logs: List[LogRecord] = field(default_factory=list)
     is_errored: bool = False
@@ -1064,8 +1064,8 @@ class TestResult:
         self.checks.append(check)
         return check
 
-    def add_error(self, exception: Exception, example: Optional[Case] = None) -> None:
-        self.errors.append((exception, example))
+    def add_error(self, exception: Exception) -> None:
+        self.errors.append(exception)
 
     def store_requests_response(
         self, case: Case, response: requests.Response, status: Status, checks: List[Check]

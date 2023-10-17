@@ -280,7 +280,7 @@ class Finished(ExecutionEvent):
             is_empty=results.is_empty,
             total=results.total,
             generic_errors=[
-                SerializedError.from_error(error, None, None, error.full_path) for error in results.generic_errors
+                SerializedError.from_error(exception=error, title=error.full_path) for error in results.generic_errors
             ],
             warnings=results.warnings,
             running_time=running_time,
