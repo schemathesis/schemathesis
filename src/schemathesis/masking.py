@@ -286,7 +286,6 @@ def mask_url(
 
 
 def mask_serialized_check(check: "SerializedCheck") -> None:
-    # TODO: Unit tests
     mask_request(check.request)
     response = check.response
     if response:
@@ -298,14 +297,12 @@ def mask_serialized_check(check: "SerializedCheck") -> None:
 
 
 def mask_serialized_case(case: "SerializedCase") -> None:
-    # TODO: Unit tests
     for value in (case.path_parameters, case.headers, case.cookies, case.query, case.extra_headers):
         if value is not None:
             mask_value(value)
 
 
 def mask_serialized_interaction(interaction: "SerializedInteraction") -> None:
-    # TODO: Unit tests
     mask_request(interaction.request)
     if interaction.response:
         mask_value(interaction.response.headers)

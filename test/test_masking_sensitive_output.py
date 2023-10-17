@@ -11,10 +11,15 @@ from schemathesis.masking import (
     mask_history,
     mask_request,
     mask_sensitive_output,
+    mask_serialized_check,
+    mask_serialized_interaction,
     mask_url,
 )
-from schemathesis.models import CaseSource
+from schemathesis.models import CaseSource, Check
 from schemathesis.models import Request as SerializedRequest
+from schemathesis.models import Response as SerializedResponse
+from schemathesis.models import Status
+from schemathesis.runner.serialization import SerializedCheck, SerializedInteraction
 from schemathesis.utils import NOT_SET
 
 
@@ -208,3 +213,52 @@ URLENCODED_REPLACEMENT = urlencode({"": DEFAULT_REPLACEMENT})[1:]  # skip the `=
 )
 def test_mask_url(input_url, expected_url):
     assert mask_url(input_url) == expected_url
+
+
+@pytest.fixture
+def serialized_check(case_factory, response_factory):
+    root_case = case_factory()
+    value = "secret"
+    root_case.source = CaseSource(
+        case=case_factory(), response=response_factory.requests(headers={"X-Token": value}), elapsed=1.0
+    )
+    check = Check(
+        name="test",
+        value=Status.failure,
+        response=response_factory.requests(headers={"X-Token": value}),
+        elapsed=1.0,
+        example=root_case,
+    )
+    return SerializedCheck.from_check(check)
+
+
+def test_mask_serialized_check(serialized_check):
+    mask_serialized_check(serialized_check)
+    assert serialized_check.example.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
+    assert serialized_check.history[0].case.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
+
+
+def test_mask_serialized_interaction(serialized_check):
+    request = SerializedRequest(
+        method="POST", uri="http://user:pass@127.0.0.1/path", body=None, headers={"X-Token": "Secret"}
+    )
+    response = SerializedResponse(
+        status_code=500,
+        message="Internal Server Error",
+        body=None,
+        headers={"X-Token": ["Secret"]},
+        encoding=None,
+        http_version="1.1",
+        elapsed=1.0,
+        verify=True,
+    )
+    interaction = SerializedInteraction(
+        request=request, response=response, checks=[serialized_check], status=Status.failure, recorded_at=""
+    )
+    mask_serialized_interaction(interaction)
+
+    assert interaction.checks[0].example.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
+    assert interaction.checks[0].history[0].case.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
+    assert interaction.request.uri == f"http://{DEFAULT_REPLACEMENT}@127.0.0.1/path"
+    assert interaction.request.headers["X-Token"] == DEFAULT_REPLACEMENT
+    assert interaction.response.headers["X-Token"] == [DEFAULT_REPLACEMENT]
