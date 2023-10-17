@@ -4,7 +4,6 @@ import pytest
 import requests
 from requests import Request, Response
 
-from schemathesis import Case
 from schemathesis.masking import (
     DEFAULT_KEYS_TO_MASK,
     DEFAULT_REPLACEMENT,
@@ -24,15 +23,6 @@ def request_factory():
     def factory(url="http://127.0.0.1", headers=None):
         request = Request(url=url, headers=headers or {})
         return request.prepare()
-
-    return factory
-
-
-@pytest.fixture
-def case_factory(swagger_20):
-    def factory(**kwargs):
-        kwargs.setdefault("operation", swagger_20["/users"]["get"])
-        return Case(**kwargs)
 
     return factory
 

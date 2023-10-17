@@ -2,7 +2,7 @@ import io
 import os
 from textwrap import dedent
 from types import SimpleNamespace
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import pytest
 import requests
@@ -13,6 +13,7 @@ from packaging import version
 from urllib3 import HTTPResponse
 
 import schemathesis.cli
+from schemathesis import Case
 from schemathesis._compat import IS_HYPOTHESIS_ABOVE_6_54, metadata
 from schemathesis.cli import reset_checks
 from schemathesis.constants import HOOKS_MODULE_ENV_VAR
@@ -885,27 +886,42 @@ def is_older_subtests():
 @pytest.fixture
 def response_factory():
     def requests_factory(
-        *, content: bytes = b"{}", content_type: Optional[str] = "application/json", status_code: int = 200
+        *,
+        content: bytes = b"{}",
+        content_type: Optional[str] = "application/json",
+        status_code: int = 200,
+        headers: Optional[Dict[str, Any]] = None,
     ) -> requests.Response:
         response = requests.Response()
         response._content = content
         response.status_code = status_code
-        headers = {}
+        headers = headers or {}
         if content_type:
-            headers["Content-Type"] = content_type
+            headers.setdefault("Content-Type", content_type)
         response.headers.update(headers)
         response.raw = HTTPResponse(body=io.BytesIO(content), status=status_code, headers=response.headers)
         response.request = requests.PreparedRequest()
         response.request.prepare(method="POST", url="http://127.0.0.1", headers=headers)
         return response
 
-    def werkzeug_factory(*, status_code: int = 200):
+    def werkzeug_factory(*, status_code: int = 200, headers: Optional[Dict[str, Any]] = None):
         response = WSGIResponse(response=b'{"some": "value"}', status=status_code)
         response.request = requests.PreparedRequest()
-        response.request.prepare(method="POST", url="http://example.com", headers={"Content-Type": "application/json"})
+        response.request.prepare(
+            method="POST", url="http://example.com", headers={"Content-Type": "application/json", **(headers or {})}
+        )
         return response
 
     return SimpleNamespace(
         requests=requests_factory,
         werkzeug=werkzeug_factory,
     )
+
+
+@pytest.fixture
+def case_factory(swagger_20):
+    def factory(**kwargs):
+        kwargs.setdefault("operation", swagger_20["/users"]["get"])
+        return Case(**kwargs)
+
+    return factory
