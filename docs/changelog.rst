@@ -72,6 +72,7 @@ After:
 **Removed**
 
 - Unused ``SerializedError.example`` attribute. It used to be populated for flaky errors before they became regular failures.
+- Unused ``TestResult.overridden_headers`` attribute.
 
 .. _v3.19.7:
 

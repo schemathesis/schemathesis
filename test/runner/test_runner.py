@@ -1041,7 +1041,6 @@ def result():
         method="POST",
         path="/users/",
         verbose_name="POST /users/",
-        overridden_headers=None,
         data_generation_method=DataGenerationMethod.positive,
     )
 

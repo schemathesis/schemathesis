@@ -1006,9 +1006,6 @@ class TestResult:
     is_skipped: bool = False
     is_executed: bool = False
     seed: Optional[int] = None
-    # To show a proper reproduction code if an error happens and there is no way to get actual headers that were
-    # sent over the network. Or there could be no actual requests at all
-    overridden_headers: Optional[Dict[str, Any]] = None
 
     def mark_errored(self) -> None:
         self.is_errored = True

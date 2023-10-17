@@ -300,7 +300,6 @@ def run_test(
         method=operation.method.upper(),
         path=operation.full_path,
         verbose_name=operation.verbose_name,
-        overridden_headers=headers,
         data_generation_method=data_generation_methods,
     )
     # To simplify connecting `before` and `after` events in external systems
