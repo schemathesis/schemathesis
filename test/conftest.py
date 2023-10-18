@@ -1,5 +1,7 @@
 import io
 import os
+import shlex
+from dataclasses import dataclass, field
 from textwrap import dedent
 from types import SimpleNamespace
 from typing import Any, Dict, Optional
@@ -934,3 +936,22 @@ def case_factory(swagger_20):
         return Case(**kwargs)
 
     return factory
+
+
+@dataclass
+class CurlWrapper:
+    testdir: field()
+
+    def run(self, command: str):
+        return self.testdir.run(*shlex.split(command))
+
+    def assert_valid(self, command: str):
+        result = self.run(command)
+        if result.ret != 0:
+            # The command is valid, but the target is not reachable
+            assert "Failed to connect" in result.stderr.lines[-1]
+
+
+@pytest.fixture
+def curl(testdir):
+    return CurlWrapper(testdir)
