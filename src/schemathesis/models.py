@@ -37,6 +37,7 @@ from requests.structures import CaseInsensitiveDict
 from starlette_testclient import TestClient as ASGIClient
 
 from . import failures, serializers
+from ._compat import IS_WERKZEUG_ABOVE_3
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import (
@@ -562,10 +563,16 @@ def cookie_handler(client: werkzeug.Client, cookies: Optional[Cookies]) -> Gener
         yield
     else:
         for key, value in cookies.items():
-            client.set_cookie("localhost", key, value)
+            if IS_WERKZEUG_ABOVE_3:
+                client.set_cookie(key=key, value=value, domain="localhost")
+            else:
+                client.set_cookie("localhost", key=key, value=value)
         yield
         for key in cookies:
-            client.delete_cookie("localhost", key)
+            if IS_WERKZEUG_ABOVE_3:
+                client.delete_cookie(key=key, domain="localhost")
+            else:
+                client.delete_cookie("localhost", key=key)
 
 
 P = TypeVar("P", bound=Parameter)
@@ -932,7 +939,8 @@ class Response:
         body = None if response.response == [] else serialize_payload(data)
         encoding: Optional[str]
         if body is not None:
-            encoding = response.mimetype_params.get("charset", response.charset)
+            # Werkzeug <3.0 had `charset` attr, newer versions always have UTF-8
+            encoding = response.mimetype_params.get("charset", getattr(response, "charset", "utf-8"))
         else:
             encoding = None
         return cls(
