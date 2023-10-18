@@ -620,3 +620,29 @@ def test(value):
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
     assert "InvalidSchema: Cannot have" not in result.stdout.str()
+
+
+@pytest.mark.parametrize("value", (True, False))
+def test_output_sanitization(testdir, openapi3_base_url, value):
+    auth = "secret-auth"
+    testdir.make_test(
+        f"""
+
+schema.base_url = "{openapi3_base_url}"
+
+@schema.parametrize(endpoint="failure")
+def test(case):
+    response = case.call(headers={{'Authorization': '{auth}'}})
+    case.validate_response(response)
+""",
+        paths={"/failure": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        sanitize_output=value,
+    )
+    result = testdir.runpytest()
+    # We should skip checking for a server error
+    result.assert_outcomes(failed=1)
+    if value:
+        expected = rf"E           curl -X GET -H 'Authorization: [Filtered]' {openapi3_base_url}/failure"
+    else:
+        expected = rf"E           curl -X GET -H 'Authorization: {auth}' {openapi3_base_url}/failure"
+    assert expected in result.stdout.lines

@@ -122,14 +122,32 @@ Each failure is accompanied by a cURL snippet you can use to reproduce the issue
 
 .. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_server_error.png
 
-Alternatively, you can use the **Replay** button on the failure page.
-
-What data is sent?
+What Data is Sent?
 ------------------
 
-CLI sends info to Schemathesis.io in the following cases:
+The following data is included in the reports sent to Schemathesis.io by the CLI:
 
-- Authentication. Metadata about your host machine, that helps us to understand our users better. We collect your Python interpreter version, implementation, system/OS name and release. For more information look at ``service/metadata.py``
-- Test runs. Most of Schemathesis runner's events, including all generated data and explicitly passed headers. For more information look at ``service/serialization.py``
-- Some environment variables specific to CI providers. We use them to comment on pull requests.
-- Command-line options without free-form values. It helps us to understand how you use the CLI.
+- **Metadata**:
+
+  - Information about your host machine to help us understand our users better.
+  - Collected data includes your Python interpreter version, implementation, system/OS name, and release.
+
+- **Test Runs**:
+
+  - Most of the Schemathesis runner's events are included, encompassing all generated data and explicitly passed headers.
+  - Sensitive data within the generated test cases and received responses is automatically sanitized by default, replaced with the string ``[Filtered]`` to prevent accidental exposure.
+  - Further information on what is considered sensitive and how it is sanitized can be found at :ref:`Sanitizing Output <sanitizing-output>`.
+
+- **Environment Variables**:
+
+  - Some environment variables specific to CI providers are included.
+  - These are used to comment on pull requests.
+
+- **Command-Line Options**:
+
+  - Command-line options without free-form values are sent to help us understand how you use the CLI.
+  - Rest assured, any sensitive data passed through command-line options is sanitized by default.
+
+For more details on our data handling practices, please refer to our `Privacy Policy <https://schemathesis.io/legal/privacy>`_. If you have further questions or concerns about data handling, feel free to contact us at `support@schemathesis.io <mailto:support@schemathesis.io>`_.
+
+For information on data access, retention, and deletion, please refer to the `FAQ section <https://docs.schemathesis.io/faq>`_ in our SaaS documentation.

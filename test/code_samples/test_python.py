@@ -139,7 +139,9 @@ def test_cli_output(cli, base_url, schema_url):
 def test_reproduce_code_with_overridden_headers(any_app_schema, base_url):
     headers = {"X-Token": "test"}
     *_, after, finished = from_schema(
-        any_app_schema, headers=headers.copy(), hypothesis_settings=hypothesis.settings(max_examples=1)
+        any_app_schema,
+        headers=headers.copy(),
+        hypothesis_settings=hypothesis.settings(max_examples=1),
     ).execute()
     assert finished.has_failures
     for key, value in headers.items():
