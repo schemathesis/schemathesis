@@ -107,6 +107,16 @@ Loaders
 .. autofunction:: schemathesis.graphql.from_url
 .. autofunction:: schemathesis.graphql.from_wsgi
 
+Sanitizing Output
+~~~~~~~~~~~~~~~~~
+
+.. autoclass:: schemathesis.sanitization.Config()
+
+  .. automethod:: with_keys_to_sanitize
+  .. automethod:: without_keys_to_sanitize
+  .. automethod:: with_sensitive_markers
+  .. automethod:: without_sensitive_markers
+
 Schema
 ~~~~~~
 

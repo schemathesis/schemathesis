@@ -488,6 +488,7 @@ def deduplicate_errors(errors: List[Exception]) -> Generator[Exception, None, No
 
 
 def run_checks(
+    *,
     case: Case,
     checks: Iterable[CheckFunction],
     check_results: List[Check],
@@ -621,8 +622,7 @@ def network_test(
             headers["User-Agent"] = USER_AGENT
         timeout = prepare_timeout(request_timeout)
         if not dry_run:
-            response = _network_test(
-                case,
+            args = (
                 checks,
                 targets,
                 result,
@@ -635,22 +635,8 @@ def network_test(
                 request_cert,
                 max_response_time,
             )
-            add_cases(
-                case,
-                response,
-                _network_test,
-                checks,
-                targets,
-                result,
-                session,
-                timeout,
-                store_interactions,
-                headers,
-                feedback,
-                request_tls_verify,
-                request_cert,
-                max_response_time,
-            )
+            response = _network_test(case, *args)
+            add_cases(case, response, _network_test, *args)
 
 
 def _network_test(
@@ -693,14 +679,22 @@ def _network_test(
     run_targets(targets, context)
     status = Status.success
     try:
-        run_checks(case, checks, check_results, result, response, context.response_time * 1000, max_response_time)
+        run_checks(
+            case=case,
+            checks=checks,
+            check_results=check_results,
+            result=result,
+            response=response,
+            elapsed_time=context.response_time * 1000,
+            max_response_time=max_response_time,
+        )
     except CheckFailed:
         status = Status.failure
         raise
     finally:
+        feedback.add_test_case(case, response)
         if store_interactions:
             result.store_requests_response(case, response, status, check_results)
-    feedback.add_test_case(case, response)
     return response
 
 
@@ -740,13 +734,7 @@ def wsgi_test(
         result.mark_executed()
         headers = _prepare_wsgi_headers(headers, auth, auth_type)
         if not dry_run:
-            response = _wsgi_test(
-                case, checks, targets, result, headers, store_interactions, feedback, max_response_time
-            )
-            add_cases(
-                case,
-                response,
-                _wsgi_test,
+            args = (
                 checks,
                 targets,
                 result,
@@ -755,6 +743,8 @@ def wsgi_test(
                 feedback,
                 max_response_time,
             )
+            response = _wsgi_test(case, *args)
+            add_cases(case, response, _wsgi_test, *args)
 
 
 def _wsgi_test(
@@ -780,14 +770,22 @@ def _wsgi_test(
     status = Status.success
     check_results: List[Check] = []
     try:
-        run_checks(case, checks, check_results, result, response, context.response_time * 1000, max_response_time)
+        run_checks(
+            case=case,
+            checks=checks,
+            check_results=check_results,
+            result=result,
+            response=response,
+            elapsed_time=context.response_time * 1000,
+            max_response_time=max_response_time,
+        )
     except CheckFailed:
         status = Status.failure
         raise
     finally:
+        feedback.add_test_case(case, response)
         if store_interactions:
             result.store_wsgi_response(case, response, headers, elapsed, status, check_results)
-    feedback.add_test_case(case, response)
     return response
 
 
@@ -831,13 +829,7 @@ def asgi_test(
         headers = headers or {}
 
         if not dry_run:
-            response = _asgi_test(
-                case, checks, targets, result, store_interactions, headers, feedback, max_response_time
-            )
-            add_cases(
-                case,
-                response,
-                _asgi_test,
+            args = (
                 checks,
                 targets,
                 result,
@@ -846,6 +838,8 @@ def asgi_test(
                 feedback,
                 max_response_time,
             )
+            response = _asgi_test(case, *args)
+            add_cases(case, response, _asgi_test, *args)
 
 
 def _asgi_test(
@@ -867,12 +861,20 @@ def _asgi_test(
     status = Status.success
     check_results: List[Check] = []
     try:
-        run_checks(case, checks, check_results, result, response, context.response_time * 1000, max_response_time)
+        run_checks(
+            case=case,
+            checks=checks,
+            check_results=check_results,
+            result=result,
+            response=response,
+            elapsed_time=context.response_time * 1000,
+            max_response_time=max_response_time,
+        )
     except CheckFailed:
         status = Status.failure
         raise
     finally:
+        feedback.add_test_case(case, response)
         if store_interactions:
             result.store_requests_response(case, response, status, check_results)
-    feedback.add_test_case(case, response)
     return response

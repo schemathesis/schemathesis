@@ -217,6 +217,7 @@ User's Guide
    contrib
    stateful
    how
+   sanitizing
    compatibility
    examples
    graphql

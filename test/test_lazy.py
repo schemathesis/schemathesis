@@ -841,7 +841,7 @@ def test_(case):
     # And internal frames should not be displayed
     assert "def run_subtest" not in stdout
     assert "def collecting_wrapper" not in stdout
-    assert stdout.count("test_multiple_failures_non_check.py:30") == 1
+    assert stdout.count("test_multiple_failures_non_check.py:37") == 1
 
 
 @pytest.mark.operations("flaky")
@@ -868,7 +868,33 @@ def test_(case):
     assert "def run_subtest" not in stdout
     assert "def collecting_wrapper" not in stdout
     assert "def __flaky" not in stdout
-    assert stdout.count("test_flaky.py:2") == 1
+    assert stdout.count("test_flaky.py:3") == 1
+
+
+@pytest.mark.operations("failure")
+@pytest.mark.parametrize("value", (True, False))
+def test_output_sanitization(testdir, openapi3_schema_url, openapi3_base_url, value):
+    auth = "secret-auth"
+    testdir.make_test(
+        f"""
+@pytest.fixture
+def api_schema():
+    return schemathesis.from_uri('{openapi3_schema_url}')
+
+lazy_schema = schemathesis.from_pytest_fixture("api_schema", sanitize_output={value})
+
+@lazy_schema.parametrize()
+def test_(case):
+    case.call_and_validate(headers={{'Authorization': '{auth}'}})""",
+    )
+    result = testdir.runpytest()
+    # We should skip checking for a server error
+    result.assert_outcomes(passed=1, failed=1)
+    if value:
+        expected = rf"E           curl -X GET -H 'Authorization: [Filtered]' {openapi3_base_url}/failure"
+    else:
+        expected = rf"E           curl -X GET -H 'Authorization: {auth}' {openapi3_base_url}/failure"
+    assert expected in result.stdout.lines
 
 
 @pytest.mark.operations("success")
