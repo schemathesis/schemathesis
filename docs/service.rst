@@ -136,7 +136,7 @@ The following data is included in the reports sent to Schemathesis.io by the CLI
 
   - Most of the Schemathesis runner's events are included, encompassing all generated data and explicitly passed headers.
   - Sensitive data within the generated test cases and received responses is automatically masked by default, replaced with the string ``[Masked]`` to prevent accidental exposure.
-  - Further information on what is considered sensitive and how it is masked can be found at :ref:`Masking Sensitive Output <sensitive-output>` and :ref:`Customizing Sensitive Output Masking <sensitive-output-hook>`.
+  - Further information on what is considered sensitive and how it is masked can be found at :ref:`Masking Sensitive Output <sensitive-output>`.
 
 - **Environment Variables**:
 
