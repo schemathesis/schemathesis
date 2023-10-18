@@ -623,7 +623,7 @@ def test(value):
 
 
 @pytest.mark.parametrize("value", (True, False))
-def test_sensitive_data_masking(testdir, openapi3_base_url, value):
+def test_output_sanitization(testdir, openapi3_base_url, value):
     auth = "secret-auth"
     testdir.make_test(
         f"""
@@ -636,13 +636,13 @@ def test(case):
     case.validate_response(response)
 """,
         paths={"/failure": {"get": {"responses": {"200": {"description": "OK"}}}}},
-        mask_sensitive_output=value,
+        sanitize_output=value,
     )
     result = testdir.runpytest()
     # We should skip checking for a server error
     result.assert_outcomes(failed=1)
     if value:
-        expected = rf"E           curl -X GET -H 'Authorization: [Masked]' {openapi3_base_url}/failure"
+        expected = rf"E           curl -X GET -H 'Authorization: [Filtered]' {openapi3_base_url}/failure"
     else:
         expected = rf"E           curl -X GET -H 'Authorization: {auth}' {openapi3_base_url}/failure"
     assert expected in result.stdout.lines

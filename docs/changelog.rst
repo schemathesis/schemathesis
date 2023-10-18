@@ -14,7 +14,7 @@ Changelog
 - Support for ``body`` hooks in GraphQL schemas, enabling custom filtering or modification of queries and mutations. `#1464`_
 - New ``filter_operations`` hook to conditionally include or exclude specific API operations from being tested.
 - Added ``contains`` method to ``ParameterSet`` for easier parameter checks in hooks. `#1789`_
-- Automatic masking of sensitive data in the output by default. Disable with ``--mask-sensitive-output=false`` CLI option or customize via the new ``mask_sensitive_output`` hook. `#1794`_
+- Automatic sanitization of sensitive data in the output is now enabled by default. This feature can be disabled using the ``--sanitize-output=false`` CLI option. For more advanced customization, use ``schemathesis.sanitizing.configure()``. `#1794`_
 - ``--experimental=openapi-3.1`` CLI option for experimental support of OpenAPI 3.1. This enables compatible JSON Schema validation for responses, while data generation remains OpenAPI 3.0-compatible. `#1820`_
 
 **Note**: Experimental features can change or be removed in any minor version release.

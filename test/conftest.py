@@ -730,7 +730,7 @@ def testdir(testdir):
         tag=None,
         pytest_plugins=("aiohttp.pytest_plugin",),
         validate_schema=True,
-        mask_sensitive_output=True,
+        sanitize_output=True,
         schema=None,
         schema_name="simple_swagger.yaml",
         **kwargs,
@@ -759,7 +759,7 @@ def testdir(testdir):
             endpoint={endpoint},
             tag={tag},
             validate_schema={validate_schema},
-            mask_sensitive_output={mask_sensitive_output}
+            sanitize_output={sanitize_output}
         )
         """.format(
                 schema=schema,
@@ -767,7 +767,7 @@ def testdir(testdir):
                 endpoint=repr(endpoint),
                 tag=repr(tag),
                 validate_schema=repr(validate_schema),
-                mask_sensitive_output=repr(mask_sensitive_output),
+                sanitize_output=repr(sanitize_output),
             )
         )
         module = testdir.makepyfile(preparation, content)

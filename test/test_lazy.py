@@ -873,7 +873,7 @@ def test_(case):
 
 @pytest.mark.operations("failure")
 @pytest.mark.parametrize("value", (True, False))
-def test_sensitive_data_masking(testdir, openapi3_schema_url, openapi3_base_url, value):
+def test_output_sanitization(testdir, openapi3_schema_url, openapi3_base_url, value):
     auth = "secret-auth"
     testdir.make_test(
         f"""
@@ -881,7 +881,7 @@ def test_sensitive_data_masking(testdir, openapi3_schema_url, openapi3_base_url,
 def api_schema():
     return schemathesis.from_uri('{openapi3_schema_url}')
 
-lazy_schema = schemathesis.from_pytest_fixture("api_schema", mask_sensitive_output={value})
+lazy_schema = schemathesis.from_pytest_fixture("api_schema", sanitize_output={value})
 
 @lazy_schema.parametrize()
 def test_(case):
@@ -891,7 +891,7 @@ def test_(case):
     # We should skip checking for a server error
     result.assert_outcomes(passed=1, failed=1)
     if value:
-        expected = rf"E           curl -X GET -H 'Authorization: [Masked]' {openapi3_base_url}/failure"
+        expected = rf"E           curl -X GET -H 'Authorization: [Filtered]' {openapi3_base_url}/failure"
     else:
         expected = rf"E           curl -X GET -H 'Authorization: {auth}' {openapi3_base_url}/failure"
     assert expected in result.stdout.lines

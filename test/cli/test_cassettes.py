@@ -317,7 +317,7 @@ def test_headers_serialization(cli, openapi2_schema_url, hypothesis_max_examples
 
 @pytest.mark.parametrize("value", ("true", "false"))
 @pytest.mark.operations("headers")
-def test_sensitive_data_masking(cli, openapi2_schema_url, hypothesis_max_examples, cassette_path, value):
+def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, cassette_path, value):
     auth = "secret-auth"
     result = cli.run(
         openapi2_schema_url,
@@ -326,13 +326,13 @@ def test_sensitive_data_masking(cli, openapi2_schema_url, hypothesis_max_example
         "--hypothesis-seed=1",
         "--validate-schema=false",
         f"-H Authorization: {auth}",
-        f"--mask-sensitive-output={value}",
+        f"--sanitize-output={value}",
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
 
     if value == "true":
-        expected = "[Masked]"
+        expected = "[Filtered]"
     else:
         expected = ANY
     interactions = cassette["http_interactions"]

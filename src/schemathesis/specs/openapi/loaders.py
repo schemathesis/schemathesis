@@ -69,7 +69,7 @@ def from_path(
     code_sample_style: str = CodeSampleStyle.default().name,
     rate_limit: Optional[str] = None,
     encoding: str = "utf8",
-    mask_sensitive_output: bool = True,
+    sanitize_output: bool = True,
 ) -> BaseOpenAPISchema:
     """Load Open API schema via a file from an OS path.
 
@@ -92,7 +92,7 @@ def from_path(
             code_sample_style=code_sample_style,
             location=pathlib.Path(path).absolute().as_uri(),
             rate_limit=rate_limit,
-            mask_sensitive_output=mask_sensitive_output,
+            sanitize_output=sanitize_output,
             __expects_json=_is_json_path(path),
         )
 
@@ -114,7 +114,7 @@ def from_uri(
     code_sample_style: str = CodeSampleStyle.default().name,
     wait_for_schema: Optional[float] = None,
     rate_limit: Optional[str] = None,
-    mask_sensitive_output: bool = True,
+    sanitize_output: bool = True,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from the network.
@@ -157,7 +157,7 @@ def from_uri(
         code_sample_style=code_sample_style,
         location=uri,
         rate_limit=rate_limit,
-        mask_sensitive_output=mask_sensitive_output,
+        sanitize_output=sanitize_output,
         __expects_json=_is_json_response(response),
     )
 
@@ -188,7 +188,7 @@ def from_file(
     code_sample_style: str = CodeSampleStyle.default().name,
     location: Optional[str] = None,
     rate_limit: Optional[str] = None,
-    mask_sensitive_output: bool = True,
+    sanitize_output: bool = True,
     __expects_json: bool = False,
     **kwargs: Any,  # needed in the runner to have compatible API across all loaders
 ) -> BaseOpenAPISchema:
@@ -225,7 +225,7 @@ def from_file(
         code_sample_style=code_sample_style,
         location=location,
         rate_limit=rate_limit,
-        mask_sensitive_output=mask_sensitive_output,
+        sanitize_output=sanitize_output,
     )
 
 
@@ -252,7 +252,7 @@ def from_dict(
     code_sample_style: str = CodeSampleStyle.default().name,
     location: Optional[str] = None,
     rate_limit: Optional[str] = None,
-    mask_sensitive_output: bool = True,
+    sanitize_output: bool = True,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from a Python dictionary.
 
@@ -287,7 +287,7 @@ def from_dict(
             code_sample_style=_code_sample_style,
             location=location,
             rate_limiter=rate_limiter,
-            mask_sensitive_output=mask_sensitive_output,
+            sanitize_output=sanitize_output,
         )
         dispatch("after_load_schema", hook_context, instance)
         return instance
@@ -322,7 +322,7 @@ def from_dict(
             code_sample_style=_code_sample_style,
             location=location,
             rate_limiter=rate_limiter,
-            mask_sensitive_output=mask_sensitive_output,
+            sanitize_output=sanitize_output,
         )
         dispatch("after_load_schema", hook_context, instance)
         return instance
@@ -406,7 +406,7 @@ def from_pytest_fixture(
     data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
     code_sample_style: str = CodeSampleStyle.default().name,
     rate_limit: Optional[str] = None,
-    mask_sensitive_output: bool = True,
+    sanitize_output: bool = True,
 ) -> LazySchema:
     """Load schema from a ``pytest`` fixture.
 
@@ -440,7 +440,7 @@ def from_pytest_fixture(
         data_generation_methods=_data_generation_methods,
         code_sample_style=_code_sample_style,
         rate_limiter=rate_limiter,
-        mask_sensitive_output=mask_sensitive_output,
+        sanitize_output=sanitize_output,
     )
 
 
@@ -459,7 +459,7 @@ def from_wsgi(
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     rate_limit: Optional[str] = None,
-    mask_sensitive_output: bool = True,
+    sanitize_output: bool = True,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from a WSGI app.
@@ -486,7 +486,7 @@ def from_wsgi(
         code_sample_style=code_sample_style,
         location=schema_path,
         rate_limit=rate_limit,
-        mask_sensitive_output=mask_sensitive_output,
+        sanitize_output=sanitize_output,
         __expects_json=_is_json_response(response),
     )
 
@@ -514,7 +514,7 @@ def from_aiohttp(
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     rate_limit: Optional[str] = None,
-    mask_sensitive_output: bool = True,
+    sanitize_output: bool = True,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from an AioHTTP app.
@@ -540,7 +540,7 @@ def from_aiohttp(
         data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
         rate_limit=rate_limit,
-        mask_sensitive_output=mask_sensitive_output,
+        sanitize_output=sanitize_output,
         **kwargs,
     )
 
@@ -560,7 +560,7 @@ def from_asgi(
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
     rate_limit: Optional[str] = None,
-    mask_sensitive_output: bool = True,
+    sanitize_output: bool = True,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from an ASGI app.
@@ -587,6 +587,6 @@ def from_asgi(
         code_sample_style=code_sample_style,
         location=schema_path,
         rate_limit=rate_limit,
-        mask_sensitive_output=mask_sensitive_output,
+        sanitize_output=sanitize_output,
         __expects_json=_is_json_response(response),
     )

@@ -135,8 +135,8 @@ The following data is included in the reports sent to Schemathesis.io by the CLI
 - **Test Runs**:
 
   - Most of the Schemathesis runner's events are included, encompassing all generated data and explicitly passed headers.
-  - Sensitive data within the generated test cases and received responses is automatically masked by default, replaced with the string ``[Masked]`` to prevent accidental exposure.
-  - Further information on what is considered sensitive and how it is masked can be found at :ref:`Masking Sensitive Output <sensitive-output>`.
+  - Sensitive data within the generated test cases and received responses is automatically sanitized by default, replaced with the string ``[Filtered]`` to prevent accidental exposure.
+  - Further information on what is considered sensitive and how it is sanitized can be found at :ref:`Sanitizing Output <sanitizing-output>`.
 
 - **Environment Variables**:
 
@@ -146,7 +146,7 @@ The following data is included in the reports sent to Schemathesis.io by the CLI
 - **Command-Line Options**:
 
   - Command-line options without free-form values are sent to help us understand how you use the CLI.
-  - Rest assured, any sensitive data passed through command-line options is masked by default.
+  - Rest assured, any sensitive data passed through command-line options is sanitized by default.
 
 For more details on our data handling practices, please refer to our `Privacy Policy <https://schemathesis.io/legal/privacy>`_. If you have further questions or concerns about data handling, feel free to contact us at `support@schemathesis.io <mailto:support@schemathesis.io>`_.
 

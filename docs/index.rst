@@ -217,7 +217,7 @@ User's Guide
    contrib
    stateful
    how
-   sensitive_output
+   sanitizing
    compatibility
    examples
    graphql

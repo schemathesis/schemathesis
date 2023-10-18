@@ -56,8 +56,8 @@ from .exceptions import (
     get_timeout_error,
 )
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
-from .masking import mask_request, mask_response
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
+from .sanitization import sanitize_request, sanitize_response
 from .serializers import Serializer, SerializerContext
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
 from .utils import (
@@ -472,9 +472,9 @@ class Case:
                 else self.operation.schema.code_sample_style
             )
             verify = getattr(response, "verify", True)
-            if self.operation.schema.mask_sensitive_output:
-                mask_request(response.request)
-                mask_response(response)
+            if self.operation.schema.sanitize_output:
+                sanitize_request(response.request)
+                sanitize_response(response)
             code_message = self._get_code_message(code_sample_style, response.request, verify=verify)
             payload = get_response_payload(response)
             raise exception_cls(

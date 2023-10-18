@@ -4,25 +4,25 @@ import pytest
 import requests
 from requests import Request, Response
 
-from schemathesis.masking import (
-    DEFAULT_KEYS_TO_MASK,
-    DEFAULT_REPLACEMENT,
-    DEFAULT_SENSITIVE_MARKERS,
-    Config,
-    configure,
-    mask_case,
-    mask_history,
-    mask_request,
-    mask_sensitive_output,
-    mask_serialized_check,
-    mask_serialized_interaction,
-    mask_url,
-)
 from schemathesis.models import CaseSource, Check
 from schemathesis.models import Request as SerializedRequest
 from schemathesis.models import Response as SerializedResponse
 from schemathesis.models import Status
 from schemathesis.runner.serialization import SerializedCheck, SerializedInteraction
+from schemathesis.sanitization import (
+    DEFAULT_KEYS_TO_SANITIZE,
+    DEFAULT_REPLACEMENT,
+    DEFAULT_SENSITIVE_MARKERS,
+    Config,
+    configure,
+    sanitize_case,
+    sanitize_history,
+    sanitize_output,
+    sanitize_request,
+    sanitize_serialized_check,
+    sanitize_serialized_interaction,
+    sanitize_url,
+)
 from schemathesis.utils import NOT_SET
 
 
@@ -36,11 +36,11 @@ def request_factory():
 
 
 @pytest.fixture
-def masked_case_factory(case_factory):
-    def factory(keys_to_mask=DEFAULT_KEYS_TO_MASK, default_replacement=DEFAULT_REPLACEMENT, **kwargs):
+def sanitized_case_factory_factory(case_factory):
+    def factory(keys_to_sanitize=DEFAULT_KEYS_TO_SANITIZE, default_replacement=DEFAULT_REPLACEMENT, **kwargs):
         case = case_factory(**kwargs)
-        config = Config(keys_to_mask=keys_to_mask, replacement=default_replacement)
-        mask_case(case, config=config)
+        config = Config(keys_to_sanitize=keys_to_sanitize, replacement=default_replacement)
+        sanitize_case(case, config=config)
         return case
 
     return factory
@@ -49,54 +49,56 @@ def masked_case_factory(case_factory):
 @pytest.mark.parametrize(
     "attr, initial, expected",
     [
-        ("path_parameters", {"password": "1234"}, {"password": "[Masked]"}),
-        ("headers", {"Authorization": "Bearer token"}, {"Authorization": "[Masked]"}),
-        ("headers", {"Authorization": ["Bearer token"]}, {"Authorization": ["[Masked]"]}),
-        ("headers", {"X-Foo-Authorization": "Bearer token"}, {"X-Foo-Authorization": "[Masked]"}),
-        ("cookies", {"session": "xyz"}, {"session": "[Masked]"}),
-        ("query", {"api_key": "5678"}, {"api_key": "[Masked]"}),
-        ("body", {"nested": {"password": "password"}}, {"nested": {"password": "[Masked]"}}),
+        ("path_parameters", {"password": "1234"}, {"password": "[Filtered]"}),
+        ("headers", {"Authorization": "Bearer token"}, {"Authorization": "[Filtered]"}),
+        ("headers", {"Authorization": ["Bearer token"]}, {"Authorization": ["[Filtered]"]}),
+        ("headers", {"X-Foo-Authorization": "Bearer token"}, {"X-Foo-Authorization": "[Filtered]"}),
+        ("cookies", {"session": "xyz"}, {"session": "[Filtered]"}),
+        ("query", {"api_key": "5678"}, {"api_key": "[Filtered]"}),
+        ("body", {"nested": {"password": "password"}}, {"nested": {"password": "[Filtered]"}}),
     ],
 )
-def test_mask_case(masked_case_factory, attr, initial, expected):
-    case = masked_case_factory(**{attr: initial})
+def test_sanitize_case(sanitized_case_factory_factory, attr, initial, expected):
+    case = sanitized_case_factory_factory(**{attr: initial})
     assert getattr(case, attr) == expected
 
 
-def test_mask_case_body_not_dict_or_not_set(masked_case_factory):
-    assert masked_case_factory(body="Some string body").body == "Some string body"  # Body should remain unchanged
+def test_sanitize_case_body_not_dict_or_not_set(sanitized_case_factory_factory):
+    assert (
+        sanitized_case_factory_factory(body="Some string body").body == "Some string body"
+    )  # Body should remain unchanged
 
 
-def test_mask_case_body_is_not_set(masked_case_factory):
-    assert masked_case_factory(body=NOT_SET).body is NOT_SET  # Body should remain unchanged
+def test_sanitize_case_body_is_not_set(sanitized_case_factory_factory):
+    assert sanitized_case_factory_factory(body=NOT_SET).body is NOT_SET  # Body should remain unchanged
 
 
-def test_mask_case_custom_keys_to_mask(masked_case_factory):
-    case = masked_case_factory(query={"custom_key": "sensitive"}, keys_to_mask=("custom_key",))
-    assert case.query["custom_key"] == "[Masked]"
+def test_sanitize_case_custom_keys_to_sanitize(sanitized_case_factory_factory):
+    case = sanitized_case_factory_factory(query={"custom_key": "sensitive"}, keys_to_sanitize=("custom_key",))
+    assert case.query["custom_key"] == "[Filtered]"
 
 
-def test_mask_case_custom_replacement(masked_case_factory):
+def test_sanitize_case_custom_replacement(sanitized_case_factory_factory):
     custom_replacement = "[Redacted]"
-    case = masked_case_factory(path_parameters={"password": "1234"}, default_replacement=custom_replacement)
+    case = sanitized_case_factory_factory(path_parameters={"password": "1234"}, default_replacement=custom_replacement)
     assert case.path_parameters["password"] == custom_replacement
 
 
 @pytest.mark.parametrize(
     "body, expected",
     [
-        ({"nested": {"secret": "reveal"}, "foo": 123}, {"nested": {"secret": "[Masked]"}, "foo": 123}),
-        ([{"secret": "reveal"}, 1], [{"secret": "[Masked]"}, 1]),
+        ({"nested": {"secret": "reveal"}, "foo": 123}, {"nested": {"secret": "[Filtered]"}, "foo": 123}),
+        ([{"secret": "reveal"}, 1], [{"secret": "[Filtered]"}, 1]),
         ("string body", "string body"),
         (123, 123),
         (NOT_SET, NOT_SET),
     ],
 )
-def test_mask_case_body_variants(masked_case_factory, body, expected):
-    assert masked_case_factory(body=body).body == expected
+def test_sanitize_case_body_variants(sanitized_case_factory_factory, body, expected):
+    assert sanitized_case_factory_factory(body=body).body == expected
 
 
-def test_mask_history(case_factory):
+def test_sanitize_history(case_factory):
     case3 = case_factory(headers={"Authorization": "Bearer token"})
     source3 = CaseSource(case=case3, response=requests.Response(), elapsed=0.3)
 
@@ -106,65 +108,65 @@ def test_mask_history(case_factory):
     case1 = case_factory(headers={"Password": "password"}, source=source2)
     source1 = CaseSource(case=case1, response=requests.Response(), elapsed=0.1)
 
-    mask_history(source1)
+    sanitize_history(source1)
 
-    assert case1.headers == {"Password": "[Masked]"}
-    assert case2.headers == {"X-API-Key": "[Masked]"}
-    assert case3.headers == {"Authorization": "[Masked]"}
+    assert case1.headers == {"Password": "[Filtered]"}
+    assert case2.headers == {"X-API-Key": "[Filtered]"}
+    assert case3.headers == {"Authorization": "[Filtered]"}
 
 
-def test_mask_history_empty(case_factory):
+def test_sanitize_history_empty(case_factory):
     case = case_factory(headers={"Password": "password"})
     source = CaseSource(case=case, response=requests.Response(), elapsed=0.1)
 
-    mask_history(source)
+    sanitize_history(source)
 
-    assert case.headers == {"Password": "[Masked]"}
+    assert case.headers == {"Password": "[Filtered]"}
 
 
 @pytest.mark.parametrize(
     "headers, expected",
     (
-        ({"Authorization": "Bearer token"}, {"Authorization": "[Masked]"}),
-        ({"Custom-Token": "custom_token_value"}, {"Custom-Token": "[Masked]"}),
+        ({"Authorization": "Bearer token"}, {"Authorization": "[Filtered]"}),
+        ({"Custom-Token": "custom_token_value"}, {"Custom-Token": "[Filtered]"}),
         ({"Content-Type": "application/json"}, {"Content-Type": "application/json"}),
     ),
 )
-def test_mask_request(request_factory, headers, expected):
+def test_sanitize_request(request_factory, headers, expected):
     request = request_factory(headers=headers)
-    mask_request(request)
+    sanitize_request(request)
     assert request.headers == {**expected, "Content-Length": "0"}
 
 
-def test_mask_request_url(request_factory):
+def test_sanitize_request_url(request_factory):
     request = request_factory(url="http://user:pass@127.0.0.1/path")
-    mask_request(request)
-    assert request.url == "http://[Masked]@127.0.0.1/path"
+    sanitize_request(request)
+    assert request.url == "http://[Filtered]@127.0.0.1/path"
 
 
-def test_mask_serialized_request():
+def test_sanitize_serialized_request():
     request = SerializedRequest(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, headers={})
-    mask_request(request)
-    assert request.uri == "http://[Masked]@127.0.0.1/path"
+    sanitize_request(request)
+    assert request.uri == "http://[Filtered]@127.0.0.1/path"
 
 
-def test_mask_sensitive_output(case_factory, request_factory):
+def test_sanitize_output(case_factory, request_factory):
     response = Response()
     response.headers = {"API-Key": "secret"}
     response.request = request_factory(headers={"Custom-Token": "custom_token_value"})
     case = case_factory(headers={"Authorization": "Bearer token"}, query={"api_key": "12345"})
-    mask_sensitive_output(case, response=response)
-    assert case.headers == {"Authorization": "[Masked]"}
-    assert case.query == {"api_key": "[Masked]"}
-    assert response.headers == {"API-Key": "[Masked]"}
-    assert response.request.headers == {"Custom-Token": "[Masked]", "Content-Length": "0"}
+    sanitize_output(case, response=response)
+    assert case.headers == {"Authorization": "[Filtered]"}
+    assert case.query == {"api_key": "[Filtered]"}
+    assert response.headers == {"API-Key": "[Filtered]"}
+    assert response.request.headers == {"Custom-Token": "[Filtered]", "Content-Length": "0"}
 
 
-def test_mask_sensitive_output_no_response(case_factory):
+def test_sanitize_output_no_response(case_factory):
     case = case_factory(headers={"Authorization": "Bearer token"}, query={"api_key": "12345"})
-    mask_sensitive_output(case)
-    assert case.headers == {"Authorization": "[Masked]"}
-    assert case.query == {"api_key": "[Masked]"}
+    sanitize_output(case)
+    assert case.headers == {"Authorization": "[Filtered]"}
+    assert case.query == {"api_key": "[Filtered]"}
 
 
 URLENCODED_REPLACEMENT = urlencode({"": DEFAULT_REPLACEMENT})[1:]  # skip the `=` character
@@ -215,8 +217,8 @@ URLENCODED_REPLACEMENT = urlencode({"": DEFAULT_REPLACEMENT})[1:]  # skip the `=
         ),
     ],
 )
-def test_mask_url(input_url, expected_url):
-    assert mask_url(input_url) == expected_url
+def test_sanitize_url(input_url, expected_url):
+    assert sanitize_url(input_url) == expected_url
 
 
 @pytest.fixture
@@ -236,13 +238,13 @@ def serialized_check(case_factory, response_factory):
     return SerializedCheck.from_check(check)
 
 
-def test_mask_serialized_check(serialized_check):
-    mask_serialized_check(serialized_check)
+def test_sanitize_serialized_check(serialized_check):
+    sanitize_serialized_check(serialized_check)
     assert serialized_check.example.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
     assert serialized_check.history[0].case.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
 
 
-def test_mask_serialized_interaction(serialized_check):
+def test_sanitize_serialized_interaction(serialized_check):
     request = SerializedRequest(
         method="POST", uri="http://user:pass@127.0.0.1/path", body=None, headers={"X-Token": "Secret"}
     )
@@ -259,7 +261,7 @@ def test_mask_serialized_interaction(serialized_check):
     interaction = SerializedInteraction(
         request=request, response=response, checks=[serialized_check], status=Status.failure, recorded_at=""
     )
-    mask_serialized_interaction(interaction)
+    sanitize_serialized_interaction(interaction)
 
     assert interaction.checks[0].example.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
     assert interaction.checks[0].history[0].case.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
@@ -269,42 +271,51 @@ def test_mask_serialized_interaction(serialized_check):
 
 
 @pytest.fixture
-def masking_config():
+def config():
     return Config()
 
 
-def test_with_keys_to_mask(masking_config):
+def test_with_keys_to_sanitize(config):
     new_keys = {"new_key1", "new_key2"}
-    updated_config = masking_config.with_keys_to_mask(*new_keys)
-    assert updated_config.keys_to_mask == DEFAULT_KEYS_TO_MASK.union(new_keys)
+    updated_config = config.with_keys_to_sanitize(*new_keys)
+    assert updated_config.keys_to_sanitize == DEFAULT_KEYS_TO_SANITIZE.union(new_keys)
 
 
-def test_without_keys_to_mask(masking_config):
+def test_without_keys_to_sanitize(config):
     remove_keys = {"phpsessid", "xsrf-token"}
-    updated_config = masking_config.without_keys_to_mask(*remove_keys)
-    assert updated_config.keys_to_mask == DEFAULT_KEYS_TO_MASK.difference(remove_keys)
+    updated_config = config.without_keys_to_sanitize(*remove_keys)
+    assert updated_config.keys_to_sanitize == DEFAULT_KEYS_TO_SANITIZE.difference(remove_keys)
 
 
-def test_with_sensitive_markers(masking_config):
+def test_with_sensitive_markers(config):
     new_markers = {"new_marker1", "new_marker2"}
-    updated_config = masking_config.with_sensitive_markers(*new_markers)
+    updated_config = config.with_sensitive_markers(*new_markers)
     assert updated_config.sensitive_markers == DEFAULT_SENSITIVE_MARKERS.union(new_markers)
 
 
-def test_without_sensitive_markers(masking_config):
+def test_without_sensitive_markers(config):
     remove_markers = {"token", "key"}
-    updated_config = masking_config.without_sensitive_markers(*remove_markers)
+    updated_config = config.without_sensitive_markers(*remove_markers)
     assert updated_config.sensitive_markers == DEFAULT_SENSITIVE_MARKERS.difference(remove_markers)
 
 
-def test_default_replacement_unchanged(masking_config):
+def test_default_replacement_unchanged(config):
     new_keys = {"new_key1", "new_key2"}
-    updated_config = masking_config.with_keys_to_mask(*new_keys)
+    updated_config = config.with_keys_to_sanitize(*new_keys)
     assert updated_config.replacement == DEFAULT_REPLACEMENT
 
 
-def test_configure(case_factory):
-    configure(Config().with_keys_to_mask("foobar"))
-    case = case_factory(query={"foobar": "sensitive"})
-    mask_case(case)
-    assert case.query == {"foobar": "[Masked]"}
+@pytest.mark.parametrize("header", ("x-customer-id", "X-CUSTOMER-ID", "X-Customer-Id"))
+def test_configure_keys_to_sanitize(case_factory, header):
+    configure(Config().with_keys_to_sanitize("X-Customer-ID"))
+    case = case_factory(headers={header: "sensitive"})
+    sanitize_case(case)
+    assert case.headers == {header: "[Filtered]"}
+
+
+@pytest.mark.parametrize("header", ("billing-address", "BILLING-ADDRESS", "Billing-Address"))
+def test_configure_sensitive_markers(case_factory, header):
+    configure(Config().with_sensitive_markers("billing"))
+    case = case_factory(headers={header: "sensitive"})
+    sanitize_case(case)
+    assert case.headers == {header: "[Filtered]"}

@@ -107,13 +107,13 @@ Loaders
 .. autofunction:: schemathesis.graphql.from_url
 .. autofunction:: schemathesis.graphql.from_wsgi
 
-Masking Sensitive Output
-~~~~~~~~~~~~~~~~~~~~~~~~
+Sanitizing Output
+~~~~~~~~~~~~~~~~~
 
-.. autoclass:: schemathesis.masking.Config()
+.. autoclass:: schemathesis.sanitization.Config()
 
-  .. automethod:: with_keys_to_mask
-  .. automethod:: without_keys_to_mask
+  .. automethod:: with_keys_to_sanitize
+  .. automethod:: without_keys_to_sanitize
   .. automethod:: with_sensitive_markers
   .. automethod:: without_sensitive_markers
 

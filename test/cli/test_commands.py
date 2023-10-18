@@ -346,8 +346,7 @@ def test_commands_run_help(cli):
         "                                  [default: 5; 1<=x<=100]",
         "  --force-schema-version [20|30]  Force Schemathesis to parse the input schema",
         "                                  with the specified spec version.",
-        "  --mask-sensitive-output BOOLEAN",
-        "                                  Enable or disable automatic output",
+        "  --sanitize-output BOOLEAN       Enable or disable automatic output",
         "                                  sanitization to obscure sensitive data.",
         "                                  [default: True]",
         "  --contrib-unique-data           Forces Schemathesis to generate unique test",
@@ -1978,7 +1977,7 @@ def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra):
     # See GH-792
     # When the tested API operation has basic auth
     # And the auth is overridden (directly or via headers)
-    result = cli.run(schema_url, "--checks=all", "--mask-sensitive-output=false", extra)
+    result = cli.run(schema_url, "--checks=all", "--sanitize-output=false", extra)
     # And there is an error during testing
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
@@ -1992,7 +1991,7 @@ def test_explicit_headers_in_output_on_errors(cli, schema_url):
     # When there is a non-fatal error during testing (e.g. flakiness)
     # And custom headers were passed explicitly
     auth = "Basic J3Rlc3Q6d3Jvbmcn"
-    result = cli.run(schema_url, "--checks=all", "--mask-sensitive-output=false", f"-H Authorization: {auth}")
+    result = cli.run(schema_url, "--checks=all", "--sanitize-output=false", f"-H Authorization: {auth}")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.splitlines()
     # Then the code sample should have the overridden value
@@ -2132,7 +2131,7 @@ def assert_exit_code(event_stream, code):
             started_at=current_datetime(),
             report=None,
             telemetry=False,
-            mask_sensitive_output=False,
+            sanitize_output=False,
         )
     assert exc.value.code == code
 
@@ -2219,7 +2218,7 @@ def test_explicit_example_failure_output(testdir, cli, openapi3_base_url):
         },
     }
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
-    result = cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--mask-sensitive-output=false")
+    result = cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--sanitize-output=false")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then the failure should only appear in the FAILURES block
     assert "HYPOTHESIS OUTPUT" not in result.stdout
@@ -2436,7 +2435,7 @@ Ensure that the definition complies with the OpenAPI specification"""
 
 @pytest.mark.parametrize("value", ("true", "false"))
 @pytest.mark.operations("failure")
-def test_sensitive_data_masking(cli, openapi2_schema_url, hypothesis_max_examples, value):
+def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, value):
     auth = "secret-auth"
     result = cli.run(
         openapi2_schema_url,
@@ -2444,11 +2443,11 @@ def test_sensitive_data_masking(cli, openapi2_schema_url, hypothesis_max_example
         "--hypothesis-seed=1",
         "--validate-schema=false",
         f"-H Authorization: {auth}",
-        f"--mask-sensitive-output={value}",
+        f"--sanitize-output={value}",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     if value == "false":
         expected = f"curl -X GET -H 'Authorization: {auth}'"
     else:
-        expected = "curl -X GET -H 'Authorization: [Masked]'"
+        expected = "curl -X GET -H 'Authorization: [Filtered]'"
     assert expected in result.stdout

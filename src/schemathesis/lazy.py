@@ -50,7 +50,7 @@ class LazySchema:
     data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
     rate_limiter: Optional[Limiter] = None
-    mask_sensitive_output: bool = True
+    sanitize_output: bool = True
 
     def hook(self, hook: Union[str, Callable]) -> Callable:
         return self.hooks.register(hook)
@@ -117,7 +117,7 @@ class LazySchema:
                     code_sample_style=_code_sample_style,
                     app=self.app,
                     rate_limiter=self.rate_limiter,
-                    mask_sensitive_output=self.mask_sensitive_output,
+                    sanitize_output=self.sanitize_output,
                 )
                 fixtures = get_fixtures(test, request, given_kwargs)
                 # Changing the node id is required for better reporting - the method and path will appear there
@@ -278,7 +278,7 @@ def get_schema(
     data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
     code_sample_style: CodeSampleStyle,
     rate_limiter: Optional[Limiter],
-    mask_sensitive_output: bool,
+    sanitize_output: bool,
 ) -> BaseSchema:
     """Loads a schema from the fixture."""
     schema = request.getfixturevalue(name)
@@ -299,7 +299,7 @@ def get_schema(
         data_generation_methods=data_generation_methods,
         code_sample_style=code_sample_style,
         rate_limiter=rate_limiter,
-        mask_sensitive_output=mask_sensitive_output,
+        sanitize_output=sanitize_output,
     )
 
 
