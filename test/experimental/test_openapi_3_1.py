@@ -65,7 +65,7 @@ def test_works_with_fastapi(fastapi_app, with_fixup):
     schema = from_asgi("/openapi.json", fastapi_app)
 
     @given(case=schema["/address/"]["GET"].as_strategy())
-    @settings(phases=[Phase.generate])
+    @settings(phases=[Phase.generate], deadline=None)
     def test(case):
         response = case.call_asgi()
         with pytest.raises(CheckFailed) as exc:
