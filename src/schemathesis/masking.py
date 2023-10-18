@@ -79,23 +79,34 @@ DEFAULT_REPLACEMENT = "[Masked]"
 
 @dataclass
 class MaskingConfig:
+    """Configuration class for masking sensitive data.
+
+    :param FrozenSet[str] keys_to_mask: The exact keys to mask.
+    :param FrozenSet[str] sensitive_markers: Markers indicating potentially sensitive keys.
+    :param str replacement: The replacement string for masked values.
+    """
+
     keys_to_mask: FrozenSet[str] = DEFAULT_KEYS_TO_MASK
     sensitive_markers: FrozenSet[str] = DEFAULT_SENSITIVE_MARKERS
-    default_replacement: str = DEFAULT_REPLACEMENT
+    replacement: str = DEFAULT_REPLACEMENT
 
     def with_keys_to_mask(self, *keys: str) -> "MaskingConfig":
+        """Create a new configuration with additional keys to mask."""
         new_keys_to_mask = self.keys_to_mask.union(keys)
         return replace(self, keys_to_mask=frozenset(new_keys_to_mask))
 
     def without_keys_to_mask(self, *keys: str) -> "MaskingConfig":
+        """Create a new configuration without certain keys to mask."""
         new_keys_to_mask = self.keys_to_mask.difference(keys)
         return replace(self, keys_to_mask=frozenset(new_keys_to_mask))
 
     def with_sensitive_markers(self, *markers: str) -> "MaskingConfig":
+        """Create a new configuration with additional sensitive markers."""
         new_sensitive_markers = self.sensitive_markers.union(markers)
         return replace(self, sensitive_markers=frozenset(new_sensitive_markers))
 
     def without_sensitive_markers(self, *markers: str) -> "MaskingConfig":
+        """Create a new configuration without certain sensitive markers."""
         new_sensitive_markers = self.sensitive_markers.difference(markers)
         return replace(self, sensitive_markers=frozenset(new_sensitive_markers))
 
@@ -104,14 +115,19 @@ DEFAULT_MASKING_CONFIG = MaskingConfig()
 
 
 def mask_value(item: Any, *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -> None:
+    """Mask sensitive values within a given item.
+
+    This function is recursive and will mask sensitive data within nested
+    dictionaries and lists as well.
+    """
     if isinstance(item, MutableMapping):
         for key in list(item.keys()):
             lower_key = key.lower()
             if lower_key in config.keys_to_mask or any(marker in lower_key for marker in config.sensitive_markers):
                 if isinstance(item[key], list):
-                    item[key] = [config.default_replacement]
+                    item[key] = [config.replacement]
                 else:
-                    item[key] = config.default_replacement
+                    item[key] = config.replacement
         for value in item.values():
             if isinstance(value, (MutableMapping, MutableSequence)):
                 mask_value(value, config=config)
@@ -122,6 +138,7 @@ def mask_value(item: Any, *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -> 
 
 
 def mask_case(case: "Case", *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -> None:
+    """Mask sensitive values within a given case."""
     if case.path_parameters is not None:
         mask_value(case.path_parameters, config=config)
     if case.headers is not None:
@@ -170,12 +187,16 @@ def mask_sensitive_output(
 
 
 def mask_url(url: str, *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -> str:
+    """Mask sensitive parts of a given URL.
+
+    This function will mask the authority and query parameters in the URL.
+    """
     parsed = urlsplit(url)
 
     # Mask authority
     netloc_parts = parsed.netloc.split("@")
     if len(netloc_parts) > 1:
-        netloc = f"{config.default_replacement}@{netloc_parts[-1]}"
+        netloc = f"{config.replacement}@{netloc_parts[-1]}"
     else:
         netloc = parsed.netloc
 
@@ -210,7 +231,6 @@ def mask_serialized_interaction(
     interaction: "SerializedInteraction", *, config: MaskingConfig = DEFAULT_MASKING_CONFIG
 ) -> None:
     mask_request(interaction.request, config=config)
-    if interaction.response:
-        mask_value(interaction.response.headers, config=config)
+    mask_value(interaction.response.headers, config=config)
     for check in interaction.checks:
         mask_serialized_check(check, config=config)

@@ -309,7 +309,7 @@ Customizing Sensitive Output Masking
 Schemathesis performs automatic masking of sensitive data in the generated test case and the received response by default.
 For details on the default masking rules, see :ref:`Masking Sensitive Output <sensitive-output>`.
 
-You can customize the masking process further using the ``mask_sensitive_output`` hook:
+You can customize the masking process using the ``configure_sensitive_output_masking`` hook:
 
 .. code:: python
 
@@ -317,16 +317,17 @@ You can customize the masking process further using the ``mask_sensitive_output`
 
 
     @schemathesis.hook
-    def mask_sensitive_output(context, case, response):
-        if case.headers and "Custom-Header" in case.headers:
-            case.headers["Custom-Header"] = "***"
-        if isinstance(case.body, dict) and "customer_address" in case.body:
-            case.body["customer_address"] = "***"
-        # Run the default masking
-        context.mask_sensitive_output(case, response)
+    def configure_sensitive_output_masking(context):
+        # Create a new MaskingConfig instance with your custom settings
+        return (
+            MaskingConfig(replacement="[Custom Masked]")
+            # Additional keys to mask
+            .with_keys_to_mask("X-Customer-ID")
+            # Additional sensitive markers
+            .with_sensitive_markers("address")
+        )
 
-In this example, the ``mask_sensitive_output`` hook obscures a custom ``Custom-Header`` header and a field ``customer_address`` within the test case body,
-before invoking the default masking through ``context.mask_sensitive_output(case, response)``.
+In this example, specifying a custom masking configuration ensures that Schemathesis will mask the "X-Customer-ID" header and all fields containing "address" in their names in the test output.
 
 ``before_process_path``
 ~~~~~~~~~~~~~~~~~~~~~~~

@@ -38,7 +38,7 @@ def request_factory():
 def masked_case(case_factory):
     def factory(keys_to_mask=DEFAULT_KEYS_TO_MASK, default_replacement=DEFAULT_REPLACEMENT, **kwargs):
         case = case_factory(**kwargs)
-        config = MaskingConfig(keys_to_mask=keys_to_mask, default_replacement=default_replacement)
+        config = MaskingConfig(keys_to_mask=keys_to_mask, replacement=default_replacement)
         mask_case(case, config=config)
         return case
 
@@ -299,4 +299,4 @@ def test_without_sensitive_markers(masking_config):
 def test_default_replacement_unchanged(masking_config):
     new_keys = {"new_key1", "new_key2"}
     updated_config = masking_config.with_keys_to_mask(*new_keys)
-    assert updated_config.default_replacement == DEFAULT_REPLACEMENT
+    assert updated_config.replacement == DEFAULT_REPLACEMENT
