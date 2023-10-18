@@ -301,34 +301,6 @@ Here's a GraphQL example that includes all queries:
 In these examples, the ``filter_operations`` hook skips all ``POST`` methods in Open API and all mutations in GraphQL.
 You can implement any custom logic within the ``filter_operations`` function to include or exclude specific API operations.
 
-.. _sensitive-output-hook:
-
-Customizing Sensitive Output Masking
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Schemathesis performs automatic masking of sensitive data in the generated test case and the received response by default.
-For details on the default masking rules, see :ref:`Masking Sensitive Output <sensitive-output>`.
-
-You can customize the masking process using the ``configure_sensitive_output_masking`` hook:
-
-.. code:: python
-
-    import schemathesis
-
-
-    @schemathesis.hook
-    def configure_sensitive_output_masking(context):
-        # Create a new MaskingConfig instance with your custom settings
-        return (
-            MaskingConfig(replacement="[Custom Masked]")
-            # Additional keys to mask
-            .with_keys_to_mask("X-Customer-ID")
-            # Additional sensitive markers
-            .with_sensitive_markers("address")
-        )
-
-In this example, specifying a custom masking configuration ensures that Schemathesis will mask the "X-Customer-ID" header and all fields containing "address" in their names in the test output.
-
 ``before_process_path``
 ~~~~~~~~~~~~~~~~~~~~~~~
 

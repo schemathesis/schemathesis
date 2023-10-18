@@ -8,7 +8,8 @@ from schemathesis.masking import (
     DEFAULT_KEYS_TO_MASK,
     DEFAULT_REPLACEMENT,
     DEFAULT_SENSITIVE_MARKERS,
-    MaskingConfig,
+    Config,
+    configure,
     mask_case,
     mask_history,
     mask_request,
@@ -35,10 +36,10 @@ def request_factory():
 
 
 @pytest.fixture
-def masked_case(case_factory):
+def masked_case_factory(case_factory):
     def factory(keys_to_mask=DEFAULT_KEYS_TO_MASK, default_replacement=DEFAULT_REPLACEMENT, **kwargs):
         case = case_factory(**kwargs)
-        config = MaskingConfig(keys_to_mask=keys_to_mask, replacement=default_replacement)
+        config = Config(keys_to_mask=keys_to_mask, replacement=default_replacement)
         mask_case(case, config=config)
         return case
 
@@ -57,27 +58,27 @@ def masked_case(case_factory):
         ("body", {"nested": {"password": "password"}}, {"nested": {"password": "[Masked]"}}),
     ],
 )
-def test_mask_case(masked_case, attr, initial, expected):
-    case = masked_case(**{attr: initial})
+def test_mask_case(masked_case_factory, attr, initial, expected):
+    case = masked_case_factory(**{attr: initial})
     assert getattr(case, attr) == expected
 
 
-def test_mask_case_body_not_dict_or_not_set(masked_case):
-    assert masked_case(body="Some string body").body == "Some string body"  # Body should remain unchanged
+def test_mask_case_body_not_dict_or_not_set(masked_case_factory):
+    assert masked_case_factory(body="Some string body").body == "Some string body"  # Body should remain unchanged
 
 
-def test_mask_case_body_is_not_set(masked_case):
-    assert masked_case(body=NOT_SET).body is NOT_SET  # Body should remain unchanged
+def test_mask_case_body_is_not_set(masked_case_factory):
+    assert masked_case_factory(body=NOT_SET).body is NOT_SET  # Body should remain unchanged
 
 
-def test_mask_case_custom_keys_to_mask(masked_case):
-    case = masked_case(query={"custom_key": "sensitive"}, keys_to_mask=("custom_key",))
+def test_mask_case_custom_keys_to_mask(masked_case_factory):
+    case = masked_case_factory(query={"custom_key": "sensitive"}, keys_to_mask=("custom_key",))
     assert case.query["custom_key"] == "[Masked]"
 
 
-def test_mask_case_custom_replacement(masked_case):
+def test_mask_case_custom_replacement(masked_case_factory):
     custom_replacement = "[Redacted]"
-    case = masked_case(path_parameters={"password": "1234"}, default_replacement=custom_replacement)
+    case = masked_case_factory(path_parameters={"password": "1234"}, default_replacement=custom_replacement)
     assert case.path_parameters["password"] == custom_replacement
 
 
@@ -91,8 +92,8 @@ def test_mask_case_custom_replacement(masked_case):
         (NOT_SET, NOT_SET),
     ],
 )
-def test_mask_case_body_variants(masked_case, body, expected):
-    assert masked_case(body=body).body == expected
+def test_mask_case_body_variants(masked_case_factory, body, expected):
+    assert masked_case_factory(body=body).body == expected
 
 
 def test_mask_history(case_factory):
@@ -269,7 +270,7 @@ def test_mask_serialized_interaction(serialized_check):
 
 @pytest.fixture
 def masking_config():
-    return MaskingConfig()
+    return Config()
 
 
 def test_with_keys_to_mask(masking_config):
@@ -300,3 +301,10 @@ def test_default_replacement_unchanged(masking_config):
     new_keys = {"new_key1", "new_key2"}
     updated_config = masking_config.with_keys_to_mask(*new_keys)
     assert updated_config.replacement == DEFAULT_REPLACEMENT
+
+
+def test_configure(case_factory):
+    configure(Config().with_keys_to_mask("foobar"))
+    case = case_factory(query={"foobar": "sensitive"})
+    mask_case(case)
+    assert case.query == {"foobar": "[Masked]"}

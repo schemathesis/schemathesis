@@ -1,3 +1,4 @@
+import threading
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, FrozenSet, Optional, Union, cast
@@ -78,7 +79,7 @@ DEFAULT_REPLACEMENT = "[Masked]"
 
 
 @dataclass
-class MaskingConfig:
+class Config:
     """Configuration class for masking sensitive data.
 
     :param FrozenSet[str] keys_to_mask: The exact keys to mask.
@@ -90,36 +91,48 @@ class MaskingConfig:
     sensitive_markers: FrozenSet[str] = DEFAULT_SENSITIVE_MARKERS
     replacement: str = DEFAULT_REPLACEMENT
 
-    def with_keys_to_mask(self, *keys: str) -> "MaskingConfig":
+    def with_keys_to_mask(self, *keys: str) -> "Config":
         """Create a new configuration with additional keys to mask."""
         new_keys_to_mask = self.keys_to_mask.union(keys)
         return replace(self, keys_to_mask=frozenset(new_keys_to_mask))
 
-    def without_keys_to_mask(self, *keys: str) -> "MaskingConfig":
+    def without_keys_to_mask(self, *keys: str) -> "Config":
         """Create a new configuration without certain keys to mask."""
         new_keys_to_mask = self.keys_to_mask.difference(keys)
         return replace(self, keys_to_mask=frozenset(new_keys_to_mask))
 
-    def with_sensitive_markers(self, *markers: str) -> "MaskingConfig":
+    def with_sensitive_markers(self, *markers: str) -> "Config":
         """Create a new configuration with additional sensitive markers."""
         new_sensitive_markers = self.sensitive_markers.union(markers)
         return replace(self, sensitive_markers=frozenset(new_sensitive_markers))
 
-    def without_sensitive_markers(self, *markers: str) -> "MaskingConfig":
+    def without_sensitive_markers(self, *markers: str) -> "Config":
         """Create a new configuration without certain sensitive markers."""
         new_sensitive_markers = self.sensitive_markers.difference(markers)
         return replace(self, sensitive_markers=frozenset(new_sensitive_markers))
 
 
-DEFAULT_MASKING_CONFIG = MaskingConfig()
+_thread_local = threading.local()
 
 
-def mask_value(item: Any, *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -> None:
+def _get_default_masking_config() -> Config:
+    # Initialize the thread-local default masking config if not already set
+    if not hasattr(_thread_local, "default_masking_config"):
+        _thread_local.default_masking_config = Config()
+    return _thread_local.default_masking_config
+
+
+def configure(config: Config) -> None:
+    _thread_local.default_masking_config = config
+
+
+def mask_value(item: Any, *, config: Optional[Config] = None) -> None:
     """Mask sensitive values within a given item.
 
     This function is recursive and will mask sensitive data within nested
     dictionaries and lists as well.
     """
+    config = config or _get_default_masking_config()
     if isinstance(item, MutableMapping):
         for key in list(item.keys()):
             lower_key = key.lower()
@@ -137,7 +150,7 @@ def mask_value(item: Any, *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -> 
                 mask_value(value, config=config)
 
 
-def mask_case(case: "Case", *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -> None:
+def mask_case(case: "Case", *, config: Optional[Config] = None) -> None:
     """Mask sensitive values within a given case."""
     if case.path_parameters is not None:
         mask_value(case.path_parameters, config=config)
@@ -153,7 +166,7 @@ def mask_case(case: "Case", *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -
         mask_history(case.source, config=config)
 
 
-def mask_history(source: "CaseSource", *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -> None:
+def mask_history(source: "CaseSource", *, config: Optional[Config] = None) -> None:
     """Recursively mask history of case/response pairs."""
     current: Optional["CaseSource"] = source
     while current is not None:
@@ -162,12 +175,12 @@ def mask_history(source: "CaseSource", *, config: MaskingConfig = DEFAULT_MASKIN
         current = current.case.source
 
 
-def mask_response(response: "GenericResponse", *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -> None:
+def mask_response(response: "GenericResponse", *, config: Optional[Config] = None) -> None:
     # Mask headers
     mask_value(response.headers, config=config)
 
 
-def mask_request(request: Union[PreparedRequest, "Request"], *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -> None:
+def mask_request(request: Union[PreparedRequest, "Request"], *, config: Optional[Config] = None) -> None:
     if isinstance(request, PreparedRequest) and request.url:
         request.url = mask_url(request.url, config=config)
     else:
@@ -178,7 +191,7 @@ def mask_request(request: Union[PreparedRequest, "Request"], *, config: MaskingC
 
 
 def mask_sensitive_output(
-    case: "Case", response: Optional["GenericResponse"] = None, *, config: MaskingConfig = DEFAULT_MASKING_CONFIG
+    case: "Case", response: Optional["GenericResponse"] = None, *, config: Optional[Config] = None
 ) -> None:
     mask_case(case, config=config)
     if response is not None:
@@ -186,11 +199,12 @@ def mask_sensitive_output(
         mask_request(response.request, config=config)
 
 
-def mask_url(url: str, *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -> str:
+def mask_url(url: str, *, config: Optional[Config] = None) -> str:
     """Mask sensitive parts of a given URL.
 
     This function will mask the authority and query parameters in the URL.
     """
+    config = config or _get_default_masking_config()
     parsed = urlsplit(url)
 
     # Mask authority
@@ -210,7 +224,7 @@ def mask_url(url: str, *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -> str
     return urlunsplit(masked_url_parts)
 
 
-def mask_serialized_check(check: "SerializedCheck", *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -> None:
+def mask_serialized_check(check: "SerializedCheck", *, config: Optional[Config] = None) -> None:
     mask_request(check.request, config=config)
     response = check.response
     if response:
@@ -221,15 +235,13 @@ def mask_serialized_check(check: "SerializedCheck", *, config: MaskingConfig = D
         mask_value(entry.response.headers, config=config)
 
 
-def mask_serialized_case(case: "SerializedCase", *, config: MaskingConfig = DEFAULT_MASKING_CONFIG) -> None:
+def mask_serialized_case(case: "SerializedCase", *, config: Optional[Config] = None) -> None:
     for value in (case.path_parameters, case.headers, case.cookies, case.query, case.extra_headers):
         if value is not None:
             mask_value(value, config=config)
 
 
-def mask_serialized_interaction(
-    interaction: "SerializedInteraction", *, config: MaskingConfig = DEFAULT_MASKING_CONFIG
-) -> None:
+def mask_serialized_interaction(interaction: "SerializedInteraction", *, config: Optional[Config] = None) -> None:
     mask_request(interaction.request, config=config)
     mask_value(interaction.response.headers, config=config)
     for check in interaction.checks:
