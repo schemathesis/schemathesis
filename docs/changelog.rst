@@ -7,7 +7,7 @@ Changelog
 **Added**
 
 - Support for ``application/xml`` serialization based on Open API schema definitions. `#733`_
-- Hook shortcuts (``filter_query``, ``map_header``, etc.) to minimize boilerplate in extensions.
+- Hook shortcuts (``filter_query``, ``map_header``, etc.) to minimize boilerplate in extensions. `#1673`_
 - Support for colored output from docker container. `#1170`_
 - A way to disable suggestion for visualizing test results via the ``SCHEMATHESIS_REPORT_SUGGESTION=0`` environment variable. `#1802`_
 - Automatic FastAPI fixup injecting for ASGI loaders, eliminating the need for manual setup. `#1797`_
@@ -3497,6 +3497,7 @@ Deprecated
 .. _#1700: https://github.com/schemathesis/schemathesis/issues/1700
 .. _#1699: https://github.com/schemathesis/schemathesis/issues/1699
 .. _#1695: https://github.com/schemathesis/schemathesis/issues/1695
+.. _#1673: https://github.com/schemathesis/schemathesis/issues/1673
 .. _#1669: https://github.com/schemathesis/schemathesis/issues/1669
 .. _#1643: https://github.com/schemathesis/schemathesis/issues/1643
 .. _#1637: https://github.com/schemathesis/schemathesis/issues/1637
