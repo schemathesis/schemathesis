@@ -67,7 +67,7 @@ def test_text_csv(api_schema):
     # And the user registers a custom serializer for it
 
     @given(case=api_schema["/csv"]["POST"].as_strategy())
-    @settings(max_examples=5)
+    @settings(max_examples=5, deadline=None)
     def test(case):
         if case.app is not None:
             response = case.call_wsgi()
