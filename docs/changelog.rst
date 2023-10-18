@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.20.0:
+
+`3.20.0`_ - 2023-10-18
+----------------------
+
 **Added**
 
 - Support for ``application/xml`` serialization based on Open API schema definitions. `#733`_
@@ -3241,7 +3246,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.19.7...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.20.0...HEAD
+.. _3.20.0: https://github.com/schemathesis/schemathesis/compare/v3.19.7...v3.20.0
 .. _3.19.7: https://github.com/schemathesis/schemathesis/compare/v3.19.6...v3.19.7
 .. _3.19.6: https://github.com/schemathesis/schemathesis/compare/v3.19.5...v3.19.6
 .. _3.19.5: https://github.com/schemathesis/schemathesis/compare/v3.19.4...v3.19.5
