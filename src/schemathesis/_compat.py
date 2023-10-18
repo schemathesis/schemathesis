@@ -1,7 +1,6 @@
 import hypothesis
 import hypothesis_jsonschema._from_schema
 import jsonschema
-import werkzeug
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument
 from packaging import version
@@ -11,7 +10,9 @@ try:
 except ImportError:
     import importlib_metadata as metadata  # type: ignore
 
-if version.parse(werkzeug.__version__) < version.parse("2.1.0"):
+WERKZEUG_VERSION = version.parse(metadata.version("werkzeug"))
+IS_WERKZEUG_ABOVE_3 = WERKZEUG_VERSION >= version.parse("3.0")
+if WERKZEUG_VERSION < version.parse("2.1.0"):
     from werkzeug.wrappers.json import JSONMixin
 else:
 

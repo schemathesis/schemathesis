@@ -21,7 +21,7 @@ Changelog
 
 **Changed**
 
-- Pin ``Werkzeug`` to ``<3.0``.
+- Support ``Werkzeug>=3.0``. `#1819`_
 - Refined generated reproduction code and shortened ``X-Schemathesis-TestCaseId`` for easier debugging. `#1801`_
 - Add ``case`` as the first argument to ``AuthContext.set``. Previous calling convention is still supported. `#1788`_
 - Disable the 'explain' phase in Hypothesis to improve performance. `#1808`_
@@ -3473,6 +3473,7 @@ Deprecated
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
 .. _#1820: https://github.com/schemathesis/schemathesis/issues/1820
+.. _#1819: https://github.com/schemathesis/schemathesis/issues/1819
 .. _#1808: https://github.com/schemathesis/schemathesis/issues/1808
 .. _#1802: https://github.com/schemathesis/schemathesis/issues/1802
 .. _#1801: https://github.com/schemathesis/schemathesis/issues/1801
