@@ -18,11 +18,29 @@ from ..stateful import Stateful
 from ..types import PathLike
 from .constants import DEFAULT_WORKERS
 
+INVALID_DERANDOMIZE_MESSAGE = (
+    "`--hypothesis-derandomize` implies no database, so passing `--hypothesis-database` too is invalid."
+)
 MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE = (
     'Missing argument, "--cassette-path" should be specified as well if you use "--cassette-preserve-exact-body-bytes".'
 )
 INVALID_SCHEMA_MESSAGE = "Invalid SCHEMA, must be a valid URL, file path or an API name from Schemathesis.io."
 FILE_DOES_NOT_EXIST_MESSAGE = "The specified file does not exist. Please provide a valid path to an existing file."
+INVALID_BASE_URL_MESSAGE = (
+    "The provided base URL is invalid. This URL serves as a prefix for all API endpoints you want to test. "
+    "Make sure it is a properly formatted URL."
+)
+MISSING_BASE_URL_MESSAGE = "The `--base-url` option is required when specifying a schema via a file."
+APPLICATION_FORMAT_MESSAGE = """Unable to import application from the provided module.
+The `--app` option should follow this format:
+
+    module_path:variable_name
+
+- `module_path`: A path to an importable Python module.
+- `variable_name`: The name of the application variable within that module.
+
+Example: `st run --app=your_module:app ...`"""
+MISSING_REQUEST_CERT_MESSAGE = "The `--request-cert` option must be specified if `--request-cert-key` is used."
 
 
 @enum.unique
@@ -74,7 +92,7 @@ def validate_schema(
             if not utils.file_exists(schema):
                 message = FILE_DOES_NOT_EXIST_MESSAGE
             else:
-                message = 'Missing argument, "--base-url" is required for SCHEMA specified by file.'
+                message = MISSING_BASE_URL_MESSAGE
             raise click.UsageError(message)
     if kind == SchemaInputKind.NAME:
         if api_name is not None:
@@ -92,9 +110,9 @@ def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_
     try:
         netloc = urlparse(raw_value).netloc
     except ValueError as exc:
-        raise click.UsageError("Invalid base URL") from exc
+        raise click.UsageError(INVALID_BASE_URL_MESSAGE) from exc
     if raw_value and not netloc:
-        raise click.UsageError("Invalid base URL")
+        raise click.UsageError(INVALID_BASE_URL_MESSAGE)
     return raw_value
 
 
@@ -108,14 +126,6 @@ def validate_rate_limit(
         return raw_value
     except exceptions.UsageError as exc:
         raise click.UsageError(exc.args[0]) from exc
-
-
-APPLICATION_FORMAT_MESSAGE = (
-    "Can not import application from the given module!\n"
-    "The `--app` option value should be in format:\n\n    path:variable\n\n"
-    "where `path` is an importable path to a Python module,\n"
-    "and `variable` is a variable name inside that module."
-)
 
 
 def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]) -> Optional[str]:
@@ -145,9 +155,7 @@ def validate_hypothesis_database(
     if raw_value is None:
         return raw_value
     if ctx.params.get("hypothesis_derandomize"):
-        raise click.UsageError(
-            "--hypothesis-derandomize implies no database, so passing --hypothesis-database too is invalid."
-        )
+        raise click.UsageError(INVALID_DERANDOMIZE_MESSAGE)
     return raw_value
 
 
@@ -201,7 +209,7 @@ def validate_request_cert_key(
     ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]
 ) -> Optional[str]:
     if raw_value is not None and "request_cert" not in ctx.params:
-        raise click.UsageError('Missing argument, "--request-cert" should be specified as well.')
+        raise click.UsageError(MISSING_REQUEST_CERT_MESSAGE)
     return raw_value
 
 

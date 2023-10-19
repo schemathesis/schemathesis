@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Improved CLI error messages for missing or invalid arguments.
+
 .. _v3.20.0:
 
 `3.20.0`_ - 2023-10-18
