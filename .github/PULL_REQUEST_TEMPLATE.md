@@ -1,12 +1,12 @@
-🚨Please review the [guidelines for contributing](https://github.com/schemathesis/schemathesis/blob/master/CONTRIBUTING.rst) to this repository.
+🚨Please review the [Contributing Guidelines](https://github.com/schemathesis/schemathesis/blob/master/CONTRIBUTING.rst).
 
 ### Description
 
-Please explain the changes you made here.
+Briefly describe your changes.
 
 ### Checklist
 
-- [ ] Created tests which fail without the change (if possible)
-- [ ] All tests passing
-- [ ] Added a changelog entry
-- [ ] Extended the README / documentation, if necessary
+- [ ] Added failing tests for the change
+- [ ] All new and existing tests pass
+- [ ] Added changelog entry (follow guidelines in CONTRIBUTING.rst)
+- [ ] Updated README/documentation, if necessary
