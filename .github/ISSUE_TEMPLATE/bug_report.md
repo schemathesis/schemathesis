@@ -2,42 +2,46 @@
 name: Bug report
 about: Create a report to help us improve
 title: "[BUG]"
-labels: "Status: Review Needed, Type: Bug"
+labels: "Status: Needs Triage, Type: Bug"
 assignees: Stranger6667
 ---
 
-**Checklist**
+### Checklist
 
 - [ ] I checked the [FAQ section](https://schemathesis.readthedocs.io/en/stable/faq.html#frequently-asked-questions) of the documentation
 - [ ] I looked for similar issues in the [issue tracker](https://github.com/schemathesis/schemathesis/issues)
+- [ ] I am using the latest version of Schemathesis
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+### Describe the bug
 
-**To Reproduce**
-Steps to reproduce the behavior:
+Clearly describe the issue you're facing.
+
+### To Reproduce
+
+🚨 **Mandatory** 🚨: Steps to reproduce the behavior:
 
 1. Run this command '...'
 2. See error
 
-If possible, please post a minimal version of your API schema that cause this behavior:
+Please include a minimal API schema causing this issue:
 
 ```yaml
-{
-    "openapi": "3.0.2"
-    ... Add more here
-}
+{ "openapi": "3.0.2", ... }
 ```
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+### Expected behavior
 
-**Environment (please complete the following information):**
+Clearly describe your expected outcome.
 
+### Environment
+
+```
 - OS: [e.g. Linux or Windows]
-- Python version: [e.g. 3.7.2]
-- Schemathesis version: [e.g. 2.4.1]
+- Python version: [e.g. 3.11]
+- Schemathesis version: [e.g. 3.20.0]
 - Spec version: [e.g. Open API 3.0.2]
+```
 
-**Additional context**
-Add any other context about the problem here.
+### Additional context
+
+Include any other relevant details, like logs or screenshots.

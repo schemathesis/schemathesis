@@ -2,18 +2,22 @@
 name: Feature request
 about: Suggest an idea for this project
 title: "[FEATURE]"
-labels: "Status: Review Needed, Type: Feature"
+labels: "Status: Needs Triage, Type: Feature"
 assignees: Stranger6667
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+### Is your feature request related to a problem? Please describe
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+Clearly state the issue you're facing. How often does this occur? What's the impact?
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+### Describe the solution you'd like
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+Clearly describe what you want to happen.
+
+### Describe alternatives you've considered
+
+Have you tried any workarounds? Describe alternative solutions or features.
+
+### Additional context
+
+Include any other context, like use-cases, diagrams, or screenshots, to help us understand the feature request.
