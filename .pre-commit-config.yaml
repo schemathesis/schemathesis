@@ -35,7 +35,7 @@ repos:
       - id: relint
 
   - repo: https://github.com/ambv/black
-    rev: 23.9.1
+    rev: 23.10.0
     hooks:
       - id: black
         types: [python]
@@ -44,7 +44,7 @@ repos:
     rev: 1.16.0
     hooks:
       - id: blacken-docs
-        additional_dependencies: [black==23.9.1]
+        additional_dependencies: [black==23.10.0]
 
   - repo: https://github.com/pre-commit/mirrors-isort
     rev: v5.10.1
@@ -54,7 +54,7 @@ repos:
         additional_dependencies: ["isort[pyproject]"]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.6.0
+    rev: v1.6.1
     hooks:
       - id: mypy
         exclude: ^(docs/|test/|test-corpus/|example/).*$
@@ -62,7 +62,7 @@ repos:
         additional_dependencies: [types-click, types-requests, types-PyYAML]
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: "v0.0.292"
+    rev: "v0.1.0"
     hooks:
       - id: ruff
 
@@ -71,5 +71,5 @@ repos:
     hooks:
       - id: rstcheck
         additional_dependencies:
-          - sphinx==4.5.0
-          - sphinx-click==3.1.0
+          - sphinx==5.3.0
+          - sphinx-click==4.3.0
