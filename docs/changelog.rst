@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.20.1:
+
+`3.20.1`_ - 2023-10-20
+----------------------
+
 **Changed**
 
 - Improved CLI error messages for missing or invalid arguments.
@@ -3250,7 +3255,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.20.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.20.1...HEAD
+.. _3.20.1: https://github.com/schemathesis/schemathesis/compare/v3.20.0...v3.20.1
 .. _3.20.0: https://github.com/schemathesis/schemathesis/compare/v3.19.7...v3.20.0
 .. _3.19.7: https://github.com/schemathesis/schemathesis/compare/v3.19.6...v3.19.7
 .. _3.19.6: https://github.com/schemathesis/schemathesis/compare/v3.19.5...v3.19.6
