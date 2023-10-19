@@ -34,7 +34,14 @@ from schemathesis.cli import (
     get_exit_code,
     reset_checks,
 )
-from schemathesis.cli.callbacks import FILE_DOES_NOT_EXIST_MESSAGE, INVALID_SCHEMA_MESSAGE
+from schemathesis.cli.callbacks import (
+    FILE_DOES_NOT_EXIST_MESSAGE,
+    INVALID_BASE_URL_MESSAGE,
+    INVALID_DERANDOMIZE_MESSAGE,
+    INVALID_SCHEMA_MESSAGE,
+    MISSING_BASE_URL_MESSAGE,
+    MISSING_REQUEST_CERT_MESSAGE,
+)
 from schemathesis.code_samples import CodeSampleStyle
 from schemathesis.constants import (
     DEFAULT_RESPONSE_TIMEOUT,
@@ -90,9 +97,9 @@ def test_commands_version(cli):
     (
         (("run",), "Error: Missing argument 'SCHEMA'."),
         (("run", "not-url"), "See https://schemathesis.readthedocs.io/en/stable/service.html for more details"),
-        (("run", SIMPLE_PATH), 'Error: Missing argument, "--base-url" is required for SCHEMA specified by file.'),
-        (("run", SIMPLE_PATH, "--base-url=test"), "Error: Invalid base URL"),
-        (("run", SIMPLE_PATH, "--base-url=127.0.0.1:8080"), "Error: Invalid base URL"),
+        (("run", SIMPLE_PATH), f"Error: {MISSING_BASE_URL_MESSAGE}"),
+        (("run", SIMPLE_PATH, "--base-url=test"), f"Error: {INVALID_BASE_URL_MESSAGE}"),
+        (("run", SIMPLE_PATH, "--base-url=127.0.0.1:8080"), f"Error: {INVALID_BASE_URL_MESSAGE}"),
         (
             ("run", "http://127.0.0.1", "--request-timeout=-5"),
             "Error: Invalid value for '--request-timeout': -5 is not in the range x>=1.",
@@ -180,10 +187,7 @@ def test_certificate_only_key(cli, tmp_path):
 
     # Then an appropriate error should be displayed
     assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
-    assert (
-        result.stdout.strip().split("\n")[-1]
-        == 'Error: Missing argument, "--request-cert" should be specified as well.'
-    )
+    assert result.stdout.strip().split("\n")[-1] == f"Error: {MISSING_REQUEST_CERT_MESSAGE}"
 
 
 @pytest.mark.openapi_version("3.0")
@@ -544,10 +548,7 @@ def test_hypothesis_database_with_derandomize(cli, schema_url):
     result = cli.run(schema_url, "--hypothesis-database=:memory:", "--hypothesis-derandomize")
     assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
     lines = result.stdout.split("\n")
-    assert (
-        lines[3]
-        == "Error: --hypothesis-derandomize implies no database, so passing --hypothesis-database too is invalid."
-    )
+    assert lines[3] == f"Error: {INVALID_DERANDOMIZE_MESSAGE}"
 
 
 @pytest.mark.openapi_version("3.0")
@@ -1524,7 +1525,7 @@ def test_wsgi_app_missing(testdir, cli):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
     assert "AttributeError: module 'location' has no attribute 'app'" in lines
-    assert "Can not import application from the given module!" in lines
+    assert "Unable to import application from the provided module." in lines
 
 
 def test_wsgi_app_internal_exception(testdir, cli):
