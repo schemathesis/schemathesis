@@ -37,9 +37,7 @@ For example, to enable experimental support for OpenAPI 3.1:
 In Python Tests
 ~~~~~~~~~~~~~~~
 
-To enable experimental features globally across all your Schemathesis tests, you can use the ``enable`` method on the desired experimental feature.
-
-Here's an example:
+To enable experimental features for your Schemathesis tests in Python, use the ``enable`` method on the desired experimental feature. It's a good idea to put the code to enable the feature in a place that runs before your tests start. For those using ``pytest``, putting this code in a ``conftest.py`` file at the root of your test directory would work well.
 
 .. code-block:: python
 
@@ -48,11 +46,11 @@ Here's an example:
     # Globally enable OpenAPI 3.1 experimental feature
     schemathesis.experimental.openapi_3_1.enable()
 
-By doing this, all schemas loaded afterwards will automatically use the enabled experimental features.
+Executing the above code will ensure that Schemathesis will utilize the enabled experimental features in all tests run afterwards.
 
 .. note::
 
-    Enabling an experimental feature globally will affect all your tests. Use this feature with caution.
+    This action will apply globally, affecting all your tests. Use with caution.
 
 Using Environment Variables
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
