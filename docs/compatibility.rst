@@ -29,7 +29,7 @@ If you're using FastAPI versions that generate OpenAPI 3.1 schemas, activate Sch
     import schemathesis
 
     # Globally enable OpenAPI 3.1 experimental feature
-    schemathesis.experimental.openapi_3_1.enable()
+    schemathesis.experimental.OPEN_API_3_1.enable()
 
 For Older FastAPI Versions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

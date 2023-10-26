@@ -4,7 +4,7 @@ _install_hypothesis_jsonschema_compatibility_shim()
 
 del _install_hypothesis_jsonschema_compatibility_shim
 
-from . import auths, checks, contrib, fixups, graphql, hooks, runner, serializers, targets  # noqa: E402
+from . import auths, checks, experimental, contrib, fixups, graphql, hooks, runner, serializers, targets  # noqa: E402
 from .constants import DataGenerationMethod, __version__  # noqa: E402
 from .models import Case  # noqa: E402
 from .specs import openapi  # noqa: E402

@@ -43,6 +43,9 @@ BASE_URL_ENV_VAR = "SCHEMATHESIS_BASE_URL"
 WAIT_FOR_SCHEMA_ENV_VAR = "SCHEMATHESIS_WAIT_FOR_SCHEMA"
 REPORT_SUGGESTION_ENV_VAR = "SCHEMATHESIS_REPORT_SUGGESTION"
 
+TRUE_VALUES = ("y", "yes", "t", "true", "on", "1")
+FALSE_VALUES = ("n", "no", "f", "false", "off", "0")
+
 
 class DataGenerationMethod(str, Enum):
     """Defines what data Schemathesis generates for tests."""
