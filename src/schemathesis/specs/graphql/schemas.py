@@ -248,7 +248,10 @@ def get_case_strategy(
     }[definition.root_type]
     hook_context = HookContext(operation)
     strategy = strategy_factory(
-        client_schema, fields=[definition.field_name], custom_scalars=CUSTOM_SCALARS, print_ast=_noop  # type: ignore
+        client_schema,
+        fields=[definition.field_name],
+        custom_scalars=CUSTOM_SCALARS,
+        print_ast=_noop,  # type: ignore
     )
     strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body").map(graphql.print_ast)
     body = draw(strategy)

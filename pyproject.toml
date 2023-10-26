@@ -93,17 +93,6 @@ st = "schemathesis.cli:schemathesis"
 [project.entry-points.pytest11]
 schemathesis = "schemathesis.extra.pytest_plugin"
 
-[tool.black]
-line-length = 120
-target_version = ["py37"]
-
-[tool.isort]
-profile = "black"
-line_length = 120
-default_section = "THIRDPARTY"
-known_first_party = "schemathesis"
-known_third_party = ["_pytest", "aiohttp", "click", "curlify", "fastapi", "flask", "graphene", "graphql", "graphql_server", "hypothesis", "hypothesis_graphql", "hypothesis_jsonschema", "jsonschema", "junit_xml", "packaging", "pydantic", "pytest", "pytest_subtests", "requests", "schemathesis", "starlette", "typing_extensions", "urllib3", "werkzeug", "yaml", "yarl"]
-
 [tool.pytest.ini_options]
 addopts = ["-ra", "--strict-markers", "--strict-config"]
 xfail_strict = true
@@ -131,6 +120,7 @@ exclude_lines = [
 ]
 
 [tool.ruff]
+line-length = 120
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -140,7 +130,7 @@ select = [
     "D",  # pydocstyle
 ]
 ignore = [
-    "E501",  # Line too long, handled by black
+    "E501",  # Line too long
     "B008",  # Do not perform function calls in argument defaults
     "C901",  # Too complex
     "D100",  # Missing docstring in public module
@@ -160,3 +150,10 @@ target-version = "py37"
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["F401"]
 "_compat.py" = ["F401"]
+
+[tool.ruff.format]
+skip-magic-trailing-comma = false
+
+[tool.ruff.isort]
+known-first-party = ["schemathesis"]
+known-third-party = ["_pytest", "aiohttp", "click", "curlify", "fastapi", "flask", "graphene", "graphql", "graphql_server", "hypothesis", "hypothesis_graphql", "hypothesis_jsonschema", "jsonschema", "junit_xml", "packaging", "pydantic", "pytest", "pytest_subtests", "requests", "schemathesis", "starlette", "typing_extensions", "urllib3", "werkzeug", "yaml", "yarl"]
