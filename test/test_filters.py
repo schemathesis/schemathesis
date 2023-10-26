@@ -17,9 +17,7 @@ def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.full_path == "/v1/foo"
     assert case.method == "GET"
-""".format(
-            endpoint
-        ),
+""".format(endpoint),
         paths={"/foo": {"get": parameters}, "/bar": {"get": parameters}},
     )
     result = testdir.runpytest("-v", "-s")
@@ -40,9 +38,7 @@ def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.full_path in ("/v1/foo", "/v1/users")
     assert case.method == "GET"
-""".format(
-            method
-        ),
+""".format(method),
         paths={"/foo": {"get": parameters}, "/bar": {"post": parameters}},
     )
     result = testdir.runpytest("-v", "-s")
