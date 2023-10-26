@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.20.2:
+
+`3.20.2`_ - 2023-10-27
+----------------------
+
 **Fixed**
 
 - Incorrect documentation & implementation for enabling experimental features in ``pytest``.
@@ -3259,7 +3264,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.20.1...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.20.2...HEAD
+.. _3.20.2: https://github.com/schemathesis/schemathesis/compare/v3.20.1...v3.20.2
 .. _3.20.1: https://github.com/schemathesis/schemathesis/compare/v3.20.0...v3.20.1
 .. _3.20.0: https://github.com/schemathesis/schemathesis/compare/v3.19.7...v3.20.0
 .. _3.19.7: https://github.com/schemathesis/schemathesis/compare/v3.19.6...v3.19.7
