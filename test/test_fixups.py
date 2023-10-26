@@ -22,9 +22,7 @@ def teardown_module(module):
 @settings(max_examples=1)
 def test(case):
     assert 0 < case.query["value"] < 10
-    """.format(
-            schema=fast_api_schema
-        ),
+    """.format(schema=fast_api_schema),
     )
     # Then Fast API schemas that are not compliant should be processed
     result = testdir.runpytest("-s")

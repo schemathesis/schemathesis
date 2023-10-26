@@ -68,7 +68,7 @@ This will install all the necessary packages for development, including those fo
     pre-commit install
 
 4. **Branching**: Create a new branch and switch to it. Target your pull request to the ``master`` branch of the main repository.
-5. **Coding Standards**: Follow `PEP-8 <https://pep8.org/>`_ for naming conventions and use `black <https://github.com/psf/black>`_ for code formatting.
+5. **Coding Standards**: Follow `PEP-8 <https://pep8.org/>`_ for naming conventions and use `ruff <https://github.com/astral-sh/ruff>`_ for code formatting.
 6. **Write Tests**: Preferably, write integration tests that run the whole Schemathesis CLI.
 7. **Run Tests**:
 

@@ -10,9 +10,7 @@ def test_hook(request, schema_fixture):
     {
         "graphql_schema": assert_graphql,
         "openapi3_schema": assert_openapi,
-    }[
-        schema_fixture
-    ](schema)
+    }[schema_fixture](schema)
 
 
 def assert_graphql(schema):

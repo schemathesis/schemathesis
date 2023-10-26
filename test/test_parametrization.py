@@ -549,9 +549,7 @@ def test_invalid_schema_with_parametrize(testdir, as_kwarg):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-""".format(
-            "" if not as_kwarg else "validate_schema=False"
-        ),
+""".format("" if not as_kwarg else "validate_schema=False"),
         validate_schema=False,
         schema_name="simple_openapi.yaml",
         paths={
