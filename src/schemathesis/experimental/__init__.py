@@ -1,5 +1,8 @@
+import os
 import threading
 from dataclasses import dataclass, field
+
+from ..constants import TRUE_VALUES
 
 
 @dataclass(eq=False)
@@ -20,6 +23,10 @@ class Experiment:
     @property
     def is_enabled(self) -> bool:
         return self._storage.is_enabled(self)
+
+    @property
+    def is_env_var_set(self) -> bool:
+        return os.getenv(self.env_var, "").lower() in TRUE_VALUES
 
 
 @dataclass
@@ -58,6 +65,8 @@ class ExperimentSet:
             _storage=self,
         )
         self.available.add(instance)
+        if instance.is_env_var_set:
+            self.enable(instance)
         return instance
 
     def enable(self, feature: Experiment) -> None:

@@ -12,7 +12,7 @@ from requests import PreparedRequest, RequestException
 
 from .. import exceptions, experimental, throttling, utils
 from ..code_samples import CodeSampleStyle
-from ..constants import DataGenerationMethod
+from ..constants import DataGenerationMethod, TRUE_VALUES, FALSE_VALUES
 from ..service.hosts import get_temporary_hosts_file
 from ..stateful import Stateful
 from ..types import PathLike
@@ -239,7 +239,7 @@ def convert_experimental(
     return [
         feature
         for feature in experimental.GLOBAL_EXPERIMENTS.available
-        if feature.name in value or os.getenv(feature.env_var, "").lower() in TRUE_VALUES
+        if feature.name in value or feature.is_env_var_set
     ]
 
 
@@ -257,10 +257,6 @@ def convert_data_generation_method(
     if value == "all":
         return DataGenerationMethod.all()
     return [DataGenerationMethod[value]]
-
-
-TRUE_VALUES = ("y", "yes", "t", "true", "on", "1")
-FALSE_VALUES = ("n", "no", "f", "false", "off", "0")
 
 
 def _is_usable_dir(path: PathLike) -> bool:
