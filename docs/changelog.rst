@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Fixed**
+
+- Incorrect documentation & implementation for enabling experimental features in ``pytest``.
+
 .. _v3.20.1:
 
 `3.20.1`_ - 2023-10-20

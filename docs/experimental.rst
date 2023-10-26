@@ -44,7 +44,7 @@ To enable experimental features for your Schemathesis tests in Python, use the `
     import schemathesis
 
     # Globally enable OpenAPI 3.1 experimental feature
-    schemathesis.experimental.openapi_3_1.enable()
+    schemathesis.experimental.OPEN_API_3_1.enable()
 
 Executing the above code will ensure that Schemathesis will utilize the enabled experimental features in all tests run afterwards.
 
@@ -97,7 +97,7 @@ In Python Tests
     import schemathesis
 
     # Globally enable OpenAPI 3.1 experimental feature
-    schemathesis.experimental.openapi_3_1.enable()
+    schemathesis.experimental.OPEN_API_3_1.enable()
 
 .. _openapi-31-env-vars:
 
