@@ -5,7 +5,7 @@ _install_hypothesis_jsonschema_compatibility_shim()
 del _install_hypothesis_jsonschema_compatibility_shim
 
 from . import auths, checks, experimental, contrib, fixups, graphql, hooks, runner, serializers, targets  # noqa: E402
-from .constants import DataGenerationMethod, __version__  # noqa: E402
+from .constants import DataGenerationMethod, SCHEMATHESIS_VERSION  # noqa: E402
 from .models import Case  # noqa: E402
 from .specs import openapi  # noqa: E402
 from .specs.openapi._hypothesis import init_default_strategies  # noqa: E402
@@ -15,6 +15,8 @@ init_default_strategies()
 
 # Is not a part of the public API
 del init_default_strategies
+
+__version__ = SCHEMATHESIS_VERSION
 
 # Default loaders
 from_aiohttp = openapi.from_aiohttp

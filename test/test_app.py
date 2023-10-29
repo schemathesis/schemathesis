@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from schemathesis.constants import IS_PYTEST_ABOVE_7
+from schemathesis._dependency_versions import IS_PYTEST_ABOVE_7
 
 if IS_PYTEST_ABOVE_7:
     from _pytest.pytester import Pytester

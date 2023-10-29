@@ -16,7 +16,7 @@ from ...constants import (
     FLAKY_FAILURE_MESSAGE,
     REPORT_SUGGESTION_ENV_VAR,
     SCHEMATHESIS_TEST_CASE_HEADER,
-    __version__,
+    SCHEMATHESIS_VERSION,
 )
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...models import Response, Status
@@ -542,7 +542,7 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
         versions = (
             f"platform {platform.system()} -- "
             f"Python {platform.python_version()}, "
-            f"schemathesis-{__version__}, "
+            f"schemathesis-{SCHEMATHESIS_VERSION}, "
             f"hypothesis-{metadata.version('hypothesis')}, "
             f"hypothesis_jsonschema-{metadata.version('hypothesis_jsonschema')}, "
             f"jsonschema-{metadata.version('jsonschema')}"

@@ -16,7 +16,8 @@ from urllib3 import HTTPResponse
 
 import schemathesis.cli
 from schemathesis import Case
-from schemathesis._compat import IS_HYPOTHESIS_ABOVE_6_54, metadata
+from schemathesis._compat import metadata
+from schemathesis._dependency_versions import IS_HYPOTHESIS_ABOVE_6_54
 from schemathesis.cli import reset_checks
 from schemathesis.constants import HOOKS_MODULE_ENV_VAR
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
