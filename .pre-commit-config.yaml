@@ -38,7 +38,7 @@ repos:
     rev: v1.6.1
     hooks:
       - id: mypy
-        exclude: ^(docs/|test/|test-corpus/|example/).*$
+        exclude: ^(docs/|test/|test-corpus/|example/|benches/).*$
         args: ["--ignore-missing-imports"]
         additional_dependencies: [types-click, types-requests, types-PyYAML]
 
