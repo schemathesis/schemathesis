@@ -1,21 +1,15 @@
 from enum import Enum
 from typing import List
 
-import pytest
-from packaging import version
-
 from ._compat import metadata
 
 try:
-    __version__ = metadata.version(__package__)
+    SCHEMATHESIS_VERSION = metadata.version(__package__)
 except metadata.PackageNotFoundError:
     # Local run without installation
-    __version__ = "dev"
+    SCHEMATHESIS_VERSION = "dev"
 
-IS_PYTEST_ABOVE_54 = version.parse(pytest.__version__) >= version.parse("5.4.0")
-IS_PYTEST_ABOVE_7 = version.parse(pytest.__version__) >= version.parse("7.0.0")
-
-USER_AGENT = f"schemathesis/{__version__}"
+USER_AGENT = f"schemathesis/{SCHEMATHESIS_VERSION}"
 SCHEMATHESIS_TEST_CASE_HEADER = "X-Schemathesis-TestCaseId"
 HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER = ":memory:"
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"

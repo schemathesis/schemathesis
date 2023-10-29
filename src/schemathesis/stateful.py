@@ -10,7 +10,7 @@ from hypothesis.stateful import run_state_machine_as_test as _run_state_machine_
 from requests.structures import CaseInsensitiveDict
 from starlette.applications import Starlette
 
-from ._compat import IS_HYPOTHESIS_ABOVE_6_68_1
+from ._dependency_versions import IS_HYPOTHESIS_ABOVE_6_68_1
 from .exceptions import OperationSchemaError
 from .models import APIOperation, Case, CheckFunction
 from .utils import NOT_SET, GenericResponse, Ok, Result

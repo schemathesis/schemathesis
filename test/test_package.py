@@ -11,7 +11,7 @@ def test_dev_version(monkeypatch, mocker):
     else:
         path = "importlib.metadata.version"
     mocker.patch(path, side_effect=metadata.PackageNotFoundError)
-    from schemathesis.constants import __version__
+    from schemathesis.constants import SCHEMATHESIS_VERSION
 
     # Then it's version is "dev"
-    assert __version__ == "dev"
+    assert SCHEMATHESIS_VERSION == "dev"

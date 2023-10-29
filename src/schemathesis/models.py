@@ -37,7 +37,7 @@ from requests.structures import CaseInsensitiveDict
 from starlette_testclient import TestClient as ASGIClient
 
 from . import failures, serializers
-from ._compat import IS_WERKZEUG_ABOVE_3
+from ._dependency_versions import IS_WERKZEUG_ABOVE_3
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import (

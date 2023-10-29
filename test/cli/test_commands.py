@@ -24,7 +24,7 @@ from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDa
 from packaging import version
 
 from schemathesis import Case, DataGenerationMethod
-from schemathesis._compat import IS_HYPOTHESIS_ABOVE_6_54
+from schemathesis._dependency_versions import IS_HYPOTHESIS_ABOVE_6_54
 from schemathesis.checks import ALL_CHECKS, not_a_server_error
 from schemathesis.cli import (
     COLOR_OPTIONS_INVALID_USAGE_MESSAGE,
@@ -43,11 +43,11 @@ from schemathesis.cli.callbacks import (
     MISSING_REQUEST_CERT_MESSAGE,
 )
 from schemathesis.code_samples import CodeSampleStyle
+from schemathesis._dependency_versions import IS_PYTEST_ABOVE_54
 from schemathesis.constants import (
     DEFAULT_RESPONSE_TIMEOUT,
     FLAKY_FAILURE_MESSAGE,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
-    IS_PYTEST_ABOVE_54,
     REPORT_SUGGESTION_ENV_VAR,
 )
 from schemathesis.extra._flask import run_server

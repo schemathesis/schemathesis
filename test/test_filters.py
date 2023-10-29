@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis.constants import IS_PYTEST_ABOVE_54
+from schemathesis._dependency_versions import IS_PYTEST_ABOVE_54
 
 from .utils import integer
 

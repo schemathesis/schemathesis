@@ -186,7 +186,7 @@ def worker(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, q
         if isinstance(item, Initialize):
             stream.write(
                 f"""command: '{get_command_representation()}'
-recorded_with: 'Schemathesis {constants.__version__}'
+recorded_with: 'Schemathesis {constants.SCHEMATHESIS_VERSION}'
 http_interactions:"""
             )
         elif isinstance(item, Process):

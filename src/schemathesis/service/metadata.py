@@ -2,7 +2,7 @@
 import platform
 from dataclasses import dataclass, field
 
-from ..constants import __version__
+from ..constants import SCHEMATHESIS_VERSION
 
 
 @dataclass
@@ -26,7 +26,7 @@ class InterpreterMetadata:
 @dataclass
 class CliMetadata:
     # Schemathesis package version.
-    version: str = __version__
+    version: str = SCHEMATHESIS_VERSION
 
 
 @dataclass
