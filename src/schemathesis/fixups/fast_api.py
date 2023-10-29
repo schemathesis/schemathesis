@@ -3,7 +3,7 @@ from typing import Any, Dict
 from ..hooks import HookContext
 from ..hooks import is_installed as global_is_installed
 from ..hooks import register, unregister
-from ..utils import traverse_schema
+from ..internal.jsonschema import traverse_schema
 
 
 def install() -> None:

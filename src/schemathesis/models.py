@@ -56,6 +56,8 @@ from .exceptions import (
     get_grouped_exception,
     get_timeout_error,
 )
+from .internal.deprecation import deprecated_property
+from .internal.copy import fast_deepcopy
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_request, sanitize_response
@@ -66,8 +68,6 @@ from .utils import (
     GenericResponse,
     WSGIResponse,
     copy_response,
-    deprecated_property,
-    fast_deepcopy,
     generate_random_case_id,
     get_response_payload,
     maybe_set_assertion_message,

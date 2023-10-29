@@ -1,10 +1,9 @@
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Set, Tuple, Union
 
-from hypothesis.strategies import SearchStrategy
-
 if TYPE_CHECKING:
-    from . import DataGenerationMethod
+    from hypothesis.strategies import SearchStrategy
+    from .constants import DataGenerationMethod
     from .hooks import HookContext
 
 PathLike = Union[Path, str]
@@ -28,7 +27,9 @@ RequestCert = Union[str, Tuple[str, str]]
 # A filter for path / method
 Filter = Union[str, List[str], Tuple[str], Set[str], NotSet]
 
-Hook = Union[Callable[[SearchStrategy], SearchStrategy], Callable[[SearchStrategy, "HookContext"], SearchStrategy]]
+Hook = Union[
+    Callable[["SearchStrategy"], "SearchStrategy"], Callable[["SearchStrategy", "HookContext"], "SearchStrategy"]
+]
 
 RawAuth = Tuple[str, str]
 # Generic test with any arguments and no return

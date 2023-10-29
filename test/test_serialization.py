@@ -17,7 +17,7 @@ from schemathesis.exceptions import (
     SerializationNotPossible,
     UnboundPrefixError,
 )
-from schemathesis.utils import fast_deepcopy
+from schemathesis.internal.copy import fast_deepcopy
 
 
 def to_csv(data):
