@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
 from ..models import Response
 from ..runner import events
 from ..runner.serialization import SerializedCase
-from ..utils import merge
+from ..internal.transformation import merge_recursively
 
 S = TypeVar("S", bound=events.ExecutionEvent)
 SerializeFunc = Callable[[S], Optional[Dict[str, Any]]]
@@ -159,7 +159,7 @@ def serialize_event(
         if data is None:
             data = extra
         else:
-            data = merge(data, extra)
+            data = merge_recursively(data, extra)
     # Externally tagged structure
     return {event.__class__.__name__: data}
 

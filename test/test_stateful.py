@@ -5,7 +5,7 @@ import pytest
 import schemathesis
 from schemathesis.specs.openapi import expressions
 from schemathesis.stateful import ParsedData
-from schemathesis.utils import NOT_SET
+from schemathesis.constants import NOT_SET
 
 pytestmark = [pytest.mark.openapi_version("3.0")]
 

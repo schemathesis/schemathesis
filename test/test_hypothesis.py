@@ -6,7 +6,8 @@ from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis import Case, DataGenerationMethod
+from schemathesis.models import Case
+from schemathesis.generation import DataGenerationMethod
 from schemathesis.exceptions import OperationSchemaError
 from schemathesis.models import APIOperation, OperationDefinition
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
@@ -22,7 +23,7 @@ from schemathesis.specs.openapi._hypothesis import (
     quote_all,
 )
 from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20CompositeBody, OpenAPI20Parameter
-from schemathesis.utils import NOT_SET
+from schemathesis.constants import NOT_SET
 
 
 def make_operation(schema, **kwargs) -> APIOperation:

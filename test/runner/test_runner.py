@@ -20,8 +20,9 @@ from schemathesis._hypothesis import add_examples
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
+from schemathesis.transports.auth import get_requests_auth
 from schemathesis.models import Check, Status, TestResult
-from schemathesis.runner import ThreadPoolRunner, events, from_schema, get_requests_auth
+from schemathesis.runner import events, from_schema
 from schemathesis.runner.impl import threadpool
 from schemathesis.runner.impl.core import get_wsgi_auth, has_too_many_responses_with_status, reraise
 from schemathesis.specs.graphql import loaders as gql_loaders
@@ -686,7 +687,7 @@ def test_max_failures(any_app_schema):
 @pytest.mark.operations("success")
 def test_workers_num_regression(mocker, real_app_schema):
     # GH: 579
-    spy = mocker.patch("schemathesis.runner.ThreadPoolRunner", wraps=ThreadPoolRunner)
+    spy = mocker.patch("schemathesis.runner.impl.ThreadPoolRunner", wraps=threadpool.ThreadPoolRunner)
     execute(real_app_schema, workers_num=5)
     assert spy.call_args[1]["workers_num"] == 5
 

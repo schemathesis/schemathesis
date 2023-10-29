@@ -8,21 +8,17 @@ from dataclasses import dataclass, field
 from queue import Queue
 from typing import IO, Any, Dict, Generator, Iterator, List, Optional, cast, TYPE_CHECKING
 
-import click
-import requests
-from requests.cookies import RequestsCookieJar
-from requests.structures import CaseInsensitiveDict
-from yaml.emitter import Emitter
-
 from ..constants import SCHEMATHESIS_VERSION
-from ..models import Request, Response
 from ..runner import events
-from ..runner.serialization import SerializedCheck, SerializedInteraction
 from ..types import RequestCert
-from .context import ExecutionContext
 from .handlers import EventHandler
 
 if TYPE_CHECKING:
+    import click
+    import requests
+    from ..models import Request, Response
+    from ..runner.serialization import SerializedCheck, SerializedInteraction
+    from .context import ExecutionContext
     from ..generation import DataGenerationMethod
 
 # Wait until the worker terminates
@@ -243,6 +239,8 @@ def _safe_decode(value: str, encoding: str) -> str:
 
 def write_double_quoted(stream: IO, text: str) -> None:
     """Writes a valid YAML string enclosed in double quotes."""
+    from yaml.emitter import Emitter
+
     # Adapted from `yaml.Emitter.write_double_quoted`:
     #   - Doesn't split the string, therefore doesn't track the current column
     #   - Doesn't encode the input
@@ -294,6 +292,8 @@ def replay(
     request_cert: Optional[RequestCert] = None,
 ) -> Generator[Replayed, None, None]:
     """Replay saved interactions."""
+    import requests
+
     session = requests.Session()
     session.verify = request_tls_verify
     session.cert = request_cert
@@ -347,6 +347,10 @@ def filter_cassette(
 
 def get_prepared_request(data: Dict[str, Any]) -> requests.PreparedRequest:
     """Create a `requests.PreparedRequest` from a serialized one."""
+    from requests.structures import CaseInsensitiveDict
+    from requests.cookies import RequestsCookieJar
+    import requests
+
     prepared = requests.PreparedRequest()
     prepared.method = data["method"]
     prepared.url = data["uri"]

@@ -1,17 +1,18 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Dict, List, Tuple
 
 import hypothesis.strategies as st
 from requests.structures import CaseInsensitiveDict
 
-from ....stateful import StepResult
 from ..links import OpenAPILink, get_all_links
 from ..utils import expand_status_code
 
 if TYPE_CHECKING:
+    from ....stateful.state_machine import StepResult
     from ....models import APIOperation
 
-FilterFunction = Callable[[StepResult], bool]
+FilterFunction = Callable[["StepResult"], bool]
 
 
 @dataclass

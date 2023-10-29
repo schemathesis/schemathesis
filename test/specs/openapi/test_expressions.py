@@ -5,7 +5,7 @@ import requests
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from schemathesis import Case
+from schemathesis.models import Case
 from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError

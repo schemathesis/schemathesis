@@ -9,10 +9,11 @@ from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tup
 
 from ...models import APIOperation, Case
 from ...parameters import ParameterSet
-from ...stateful import Direction, ParsedData, StatefulTest
+from ...stateful import ParsedData, StatefulTest
+from ...stateful.state_machine import Direction
 from ...types import NotSet
 
-from ...utils import NOT_SET
+from ...constants import NOT_SET
 from ...internal.copy import fast_deepcopy
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER

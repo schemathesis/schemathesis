@@ -4,7 +4,7 @@ from typing import Generator, Optional, Union
 
 from ...models import TestResultSet
 from ...types import RequestCert
-from ...utils import get_requests_auth
+from ...transports.auth import get_requests_auth
 from .. import events
 from .core import BaseRunner, asgi_test, get_session, network_test, wsgi_test
 

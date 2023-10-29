@@ -7,13 +7,13 @@ import click
 import pytest
 import requests
 import urllib3
-import yaml
 
 import schemathesis
-from schemathesis import Case
+from schemathesis.internal.transformation import merge_recursively
+from schemathesis.loaders import load_yaml
+from schemathesis.models import Case
 from schemathesis.exceptions import CheckFailed
 from schemathesis.schemas import BaseSchema
-from schemathesis.utils import StringDatesYAMLLoader, merge
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -32,14 +32,14 @@ def get_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> BaseS
 
 def make_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> Dict[str, Any]:
     schema = load_schema(schema_name)
-    return merge(kwargs, schema)
+    return merge_recursively(kwargs, schema)
 
 
 @lru_cache()
 def load_schema(schema_name: str) -> Dict[str, Any]:
     path = get_schema_path(schema_name)
     with open(path) as fd:
-        return yaml.load(fd, StringDatesYAMLLoader)
+        return load_yaml(fd)
 
 
 def integer(**kwargs: Any) -> Dict[str, Any]:

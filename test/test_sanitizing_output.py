@@ -23,7 +23,7 @@ from schemathesis.sanitization import (
     sanitize_serialized_interaction,
     sanitize_url,
 )
-from schemathesis.utils import NOT_SET
+from schemathesis.constants import NOT_SET
 
 
 @pytest.fixture

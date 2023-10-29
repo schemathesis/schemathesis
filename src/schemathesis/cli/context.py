@@ -1,13 +1,15 @@
+from __future__ import annotations
 import os
 import shutil
 from dataclasses import dataclass, field
 from queue import Queue
-from typing import List, Optional, Union
-
-import hypothesis
+from typing import List, Optional, Union, TYPE_CHECKING
 
 from ..code_samples import CodeSampleStyle
 from ..runner.serialization import SerializedTestResult
+
+if TYPE_CHECKING:
+    import hypothesis
 
 
 @dataclass

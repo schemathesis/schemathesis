@@ -5,7 +5,7 @@ from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.specs.openapi import _hypothesis
+from schemathesis.specs.openapi import _hypothesis, formats
 from schemathesis.specs.openapi._hypothesis import get_case_strategy, is_valid_header, make_positive_strategy
 from schemathesis.specs.openapi.references import load_file
 
@@ -370,10 +370,10 @@ def test_unregister_string_format_valid():
     name = "example"
     schemathesis.openapi.format(name, st.text())
     assert name in _hypothesis.STRING_FORMATS
-    _hypothesis.unregister_string_format(name)
+    formats.unregister_string_format(name)
     assert name not in _hypothesis.STRING_FORMATS
 
 
 def test_unregister_string_format_invalid():
     with pytest.raises(ValueError, match="Unknown Open API format: unknown"):
-        _hypothesis.unregister_string_format("unknown")
+        formats.unregister_string_format("unknown")

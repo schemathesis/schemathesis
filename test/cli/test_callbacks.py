@@ -5,9 +5,9 @@ import pytest
 from hypothesis import example, given
 from hypothesis import strategies as st
 
-from schemathesis import utils
 from schemathesis.cli import callbacks
 from schemathesis.cli.callbacks import SchemaInputKind
+from schemathesis.transports.headers import is_latin_1_encodable
 
 from ..utils import SIMPLE_PATH
 
@@ -45,7 +45,7 @@ def is_invalid_header(header):
     try:
         # We need to avoid generating known valid headers
         key, _ = header.split(":", maxsplit=1)
-        return not (key.strip() and utils.is_latin_1_encodable(key))
+        return not (key.strip() and is_latin_1_encodable(key))
     except ValueError:
         return True
 

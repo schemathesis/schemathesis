@@ -1,4 +1,4 @@
-import base64
+from __future__ import annotations
 import datetime
 import http
 import inspect
@@ -6,7 +6,7 @@ from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import partial
+from functools import partial, lru_cache
 from itertools import chain
 from logging import LogRecord
 from typing import (
@@ -29,13 +29,6 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
-import requests.auth
-import werkzeug
-from hypothesis import event, note, reject
-from hypothesis import strategies as st
-from requests.structures import CaseInsensitiveDict
-from starlette_testclient import TestClient as ASGIClient
-
 from . import failures, serializers
 from ._dependency_versions import IS_WERKZEUG_ABOVE_3
 from .auths import AuthStorage
@@ -46,8 +39,10 @@ from .constants import (
     SCHEMATHESIS_TEST_CASE_HEADER,
     SERIALIZERS_SUGGESTION_MESSAGE,
     USER_AGENT,
+    NOT_SET,
 )
 from .exceptions import (
+    maybe_set_assertion_message,
     CheckFailed,
     FailureContext,
     OperationSchemaError,
@@ -58,15 +53,20 @@ from .exceptions import (
 )
 from .internal.deprecation import deprecated_property
 from .internal.copy import fast_deepcopy
-from .transports.responses import GenericResponse, WSGIResponse, get_payload, copy_response
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_request, sanitize_response
 from .serializers import Serializer, SerializerContext
+from .transports import serialize_payload
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
-from .utils import NOT_SET, generate_random_case_id, maybe_set_assertion_message
+from .generation import generate_random_case_id
 
 if TYPE_CHECKING:
+    import werkzeug
+    from requests.structures import CaseInsensitiveDict
+    from hypothesis import strategies as st
+    import requests.auth
+    from .transports.responses import GenericResponse, WSGIResponse
     from .schemas import BaseSchema
     from .stateful import Stateful, StatefulTest
 
@@ -80,6 +80,8 @@ class CaseSource:
     elapsed: float
 
     def partial_deepcopy(self) -> "CaseSource":
+        from .transports.responses import copy_response
+
         return self.__class__(
             case=self.case.partial_deepcopy(), response=copy_response(self.response), elapsed=self.elapsed
         )
@@ -87,13 +89,19 @@ class CaseSource:
 
 def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
     """Reject the current example if we don't know how to send this data to the application."""
+    from hypothesis import note, event, reject
+
     event_text = f"Can't serialize data to `{media_type}`."
     note(f"{event_text} {SERIALIZERS_SUGGESTION_MESSAGE}")
     event(event_text)
     reject()  # type: ignore
 
 
-REQUEST_SIGNATURE = inspect.signature(requests.Request)
+@lru_cache()
+def get_request_signature() -> inspect.Signature:
+    import requests
+
+    return inspect.signature(requests.Request)
 
 
 @dataclass()
@@ -106,7 +114,9 @@ class PreparedRequestData:
 
 def prepare_request_data(kwargs: Dict[str, Any]) -> PreparedRequestData:
     """Prepare request data for generating code samples."""
-    kwargs = {key: value for key, value in kwargs.items() if key in REQUEST_SIGNATURE.parameters}
+    import requests
+
+    kwargs = {key: value for key, value in kwargs.items() if key in get_request_signature().parameters}
     request = requests.Request(**kwargs).prepare()
     return PreparedRequestData(
         method=str(request.method), url=str(request.url), body=request.body, headers=dict(request.headers)
@@ -255,6 +265,8 @@ class Case:
         return base_url
 
     def _get_headers(self, headers: Optional[Dict[str, str]] = None) -> CaseInsensitiveDict:
+        from requests.structures import CaseInsensitiveDict
+
         final_headers = self.headers.copy() if self.headers is not None else CaseInsensitiveDict()
         if headers:
             final_headers.update(headers)
@@ -321,6 +333,8 @@ class Case:
         cookies: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> requests.Response:
+        import requests
+
         """Make a network call with `requests`."""
         hook_context = HookContext(operation=self.operation)
         dispatch("before_call", hook_context, self)
@@ -384,6 +398,10 @@ class Case:
         query_string: Optional[Dict[str, str]] = None,
         **kwargs: Any,
     ) -> WSGIResponse:
+        from .transports.responses import WSGIResponse
+        import werkzeug
+        import requests
+
         application = app or self.app
         if application is None:
             raise RuntimeError(
@@ -410,6 +428,8 @@ class Case:
         headers: Optional[Dict[str, str]] = None,
         **kwargs: Any,
     ) -> requests.Response:
+        from starlette_testclient import TestClient as ASGIClient
+
         application = app or self.app
         if application is None:
             raise RuntimeError(
@@ -443,6 +463,7 @@ class Case:
         """
         __tracebackhide__ = True
         from .checks import ALL_CHECKS
+        from .transports.responses import get_payload, copy_response
 
         checks = checks or ALL_CHECKS
         checks = tuple(check for check in checks if check not in excluded_checks)
@@ -507,6 +528,8 @@ class Case:
 
     def get_full_url(self) -> str:
         """Make a full URL to the current API operation, including query parameters."""
+        import requests
+
         base_url = self.base_url or "http://127.0.0.1"
         kwargs = self.as_requests_kwargs(base_url)
         request = requests.Request(**kwargs)
@@ -854,6 +877,8 @@ class Request:
     @classmethod
     def from_case(cls, case: Case, session: requests.Session) -> "Request":
         """Create a new `Request` instance from `Case`."""
+        import requests
+
         base_url = case.get_full_base_url()
         kwargs = case.as_requests_kwargs(base_url)
         request = requests.Request(**kwargs)
@@ -878,10 +903,6 @@ class Request:
             headers={key: [value] for (key, value) in prepared.headers.items()},
             body=serialize_payload(body) if body is not None else body,
         )
-
-
-def serialize_payload(payload: bytes) -> str:
-    return base64.b64encode(payload).decode()
 
 
 @dataclass(repr=False)
@@ -981,6 +1002,8 @@ class Interaction:
         status: Status,
         checks: List[Check],
     ) -> "Interaction":
+        import requests
+
         session = requests.Session()
         session.headers.update(headers)
         return cls(
@@ -1161,4 +1184,4 @@ class TestResultSet:
         self.warnings.append(warning)
 
 
-CheckFunction = Callable[[GenericResponse, Case], Optional[bool]]
+CheckFunction = Callable[["GenericResponse", Case], Optional[bool]]

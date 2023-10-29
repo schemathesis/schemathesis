@@ -35,7 +35,7 @@ from requests.structures import CaseInsensitiveDict
 from ... import experimental, failures
 from ...auths import AuthStorage
 from ...generation import DataGenerationMethod
-from ...constants import HTTP_METHODS
+from ...constants import HTTP_METHODS, NOT_SET
 from ...exceptions import (
     OperationSchemaError,
     UsageError,
@@ -44,20 +44,16 @@ from ...exceptions import (
     get_schema_validation_error,
 )
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, should_skip_operation
+from ...internal.result import Ok, Err, Result
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import BaseSchema
-from ...stateful import APIStateMachine, Stateful, StatefulTest
+from ...stateful import Stateful, StatefulTest
+from ...stateful.state_machine import APIStateMachine
 from ...types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
 from ...internal.jsonschema import traverse_schema
 from ...internal.copy import fast_deepcopy
 from ...transports.content_types import is_json_media_type
 from ...transports.responses import get_payload
-from ...utils import (
-    NOT_SET,
-    Err,
-    Ok,
-    Result,
-)
 from . import links, serialization
 from ._hypothesis import get_case_strategy
 from .converter import to_json_schema, to_json_schema_recursive

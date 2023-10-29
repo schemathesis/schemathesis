@@ -15,7 +15,7 @@ from packaging import version
 from urllib3 import HTTPResponse
 
 import schemathesis.cli
-from schemathesis import Case
+from schemathesis.models import Case
 from schemathesis._compat import metadata
 from schemathesis._dependency_versions import IS_HYPOTHESIS_ABOVE_6_54
 from schemathesis.cli import reset_checks
@@ -744,8 +744,8 @@ def testdir(testdir):
         import pytest
         import schemathesis
         from schemathesis.stateful import Stateful
-        from schemathesis.utils import NOT_SET
-        from schemathesis import DataGenerationMethod
+        from schemathesis.constants import NOT_SET
+        from schemathesis.generation import DataGenerationMethod
         from test.utils import *
         from hypothesis import given, settings, HealthCheck, Phase, assume, strategies as st, seed
         raw_schema = {schema}

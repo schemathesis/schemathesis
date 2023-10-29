@@ -1,14 +1,19 @@
+from __future__ import annotations
 import platform
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, TYPE_CHECKING
 
-from click.utils import LazyFile
 from junit_xml import TestCase, TestSuite, to_xml_report_file
 
 from ..models import Status
 from ..runner import events
 from ..runner.serialization import deduplicate_failures
-from .handlers import EventHandler, ExecutionContext
+from .handlers import EventHandler
+
+
+if TYPE_CHECKING:
+    from click.utils import LazyFile
+    from .context import ExecutionContext
 
 
 @dataclass

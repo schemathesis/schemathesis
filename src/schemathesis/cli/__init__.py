@@ -1,3 +1,4 @@
+from __future__ import annotations
 import base64
 import enum
 import os
@@ -9,14 +10,10 @@ from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum
 from queue import Queue
-from typing import Any, Callable, Dict, Generator, Iterable, List, NoReturn, Optional, Tuple, Union, cast
+from typing import Any, Callable, Dict, Generator, Iterable, List, NoReturn, Optional, Tuple, Union, cast, TYPE_CHECKING
 from urllib.parse import urlparse
 
 import click
-import hypothesis
-import requests
-import yaml
-from urllib3.exceptions import InsecureRequestWarning
 
 from .. import checks as checks_module
 from .. import contrib, experimental
@@ -24,6 +21,7 @@ from .. import fixups as _fixups
 from .. import runner, service
 from .. import targets as targets_module
 from ..code_samples import CodeSampleStyle
+from .constants import HealthCheck, Phase, Verbosity
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from ..constants import (
     API_NAME_ENV_VAR,
@@ -36,30 +34,33 @@ from ..constants import (
 )
 from ..exceptions import SchemaError
 from ..fixups import ALL_FIXUPS
+from ..loaders import load_app, load_yaml
+from ..transports.auth import get_requests_auth
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..models import Case, CheckFunction
 from ..runner import events, prepare_hypothesis_settings
-from ..schemas import BaseSchema
 from ..specs.graphql import loaders as gql_loaders
-from ..specs.graphql.schemas import GraphQLSchema
 from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import Target
 from ..types import Filter, PathLike, RequestCert
-from ..utils import current_datetime, file_exists, get_requests_auth, import_app
+from ..internal.datetime import current_datetime
+from ..internal.validation import file_exists
 from . import callbacks, cassettes, output
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
 from .context import ExecutionContext, FileReportContext, ServiceReportContext
 from .debug import DebugOutputHandler
-from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
 from .options import CsvChoice, CsvEnumChoice, CustomHelpMessageChoice, NotSet, OptionalInt
 from .sanitization import SanitizationHandler
 
-try:
-    from yaml import CSafeLoader as SafeLoader
-except ImportError:
-    from yaml import SafeLoader  # type: ignore
+if TYPE_CHECKING:
+    import hypothesis
+    import requests
+    from ..service.client import ServiceClient
+    from ..schemas import BaseSchema
+    from ..specs.graphql.schemas import GraphQLSchema
+    from .handlers import EventHandler
 
 
 def _get_callable_names(items: Tuple[Callable, ...]) -> Tuple[str, ...]:
@@ -563,7 +564,7 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 @click.option(
     "--hypothesis-phases",
     help="Control which phases should be run.",
-    type=CsvEnumChoice(hypothesis.Phase),
+    type=CsvEnumChoice(Phase),
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,
 )
@@ -584,14 +585,14 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 @click.option(
     "--hypothesis-suppress-health-check",
     help="Comma-separated list of health checks to disable.",
-    type=CsvEnumChoice(hypothesis.HealthCheck),
+    type=CsvEnumChoice(HealthCheck),
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,
 )
 @click.option(
     "--hypothesis-verbosity",
     help="Verbosity level of Hypothesis messages.",
-    type=click.Choice([item.name for item in hypothesis.Verbosity]),
+    type=click.Choice([item.name for item in Verbosity]),
     callback=callbacks.convert_verbosity,
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,
@@ -639,7 +640,7 @@ def run(
     headers: Dict[str, str],
     experimental: list,
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
-    exclude_checks: Iterable[str] = [],
+    exclude_checks: Iterable[str] = (),
     data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
     max_response_time: Optional[int] = None,
     targets: Iterable[str] = DEFAULT_TARGETS_NAMES,
@@ -679,9 +680,9 @@ def run(
     hypothesis_deadline: Optional[Union[int, NotSet]] = None,
     hypothesis_derandomize: Optional[bool] = None,
     hypothesis_max_examples: Optional[int] = None,
-    hypothesis_phases: Optional[List[hypothesis.Phase]] = None,
+    hypothesis_phases: Optional[List[Phase]] = None,
     hypothesis_report_multiple_bugs: Optional[bool] = None,
-    hypothesis_suppress_health_check: Optional[List[hypothesis.HealthCheck]] = None,
+    hypothesis_suppress_health_check: Optional[List[HealthCheck]] = None,
     hypothesis_seed: Optional[int] = None,
     hypothesis_verbosity: Optional[hypothesis.Verbosity] = None,
     verbosity: int = 0,
@@ -699,6 +700,15 @@ def run(
 
     API_NAME is an API identifier to upload data to Schemathesis.io.
     """
+    _hypothesis_phases: Optional[List[hypothesis.Phase]] = None
+    if hypothesis_phases is not None:
+        _hypothesis_phases = [phase.as_hypothesis() for phase in hypothesis_phases]
+    _hypothesis_suppress_health_check: Optional[List[hypothesis.HealthCheck]] = None
+    if hypothesis_suppress_health_check is not None:
+        _hypothesis_suppress_health_check = [
+            health_check.as_hypothesis() for health_check in hypothesis_suppress_health_check
+        ]
+
     # Enable selected experiments
     for experiment in experimental:
         experiment.enable()
@@ -739,7 +749,9 @@ def run(
         and api_name is not None
         and schema_kind == callbacks.SchemaInputKind.NAME
     ):
-        client = service.ServiceClient(base_url=schemathesis_io_url, token=token)
+        from ..service.client import ServiceClient
+
+        client = ServiceClient(base_url=schemathesis_io_url, token=token)
         # It is assigned above
         if token is not None or schema_kind == callbacks.SchemaInputKind.NAME:
             if token is None:
@@ -757,6 +769,8 @@ def run(
                     "See https://schemathesis.readthedocs.io/en/stable/service.html for more details"
                 )
             name: str = cast(str, api_name)
+            import requests
+
             try:
                 details = client.get_api_details(name)
                 # Replace config values with ones loaded from the service
@@ -765,8 +779,10 @@ def run(
             except requests.HTTPError as exc:
                 handle_service_error(exc, name)
     if report is REPORT_TO_SERVICE and not client:
+        from ..service.client import ServiceClient
+
         # Upload without connecting data to a certain API
-        client = service.ServiceClient(base_url=schemathesis_io_url, token=token)
+        client = ServiceClient(base_url=schemathesis_io_url, token=token)
     host_data = service.hosts.HostData(schemathesis_io_hostname, hosts_file)
 
     if "all" in checks:
@@ -792,9 +808,9 @@ def run(
         deadline=hypothesis_deadline,
         derandomize=hypothesis_derandomize,
         max_examples=hypothesis_max_examples,
-        phases=hypothesis_phases,
+        phases=_hypothesis_phases,
         report_multiple_bugs=hypothesis_report_multiple_bugs,
-        suppress_health_check=hypothesis_suppress_health_check,
+        suppress_health_check=_hypothesis_suppress_health_check,
         verbosity=hypothesis_verbosity,
     )
     event_stream = into_event_stream(
@@ -933,7 +949,7 @@ def into_event_stream(
 ) -> Generator[events.ExecutionEvent, None, None]:
     try:
         if app is not None:
-            app = import_app(app)
+            app = load_app(app)
         config = LoaderConfig(
             schema_location=schema_location,
             app=app,
@@ -997,6 +1013,8 @@ def load_schema(config: LoaderConfig) -> BaseSchema:
 
 
 def should_try_more(exc: SchemaError) -> bool:
+    import requests
+
     # We should not try other loaders for cases when we can't even establish connection
     return not isinstance(exc.__cause__, requests.exceptions.ConnectionError)
 
@@ -1004,6 +1022,8 @@ def should_try_more(exc: SchemaError) -> bool:
 def _try_load_schema(
     config: LoaderConfig, first: Callable[[LoaderConfig], BaseSchema], second: Callable[[LoaderConfig], BaseSchema]
 ) -> BaseSchema:
+    from urllib3.exceptions import InsecureRequestWarning
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", InsecureRequestWarning)
         try:
@@ -1148,7 +1168,7 @@ def execute(
     debug_output_file: Optional[click.utils.LazyFile],
     sanitize_output: bool,
     host_data: service.hosts.HostData,
-    client: Optional[service.ServiceClient],
+    client: Optional[ServiceClient],
     report: Optional[Union[ReportToService, click.utils.LazyFile]],
     telemetry: bool,
     api_name: Optional[str],
@@ -1242,6 +1262,8 @@ def execute(
 
 
 def handle_service_error(exc: requests.HTTPError, api_name: str) -> NoReturn:
+    import requests
+
     response = cast(requests.Response, exc.response)
     if response.status_code == 403:
         error_message(response.json()["detail"])
@@ -1301,7 +1323,7 @@ def replay(
 
     click.secho(f"{bold('Replaying cassette')}: {cassette_path}")
     with open(cassette_path, "rb") as fd:
-        cassette = yaml.load(fd, Loader=SafeLoader)
+        cassette = load_yaml(fd)
     click.secho(f"{bold('Total interactions')}: {len(cassette['http_interactions'])}\n")
     for replayed in cassettes.replay(
         cassette,
@@ -1362,6 +1384,8 @@ def login(token: str, hostname: str, hosts_file: str, protocol: str, request_tls
         st auth login MY_TOKEN
 
     """
+    import requests
+
     try:
         username = service.auth.login(token, hostname, protocol, request_tls_verify)
         service.hosts.store(token, hostname, hosts_file)

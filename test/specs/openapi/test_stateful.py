@@ -4,7 +4,7 @@ from hypothesis import HealthCheck, Phase, settings
 import schemathesis
 from schemathesis.exceptions import CheckFailed
 from schemathesis.specs.openapi.stateful.links import make_response_filter, match_status_code
-from schemathesis.stateful import StepResult
+from schemathesis.stateful.state_machine import StepResult
 from src.schemathesis.models import CaseSource, Check, Status
 from src.schemathesis.runner.serialization import SerializedCheck
 

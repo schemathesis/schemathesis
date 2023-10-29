@@ -13,15 +13,18 @@ from hypothesis_jsonschema import from_schema
 from requests.auth import _basic_auth_str
 from requests.structures import CaseInsensitiveDict
 
-from ... import auths, serializers, utils
+from ...constants import NOT_SET
+from .formats import STRING_FORMATS
+from ... import auths, serializers
 from ...generation import DataGenerationMethod
 from ...internal.copy import fast_deepcopy
 from ...exceptions import OperationSchemaError, SerializationNotPossible
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...models import APIOperation, Case, cant_serialize
+from ...transports.headers import has_invalid_characters, is_latin_1_encodable
 from ...types import NotSet
 from ...serializers import Binary
-from ...utils import NOT_SET, compose, skip
+from ...utils import compose, skip
 from .constants import LOCATION_TO_CONTAINER
 from .negative import negative_schema
 from .negative.utils import can_negate
@@ -31,30 +34,7 @@ from .utils import is_header_location
 HEADER_FORMAT = "_header_value"
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
 SLASH = "/"
-STRING_FORMATS: Dict[str, st.SearchStrategy] = {}
 StrategyFactory = Callable[[Dict[str, Any], str, str, Optional[str]], st.SearchStrategy]
-
-
-def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
-    """Register a new strategy for generating data for specific string "format".
-
-    :param str name: Format name. It should correspond the one used in the API schema as the "format" keyword value.
-    :param strategy: Hypothesis strategy you'd like to use to generate values for this format.
-    """
-    if not isinstance(name, str):
-        raise TypeError(f"name must be of type {str}, not {type(name)}")
-    if not isinstance(strategy, st.SearchStrategy):
-        raise TypeError(f"strategy must be of type {st.SearchStrategy}, not {type(strategy)}")
-
-    STRING_FORMATS[name] = strategy
-
-
-def unregister_string_format(name: str) -> None:
-    """Remove format strategy from the registry."""
-    try:
-        del STRING_FORMATS[name]
-    except KeyError as exc:
-        raise ValueError(f"Unknown Open API format: {name}") from exc
 
 
 @lru_cache()
@@ -86,9 +66,9 @@ def get_default_format_strategies() -> Dict[str, st.SearchStrategy]:
 def is_valid_header(headers: Dict[str, Any]) -> bool:
     """Verify if the generated headers are valid."""
     for name, value in headers.items():
-        if not utils.is_latin_1_encodable(value):
+        if not is_latin_1_encodable(value):
             return False
-        if utils.has_invalid_characters(name, value):
+        if has_invalid_characters(name, value):
             return False
     return True
 

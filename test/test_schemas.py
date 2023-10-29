@@ -4,7 +4,7 @@ import schemathesis
 from schemathesis.exceptions import OperationSchemaError, SchemaError
 from schemathesis.specs.openapi.parameters import OpenAPI20Body
 from schemathesis.specs.openapi.schemas import InliningResolver
-from schemathesis.utils import Err, Ok
+from schemathesis.internal.result import Err, Ok
 
 
 @pytest.mark.parametrize("base_path", ("/v1", "/v1/"))

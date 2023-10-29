@@ -1,14 +1,14 @@
+from __future__ import annotations
 import threading
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, FrozenSet, Optional, Union, cast
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
-from requests import PreparedRequest
-
-from .utils import NOT_SET
+from .constants import NOT_SET
 
 if TYPE_CHECKING:
+    from requests import PreparedRequest
     from .models import Case, CaseSource, Request
     from .runner.serialization import SerializedCase, SerializedCheck, SerializedInteraction
     from .transports.responses import GenericResponse
@@ -181,6 +181,8 @@ def sanitize_response(response: "GenericResponse", *, config: Optional[Config] =
 
 
 def sanitize_request(request: Union[PreparedRequest, "Request"], *, config: Optional[Config] = None) -> None:
+    from requests import PreparedRequest
+
     if isinstance(request, PreparedRequest) and request.url:
         request.url = sanitize_url(request.url, config=config)
     else:

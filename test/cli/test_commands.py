@@ -11,21 +11,21 @@ from unittest.mock import ANY
 from urllib.parse import urljoin
 from warnings import catch_warnings
 
-import hypothesis
 import pytest
 import requests
 import trustme
 import yaml
 from _pytest.main import ExitCode
 from aiohttp.test_utils import unused_port
-from hypothesis import HealthCheck, Phase, Verbosity
+import hypothesis
 from hypothesis.configuration import set_hypothesis_home_dir, storage_directory
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 from packaging import version
 
-from schemathesis import Case, DataGenerationMethod
+from schemathesis.models import Case
+from schemathesis.generation import DataGenerationMethod
 from schemathesis._dependency_versions import IS_HYPOTHESIS_ABOVE_6_54
-from schemathesis.checks import ALL_CHECKS, not_a_server_error
+from schemathesis.checks import ALL_CHECKS, not_a_server_error, DEFAULT_CHECKS
 from schemathesis.cli import (
     COLOR_OPTIONS_INVALID_USAGE_MESSAGE,
     DEPRECATED_PRE_RUN_OPTION_WARNING,
@@ -34,6 +34,7 @@ from schemathesis.cli import (
     get_exit_code,
     reset_checks,
 )
+from schemathesis.cli.constants import Phase, HealthCheck
 from schemathesis.cli.callbacks import (
     FILE_DOES_NOT_EXIST_MESSAGE,
     INVALID_BASE_URL_MESSAGE,
@@ -52,13 +53,13 @@ from schemathesis.constants import (
 )
 from schemathesis.extra._flask import run_server
 from schemathesis.models import APIOperation
-from schemathesis.runner import DEFAULT_CHECKS, from_schema
+from schemathesis.runner import from_schema
 from schemathesis.runner.impl import threadpool
 from schemathesis.specs.openapi import unregister_string_format
 from schemathesis.specs.openapi.checks import status_code_conformance
 from schemathesis.stateful import Stateful
 from schemathesis.targets import DEFAULT_TARGETS
-from schemathesis.utils import current_datetime
+from schemathesis.internal.datetime import current_datetime
 
 PHASES = ", ".join((x.name for x in Phase))
 HEALTH_CHECKS = "|".join((x.name for x in HealthCheck))
@@ -399,10 +400,10 @@ SCHEMA_URI = "https://example.schemathesis.io/openapi.json"
                     deadline=1000,
                     derandomize=True,
                     max_examples=1000,
-                    phases=[Phase.explicit, Phase.generate],
+                    phases=[hypothesis.Phase.explicit, hypothesis.Phase.generate],
                     report_multiple_bugs=False,
-                    suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
-                    verbosity=Verbosity.normal,
+                    suppress_health_check=[hypothesis.HealthCheck.too_slow, hypothesis.HealthCheck.filter_too_much],
+                    verbosity=hypothesis.Verbosity.normal,
                 )
             },
         ),
@@ -463,7 +464,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
     ),
 )
 def test_load_schema_arguments(cli, mocker, args, expected):
-    mocker.patch("schemathesis.runner.SingleThreadRunner.execute", autospec=True)
+    mocker.patch("schemathesis.runner.impl.SingleThreadRunner.execute", autospec=True)
     load_schema = mocker.patch("schemathesis.cli.load_schema", autospec=True)
 
     cli.run(SCHEMA_URI, *args)

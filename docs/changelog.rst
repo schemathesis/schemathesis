@@ -9,6 +9,7 @@ Changelog
 - Generated binary data inside ``Case.body`` is wrapped with a custom wrapper - ``Binary`` in order to simplify
   compatibility with ``hypothesis-jsonschema``.
 - Do not modify ``Case.body`` inside ``Case.as_requests_kwargs`` when serializing multipart data.
+- **INTERNAL**: Moved heavy imports inside functions to improve CLI startup time by 4.3x, not affecting overall execution speed. `#1509`_
 
 .. _v3.20.2:
 
@@ -3550,6 +3551,7 @@ Deprecated
 .. _#1518: https://github.com/schemathesis/schemathesis/issues/1518
 .. _#1517: https://github.com/schemathesis/schemathesis/issues/1517
 .. _#1514: https://github.com/schemathesis/schemathesis/issues/1514
+.. _#1509: https://github.com/schemathesis/schemathesis/issues/1509
 .. _#1485: https://github.com/schemathesis/schemathesis/issues/1485
 .. _#1472: https://github.com/schemathesis/schemathesis/issues/1472
 .. _#1464: https://github.com/schemathesis/schemathesis/issues/1464

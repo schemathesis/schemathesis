@@ -1,9 +1,12 @@
+from __future__ import annotations
+from typing import Any
+
 from . import auths, checks, experimental, contrib, fixups, graphql, hooks, runner, serializers, targets  # noqa: E402
+from ._lazy_import import lazy_import
 from .generation import DataGenerationMethod  # noqa: E402
 from .constants import SCHEMATHESIS_VERSION  # noqa: E402
 from .models import Case  # noqa: E402
 from .specs import openapi  # noqa: E402
-from .transports.responses import GenericResponse  # noqa: E402
 
 
 __version__ = SCHEMATHESIS_VERSION
@@ -29,3 +32,51 @@ target = targets.register
 register_check = checks.register
 register_target = targets.register
 register_string_format = openapi.format
+
+__all__ = [
+    "auths",
+    "checks",
+    "experimental",
+    "contrib",
+    "fixups",
+    "graphql",
+    "hooks",
+    "runner",
+    "serializers",
+    "targets",
+    "DataGenerationMethod",
+    "SCHEMATHESIS_VERSION",
+    "Case",
+    "openapi",
+    "__version__",
+    "from_aiohttp",
+    "from_asgi",
+    "from_dict",
+    "from_file",
+    "from_path",
+    "from_pytest_fixture",
+    "from_uri",
+    "from_wsgi",
+    "auth",
+    "check",
+    "hook",
+    "serializer",
+    "target",
+    "register_check",
+    "register_target",
+    "register_string_format",
+]
+
+
+def _load_generic_response() -> Any:
+    from .transports.responses import GenericResponse
+
+    return GenericResponse
+
+
+_imports = {"GenericResponse": _load_generic_response}
+
+
+def __getattr__(name: str) -> Any:
+    # Some modules are relatively heavy, hence load them lazily to improve startup time for CLI
+    return lazy_import(__name__, name, _imports, globals())

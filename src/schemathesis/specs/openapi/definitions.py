@@ -1,5 +1,12 @@
 # These schemas are copied from https://github.com/OAI/OpenAPI-Specification/tree/master/schemas
-import jsonschema
+from __future__ import annotations
+from typing import Any, Dict, TYPE_CHECKING
+
+from ..._lazy_import import lazy_import
+
+if TYPE_CHECKING:
+    from jsonschema import Validator
+
 
 SWAGGER_20 = {
     "title": "A JSON Schema for Swagger 2.0 API.",
@@ -664,7 +671,6 @@ SWAGGER_20 = {
         },
     },
 }
-SWAGGER_20_VALIDATOR = jsonschema.validators.validator_for(SWAGGER_20)(SWAGGER_20)
 OPENAPI_30 = {
     "id": "https://spec.openapis.org/oas/3.0/schema/2019-04-02",
     "$schema": "http://json-schema.org/draft-04/schema#",
@@ -1323,8 +1329,6 @@ OPENAPI_30 = {
         },
     },
 }
-OPENAPI_30_VALIDATOR = jsonschema.validators.validator_for(OPENAPI_30)(OPENAPI_30)
-
 OPENAPI_31 = {
     "$id": "https://spec.openapis.org/oas/3.1/schema/2022-10-07",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1895,4 +1899,31 @@ OPENAPI_31 = {
         },
     },
 }
-OPENAPI_31_VALIDATOR = jsonschema.validators.validator_for(OPENAPI_31)(OPENAPI_31)
+
+_VALIDATORS = [
+    "SWAGGER_20_VALIDATOR",
+    "OPENAPI_30_VALIDATOR",
+    "OPENAPI_31_VALIDATOR",
+]
+
+__all__ = [
+    "SWAGGER_20",
+    "OPENAPI_30",
+    "OPENAPI_31",
+] + _VALIDATORS
+
+_imports = {
+    "SWAGGER_20_VALIDATOR": lambda: make_validator(SWAGGER_20),
+    "OPENAPI_30_VALIDATOR": lambda: make_validator(OPENAPI_30),
+    "OPENAPI_31_VALIDATOR": lambda: make_validator(OPENAPI_31),
+}
+
+
+def make_validator(schema: Dict[str, Any]) -> Validator:
+    import jsonschema
+
+    return jsonschema.validators.validator_for(schema)(schema)
+
+
+def __getattr__(name: str) -> Any:
+    return lazy_import(__name__, name, _imports, globals())

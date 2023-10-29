@@ -31,22 +31,20 @@ from ...exceptions import (
     OperationSchemaError,
     SkipTest,
     get_grouped_exception,
+    maybe_set_assertion_message,
+    format_exception,
 )
 from ...hooks import HookContext, get_all_by_name
+from ...internal.result import Ok
 from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResult, TestResultSet
 from ...runner import events
+from ...internal.datetime import current_datetime
 from ...transports.responses import copy_response
 from ...schemas import BaseSchema
 from ...stateful import Feedback, Stateful
 from ...targets import Target, TargetContext
 from ...types import RawAuth, RequestCert
-from ...utils import (
-    Ok,
-    capture_hypothesis_output,
-    current_datetime,
-    format_exception,
-    maybe_set_assertion_message,
-)
+from ...utils import capture_hypothesis_output
 from ..serialization import SerializedTestResult
 
 if TYPE_CHECKING:
