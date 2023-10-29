@@ -13,6 +13,7 @@ from ..constants import (
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     DataGenerationMethod,
 )
+from ..internal.deprecation import deprecated_function
 from ..exceptions import SchemaError
 from ..models import CheckFunction
 from ..schemas import BaseSchema
@@ -23,7 +24,6 @@ from ..targets import DEFAULT_TARGETS, Target
 from ..types import Filter, NotSet, RawAuth, RequestCert
 from ..utils import (
     current_datetime,
-    deprecated,
     dict_not_none_values,
     dict_true_values,
     file_exists,
@@ -42,7 +42,7 @@ from .impl import (
 )
 
 
-@deprecated(removed_in="4.0", replacement="schemathesis.runner.from_schema")
+@deprecated_function(removed_in="4.0", replacement="schemathesis.runner.from_schema")
 def prepare(
     schema_uri: Union[str, Dict[str, Any]],
     *,

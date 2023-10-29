@@ -25,7 +25,7 @@ from schemathesis.specs.openapi.negative.mutations import (
     remove_required_property,
 )
 from schemathesis.specs.openapi.utils import is_header_location
-from schemathesis.utils import fast_deepcopy
+from schemathesis.internal.copy import fast_deepcopy
 
 MAX_EXAMPLES = 15
 SUPPRESSED_HEALTH_CHECKS = [HealthCheck.too_slow, HealthCheck.filter_too_much, HealthCheck.data_too_large]

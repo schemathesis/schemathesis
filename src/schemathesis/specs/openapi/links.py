@@ -10,7 +10,8 @@ from ...models import APIOperation, Case
 from ...parameters import ParameterSet
 from ...stateful import Direction, ParsedData, StatefulTest
 from ...types import NotSet
-from ...utils import NOT_SET, GenericResponse, fast_deepcopy
+from ...utils import NOT_SET, GenericResponse
+from ...internal.copy import fast_deepcopy
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPI20Body, OpenAPI30Body, OpenAPIParameter

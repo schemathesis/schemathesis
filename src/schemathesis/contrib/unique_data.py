@@ -1,11 +1,11 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING
-
-from hypothesis import strategies as st
 
 from ..hooks import HookContext, register, unregister
 
 if TYPE_CHECKING:
     from ..models import Case
+    from hypothesis import strategies as st
 
 
 def install() -> None:

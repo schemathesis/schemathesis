@@ -45,16 +45,16 @@ from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import BaseSchema
 from ...stateful import APIStateMachine, Stateful, StatefulTest
 from ...types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
+from ...internal.jsonschema import traverse_schema
+from ...internal.copy import fast_deepcopy
+from ...transports.content_types import is_json_media_type
 from ...utils import (
     NOT_SET,
     Err,
     GenericResponse,
     Ok,
     Result,
-    fast_deepcopy,
     get_response_payload,
-    is_json_media_type,
-    traverse_schema,
 )
 from . import links, serialization
 from ._hypothesis import get_case_strategy

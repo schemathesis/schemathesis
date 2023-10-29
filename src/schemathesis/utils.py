@@ -1,4 +1,3 @@
-import cgi
 import functools
 import operator
 import pathlib
@@ -6,7 +5,6 @@ import random
 import re
 import sys
 import traceback
-import warnings
 from contextlib import contextmanager
 from copy import copy, deepcopy
 from datetime import datetime, timezone
@@ -26,7 +24,6 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    overload,
 )
 
 import pytest
@@ -172,36 +169,6 @@ def format_exception(error: Exception, include_traceback: bool = False) -> str:
     return "".join(lines).strip()
 
 
-def parse_content_type(content_type: str) -> Tuple[str, str]:
-    """Parse Content Type and return main type and subtype."""
-    try:
-        content_type, _ = cgi.parse_header(content_type)
-        main_type, sub_type = content_type.split("/", 1)
-    except ValueError as exc:
-        raise ValueError(f"Malformed media type: `{content_type}`") from exc
-    return main_type.lower(), sub_type.lower()
-
-
-def is_json_media_type(value: str) -> bool:
-    """Detect whether the content type is JSON-compatible.
-
-    For example - ``application/problem+json`` matches.
-    """
-    main, sub = parse_content_type(value)
-    return main == "application" and (sub == "json" or sub.endswith("+json"))
-
-
-def is_plain_text_media_type(value: str) -> bool:
-    """Detect variations of the ``text/plain`` media type."""
-    return parse_content_type(value) == ("text", "plain")
-
-
-def is_xml_media_type(value: str) -> bool:
-    """Detect variations of the ``application/xml`` media type."""
-    _, sub = parse_content_type(value)
-    return sub == "xml" or sub.endswith("+xml")
-
-
 def make_loader(*tags_to_remove: str) -> Type[yaml.SafeLoader]:
     """Create a YAML loader, that doesn't parse specific tokens into Python objects."""
     cls: Type[yaml.SafeLoader] = type("YAMLLoader", (SafeLoader,), {})
@@ -301,72 +268,6 @@ def import_app(path: str) -> Any:
     # may return a parent module (system dependent)
     module = sys.modules[path]
     return getattr(module, name)
-
-
-Schema = Union[Dict[str, Any], List, str, float, int]
-
-
-@overload
-def traverse_schema(schema: Dict[str, Any], callback: Callable, *args: Any, **kwargs: Any) -> Dict[str, Any]:
-    pass
-
-
-@overload
-def traverse_schema(schema: List, callback: Callable, *args: Any, **kwargs: Any) -> List:
-    pass
-
-
-@overload
-def traverse_schema(schema: str, callback: Callable, *args: Any, **kwargs: Any) -> str:
-    pass
-
-
-@overload
-def traverse_schema(schema: float, callback: Callable, *args: Any, **kwargs: Any) -> float:
-    pass
-
-
-def traverse_schema(schema: Schema, callback: Callable[..., Dict[str, Any]], *args: Any, **kwargs: Any) -> Schema:
-    """Apply callback recursively to the given schema."""
-    if isinstance(schema, dict):
-        schema = callback(schema, *args, **kwargs)
-        for key, sub_item in schema.items():
-            schema[key] = traverse_schema(sub_item, callback, *args, **kwargs)
-    elif isinstance(schema, list):
-        schema = [traverse_schema(sub_item, callback, *args, **kwargs) for sub_item in schema]
-    return schema
-
-
-def _warn_deprecation(*, thing: str, removed_in: str, replacement: str) -> None:
-    warnings.warn(
-        f"Property `{thing}` is deprecated and will be removed in Schemathesis {removed_in}. "
-        f"Use `{replacement}` instead.",
-        DeprecationWarning,
-        stacklevel=1,
-    )
-
-
-def deprecated_property(*, removed_in: str, replacement: str) -> Callable:
-    def wrapper(prop: Callable) -> Callable:
-        @property  # type: ignore
-        def inner(self: Any) -> Any:
-            _warn_deprecation(thing=prop.__name__, removed_in=removed_in, replacement=replacement)
-            return prop(self)
-
-        return inner
-
-    return wrapper
-
-
-def deprecated(*, removed_in: str, replacement: str) -> Callable:
-    def wrapper(func: Callable) -> Callable:
-        def inner(*args: Any, **kwargs: Any) -> Any:
-            _warn_deprecation(thing=func.__name__, removed_in=removed_in, replacement=replacement)
-            return func(*args, **kwargs)
-
-        return inner
-
-    return wrapper
 
 
 def setup_headers(kwargs: Dict[str, Any]) -> None:
@@ -512,18 +413,6 @@ def combine_strategies(strategies: List[st.SearchStrategy]) -> st.SearchStrategy
 
 def skip(operation_name: str) -> NoReturn:
     raise SkipTest(f"It is not possible to generate negative test cases for `{operation_name}`")
-
-
-def fast_deepcopy(value: Any) -> Any:
-    """A specialized version of `deepcopy` that copies only `dict` and `list`.
-
-    It is on average 3x faster than `deepcopy` and given the amount of calls, it is an important optimization.
-    """
-    if isinstance(value, dict):
-        return {key: fast_deepcopy(v) for key, v in value.items()}
-    if isinstance(value, list):
-        return [fast_deepcopy(v) for v in value]
-    return value
 
 
 CASE_ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
