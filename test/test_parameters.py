@@ -7,7 +7,7 @@ from hypothesis.errors import NoSuchExample
 
 import schemathesis
 from schemathesis.exceptions import OperationSchemaError
-from schemathesis.specs.openapi._hypothesis import STRING_FORMATS, is_valid_header
+from schemathesis.specs.openapi._hypothesis import is_valid_header, get_default_format_strategies
 from schemathesis.utils import fast_deepcopy
 
 from .utils import as_param
@@ -346,8 +346,9 @@ def test_bearer_auth_valid_header():
     # When an HTTP Bearer Auth headers is generated
     # Then it should be a valid header
     # And no invalid headers should be generated
+    strategy = get_default_format_strategies()["_bearer_auth"]
     with pytest.raises(NoSuchExample):
-        find(STRING_FORMATS["_bearer_auth"], lambda x: not is_valid_header({"x": x}))
+        find(strategy, lambda x: not is_valid_header({"x": x}))
 
 
 def test_unknown_data(testdir):

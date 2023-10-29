@@ -13,7 +13,6 @@ from schemathesis.parameters import ParameterSet, PayloadAlternatives
 from schemathesis.serializers import Binary
 from schemathesis.specs.openapi._hypothesis import (
     PARAMETERS,
-    STRING_FORMATS,
     _get_body_strategy,
     get_case_strategy,
     is_valid_path,
@@ -169,11 +168,6 @@ def test_custom_strategies(swagger_20):
     result = get_case_strategy(operation).example()
     assert len(result.query["id"]) == 4
     assert int(result.query["id"]) % 2 == 0
-
-
-def test_register_default_strategies():
-    assert "binary" in STRING_FORMATS
-    assert "byte" in STRING_FORMATS
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
