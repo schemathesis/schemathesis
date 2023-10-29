@@ -8,7 +8,7 @@ import yaml
 from typing_extensions import Protocol, runtime_checkable
 
 from ._xml import _to_xml
-from .utils import is_json_media_type, is_plain_text_media_type, is_xml_media_type, parse_content_type
+from .utils import is_json_media_type, is_plain_text_media_type, is_xml_media_type, parse_content_type, fast_deepcopy
 
 if TYPE_CHECKING:
     from .models import Case
@@ -219,6 +219,7 @@ class MultipartSerializer:
         if isinstance(value, bytes):
             return {"data": value}
         if isinstance(value, dict):
+            value = fast_deepcopy(value)
             multipart = _prepare_form_data(value)
             files, data = context.case.operation.prepare_multipart(multipart)
             return {"files": files, "data": data}
