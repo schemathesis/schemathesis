@@ -7,7 +7,7 @@ from ..hooks import register, unregister
 
 if TYPE_CHECKING:
     from ..models import Case
-    from ..utils import GenericResponse
+    from ..transports.responses import GenericResponse
 
 
 def install() -> None:

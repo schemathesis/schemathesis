@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from hypothesis import strategies as st
     from .models import APIOperation, Case
     from .schemas import BaseSchema
-    from .utils import GenericResponse
+    from .transports.responses import GenericResponse
 
 
 @unique

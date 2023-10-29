@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING, Optional, Tuple
 
 from . import failures
@@ -8,9 +9,9 @@ from .specs.openapi.checks import (
     response_schema_conformance,
     status_code_conformance,
 )
-from .utils import GenericResponse
 
 if TYPE_CHECKING:
+    from .transports.responses import GenericResponse
     from .models import Case, CheckFunction
 
 

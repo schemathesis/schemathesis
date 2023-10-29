@@ -40,12 +40,12 @@ from . import failures, serializers
 from ._dependency_versions import IS_WERKZEUG_ABOVE_3
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
+from .generation import DataGenerationMethod
 from .constants import (
     DEFAULT_RESPONSE_TIMEOUT,
     SCHEMATHESIS_TEST_CASE_HEADER,
     SERIALIZERS_SUGGESTION_MESSAGE,
     USER_AGENT,
-    DataGenerationMethod,
 )
 from .exceptions import (
     CheckFailed,
@@ -58,20 +58,13 @@ from .exceptions import (
 )
 from .internal.deprecation import deprecated_property
 from .internal.copy import fast_deepcopy
+from .transports.responses import GenericResponse, WSGIResponse, get_payload, copy_response
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_request, sanitize_response
 from .serializers import Serializer, SerializerContext
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
-from .utils import (
-    NOT_SET,
-    GenericResponse,
-    WSGIResponse,
-    copy_response,
-    generate_random_case_id,
-    get_response_payload,
-    maybe_set_assertion_message,
-)
+from .utils import NOT_SET, generate_random_case_id, maybe_set_assertion_message
 
 if TYPE_CHECKING:
     from .schemas import BaseSchema
@@ -477,7 +470,7 @@ class Case:
                 sanitize_request(response.request)
                 sanitize_response(response)
             code_message = self._get_code_message(code_sample_style, response.request, verify=verify)
-            payload = get_response_payload(response)
+            payload = get_payload(response)
             raise exception_cls(
                 f"\n\n{formatted_failures}\n\n"
                 f"----------\n\n"

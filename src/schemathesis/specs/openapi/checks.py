@@ -14,7 +14,7 @@ from .schemas import BaseOpenAPISchema
 from .utils import expand_status_code
 
 if TYPE_CHECKING:
-    from ...utils import GenericResponse
+    from ...transports.responses import GenericResponse
     from ...models import Case
 
 

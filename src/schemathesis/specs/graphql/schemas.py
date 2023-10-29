@@ -1,7 +1,22 @@
+from __future__ import annotations
 import enum
 from dataclasses import dataclass
 from enum import unique
-from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+    TYPE_CHECKING,
+)
 from urllib.parse import urlsplit
 
 import graphql
@@ -14,7 +29,7 @@ from requests.structures import CaseInsensitiveDict
 from ... import auths
 from ...auths import AuthStorage
 from ...checks import not_a_server_error
-from ...constants import DataGenerationMethod
+from ...generation import DataGenerationMethod
 from ...exceptions import OperationSchemaError
 from ...hooks import (
     GLOBAL_HOOK_DISPATCHER,
@@ -27,8 +42,11 @@ from ...models import APIOperation, Case, CheckFunction, OperationDefinition
 from ...schemas import BaseSchema
 from ...stateful import Stateful, StatefulTest
 from ...types import Body, Cookies, Headers, NotSet, PathParameters, Query
-from ...utils import NOT_SET, GenericResponse, Ok, Result
+from ...utils import NOT_SET, Ok, Result
 from .scalars import CUSTOM_SCALARS
+
+if TYPE_CHECKING:
+    from ...transports.responses import GenericResponse
 
 
 @unique

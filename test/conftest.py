@@ -25,7 +25,7 @@ from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.service import HOSTS_PATH_ENV_VAR
 from schemathesis.specs.openapi import loaders as oas_loaders
-from schemathesis.utils import WSGIResponse
+from schemathesis.transports.responses import WSGIResponse
 
 from .apps import _graphql as graphql
 from .apps import openapi

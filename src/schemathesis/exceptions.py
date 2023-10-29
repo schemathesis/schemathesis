@@ -12,7 +12,7 @@ from .failures import FailureContext
 if TYPE_CHECKING:
     import hypothesis.errors
     from jsonschema import RefResolutionError, ValidationError
-    from .utils import GenericResponse
+    from .transports.responses import GenericResponse
 
 
 class CheckFailed(AssertionError):

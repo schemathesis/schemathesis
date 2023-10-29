@@ -7,7 +7,8 @@ import requests
 from hypothesis import given, settings
 
 import schemathesis
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT, DataGenerationMethod
+from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
+from schemathesis.generation import DataGenerationMethod
 from schemathesis.exceptions import CheckFailed, UsageError
 from schemathesis.models import APIOperation, Case, CaseSource, OperationDefinition, Request, Response, _merge_dict_to
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance

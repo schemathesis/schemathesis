@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Callable, Tuple
 
 if TYPE_CHECKING:
     from .models import Case
-    from .utils import GenericResponse
+    from .transports.responses import GenericResponse
 
 
 @dataclass

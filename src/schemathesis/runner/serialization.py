@@ -9,10 +9,11 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import requests
 from requests.structures import CaseInsensitiveDict
 
-from ..code_samples import EXCLUDED_HEADERS
+from ..transports.responses import WSGIResponse
+from ..code_samples import get_excluded_headers
 from ..exceptions import FailureContext, InternalError, make_unique_by_key
 from ..models import Case, Check, Interaction, Request, Response, Status, TestResult, serialize_payload
-from ..utils import WSGIResponse, format_exception
+from ..utils import format_exception
 
 
 @dataclass
@@ -119,7 +120,7 @@ class SerializedCheck:
 
 
 def _get_headers(headers: Union[Dict[str, Any], CaseInsensitiveDict]) -> Dict[str, str]:
-    return {key: value[0] for key, value in headers.items() if key not in EXCLUDED_HEADERS}
+    return {key: value[0] for key, value in headers.items() if key not in get_excluded_headers()}
 
 
 @dataclass
