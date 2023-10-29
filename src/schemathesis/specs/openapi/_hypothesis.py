@@ -3,6 +3,7 @@ import string
 from base64 import b64encode
 from contextlib import suppress
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
@@ -55,30 +56,30 @@ def unregister_string_format(name: str) -> None:
         raise ValueError(f"Unknown Open API format: {name}") from exc
 
 
-def init_default_strategies() -> None:
-    """Register all default "format" strategies."""
-    register_string_format("binary", st.binary().map(Binary))
-    register_string_format("byte", st.binary().map(lambda x: b64encode(x).decode()))
+@lru_cache()
+def get_default_format_strategies() -> Dict[str, st.SearchStrategy]:
+    """Get all default "format" strategies."""
 
     def make_basic_auth_str(item: Tuple[str, str]) -> str:
         return _basic_auth_str(*item)
 
     latin1_text = st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255))
 
-    # RFC 7230, Section 3.2.6
-    register_string_format(
-        "_header_name",
-        st.text(min_size=1, alphabet=st.sampled_from("!#$%&'*+-.^_`|~" + string.digits + string.ascii_letters)),
-    )
     # Define valid characters here to avoid filtering them out in `is_valid_header` later
     header_value = st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255, blacklist_characters="\n\r"))
-    # Header values with leading non-visible chars can't be sent with `requests`
-    register_string_format(HEADER_FORMAT, header_value.map(str.lstrip))
-    register_string_format("_basic_auth", st.tuples(latin1_text, latin1_text).map(make_basic_auth_str))  # type: ignore
-    register_string_format(
-        "_bearer_auth",
-        header_value.map("Bearer {}".format),
-    )
+
+    return {
+        "binary": st.binary().map(Binary),
+        "byte": st.binary().map(lambda x: b64encode(x).decode()),
+        # RFC 7230, Section 3.2.6
+        "_header_name": st.text(
+            min_size=1, alphabet=st.sampled_from("!#$%&'*+-.^_`|~" + string.digits + string.ascii_letters)
+        ),
+        # Header values with leading non-visible chars can't be sent with `requests`
+        HEADER_FORMAT: header_value.map(str.lstrip),
+        "_basic_auth": st.tuples(latin1_text, latin1_text).map(make_basic_auth_str),
+        "_bearer_auth": header_value.map("Bearer {}".format),
+    }
 
 
 def is_valid_header(headers: Dict[str, Any]) -> bool:
@@ -427,7 +428,9 @@ def make_positive_strategy(
         for sub_schema in schema.get("properties", {}).values():
             if list(sub_schema) == ["type"] and sub_schema["type"] == "string":
                 sub_schema.setdefault("format", HEADER_FORMAT)
-    return from_schema(schema, custom_formats={**STRING_FORMATS, **(custom_formats or {})})
+    return from_schema(
+        schema, custom_formats={**get_default_format_strategies(), **STRING_FORMATS, **(custom_formats or {})}
+    )
 
 
 def _can_skip_header_filter(schema: Dict[str, Any]) -> bool:
@@ -447,7 +450,7 @@ def make_negative_strategy(
         operation_name=operation_name,
         location=location,
         media_type=media_type,
-        custom_formats={**STRING_FORMATS, **(custom_formats or {})},
+        custom_formats={**get_default_format_strategies(), **STRING_FORMATS, **(custom_formats or {})},
     )
 
 

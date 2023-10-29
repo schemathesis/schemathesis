@@ -2,13 +2,8 @@ from . import auths, checks, experimental, contrib, fixups, graphql, hooks, runn
 from .constants import DataGenerationMethod, SCHEMATHESIS_VERSION  # noqa: E402
 from .models import Case  # noqa: E402
 from .specs import openapi  # noqa: E402
-from .specs.openapi._hypothesis import init_default_strategies  # noqa: E402
 from .utils import GenericResponse  # noqa: E402
 
-init_default_strategies()
-
-# Is not a part of the public API
-del init_default_strategies
 
 __version__ = SCHEMATHESIS_VERSION
 
