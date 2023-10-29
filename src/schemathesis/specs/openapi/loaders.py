@@ -1,8 +1,9 @@
+from __future__ import annotations
 import io
 import json
 import pathlib
 import re
-from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union, cast
+from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union, cast, TYPE_CHECKING
 from urllib.parse import urljoin
 
 import backoff
@@ -18,25 +19,23 @@ from yarl import URL
 
 from ... import experimental, fixups
 from ...code_samples import CodeSampleStyle
-from ...constants import DEFAULT_DATA_GENERATION_METHODS, WAIT_FOR_SCHEMA_INTERVAL
+from ...generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethodInput, DataGenerationMethod
+from ...constants import WAIT_FOR_SCHEMA_INTERVAL
 from ...exceptions import SchemaError, SchemaErrorType
 from ...hooks import HookContext, dispatch
 from ...lazy import LazySchema
 from ...loaders import load_schema_from_url
 from ...throttling import build_limiter
-from ...types import DataGenerationMethodInput, Filter, NotSet, PathLike
+from ...types import Filter, NotSet, PathLike
 from ...transports.content_types import is_json_media_type
-from ...utils import (
-    NOT_SET,
-    GenericResponse,
-    StringDatesYAMLLoader,
-    WSGIResponse,
-    prepare_data_generation_methods,
-    require_relative_url,
-    setup_headers,
-)
+from ...transports.headers import setup_default_headers
+from ...internal.validation import require_relative_url
+from ...utils import NOT_SET, StringDatesYAMLLoader
 from . import definitions, validation
 from .schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
+
+if TYPE_CHECKING:
+    from ...transports.responses import GenericResponse
 
 
 def _is_json_response(response: GenericResponse) -> bool:
@@ -121,7 +120,7 @@ def from_uri(
 
     :param str uri: Schema URL.
     """
-    setup_headers(kwargs)
+    setup_default_headers(kwargs)
     if port:
         uri = str(URL(uri).with_port(port))
         if not base_url:
@@ -283,7 +282,7 @@ def from_dict(
             operation_id=operation_id,
             skip_deprecated_operations=skip_deprecated_operations,
             validate_schema=validate_schema,
-            data_generation_methods=prepare_data_generation_methods(data_generation_methods),
+            data_generation_methods=DataGenerationMethod.ensure_list(data_generation_methods),
             code_sample_style=_code_sample_style,
             location=location,
             rate_limiter=rate_limiter,
@@ -318,7 +317,7 @@ def from_dict(
             operation_id=operation_id,
             skip_deprecated_operations=skip_deprecated_operations,
             validate_schema=validate_schema,
-            data_generation_methods=prepare_data_generation_methods(data_generation_methods),
+            data_generation_methods=DataGenerationMethod.ensure_list(data_generation_methods),
             code_sample_style=_code_sample_style,
             location=location,
             rate_limiter=rate_limiter,
@@ -421,7 +420,7 @@ def from_pytest_fixture(
     _data_generation_methods: Union[DataGenerationMethodInput, NotSet]
     if data_generation_methods is not NOT_SET:
         data_generation_methods = cast(DataGenerationMethodInput, data_generation_methods)
-        _data_generation_methods = prepare_data_generation_methods(data_generation_methods)
+        _data_generation_methods = DataGenerationMethod.ensure_list(data_generation_methods)
     else:
         _data_generation_methods = data_generation_methods
     rate_limiter: Optional[Limiter] = None
@@ -467,8 +466,10 @@ def from_wsgi(
     :param str schema_path: An in-app relative URL to the schema.
     :param app: A WSGI app instance.
     """
+    from ...transports.responses import WSGIResponse
+
     require_relative_url(schema_path)
-    setup_headers(kwargs)
+    setup_default_headers(kwargs)
     client = Client(app, WSGIResponse)
     response = load_schema_from_url(lambda: client.get(schema_path, **kwargs))
     return from_file(
@@ -569,7 +570,7 @@ def from_asgi(
     :param app: An ASGI app instance.
     """
     require_relative_url(schema_path)
-    setup_headers(kwargs)
+    setup_default_headers(kwargs)
     client = ASGIClient(app)
     response = load_schema_from_url(lambda: client.get(schema_path, **kwargs))
     return from_file(

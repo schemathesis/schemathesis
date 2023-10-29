@@ -6,6 +6,7 @@ Their responsibilities:
 
 They give only static definitions of paths.
 """
+from __future__ import annotations
 from collections.abc import Mapping
 from contextlib import nullcontext
 from dataclasses import dataclass, field
@@ -27,6 +28,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    TYPE_CHECKING,
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
@@ -38,7 +40,7 @@ from requests.structures import CaseInsensitiveDict
 from ._hypothesis import create_test
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
-from .constants import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
+from .generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod, DataGenerationMethodInput
 from .exceptions import OperationSchemaError, UsageError
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .models import APIOperation, Case
@@ -46,7 +48,6 @@ from .stateful import APIStateMachine, Stateful, StatefulTest
 from .types import (
     Body,
     Cookies,
-    DataGenerationMethodInput,
     Filter,
     FormData,
     GenericTest,
@@ -55,7 +56,11 @@ from .types import (
     PathParameters,
     Query,
 )
-from .utils import NOT_SET, PARAMETRIZE_MARKER, GenericResponse, GivenInput, Ok, Result, given_proxy
+from .utils import NOT_SET, PARAMETRIZE_MARKER, GivenInput, Ok, Result, given_proxy
+
+
+if TYPE_CHECKING:
+    from .transports.responses import GenericResponse
 
 
 class MethodsDict(CaseInsensitiveDict):

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import itertools
 import json
 from collections import defaultdict
@@ -22,6 +23,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    TYPE_CHECKING,
 )
 from urllib.parse import urlsplit
 
@@ -32,7 +34,8 @@ from requests.structures import CaseInsensitiveDict
 
 from ... import experimental, failures
 from ...auths import AuthStorage
-from ...constants import HTTP_METHODS, DataGenerationMethod
+from ...generation import DataGenerationMethod
+from ...constants import HTTP_METHODS
 from ...exceptions import (
     OperationSchemaError,
     UsageError,
@@ -48,13 +51,12 @@ from ...types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Q
 from ...internal.jsonschema import traverse_schema
 from ...internal.copy import fast_deepcopy
 from ...transports.content_types import is_json_media_type
+from ...transports.responses import get_payload
 from ...utils import (
     NOT_SET,
     Err,
-    GenericResponse,
     Ok,
     Result,
-    get_response_payload,
 )
 from . import links, serialization
 from ._hypothesis import get_case_strategy
@@ -79,6 +81,9 @@ from .parameters import (
 from .references import RECURSION_DEPTH_LIMIT, ConvertingResolver, InliningResolver, resolve_pointer
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
+
+if TYPE_CHECKING:
+    from ...transports.responses import GenericResponse
 
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError)
@@ -528,7 +533,7 @@ class BaseOpenAPISchema(BaseSchema):
                 data = response.json
         except JSONDecodeError as exc:
             exc_class = get_response_parsing_error(exc)
-            payload = get_response_payload(response)
+            payload = get_payload(response)
             raise exc_class(
                 f"The received response is not valid JSON:\n\n    {payload}\n\nException: \n\n    {exc}",
                 context=failures.JSONDecodeErrorContext(

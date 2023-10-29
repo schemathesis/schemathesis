@@ -4,7 +4,7 @@ import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Union
 
-from ..constants import DataGenerationMethod
+from ..generation import DataGenerationMethod
 from ..exceptions import SchemaError, SchemaErrorType
 from ..models import APIOperation, Status, TestResult, TestResultSet
 from ..schemas import BaseSchema
