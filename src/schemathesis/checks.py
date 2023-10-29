@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from .models import Case, CheckFunction
 
 
-def not_a_server_error(response: GenericResponse, case: "Case") -> Optional[bool]:
+def not_a_server_error(response: GenericResponse, case: Case) -> Optional[bool]:
     """A check to verify that the response is not a server-side error."""
     if response.status_code >= 500:
         exc_class = get_server_error(response.status_code)
@@ -36,7 +36,7 @@ OPTIONAL_CHECKS = (
 ALL_CHECKS: Tuple["CheckFunction", ...] = DEFAULT_CHECKS + OPTIONAL_CHECKS
 
 
-def register(check: "CheckFunction") -> "CheckFunction":
+def register(check: CheckFunction) -> CheckFunction:
     """Register a new check for schemathesis CLI.
 
     :param check: A function to validate API responses.

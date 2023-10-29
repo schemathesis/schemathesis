@@ -1,3 +1,4 @@
+from __future__ import annotations
 import base64
 import os
 import platform
@@ -7,7 +8,6 @@ from queue import Queue
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union, cast
 
 import click
-import requests
 
 from ... import service
 from ..._compat import metadata
@@ -17,13 +17,13 @@ from ...constants import (
     REPORT_SUGGESTION_ENV_VAR,
     SCHEMATHESIS_TEST_CASE_HEADER,
     SCHEMATHESIS_VERSION,
+    FALSE_VALUES,
 )
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...models import Response, Status
 from ...runner import events
 from ...runner.events import InternalErrorType, SchemaErrorType
 from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult, deduplicate_failures
-from ..callbacks import FALSE_VALUES
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
 
@@ -381,8 +381,10 @@ def display_report_metadata(meta: service.Metadata) -> None:
 
 def display_service_error(event: service.Error) -> None:
     """Show information about an error during communication with Schemathesis.io."""
-    if isinstance(event.exception, requests.HTTPError):
-        response = cast(requests.Response, event.exception.response)
+    from requests import RequestException, HTTPError, Response
+
+    if isinstance(event.exception, HTTPError):
+        response = cast(Response, event.exception.response)
         status_code = response.status_code
         click.secho(f"Schemathesis.io responded with HTTP {status_code}", fg="red")
         if 500 <= status_code <= 599:
@@ -402,7 +404,7 @@ def display_service_error(event: service.Error) -> None:
         else:
             # Other client-side errors are likely caused by a bug on the CLI side
             ask_to_report(event)
-    elif isinstance(event.exception, requests.RequestException):
+    elif isinstance(event.exception, RequestException):
         ask_to_report(event, report_to_issues=False)
     else:
         ask_to_report(event)
@@ -412,9 +414,11 @@ SERVICE_ERROR_MESSAGE = "An error happened during uploading reports to Schemathe
 
 
 def ask_to_report(event: service.Error, report_to_issues: bool = True, extra: str = "") -> None:
+    from requests import RequestException
+
     # Likely an internal Schemathesis error
     traceback = event.get_message(True)
-    if isinstance(event.exception, requests.RequestException) and event.exception.response is not None:
+    if isinstance(event.exception, RequestException) and event.exception.response is not None:
         response = f"Response: {event.exception.response.text}\n"
     else:
         response = ""

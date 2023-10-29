@@ -34,7 +34,7 @@ servers:
         default: v1
 """
     response.status_code = 200
-    with mock.patch("schemathesis.specs.openapi.loaders.requests.sessions.Session.send", return_value=response):
+    with mock.patch("requests.sessions.Session.send", return_value=response):
         yield
 
 

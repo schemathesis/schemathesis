@@ -1,14 +1,13 @@
 import re
-from typing import List, Optional
+from typing import List, Optional, Union, Set, Tuple
 
 from ...types import Filter
-from ...utils import force_tuple
 
 
 def should_skip_method(method: str, pattern: Optional[Filter]) -> bool:
     if pattern is None:
         return False
-    patterns = force_tuple(pattern)
+    patterns = _ensure_tuple(pattern)
     return method.upper() not in map(str.upper, patterns)
 
 
@@ -23,7 +22,7 @@ def should_skip_by_tag(tags: Optional[List[str]], pattern: Optional[Filter]) -> 
         return False
     if not tags:
         return True
-    patterns = force_tuple(pattern)
+    patterns = _ensure_tuple(pattern)
     return not any(re.search(item, tag) for item in patterns for tag in tags)
 
 
@@ -40,5 +39,11 @@ def should_skip_deprecated(is_deprecated: bool, skip_deprecated_operations: bool
 
 
 def _match_any_pattern(target: str, pattern: Filter) -> bool:
-    patterns = force_tuple(pattern)
+    patterns = _ensure_tuple(pattern)
     return any(re.search(item, target) for item in patterns)
+
+
+def _ensure_tuple(item: Filter) -> Union[List, Set, Tuple]:
+    if not isinstance(item, (list, set, tuple)):
+        return (item,)
+    return item

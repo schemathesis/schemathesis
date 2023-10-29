@@ -14,17 +14,16 @@ from pytest_subtests import SubTests, nullcontext
 from ._compat import MultipleFailures
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
-from .constants import FLAKY_FAILURE_MESSAGE
+from .constants import FLAKY_FAILURE_MESSAGE, NOT_SET
 from .generation import DataGenerationMethodInput
 from .exceptions import CheckFailed, OperationSchemaError, SkipTest, get_grouped_exception
 from .hooks import HookDispatcher, HookScope
+from .internal.result import Ok
 from .models import APIOperation
 from .schemas import BaseSchema
 from .types import Filter, GenericTest, NotSet
 from .utils import (
-    NOT_SET,
     GivenInput,
-    Ok,
     fail_on_no_matches,
     get_given_args,
     get_given_kwargs,

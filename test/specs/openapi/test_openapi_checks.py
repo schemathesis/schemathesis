@@ -1,7 +1,7 @@
 import pytest
 import requests
 
-from schemathesis import Case
+from schemathesis.models import Case
 from schemathesis.models import APIOperation
 from schemathesis.schemas import BaseSchema
 from schemathesis.specs.openapi.checks import (

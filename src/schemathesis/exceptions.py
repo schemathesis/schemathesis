@@ -1,6 +1,7 @@
 from __future__ import annotations
 import enum
 import json
+import traceback
 from dataclasses import dataclass, field
 from hashlib import sha1
 from json import JSONDecodeError
@@ -356,3 +357,21 @@ class InvalidRegularExpression(Exception):
 
 class UsageError(Exception):
     """Incorrect usage of Schemathesis functions."""
+
+
+def maybe_set_assertion_message(exc: AssertionError, check_name: str) -> str:
+    message = str(exc)
+    if not message:
+        message = f"Check '{check_name}' failed"
+        exc.args = (message,)
+    return message
+
+
+def format_exception(error: Exception, include_traceback: bool = False) -> str:
+    """Format exception as text."""
+    error_type = type(error)
+    if include_traceback:
+        lines = traceback.format_exception(error_type, error, error.__traceback__)
+    else:
+        lines = traceback.format_exception_only(error_type, error)
+    return "".join(lines).strip()

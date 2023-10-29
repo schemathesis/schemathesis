@@ -31,6 +31,7 @@ from ...auths import AuthStorage
 from ...checks import not_a_server_error
 from ...generation import DataGenerationMethod
 from ...exceptions import OperationSchemaError
+from ...constants import NOT_SET
 from ...hooks import (
     GLOBAL_HOOK_DISPATCHER,
     HookContext,
@@ -38,11 +39,11 @@ from ...hooks import (
     apply_to_all_dispatchers,
     should_skip_operation,
 )
+from ...internal.result import Result, Ok
 from ...models import APIOperation, Case, CheckFunction, OperationDefinition
 from ...schemas import BaseSchema
 from ...stateful import Stateful, StatefulTest
 from ...types import Body, Cookies, Headers, NotSet, PathParameters, Query
-from ...utils import NOT_SET, Ok, Result
 from .scalars import CUSTOM_SCALARS
 
 if TYPE_CHECKING:

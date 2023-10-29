@@ -2,18 +2,18 @@
 
 They all consist of primitive types and don't have references to schemas, app, etc.
 """
+from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union, TYPE_CHECKING
 
-import requests
-from requests.structures import CaseInsensitiveDict
-
-from ..transports.responses import WSGIResponse
+from ..transports import serialize_payload
 from ..code_samples import get_excluded_headers
-from ..exceptions import FailureContext, InternalError, make_unique_by_key
-from ..models import Case, Check, Interaction, Request, Response, Status, TestResult, serialize_payload
-from ..utils import format_exception
+from ..exceptions import FailureContext, InternalError, make_unique_by_key, format_exception
+from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
+
+if TYPE_CHECKING:
+    from requests.structures import CaseInsensitiveDict
 
 
 @dataclass
@@ -88,6 +88,9 @@ class SerializedCheck:
 
     @classmethod
     def from_check(cls, check: Check) -> "SerializedCheck":
+        import requests
+        from ..transports.responses import WSGIResponse
+
         if check.response is not None:
             request = Request.from_prepared_request(check.response.request)
         elif check.request is not None:
@@ -130,6 +133,8 @@ class SerializedHistoryEntry:
 
 
 def get_serialized_history(case: Case) -> List[SerializedHistoryEntry]:
+    import requests
+
     history = []
     while case.source is not None:
         history_request = case.source.response.request

@@ -5,7 +5,7 @@ from fastapi import Cookie, FastAPI
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
-from schemathesis import Case
+from schemathesis.models import Case
 from schemathesis.specs.openapi.loaders import from_asgi
 
 

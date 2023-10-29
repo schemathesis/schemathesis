@@ -3,6 +3,7 @@ from typing import Any, List, NoReturn, Optional, Set, Tuple, Type, Union
 
 import click
 
+from ..constants import NOT_SET
 from ..types import NotSet
 
 
@@ -54,15 +55,12 @@ class CsvChoice(BaseCsvChoice):
         self.fail_on_invalid_options(invalid_options, selected)
 
 
-not_set = NotSet()
-
-
 class OptionalInt(click.types.IntRange):
     def convert(  # type: ignore
         self, value: str, param: Optional[click.core.Parameter], ctx: Optional[click.core.Context]
     ) -> Union[int, NotSet]:
         if value.lower() == "none":
-            return not_set
+            return NOT_SET
         try:
             int(value)
             return super().convert(value, param, ctx)

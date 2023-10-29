@@ -1,5 +1,10 @@
-from ..runner import events
-from .context import ExecutionContext
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from ..runner import events
+    from .context import ExecutionContext
 
 
 class EventHandler:

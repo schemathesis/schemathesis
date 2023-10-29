@@ -1,40 +1,31 @@
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
+from __future__ import annotations
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union, TYPE_CHECKING
 from urllib.parse import urlparse
 
-import hypothesis.errors
-from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
-from starlette.applications import Starlette
-
-from ..checks import DEFAULT_CHECKS
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
-from ..constants import DEFAULT_DEADLINE, DEFAULT_STATEFUL_RECURSION_LIMIT, HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
+from ..constants import (
+    DEFAULT_DEADLINE,
+    DEFAULT_STATEFUL_RECURSION_LIMIT,
+    HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
+)
 from ..internal.deprecation import deprecated_function
+from ..internal.datetime import current_datetime
+from ..internal.validation import file_exists
+from ..transports.auth import get_requests_auth
 from ..exceptions import SchemaError
-from ..models import CheckFunction
-from ..schemas import BaseSchema
+from ..loaders import load_app
 from ..specs.graphql import loaders as gql_loaders
 from ..specs.openapi import loaders as oas_loaders
-from ..stateful import Stateful
 from ..targets import DEFAULT_TARGETS, Target
 from ..types import Filter, NotSet, RawAuth, RequestCert
-from ..utils import (
-    current_datetime,
-    dict_not_none_values,
-    dict_true_values,
-    file_exists,
-    get_requests_auth,
-    import_app,
-)
-from . import events
-from .impl import (
-    BaseRunner,
-    SingleThreadASGIRunner,
-    SingleThreadRunner,
-    SingleThreadWSGIRunner,
-    ThreadPoolASGIRunner,
-    ThreadPoolRunner,
-    ThreadPoolWSGIRunner,
-)
+
+if TYPE_CHECKING:
+    from . import events
+    from ..models import CheckFunction
+    from ..schemas import BaseSchema
+    from .impl import BaseRunner
+    from ..stateful import Stateful
+    import hypothesis
 
 
 @deprecated_function(removed_in="4.0", replacement="schemathesis.runner.from_schema")
@@ -42,7 +33,7 @@ def prepare(
     schema_uri: Union[str, Dict[str, Any]],
     *,
     # Runtime behavior
-    checks: Iterable[CheckFunction] = DEFAULT_CHECKS,
+    checks: Optional[Iterable[CheckFunction]] = None,
     data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
     max_response_time: Optional[int] = None,
     targets: Iterable[Target] = DEFAULT_TARGETS,
@@ -81,6 +72,10 @@ def prepare(
     hypothesis_verbosity: Optional[hypothesis.Verbosity] = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Prepare a generator that will run test cases against the given API definition."""
+    from ..checks import DEFAULT_CHECKS
+
+    checks = checks or DEFAULT_CHECKS
+
     validate_loader(loader, schema_uri)
 
     if auth is None:
@@ -191,7 +186,7 @@ def execute_from_schema(
     """
     try:
         if app is not None:
-            app = import_app(app)
+            app = load_app(app)
         schema = load_schema(
             schema_uri,
             base_url=base_url,
@@ -261,15 +256,19 @@ def load_schema(
     operation_id: Optional[Filter] = None,
 ) -> BaseSchema:
     """Load schema via specified loader and parameters."""
-    loader_options = dict_true_values(
-        base_url=base_url,
-        endpoint=endpoint,
-        method=method,
-        tag=tag,
-        operation_id=operation_id,
-        app=app,
-        data_generation_methods=data_generation_methods,
-    )
+    loader_options = {
+        key: value
+        for key, value in (
+            ("base_url", base_url),
+            ("endpoint", endpoint),
+            ("method", method),
+            ("tag", tag),
+            ("operation_id", operation_id),
+            ("app", app),
+            ("data_generation_methods", data_generation_methods),
+        )
+        if value
+    }
 
     if not isinstance(schema_uri, dict):
         if file_exists(schema_uri):
@@ -279,9 +278,15 @@ def load_schema(
                 # If `schema` is not an existing filesystem path, or a URL then it is considered as a path within
                 # the given app
                 loader = oas_loaders.get_loader_for_app(app)
-                loader_options.update(dict_true_values(headers=headers))
+                if headers:
+                    loader_options["headers"] = headers
             else:
-                loader_options.update(dict_true_values(headers=headers, auth=auth, auth_type=auth_type))
+                if headers:
+                    loader_options["headers"] = headers
+                if auth:
+                    loader_options["auth"] = auth
+                if auth_type:
+                    loader_options["auth_type"] = auth_type
 
     if loader is oas_loaders.from_uri and loader_options.get("auth"):
         loader_options["auth"] = get_requests_auth(loader_options["auth"], loader_options.pop("auth_type", None))
@@ -301,7 +306,7 @@ def load_schema(
 def from_schema(
     schema: BaseSchema,
     *,
-    checks: Iterable[CheckFunction] = DEFAULT_CHECKS,
+    checks: Optional[Iterable[CheckFunction]] = None,
     max_response_time: Optional[int] = None,
     targets: Iterable[Target] = DEFAULT_TARGETS,
     workers_num: int = 1,
@@ -322,6 +327,20 @@ def from_schema(
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     count_operations: bool = True,
 ) -> BaseRunner:
+    from starlette.applications import Starlette
+    import hypothesis
+    from ..checks import DEFAULT_CHECKS
+    from .impl import (
+        SingleThreadASGIRunner,
+        SingleThreadRunner,
+        SingleThreadWSGIRunner,
+        ThreadPoolASGIRunner,
+        ThreadPoolRunner,
+        ThreadPoolWSGIRunner,
+    )
+
+    checks = checks or DEFAULT_CHECKS
+
     hypothesis_settings = hypothesis_settings or hypothesis.settings(deadline=DEFAULT_DEADLINE)
     started_at = started_at or current_datetime()
     if workers_num > 1:
@@ -463,14 +482,21 @@ def prepare_hypothesis_settings(
     suppress_health_check: Optional[List[hypothesis.HealthCheck]] = None,
     verbosity: Optional[hypothesis.Verbosity] = None,
 ) -> hypothesis.settings:
-    kwargs = dict_not_none_values(
-        derandomize=derandomize,
-        max_examples=max_examples,
-        phases=phases,
-        report_multiple_bugs=report_multiple_bugs,
-        suppress_health_check=suppress_health_check,
-        verbosity=verbosity,
-    )
+    import hypothesis
+    from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
+
+    kwargs = {
+        key: value
+        for key, value in (
+            ("derandomize", derandomize),
+            ("max_examples", max_examples),
+            ("phases", phases),
+            ("report_multiple_bugs", report_multiple_bugs),
+            ("suppress_health_check", suppress_health_check),
+            ("verbosity", verbosity),
+        )
+        if value is not None
+    }
     # `deadline` is special, since Hypothesis allows passing `None`
     if deadline is not None:
         if isinstance(deadline, NotSet):

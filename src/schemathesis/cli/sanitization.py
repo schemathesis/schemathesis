@@ -1,8 +1,13 @@
+from __future__ import annotations
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..runner import events
 from ..sanitization import sanitize_serialized_check, sanitize_serialized_interaction
-from .handlers import EventHandler, ExecutionContext
+from .handlers import EventHandler
+
+if TYPE_CHECKING:
+    from .context import ExecutionContext
 
 
 @dataclass

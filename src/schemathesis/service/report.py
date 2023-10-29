@@ -1,3 +1,4 @@
+from __future__ import annotations
 import enum
 import json
 import os
@@ -8,19 +9,24 @@ from contextlib import suppress
 from dataclasses import asdict, dataclass, field
 from io import BytesIO
 from queue import Queue
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 import click
 
-from ..cli.context import ExecutionContext
 from ..cli.handlers import EventHandler
-from ..runner.events import ExecutionEvent, Initialized, InternalError, Interrupted
-from . import ServiceClient, ci, events, usage
+from ..runner.events import Initialized, InternalError, Interrupted
+from . import ci, events, usage
 from .constants import REPORT_FORMAT_VERSION, STOP_MARKER, WORKER_JOIN_TIMEOUT
 from .hosts import HostData
 from .metadata import Metadata
 from .models import UploadResponse
 from .serialization import serialize_event
+
+
+if TYPE_CHECKING:
+    from .client import ServiceClient
+    from ..cli.context import ExecutionContext
+    from ..runner.events import ExecutionEvent
 
 
 @dataclass

@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Generator, Optional, Type, cast
 
-import yaml
 from typing_extensions import Protocol, runtime_checkable
 
 from .internal.copy import fast_deepcopy
@@ -18,11 +17,6 @@ from .transports.content_types import (
 
 if TYPE_CHECKING:
     from .models import Case
-
-try:
-    from yaml import CSafeDumper as SafeDumper
-except ImportError:
-    from yaml import SafeDumper  # type: ignore
 
 
 SERIALIZERS: Dict[str, Type["Serializer"]] = {}
@@ -146,6 +140,13 @@ class JSONSerializer:
 
 
 def _to_yaml(value: Any) -> Dict[str, Any]:
+    import yaml
+
+    try:
+        from yaml import CSafeDumper as SafeDumper
+    except ImportError:
+        from yaml import SafeDumper  # type: ignore
+
     if isinstance(value, bytes):
         return {"data": value}
     return {"data": yaml.dump(value, Dumper=SafeDumper)}
