@@ -75,13 +75,13 @@ def to_ipv6(url):
         (
             schemathesis.openapi.from_uri,
             "openapi3_schema_url",
-            "schemathesis.specs.openapi.loaders.requests.get",
+            "requests.get",
             "http://[2002:7f00:1::]:8081/schema.yaml",
         ),
         (
             schemathesis.graphql.from_url,
             "graphql_url",
-            "schemathesis.specs.graphql.loaders.requests.post",
+            "requests.post",
             "http://[2002:7f00:1::]:8081/graphql",
         ),
     ),
@@ -120,8 +120,8 @@ def test_base_url_override(request, loader, url_fixture, base_url):
 @pytest.mark.parametrize(
     "target, loader",
     (
-        ("schemathesis.specs.openapi.loaders.requests.get", schemathesis.openapi.from_uri),
-        ("schemathesis.specs.graphql.loaders.requests.post", schemathesis.graphql.from_url),
+        ("requests.get", schemathesis.openapi.from_uri),
+        ("requests.post", schemathesis.graphql.from_url),
     ),
 )
 def test_uri_loader_custom_kwargs(mocker, target, loader):

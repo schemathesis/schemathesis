@@ -1,13 +1,14 @@
+from __future__ import annotations
 import http.client
 import re
-from typing import Callable, TypeVar, cast
-
-import requests
+from typing import Callable, TypeVar, cast, TYPE_CHECKING
 
 from .exceptions import SchemaError, SchemaErrorType
-from .utils import GenericResponse
 
-R = TypeVar("R", bound=GenericResponse)
+if TYPE_CHECKING:
+    from .transports.responses import GenericResponse
+
+R = TypeVar("R", bound="GenericResponse")
 
 
 def remove_ssl_line_number(text: str) -> str:
@@ -15,6 +16,8 @@ def remove_ssl_line_number(text: str) -> str:
 
 
 def load_schema_from_url(loader: Callable[[], R]) -> R:
+    import requests
+
     try:
         response = loader()
     except requests.RequestException as exc:
@@ -38,7 +41,7 @@ def load_schema_from_url(loader: Callable[[], R]) -> R:
     return response
 
 
-def _raise_for_status(response: GenericResponse) -> None:
+def _raise_for_status(response: "GenericResponse") -> None:
     status_code = response.status_code
     reason = http.client.responses.get(status_code, "Unknown")
     if status_code >= 500:

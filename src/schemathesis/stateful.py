@@ -1,3 +1,4 @@
+from __future__ import annotations
 import enum
 import json
 import time
@@ -13,9 +14,10 @@ from starlette.applications import Starlette
 from ._dependency_versions import IS_HYPOTHESIS_ABOVE_6_68_1
 from .exceptions import OperationSchemaError
 from .models import APIOperation, Case, CheckFunction
-from .utils import NOT_SET, GenericResponse, Ok, Result
+from .utils import NOT_SET, Ok, Result
 
 if TYPE_CHECKING:
+    from .transports.responses import GenericResponse
     from .schemas import BaseSchema
 
 

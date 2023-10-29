@@ -1,11 +1,16 @@
-from typing import Tuple
-
-from pyrate_limiter import Duration, Limiter, RequestRate
+from __future__ import annotations
+from typing import Tuple, TYPE_CHECKING
 
 from .exceptions import UsageError
 
 
+if TYPE_CHECKING:
+    from pyrate_limiter import Limiter
+
+
 def parse_units(rate: str) -> Tuple[int, int]:
+    from pyrate_limiter import Duration
+
     try:
         limit, interval_text = rate.split("/")
         interval = {
@@ -29,6 +34,8 @@ def invalid_rate(value: str) -> UsageError:
 
 
 def build_limiter(rate: str) -> Limiter:
+    from pyrate_limiter import Limiter, RequestRate
+
     limit, interval = parse_units(rate)
     rate = RequestRate(limit, interval)
     return Limiter(rate)

@@ -14,7 +14,7 @@ from requests.auth import _basic_auth_str
 from requests.structures import CaseInsensitiveDict
 
 from ... import auths, serializers, utils
-from ...constants import DataGenerationMethod
+from ...generation import DataGenerationMethod
 from ...internal.copy import fast_deepcopy
 from ...exceptions import OperationSchemaError, SerializationNotPossible
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers

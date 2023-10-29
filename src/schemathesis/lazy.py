@@ -15,11 +15,12 @@ from ._compat import MultipleFailures
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import FLAKY_FAILURE_MESSAGE
+from .generation import DataGenerationMethodInput
 from .exceptions import CheckFailed, OperationSchemaError, SkipTest, get_grouped_exception
 from .hooks import HookDispatcher, HookScope
 from .models import APIOperation
 from .schemas import BaseSchema
-from .types import DataGenerationMethodInput, Filter, GenericTest, NotSet
+from .types import Filter, GenericTest, NotSet
 from .utils import (
     NOT_SET,
     GivenInput,

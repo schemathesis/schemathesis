@@ -24,16 +24,15 @@ from .. import fixups as _fixups
 from .. import runner, service
 from .. import targets as targets_module
 from ..code_samples import CodeSampleStyle
+from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from ..constants import (
     API_NAME_ENV_VAR,
     BASE_URL_ENV_VAR,
-    DEFAULT_DATA_GENERATION_METHODS,
     DEFAULT_RESPONSE_TIMEOUT,
     DEFAULT_STATEFUL_RECURSION_LIMIT,
     HOOKS_MODULE_ENV_VAR,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     WAIT_FOR_SCHEMA_ENV_VAR,
-    DataGenerationMethod,
 )
 from ..exceptions import SchemaError
 from ..fixups import ALL_FIXUPS

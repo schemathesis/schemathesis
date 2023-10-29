@@ -1,24 +1,32 @@
+from __future__ import annotations
 from enum import Enum
+from functools import lru_cache
 from shlex import quote
-from typing import Optional, Union
+from typing import Optional, Union, TYPE_CHECKING
 
-from requests.structures import CaseInsensitiveDict
-from requests.utils import default_headers
-
-from .constants import SCHEMATHESIS_TEST_CASE_HEADER, DataGenerationMethod
+from .constants import SCHEMATHESIS_TEST_CASE_HEADER
 from .types import Headers
 
-DEFAULT_DATA_GENERATION_METHODS = (DataGenerationMethod.default(),)
-# These headers are added automatically by Schemathesis or `requests`.
-# Do not show them in code samples to make them more readable
-EXCLUDED_HEADERS = CaseInsensitiveDict(
-    {
-        "Content-Length": None,
-        "Transfer-Encoding": None,
-        SCHEMATHESIS_TEST_CASE_HEADER: None,
-        **default_headers(),
-    }
-)
+if TYPE_CHECKING:
+    from requests.structures import CaseInsensitiveDict
+
+
+@lru_cache()
+def get_excluded_headers() -> CaseInsensitiveDict:
+    from requests.structures import CaseInsensitiveDict
+    from requests.utils import default_headers
+
+    # These headers are added automatically by Schemathesis or `requests`.
+    # Do not show them in code samples to make them more readable
+
+    return CaseInsensitiveDict(
+        {
+            "Content-Length": None,
+            "Transfer-Encoding": None,
+            SCHEMATHESIS_TEST_CASE_HEADER: None,
+            **default_headers(),
+        }
+    )
 
 
 class CodeSampleStyle(str, Enum):
@@ -72,7 +80,7 @@ def _filter_headers(headers: Optional[Headers], extra: Optional[Headers] = None)
     headers = headers.copy() if headers else {}
     if extra is not None:
         for key, value in extra.items():
-            if key not in EXCLUDED_HEADERS:
+            if key not in get_excluded_headers():
                 headers[key] = value
     return headers
 

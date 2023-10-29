@@ -9,7 +9,7 @@ from hypothesis import HealthCheck, given, settings
 import schemathesis
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.exceptions import SchemaError
-from schemathesis.specs.graphql.loaders import INTROSPECTION_QUERY, extract_schema_from_response
+from schemathesis.specs.graphql.loaders import get_introspection_query, extract_schema_from_response
 from schemathesis.specs.graphql.schemas import GraphQLCase
 
 
@@ -77,7 +77,7 @@ def test_make_case(graphql_schema, kwargs):
 
 def test_no_query(graphql_url):
     # When GraphQL schema does not contain the `Query` type
-    response = requests.post(graphql_url, json={"query": INTROSPECTION_QUERY}, timeout=1)
+    response = requests.post(graphql_url, json={"query": get_introspection_query()}, timeout=1)
     decoded = response.json()
     raw_schema = decoded["data"]
     raw_schema["__schema"]["queryType"] = None
@@ -90,7 +90,7 @@ def test_no_query(graphql_url):
 
 @pytest.mark.parametrize("with_data_key", (True, False))
 def test_data_key(graphql_url, with_data_key):
-    response = requests.post(graphql_url, json={"query": INTROSPECTION_QUERY}, timeout=1)
+    response = requests.post(graphql_url, json={"query": get_introspection_query()}, timeout=1)
     decoded = response.json()
     if not with_data_key:
         decoded = decoded["data"]
@@ -99,14 +99,14 @@ def test_data_key(graphql_url, with_data_key):
 
 
 def test_malformed_response(graphql_url):
-    response = requests.post(graphql_url, json={"query": INTROSPECTION_QUERY}, timeout=1)
+    response = requests.post(graphql_url, json={"query": get_introspection_query()}, timeout=1)
     response._content += b"42"
     with pytest.raises(SchemaError, match="Received unsupported content while expecting a JSON payload for GraphQL"):
         extract_schema_from_response(response)
 
 
 def test_operations_count(graphql_url):
-    response = requests.post(graphql_url, json={"query": INTROSPECTION_QUERY}, timeout=1)
+    response = requests.post(graphql_url, json={"query": get_introspection_query()}, timeout=1)
     decoded = response.json()
     raw_schema = decoded["data"]
     schema = schemathesis.graphql.from_dict(raw_schema)

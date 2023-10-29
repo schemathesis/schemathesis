@@ -11,7 +11,8 @@ from hypothesis.internal.reflection import proxies
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
 from .auths import get_auth_storage_from_test
-from .constants import DEFAULT_DEADLINE, DataGenerationMethod
+from .generation import DataGenerationMethod
+from .constants import DEFAULT_DEADLINE
 from .exceptions import OperationSchemaError
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import APIOperation, Case

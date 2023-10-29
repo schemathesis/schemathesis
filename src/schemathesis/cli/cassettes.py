@@ -1,3 +1,4 @@
+from __future__ import annotations
 import base64
 import json
 import re
@@ -5,7 +6,7 @@ import sys
 import threading
 from dataclasses import dataclass, field
 from queue import Queue
-from typing import IO, Any, Dict, Generator, Iterator, List, Optional, cast
+from typing import IO, Any, Dict, Generator, Iterator, List, Optional, cast, TYPE_CHECKING
 
 import click
 import requests
@@ -13,13 +14,16 @@ from requests.cookies import RequestsCookieJar
 from requests.structures import CaseInsensitiveDict
 from yaml.emitter import Emitter
 
-from .. import constants
+from ..constants import SCHEMATHESIS_VERSION
 from ..models import Request, Response
 from ..runner import events
 from ..runner.serialization import SerializedCheck, SerializedInteraction
 from ..types import RequestCert
 from .context import ExecutionContext
 from .handlers import EventHandler
+
+if TYPE_CHECKING:
+    from ..generation import DataGenerationMethod
 
 # Wait until the worker terminates
 WRITER_WORKER_JOIN_TIMEOUT = 1
@@ -92,7 +96,7 @@ class Process:
     seed: int
     correlation_id: str
     thread_id: int
-    data_generation_method: constants.DataGenerationMethod
+    data_generation_method: DataGenerationMethod
     interactions: List[SerializedInteraction]
 
 
@@ -186,7 +190,7 @@ def worker(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, q
         if isinstance(item, Initialize):
             stream.write(
                 f"""command: '{get_command_representation()}'
-recorded_with: 'Schemathesis {constants.SCHEMATHESIS_VERSION}'
+recorded_with: 'Schemathesis {SCHEMATHESIS_VERSION}'
 http_interactions:"""
             )
         elif isinstance(item, Process):

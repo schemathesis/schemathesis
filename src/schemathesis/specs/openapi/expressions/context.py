@@ -1,7 +1,11 @@
+from __future__ import annotations
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from ....models import Case
-from ....utils import GenericResponse
+
+if TYPE_CHECKING:
+    from ....models import Case
+    from ....transports.responses import GenericResponse
 
 
 @dataclass

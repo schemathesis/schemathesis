@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 import threading
 import time
@@ -6,7 +7,7 @@ import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from types import TracebackType
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Type, Union, cast
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Type, Union, cast, TYPE_CHECKING
 from warnings import WarningMessage, catch_warnings
 
 import hypothesis
@@ -20,12 +21,8 @@ from requests.auth import HTTPDigestAuth, _basic_auth_str
 from ... import failures, hooks
 from ..._compat import MultipleFailures
 from ...auths import unregister as unregister_auth
-from ...constants import (
-    DEFAULT_STATEFUL_RECURSION_LIMIT,
-    RECURSIVE_REFERENCE_ERROR_MESSAGE,
-    USER_AGENT,
-    DataGenerationMethod,
-)
+from ...generation import DataGenerationMethod
+from ...constants import DEFAULT_STATEFUL_RECURSION_LIMIT, RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
 from ...exceptions import (
     CheckFailed,
     DeadlineExceeded,
@@ -38,21 +35,22 @@ from ...exceptions import (
 from ...hooks import HookContext, get_all_by_name
 from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResult, TestResultSet
 from ...runner import events
+from ...transports.responses import copy_response
 from ...schemas import BaseSchema
 from ...stateful import Feedback, Stateful
 from ...targets import Target, TargetContext
 from ...types import RawAuth, RequestCert
 from ...utils import (
-    GenericResponse,
     Ok,
-    WSGIResponse,
     capture_hypothesis_output,
-    copy_response,
     current_datetime,
     format_exception,
     maybe_set_assertion_message,
 )
 from ..serialization import SerializedTestResult
+
+if TYPE_CHECKING:
+    from ...transports.responses import WSGIResponse, GenericResponse
 
 
 def _should_count_towards_stop(event: events.ExecutionEvent) -> bool:

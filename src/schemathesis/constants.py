@@ -1,6 +1,3 @@
-from enum import Enum
-from typing import List
-
 from ._compat import metadata
 
 try:
@@ -39,33 +36,3 @@ REPORT_SUGGESTION_ENV_VAR = "SCHEMATHESIS_REPORT_SUGGESTION"
 
 TRUE_VALUES = ("y", "yes", "t", "true", "on", "1")
 FALSE_VALUES = ("n", "no", "f", "false", "off", "0")
-
-
-class DataGenerationMethod(str, Enum):
-    """Defines what data Schemathesis generates for tests."""
-
-    # Generate data, that fits the API schema
-    positive = "positive"
-    # Doesn't fit the API schema
-    negative = "negative"
-
-    @classmethod
-    def default(cls) -> "DataGenerationMethod":
-        return cls.positive
-
-    @classmethod
-    def all(cls) -> List["DataGenerationMethod"]:
-        return list(DataGenerationMethod)
-
-    def as_short_name(self) -> str:
-        return {
-            DataGenerationMethod.positive: "P",
-            DataGenerationMethod.negative: "N",
-        }[self]
-
-    @property
-    def is_negative(self) -> bool:
-        return self == DataGenerationMethod.negative
-
-
-DEFAULT_DATA_GENERATION_METHODS = (DataGenerationMethod.default(),)

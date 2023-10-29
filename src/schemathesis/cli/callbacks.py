@@ -12,7 +12,8 @@ from requests import PreparedRequest, RequestException
 
 from .. import exceptions, experimental, throttling, utils
 from ..code_samples import CodeSampleStyle
-from ..constants import DataGenerationMethod, TRUE_VALUES, FALSE_VALUES
+from ..generation import DataGenerationMethod
+from ..constants import TRUE_VALUES, FALSE_VALUES
 from ..service.hosts import get_temporary_hosts_file
 from ..stateful import Stateful
 from ..types import PathLike

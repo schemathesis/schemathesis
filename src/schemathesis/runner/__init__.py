@@ -6,13 +6,8 @@ from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDa
 from starlette.applications import Starlette
 
 from ..checks import DEFAULT_CHECKS
-from ..constants import (
-    DEFAULT_DATA_GENERATION_METHODS,
-    DEFAULT_DEADLINE,
-    DEFAULT_STATEFUL_RECURSION_LIMIT,
-    HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
-    DataGenerationMethod,
-)
+from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
+from ..constants import DEFAULT_DEADLINE, DEFAULT_STATEFUL_RECURSION_LIMIT, HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
 from ..internal.deprecation import deprecated_function
 from ..exceptions import SchemaError
 from ..models import CheckFunction

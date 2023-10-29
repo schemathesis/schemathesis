@@ -5,7 +5,6 @@ from typing import Any, Dict, Optional, Union
 
 from requests.structures import CaseInsensitiveDict
 
-from ....utils import WSGIResponse
 from .. import references
 from .context import ExpressionContext
 
@@ -115,6 +114,8 @@ class BodyResponse(Node):
     pointer: Optional[str] = None
 
     def evaluate(self, context: ExpressionContext) -> Any:
+        from ....transports.responses import WSGIResponse
+
         if isinstance(context.response, WSGIResponse):
             document = context.response.json
         else:

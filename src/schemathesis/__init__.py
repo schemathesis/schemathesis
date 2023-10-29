@@ -1,8 +1,9 @@
 from . import auths, checks, experimental, contrib, fixups, graphql, hooks, runner, serializers, targets  # noqa: E402
-from .constants import DataGenerationMethod, SCHEMATHESIS_VERSION  # noqa: E402
+from .generation import DataGenerationMethod  # noqa: E402
+from .constants import SCHEMATHESIS_VERSION  # noqa: E402
 from .models import Case  # noqa: E402
 from .specs import openapi  # noqa: E402
-from .utils import GenericResponse  # noqa: E402
+from .transports.responses import GenericResponse  # noqa: E402
 
 
 __version__ = SCHEMATHESIS_VERSION

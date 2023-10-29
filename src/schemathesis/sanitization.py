@@ -11,7 +11,7 @@ from .utils import NOT_SET
 if TYPE_CHECKING:
     from .models import Case, CaseSource, Request
     from .runner.serialization import SerializedCase, SerializedCheck, SerializedInteraction
-    from .utils import GenericResponse
+    from .transports.responses import GenericResponse
 
 # Exact keys to sanitize
 DEFAULT_KEYS_TO_SANITIZE = frozenset(

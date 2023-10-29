@@ -6,10 +6,8 @@ import re
 import sys
 import traceback
 from contextlib import contextmanager
-from copy import copy, deepcopy
 from datetime import datetime, timezone
 from inspect import getfullargspec
-from json import JSONDecodeError
 from typing import (
     Any,
     Callable,
@@ -27,9 +25,7 @@ from typing import (
 )
 
 import pytest
-import requests
 import yaml
-import yarl
 from hypothesis import strategies as st
 from hypothesis.core import is_invalid_test
 from hypothesis.reporting import with_reporter
@@ -37,12 +33,10 @@ from hypothesis.strategies import SearchStrategy
 from requests.auth import HTTPDigestAuth
 from requests.exceptions import InvalidHeader  # type: ignore
 from requests.utils import check_header_validity
-from werkzeug.wrappers import Response as BaseResponse
 
-from ._compat import InferType, JSONMixin, get_signature
-from .constants import USER_AGENT, DataGenerationMethod
+from ._compat import InferType, get_signature
 from .exceptions import SkipTest, UsageError
-from .types import DataGenerationMethodInput, Filter, GenericTest, NotSet, RawAuth
+from .types import Filter, GenericTest, NotSet, RawAuth
 
 try:
     from yaml import CSafeLoader as SafeLoader
@@ -215,49 +209,10 @@ def make_loader(*tags_to_remove: str) -> Type[yaml.SafeLoader]:
 StringDatesYAMLLoader = make_loader("tag:yaml.org,2002:timestamp")
 
 
-class WSGIResponse(BaseResponse, JSONMixin):
-    # We store "requests" request to build a reproduction code
-    request: requests.PreparedRequest
-
-    def on_json_loading_failed(self, e: JSONDecodeError) -> NoReturn:
-        # We don't need a werkzeug-specific exception when JSON parsing error happens
-        raise e
-
-
 def get_requests_auth(auth: Optional[RawAuth], auth_type: Optional[str]) -> Optional[Union[HTTPDigestAuth, RawAuth]]:
     if auth and auth_type == "digest":
         return HTTPDigestAuth(*auth)
     return auth
-
-
-GenericResponse = Union[requests.Response, WSGIResponse]
-
-
-def copy_response(response: GenericResponse) -> GenericResponse:
-    """Create a copy of the given response as far as it makes sense."""
-    if isinstance(response, requests.Response):
-        # Hooks are not copyable. Keep them out and copy the rest
-        hooks = None
-        if response.request is not None:
-            hooks = response.request.hooks["response"]
-            response.request.hooks["response"] = []
-        copied_response = deepcopy(response)
-        if hooks is not None:
-            copied_response.request.hooks["response"] = hooks
-        copied_response.raw = response.raw
-        copied_response.verify = getattr(response, "verify", True)  # type: ignore[union-attr]
-        return copied_response
-    # Can't deepcopy WSGI response due to generators inside (`response.freeze` doesn't completely help)
-    response.freeze()
-    copied_response = copy(response)
-    copied_response.request = deepcopy(response.request)
-    return copied_response
-
-
-def get_response_payload(response: GenericResponse) -> str:
-    if isinstance(response, requests.Response):
-        return response.text
-    return response.get_data(as_text=True)
 
 
 def import_app(path: str) -> Any:
@@ -268,18 +223,6 @@ def import_app(path: str) -> Any:
     # may return a parent module (system dependent)
     module = sys.modules[path]
     return getattr(module, name)
-
-
-def setup_headers(kwargs: Dict[str, Any]) -> None:
-    headers = kwargs.setdefault("headers", {})
-    if "user-agent" not in {header.lower() for header in headers}:
-        kwargs["headers"]["User-Agent"] = USER_AGENT
-
-
-def require_relative_url(url: str) -> None:
-    """Raise an error if the URL is not relative."""
-    if yarl.URL(url).is_absolute():
-        raise ValueError("Schema path should be relative for WSGI/ASGI loaders")
 
 
 T = TypeVar("T")
@@ -378,12 +321,6 @@ def maybe_set_assertion_message(exc: AssertionError, check_name: str) -> str:
         message = f"Check '{check_name}' failed"
         exc.args = (message,)
     return message
-
-
-def prepare_data_generation_methods(data_generation_methods: DataGenerationMethodInput) -> List[DataGenerationMethod]:
-    if isinstance(data_generation_methods, DataGenerationMethod):
-        return [data_generation_methods]
-    return list(data_generation_methods)
 
 
 def merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:

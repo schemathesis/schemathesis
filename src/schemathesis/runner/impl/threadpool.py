@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Uni
 import hypothesis
 
 from ..._hypothesis import create_test
-from ...constants import DataGenerationMethod
+from ...generation import DataGenerationMethod
 from ...models import CheckFunction, TestResultSet
 from ...stateful import Feedback, Stateful
 from ...targets import Target

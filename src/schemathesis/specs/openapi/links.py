@@ -2,19 +2,25 @@
 
 Based on https://swagger.io/docs/specification/links/
 """
+from __future__ import annotations
 from dataclasses import dataclass, field
 from difflib import get_close_matches
-from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tuple, Union, TYPE_CHECKING
 
 from ...models import APIOperation, Case
 from ...parameters import ParameterSet
 from ...stateful import Direction, ParsedData, StatefulTest
 from ...types import NotSet
-from ...utils import NOT_SET, GenericResponse
+
+from ...utils import NOT_SET
 from ...internal.copy import fast_deepcopy
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPI20Body, OpenAPI30Body, OpenAPIParameter
+
+
+if TYPE_CHECKING:
+    from ...transports.responses import GenericResponse
 
 
 @dataclass(repr=False)
