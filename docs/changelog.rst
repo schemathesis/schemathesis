@@ -8,6 +8,7 @@ Changelog
 
 - Generated binary data inside ``Case.body`` is wrapped with a custom wrapper - ``Binary`` in order to simplify
   compatibility with ``hypothesis-jsonschema``.
+- Do not modify ``Case.body`` inside ``Case.as_requests_kwargs`` when serializing multipart data.
 
 .. _v3.20.2:
 

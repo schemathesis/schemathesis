@@ -178,24 +178,22 @@ def test_register_default_strategies():
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_default_strategies_binary(swagger_20):
-    operation = make_operation(
-        swagger_20,
-        body=PayloadAlternatives(
-            [
-                OpenAPI20CompositeBody.from_parameters(
-                    {
-                        "name": "upfile",
-                        "in": "formData",
-                        "type": "file",
-                        "required": True,
-                    },
-                    media_type="multipart/form-data",
-                )
-            ]
-        ),
+    body = OpenAPI20CompositeBody.from_parameters(
+        {
+            "name": "upfile",
+            "in": "formData",
+            "type": "file",
+            "required": True,
+        },
+        media_type="multipart/form-data",
     )
+    operation = make_operation(swagger_20, body=PayloadAlternatives([body]))
+    operation.definition.parameters = [body]
+    swagger_20.raw_schema["consumes"] = ["multipart/form-data"]
     result = get_case_strategy(operation).example()
     assert isinstance(result.body["upfile"], Binary)
+    kwargs = result.as_requests_kwargs(base_url="http://127.0.0.1")
+    assert kwargs["files"] == [("upfile", result.body["upfile"].data)]
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
