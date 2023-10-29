@@ -37,14 +37,17 @@ from hypothesis.strategies import SearchStrategy
 from pyrate_limiter import Limiter
 from requests.structures import CaseInsensitiveDict
 
+from .constants import NOT_SET
 from ._hypothesis import create_test
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod, DataGenerationMethodInput
 from .exceptions import OperationSchemaError, UsageError
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
+from .internal.result import Result, Ok
 from .models import APIOperation, Case
-from .stateful import APIStateMachine, Stateful, StatefulTest
+from .stateful.state_machine import APIStateMachine
+from .stateful import Stateful, StatefulTest
 from .types import (
     Body,
     Cookies,
@@ -56,7 +59,7 @@ from .types import (
     PathParameters,
     Query,
 )
-from .utils import NOT_SET, PARAMETRIZE_MARKER, GivenInput, Ok, Result, given_proxy
+from .utils import PARAMETRIZE_MARKER, GivenInput, given_proxy
 
 
 if TYPE_CHECKING:

@@ -16,11 +16,10 @@ from .._hypothesis import create_test
 from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from .._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54
 from ..exceptions import OperationSchemaError, SkipTest
+from ..internal.result import Result, Ok
 from ..models import APIOperation
 from ..utils import (
     PARAMETRIZE_MARKER,
-    Ok,
-    Result,
     fail_on_no_matches,
     get_given_args,
     get_given_kwargs,

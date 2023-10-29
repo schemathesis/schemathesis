@@ -6,36 +6,27 @@ import re
 from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union, cast, TYPE_CHECKING
 from urllib.parse import urljoin
 
-import backoff
-import jsonschema
-import requests
-import yaml
-from jsonschema import ValidationError
-from pyrate_limiter import Limiter
-from starlette.applications import Starlette
-from starlette_testclient import TestClient as ASGIClient
-from werkzeug.test import Client
-from yarl import URL
-
 from ... import experimental, fixups
 from ...code_samples import CodeSampleStyle
 from ...generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethodInput, DataGenerationMethod
 from ...constants import WAIT_FOR_SCHEMA_INTERVAL
 from ...exceptions import SchemaError, SchemaErrorType
 from ...hooks import HookContext, dispatch
-from ...lazy import LazySchema
-from ...loaders import load_schema_from_url
+from ...loaders import load_schema_from_url, load_yaml
 from ...throttling import build_limiter
 from ...types import Filter, NotSet, PathLike
 from ...transports.content_types import is_json_media_type
 from ...transports.headers import setup_default_headers
 from ...internal.validation import require_relative_url
-from ...utils import NOT_SET, StringDatesYAMLLoader
+from ...constants import NOT_SET
 from . import definitions, validation
-from .schemas import BaseOpenAPISchema, OpenApi30, SwaggerV20
 
 if TYPE_CHECKING:
+    from .schemas import BaseOpenAPISchema
     from ...transports.responses import GenericResponse
+    import jsonschema
+    from pyrate_limiter import Limiter
+    from ...lazy import LazySchema
 
 
 def _is_json_response(response: GenericResponse) -> bool:
@@ -120,8 +111,13 @@ def from_uri(
 
     :param str uri: Schema URL.
     """
+    import backoff
+    import requests
+
     setup_default_headers(kwargs)
     if port:
+        from yarl import URL
+
         uri = str(URL(uri).with_port(port))
         if not base_url:
             base_url = uri
@@ -165,8 +161,10 @@ SCHEMA_LOADING_ERROR = "Received unsupported content while expecting a JSON or Y
 
 
 def _load_yaml(data: str) -> Dict[str, Any]:
+    import yaml
+
     try:
-        return yaml.load(data, StringDatesYAMLLoader)
+        return load_yaml(data)
     except yaml.YAMLError as exc:
         raise SchemaError(SchemaErrorType.UNEXPECTED_CONTENT_TYPE, SCHEMA_LOADING_ERROR) from exc
 
@@ -257,6 +255,8 @@ def from_dict(
 
     :param dict raw_schema: A schema to load.
     """
+    from .schemas import OpenApi30, SwaggerV20
+
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     hook_context = HookContext()
     is_openapi_31 = raw_schema.get("openapi", "").startswith("3.1")
@@ -369,6 +369,8 @@ def _format_status_codes(status_codes: List[Tuple[int, List[Union[str, int]]]]) 
 def _maybe_validate_schema(
     instance: Dict[str, Any], validator: jsonschema.validators.Draft4Validator, validate_schema: bool
 ) -> None:
+    from jsonschema import ValidationError
+
     if validate_schema:
         try:
             validator.validate(instance)
@@ -416,6 +418,8 @@ def from_pytest_fixture(
 
     :param str fixture_name: The name of a fixture to load.
     """
+    from ...lazy import LazySchema
+
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     _data_generation_methods: Union[DataGenerationMethodInput, NotSet]
     if data_generation_methods is not NOT_SET:
@@ -467,6 +471,7 @@ def from_wsgi(
     :param app: A WSGI app instance.
     """
     from ...transports.responses import WSGIResponse
+    from werkzeug.test import Client
 
     require_relative_url(schema_path)
     setup_default_headers(kwargs)
@@ -493,6 +498,8 @@ def from_wsgi(
 
 
 def get_loader_for_app(app: Any) -> Callable:
+    from starlette.applications import Starlette
+
     if isinstance(app, Starlette):
         return from_asgi
     if app.__class__.__module__.startswith("aiohttp."):
@@ -569,6 +576,8 @@ def from_asgi(
     :param str schema_path: An in-app relative URL to the schema.
     :param app: An ASGI app instance.
     """
+    from starlette_testclient import TestClient as ASGIClient
+
     require_relative_url(schema_path)
     setup_default_headers(kwargs)
     client = ASGIClient(app)

@@ -1,7 +1,6 @@
 import pytest
-import yaml
 
-from src.schemathesis.utils import StringDatesYAMLLoader
+from schemathesis.loaders import load_yaml
 
 
 @pytest.mark.parametrize(
@@ -15,4 +14,4 @@ from src.schemathesis.utils import StringDatesYAMLLoader
     ids=["string-key-string-value", "int-key-string-value", "int-key-int-value", "bool-key-bool-value"],
 )
 def test_parse(value, expected):
-    assert yaml.load(value, StringDatesYAMLLoader) == expected
+    assert load_yaml(value) == expected

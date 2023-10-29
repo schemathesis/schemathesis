@@ -4,11 +4,10 @@ from urllib.request import urlopen
 
 import jsonschema
 import requests
-import yaml
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...internal.copy import fast_deepcopy
-from ...utils import StringDatesYAMLLoader
+from ...loaders import load_yaml
 from .constants import ALL_KEYWORDS
 from .converter import to_json_schema_recursive
 from .utils import get_type
@@ -20,7 +19,7 @@ RECURSION_DEPTH_LIMIT = 100
 def load_file_impl(location: str, opener: Callable) -> Dict[str, Any]:
     """Load a schema from the given file."""
     with opener(location) as fd:
-        return yaml.load(fd, StringDatesYAMLLoader)
+        return load_yaml(fd)
 
 
 @lru_cache()
@@ -38,7 +37,7 @@ def load_file_uri(location: str) -> Dict[str, Any]:
 def load_remote_uri(uri: str) -> Any:
     """Load the resource and parse it as YAML / JSON."""
     response = requests.get(uri, timeout=DEFAULT_RESPONSE_TIMEOUT / 1000)
-    return yaml.load(response.content, StringDatesYAMLLoader)
+    return load_yaml(response.content)
 
 
 JSONType = Union[None, bool, float, str, list, Dict[str, Any]]

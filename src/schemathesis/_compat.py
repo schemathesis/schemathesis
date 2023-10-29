@@ -1,4 +1,5 @@
 from typing import Any, Type, Callable
+from ._lazy_import import lazy_import
 
 try:
     from importlib import metadata
@@ -73,12 +74,4 @@ _imports = {
 
 def __getattr__(name: str) -> Any:
     # Some modules are relatively heavy, hence load them lazily to improve startup time for CLI
-    value = globals().get(name)
-    if value is not None:
-        return value
-    loader = _imports.get(name)
-    if loader is not None:
-        value = loader()
-        globals()[name] = value
-        return value
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return lazy_import(__name__, name, _imports, globals())

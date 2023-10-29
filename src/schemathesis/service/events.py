@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from ..utils import format_exception
 from . import ci
+from ..exceptions import format_exception
 
 
 class Event:

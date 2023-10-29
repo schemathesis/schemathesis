@@ -1,23 +1,30 @@
+from __future__ import annotations
 import enum
 import os
 import re
 from contextlib import contextmanager
-from typing import Dict, Generator, List, Optional, Tuple, Union
+from typing import Dict, Generator, List, Optional, Tuple, Union, TYPE_CHECKING
 from urllib.parse import urlparse
 
 import click
-import hypothesis
-from click.types import LazyFile  # type: ignore
-from requests import PreparedRequest, RequestException
 
-from .. import exceptions, experimental, throttling, utils
+from click.types import LazyFile  # type: ignore
+
+from .. import exceptions, experimental, throttling
 from ..code_samples import CodeSampleStyle
+from ..exceptions import format_exception
 from ..generation import DataGenerationMethod
 from ..constants import TRUE_VALUES, FALSE_VALUES
+from ..internal.validation import file_exists, is_filename
+from ..loaders import load_app
 from ..service.hosts import get_temporary_hosts_file
-from ..stateful import Stateful
+from ..transports.headers import has_invalid_characters, is_latin_1_encodable
 from ..types import PathLike
 from .constants import DEFAULT_WORKERS
+from ..stateful import Stateful
+
+if TYPE_CHECKING:
+    import hypothesis
 
 INVALID_DERANDOMIZE_MESSAGE = (
     "`--hypothesis-derandomize` implies no database, so passing `--hypothesis-database` too is invalid."
@@ -68,7 +75,7 @@ def parse_schema_kind(schema: str, app: Optional[str]) -> SchemaInputKind:
         raise click.UsageError(INVALID_SCHEMA_MESSAGE)
     if netloc:
         return SchemaInputKind.URL
-    if utils.file_exists(schema) or utils.is_filename(schema):
+    if file_exists(schema) or is_filename(schema):
         return SchemaInputKind.PATH
     if app is not None:
         return SchemaInputKind.APP_PATH
@@ -90,7 +97,7 @@ def validate_schema(
     if kind == SchemaInputKind.PATH:
         # Base URL is required if it is not a dry run
         if app is None and base_url is None and not dry_run:
-            if not utils.file_exists(schema):
+            if not file_exists(schema):
                 message = FILE_DOES_NOT_EXIST_MESSAGE
             else:
                 message = MISSING_BASE_URL_MESSAGE
@@ -101,6 +108,8 @@ def validate_schema(
 
 
 def validate_url(value: str) -> None:
+    from requests import PreparedRequest, RequestException
+
     try:
         PreparedRequest().prepare_url(value, {})  # type: ignore
     except RequestException as exc:
@@ -133,14 +142,14 @@ def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value
     if raw_value is None:
         return raw_value
     try:
-        utils.import_app(raw_value)
+        load_app(raw_value)
         # String is returned instead of an app because it might be passed to a subprocess
         # Since most app instances are not-transferable to another process, they are passed as strings and
         # imported in a subprocess
         return raw_value
     except Exception as exc:
         show_errors_tracebacks = ctx.params["show_errors_tracebacks"]
-        message = utils.format_exception(exc, show_errors_tracebacks).strip()
+        message = format_exception(exc, show_errors_tracebacks).strip()
         click.secho(f"{APPLICATION_FORMAT_MESSAGE}\n\nException:\n\n{message}", fg="red")
         if not show_errors_tracebacks:
             click.secho(
@@ -168,9 +177,9 @@ def validate_auth(
             user, password = tuple(raw_value.split(":"))
         if not user:
             raise click.BadParameter("Username should not be empty")
-        if not utils.is_latin_1_encodable(user):
+        if not is_latin_1_encodable(user):
             raise click.BadParameter("Username should be latin-1 encodable")
-        if not utils.is_latin_1_encodable(password):
+        if not is_latin_1_encodable(password):
             raise click.BadParameter("Password should be latin-1 encodable")
         return user, password
     return None
@@ -187,11 +196,11 @@ def validate_headers(
         key = key.strip()
         if not key:
             raise click.BadParameter("Header name should not be empty")
-        if not utils.is_latin_1_encodable(key):
+        if not is_latin_1_encodable(key):
             raise click.BadParameter("Header name should be latin-1 encodable")
-        if not utils.is_latin_1_encodable(value):
+        if not is_latin_1_encodable(value):
             raise click.BadParameter("Header value should be latin-1 encodable")
-        if utils.has_invalid_characters(key, value):
+        if has_invalid_characters(key, value):
             raise click.BadParameter("Invalid return character or leading space in header")
         headers[key] = value
     return headers
@@ -223,6 +232,8 @@ def validate_preserve_exact_body_bytes(ctx: click.core.Context, param: click.cor
 def convert_verbosity(
     ctx: click.core.Context, param: click.core.Parameter, value: Optional[str]
 ) -> Optional[hypothesis.Verbosity]:
+    import hypothesis
+
     if value is None:
         return value
     return hypothesis.Verbosity[value]

@@ -2,7 +2,7 @@ import warnings
 
 import pytest
 
-from schemathesis import Case
+from schemathesis.models import Case
 from schemathesis.auths import AuthContext, AuthStorage, CachingAuthProvider
 from schemathesis.exceptions import UsageError
 

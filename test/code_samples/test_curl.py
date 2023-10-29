@@ -5,7 +5,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
-from schemathesis import Case
+from schemathesis.models import Case
 
 schema = schemathesis.from_dict(app.openapi(), force_schema_version="30")
 

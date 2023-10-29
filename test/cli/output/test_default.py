@@ -17,7 +17,7 @@ from schemathesis.cli.output.default import display_internal_error
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.runner.events import Finished, InternalError
 from schemathesis.runner.serialization import SerializedTestResult
-from schemathesis.utils import NOT_SET
+from schemathesis.constants import NOT_SET
 
 from ...utils import strip_style_win32
 

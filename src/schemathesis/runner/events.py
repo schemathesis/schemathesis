@@ -1,15 +1,19 @@
+from __future__ import annotations
 import enum
 import threading
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
 
+from ..internal.datetime import current_datetime
 from ..generation import DataGenerationMethod
-from ..exceptions import SchemaError, SchemaErrorType
-from ..models import APIOperation, Status, TestResult, TestResultSet
-from ..schemas import BaseSchema
-from ..utils import current_datetime, format_exception
+from ..exceptions import SchemaError, SchemaErrorType, format_exception
 from .serialization import SerializedError, SerializedTestResult
+
+
+if TYPE_CHECKING:
+    from ..models import APIOperation, Status, TestResult, TestResultSet
+    from ..schemas import BaseSchema
 
 
 @dataclass

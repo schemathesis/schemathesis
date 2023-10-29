@@ -10,7 +10,6 @@ from ...exceptions import (
     get_status_code_error,
 )
 from ...transports.content_types import parse_content_type
-from .schemas import BaseOpenAPISchema
 from .utils import expand_status_code
 
 if TYPE_CHECKING:
@@ -19,6 +18,8 @@ if TYPE_CHECKING:
 
 
 def status_code_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
+    from .schemas import BaseOpenAPISchema
+
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
     responses = case.operation.definition.raw.get("responses", {})
@@ -51,6 +52,8 @@ def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, N
 
 
 def content_type_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
+    from .schemas import BaseOpenAPISchema
+
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
     defined_content_types = case.operation.schema.get_content_types(case.operation, response)
@@ -95,6 +98,8 @@ def _reraise_malformed_media_type(exc: ValueError, location: str, actual: str, d
 
 
 def response_headers_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
+    from .schemas import BaseOpenAPISchema
+
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
     defined_headers = case.operation.schema.get_headers(case.operation, response)
@@ -117,6 +122,8 @@ def response_headers_conformance(response: GenericResponse, case: "Case") -> Opt
 
 
 def response_schema_conformance(response: GenericResponse, case: "Case") -> None:
+    from .schemas import BaseOpenAPISchema
+
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
     return case.operation.validate_response(response)
