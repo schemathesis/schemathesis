@@ -8,7 +8,7 @@ from hypothesis.errors import NoSuchExample
 import schemathesis
 from schemathesis.exceptions import OperationSchemaError
 from schemathesis.specs.openapi._hypothesis import is_valid_header, get_default_format_strategies
-from schemathesis.utils import fast_deepcopy
+from schemathesis.internal.copy import fast_deepcopy
 
 from .utils import as_param
 

@@ -7,7 +7,8 @@ import requests
 import yaml
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
-from ...utils import StringDatesYAMLLoader, fast_deepcopy
+from ...internal.copy import fast_deepcopy
+from ...utils import StringDatesYAMLLoader
 from .constants import ALL_KEYWORDS
 from .converter import to_json_schema_recursive
 from .utils import get_type

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import enum
 import json
 from dataclasses import dataclass, field
@@ -5,13 +6,12 @@ from hashlib import sha1
 from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, NoReturn, Optional, Tuple, Type, Union
 
-import hypothesis.errors
-from jsonschema import RefResolutionError, ValidationError
-
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE
 from .failures import FailureContext
 
 if TYPE_CHECKING:
+    import hypothesis.errors
+    from jsonschema import RefResolutionError, ValidationError
     from .utils import GenericResponse
 
 

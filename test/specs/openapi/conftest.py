@@ -4,7 +4,7 @@ import pytest
 
 import schemathesis
 from schemathesis.specs.openapi.definitions import OPENAPI_30_VALIDATOR, SWAGGER_20_VALIDATOR
-from schemathesis.utils import fast_deepcopy
+from schemathesis.internal.copy import fast_deepcopy
 
 
 def make_object_schema(is_loose=False, **properties):

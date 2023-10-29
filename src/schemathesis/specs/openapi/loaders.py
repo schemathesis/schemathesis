@@ -25,12 +25,12 @@ from ...lazy import LazySchema
 from ...loaders import load_schema_from_url
 from ...throttling import build_limiter
 from ...types import DataGenerationMethodInput, Filter, NotSet, PathLike
+from ...transports.content_types import is_json_media_type
 from ...utils import (
     NOT_SET,
     GenericResponse,
     StringDatesYAMLLoader,
     WSGIResponse,
-    is_json_media_type,
     prepare_data_generation_methods,
     require_relative_url,
     setup_headers,

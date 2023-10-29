@@ -2,7 +2,7 @@ import pytest
 
 from schemathesis.specs.openapi import converter
 from schemathesis.specs.openapi.converter import forbid_properties, is_read_only, is_write_only, rewrite_properties
-from schemathesis.utils import traverse_schema
+from schemathesis.internal.jsonschema import traverse_schema
 
 
 @pytest.mark.parametrize(

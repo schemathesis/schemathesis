@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, Generator, NoReturn, Optional, Union
 
 from ... import failures
@@ -8,11 +9,12 @@ from ...exceptions import (
     get_response_type_error,
     get_status_code_error,
 )
-from ...utils import GenericResponse, parse_content_type
+from ...transports.content_types import parse_content_type
 from .schemas import BaseOpenAPISchema
 from .utils import expand_status_code
 
 if TYPE_CHECKING:
+    from ...utils import GenericResponse
     from ...models import Case
 
 

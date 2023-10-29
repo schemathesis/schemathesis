@@ -2,14 +2,9 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from schemathesis.utils import (
-    dict_true_values,
-    import_app,
-    is_json_media_type,
-    is_plain_text_media_type,
-    is_schemathesis_test,
-    parse_content_type,
-)
+from schemathesis.transports.content_types import is_json_media_type, is_plain_text_media_type, parse_content_type
+
+from schemathesis.utils import dict_true_values, import_app, is_schemathesis_test
 
 
 def test_is_schemathesis_test(swagger_20):

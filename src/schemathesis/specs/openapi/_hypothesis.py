@@ -15,12 +15,13 @@ from requests.structures import CaseInsensitiveDict
 
 from ... import auths, serializers, utils
 from ...constants import DataGenerationMethod
+from ...internal.copy import fast_deepcopy
 from ...exceptions import OperationSchemaError, SerializationNotPossible
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...models import APIOperation, Case, cant_serialize
 from ...types import NotSet
 from ...serializers import Binary
-from ...utils import NOT_SET, compose, fast_deepcopy, skip
+from ...utils import NOT_SET, compose, skip
 from .constants import LOCATION_TO_CONTAINER
 from .negative import negative_schema
 from .negative.utils import can_negate

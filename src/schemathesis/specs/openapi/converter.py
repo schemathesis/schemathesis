@@ -1,7 +1,8 @@
 from itertools import chain
 from typing import Any, Callable, Dict, List
 
-from ...utils import fast_deepcopy, traverse_schema
+from ...internal.jsonschema import traverse_schema
+from ...internal.copy import fast_deepcopy
 
 
 def to_json_schema(

@@ -3,10 +3,8 @@ from io import StringIO
 from typing import Any, Dict, List, Union
 from xml.etree import ElementTree
 
-from hypothesis import reject
-
 from .exceptions import UnboundPrefixError
-from .utils import fast_deepcopy
+from .internal.copy import fast_deepcopy
 
 Primitive = Union[str, int, float, bool, None]
 JSON = Union[Primitive, List, Dict[str, Any]]
@@ -32,6 +30,8 @@ def _to_xml(value: Any, raw_schema: Dict[str, Any], resolved_schema: Dict[str, A
     _write_xml(buffer, value, tag, resolved_schema, namespace_stack)
     data = buffer.getvalue()
     if not is_valid_xml(data):
+        from hypothesis import reject
+
         reject()
     return {"data": data.encode("utf8")}
 
