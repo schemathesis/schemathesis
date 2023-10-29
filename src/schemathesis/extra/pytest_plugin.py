@@ -13,7 +13,8 @@ from hypothesis.errors import InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
 from .._hypothesis import create_test
-from ..constants import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54, RECURSIVE_REFERENCE_ERROR_MESSAGE
+from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
+from .._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54
 from ..exceptions import OperationSchemaError, SkipTest
 from ..models import APIOperation
 from ..utils import (
