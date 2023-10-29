@@ -23,6 +23,17 @@ SERIALIZERS: Dict[str, Type["Serializer"]] = {}
 
 
 @dataclass
+class Binary(str):
+    """A wrapper around `bytes` to resolve OpenAPI and JSON Schema `format` discrepancies.
+
+    Treat `bytes` as a valid type, allowing generation of bytes for OpenAPI `format` values like `binary` or `file`
+    that JSON Schema expects to be strings.
+    """
+
+    data: bytes
+
+
+@dataclass
 class SerializerContext:
     """The context for serialization process.
 
@@ -155,7 +166,7 @@ class XMLSerializer:
 def _should_coerce_to_bytes(item: Any) -> bool:
     """Whether the item should be converted to bytes."""
     # These types are OK in forms, others should be coerced to bytes
-    return not isinstance(item, (bytes, str, int))
+    return isinstance(item, Binary) or not isinstance(item, (bytes, str, int))
 
 
 def _prepare_form_data(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -178,6 +189,8 @@ def _to_bytes(value: Any) -> bytes:
     """Convert the input value to bytes and ignore any conversion errors."""
     if isinstance(value, bytes):
         return value
+    if isinstance(value, Binary):
+        return value.data
     return str(value).encode(errors="ignore")
 
 

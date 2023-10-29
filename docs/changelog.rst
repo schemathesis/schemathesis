@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Changed**
+
+- Generated binary data inside ``Case.body`` is wrapped with a custom wrapper - ``Binary`` in order to simplify
+  compatibility with ``hypothesis-jsonschema``.
+
 .. _v3.20.2:
 
 `3.20.2`_ - 2023-10-27

@@ -1,9 +1,3 @@
-from ._compat import _install_hypothesis_jsonschema_compatibility_shim
-
-_install_hypothesis_jsonschema_compatibility_shim()
-
-del _install_hypothesis_jsonschema_compatibility_shim
-
 from . import auths, checks, experimental, contrib, fixups, graphql, hooks, runner, serializers, targets  # noqa: E402
 from .constants import DataGenerationMethod, SCHEMATHESIS_VERSION  # noqa: E402
 from .models import Case  # noqa: E402

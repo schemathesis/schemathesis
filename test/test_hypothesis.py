@@ -10,6 +10,7 @@ from schemathesis import Case, DataGenerationMethod
 from schemathesis.exceptions import OperationSchemaError
 from schemathesis.models import APIOperation, OperationDefinition
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
+from schemathesis.serializers import Binary
 from schemathesis.specs.openapi._hypothesis import (
     PARAMETERS,
     STRING_FORMATS,
@@ -194,7 +195,7 @@ def test_default_strategies_binary(swagger_20):
         ),
     )
     result = get_case_strategy(operation).example()
-    assert isinstance(result.body["upfile"], bytes)
+    assert isinstance(result.body["upfile"], Binary)
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
