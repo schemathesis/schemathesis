@@ -1,0 +1,27 @@
+name: Benchmarks
+
+on:
+  push:
+    branches:
+      - "master"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          # Python 3.12 for flamegraph support
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install ".[bench]"
+
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@v1
+        with:
+          token: ${{ secrets.CODSPEED_TOKEN }}
+          run: pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio

@@ -72,12 +72,15 @@ cov = [
     "coverage-enable-subprocess",
     "coverage[toml]>=5.3",
 ]
+bench = [
+    "pytest-codspeed==2.2.0",
+]
 docs = [
     "sphinx",
     "sphinx_rtd_theme",
     "sphinx-click",
 ]
-dev = ["schemathesis[tests,cov,docs]"]
+dev = ["schemathesis[tests,cov,bench,docs]"]
 
 [project.urls]
 Documentation = "https://schemathesis.readthedocs.io/en/stable/"
@@ -97,7 +100,6 @@ schemathesis = "schemathesis.extra.pytest_plugin"
 addopts = ["-ra", "--strict-markers", "--strict-config"]
 xfail_strict = true
 testpaths = "tests"
-asyncio_mode = "auto"
 norecursedirs = ".hypothesis .idea .git src docs .pytest_cache .mypy_cache .tox"
 
 [tool.coverage.run]
