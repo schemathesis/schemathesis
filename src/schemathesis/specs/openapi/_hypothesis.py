@@ -18,6 +18,7 @@ from ...exceptions import OperationSchemaError, SerializationNotPossible
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...models import APIOperation, Case, cant_serialize
 from ...types import NotSet
+from ...serializers import Binary
 from ...utils import NOT_SET, compose, fast_deepcopy, skip
 from .constants import LOCATION_TO_CONTAINER
 from .negative import negative_schema
@@ -56,7 +57,7 @@ def unregister_string_format(name: str) -> None:
 
 def init_default_strategies() -> None:
     """Register all default "format" strategies."""
-    register_string_format("binary", st.binary())
+    register_string_format("binary", st.binary().map(Binary))
     register_string_format("byte", st.binary().map(lambda x: b64encode(x).decode()))
 
     def make_basic_auth_str(item: Tuple[str, str]) -> str:
