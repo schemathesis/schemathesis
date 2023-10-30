@@ -1,0 +1,7 @@
+Exit code: 2
+---
+Stdout:
+Usage: run [OPTIONS] SCHEMA [API_NAME]
+Try 'run --help' for help.
+
+Error: Invalid SCHEMA, must be a valid URL, file path or an API name from Schemathesis.io.

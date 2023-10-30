@@ -1,0 +1,8 @@
+Exit code: 1
+---
+Stdout:
+Schema Loading Error
+
+Failed to load schema due to client error (HTTP 404 Not Found)
+
+Tip: Verify that the URL points directly to the Open API schema

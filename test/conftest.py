@@ -9,9 +9,11 @@ from typing import Any, Dict, Optional
 import pytest
 import requests
 import yaml
-from click.testing import CliRunner
+from click.testing import CliRunner, Result
 from hypothesis import settings
 from packaging import version
+from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
+from syrupy.types import PropertyFilter, PropertyMatcher
 from urllib3 import HTTPResponse
 
 import schemathesis.cli
@@ -243,6 +245,30 @@ def graphql_schema(graphql_url):
 @pytest.fixture
 def graphql_strategy(graphql_schema):
     return graphql_schema["/graphql"]["POST"].as_strategy()
+
+
+class CliSnapshotExtension(SingleFileSnapshotExtension):
+    _write_mode = WriteMode.TEXT
+
+    def serialize(
+        self,
+        data: Result,
+        *,
+        exclude: Optional["PropertyFilter"] = None,
+        include: Optional["PropertyFilter"] = None,
+        matcher: Optional["PropertyMatcher"] = None,
+    ) -> str:
+        serialized = f"Exit code: {data.exit_code}"
+        if data.stdout_bytes:
+            serialized += f"\n---\nStdout:\n{data.stdout}"
+        if data.stderr_bytes:
+            serialized += f"\n---\nStderr:\n{data.stderr}"
+        return serialized.replace("\r\n", "\n").replace("\r", "\n")
+
+
+@pytest.fixture
+def snapshot_cli(snapshot):
+    return snapshot.use_extension(extension_class=CliSnapshotExtension)
 
 
 @pytest.fixture(scope="session")

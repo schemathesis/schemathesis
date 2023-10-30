@@ -10,6 +10,8 @@ Changelog
   compatibility with ``hypothesis-jsonschema``.
 - Do not modify ``Case.body`` inside ``Case.as_requests_kwargs`` when serializing multipart data.
 - **INTERNAL**: Moved heavy imports inside functions to improve CLI startup time by 4.3x, not affecting overall execution speed. `#1509`_
+- Clarify CLI error messages for loading hooks and WSGI applications.
+- Clarify CLI option docstrings.
 
 .. _v3.20.2:
 

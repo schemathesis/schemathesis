@@ -61,7 +61,7 @@ def test_validate_header(value):
 
 
 def test_reraise_format_error():
-    with pytest.raises(click.BadParameter, match="Should be in KEY:VALUE format. Got: bla"):
+    with pytest.raises(click.BadParameter, match="Expected KEY:VALUE format, received bla."):
         with callbacks.reraise_format_error("bla"):
             raise ValueError
 
