@@ -1,0 +1,7 @@
+Exit code: 2
+---
+Stdout:
+Usage: run [OPTIONS] SCHEMA [API_NAME]
+Try 'run --help' for help.
+
+Error: The provided base URL is invalid. This URL serves as a prefix for all API endpoints you want to test. Make sure it is a properly formatted URL.

@@ -1,0 +1,15 @@
+Exit code: 1
+---
+Stdout:
+Schema Loading Error
+
+The provided API schema does not appear to be a valid OpenAPI schema
+
+    {'in': 'query', 'name': 'id', 'required': True, 'type': 'int'} is not valid under any of the given schemas
+    Failed validating 'oneOf' in schema['properties']['paths']['patternProperties']['^/']['properties']['post']['properties']['parameters']['items']:
+        {'oneOf': [{'$ref': '#/definitions/parameter'},
+                   {'$ref': '#/definitions/jsonReference'}]}
+    On instance['paths']['/invalid']['post']['parameters'][0]:
+        {'in': 'query', 'name': 'id', 'required': True, 'type': 'int'}
+
+Tip: Bypass validation using `--validate-schema=false`. Caution: May cause unexpected errors.

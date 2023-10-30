@@ -5,6 +5,7 @@ import traceback
 from dataclasses import dataclass, field
 from hashlib import sha1
 from json import JSONDecodeError
+from types import TracebackType
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, NoReturn, Optional, Tuple, Type, Union
 
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE
@@ -375,3 +376,11 @@ def format_exception(error: Exception, include_traceback: bool = False) -> str:
     else:
         lines = traceback.format_exception_only(error_type, error)
     return "".join(lines).strip()
+
+
+def extract_nth_traceback(trace: Optional[TracebackType], n: int) -> Optional[TracebackType]:
+    depth = 0
+    while depth < n and trace is not None:
+        trace = trace.tb_next
+        depth += 1
+    return trace

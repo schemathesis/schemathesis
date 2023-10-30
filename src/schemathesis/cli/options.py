@@ -28,7 +28,7 @@ class BaseCsvChoice(click.Choice):
         # Sort to keep the error output consistent with the passed values
         sorted_options = ", ".join(sorted(invalid_options, key=selected.index))
         available_options = ", ".join(self.choices)
-        self.fail(f"invalid choice(s): {sorted_options}. Choose from {available_options}")
+        self.fail(f"invalid choice(s): {sorted_options}. Choose from {available_options}.")
 
 
 class CsvEnumChoice(BaseCsvChoice):
@@ -65,4 +65,4 @@ class OptionalInt(click.types.IntRange):
             int(value)
             return super().convert(value, param, ctx)
         except ValueError:
-            self.fail("%s is not a valid integer or None" % value, param, ctx)
+            self.fail("%s is not a valid integer or None." % value, param, ctx)

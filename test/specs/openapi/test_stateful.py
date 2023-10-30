@@ -126,7 +126,7 @@ APIWorkflow = schema.as_state_machine()
         schema=app_schema,
     )
     result = testdir.runpytest()
-    assert "E   1. Received a response with 5xx status code: 500" in result.outlines
+    assert "Received a response with 5xx status code: 500" in "\n".join(result.outlines)
 
 
 def removeprefix(value: str, prefix: str) -> str:

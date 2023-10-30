@@ -2,6 +2,7 @@ from __future__ import annotations
 import enum
 import os
 import re
+import traceback
 from contextlib import contextmanager
 from typing import Dict, Generator, List, Optional, Tuple, Union, TYPE_CHECKING
 from urllib.parse import urlparse
@@ -12,7 +13,7 @@ from click.types import LazyFile  # type: ignore
 
 from .. import exceptions, experimental, throttling
 from ..code_samples import CodeSampleStyle
-from ..exceptions import format_exception
+from ..exceptions import extract_nth_traceback
 from ..generation import DataGenerationMethod
 from ..constants import TRUE_VALUES, FALSE_VALUES
 from ..internal.validation import file_exists, is_filename
@@ -30,7 +31,7 @@ INVALID_DERANDOMIZE_MESSAGE = (
     "`--hypothesis-derandomize` implies no database, so passing `--hypothesis-database` too is invalid."
 )
 MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE = (
-    'Missing argument, "--cassette-path" should be specified as well if you use "--cassette-preserve-exact-body-bytes".'
+    "Missing argument, `--cassette-path` should be specified as well if you use `--cassette-preserve-exact-body-bytes`."
 )
 INVALID_SCHEMA_MESSAGE = "Invalid SCHEMA, must be a valid URL, file path or an API name from Schemathesis.io."
 FILE_DOES_NOT_EXIST_MESSAGE = "The specified file does not exist. Please provide a valid path to an existing file."
@@ -39,7 +40,9 @@ INVALID_BASE_URL_MESSAGE = (
     "Make sure it is a properly formatted URL."
 )
 MISSING_BASE_URL_MESSAGE = "The `--base-url` option is required when specifying a schema via a file."
-APPLICATION_FORMAT_MESSAGE = """Unable to import application from the provided module.
+WSGI_DOCUMENTATION_URL = "https://schemathesis.readthedocs.io/en/stable/python.html#asgi-wsgi-support"
+APPLICATION_MISSING_MODULE_MESSAGE = f"""Unable to import application from {{module}}.
+
 The `--app` option should follow this format:
 
     module_path:variable_name
@@ -47,7 +50,16 @@ The `--app` option should follow this format:
 - `module_path`: A path to an importable Python module.
 - `variable_name`: The name of the application variable within that module.
 
-Example: `st run --app=your_module:app ...`"""
+Example: `st run --app=your_module:app ...`
+
+For details on working with WSGI applications, visit {WSGI_DOCUMENTATION_URL}"""
+APPLICATION_IMPORT_ERROR_MESSAGE = f"""An error occurred while loading the application from {{module}}.
+
+Traceback:
+
+{{traceback}}
+
+For details on working with WSGI applications, visit {WSGI_DOCUMENTATION_URL}"""
 MISSING_REQUEST_CERT_MESSAGE = "The `--request-cert` option must be specified if `--request-cert-key` is used."
 
 
@@ -148,15 +160,19 @@ def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value
         # imported in a subprocess
         return raw_value
     except Exception as exc:
-        show_errors_tracebacks = ctx.params["show_errors_tracebacks"]
-        message = format_exception(exc, show_errors_tracebacks).strip()
-        click.secho(f"{APPLICATION_FORMAT_MESSAGE}\n\nException:\n\n{message}", fg="red")
-        if not show_errors_tracebacks:
-            click.secho(
-                "\nAdd this option to your command line parameters to see full tracebacks: --show-errors-tracebacks",
-                fg="red",
+        formatted_module_name = click.style(f"'{raw_value}'", bold=True)
+        if isinstance(exc, ModuleNotFoundError):
+            message = APPLICATION_MISSING_MODULE_MESSAGE.format(module=formatted_module_name)
+            click.echo(message)
+        else:
+            trace = extract_nth_traceback(exc.__traceback__, 2)
+            lines = traceback.format_exception(type(exc), exc, trace)
+            traceback_message = "".join(lines).strip()
+            message = APPLICATION_IMPORT_ERROR_MESSAGE.format(
+                module=formatted_module_name, traceback=click.style(traceback_message, fg="red")
             )
-        raise click.exceptions.Exit(1)  # noqa: B904
+            click.echo(message)
+        raise click.exceptions.Exit(1) from None
 
 
 def validate_hypothesis_database(
@@ -176,11 +192,11 @@ def validate_auth(
         with reraise_format_error(raw_value):
             user, password = tuple(raw_value.split(":"))
         if not user:
-            raise click.BadParameter("Username should not be empty")
+            raise click.BadParameter("Username should not be empty.")
         if not is_latin_1_encodable(user):
-            raise click.BadParameter("Username should be latin-1 encodable")
+            raise click.BadParameter("Username should be latin-1 encodable.")
         if not is_latin_1_encodable(password):
-            raise click.BadParameter("Password should be latin-1 encodable")
+            raise click.BadParameter("Password should be latin-1 encodable.")
         return user, password
     return None
 
@@ -195,13 +211,13 @@ def validate_headers(
         value = value.lstrip()
         key = key.strip()
         if not key:
-            raise click.BadParameter("Header name should not be empty")
+            raise click.BadParameter("Header name should not be empty.")
         if not is_latin_1_encodable(key):
-            raise click.BadParameter("Header name should be latin-1 encodable")
+            raise click.BadParameter("Header name should be latin-1 encodable.")
         if not is_latin_1_encodable(value):
-            raise click.BadParameter("Header value should be latin-1 encodable")
+            raise click.BadParameter("Header value should be latin-1 encodable.")
         if has_invalid_characters(key, value):
-            raise click.BadParameter("Invalid return character or leading space in header")
+            raise click.BadParameter("Invalid return character or leading space in header.")
         headers[key] = value
     return headers
 
@@ -211,7 +227,7 @@ def validate_regex(ctx: click.core.Context, param: click.core.Parameter, raw_val
         try:
             re.compile(value)
         except (re.error, OverflowError, RuntimeError) as exc:
-            raise click.BadParameter(f"Invalid regex: {exc.args[0]}")  # noqa: B904
+            raise click.BadParameter(f"Invalid regex: {exc.args[0]}.")  # noqa: B904
     return raw_value
 
 
@@ -310,7 +326,7 @@ def reraise_format_error(raw_value: str) -> Generator[None, None, None]:
     try:
         yield
     except ValueError as exc:
-        raise click.BadParameter(f"Should be in KEY:VALUE format. Got: {raw_value}") from exc
+        raise click.BadParameter(f"Expected KEY:VALUE format, received {raw_value}.") from exc
 
 
 def get_workers_count() -> int:

@@ -106,7 +106,7 @@ def test_case_hook(wsgi_app_schema):
 def test_schema_query_hook(wsgi_app_schema, schema_url):
     @wsgi_app_schema.hook
     def filter_query(context, query):
-        return query["id"].isdigit()
+        return query["id"].isdigit() and query["id"].isascii()
 
     strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
 
@@ -299,7 +299,7 @@ def test_multiple_hooks_per_spec(wsgi_app_schema):
 def test_flatmap(wsgi_app_schema):
     @wsgi_app_schema.hook
     def filter_query(context, query):
-        return query["id"].isdigit()
+        return query["id"].isdigit() and query["id"].isascii()
 
     @wsgi_app_schema.hook
     def flatmap_query(context, query):
@@ -323,7 +323,7 @@ def test_flatmap(wsgi_app_schema):
 def test_case_hooks(wsgi_app_schema):
     @wsgi_app_schema.hook
     def filter_case(context, case):
-        return case.query["id"].isdigit()
+        return case.query["id"].isdigit() and case.query["id"].isascii()
 
     @wsgi_app_schema.hook
     def map_case(context, case):

@@ -1,0 +1,14 @@
+Exit code: 1
+---
+Stdout:
+Missing authentication for Schemathesis.io upload
+
+You've specified an API name, suggesting you want to upload data to Schemathesis.io. However, your CLI is not currently authenticated.
+
+To authenticate:
+1. Retrieve your token from Schemathesis.io
+2. Execute `st auth login <TOKEN>`
+
+As an alternative, supply the token directly using the `--schemathesis-io-token` option or the `SCHEMATHESIS_TOKEN` environment variable.
+
+For more information, please visit: https://schemathesis.readthedocs.io/en/stable/service.html

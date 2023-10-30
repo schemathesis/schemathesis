@@ -1,0 +1,8 @@
+Exit code: 1
+---
+Stdout:
+Schema Loading Error
+
+Connection failed
+
+    Failed to establish a new connection: [Errno 111] Connection refused

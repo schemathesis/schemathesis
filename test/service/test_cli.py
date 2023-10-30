@@ -261,23 +261,22 @@ def test_forbidden(cli, schema_url, service):
     assert result.stdout.strip() == "❌ FORBIDDEN!"
 
 
-def test_not_authenticated_with_name(cli):
+def test_not_authenticated_with_name(cli, snapshot_cli):
     # When the user is not authenticated
     # And uses an API name
-    result = cli.run("my-api")
     # Then the error message should note it
-    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
-    assert "You are trying to upload data to" in result.stdout.strip()
+    assert cli.run("my-api") == snapshot_cli
 
 
-def test_two_names(cli, service):
+def test_two_names(cli, service, snapshot_cli):
     # When the user passes api name twice
-    result = cli.run(
-        "my-api", "my-api", f"--schemathesis-io-token={service.token}", f"--schemathesis-io-url={service.base_url}"
-    )
     # Then the error message should note it
-    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
-    assert result.stdout.strip().endswith("Got unexpected extra argument (my-api)")
+    assert (
+        cli.run(
+            "my-api", "my-api", f"--schemathesis-io-token={service.token}", f"--schemathesis-io-url={service.base_url}"
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.operations("success")

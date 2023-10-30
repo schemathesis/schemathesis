@@ -1,0 +1,7 @@
+Exit code: 2
+---
+Stdout:
+Usage: run [OPTIONS] SCHEMA [API_NAME]
+Try 'run --help' for help.
+
+Error: Invalid value for '--max-response-time': 0 is not in the range x>=1.
