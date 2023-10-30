@@ -31,8 +31,9 @@ from ..constants import (
     HOOKS_MODULE_ENV_VAR,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     WAIT_FOR_SCHEMA_ENV_VAR,
+    HOOKS_DOCUMENTATION_URL,
 )
-from ..exceptions import SchemaError
+from ..exceptions import SchemaError, extract_nth_traceback
 from ..fixups import ALL_FIXUPS
 from ..loaders import load_app, load_yaml
 from ..transports.auth import get_requests_auth
@@ -123,10 +124,10 @@ class DeprecatedOption(click.Option):
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
-@click.option("--pre-run", help="A module to execute before running the tests.", type=str)
+@click.option("--pre-run", help="A module to execute before running the tests.", type=str, hidden=True)
 @click.version_option()
 def schemathesis(pre_run: Optional[str] = None) -> None:
-    """Specification-based testing tool for OpenAPI and GraphQL apps."""
+    """Automated API testing employing fuzzing techniques for OpenAPI and GraphQL."""
     # Don't use `envvar=HOOKS_MODULE_ENV_VAR` arg to raise a deprecation warning for hooks
     hooks: Optional[str]
     if pre_run:
@@ -139,9 +140,9 @@ def schemathesis(pre_run: Optional[str] = None) -> None:
 
 
 class ParameterGroup(enum.Enum):
-    filtering = "Filtering", "These options define what parts of the API will be tested."
-    validation = "Validation", "Options, responsible for how responses & schemas will be checked."
-    hypothesis = "Hypothesis", "Configuration of the underlying Hypothesis engine."
+    filtering = "Testing scope", "Customize the scope of the API testing."
+    validation = "Response & Schema validation", "These options specify how API responses and schemas are validated."
+    hypothesis = "Hypothesis engine", "Configuration of the underlying Hypothesis engine."
     generic = "Generic", None
 
 
@@ -160,8 +161,8 @@ class CommandWithCustomHelp(click.Command):
         # Then display groups separately with optional description
         for group in ParameterGroup:
             opts = groups[group]
-            group_name, description = group.value
-            with formatter.section(f"{group_name} options"):
+            title, description = group.value
+            with formatter.section(title):
                 if description:
                     formatter.write_paragraph()
                     formatter.write_text(description)
@@ -177,8 +178,7 @@ class GroupedOption(click.Option):
 
 with_request_tls_verify = click.option(
     "--request-tls-verify",
-    help="Controls whether Schemathesis verifies the server's TLS certificate. "
-    "You can also pass the path to a CA_BUNDLE file for private certs.",
+    help="Configures TLS certificate verification for server requests. Can specify path to CA_BUNDLE for custom certs.",
     type=str,
     default="true",
     show_default=True,
@@ -195,7 +195,7 @@ with_request_cert = click.option(
 )
 with_request_cert_key = click.option(
     "--request-cert-key",
-    help="File path of the private key of the client certificate.",
+    help="Specifies the file path of the private key for the client certificate.",
     type=click.Path(exists=True),
     default=None,
     show_default=False,
@@ -218,14 +218,16 @@ class ReportToService:
 REPORT_TO_SERVICE = ReportToService()
 
 
-@schemathesis.command(short_help="Perform schemathesis test.", cls=CommandWithCustomHelp)
+@schemathesis.command(short_help="Execute automated tests based on API specifications.", cls=CommandWithCustomHelp)
 @click.argument("schema", type=str)
 @click.argument("api_name", type=str, required=False, envvar=API_NAME_ENV_VAR)
 @click.option(
     "--checks",
     "-c",
     multiple=True,
-    help="Comma-separated list of checks to run.",
+    help="Specifies the validation checks to apply to API responses. "
+    "Provide a comma-separated list of checks such as 'not_a_server_error,status_code_conformance', etc. "
+    f"Default is '{','.join(DEFAULT_CHECKS_NAMES)}'.",
     type=CHECKS_TYPE,
     default=DEFAULT_CHECKS_NAMES,
     cls=GroupedOption,
@@ -236,7 +238,8 @@ REPORT_TO_SERVICE = ReportToService()
 @click.option(
     "--exclude-checks",
     multiple=True,
-    help="Comma-separated list of checks to exclude.",
+    help="Specifies the validation checks to skip during testing. "
+    "Provide a comma-separated list of checks you wish to bypass.",
     type=EXCLUDE_CHECKS_TYPE,
     default=[],
     cls=GroupedOption,
@@ -248,15 +251,19 @@ REPORT_TO_SERVICE = ReportToService()
     "--data-generation-method",
     "-D",
     "data_generation_methods",
-    help="Defines how Schemathesis generates data for tests.",
+    help="Specifies the approach Schemathesis uses to generate test data. "
+    "Use 'positive' for valid data, 'negative' for invalid data, or 'all' for both. "
+    "Default is 'positive'.",
     type=DATA_GENERATION_METHOD_TYPE,
-    default=DataGenerationMethod.default(),
+    default=DataGenerationMethod.default().name,
     callback=callbacks.convert_data_generation_method,
     show_default=True,
 )
 @click.option(
     "--max-response-time",
-    help="A custom check that will fail if the response time is greater than the specified one in milliseconds.",
+    help="Sets a custom time limit for API response times. "
+    "The test will fail if a response time exceeds this limit. "
+    "Provide the time in milliseconds.",
     type=click.IntRange(min=1),
     cls=GroupedOption,
     group=ParameterGroup.validation,
@@ -266,7 +273,7 @@ REPORT_TO_SERVICE = ReportToService()
     "-t",
     "targets",
     multiple=True,
-    help="Targets for input generation.",
+    help="Guides input generation to values more likely to expose bugs via targeted property-based testing.",
     type=TARGETS_TYPE,
     default=DEFAULT_TARGETS_NAMES,
     show_default=True,
@@ -277,14 +284,14 @@ REPORT_TO_SERVICE = ReportToService()
     "exit_first",
     is_flag=True,
     default=False,
-    help="Exit instantly on first error or failed test.",
+    help="Terminates the test suite immediately upon the first failure or error encountered.",
     show_default=True,
 )
 @click.option(
     "--max-failures",
     "max_failures",
     type=click.IntRange(min=1),
-    help="Exit after N failures or errors.",
+    help="Terminates the test suite after reaching a specified number of failures or errors.",
     show_default=True,
 )
 @click.option(
@@ -292,25 +299,28 @@ REPORT_TO_SERVICE = ReportToService()
     "dry_run",
     is_flag=True,
     default=False,
-    help="Disable sending data to the application and checking responses. "
-    "Helpful to verify whether data is generated at all.",
+    help="Simulates test execution without making any actual requests, useful for validating data generation.",
 )
 @click.option(
-    "--auth", "-a", help="Server user and password. Example: USER:PASSWORD", type=str, callback=callbacks.validate_auth
+    "--auth",
+    "-a",
+    help="Provides the server authentication details in the 'USER:PASSWORD' format.",
+    type=str,
+    callback=callbacks.validate_auth,
 )
 @click.option(
     "--auth-type",
     "-A",
     type=click.Choice(["basic", "digest"], case_sensitive=False),
     default="basic",
-    help="The authentication mechanism to be used. Defaults to 'basic'.",
+    help="Specifies the authentication method. Default is 'basic'.",
     show_default=True,
 )
 @click.option(
     "--header",
     "-H",
     "headers",
-    help=r"Custom header that will be used in all requests to the server. Example: Authorization: Bearer\ 123",
+    help=r"Adds a custom HTTP header to all API requests. Format: 'Header-Name: Value'.",
     multiple=True,
     type=str,
     callback=callbacks.validate_headers,
@@ -321,7 +331,7 @@ REPORT_TO_SERVICE = ReportToService()
     "endpoints",
     type=str,
     multiple=True,
-    help=r"Filter schemathesis tests by API operation path pattern. Example: users/\d+",
+    help=r"API operation path pattern (e.g., users/\d+).",
     callback=callbacks.validate_regex,
     cls=GroupedOption,
     group=ParameterGroup.filtering,
@@ -332,7 +342,7 @@ REPORT_TO_SERVICE = ReportToService()
     "methods",
     type=str,
     multiple=True,
-    help="Filter schemathesis tests by HTTP method.",
+    help="HTTP method (e.g., GET, POST).",
     callback=callbacks.validate_regex,
     cls=GroupedOption,
     group=ParameterGroup.filtering,
@@ -343,7 +353,7 @@ REPORT_TO_SERVICE = ReportToService()
     "tags",
     type=str,
     multiple=True,
-    help="Filter schemathesis tests by schema tag pattern.",
+    help="Schema tag pattern.",
     callback=callbacks.validate_regex,
     cls=GroupedOption,
     group=ParameterGroup.filtering,
@@ -354,7 +364,7 @@ REPORT_TO_SERVICE = ReportToService()
     "operation_ids",
     type=str,
     multiple=True,
-    help="Filter schemathesis tests by operationId pattern.",
+    help="OpenAPI operationId pattern.",
     callback=callbacks.validate_regex,
     cls=GroupedOption,
     group=ParameterGroup.filtering,
@@ -363,7 +373,7 @@ REPORT_TO_SERVICE = ReportToService()
     "--workers",
     "-w",
     "workers_num",
-    help="Number of workers to run tests.",
+    help="Sets the number of concurrent workers for testing. Auto-adjusts if 'auto' is specified.",
     type=CustomHelpMessageChoice(
         ["auto"] + list(map(str, range(MIN_WORKERS, MAX_WORKERS + 1))),
         choices_repr=f"[auto|{MIN_WORKERS}-{MAX_WORKERS}]",
@@ -375,22 +385,27 @@ REPORT_TO_SERVICE = ReportToService()
 @click.option(
     "--base-url",
     "-b",
-    help="Base URL address of the API, required for SCHEMA if specified by file.",
+    help="Provides the base URL of the API, required when schema is provided as a file.",
     type=str,
     callback=callbacks.validate_base_url,
     envvar=BASE_URL_ENV_VAR,
 )
-@click.option("--app", help="WSGI/ASGI application to test.", type=str, callback=callbacks.validate_app)
+@click.option(
+    "--app",
+    help="Specifies the WSGI/ASGI application under test, provided as an importable Python path.",
+    type=str,
+    callback=callbacks.validate_app,
+)
 @click.option(
     "--wait-for-schema",
-    help="Maximum time in seconds to wait on the API schema availability.",
+    help="Maximum duration, in seconds, to wait for the API schema to become available.",
     type=click.FloatRange(1.0),
     default=None,
     envvar=WAIT_FOR_SCHEMA_ENV_VAR,
 )
 @click.option(
     "--request-timeout",
-    help="Timeout in milliseconds for network requests during the test run.",
+    help="Sets a timeout limit, in milliseconds, for each network request during tests.",
     type=click.IntRange(1),
     default=DEFAULT_RESPONSE_TIMEOUT,
 )
@@ -399,7 +414,9 @@ REPORT_TO_SERVICE = ReportToService()
 @with_request_cert_key
 @click.option(
     "--validate-schema",
-    help="Enable or disable validation of input schema.",
+    help="Toggles validation of incoming payloads against the defined API schema. "
+    "Set to 'True' to enable or 'False' to disable. "
+    "Default is 'False'.",
     type=bool,
     default=False,
     show_default=True,
@@ -408,7 +425,7 @@ REPORT_TO_SERVICE = ReportToService()
 )
 @click.option(
     "--skip-deprecated-operations",
-    help="Skip testing of deprecated API operations.",
+    help="Exclude deprecated API operations from testing.",
     is_flag=True,
     is_eager=True,
     default=False,
@@ -417,7 +434,9 @@ REPORT_TO_SERVICE = ReportToService()
     group=ParameterGroup.filtering,
 )
 @click.option(
-    "--junit-xml", help="Create junit-xml style report file at given path.", type=click.File("w", encoding="utf-8")
+    "--junit-xml",
+    help="Outputs a JUnit-XML style report at the specified file path.",
+    type=click.File("w", encoding="utf-8"),
 )
 @click.option(
     "--report",
@@ -433,12 +452,12 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 )
 @click.option(
     "--debug-output-file",
-    help="Save debug output as JSON lines in the given file.",
+    help="Saves debugging information in a JSONL format at the specified file path.",
     type=click.File("w", encoding="utf-8"),
 )
 @click.option(
     "--show-errors-tracebacks",
-    help="Show full tracebacks for internal errors.",
+    help="Displays complete traceback information for internal errors.",
     is_flag=True,
     is_eager=True,
     default=False,
@@ -446,51 +465,51 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 )
 @click.option(
     "--code-sample-style",
-    help="Controls the style of code samples for failure reproduction.",
+    help="Selects the code sample style for reproducing failures.",
     type=click.Choice([item.name for item in CodeSampleStyle]),
     default=CodeSampleStyle.default().name,
     callback=callbacks.convert_code_sample_style,
 )
 @click.option(
     "--cassette-path",
-    help="Save test results as a VCR-compatible cassette.",
+    help="Saves the test outcomes in a VCR-compatible format.",
     type=click.File("w", encoding="utf-8"),
     is_eager=True,
 )
 @click.option(
     "--cassette-preserve-exact-body-bytes",
-    help="Encode payloads in cassettes as base64.",
+    help="Retains exact byte sequence of payloads in cassettes, encoded as base64.",
     is_flag=True,
     callback=callbacks.validate_preserve_exact_body_bytes,
 )
 @click.option(
     "--store-network-log",
-    help="[DEPRECATED] Store requests and responses into a file.",
+    help="[DEPRECATED] Saves the test outcomes in a VCR-compatible format.",
     type=click.File("w", encoding="utf-8"),
 )
 @click.option(
     "--fixups",
-    help="Install specified compatibility fixups.",
+    help="Applies compatibility adjustments like 'fast_api', 'utf8_bom'.",
     multiple=True,
     type=click.Choice(list(ALL_FIXUPS) + ["all"]),
 )
 @click.option(
     "--rate-limit",
-    help="The maximum rate of requests to send to the tested API in the format of `<limit>/<duration>`. "
+    help="Specifies a rate limit for test requests in '<limit>/<duration>' format. "
     "Example - `100/m` for 100 requests per minute.",
     type=str,
     callback=callbacks.validate_rate_limit,
 )
 @click.option(
     "--stateful",
-    help="Utilize stateful testing capabilities.",
+    help="Enables or disables stateful testing features.",
     type=click.Choice([item.name for item in Stateful]),
     default=Stateful.links.name,
     callback=callbacks.convert_stateful,
 )
 @click.option(
     "--stateful-recursion-limit",
-    help="Limit recursion depth for stateful testing.",
+    help="Sets the recursion depth limit for stateful testing.",
     default=DEFAULT_STATEFUL_RECURSION_LIMIT,
     show_default=True,
     type=click.IntRange(1, 100),
@@ -499,7 +518,7 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 )
 @click.option(
     "--force-schema-version",
-    help="Force Schemathesis to parse the input schema with the specified spec version.",
+    help="Forces the schema to be interpreted as a particular OpenAPI version.",
     type=click.Choice(["20", "30"]),
 )
 @click.option(
@@ -512,7 +531,7 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 @click.option(
     "--contrib-unique-data",
     "contrib_unique_data",
-    help="Forces Schemathesis to generate unique test cases.",
+    help="Forces the generation of unique test cases.",
     is_flag=True,
     default=False,
     show_default=True,
@@ -520,17 +539,16 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 @click.option(
     "--contrib-openapi-formats-uuid",
     "contrib_openapi_formats_uuid",
-    help="Enable support for the `uuid` string format.",
+    help="Enables support for the 'uuid' string format in OpenAPI.",
     is_flag=True,
     default=False,
     show_default=True,
 )
 @click.option(
     "--hypothesis-database",
-    help="A way to store found examples in Hypothesis' database. "
-    "You can either disable it completely with `none`, "
-    f"do not persist bugs between test runs with `{HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER}` "
-    "or use an arbitrary path to store examples as files.",
+    help="Configures storage for examples discovered by Hypothesis. "
+    f"Use 'none' to disable, '{HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER}' for temporary storage, "
+    f"or specify a file path for persistent storage.",
     type=str,
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,
@@ -538,7 +556,8 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 )
 @click.option(
     "--hypothesis-deadline",
-    help="Duration in milliseconds that each individual example with a test is not allowed to exceed.",
+    help="Sets a time limit for each test case generated by Hypothesis, in milliseconds. "
+    "Exceeding this limit will cause the test to fail.",
     # max value to avoid overflow. It is the maximum amount of days in milliseconds
     type=OptionalInt(1, 999999999 * 24 * 3600 * 1000),
     cls=GroupedOption,
@@ -546,7 +565,7 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 )
 @click.option(
     "--hypothesis-derandomize",
-    help="Use Hypothesis's deterministic mode.",
+    help="Enables deterministic mode in Hypothesis, which eliminates random variation between test runs.",
     is_flag=True,
     is_eager=True,
     default=None,
@@ -556,42 +575,43 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 )
 @click.option(
     "--hypothesis-max-examples",
-    help="Maximum number of generated examples per each method/path combination.",
+    help="Sets the cap on the number of examples generated by Hypothesis for each API method/path pair.",
     type=click.IntRange(1),
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,
 )
 @click.option(
     "--hypothesis-phases",
-    help="Control which phases should be run.",
+    help="Specifies which testing phases to execute.",
     type=CsvEnumChoice(Phase),
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,
 )
 @click.option(
     "--hypothesis-report-multiple-bugs",
-    help="Raise only the exception with the smallest minimal example.",
+    help="If set, only the most easily reproducible exception will be reported when multiple issues are found.",
     type=bool,
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,
 )
 @click.option(
     "--hypothesis-seed",
-    help="Set a seed to use for all Hypothesis tests.",
+    help="Sets a seed value for Hypothesis, ensuring reproducibility across test runs.",
     type=int,
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,
 )
 @click.option(
     "--hypothesis-suppress-health-check",
-    help="Comma-separated list of health checks to disable.",
+    help="Disables specified health checks from Hypothesis like 'data_too_large', 'filter_too_much', etc. "
+    "Provide a comma-separated list",
     type=CsvEnumChoice(HealthCheck),
     cls=GroupedOption,
     group=ParameterGroup.hypothesis,
 )
 @click.option(
     "--hypothesis-verbosity",
-    help="Verbosity level of Hypothesis messages.",
+    help="Controls the verbosity level of Hypothesis output.",
     type=click.Choice([item.name for item in Verbosity]),
     callback=callbacks.convert_verbosity,
     cls=GroupedOption,
@@ -694,11 +714,11 @@ def run(
     hosts_file: PathLike = service.DEFAULT_HOSTS_PATH,
     force_color: bool = False,
 ) -> None:
-    """Perform schemathesis test against an API specified by SCHEMA.
+    """Run tests against an API using a specified SCHEMA.
 
-    SCHEMA must be a valid URL or file path pointing to an Open API / GraphQL specification.
+    [Required] SCHEMA: Path to an OpenAPI (`.json`, `.yml`) or GraphQL SDL file, or a URL pointing to such specifications.
 
-    API_NAME is an API identifier to upload data to Schemathesis.io.
+    [Optional] API_NAME: Identifier for uploading test data to Schemathesis.io.
     """
     _hypothesis_phases: Optional[List[hypothesis.Phase]] = None
     if hypothesis_phases is not None:
@@ -723,16 +743,14 @@ def run(
     started_at = current_datetime()
 
     if no_color and force_color:
-        error_message(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
-        sys.exit(1)
+        raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
     decide_color_output(ctx, no_color, force_color)
 
     check_auth(auth, headers)
     selected_targets = tuple(target for target in targets_module.ALL_TARGETS if target.__name__ in targets)
 
     if store_network_log and cassette_path:
-        error_message(CASSETTES_PATH_INVALID_USAGE_MESSAGE)
-        sys.exit(1)
+        raise click.UsageError(CASSETTES_PATH_INVALID_USAGE_MESSAGE)
     if store_network_log is not None:
         click.secho(DEPRECATED_CASSETTE_PATH_OPTION_WARNING, fg="yellow")
         cassette_path = store_network_log
@@ -760,14 +778,24 @@ def run(
                     if schemathesis_io_hostname == service.DEFAULT_HOSTNAME
                     else schemathesis_io_hostname
                 )
-                raise click.UsageError(
-                    "\n\n"
-                    f"You are trying to upload data to {hostname}, but your CLI appears to be not authenticated.\n\n"
-                    "To authenticate, grab your token from `app.schemathesis.io` and run `st auth login <TOKEN>`\n"
-                    "Alternatively, you can pass the token explicitly via the `--schemathesis-io-token` option / "
-                    f"`{service.TOKEN_ENV_VAR}` environment variable\n\n"
-                    "See https://schemathesis.readthedocs.io/en/stable/service.html for more details"
+                click.secho(f"Missing authentication for {hostname} upload", bold=True, fg="red")
+                click.echo(
+                    f"\nYou've specified an API name, suggesting you want to upload data to {bold(hostname)}. "
+                    "However, your CLI is not currently authenticated."
                 )
+                click.secho("\nTo authenticate:")
+                click.secho(f"1. Retrieve your token from {bold(hostname)}")
+                click.secho(f"2. Execute {bold('`st auth login <TOKEN>`')}")
+                env_var = bold(f"`{service.TOKEN_ENV_VAR}`")
+                click.secho(
+                    f"\nAs an alternative, supply the token directly "
+                    f"using the {bold('`--schemathesis-io-token`')} option "
+                    f"or the {env_var} environment variable."
+                )
+                click.echo(
+                    "\nFor more information, please visit: https://schemathesis.readthedocs.io/en/stable/service.html"
+                )
+                raise click.exceptions.Exit(1) from None
             name: str = cast(str, api_name)
             import requests
 
@@ -1120,7 +1148,10 @@ def is_probably_graphql(location: str) -> bool:
 
 def check_auth(auth: Optional[Tuple[str, str]], headers: Dict[str, str]) -> None:
     if auth is not None and "authorization" in {header.lower() for header in headers}:
-        raise click.BadParameter("Passing `--auth` together with `--header` that sets `Authorization` is not allowed.")
+        raise click.BadParameter(
+            "The `--auth` and `--header` options were both used to set "
+            "the 'Authorization' header, which is not permitted."
+        )
 
 
 def get_output_handler(workers_num: int) -> EventHandler:
@@ -1137,10 +1168,21 @@ def load_hook(module_name: str) -> None:
         sys.path.append(os.getcwd())  # fix ModuleNotFoundError module in cwd
         __import__(module_name)
     except Exception as exc:
-        click.secho("An exception happened during hooks loading:\n", fg="red")
-        message = traceback.format_exc()
-        click.secho(message, fg="red")
-        raise click.Abort() from exc
+        click.secho("Unable to load Schemathesis extension hooks", fg="red", bold=True)
+        formatted_module_name = bold(f"'{module_name}'")
+        if isinstance(exc, ModuleNotFoundError):
+            click.echo(
+                f"\nAn attempt to import the module {formatted_module_name} failed because it could not be found."
+            )
+            click.echo("\nEnsure the module name is correctly spelled and reachable from the current directory.")
+        else:
+            click.echo(f"\nAn error occurred while importing the module {formatted_module_name}. Traceback:")
+            trace = extract_nth_traceback(exc.__traceback__, 1)
+            lines = traceback.format_exception(type(exc), exc, trace)
+            message = "".join(lines).strip()
+            click.secho(f"\n{message}", fg="red")
+        click.echo(f"\nFor more information on how to work with hooks, visit {HOOKS_DOCUMENTATION_URL}")
+        raise click.exceptions.Exit(1) from None
 
 
 class OutputStyle(Enum):
@@ -1317,8 +1359,7 @@ def replay(
     For example, ones that are recorded with ``store-network-log`` option of `st run` command.
     """
     if no_color and force_color:
-        error_message(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
-        sys.exit(1)
+        raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
     decide_color_output(ctx, no_color, force_color)
 
     click.secho(f"{bold('Replaying cassette')}: {cassette_path}")
@@ -1354,7 +1395,7 @@ def replay(
         click.echo()
 
 
-@schemathesis.group(short_help="Authenticate Schemathesis.io.")
+@schemathesis.group(short_help="Authenticate with Schemathesis.io.")
 def auth() -> None:
     pass
 

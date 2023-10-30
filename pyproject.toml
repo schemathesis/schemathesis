@@ -66,6 +66,7 @@ tests = [
     "pytest-mock>=3.7.0,<4.0",
     "pytest-xdist>=3,<4.0",
     "strawberry-graphql[fastapi]>=0.109.0",
+    "syrupy>=2,<5.0",
     "trustme>=0.9.0,<1.0"
 ]
 cov = [

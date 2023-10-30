@@ -13,8 +13,7 @@ from hypothesis import example, given
 from hypothesis import strategies as st
 from urllib3._collections import HTTPHeaderDict
 
-from schemathesis.cli import CASSETTES_PATH_INVALID_USAGE_MESSAGE, DEPRECATED_CASSETTE_PATH_OPTION_WARNING
-from schemathesis.cli.callbacks import MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE
+from schemathesis.cli import DEPRECATED_CASSETTE_PATH_OPTION_WARNING
 from schemathesis.cli.cassettes import (
     filter_cassette,
     get_command_representation,
@@ -413,26 +412,22 @@ def test_use_deprecation(cli, schema_url, cassette_path):
 
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
-def test_forbid_simultaneous_use_of_deprecated_and_new_options(cli, schema_url, cassette_path):
-    result = cli.run(
-        schema_url,
-        f"--store-network-log={cassette_path}",
-        f"--cassette-path={cassette_path}",
+def test_forbid_simultaneous_use_of_deprecated_and_new_options(cli, schema_url, cassette_path, snapshot_cli):
+    assert (
+        cli.run(
+            schema_url,
+            f"--store-network-log={cassette_path}",
+            f"--cassette-path={cassette_path}",
+        )
+        == snapshot_cli
     )
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    assert result.stdout.splitlines()[0].endswith(CASSETTES_PATH_INVALID_USAGE_MESSAGE)
 
 
 @pytest.mark.openapi_version("3.0")
-def test_forbid_preserve_exact_bytes_without_cassette_path(cli, schema_url):
+def test_forbid_preserve_exact_bytes_without_cassette_path(cli, schema_url, snapshot_cli):
     # When `--cassette-preserve-exact-body-bytes` is specified without `--cassette-path`
-    result = cli.run(
-        schema_url,
-        "--cassette-preserve-exact-body-bytes",
-    )
     # Then it is an error
-    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
-    assert result.stdout.splitlines()[-1].endswith(MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE)
+    assert cli.run(schema_url, "--cassette-preserve-exact-body-bytes") == snapshot_cli
 
 
 @given(text=st.text())

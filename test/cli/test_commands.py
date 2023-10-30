@@ -27,7 +27,6 @@ from schemathesis.generation import DataGenerationMethod
 from schemathesis._dependency_versions import IS_HYPOTHESIS_ABOVE_6_54
 from schemathesis.checks import ALL_CHECKS, not_a_server_error, DEFAULT_CHECKS
 from schemathesis.cli import (
-    COLOR_OPTIONS_INVALID_USAGE_MESSAGE,
     DEPRECATED_PRE_RUN_OPTION_WARNING,
     LoaderConfig,
     execute,
@@ -35,22 +34,9 @@ from schemathesis.cli import (
     reset_checks,
 )
 from schemathesis.cli.constants import Phase, HealthCheck
-from schemathesis.cli.callbacks import (
-    FILE_DOES_NOT_EXIST_MESSAGE,
-    INVALID_BASE_URL_MESSAGE,
-    INVALID_DERANDOMIZE_MESSAGE,
-    INVALID_SCHEMA_MESSAGE,
-    MISSING_BASE_URL_MESSAGE,
-    MISSING_REQUEST_CERT_MESSAGE,
-)
 from schemathesis.code_samples import CodeSampleStyle
 from schemathesis._dependency_versions import IS_PYTEST_ABOVE_54
-from schemathesis.constants import (
-    DEFAULT_RESPONSE_TIMEOUT,
-    FLAKY_FAILURE_MESSAGE,
-    HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
-    REPORT_SUGGESTION_ENV_VAR,
-)
+from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT, FLAKY_FAILURE_MESSAGE, REPORT_SUGGESTION_ENV_VAR
 from schemathesis.extra._flask import run_server
 from schemathesis.models import APIOperation
 from schemathesis.runner import from_schema
@@ -65,19 +51,8 @@ PHASES = ", ".join((x.name for x in Phase))
 HEALTH_CHECKS = "|".join((x.name for x in HealthCheck))
 
 
-def test_commands_help(cli):
-    result = cli.main()
-
-    assert result.exit_code == ExitCode.OK, result.stdout
-    lines = result.stdout.split("\n")
-    assert lines[10] == "  auth    Authenticate Schemathesis.io."
-    assert lines[11] == "  replay  Replay requests from a saved cassette."
-    assert lines[12] == "  run     Perform schemathesis test."
-
-    result_help = cli.main("--help")
-    result_h = cli.main("-h")
-
-    assert result.stdout == result_h.stdout == result_help.stdout
+def test_commands_help(cli, snapshot_cli):
+    assert cli.main() == snapshot_cli
 
 
 def test_run_subprocess(testdir):
@@ -86,109 +61,136 @@ def test_run_subprocess(testdir):
     assert result.ret == ExitCode.OK
 
 
-def test_commands_version(cli):
-    result = cli.main("--version")
-
-    assert result.exit_code == ExitCode.OK, result.stdout
-    assert "version" in result.stdout.split("\n")[0]
+def test_commands_version(cli, snapshot_cli):
+    assert cli.main("--version") == snapshot_cli
 
 
 @pytest.mark.parametrize(
-    "args, error",
+    "args",
     (
-        (("run",), "Error: Missing argument 'SCHEMA'."),
-        (("run", "not-url"), "See https://schemathesis.readthedocs.io/en/stable/service.html for more details"),
-        (("run", SIMPLE_PATH), f"Error: {MISSING_BASE_URL_MESSAGE}"),
-        (("run", SIMPLE_PATH, "--base-url=test"), f"Error: {INVALID_BASE_URL_MESSAGE}"),
-        (("run", SIMPLE_PATH, "--base-url=127.0.0.1:8080"), f"Error: {INVALID_BASE_URL_MESSAGE}"),
-        (
-            ("run", "http://127.0.0.1", "--request-timeout=-5"),
-            "Error: Invalid value for '--request-timeout': -5 is not in the range x>=1.",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--request-timeout=0"),
-            "Error: Invalid value for '--request-timeout': 0 is not in the range x>=1.",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--method=+"),
-            "Error: Invalid value for '--method' / '-M': Invalid regex: nothing to repeat at position 0",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--auth=123"),
-            "Error: Invalid value for '--auth' / '-a': Should be in KEY:VALUE format. Got: 123",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--auth=:pass"),
-            "Error: Invalid value for '--auth' / '-a': Username should not be empty",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--auth=тест:pass"),
-            "Error: Invalid value for '--auth' / '-a': Username should be latin-1 encodable",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--auth=user:тест"),
-            "Error: Invalid value for '--auth' / '-a': Password should be latin-1 encodable",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--auth-type=random"),
-            "Error: Invalid value for '--auth-type' / '-A': 'random' is not one of 'basic', 'digest'.",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--header=123"),
-            "Error: Invalid value for '--header' / '-H': Should be in KEY:VALUE format. Got: 123",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--header=:"),
-            "Error: Invalid value for '--header' / '-H': Header name should not be empty",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--header= :"),
-            "Error: Invalid value for '--header' / '-H': Header name should not be empty",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--hypothesis-phases=explicit,first,second"),
-            "Error: Invalid value for '--hypothesis-phases': invalid choice(s): first, second. "
-            f"Choose from {PHASES}",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--hypothesis-deadline=wrong"),
-            "Error: Invalid value for '--hypothesis-deadline': wrong is not a valid integer or None",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--hypothesis-deadline=0"),
-            "Error: Invalid value for '--hypothesis-deadline': 0 is not in the range 1<=x<=86399999913600000.",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--header=тест:test"),
-            "Error: Invalid value for '--header' / '-H': Header name should be latin-1 encodable",
-        ),
-        (
-            ("run", "http://127.0.0.1", "--header=test:тест"),
-            "Error: Invalid value for '--header' / '-H': Header value should be latin-1 encodable",
-        ),
-        (("run", "//test"), f"Error: {INVALID_SCHEMA_MESSAGE}"),
-        (
-            ("run", "http://127.0.0.1", "--max-response-time=0"),
-            "Error: Invalid value for '--max-response-time': 0 is not in the range x>=1.",
-        ),
+        (),
+        (SIMPLE_PATH,),
+        (SIMPLE_PATH, "--base-url=test"),
+        (SIMPLE_PATH, "--base-url=127.0.0.1:8080"),
+        ("http://127.0.0.1", "--request-timeout=-5"),
+        ("http://127.0.0.1", "--request-timeout=0"),
+        ("http://127.0.0.1", "--method=+"),
+        ("http://127.0.0.1", "--auth=123"),
+        ("http://127.0.0.1", "--auth=:pass"),
+        ("http://127.0.0.1", "--auth=тест:pass"),
+        ("http://127.0.0.1", "--auth=user:тест"),
+        ("http://127.0.0.1", "--auth-type=random"),
+        ("http://127.0.0.1", "--header=123"),
+        ("http://127.0.0.1", "--header=:"),
+        ("http://127.0.0.1", "--header= :"),
+        ("http://127.0.0.1", "--header=тест:test"),
+        ("http://127.0.0.1", "--header=test:тест"),
+        ("http://127.0.0.1", "--hypothesis-phases=explicit,first,second"),
+        ("http://127.0.0.1", "--hypothesis-deadline=wrong"),
+        ("http://127.0.0.1", "--hypothesis-deadline=0"),
+        ("//test",),
+        ("http://127.0.0.1", "--max-response-time=0"),
+        ("unknown.json",),
+        ("--help",),
     ),
 )
-def test_commands_run_errors(cli, args, error):
-    # When invalid arguments are passed to CLI
-    result = cli.main(*args)
-
-    # Then an appropriate error should be displayed
-    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
-    assert result.stdout.strip().split("\n")[-1] == error
+def test_run_output(cli, args, snapshot_cli):
+    assert cli.run(*args) == snapshot_cli
 
 
-def test_certificate_only_key(cli, tmp_path):
+def test_hooks_module_not_found(cli, snapshot_cli):
+    # When an unknown hook module is passed to CLI
+    assert cli.main("run", "http://127.0.0.1:1", hooks="hook") == snapshot_cli
+    assert os.getcwd() in sys.path
+
+
+def test_hooks_invalid(testdir, cli):
+    # When hooks are passed to the CLI call
+    # And its importing causes an exception
+    module = testdir.make_importable_pyfile(hook="1 / 0")
+
+    result = cli.main("run", "http://127.0.0.1:1", hooks=module.purebasename)
+
+    # Then CLI run should fail
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # And a helpful message should be displayed in the output
+    lines = result.stdout.strip().split("\n")
+    assert lines[0] == "Unable to load Schemathesis extension hooks"
+    if sys.version_info >= (3, 11):
+        idx = 8
+    else:
+        idx = 7
+    assert lines[idx] == "ZeroDivisionError: division by zero"
+
+
+def test_certificate_only_key(cli, tmp_path, snapshot_cli):
     # When cert key is passed without cert itself
-    result = cli.main("run", "http://127.0.0.1", f"--request-cert-key={tmp_path}")
-
     # Then an appropriate error should be displayed
-    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
-    assert result.stdout.strip().split("\n")[-1] == f"Error: {MISSING_REQUEST_CERT_MESSAGE}"
+    assert cli.run("http://127.0.0.1", f"--request-cert-key={tmp_path}") == snapshot_cli
+
+
+@pytest.mark.operations("invalid")
+def test_invalid_operation_suggestion(cli, cli_args, snapshot_cli):
+    # When the app's schema contains errors
+    # Then the whole Schemathesis run should fail
+    # And there should be a suggestion to disable schema validation
+    assert cli.run(*cli_args, "--validate-schema=true") == snapshot_cli
+
+
+@pytest.mark.operations("invalid")
+def test_invalid_operation_suggestion_disabled(cli, cli_args):
+    # When the app's schema contains errors
+    # And schema validation is disabled
+    result = cli.run(*cli_args, "--validate-schema=false")
+    # Then the whole Schemathesis run should fail
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # And there should be no suggestion
+    assert "You can disable input schema validation" not in result.stdout
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.parametrize("header", ("Authorization", "authorization"))
+def test_auth_and_authorization_header_are_disallowed(cli, schema_url, header, snapshot_cli):
+    # When ``--auth`` is passed together with ``--header`` that sets the ``Authorization`` header
+    # Then it causes a validation error
+    assert cli.run(schema_url, "--auth=test:test", f"--header={header}:token123") == snapshot_cli
+
+
+@pytest.mark.parametrize("workers", (1, 2))
+def test_schema_not_available(cli, workers):
+    # When the given schema is unreachable
+    result = cli.run("http://127.0.0.1:1/schema.yaml", f"--workers={workers}")
+    # Then the whole Schemathesis run should fail
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    # And error message is displayed
+    if platform.system() == "Windows":
+        detail = "[WinError 10061] No connection could be made because the target machine actively refused it"
+    else:
+        detail = "[Errno 111] Connection refused"
+    assert (
+        result.stdout
+        == f"""Schema Loading Error
+
+Connection failed
+
+    Failed to establish a new connection: {detail}
+
+Tip: Use `--wait-for-schema=NUM` to wait up to NUM seconds for schema availability.
+"""
+    )
+
+
+def test_schema_not_available_wsgi(cli, loadable_flask_app, snapshot_cli):
+    # When the given schema is unreachable
+    # Then the whole Schemathesis run should fail
+    # And error message is displayed
+    assert cli.run("unknown.yaml", f"--app={loadable_flask_app}") == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_force_color_nocolor(cli, schema_url, snapshot_cli):
+    assert cli.run(schema_url, "--force-color", "--no-color") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -206,173 +208,10 @@ def test_certificates(cli, schema_url, mocker):
         assert request.call_args_list[0][1]["cert"] == request.call_args_list[1][1]["cert"] == str(cert_path)
 
 
-def test_commands_run_help(cli):
-    result_help = cli.main("run", "--help")
-
-    assert result_help.exit_code == ExitCode.OK, result_help.stdout
-    assert result_help.stdout.strip().split("\n") == [
-        "Usage: schemathesis run [OPTIONS] SCHEMA [API_NAME]",
-        "",
-        "  Perform schemathesis test against an API specified by SCHEMA.",
-        "",
-        "  SCHEMA must be a valid URL or file path pointing to an Open API / GraphQL",
-        "  specification.",
-        "",
-        "  API_NAME is an API identifier to upload data to Schemathesis.io.",
-        "",
-        "Filtering options:",
-        "",
-        "  These options define what parts of the API will be tested.",
-        "",
-        "  -E, --endpoint TEXT           Filter schemathesis tests by API operation path",
-        "                                pattern. Example: users/\\d+",
-        "  -M, --method TEXT             Filter schemathesis tests by HTTP method.",
-        "  -T, --tag TEXT                Filter schemathesis tests by schema tag pattern.",
-        "  -O, --operation-id TEXT       Filter schemathesis tests by operationId",
-        "                                pattern.",
-        "  --skip-deprecated-operations  Skip testing of deprecated API operations.",
-        "",
-        "Validation options:",
-        "",
-        "  Options, responsible for how responses & schemas will be checked.",
-        "",
-        "  -c, --checks [not_a_server_error|status_code_conformance|"
-        "content_type_conformance|response_headers_conformance|response_schema_conformance|all]",
-        "                                  Comma-separated list of checks to run.",
-        "                                  [default: not_a_server_error]",
-        "  --exclude-checks [not_a_server_error|status_code_conformance|content_type_conformance|response_headers_conformance|response_schema_conformance]",
-        "                                  Comma-separated list of checks to exclude.",
-        "  --max-response-time INTEGER RANGE",
-        "                                  A custom check that will fail if the response",
-        "                                  time is greater than the specified one in",
-        "                                  milliseconds.  [x>=1]",
-        "  --validate-schema BOOLEAN       Enable or disable validation of input schema.",
-        "                                  [default: False]",
-        "",
-        "Hypothesis options:",
-        "",
-        "  Configuration of the underlying Hypothesis engine.",
-        "",
-        "  --hypothesis-database TEXT      A way to store found examples in Hypothesis'",
-        "                                  database. You can either disable it completely",
-        "                                  with `none`, do not persist bugs between test",
-        f"                                  runs with `{HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER}` "
-        f"or use an arbitrary path",
-        "                                  to store examples as files.",
-        "  --hypothesis-deadline INTEGER RANGE",
-        "                                  Duration in milliseconds that each individual",
-        "                                  example with a test is not allowed to exceed.",
-        "                                  [1<=x<=86399999913600000]",
-        "  --hypothesis-derandomize        Use Hypothesis's deterministic mode.",
-        "  --hypothesis-max-examples INTEGER RANGE",
-        "                                  Maximum number of generated examples per each",
-        "                                  method/path combination.  [x>=1]",
-        f"  --hypothesis-phases [{PHASES.replace(', ', '|')}]",
-        "                                  Control which phases should be run.",
-        "  --hypothesis-report-multiple-bugs BOOLEAN",
-        "                                  Raise only the exception with the smallest",
-        "                                  minimal example.",
-        "  --hypothesis-seed INTEGER       Set a seed to use for all Hypothesis tests.",
-        f"  --hypothesis-suppress-health-check [{HEALTH_CHECKS}]",
-        "                                  Comma-separated list of health checks to",
-        "                                  disable.",
-        "  --hypothesis-verbosity [quiet|normal|verbose|debug]",
-        "                                  Verbosity level of Hypothesis messages.",
-        "",
-        "Generic options:",
-        "  -D, --data-generation-method [positive|negative|all]",
-        "                                  Defines how Schemathesis generates data for",
-        "                                  tests.  [default:",
-        "                                  DataGenerationMethod.positive]",
-        "  -t, --target [response_time|all]",
-        "                                  Targets for input generation.",
-        "  -x, --exitfirst                 Exit instantly on first error or failed test.",
-        "  --max-failures INTEGER RANGE    Exit after N failures or errors.  [x>=1]",
-        "  --dry-run                       Disable sending data to the application and",
-        "                                  checking responses. Helpful to verify whether",
-        "                                  data is generated at all.",
-        "  -a, --auth TEXT                 Server user and password. Example:",
-        "                                  USER:PASSWORD",
-        "  -A, --auth-type [basic|digest]  The authentication mechanism to be used.",
-        "                                  Defaults to 'basic'.  [default: basic]",
-        "  -H, --header TEXT               Custom header that will be used in all",
-        "                                  requests to the server. Example:",
-        r"                                  Authorization: Bearer\ 123",
-        "  -w, --workers [auto|1-64]       Number of workers to run tests.  [default: 1]",
-        "  -b, --base-url TEXT             Base URL address of the API, required for",
-        "                                  SCHEMA if specified by file.",
-        "  --app TEXT                      WSGI/ASGI application to test.",
-        "  --wait-for-schema FLOAT RANGE   Maximum time in seconds to wait on the API",
-        "                                  schema availability.  [x>=1.0]",
-        "  --request-timeout INTEGER RANGE",
-        "                                  Timeout in milliseconds for network requests",
-        "                                  during the test run.  [x>=1]",
-        "  --request-tls-verify TEXT       Controls whether Schemathesis verifies the",
-        "                                  server's TLS certificate. You can also pass",
-        "                                  the path to a CA_BUNDLE file for private",
-        "                                  certs.  [default: true]",
-        "  --request-cert PATH             File path of unencrypted client certificate",
-        "                                  for authentication. The certificate can be",
-        "                                  bundled with a private key (e.g. PEM) or the",
-        "                                  private key can be provided with the",
-        "                                  --request-cert-key argument.",
-        "  --request-cert-key PATH         File path of the private key of the client",
-        "                                  certificate.",
-        "  --junit-xml FILENAME            Create junit-xml style report file at given",
-        "                                  path.",
-        "  --report TEXT                   Specifies how the generated report should be",
-        "                                  handled. If used without an argument, the",
-        "                                  report data will automatically be uploaded to",
-        "                                  Schemathesis.io. If a file name is provided,",
-        "                                  the report will be stored in that file. The",
-        "                                  report data, consisting of a tar gz file with",
-        "                                  multiple JSON files, is subject to change.",
-        "  --debug-output-file FILENAME    Save debug output as JSON lines in the given",
-        "                                  file.",
-        "  --show-errors-tracebacks        Show full tracebacks for internal errors.",
-        "  --code-sample-style [python|curl]",
-        "                                  Controls the style of code samples for failure",
-        "                                  reproduction.",
-        "  --cassette-path FILENAME        Save test results as a VCR-compatible",
-        "                                  cassette.",
-        "  --cassette-preserve-exact-body-bytes",
-        "                                  Encode payloads in cassettes as base64.",
-        "  --store-network-log FILENAME    [DEPRECATED] Store requests and responses into",
-        "                                  a file.",
-        "  --fixups [fast_api|utf8_bom|all]",
-        "                                  Install specified compatibility fixups.",
-        "  --rate-limit TEXT               The maximum rate of requests to send to the",
-        "                                  tested API in the format of",
-        "                                  `<limit>/<duration>`. Example - `100/m` for",
-        "                                  100 requests per minute.",
-        "  --stateful [none|links]         Utilize stateful testing capabilities.",
-        "  --stateful-recursion-limit INTEGER RANGE",
-        "                                  Limit recursion depth for stateful testing.",
-        "                                  [default: 5; 1<=x<=100]",
-        "  --force-schema-version [20|30]  Force Schemathesis to parse the input schema",
-        "                                  with the specified spec version.",
-        "  --sanitize-output BOOLEAN       Enable or disable automatic output",
-        "                                  sanitization to obscure sensitive data.",
-        "                                  [default: True]",
-        "  --contrib-unique-data           Forces Schemathesis to generate unique test",
-        "                                  cases.",
-        "  --contrib-openapi-formats-uuid  Enable support for the `uuid` string format.",
-        "  --no-color                      Disable ANSI color escape codes.",
-        "  --force-color                   Explicitly tells to enable ANSI color escape",
-        "                                  codes.",
-        "  --experimental [openapi-3.1]    Enable experimental support for specific",
-        "                                  features.",
-        "  --schemathesis-io-token TEXT    Schemathesis.io authentication token.",
-        "  --schemathesis-io-url TEXT      Schemathesis.io base URL.",
-        "  --schemathesis-io-telemetry TEXT",
-        "                                  Controls whether you send anonymized CLI usage",
-        "                                  data to Schemathesis.io along with your",
-        "                                  report.  [default: true]",
-        "  --hosts-file FILE               Path to a file to store the Schemathesis.io",
-        "                                  auth configuration.",
-        "  -v, --verbosity                 Increase verbosity of the output.",
-        "  -h, --help                      Show this message and exit.",
-    ]
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_hypothesis_database_with_derandomize(cli, schema_url, snapshot_cli):
+    assert cli.run(schema_url, "--hypothesis-database=:memory:", "--hypothesis-derandomize") == snapshot_cli
 
 
 SCHEMA_URI = "https://example.schemathesis.io/openapi.json"
@@ -541,15 +380,6 @@ def test_hypothesis_database_report(cli, schema_url):
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
     assert lines[3] == "Hypothesis: database=InMemoryExampleDatabase({}), deadline=timedelta(milliseconds=15000)"
-
-
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_hypothesis_database_with_derandomize(cli, schema_url):
-    result = cli.run(schema_url, "--hypothesis-database=:memory:", "--hypothesis-derandomize")
-    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
-    lines = result.stdout.split("\n")
-    assert lines[3] == f"Error: {INVALID_DERANDOMIZE_MESSAGE}"
 
 
 @pytest.mark.openapi_version("3.0")
@@ -889,28 +719,6 @@ Problematic definition:
     )
 
 
-@pytest.mark.operations("invalid")
-def test_invalid_operation_suggestion(cli, cli_args):
-    # When the app's schema contains errors
-    result = cli.run(*cli_args, "--validate-schema=true")
-    # Then the whole Schemathesis run should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And there should be a suggestion to disable schema validation
-    expected = "Tip: Bypass validation using `--validate-schema=false`. Caution: May cause unexpected errors."
-    assert expected in result.stdout
-
-
-@pytest.mark.operations("invalid")
-def test_invalid_operation_suggestion_disabled(cli, cli_args):
-    # When the app's schema contains errors
-    # And schema validation is disabled
-    result = cli.run(*cli_args, "--validate-schema=false")
-    # Then the whole Schemathesis run should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And there should be no suggestion
-    assert "You can disable input schema validation" not in result.stdout
-
-
 @pytest.mark.operations("teapot")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_status_code_conformance(cli, cli_args, workers):
@@ -1005,47 +813,6 @@ def test_connection_error(cli, schema_url, workers):
     assert "Max retries exceeded with url: /api/failure" in result.stdout
 
 
-@pytest.mark.parametrize("workers", (1, 2))
-def test_schema_not_available(cli, workers):
-    # When the given schema is unreachable
-    result = cli.run("http://127.0.0.1:1/schema.yaml", f"--workers={workers}")
-    # Then the whole Schemathesis run should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And error message is displayed
-    if platform.system() == "Windows":
-        detail = "[WinError 10061] No connection could be made because the target machine actively refused it"
-    else:
-        detail = "[Errno 111] Connection refused"
-    assert (
-        result.stdout
-        == f"""Schema Loading Error
-
-Connection failed
-
-    Failed to establish a new connection: {detail}
-
-Tip: Use `--wait-for-schema=NUM` to wait up to NUM seconds for schema availability.
-"""
-    )
-
-
-def test_schema_not_available_wsgi(cli, loadable_flask_app):
-    # When the given schema is unreachable
-    result = cli.run("unknown.yaml", f"--app={loadable_flask_app}")
-    # Then the whole Schemathesis run should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And error message is displayed
-    assert (
-        result.stdout
-        == """Schema Loading Error
-
-Failed to load schema due to client error (HTTP 404 Not Found)
-
-Tip: Verify that the URL points directly to the Open API schema
-"""
-    )
-
-
 @pytest.fixture
 def digits_format(testdir):
     module = testdir.make_importable_pyfile(
@@ -1090,37 +857,6 @@ def test_hooks_valid(cli, schema_url, app, digits_format, prepare_args_kwargs):
     # And the `--pre-run` version raises a deprecation warning
     if args:
         assert DEPRECATED_PRE_RUN_OPTION_WARNING in result.stdout
-
-
-def test_hooks_invalid(testdir, cli):
-    # When hooks are passed to the CLI call
-    # And its importing causes an exception
-    module = testdir.make_importable_pyfile(hook="1 / 0")
-
-    result = cli.main("run", "http://127.0.0.1:1", hooks=module.purebasename)
-
-    # Then CLI run should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And a helpful message should be displayed in the output
-    lines = result.stdout.strip().split("\n")
-    assert lines[0] == "An exception happened during hooks loading:"
-    if sys.version_info >= (3, 11):
-        idx = (8, 10)
-    else:
-        idx = (7, 9)
-    assert lines[idx[0]] == "ZeroDivisionError: division by zero"
-    assert lines[idx[1]] == "Aborted!"
-
-
-def test_hooks_module_not_found(cli):
-    # When an unknown hook module is passed to CLI
-    result = cli.main("run", "http://127.0.0.1:1", hooks="hook")
-
-    assert os.getcwd() in sys.path
-
-    # Then CLI run should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    assert "ModuleNotFoundError" in result.stdout
 
 
 def test_conditional_checks(testdir, cli, hypothesis_max_examples, schema_url):
@@ -1526,7 +1262,7 @@ def test_wsgi_app_missing(testdir, cli):
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
     assert "AttributeError: module 'location' has no attribute 'app'" in lines
-    assert "Unable to import application from the provided module." in lines
+    assert "An error occurred while loading the application from 'location:app'." in lines
 
 
 def test_wsgi_app_internal_exception(testdir, cli):
@@ -1840,20 +1576,6 @@ def test_max_response_time_valid(cli, server, schema_url):
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.parametrize("header", ("Authorization", "authorization"))
-@pytest.mark.operations()
-def test_auth_and_authorization_header_are_disallowed(cli, schema_url, header):
-    # When ``--auth`` is passed together with ``--header`` that sets the ``Authorization`` header
-    result = cli.run(schema_url, "--auth=test:test", f"--header={header}:token123")
-    # Then it causes a validation error
-    assert result.exit_code == ExitCode.INTERRUPTED
-    assert (
-        "Invalid value: Passing `--auth` together with `--header` that sets `Authorization` is not allowed."
-        in result.stdout
-    )
-
-
 @pytest.mark.parametrize("workers_num", (1, 2))
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("failure", "success")
@@ -2077,14 +1799,6 @@ def test_force_color(cli, schema_url):
     result = cli.run(schema_url, "--force-color", color=False)
     assert result.exit_code == ExitCode.OK, result.stdout
     assert "[1m" in result.stdout
-
-
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_force_color_nocolor(cli, schema_url):
-    result = cli.run(schema_url, "--force-color", "--no-color")
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    assert COLOR_OPTIONS_INVALID_USAGE_MESSAGE in result.stdout
 
 
 @pytest.mark.parametrize("graphql_path", ("/graphql", "/foo"))
@@ -2338,7 +2052,7 @@ def test_wait_for_schema(cli, schema_path, app_factory):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
-def test_wait_for_schema_not_enough(cli):
+def test_wait_for_schema_not_enough(cli, snapshot_cli):
     app = create_openapi_app(operations=("success",))
     original_run = app.run
 
@@ -2351,10 +2065,7 @@ def test_wait_for_schema_not_enough(cli):
     schema_url = f"http://127.0.0.1:{port}/schema.yaml"
     run_server(app, port=port)
 
-    result = cli.run(schema_url, "--wait-for-schema=1", "--hypothesis-max-examples=1")
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # No suggestion is shown
-    assert "--wait-for-schema" not in result.stdout
+    assert cli.run(schema_url, "--wait-for-schema=1", "--hypothesis-max-examples=1") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -2371,12 +2082,6 @@ def test_disable_report_suggestion(monkeypatch, cli, schema_url):
     monkeypatch.setenv(REPORT_SUGGESTION_ENV_VAR, "no")
     result = cli.run(schema_url)
     assert "You can visualize" not in result.stdout
-
-
-def test_non_existing_file(cli):
-    result = cli.run("unknown.json")
-    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
-    assert FILE_DOES_NOT_EXIST_MESSAGE in result.stdout
 
 
 @pytest.mark.parametrize(
