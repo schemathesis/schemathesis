@@ -12,7 +12,6 @@ SerializeFunc = Callable[[S], Optional[Dict[str, Any]]]
 
 def serialize_initialized(event: events.Initialized) -> Optional[Dict[str, Any]]:
     return {
-        "schema": event.schema,
         "operations_count": event.operations_count,
         "location": event.location or "",
         "base_url": event.base_url,
