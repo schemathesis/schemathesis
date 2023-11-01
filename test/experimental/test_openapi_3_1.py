@@ -35,15 +35,6 @@ def test_works_with_fastapi(fastapi_app, with_fixup):
         type: str
         department: str
 
-        # Pydantic <2
-        class Config:
-            @staticmethod
-            def schema_extra(schema, model):
-                schema.clear()
-
-                schema.update(json_schema)
-
-        # Pydantic >2
         @classmethod
         def __get_pydantic_json_schema__(cls, core_schema, handler):
             return json_schema
