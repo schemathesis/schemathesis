@@ -2,7 +2,6 @@ import json
 import sys
 
 import pytest
-from _pytest.main import ExitCode
 
 TOKEN = "FOO"
 AUTH_PROVIDER_MODULE_CODE = f"""
@@ -24,7 +23,7 @@ class TokenAuth:
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_custom_auth(testdir, cli, schema_url, app):
+def test_custom_auth(testdir, cli, schema_url, app, snapshot_cli):
     # When a custom auth is used
     module = testdir.make_importable_pyfile(
         hook=f"""
@@ -36,14 +35,11 @@ def after_call(context, case, response):
     assert request_authorization == f"Bearer {TOKEN}", request_authorization
     note()
     note(request_authorization)
-    note()
 """
     )
-    result = cli.main("run", schema_url, hooks=module.purebasename)
     # Then CLI should run successfully
-    assert result.exit_code == ExitCode.OK, result.stdout
     # And the auth should be used
-    assert f"Bearer {TOKEN}" in result.stdout.splitlines()
+    assert cli.main("run", schema_url, hooks=module.purebasename) == snapshot_cli
 
 
 @pytest.mark.parametrize(
@@ -55,7 +51,7 @@ def after_call(context, case, response):
 )
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_explicit_auth_precedence(testdir, cli, schema_url, args, expected):
+def test_explicit_auth_precedence(testdir, cli, schema_url, args, expected, snapshot_cli):
     # If explicit auth is passed via CLI
     module = testdir.make_importable_pyfile(
         hook=f"""
@@ -66,17 +62,14 @@ def after_call(context, case, response):
     assert request_authorization == "{expected}", request_authorization
     note()
     note(request_authorization)
-    note()
 """
     )
     # Then it overrides the one from the auth provider
-    result = cli.main("run", schema_url, "--show-errors-tracebacks", *args, hooks=module.purebasename)
-    assert result.exit_code == ExitCode.OK, result.stdout
     # And the auth should be used
-    assert expected in result.stdout.splitlines()
+    assert cli.main("run", schema_url, "--show-errors-tracebacks", *args, hooks=module.purebasename) == snapshot_cli
 
 
-def test_multiple_auth_mechanisms_with_explicit_auth(testdir, empty_open_api_3_schema, cli):
+def test_multiple_auth_mechanisms_with_explicit_auth(testdir, empty_open_api_3_schema, cli, snapshot_cli):
     # When the schema defines multiple auth mechanisms on the same operation
     # And the user passes an explicit `Authorization` header
     empty_open_api_3_schema["paths"] = {
@@ -104,14 +97,13 @@ def test_multiple_auth_mechanisms_with_explicit_auth(testdir, empty_open_api_3_s
     }
     empty_open_api_3_schema["security"] = [{"bearerAuth": []}, {"basicAuth": []}]
     schema_file = testdir.makefile(".json", schema=json.dumps(empty_open_api_3_schema))
-    result = cli.run(str(schema_file), "--dry-run", "-H", "Authorization: Bearer foo")
     # Then it should be able to generate requests
-    assert result.exit_code == ExitCode.OK, result.stdout
+    assert cli.run(str(schema_file), "--dry-run", "-H", "Authorization: Bearer foo") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success", "custom_format")
-def test_multiple_threads(testdir, cli, schema_url):
+def test_multiple_threads(testdir, cli, schema_url, snapshot_cli):
     module = testdir.make_importable_pyfile(
         hook=f"""
     import schemathesis
@@ -139,22 +131,24 @@ def test_multiple_threads(testdir, cli, schema_url):
         assert provider.get_calls == 1, provider.get_calls
     """
     )
-    result = cli.main(
-        "run",
-        schema_url,
-        "--workers",
-        "2",
-        "--hypothesis-max-examples=1",
-        "--show-errors-tracebacks",
-        hooks=module.purebasename,
-    )
     # Then CLI should run successfully
-    assert result.exit_code == ExitCode.OK, result.stdout
+    assert (
+        cli.main(
+            "run",
+            schema_url,
+            "--workers",
+            "2",
+            "--hypothesis-max-examples=1",
+            "--show-errors-tracebacks",
+            hooks=module.purebasename,
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success", "text")
-def test_requests_auth(testdir, cli, schema_url):
+def test_requests_auth(testdir, cli, schema_url, snapshot_cli):
     # When the user registers auth from `requests`
     expected = "Basic dXNlcjpwYXNz"
     module = testdir.make_importable_pyfile(
@@ -174,21 +168,18 @@ def after_call(context, case, response):
         assert request_authorization == "{expected}", request_authorization
         note()
         note(request_authorization)
-        note()
     if case.operation.path == "/text":
         assert request_authorization is None, request_authorization
 """
     )
-    result = cli.main("run", schema_url, hooks=module.purebasename)
     # Then CLI should run successfully
-    assert result.exit_code == ExitCode.OK, result.stdout
     # And the auth should be used
-    assert expected in result.stdout.splitlines()
+    assert cli.main("run", schema_url, hooks=module.purebasename) == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success", "text")
-def test_conditional(testdir, cli, schema_url):
+def test_conditional(testdir, cli, schema_url, snapshot_cli):
     # When the user sets up multiple auths applied to different API operations
     if sys.version_info < (3, 9):
         dec1 = """
@@ -236,6 +227,5 @@ def verify_auth(response, case):
     assert request_authorization == expected, f"Expected `{{expected}}`, got `{{request_authorization}}`"
 """
     )
-    result = cli.main("run", schema_url, "-c", "verify_auth", hooks=module.purebasename)
     # Then all auths should be properly applied
-    assert result.exit_code == ExitCode.OK, result.stdout
+    assert cli.main("run", schema_url, "-c", "verify_auth", hooks=module.purebasename) == snapshot_cli

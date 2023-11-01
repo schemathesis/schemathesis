@@ -72,7 +72,7 @@ def test_server_error(cli, schema_url, service):
 
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
-def test_error_in_another_handler(testdir, cli, schema_url, service):
+def test_error_in_another_handler(testdir, cli, schema_url, service, snapshot_cli):
     # When a non-Schemathesis.io handler fails
     module = testdir.make_importable_pyfile(
         hook="""
@@ -84,7 +84,7 @@ def test_error_in_another_handler(testdir, cli, schema_url, service):
         class FailingHandler(EventHandler):
 
             def handle_event(self, context, event):
-                1 / 0
+                raise ZeroDivisionError
 
         @schemathesis.hook
         def after_init_cli_run_handlers(
@@ -95,17 +95,19 @@ def test_error_in_another_handler(testdir, cli, schema_url, service):
             handlers.append(FailingHandler())
         """
     )
-    result = cli.main(
-        "run",
-        schema_url,
-        "my-api",
-        f"--schemathesis-io-token={service.token}",
-        f"--schemathesis-io-url={service.base_url}",
-        hooks=module.purebasename,
-    )
     # And all handlers are shutdown forcefully
     # And the run fails
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    assert (
+        cli.main(
+            "run",
+            schema_url,
+            "my-api",
+            f"--schemathesis-io-token={service.token}",
+            f"--schemathesis-io-url={service.base_url}",
+            hooks=module.purebasename,
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.operations("success")

@@ -18,6 +18,7 @@ from ...constants import (
     SCHEMATHESIS_TEST_CASE_HEADER,
     SCHEMATHESIS_VERSION,
     FALSE_VALUES,
+    ISSUE_TRACKER_URL,
 )
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...models import Response, Status
@@ -27,10 +28,6 @@ from ...runner.serialization import SerializedCase, SerializedError, SerializedT
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
 
-ISSUE_TRACKER_URL = (
-    "https://github.com/schemathesis/schemathesis/issues/new?"
-    "labels=Status%3A+Review+Needed%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D"
-)
 SPINNER_REPETITION_NUMBER = 10
 
 
@@ -423,7 +420,7 @@ def ask_to_report(event: service.Error, report_to_issues: bool = True, extra: st
     else:
         response = ""
     if report_to_issues:
-        ask = f"Please, consider reporting the traceback below it to our issue tracker: {ISSUE_TRACKER_URL}\n"
+        ask = f"Please, consider reporting the traceback below it to our issue tracker:\n\n  {ISSUE_TRACKER_URL}\n"
     else:
         ask = ""
     click.secho(
@@ -504,7 +501,7 @@ SCHEMA_ERROR_SUGGESTIONS = {
     SchemaErrorType.YAML_NUMERIC_STATUS_CODES: "Convert numeric status codes to strings.",
     SchemaErrorType.YAML_NON_STRING_KEYS: "Convert non-string keys to strings.",
     # Unclassified
-    SchemaErrorType.UNCLASSIFIED: f"If you suspect this is a Schemathesis issue and the schema is valid, please report it and include the schema if you can: {ISSUE_TRACKER_URL}",
+    SchemaErrorType.UNCLASSIFIED: f"If you suspect this is a Schemathesis issue and the schema is valid, please report it and include the schema if you can:\n\n  {ISSUE_TRACKER_URL}",
 }
 
 
@@ -530,7 +527,9 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
         if event.type == InternalErrorType.SCHEMA and isinstance(event.subtype, SchemaErrorType):
             suggestion = SCHEMA_ERROR_SUGGESTIONS.get(event.subtype)
         elif context.show_errors_tracebacks:
-            suggestion = f"Please consider reporting the traceback above to our issue tracker: {ISSUE_TRACKER_URL}."
+            suggestion = (
+                f"Please consider reporting the traceback above to our issue tracker:\n\n  {ISSUE_TRACKER_URL}."
+            )
         else:
             suggestion = f"To see full tracebacks, add {bold('`--show-errors-tracebacks`')} to your CLI options"
         # Display suggestion if any

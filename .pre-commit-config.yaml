@@ -8,7 +8,7 @@ repos:
       - id: check-yaml
       - id: end-of-file-fixer
       - id: trailing-whitespace
-        exclude: ^.*\.(md|rst)$
+        exclude: ^.*\.(md|rst|raw)$
       - id: debug-statements
       - id: mixed-line-ending
         args: [--fix=lf]
