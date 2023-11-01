@@ -3,7 +3,6 @@ import platform
 
 import pytest
 from hypothesis import HealthCheck, Phase, given, settings
-from pytest import ExitCode
 
 import schemathesis
 from schemathesis import DataGenerationMethod, contrib
@@ -139,18 +138,24 @@ def run(testdir, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_exa
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
-def test_cli(testdir, unique_hook, raw_schema, cli, openapi3_base_url, hypothesis_max_examples):
-    result = run(testdir, cli, unique_hook, raw_schema, openapi3_base_url, hypothesis_max_examples)
-    assert result.exit_code == ExitCode.OK, result.stdout
+def test_cli(testdir, unique_hook, raw_schema, cli, openapi3_base_url, hypothesis_max_examples, snapshot_cli):
+    assert run(testdir, cli, unique_hook, raw_schema, openapi3_base_url, hypothesis_max_examples) == snapshot_cli
 
 
 @pytest.mark.parametrize("workers", (1, 2))
 def test_explicit_headers(
-    testdir, unique_hook, empty_open_api_3_schema, cli, openapi3_base_url, hypothesis_max_examples, workers
+    testdir,
+    unique_hook,
+    empty_open_api_3_schema,
+    cli,
+    openapi3_base_url,
+    hypothesis_max_examples,
+    workers,
+    snapshot_cli,
 ):
     header_name = "X-Session-ID"
     empty_open_api_3_schema["paths"] = {
-        "/data/": {
+        "/success": {
             "get": {
                 "parameters": [
                     {
@@ -170,15 +175,17 @@ def test_explicit_headers(
     }
     # When explicit headers are passed to CLI
     # And they match one of the parameters
-    result = run(
-        testdir,
-        cli,
-        unique_hook,
-        empty_open_api_3_schema,
-        openapi3_base_url,
-        hypothesis_max_examples,
-        f"-H {header_name}: fixed",
-        f"--workers={workers}",
-    )
     # Then they should be included in the uniqueness check
-    assert result.exit_code == ExitCode.OK, result.stdout
+    assert (
+        run(
+            testdir,
+            cli,
+            unique_hook,
+            empty_open_api_3_schema,
+            openapi3_base_url,
+            hypothesis_max_examples,
+            f"-H {header_name}: fixed",
+            f"--workers={workers}",
+        )
+        == snapshot_cli
+    )

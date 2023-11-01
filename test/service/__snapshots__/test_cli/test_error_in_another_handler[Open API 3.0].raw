@@ -1,0 +1,20 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Workers: 1
+Collected API operations: 1
+
+CLI Handler Error
+
+An error occurred within your custom CLI handler `FailingHandler`.
+
+Traceback (most recent call last):
+  File "/tmp/hook.py", line 9, in handle_event
+    raise ZeroDivisionError
+ZeroDivisionError
+
+For more information on implementing extensions for Schemathesis CLI, visit https://schemathesis.readthedocs.io/en/stable/extending.html
