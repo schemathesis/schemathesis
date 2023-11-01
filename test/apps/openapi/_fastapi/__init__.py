@@ -2,7 +2,7 @@ from typing import Optional
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import ConfigDict, BaseModel, Field
 
 from ..schema import OpenAPIVersion
 
@@ -10,24 +10,18 @@ from ..schema import OpenAPIVersion
 class User(BaseModel):
     first_name: str = Field(min_length=3)
     last_name: str = Field(min_length=3)
-
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class BuggyUser(BaseModel):
     first_name: str = Field(min_length=3)
-    last_name: Optional[str] = Field(min_length=3, nullable=True)
-
-    class Config:
-        extra = "forbid"
+    last_name: Optional[str] = Field(None, min_length=3, json_schema_extra={"nullable": True})
+    model_config = ConfigDict(extra="forbid")
 
 
 class Message(BaseModel):
     detail: str
-
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 def create_app(operations=("root",), version=OpenAPIVersion("3.0")):
@@ -47,7 +41,7 @@ def create_app(operations=("root",), version=OpenAPIVersion("3.0")):
         @app.post("/users/", status_code=201)
         def create_user(user: User):
             user_id = str(uuid4())
-            users[user_id] = {**user.dict(), "id": user_id}
+            users[user_id] = {**user.model_dump(), "id": user_id}
             return {"id": user_id}
 
     if "get_user" in operations:
