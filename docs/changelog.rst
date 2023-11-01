@@ -12,6 +12,7 @@ Changelog
 - **INTERNAL**: Moved heavy imports inside functions to improve CLI startup time by 4.3x, not affecting overall execution speed. `#1509`_
 - Clarify CLI error messages for loading hooks and WSGI applications.
 - Clarify CLI option docstrings.
+- Provide an error message if an internal error happened inside CLI event handler.
 
 .. _v3.20.2:
 

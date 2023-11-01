@@ -27,7 +27,11 @@ SERIALIZERS_SUGGESTION_MESSAGE = (
     "and Schemathesis will be able to make API calls with this media type. \n"
     "See https://schemathesis.readthedocs.io/en/stable/how.html#payload-serialization for more information."
 )
-HOOKS_DOCUMENTATION_URL = "https://schemathesis.readthedocs.io/en/stable/extending.html"
+EXTENSIONS_DOCUMENTATION_URL = "https://schemathesis.readthedocs.io/en/stable/extending.html"
+ISSUE_TRACKER_URL = (
+    "https://github.com/schemathesis/schemathesis/issues/new?"
+    "labels=Status%3A%20Needs%20Triage%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D"
+)
 FLAKY_FAILURE_MESSAGE = "[FLAKY] Schemathesis was not able to reliably reproduce this failure"
 BOM_MARK = "\ufeff"
 WAIT_FOR_SCHEMA_INTERVAL = 0.05

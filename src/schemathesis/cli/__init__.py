@@ -31,7 +31,8 @@ from ..constants import (
     HOOKS_MODULE_ENV_VAR,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     WAIT_FOR_SCHEMA_ENV_VAR,
-    HOOKS_DOCUMENTATION_URL,
+    EXTENSIONS_DOCUMENTATION_URL,
+    ISSUE_TRACKER_URL,
 )
 from ..exceptions import SchemaError, extract_nth_traceback
 from ..fixups import ALL_FIXUPS
@@ -1181,7 +1182,7 @@ def load_hook(module_name: str) -> None:
             lines = traceback.format_exception(type(exc), exc, trace)
             message = "".join(lines).strip()
             click.secho(f"\n{message}", fg="red")
-        click.echo(f"\nFor more information on how to work with hooks, visit {HOOKS_DOCUMENTATION_URL}")
+        click.echo(f"\nFor more information on how to work with hooks, visit {EXTENSIONS_DOCUMENTATION_URL}")
         raise click.exceptions.Exit(1) from None
 
 
@@ -1287,7 +1288,13 @@ def execute(
     try:
         for event in event_stream:
             for handler in handlers:
-                handler.handle_event(execution_context, event)
+                try:
+                    handler.handle_event(execution_context, event)
+                except Exception as exc:
+                    # `Abort` is used for handled errors
+                    if not isinstance(exc, click.Abort):
+                        display_handler_error(handler, exc)
+                    raise
     except Exception as exc:
         if isinstance(exc, click.Abort):
             # To avoid showing "Aborted!" message, which is the default behavior in Click
@@ -1301,6 +1308,48 @@ def execute(
     # Event stream did not finish with a terminal event. Only possible if the handler is broken
     click.secho("Unexpected error", fg="red")
     sys.exit(1)
+
+
+def is_built_in_handler(handler: EventHandler) -> bool:
+    # Look for exact instances, not subclasses
+    return any(
+        type(handler) is class_
+        for class_ in (
+            output.default.DefaultOutputStyleHandler,
+            output.short.ShortOutputStyleHandler,
+            service.FileReportHandler,
+            service.ServiceReportHandler,
+            DebugOutputHandler,
+            cassettes.CassetteWriter,
+            JunitXMLHandler,
+            SanitizationHandler,
+        )
+    )
+
+
+def display_handler_error(handler: EventHandler, exc: Exception) -> None:
+    """Display error that happened within."""
+    is_built_in = is_built_in_handler(handler)
+    if is_built_in:
+        click.secho("Internal Error", fg="red", bold=True)
+        click.secho("\nSchemathesis encountered an unexpected issue.")
+        trace = exc.__traceback__
+    else:
+        click.secho("CLI Handler Error", fg="red", bold=True)
+        click.echo(f"\nAn error occurred within your custom CLI handler `{bold(handler.__class__.__name__)}`.")
+        trace = extract_nth_traceback(exc.__traceback__, 1)
+    lines = traceback.format_exception(type(exc), exc, trace)
+    message = "".join(lines).strip()
+    click.secho(f"\n{message}", fg="red")
+    if is_built_in:
+        click.echo(
+            f"\nWe apologize for the inconvenience. This appears to be an internal issue.\n"
+            f"Please consider reporting this error to our issue tracker:\n\n  {ISSUE_TRACKER_URL}."
+        )
+    else:
+        click.echo(
+            f"\nFor more information on implementing extensions for Schemathesis CLI, visit {EXTENSIONS_DOCUMENTATION_URL}"
+        )
 
 
 def handle_service_error(exc: requests.HTTPError, api_name: str) -> NoReturn:

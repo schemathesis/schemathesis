@@ -1,7 +1,10 @@
 import io
 import os
+import re
 import shlex
+from contextlib import contextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from textwrap import dedent
 from types import SimpleNamespace
 from typing import Any, Dict, Optional
@@ -9,6 +12,7 @@ from typing import Any, Dict, Optional
 import pytest
 import requests
 import yaml
+from _pytest.fixtures import FixtureRequest
 from click.testing import CliRunner, Result
 from hypothesis import settings
 from packaging import version
@@ -178,37 +182,42 @@ def server(_app):
 
 
 @pytest.fixture()
-def base_url(server, app):
+def server_address(server):
+    return f"http://127.0.0.1:{server['port']}"
+
+
+@pytest.fixture()
+def base_url(server_address, app):
     """Base URL for the running application."""
-    return f"http://127.0.0.1:{server['port']}/api"
+    return f"{server_address}/api"
 
 
 @pytest.fixture()
-def openapi2_base_url(server, openapi_2_app):
-    return f"http://127.0.0.1:{server['port']}/api"
+def openapi2_base_url(server_address, openapi_2_app):
+    return f"{server_address}/api"
 
 
 @pytest.fixture()
-def openapi3_base_url(server, openapi_3_app):
-    return f"http://127.0.0.1:{server['port']}/api"
+def openapi3_base_url(server_address, openapi_3_app):
+    return f"{server_address}/api"
 
 
 @pytest.fixture()
-def schema_url(server, app):
+def schema_url(server_address, app):
     """URL of the schema of the running application."""
-    return f"http://127.0.0.1:{server['port']}/schema.yaml"
+    return f"{server_address}/schema.yaml"
 
 
 @pytest.fixture()
-def openapi2_schema_url(server, openapi_2_app):
+def openapi2_schema_url(server_address, openapi_2_app):
     """URL of the schema of the running application."""
-    return f"http://127.0.0.1:{server['port']}/schema.yaml"
+    return f"{server_address}/schema.yaml"
 
 
 @pytest.fixture()
-def openapi3_schema_url(server, openapi_3_app):
+def openapi3_schema_url(server_address, openapi_3_app):
     """URL of the schema of the running application."""
-    return f"http://127.0.0.1:{server['port']}/schema.yaml"
+    return f"{server_address}/schema.yaml"
 
 
 @pytest.fixture()
@@ -247,27 +256,75 @@ def graphql_strategy(graphql_schema):
     return graphql_schema["/graphql"]["POST"].as_strategy()
 
 
-class CliSnapshotExtension(SingleFileSnapshotExtension):
-    _write_mode = WriteMode.TEXT
+@contextmanager
+def keep_cwd():
+    cwd = os.getcwd()
+    try:
+        yield
+    finally:
+        os.chdir(cwd)
 
-    def serialize(
-        self,
-        data: Result,
-        *,
-        exclude: Optional["PropertyFilter"] = None,
-        include: Optional["PropertyFilter"] = None,
-        matcher: Optional["PropertyMatcher"] = None,
-    ) -> str:
-        serialized = f"Exit code: {data.exit_code}"
-        if data.stdout_bytes:
-            serialized += f"\n---\nStdout:\n{data.stdout}"
-        if data.stderr_bytes:
-            serialized += f"\n---\nStderr:\n{data.stderr}"
-        return serialized.replace("\r\n", "\n").replace("\r", "\n")
+
+@dataclass()
+class CliSnapshotConfig:
+    request: FixtureRequest
+    replace_schema_location: bool = True
+    replace_tmp_dir: bool = True
+    replace_duration: bool = True
+
+    @classmethod
+    def from_request(cls, request: FixtureRequest) -> "CliSnapshotConfig":
+        marker = request.node.get_closest_marker("snapshot")
+        if marker is not None:
+            return cls(request, **marker.kwargs)
+        return cls(request)
+
+    @property
+    def testdir(self):
+        return self.request.getfixturevalue("testdir")
+
+    def serialize(self, data: str) -> str:
+        if self.replace_schema_location:
+            try:
+                server_address = self.request.getfixturevalue("server_address")
+                data = data.replace(server_address, "http://127.0.0.1")
+            except LookupError:
+                pass
+            with keep_cwd():
+                data = data.replace(Path(self.testdir.tmpdir).as_uri(), "file:///tmp")
+        if self.replace_tmp_dir:
+            with keep_cwd():
+                data = data.replace(str(self.testdir.tmpdir) + os.path.sep, "/tmp/")
+        if self.replace_duration:
+            lines = data.splitlines()
+            lines[-1] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", lines[-1])
+            data = "\n".join(lines)
+            data += "\n"
+        return data
 
 
 @pytest.fixture
-def snapshot_cli(snapshot):
+def snapshot_cli(request, snapshot, tmp_path):
+    config = CliSnapshotConfig.from_request(request)
+
+    class CliSnapshotExtension(SingleFileSnapshotExtension):
+        _write_mode = WriteMode.TEXT
+
+        def serialize(
+            self,
+            data: Result,
+            *,
+            exclude: Optional["PropertyFilter"] = None,
+            include: Optional["PropertyFilter"] = None,
+            matcher: Optional["PropertyMatcher"] = None,
+        ) -> str:
+            serialized = f"Exit code: {data.exit_code}"
+            if data.stdout_bytes:
+                serialized += f"\n---\nStdout:\n{data.stdout}"
+            if data.stderr_bytes:
+                serialized += f"\n---\nStderr:\n{data.stderr}"
+            return config.serialize(serialized).replace("\r\n", "\n").replace("\r", "\n")
+
     return snapshot.use_extension(extension_class=CliSnapshotExtension)
 
 

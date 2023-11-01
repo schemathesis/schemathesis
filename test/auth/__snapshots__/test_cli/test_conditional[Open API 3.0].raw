@@ -1,0 +1,21 @@
+Exit code: 0
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Workers: 1
+Collected API operations: 2
+
+GET /api/success .                                                        [ 50%]
+GET /api/text .                                                           [100%]
+
+=================================== SUMMARY ====================================
+
+Performed checks:
+    verify_auth                    2 / 2 passed          PASSED 
+
+Hint: You can visualize test results in Schemathesis.io by using `--report` in your CLI command.
+
+============================== 2 passed in 1.00s ===============================
