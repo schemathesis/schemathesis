@@ -424,7 +424,7 @@ def test_(case):
     )
     # Then an error should be propagated with a relevant error message
     result = testdir.run_and_assert(failed=1)
-    result.stdout.re_match_lines([r"E +OperationSchemaError: Body parameters are defined for GET request."])
+    result.stdout.re_match_lines([r"E +BodyInGetRequestError: GET requests should not contain body parameters."])
 
 
 def test_json_media_type(testdir):

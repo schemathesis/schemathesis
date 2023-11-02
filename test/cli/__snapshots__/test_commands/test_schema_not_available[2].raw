@@ -6,3 +6,5 @@ Schema Loading Error
 Connection failed
 
     Failed to establish a new connection: [Error NUM] Connection refused
+
+Tip: Use `--wait-for-schema=NUM` to wait up to NUM seconds for schema availability.

@@ -20,6 +20,7 @@ from ...constants import (
     FALSE_VALUES,
     ISSUE_TRACKER_URL,
 )
+from ...exceptions import RuntimeErrorType
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...models import Response, Status
 from ...runner import events
@@ -130,7 +131,13 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
 
     display_section_name("ERRORS")
     should_display_full_traceback_message = False
-    for result in context.results:
+    if context.workers_num > 1:
+        # Events may come out of order when multiple workers are involved
+        # Sort them to get a stable output
+        results = sorted(context.results, key=lambda r: r.verbose_name)
+    else:
+        results = context.results
+    for result in results:
         if not result.has_errors:
             continue
         should_display_full_traceback_message |= display_single_error(context, result)
@@ -138,7 +145,8 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
         display_generic_errors(context, event.generic_errors)
     if should_display_full_traceback_message and not context.show_errors_tracebacks:
         click.secho(
-            "Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks", fg="red"
+            "\nAdd this option to your command line parameters to see full tracebacks: --show-errors-tracebacks",
+            fg="red",
         )
     click.secho(
         f"\nNeed more help?\n" f"    Join our Discord server: {DISCORD_LINK}",
@@ -160,23 +168,58 @@ def display_generic_errors(context: ExecutionContext, errors: List[SerializedErr
         _display_error(context, error)
 
 
-def display_full_traceback_message(exception: str) -> bool:
+def display_full_traceback_message(error: SerializedError) -> bool:
     # Some errors should not trigger the message that suggests to show full tracebacks to the user
-    return not exception.startswith(("DeadlineExceeded", "OperationSchemaError"))
+    return not error.exception.startswith(
+        ("DeadlineExceeded", "OperationSchemaError", "requests.exceptions", "SerializationNotPossible")
+    )
+
+
+def bold(option: str) -> str:
+    return click.style(option, bold=True)
+
+
+DISABLE_SSL_SUGGESTION = f"Bypass SSL verification with {bold('`--request-tls-verify=false`')}."
+DISABLE_SCHEMA_VALIDATION_SUGGESTION = (
+    f"Bypass validation using {bold('`--validate-schema=false`')}. " f"Caution: May cause unexpected errors."
+)
+
+RUNTIME_ERROR_SUGGESTIONS = {
+    RuntimeErrorType.CONNECTION_SSL: DISABLE_SSL_SUGGESTION,
+    RuntimeErrorType.HYPOTHESIS_DEADLINE_EXCEEDED: (
+        f"Adjust the deadline using {bold('`--hypothesis-deadline=MILLIS`')} or "
+        f"disable with {bold('`--hypothesis-deadline=None`')}."
+    ),
+    RuntimeErrorType.HYPOTHESIS_UNSATISFIABLE: "Examine the schema for inconsistencies and consider simplifying it.",
+    RuntimeErrorType.SCHEMA_BODY_IN_GET_REQUEST: DISABLE_SCHEMA_VALIDATION_SUGGESTION,
+    RuntimeErrorType.SCHEMA_INVALID_REGULAR_EXPRESSION: "Ensure your regex is compatible with Python's syntax. "
+    "For guidance, visit: https://docs.python.org/3/library/re.html",
+}
 
 
 def _display_error(context: ExecutionContext, error: SerializedError) -> bool:
-    if context.show_errors_tracebacks:
-        message = error.exception_with_traceback
+    if error.title:
+        if error.type == RuntimeErrorType.SCHEMA_GENERIC:
+            click.secho("Schema Error", fg="red", bold=True)
+        else:
+            click.secho(error.title, fg="red", bold=True)
+        click.echo()
+        if error.message:
+            click.echo(error.message)
+    elif error.message:
+        click.echo(error.message)
     else:
-        message = error.exception
-    if error.exception.startswith("DeadlineExceeded"):
-        message += (
-            "Consider extending the deadline with the `--hypothesis-deadline` CLI option.\n"
-            "You can disable it completely with `--hypothesis-deadline=None`.\n"
-        )
-    click.secho(message, fg="red")
-    return display_full_traceback_message(error.exception)
+        click.echo(error.exception)
+    if error.extras:
+        extras = error.extras
+    elif context.show_errors_tracebacks:
+        extras = _split_traceback(error.exception_with_traceback)
+    else:
+        extras = []
+    _display_extras(extras)
+    suggestion = RUNTIME_ERROR_SUGGESTIONS.get(error.type)
+    _maybe_display_tip(suggestion)
+    return display_full_traceback_message(error)
 
 
 def display_failures(context: ExecutionContext, event: events.Finished) -> None:
@@ -480,13 +523,9 @@ def display_check_result(check_name: str, results: Dict[Union[str, Status], int]
 VERIFY_URL_SUGGESTION = "Verify that the URL points directly to the Open API schema"
 
 
-def bold(option: str) -> str:
-    return click.style(option, bold=True)
-
-
 SCHEMA_ERROR_SUGGESTIONS = {
     # SSL-specific connection issue
-    SchemaErrorType.CONNECTION_SSL: f"Bypass SSL verification with {bold('`--request-tls-verify=false`')}.",
+    SchemaErrorType.CONNECTION_SSL: DISABLE_SSL_SUGGESTION,
     # Other connection problems
     SchemaErrorType.CONNECTION_OTHER: f"Use {bold('`--wait-for-schema=NUM`')} to wait up to NUM seconds for schema availability.",
     # Response issues
@@ -496,7 +535,7 @@ SCHEMA_ERROR_SUGGESTIONS = {
     # OpenAPI specification issues
     SchemaErrorType.OPEN_API_UNSPECIFIED_VERSION: f"Include the version in the schema or manually set it with {bold('`--force-schema-version`')}.",
     SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION: f"Proceed with {bold('`--force-schema-version`')}. Caution: May not be fully supported.",
-    SchemaErrorType.OPEN_API_INVALID_SCHEMA: f"Bypass validation using {bold('`--validate-schema=false`')}. Caution: May cause unexpected errors.",
+    SchemaErrorType.OPEN_API_INVALID_SCHEMA: DISABLE_SCHEMA_VALIDATION_SUGGESTION,
     # YAML specific issues
     SchemaErrorType.YAML_NUMERIC_STATUS_CODES: "Convert numeric status codes to strings.",
     SchemaErrorType.YAML_NON_STRING_KEYS: "Convert non-string keys to strings.",
@@ -509,6 +548,23 @@ def should_skip_suggestion(context: ExecutionContext, event: events.InternalErro
     return event.subtype == SchemaErrorType.CONNECTION_OTHER and context.wait_for_schema is not None
 
 
+def _split_traceback(traceback: str) -> List[str]:
+    return [entry for entry in traceback.splitlines() if entry]
+
+
+def _display_extras(extras: List[str]) -> None:
+    if extras:
+        click.echo()
+    for extra in extras:
+        click.secho(f"    {extra}")
+
+
+def _maybe_display_tip(suggestion: Optional[str]) -> None:
+    # Display suggestion if any
+    if suggestion is not None:
+        click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")
+
+
 def display_internal_error(context: ExecutionContext, event: events.InternalError) -> None:
     click.secho(event.title, fg="red", bold=True)
     click.echo()
@@ -516,13 +572,10 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
     if event.type == InternalErrorType.SCHEMA:
         extras = event.extras
     elif context.show_errors_tracebacks:
-        extras = [entry for entry in event.exception_with_traceback.splitlines() if entry]
+        extras = _split_traceback(event.exception_with_traceback)
     else:
         extras = [event.exception]
-    if extras:
-        click.echo()
-    for extra in extras:
-        click.secho(f"    {extra}")
+    _display_extras(extras)
     if not should_skip_suggestion(context, event):
         if event.type == InternalErrorType.SCHEMA and isinstance(event.subtype, SchemaErrorType):
             suggestion = SCHEMA_ERROR_SUGGESTIONS.get(event.subtype)
@@ -532,9 +585,7 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
             )
         else:
             suggestion = f"To see full tracebacks, add {bold('`--show-errors-tracebacks`')} to your CLI options"
-        # Display suggestion if any
-        if suggestion is not None:
-            click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")
+        _maybe_display_tip(suggestion)
 
 
 def handle_initialized(context: ExecutionContext, event: events.Initialized) -> None:

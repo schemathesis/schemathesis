@@ -18,7 +18,7 @@ from .formats import STRING_FORMATS
 from ... import auths, serializers
 from ...generation import DataGenerationMethod
 from ...internal.copy import fast_deepcopy
-from ...exceptions import OperationSchemaError, SerializationNotPossible
+from ...exceptions import SerializationNotPossible, BodyInGetRequestError
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...models import APIOperation, Case, cant_serialize
 from ...transports.headers import has_invalid_characters, is_latin_1_encodable
@@ -169,7 +169,7 @@ def get_case_strategy(
         body_ = ValueContainer(value=body, location="body", generator=None)
 
     if operation.schema.validate_schema and operation.method.upper() == "GET" and operation.body:
-        raise OperationSchemaError("Body parameters are defined for GET request.")
+        raise BodyInGetRequestError("GET requests should not contain body parameters.")
     # If we need to generate negative cases but no generated values were negated, then skip the whole test
     if generator.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
         skip(operation.verbose_name)

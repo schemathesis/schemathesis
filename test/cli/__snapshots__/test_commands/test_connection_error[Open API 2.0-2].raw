@@ -1,0 +1,35 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1:1/api
+Specification version: Swagger 2.0
+Workers: 2
+Collected API operations: 2
+
+EE
+
+==================================== ERRORS ====================================
+_______________________________ GET /api/failure _______________________________
+Network Error
+
+Connection failed
+
+    Failed to establish a new connection: [Error NUM] Connection refused
+_______________________________ GET /api/success _______________________________
+Network Error
+
+Connection failed
+
+    Failed to establish a new connection: [Error NUM] Connection refused
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+Hint: You can visualize test results in Schemathesis.io by using `--report` in your CLI command.
+
+============================== 2 errored in 1.00s ==============================

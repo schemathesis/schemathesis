@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from textwrap import dedent
 from types import SimpleNamespace
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import pytest
 import requests
@@ -113,6 +113,7 @@ def pytest_generate_tests(metafunc):
 def pytest_configure(config):
     config.addinivalue_line("markers", "operations(*names): Add only specified API operations to the test application.")
     config.addinivalue_line("markers", "service(**kwargs): Setup mock server for Schemathesis.io.")
+    config.addinivalue_line("markers", "snapshot(**kwargs): Configure snapshot tests.")
     config.addinivalue_line("markers", "hypothesis_nested: Mark tests with nested Hypothesis tests.")
     config.addinivalue_line(
         "markers",
@@ -271,6 +272,9 @@ class CliSnapshotConfig:
     replace_schema_location: bool = True
     replace_tmp_dir: bool = True
     replace_duration: bool = True
+    replace_multi_worker_progress: Union[bool, str] = True
+    replace_statistic: bool = False
+    replace_error_codes: bool = True
 
     @classmethod
     def from_request(cls, request: FixtureRequest) -> "CliSnapshotConfig":
@@ -295,11 +299,28 @@ class CliSnapshotConfig:
         if self.replace_tmp_dir:
             with keep_cwd():
                 data = data.replace(str(self.testdir.tmpdir) + os.path.sep, "/tmp/")
+        if self.replace_multi_worker_progress:
+            lines = data.splitlines()
+            for idx, line in enumerate(lines):
+                if re.match(r"^[.FSE]+$", line):
+                    if isinstance(self.replace_multi_worker_progress, str):
+                        lines[idx] = self.replace_multi_worker_progress
+                    else:
+                        lines[idx] = "".join(sorted(line))
+            data = "\n".join(lines) + "\n"
+        if self.replace_statistic:
+            data = re.sub("[0-9]+ / [0-9]+ passed", "N / N passed", data)
+            data = re.sub("([0-9]+ passed,? )|([0-9]+ errored,? )", "", data)
+        if self.replace_error_codes:
+            data = data.replace("Errno 111", "Error NUM").replace("WinError 10061", "Error NUM")
+            data = data.replace(
+                "No connection could be made because the target machine actively refused it", "Connection refused"
+            )
         if self.replace_duration:
+            data = re.sub(r"It took [0-9]+\.[0-9]{2}ms", "It took 500.00ms", data)
             lines = data.splitlines()
             lines[-1] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", lines[-1])
-            data = "\n".join(lines)
-            data += "\n"
+            data = "\n".join(lines) + "\n"
         return data
 
 

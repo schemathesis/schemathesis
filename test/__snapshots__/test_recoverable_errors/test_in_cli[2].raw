@@ -1,0 +1,43 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/schema.yaml
+Base URL: file:///
+Specification version: Open API 3.0.2
+Workers: 2
+Collected API operations: 2
+
+.E
+
+==================================== ERRORS ====================================
+__________________________________ POST /bar ___________________________________
+Schema Error
+
+Unresolvable JSON pointer in the schema
+
+Error details:
+    JSON pointer: 'components/UnknownParameter'
+    This typically means that the schema is referencing a component that doesn't exist.
+
+Ensure that the definition complies with the OpenAPI specification
+_____________________________________ /foo _____________________________________
+Schema Error
+
+Unresolvable JSON pointer in the schema
+
+Error details:
+    JSON pointer: 'components/UnknownMethods'
+    This typically means that the schema is referencing a component that doesn't exist.
+
+Ensure that the definition complies with the OpenAPI specification
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+Hint: You can visualize test results in Schemathesis.io by using `--report` in your CLI command.
+
+========================= 1 passed, 2 errored in 1.00s =========================
