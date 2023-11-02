@@ -1,0 +1,27 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/schema.json
+Base URL: http://127.0.0.1/apiv2
+Specification version: Open API 3.0.2
+Workers: 1
+Collected API operations: 1
+
+GET /apiv2/foo E                                                          [100%]
+
+==================================== ERRORS ====================================
+________________________________ GET /apiv2/foo ________________________________
+Schema Error
+
+Can not generate data for header parameter "X-Foo"! It should have either `schema` or `content` keywords defined
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+Hint: You can visualize test results in Schemathesis.io by using `--report` in your CLI command.
+
+============================== 1 errored in 1.00s ==============================

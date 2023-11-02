@@ -1,0 +1,32 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/schema.yaml
+Base URL: file:///
+Specification version: Open API 3.0.2
+Workers: 1
+Collected API operations: 2
+
+POST /bar .                                                               [ 50%]
+POST /foo E                                                               [100%]
+
+==================================== ERRORS ====================================
+__________________________________ POST /foo ___________________________________
+Schema Error
+
+Invalid regular expression. Pattern `\\p{Alpha}` is not recognized - `bad escape \p at position 0`
+
+Tip: Ensure your regex is compatible with Python's syntax. For guidance, visit: https://docs.python.org/3/library/re.html
+
+Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+Hint: You can visualize test results in Schemathesis.io by using `--report` in your CLI command.
+
+========================= 1 passed, 1 errored in 1.00s =========================

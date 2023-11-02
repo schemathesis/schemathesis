@@ -763,7 +763,7 @@ def test_unsatisfiable_example(empty_open_api_3_schema):
     ).execute()
     # And the tests are failing because of the unsatisfiable schema
     assert finished.has_errors
-    assert "Unable to satisfy schema parameters for this API operation" in after.result.errors[0].exception
+    assert "Failed to generate test cases for this API operation" in after.result.errors[0].exception
 
 
 @pytest.mark.operations("success")

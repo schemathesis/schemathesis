@@ -115,6 +115,12 @@ def test_no_serialization_possible(api_schema):
         test()
 
 
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("csv_payload")
+def test_in_cli(cli, schema_url, snapshot_cli):
+    assert cli.run(schema_url) == snapshot_cli
+
+
 @pytest.mark.parametrize("method", ("as_requests_kwargs", "as_werkzeug_kwargs"))
 def test_serialize_yaml(open_api_3_schema_with_yaml_payload, method):
     # See GH-1010

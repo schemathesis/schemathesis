@@ -1,0 +1,47 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/schema.json
+Base URL: file:///
+Specification version: Open API 3.0.2
+Workers: 1
+Collected API operations: 1
+
+POST /data E                                                              [100%]
+
+==================================== ERRORS ====================================
+__________________________________ POST /data __________________________________
+Schema Error
+
+Invalid `bearerAuth` definition
+
+Location:
+    components -> securitySchemes -> bearerAuth
+
+Problematic definition:
+{
+    "scheme": "bearer",
+    "bearerFormat": "uuid"
+}
+
+Error details:
+    The provided definition doesn't match any of the expected formats or types.
+
+Ensure that the definition complies with the OpenAPI specification
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+Experimental Features:
+  - OpenAPI 3.1: Support for response validation
+    Feedback: https://github.com/schemathesis/schemathesis/discussions/1822
+
+Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
+
+Hint: You can visualize test results in Schemathesis.io by using `--report` in your CLI command.
+
+============================== 1 errored in 1.00s ==============================

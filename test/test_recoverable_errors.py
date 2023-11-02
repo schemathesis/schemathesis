@@ -100,22 +100,11 @@ def test_(case):
 
 
 @pytest.mark.parametrize("workers", (1, 2))
-def test_in_cli(testdir, cli, open_api_3_schema_with_recoverable_errors, workers):
+def test_in_cli(testdir, cli, open_api_3_schema_with_recoverable_errors, workers, snapshot_cli):
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(open_api_3_schema_with_recoverable_errors))
-    result = cli.run(str(schema_file), "--dry-run", "--show-errors-tracebacks", f"--workers={workers}")
-    lines = result.stdout.splitlines()
     # Then valid operation should be tested
     # And errors on the single operation error should be displayed
-    if workers == 1:
-        assert lines[7].startswith("GET /bar .")
-        assert lines[8].startswith("POST /bar E")
-    else:
-        assert lines[7] in ("E.", ".E")
-    error = "    JSON pointer: 'components/UnknownParameter'"
-    assert len([line for line in lines if error in line]) == 1
-    assert "1 passed, 2 errored" in lines[-1]
-    assert "____ /foo ____" in result.stdout
-    assert "    JSON pointer: 'components/UnknownMethods'" in result.stdout
+    assert cli.run(str(schema_file), "--dry-run", f"--workers={workers}") == snapshot_cli
 
 
 def test_direct_access(schema):

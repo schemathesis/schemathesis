@@ -117,7 +117,7 @@ def test_invalid_body_in_get(swagger_20):
             ]
         ),
     )
-    with pytest.raises(OperationSchemaError, match=r"^Body parameters are defined for GET request.$"):
+    with pytest.raises(OperationSchemaError, match=r"^GET requests should not contain body parameters.$"):
         get_case_strategy(operation).example()
 
 
