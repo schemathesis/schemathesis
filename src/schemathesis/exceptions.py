@@ -1,6 +1,7 @@
 from __future__ import annotations
 import enum
 import json
+import re
 import traceback
 from dataclasses import dataclass, field
 from hashlib import sha1
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
     import hypothesis.errors
     from jsonschema import RefResolutionError, ValidationError
     from .transports.responses import GenericResponse
+    from requests import RequestException
 
 
 class CheckFailed(AssertionError):
@@ -206,6 +208,22 @@ class OperationSchemaError(Exception):
         return actual_test
 
 
+@dataclass
+class BodyInGetRequestError(OperationSchemaError):
+    __module__ = "builtins"
+
+
+class InvalidRegularExpression(OperationSchemaError):
+    __module__ = "builtins"
+
+    @classmethod
+    def from_hypothesis_jsonschema_message(cls, message: str) -> "InvalidRegularExpression":
+        match = re.search(r"pattern='(.*?)'.*?\((.*?)\)", message)
+        if match:
+            message = f"Invalid regular expression. Pattern `{match.group(1)}` is not recognized - `{match.group(2)}`"
+        return cls(message)
+
+
 def truncated_json(data: Any, max_lines: int = 10, max_width: int = 80) -> str:
     # Convert JSON to string with indentation
     indent = 4
@@ -241,7 +259,26 @@ class DeadlineExceeded(Exception):
 
 
 @enum.unique
-class SchemaErrorType(enum.Enum):
+class RuntimeErrorType(str, enum.Enum):
+    # Connection related issues
+    CONNECTION_SSL = "connection_ssl"
+    CONNECTION_OTHER = "connection_other"
+    NETWORK_OTHER = "network_other"
+
+    # Hypothesis issues
+    HYPOTHESIS_DEADLINE_EXCEEDED = "hypothesis_deadline_exceeded"
+    HYPOTHESIS_UNSATISFIABLE = "hypothesis_unsatisfiable"
+
+    SCHEMA_BODY_IN_GET_REQUEST = "schema_body_in_get_request"
+    SCHEMA_INVALID_REGULAR_EXPRESSION = "schema_invalid_regular_expression"
+    SCHEMA_GENERIC = "schema_generic"
+
+    # Unclassified
+    UNCLASSIFIED = "unclassified"
+
+
+@enum.unique
+class SchemaErrorType(str, enum.Enum):
     # Connection related issues
     CONNECTION_SSL = "connection_ssl"
     CONNECTION_OTHER = "connection_other"
@@ -352,10 +389,6 @@ class SerializationNotPossible(SerializationError):
         return cls(SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE.format(media_type))
 
 
-class InvalidRegularExpression(Exception):
-    __module__ = "builtins"
-
-
 class UsageError(Exception):
     """Incorrect usage of Schemathesis functions."""
 
@@ -384,3 +417,24 @@ def extract_nth_traceback(trace: Optional[TracebackType], n: int) -> Optional[Tr
         trace = trace.tb_next
         depth += 1
     return trace
+
+
+def remove_ssl_line_number(text: str) -> str:
+    return re.sub(r"\(_ssl\.c:\d+\)", "", text)
+
+
+def extract_requests_exception_details(exc: RequestException) -> Tuple[str, List[str]]:
+    from requests.exceptions import SSLError, ConnectionError
+
+    if isinstance(exc, SSLError):
+        message = "SSL verification problem"
+        reason = str(exc.args[0].reason)
+        extra = [remove_ssl_line_number(reason)]
+    elif isinstance(exc, ConnectionError):
+        message = "Connection failed"
+        _, reason = exc.args[0].reason.args[0].split(":", maxsplit=1)
+        extra = [reason.strip()]
+    else:
+        message = "Network problem"
+        extra = []
+    return message, extra

@@ -157,27 +157,11 @@ def test_auth_and_authorization_header_are_disallowed(cli, schema_url, header, s
 
 
 @pytest.mark.parametrize("workers", (1, 2))
-def test_schema_not_available(cli, workers):
+def test_schema_not_available(cli, workers, snapshot_cli):
     # When the given schema is unreachable
-    result = cli.run("http://127.0.0.1:1/schema.yaml", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And error message is displayed
-    if platform.system() == "Windows":
-        detail = "[WinError 10061] No connection could be made because the target machine actively refused it"
-    else:
-        detail = "[Errno 111] Connection refused"
-    assert (
-        result.stdout
-        == f"""Schema Loading Error
-
-Connection failed
-
-    Failed to establish a new connection: {detail}
-
-Tip: Use `--wait-for-schema=NUM` to wait up to NUM seconds for schema availability.
-"""
-    )
+    assert cli.run("http://127.0.0.1:1/schema.yaml", f"--workers={workers}") == snapshot_cli
 
 
 def test_schema_not_available_wsgi(cli, loadable_flask_app, snapshot_cli):
@@ -579,25 +563,12 @@ def test_execute_missing_schema(cli, openapi3_base_url, url, message, workers):
 
 @pytest.mark.operations("success", "slow")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_hypothesis_failed_event(cli, cli_args, workers):
+@pytest.mark.snapshot(replace_multi_worker_progress="??", replace_statistic=True)
+def test_hypothesis_failed_event(cli, cli_args, workers, snapshot_cli):
     # When the Hypothesis deadline option is set manually, and it is smaller than the response time
-    result = cli.run(*cli_args, "--hypothesis-deadline=20", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And the given operation should be displayed as an error
-    lines = result.stdout.split("\n")
-    if workers == 1:
-        assert lines[7].startswith("GET /api/slow E")
-    else:
-        # It could be in any sequence, because of multiple threads
-        assert lines[7].split("\n")[0] in ("E.", ".E", "EE")
-        # empty line after all tests progress output
-        assert lines[8] == ""
     # And the proper error message should be displayed
-    assert "DeadlineExceeded: API response time is too slow! " in result.stdout
-    assert "which exceeds the deadline of 20.00ms" in result.stdout
-    # And the CLI should not suggest showing full tracebacks to the user
-    assert "Add this option to your command line parameters to see full tracebacks" not in result.stdout, result.stdout
+    assert cli.run(*cli_args, "--hypothesis-deadline=20", f"--workers={workers}") == snapshot_cli
 
 
 @pytest.mark.operations("success", "slow")
@@ -647,24 +618,12 @@ def test_seed(cli, cli_args, workers):
 
 @pytest.mark.operations("unsatisfiable")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_unsatisfiable(cli, cli_args, workers):
+def test_unsatisfiable(cli, cli_args, workers, snapshot_cli):
     # When the app's schema contains parameters that can't be generated
     # For example if it contains contradiction in the parameters' definition - requires to be integer AND string at the
     # same time
-    result = cli.run(*cli_args, f"--workers={workers}")
-    # Then the whole Schemathesis run should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And standard Hypothesis error should not appear in the output
-    assert "You can add @seed" not in result.stdout
-    # And this operation should be marked as errored in the progress line
-    lines = result.stdout.split("\n")
-    if workers == 1:
-        assert lines[7].startswith("POST /api/unsatisfiable E")
-    else:
-        assert lines[7] == "E"
     # And more clear error message is displayed instead of Hypothesis one
-    lines = result.stdout.split("\n")
-    assert "hypothesis.errors.Unsatisfiable: Unable to satisfy schema parameters for this API operation" in lines
+    assert cli.run(*cli_args, f"--workers={workers}") == snapshot_cli
 
 
 @pytest.mark.operations("flaky")
@@ -791,26 +750,11 @@ def test_multiple_failures_different_check(cli, schema_url):
 
 
 @pytest.mark.parametrize("workers", (1, 2))
-def test_connection_error(cli, schema_url, workers):
+def test_connection_error(cli, schema_url, workers, snapshot_cli):
     # When the given base_url is unreachable
-    result = cli.run(schema_url, "--base-url=http://127.0.0.1:1/api", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And all collected API operations should be marked as errored
-    lines = result.stdout.split("\n")
-    if workers == 1:
-        assert lines[7].startswith("GET /api/failure E")
-        assert lines[8].startswith("GET /api/success E")
-    else:
-        assert lines[7] == "EE"
-    # And errors section title should be displayed
-    assert "= ERRORS =" in result.stdout
-    # And all API operations should be mentioned in this section as subsections
-    assert "_ GET /api/success _" in result.stdout
-    assert "_ GET /api/failure _" in result.stdout
     # And the proper error messages should be displayed for each operation
-    assert "Max retries exceeded with url: /api/success" in result.stdout
-    assert "Max retries exceeded with url: /api/failure" in result.stdout
+    assert cli.run(schema_url, "--base-url=http://127.0.0.1:1/api", f"--workers={workers}") == snapshot_cli
 
 
 @pytest.fixture
@@ -1536,18 +1480,17 @@ def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_lim
     assert lines[7] == expected + "." if hypothesis_max_examples else expected
 
 
-def test_get_request_with_body(testdir, cli, base_url, hypothesis_max_examples, schema_with_get_payload):
+def test_get_request_with_body(testdir, cli, base_url, hypothesis_max_examples, schema_with_get_payload, snapshot_cli):
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema_with_get_payload))
-    result = cli.run(
-        str(schema_file),
-        f"--base-url={base_url}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        "--show-errors-tracebacks",
-        "--validate-schema=true",
+    assert (
+        cli.run(
+            str(schema_file),
+            f"--base-url={base_url}",
+            f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+            "--validate-schema=true",
+        )
+        == snapshot_cli
     )
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    lines = result.stdout.splitlines()
-    assert "OperationSchemaError: Body parameters are defined for GET request." in lines
 
 
 @pytest.mark.operations("slow")
@@ -1651,7 +1594,7 @@ def test_reserved_characters_in_operation_name(testdir, empty_open_api_3_schema)
     assert "GET /foo:bar .                                                            [100%]" in result.outlines
 
 
-def test_unsupported_regex(testdir, cli, empty_open_api_3_schema):
+def test_unsupported_regex(testdir, cli, empty_open_api_3_schema, snapshot_cli):
     def make_definition(min_items):
         return {
             "post": {
@@ -1681,18 +1624,9 @@ def test_unsupported_regex(testdir, cli, empty_open_api_3_schema):
         "/bar": make_definition(min_items=0),
     }
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(empty_open_api_3_schema))
-    result = cli.run(str(schema_file), "--dry-run", "--hypothesis-max-examples=1")
     # Then if it is possible it should generate at least something
-    assert "POST /bar ." in result.stdout
     # And if it is not then there should be an error with a descriptive error message
-    assert "POST /foo E" in result.stdout
-    lines = result.stdout.splitlines()
-    for idx, line in enumerate(lines):  # noqa: B007
-        if "__ POST /foo __" in line:
-            break
-    else:
-        pytest.fail("Line not found")
-    assert r"Got pattern='\\p{Alpha}', but this is not valid syntax for a Python regular expression" in lines[idx + 1]
+    assert cli.run(str(schema_file), "--dry-run", "--hypothesis-max-examples=1") == snapshot_cli
 
 
 @pytest.mark.parametrize("extra", ("--auth='test:wrong'", "-H Authorization: Basic J3Rlc3Q6d3Jvbmcn"))
@@ -1869,7 +1803,7 @@ def test_get_exit_code(swagger_20, capsys):
 
 @pytest.mark.parametrize("base_url", (None, "http://127.0.0.1/apiv2"))
 @pytest.mark.parametrize("location", ("path", "query", "header", "cookie"))
-def test_missing_content_and_schema(cli, base_url, tmp_path, testdir, empty_open_api_3_schema, location):
+def test_missing_content_and_schema(cli, base_url, tmp_path, testdir, empty_open_api_3_schema, location, snapshot_cli):
     debug_file = tmp_path / "debug.jsonl"
     # When an Open API 3 parameter is missing `schema` & `content`
     empty_open_api_3_schema["paths"] = {
@@ -1885,19 +1819,9 @@ def test_missing_content_and_schema(cli, base_url, tmp_path, testdir, empty_open
     ]
     if base_url is not None:
         args.append(f"--base-url={base_url}")
-    result = cli.run(*args)
-    lines = result.stdout.split("\n")
     # Then CLI should show that this API operation errored
     # And show the proper message under its "ERRORS" section
-    if base_url is None:
-        assert lines[7].startswith("GET /foo E")
-    else:
-        assert lines[7].startswith("GET /apiv2/foo E")
-        assert "_ GET /apiv2/foo _" in lines[10]
-    assert (
-        lines[11] == f'OperationSchemaError: Can not generate data for {location} parameter "X-Foo"! '
-        "It should have either `schema` or `content` keywords defined"
-    )
+    assert cli.run(*args) == snapshot_cli
     # And emitted Before / After event pairs have the same correlation ids
     with debug_file.open(encoding="utf-8") as fd:
         events = [json.loads(line) for line in fd]
@@ -2092,52 +2016,24 @@ def test_disable_report_suggestion(monkeypatch, cli, schema_url):
     ),
 )
 def test_invalid_schema_with_disabled_validation(
-    testdir, cli, openapi_3_schema_with_invalid_security, version, details
+    testdir, cli, openapi_3_schema_with_invalid_security, version, details, snapshot_cli
 ):
     # When there is an error in the schema
     openapi_3_schema_with_invalid_security["openapi"] = version
     schema_file = testdir.makefile(".json", schema=json.dumps(openapi_3_schema_with_invalid_security))
     # And the validation is disabled (default)
-    result = cli.run(str(schema_file), "--dry-run", "--experimental=openapi-3.1")
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then we should show an error message derived from JSON Schema
-    assert (
-        f"""OperationSchemaError: Invalid `bearerAuth` definition
-
-Location:
-    components -> securitySchemes -> bearerAuth
-
-Problematic definition:
-{{
-    "scheme": "bearer",
-    "bearerFormat": "uuid"
-}}
-
-Error details:
-    {details}
-
-Ensure that the definition complies with the OpenAPI specification"""
-        in result.stdout
-    )
+    assert cli.run(str(schema_file), "--dry-run", "--experimental=openapi-3.1") == snapshot_cli
 
 
-def test_unresolvable_reference_with_disabled_validation(testdir, cli, open_api_3_schema_with_recoverable_errors):
+def test_unresolvable_reference_with_disabled_validation(
+    testdir, cli, open_api_3_schema_with_recoverable_errors, snapshot_cli
+):
     # When there is an error in the schema
     schema_file = testdir.makefile(".json", schema=json.dumps(open_api_3_schema_with_recoverable_errors))
     # And the validation is disabled (default)
-    result = cli.run(str(schema_file), "--dry-run")
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then we should show an error message derived from JSON Schema
-    assert (
-        """OperationSchemaError: Unresolvable JSON pointer in the schema
-
-Error details:
-    JSON pointer: 'components/UnknownMethods'
-    This typically means that the schema is referencing a component that doesn't exist.
-
-Ensure that the definition complies with the OpenAPI specification"""
-        in result.stdout
-    )
+    assert cli.run(str(schema_file), "--dry-run") == snapshot_cli
 
 
 @pytest.mark.parametrize("value", ("true", "false"))

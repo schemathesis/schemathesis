@@ -1,0 +1,34 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: /schema.yaml
+Base URL: /api
+Specification version: Swagger 2.0
+Workers: 1
+Collected API operations: 1
+
+POST /api/unsatisfiable E                                                 [100%]
+
+==================================== ERRORS ====================================
+___________________________ POST /api/unsatisfiable ____________________________
+Schema Error
+
+Failed to generate test cases for this API operation. Possible reasons:
+
+    - Contradictory schema constraints, such as a minimum value exceeding the maximum.
+    - Excessive schema complexity, which hinders parameter generation.
+
+Tip: Examine the schema for inconsistencies and consider simplifying it.
+
+Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+Hint: You can visualize test results in Schemathesis.io by using `--report` in your CLI command.
+
+============================== 1 errored in 1.00s ==============================

@@ -13,6 +13,7 @@ Changelog
 - Clarify CLI error messages for loading hooks and WSGI applications.
 - Clarify CLI option docstrings.
 - Provide an error message if an internal error happened inside CLI event handler.
+- Clarify CLI error messages for issues coming from network and configuration. `#1607`_, `#1835`_
 
 .. _v3.20.2:
 
@@ -3508,6 +3509,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1835: https://github.com/schemathesis/schemathesis/issues/1835
 .. _#1820: https://github.com/schemathesis/schemathesis/issues/1820
 .. _#1819: https://github.com/schemathesis/schemathesis/issues/1819
 .. _#1808: https://github.com/schemathesis/schemathesis/issues/1808
@@ -3542,6 +3544,7 @@ Deprecated
 .. _#1627: https://github.com/schemathesis/schemathesis/issues/1627
 .. _#1625: https://github.com/schemathesis/schemathesis/issues/1625
 .. _#1614: https://github.com/schemathesis/schemathesis/issues/1614
+.. _#1607: https://github.com/schemathesis/schemathesis/issues/1607
 .. _#1602: https://github.com/schemathesis/schemathesis/issues/1602
 .. _#1592: https://github.com/schemathesis/schemathesis/issues/1592
 .. _#1591: https://github.com/schemathesis/schemathesis/issues/1591

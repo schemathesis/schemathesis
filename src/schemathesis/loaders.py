@@ -4,17 +4,13 @@ import sys
 from functools import lru_cache
 from typing import Callable, TypeVar, cast, TYPE_CHECKING, TextIO, Any, Dict, Type, BinaryIO
 
-from .exceptions import SchemaError, SchemaErrorType
+from .exceptions import SchemaError, SchemaErrorType, extract_requests_exception_details
 
 if TYPE_CHECKING:
     from .transports.responses import GenericResponse
     import yaml
 
 R = TypeVar("R", bound="GenericResponse")
-
-
-def remove_ssl_line_number(text: str) -> str:
-    return re.sub(r"\(_ssl\.c:\d+\)", "", text)
 
 
 def load_schema_from_url(loader: Callable[[], R]) -> R:
@@ -25,20 +21,13 @@ def load_schema_from_url(loader: Callable[[], R]) -> R:
     except requests.RequestException as exc:
         request = cast(requests.PreparedRequest, exc.request)
         if isinstance(exc, requests.exceptions.SSLError):
-            message = "SSL verification problem"
             type_ = SchemaErrorType.CONNECTION_SSL
-            reason = str(exc.args[0].reason)
-            extra = [remove_ssl_line_number(reason)]
         elif isinstance(exc, requests.exceptions.ConnectionError):
-            message = "Connection failed"
             type_ = SchemaErrorType.CONNECTION_OTHER
-            _, reason = exc.args[0].reason.args[0].split(":", maxsplit=1)
-            extra = [reason.strip()]
         else:
-            message = "Network problem"
             type_ = SchemaErrorType.NETWORK_OTHER
-            extra = []
-        raise SchemaError(message=message, type=type_, url=request.url, response=exc.response, extras=extra) from exc
+        message, extras = extract_requests_exception_details(exc)
+        raise SchemaError(message=message, type=type_, url=request.url, response=exc.response, extras=extras) from exc
     _raise_for_status(response)
     return response
 

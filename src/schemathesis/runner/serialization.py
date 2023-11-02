@@ -9,7 +9,18 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union, TYPE_CHECKING
 
 from ..transports import serialize_payload
 from ..code_samples import get_excluded_headers
-from ..exceptions import FailureContext, InternalError, make_unique_by_key, format_exception
+from ..exceptions import (
+    FailureContext,
+    InternalError,
+    make_unique_by_key,
+    format_exception,
+    extract_requests_exception_details,
+    RuntimeErrorType,
+    DeadlineExceeded,
+    OperationSchemaError,
+    BodyInGetRequestError,
+    InvalidRegularExpression,
+)
 from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
 
 if TYPE_CHECKING:
@@ -155,21 +166,76 @@ def get_serialized_history(case: Case) -> List[SerializedHistoryEntry]:
 
 @dataclass
 class SerializedError:
+    type: RuntimeErrorType
+    title: Optional[str]
+    message: Optional[str]
+    extras: List[str]
+
+    # Exception info
     exception: str
     exception_with_traceback: str
-    title: Optional[str]
 
     @classmethod
-    def from_error(
+    def with_exception(
         cls,
+        type_: RuntimeErrorType,
+        title: Optional[str],
+        message: Optional[str],
+        extras: List[str],
         exception: Exception,
-        title: Optional[str] = None,
     ) -> "SerializedError":
         return cls(
+            type=type_,
+            title=title,
+            message=message,
+            extras=extras,
             exception=format_exception(exception),
             exception_with_traceback=format_exception(exception, True),
-            title=title,
         )
+
+    @classmethod
+    def from_exception(cls, exception: Exception) -> "SerializedError":
+        import requests
+        import hypothesis.errors
+
+        title = "Runtime Error"
+        message: Optional[str]
+        if isinstance(exception, requests.RequestException):
+            if isinstance(exception, requests.exceptions.SSLError):
+                type_ = RuntimeErrorType.CONNECTION_SSL
+            elif isinstance(exception, requests.exceptions.ConnectionError):
+                type_ = RuntimeErrorType.CONNECTION_OTHER
+            else:
+                type_ = RuntimeErrorType.NETWORK_OTHER
+            message, extras = extract_requests_exception_details(exception)
+            title = "Network Error"
+        elif isinstance(exception, DeadlineExceeded):
+            type_ = RuntimeErrorType.HYPOTHESIS_DEADLINE_EXCEEDED
+            message = str(exception).strip()
+            extras = []
+        elif isinstance(exception, hypothesis.errors.Unsatisfiable):
+            type_ = RuntimeErrorType.HYPOTHESIS_UNSATISFIABLE
+            message = f"{exception}. Possible reasons:"
+            extras = [
+                "- Contradictory schema constraints, such as a minimum value exceeding the maximum.",
+                "- Excessive schema complexity, which hinders parameter generation.",
+            ]
+            title = "Schema Error"
+        elif isinstance(exception, OperationSchemaError):
+            if isinstance(exception, BodyInGetRequestError):
+                type_ = RuntimeErrorType.SCHEMA_BODY_IN_GET_REQUEST
+            elif isinstance(exception, InvalidRegularExpression):
+                type_ = RuntimeErrorType.SCHEMA_INVALID_REGULAR_EXPRESSION
+            else:
+                type_ = RuntimeErrorType.SCHEMA_GENERIC
+            message = exception.message
+            extras = []
+            title = "Schema Error"
+        else:
+            type_ = RuntimeErrorType.UNCLASSIFIED
+            message = str(exception)
+            extras = []
+        return cls.with_exception(type_=type_, exception=exception, title=title, message=message, extras=extras)
 
 
 @dataclass
@@ -226,7 +292,7 @@ class SerializedTestResult:
             data_generation_method=[m.as_short_name() for m in result.data_generation_method],
             checks=[SerializedCheck.from_check(check) for check in result.checks],
             logs=[formatter.format(record) for record in result.logs],
-            errors=[SerializedError.from_error(error) for error in result.errors],
+            errors=[SerializedError.from_exception(error) for error in result.errors],
             interactions=[SerializedInteraction.from_interaction(interaction) for interaction in result.interactions],
         )
 

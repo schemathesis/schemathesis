@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import re
 import threading
 import time
 import unittest
@@ -353,7 +354,7 @@ def run_test(
     except hypothesis.errors.Unsatisfiable:
         # We need more clear error message here
         status = Status.error
-        result.add_error(hypothesis.errors.Unsatisfiable("Unable to satisfy schema parameters for this API operation"))
+        result.add_error(hypothesis.errors.Unsatisfiable("Failed to generate test cases for this API operation"))
     except KeyboardInterrupt:
         yield events.Interrupted()
         return
@@ -372,7 +373,7 @@ def run_test(
         message = get_invalid_regular_expression_message(warnings)
         if message:
             # `hypothesis-jsonschema` emits a warning on invalid regular expression syntax
-            result.add_error(InvalidRegularExpression(message))
+            result.add_error(InvalidRegularExpression.from_hypothesis_jsonschema_message(message))
         else:
             result.add_error(error)
     except hypothesis.errors.DeadlineExceeded as error:
@@ -472,11 +473,16 @@ def reraise(operation: APIOperation) -> OperationSchemaError:
     return OperationSchemaError("Unknown schema error")
 
 
+MEMORY_ADDRESS_RE = re.compile("0x[0-9a-fA-F]+")
+
+
 def deduplicate_errors(errors: List[Exception]) -> Generator[Exception, None, None]:
     """Deduplicate errors by their messages + tracebacks."""
     seen = set()
     for error in errors:
         message = format_exception(error, True)
+        # Replace memory addresses with a fixed string
+        message = MEMORY_ADDRESS_RE.sub("0xbaaaaaaaaaad", message)
         if message in seen:
             continue
         seen.add(message)

@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
 
 from ..internal.datetime import current_datetime
 from ..generation import DataGenerationMethod
-from ..exceptions import SchemaError, SchemaErrorType, format_exception
+from ..exceptions import SchemaError, SchemaErrorType, format_exception, RuntimeErrorType
 from .serialization import SerializedError, SerializedTestResult
 
 
@@ -205,7 +205,7 @@ class InternalError(ExecutionEvent):
             subtype=error.type,
             title="Schema Loading Error",
             message=error.message,
-            extra=error.extras,
+            extras=error.extras,
         )
 
     @classmethod
@@ -216,7 +216,7 @@ class InternalError(ExecutionEvent):
             subtype=None,
             title="Test Execution Error",
             message="An internal error occurred during the test run",
-            extra=[],
+            extras=[],
         )
 
     @classmethod
@@ -227,7 +227,7 @@ class InternalError(ExecutionEvent):
         subtype: Optional[SchemaErrorType],
         title: str,
         message: str,
-        extra: List[str],
+        extras: List[str],
     ) -> "InternalError":
         exception_type = f"{exc.__class__.__module__}.{exc.__class__.__qualname__}"
         exception = format_exception(exc)
@@ -237,7 +237,7 @@ class InternalError(ExecutionEvent):
             subtype=subtype,
             title=title,
             message=message,
-            extras=extra,
+            extras=extras,
             exception_type=exception_type,
             exception=exception,
             exception_with_traceback=exception_with_traceback,
@@ -284,7 +284,14 @@ class Finished(ExecutionEvent):
             is_empty=results.is_empty,
             total=results.total,
             generic_errors=[
-                SerializedError.from_error(exception=error, title=error.full_path) for error in results.generic_errors
+                SerializedError.with_exception(
+                    type_=RuntimeErrorType.SCHEMA_GENERIC,
+                    exception=error,
+                    title=error.full_path,
+                    message=error.message,
+                    extras=[],
+                )
+                for error in results.generic_errors
             ],
             warnings=results.warnings,
             running_time=running_time,

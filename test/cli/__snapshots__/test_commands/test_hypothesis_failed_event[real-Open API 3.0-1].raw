@@ -1,0 +1,31 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Workers: 1
+Collected API operations: 2
+
+GET /api/slow E                                                           [ 50%]
+GET /api/success .                                                        [100%]
+
+==================================== ERRORS ====================================
+________________________________ GET /api/slow _________________________________
+Runtime Error
+
+API response time is too slow! It took 500.00ms, which exceeds the deadline of 20.00ms.
+
+Tip: Adjust the deadline using `--hypothesis-deadline=MILLIS` or disable with `--hypothesis-deadline=None`.
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                    N / N passed          PASSED 
+
+Hint: You can visualize test results in Schemathesis.io by using `--report` in your CLI command.
+
+========================= in 1.00s =========================
