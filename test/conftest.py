@@ -10,6 +10,7 @@ from textwrap import dedent
 from types import SimpleNamespace
 from typing import Any, Dict, Optional, Union
 
+import httpx
 import pytest
 import requests
 import yaml
@@ -1048,6 +1049,32 @@ def is_older_subtests():
 
 @pytest.fixture
 def response_factory():
+    def _generic_request_factory(
+        response: Union[httpx.Response, requests.Response],
+        content_type: Optional[str] = "application/json",
+        status_code: int = 200,
+        headers: Optional[Dict[str, Any]] = None,
+    ) -> Union[httpx.Response, requests.Response]:
+        response.status_code = status_code
+        headers = headers or {}
+        if content_type:
+            headers.setdefault("Content-Type", content_type)
+        response.headers.update(headers)
+        return response
+
+    def httpx_factory(
+        *,
+        content: bytes = b"{}",
+        content_type: Optional[str] = "application/json",
+        status_code: int = 200,
+        headers: Optional[Dict[str, Any]] = None,
+    ) -> httpx.Response:
+        response = httpx.Response()
+        response = _generic_request_factory(response, content_type, status_code, headers)
+        response.content = HTTPResponse(body=io.BytesIO(content), status=status_code, headers=response.headers)
+        response.request = httpx.Request(method="POST", url="http://127.0.0.1", headers=headers)
+        return response
+
     def requests_factory(
         *,
         content: bytes = b"{}",
@@ -1056,12 +1083,8 @@ def response_factory():
         headers: Optional[Dict[str, Any]] = None,
     ) -> requests.Response:
         response = requests.Response()
+        response = _generic_request_factory(response, content_type, status_code, headers)
         response._content = content
-        response.status_code = status_code
-        headers = headers or {}
-        if content_type:
-            headers.setdefault("Content-Type", content_type)
-        response.headers.update(headers)
         response.raw = HTTPResponse(body=io.BytesIO(content), status=status_code, headers=response.headers)
         response.request = requests.PreparedRequest()
         response.request.prepare(method="POST", url="http://127.0.0.1", headers=headers)
@@ -1076,6 +1099,7 @@ def response_factory():
         return response
 
     return SimpleNamespace(
+        httpx=httpx_factory,
         requests=requests_factory,
         werkzeug=werkzeug_factory,
     )
