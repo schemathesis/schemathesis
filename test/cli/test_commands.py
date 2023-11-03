@@ -4,6 +4,9 @@ import pathlib
 import platform
 import sys
 import time
+
+import urllib3.exceptions
+
 from test.apps._graphql._flask import create_app as create_graphql_app
 from test.apps.openapi._flask import create_app as create_openapi_app
 from test.utils import HERE, SIMPLE_PATH, strip_style_win32
@@ -755,6 +758,22 @@ def test_connection_error(cli, schema_url, workers, snapshot_cli):
     # Then the whole Schemathesis run should fail
     # And the proper error messages should be displayed for each operation
     assert cli.run(schema_url, "--base-url=http://127.0.0.1:1/api", f"--workers={workers}") == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_chunked_encoding_error(mocker, cli, schema_url, app, snapshot_cli):
+    app["config"]["chunked"] = True
+
+    def _update_chunk_length(response):
+        value = b""
+        try:
+            int(value, 16)
+        except ValueError as e:
+            raise urllib3.exceptions.InvalidChunkLength(response, value) from e
+
+    mocker.patch("urllib3.response.HTTPResponse._update_chunk_length", _update_chunk_length)
+    assert cli.run(schema_url) == snapshot_cli
 
 
 @pytest.fixture
