@@ -73,10 +73,9 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: actions/setup-python@v4.7.0
+      - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python }}
-          allow-prereleases: true
 
       - run: pip install tox tox-gh-actions
 
