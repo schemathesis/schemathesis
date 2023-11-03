@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import re
 import shlex
@@ -906,6 +907,11 @@ def testdir(testdir):
         return result
 
     testdir.run_and_assert = run_and_assert
+
+    def make_schema_file(schema):
+        return testdir.makefile(".json", schema=json.dumps(schema))
+
+    testdir.make_schema_file = make_schema_file
 
     return testdir
 

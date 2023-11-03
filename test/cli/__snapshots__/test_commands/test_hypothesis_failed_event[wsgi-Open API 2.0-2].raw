@@ -14,7 +14,7 @@ Collected API operations: 2
 ________________________________ GET /api/slow _________________________________
 Runtime Error
 
-API response time is too slow! It took 500.00ms, which exceeds the deadline of 20.00ms.
+Test running time is too slow! It took 500.00ms, which exceeds the deadline of 20.00ms.
 
 Tip: Adjust the deadline using `--hypothesis-deadline=MILLIS` or disable with `--hypothesis-deadline=None`.
 

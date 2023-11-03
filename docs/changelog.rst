@@ -10,10 +10,10 @@ Changelog
   compatibility with ``hypothesis-jsonschema``.
 - Do not modify ``Case.body`` inside ``Case.as_requests_kwargs`` when serializing multipart data.
 - **INTERNAL**: Moved heavy imports inside functions to improve CLI startup time by 4.3x, not affecting overall execution speed. `#1509`_
-- Clarify CLI error messages for loading hooks and WSGI applications.
-- Clarify CLI option docstrings.
-- Provide an error message if an internal error happened inside CLI event handler.
-- Clarify CLI error messages for issues coming from network and configuration. `#1607`_, `#1835`_
+- Improved messaging for loading hooks and WSGI application issues.
+- Refined documentation strings for CLI options.
+- Added an error message if an internal error happened inside CLI event handler.
+- Unified CLI messages for errors arising from network, configuration, and Hypothesis-related issues. `#1607`_, `#1782`_, `#1835`_
 
 .. _v3.20.2:
 
@@ -3520,6 +3520,7 @@ Deprecated
 .. _#1789: https://github.com/schemathesis/schemathesis/issues/1789
 .. _#1788: https://github.com/schemathesis/schemathesis/issues/1788
 .. _#1783: https://github.com/schemathesis/schemathesis/issues/1783
+.. _#1782: https://github.com/schemathesis/schemathesis/issues/1782
 .. _#1781: https://github.com/schemathesis/schemathesis/issues/1781
 .. _#1780: https://github.com/schemathesis/schemathesis/issues/1780
 .. _#1776: https://github.com/schemathesis/schemathesis/issues/1776
