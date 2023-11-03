@@ -306,7 +306,7 @@ def test_hypothesis_deadline_always_an_error(wsgi_app_schema, flask_app):
     # Then it should always be marked as an error, not a flaky failure
     assert not after.result.is_flaky
     assert after.result.errors
-    assert after.result.errors[0].exception.startswith("DeadlineExceeded: API response time is too slow!")
+    assert after.result.errors[0].exception.startswith("DeadlineExceeded: Test running time is too slow!")
 
 
 @pytest.mark.operations("multipart")

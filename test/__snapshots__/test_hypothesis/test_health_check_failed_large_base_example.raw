@@ -1,0 +1,36 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/schema.json
+Base URL: file:///
+Specification version: Open API 3.0.2
+Workers: 1
+Collected API operations: 1
+
+POST /data E                                                              [100%]
+
+==================================== ERRORS ====================================
+__________________________________ POST /data __________________________________
+Failed Health Check
+
+A health check has identified that the smallest example derived from the schema
+is excessively large, potentially leading to inefficient test execution.
+
+This is commonly due to schemas that specify large-scale data structures by
+default, such as an array with an extensive number of elements.
+
+Consider revising the schema to more accurately represent typical use cases
+or applying constraints to reduce the data size.
+
+Tip: Bypass this health check using `--hypothesis-suppress-health-check=large_base_example`.
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+Hint: You can visualize test results in Schemathesis.io by using `--report` in your CLI command.
+
+============================== 1 errored in 1.00s ==============================

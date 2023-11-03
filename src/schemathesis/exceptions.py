@@ -254,7 +254,7 @@ class DeadlineExceeded(Exception):
         runtime = exc.runtime.total_seconds() * 1000
         deadline = exc.deadline.total_seconds() * 1000
         return cls(
-            f"API response time is too slow! It took {runtime:.2f}ms, which exceeds the deadline of {deadline:.2f}ms.\n"
+            f"Test running time is too slow! It took {runtime:.2f}ms, which exceeds the deadline of {deadline:.2f}ms.\n"
         )
 
 
@@ -268,6 +268,10 @@ class RuntimeErrorType(str, enum.Enum):
     # Hypothesis issues
     HYPOTHESIS_DEADLINE_EXCEEDED = "hypothesis_deadline_exceeded"
     HYPOTHESIS_UNSATISFIABLE = "hypothesis_unsatisfiable"
+    HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE = "hypothesis_health_check_data_too_large"
+    HYPOTHESIS_HEALTH_CHECK_FILTER_TOO_MUCH = "hypothesis_health_check_filter_too_much"
+    HYPOTHESIS_HEALTH_CHECK_TOO_SLOW = "hypothesis_health_check_too_slow"
+    HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE = "hypothesis_health_check_large_base_example"
 
     SCHEMA_BODY_IN_GET_REQUEST = "schema_body_in_get_request"
     SCHEMA_INVALID_REGULAR_EXPRESSION = "schema_invalid_regular_expression"

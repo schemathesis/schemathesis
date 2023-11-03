@@ -4,6 +4,7 @@ They all consist of primitive types and don't have references to schemas, app, e
 """
 from __future__ import annotations
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple, Union, TYPE_CHECKING
 
@@ -24,6 +25,7 @@ from ..exceptions import (
 from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
 
 if TYPE_CHECKING:
+    import hypothesis.errors
     from requests.structures import CaseInsensitiveDict
 
 
@@ -197,6 +199,7 @@ class SerializedError:
     def from_exception(cls, exception: Exception) -> "SerializedError":
         import requests
         import hypothesis.errors
+        from hypothesis import HealthCheck
 
         title = "Runtime Error"
         message: Optional[str]
@@ -221,6 +224,32 @@ class SerializedError:
                 "- Excessive schema complexity, which hinders parameter generation.",
             ]
             title = "Schema Error"
+        elif isinstance(exception, hypothesis.errors.FailedHealthCheck):
+            health_check = _health_check_from_error(exception)
+            if health_check is not None:
+                message, type_ = {
+                    HealthCheck.data_too_large: (
+                        HEALTH_CHECK_MESSAGE_DATA_TOO_LARGE,
+                        RuntimeErrorType.HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE,
+                    ),
+                    HealthCheck.filter_too_much: (
+                        HEALTH_CHECK_MESSAGE_FILTER_TOO_MUCH,
+                        RuntimeErrorType.HYPOTHESIS_HEALTH_CHECK_FILTER_TOO_MUCH,
+                    ),
+                    HealthCheck.too_slow: (
+                        HEALTH_CHECK_MESSAGE_TOO_SLOW,
+                        RuntimeErrorType.HYPOTHESIS_HEALTH_CHECK_TOO_SLOW,
+                    ),
+                    HealthCheck.large_base_example: (
+                        HEALTH_CHECK_MESSAGE_LARGE_BASE_EXAMPLE,
+                        RuntimeErrorType.HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE,
+                    ),
+                }[health_check]
+            else:
+                type_ = RuntimeErrorType.UNCLASSIFIED
+                message = str(exception)
+            extras = []
+            title = "Failed Health Check"
         elif isinstance(exception, OperationSchemaError):
             if isinstance(exception, BodyInGetRequestError):
                 type_ = RuntimeErrorType.SCHEMA_BODY_IN_GET_REQUEST
@@ -236,6 +265,42 @@ class SerializedError:
             message = str(exception)
             extras = []
         return cls.with_exception(type_=type_, exception=exception, title=title, message=message, extras=extras)
+
+
+HEALTH_CHECK_MESSAGE_DATA_TOO_LARGE = """There's a notable occurrence of examples surpassing the maximum size limit.
+Typically, generating excessively large examples can compromise the quality of test outcomes.
+
+Consider revising the schema to more accurately represent typical use cases
+or applying constraints to reduce the data size."""
+HEALTH_CHECK_MESSAGE_FILTER_TOO_MUCH = """A significant number of generated examples are being filtered out, indicating
+that the schema's constraints may be too complex.
+
+This level of filtration can slow down testing and affect the distribution
+of generated data. Review and simplify the schema constraints where
+possible to mitigate this issue."""
+HEALTH_CHECK_MESSAGE_TOO_SLOW = "Data generation is extremely slow. Consider reducing the complexity of the schema."
+HEALTH_CHECK_MESSAGE_LARGE_BASE_EXAMPLE = """A health check has identified that the smallest example derived from the schema
+is excessively large, potentially leading to inefficient test execution.
+
+This is commonly due to schemas that specify large-scale data structures by
+default, such as an array with an extensive number of elements.
+
+Consider revising the schema to more accurately represent typical use cases
+or applying constraints to reduce the data size."""
+
+
+def _health_check_from_error(exception: hypothesis.errors.FailedHealthCheck) -> Optional[hypothesis.HealthCheck]:
+    from hypothesis import HealthCheck
+
+    match = re.search(r"add HealthCheck\.(\w+) to the suppress_health_check ", str(exception))
+    if match:
+        return {
+            "data_too_large": HealthCheck.data_too_large,
+            "filter_too_much": HealthCheck.filter_too_much,
+            "too_slow": HealthCheck.too_slow,
+            "large_base_example": HealthCheck.large_base_example,
+        }.get(match.group(1))
+    return None
 
 
 @dataclass
