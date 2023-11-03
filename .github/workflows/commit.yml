@@ -16,4 +16,4 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run commitsar
-        uses: aevea/commitsar@v0.18.0
+        uses: aevea/commitsar@v0.20.2
