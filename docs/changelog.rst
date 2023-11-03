@@ -6,7 +6,7 @@ Changelog
 
 **Added**
 
-- Add Python 3.12 compatibility.
+- Add Python 3.12 compatibility. `#1809`_
 
 **Changed**
 
@@ -3516,6 +3516,7 @@ Deprecated
 .. _#1835: https://github.com/schemathesis/schemathesis/issues/1835
 .. _#1820: https://github.com/schemathesis/schemathesis/issues/1820
 .. _#1819: https://github.com/schemathesis/schemathesis/issues/1819
+.. _#1809: https://github.com/schemathesis/schemathesis/issues/1809
 .. _#1808: https://github.com/schemathesis/schemathesis/issues/1808
 .. _#1802: https://github.com/schemathesis/schemathesis/issues/1802
 .. _#1801: https://github.com/schemathesis/schemathesis/issues/1801
