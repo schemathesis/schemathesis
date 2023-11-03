@@ -26,7 +26,7 @@ jobs:
     name: Generic pre-commit checks
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3.0.0
+      - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 1
 
@@ -41,7 +41,7 @@ jobs:
     name: Documentation
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3.0.0
+      - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 1
       - uses: ammaraskar/sphinx-action@master
@@ -69,7 +69,7 @@ jobs:
     name: Tests (Python ${{ matrix.python }} on ${{ matrix.os }} ${{ matrix.tox_env }})
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3.0.0
+      - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 1
 
