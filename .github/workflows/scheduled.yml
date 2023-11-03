@@ -11,7 +11,7 @@ jobs:
     name: mutmut
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3.0.0
+      - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 1
 
@@ -44,7 +44,7 @@ jobs:
     name: Hypothesis tests with CI profile
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3.0.0
+      - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 1
 
@@ -59,7 +59,7 @@ jobs:
     name: Corpus tests. Part 1
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3.0.0
+      - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 1
           submodules: true
@@ -76,7 +76,7 @@ jobs:
     name: Corpus tests. Part 2
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3.0.0
+      - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 1
           submodules: true
@@ -94,7 +94,7 @@ jobs:
     name: Corpus tests. Part 3
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3.0.0
+      - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 1
           submodules: true
@@ -111,7 +111,7 @@ jobs:
     name: Corpus tests. Part 4
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3.0.0
+      - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 1
           submodules: true
@@ -128,7 +128,7 @@ jobs:
     name: Corpus tests. Part 5
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v3.0.0
+      - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 1
           submodules: true
