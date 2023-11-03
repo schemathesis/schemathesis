@@ -15,7 +15,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: actions/setup-python@v3.1.0
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
@@ -48,7 +48,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: actions/setup-python@v3.1.0
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
@@ -64,7 +64,7 @@ jobs:
           fetch-depth: 1
           submodules: true
 
-      - uses: actions/setup-python@v3.1.0
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
@@ -81,7 +81,7 @@ jobs:
           fetch-depth: 1
           submodules: true
 
-      - uses: actions/setup-python@v3.1.0
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
@@ -99,7 +99,7 @@ jobs:
           fetch-depth: 1
           submodules: true
 
-      - uses: actions/setup-python@v3.1.0
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
@@ -116,7 +116,7 @@ jobs:
           fetch-depth: 1
           submodules: true
 
-      - uses: actions/setup-python@v3.1.0
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
@@ -133,7 +133,7 @@ jobs:
           fetch-depth: 1
           submodules: true
 
-      - uses: actions/setup-python@v3.1.0
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
