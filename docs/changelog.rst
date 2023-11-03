@@ -13,7 +13,7 @@ Changelog
 - Improved messaging for loading hooks and WSGI application issues.
 - Refined documentation strings for CLI options.
 - Added an error message if an internal error happened inside CLI event handler.
-- Unified CLI messages for errors arising from network, configuration, and Hypothesis-related issues. `#1607`_, `#1782`_, `#1835`_
+- Unified CLI messages for errors arising from network, configuration, and Hypothesis-related issues. `#1600`_, `#1607`_, `#1782`_, `#1835`_
 
 .. _v3.20.2:
 
@@ -3547,6 +3547,7 @@ Deprecated
 .. _#1614: https://github.com/schemathesis/schemathesis/issues/1614
 .. _#1607: https://github.com/schemathesis/schemathesis/issues/1607
 .. _#1602: https://github.com/schemathesis/schemathesis/issues/1602
+.. _#1600: https://github.com/schemathesis/schemathesis/issues/1600
 .. _#1592: https://github.com/schemathesis/schemathesis/issues/1592
 .. _#1591: https://github.com/schemathesis/schemathesis/issues/1591
 .. _#1584: https://github.com/schemathesis/schemathesis/issues/1584

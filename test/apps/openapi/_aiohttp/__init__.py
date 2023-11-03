@@ -42,7 +42,10 @@ def create_app(
         async def inner(request: web.Request) -> web.Response:
             await request.read()  # to introspect the payload in tests
             incoming_requests.append(request)
-            return await handler(request)
+            response = await handler(request)
+            if app["config"]["chunked"]:
+                response.headers["Transfer-Encoding"] = "chunked"
+            return response
 
         return inner
 
@@ -63,6 +66,7 @@ def create_app(
         "should_fail": True,
         "schema_data": make_openapi_schema(operations, version),
         "prefix_with_bom": False,
+        "chunked": False,
     }
     return app
 
@@ -77,5 +81,10 @@ def reset_app(
     app["incoming_requests"][:] = []
     app["schema_requests"][:] = []
     app["config"].update(
-        {"should_fail": True, "schema_data": make_openapi_schema(operations, version), "prefix_with_bom": False}
+        {
+            "should_fail": True,
+            "schema_data": make_openapi_schema(operations, version),
+            "prefix_with_bom": False,
+            "chunked": False,
+        }
     )
