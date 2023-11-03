@@ -489,3 +489,24 @@ def test_date_format(data):
 )
 def test_jsonify_python_specific_types(value, expected):
     assert jsonify_python_specific_types(value) == expected
+
+
+def test_health_check_failed_large_base_example(testdir, empty_open_api_3_schema, cli, snapshot_cli):
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "array", "items": {"type": "integer"}, "minItems": 10000}
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    schema_file = testdir.make_schema_file(empty_open_api_3_schema)
+    # Then it should be able to generate requests
+    assert cli.run(str(schema_file), "--dry-run", "--hypothesis-max-examples=1") == snapshot_cli
