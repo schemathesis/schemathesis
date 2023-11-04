@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4.1.1
 
       - name: GitHub Package Registry
-        uses: aevea/action-kaniko@v0.10.0
+        uses: aevea/action-kaniko@v0.6.2
         with:
           registry: docker.pkg.github.com
           password: ${{ secrets.GITHUB_TOKEN }}
@@ -22,7 +22,7 @@ jobs:
           cache_registry: cache
 
       - name: Alpine. Dockerhub
-        uses: aevea/action-kaniko@v0.10.0
+        uses: aevea/action-kaniko@v0.6.2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
@@ -31,7 +31,7 @@ jobs:
           cache_registry: schemathesis/cache
 
       - name: Alpine. Dockerhub stable
-        uses: aevea/action-kaniko@v0.10.0
+        uses: aevea/action-kaniko@v0.6.2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
@@ -43,7 +43,7 @@ jobs:
       - run: echo "buster_tag=$(echo -n ${GITHUB_REF} | sed -E 's/refs\/(heads|tags)\///g' | sed -e 's/\//-/g' | cat - <(echo "-buster"))" >> $GITHUB_ENV
 
       - name: Buster. Dockerhub
-        uses: aevea/action-kaniko@v0.10.0
+        uses: aevea/action-kaniko@v0.6.2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
@@ -54,7 +54,7 @@ jobs:
           cache_registry: schemathesis/cache
 
       - name: Buster. Dockerhub stable
-        uses: aevea/action-kaniko@v0.10.0
+        uses: aevea/action-kaniko@v0.6.2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
