@@ -59,6 +59,10 @@ Generates code samples to help you quickly replicate and investigate any failing
 
 ![image](https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/demo.gif)
 
+With a summary right in your PRs:
+
+![image](https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_github_report.png)
+
 ## Getting Started
 
 Choose from multiple ways to start testing your API with Schemathesis.
