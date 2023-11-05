@@ -21,6 +21,7 @@ from requests.auth import HTTPDigestAuth, _basic_auth_str
 
 from ... import failures, hooks
 from ..._compat import MultipleFailures
+from ..._dependency_versions import IS_HYPOTHESIS_ABOVE_6_54
 from ...auths import unregister as unregister_auth
 from ...generation import DataGenerationMethod
 from ...constants import DEFAULT_STATEFUL_RECURSION_LIMIT, RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
@@ -501,6 +502,15 @@ def run_checks(
 ) -> None:
     errors = []
 
+    def add_single_failure(error: AssertionError) -> None:
+        msg = maybe_set_assertion_message(error, check_name)
+        errors.append(error)
+        if isinstance(error, CheckFailed):
+            context = error.context
+        else:
+            context = None
+        check_results.append(result.add_failure(check_name, copied_case, copied_response, elapsed_time, msg, context))
+
     for check in checks:
         check_name = check.__name__
         copied_case = case.partial_deepcopy()
@@ -511,14 +521,14 @@ def run_checks(
                 check_result = result.add_success(check_name, copied_case, copied_response, elapsed_time)
                 check_results.append(check_result)
         except AssertionError as exc:
-            message = maybe_set_assertion_message(exc, check_name)
-            errors.append(exc)
-            if isinstance(exc, CheckFailed):
-                context = exc.context
+            add_single_failure(exc)
+        except MultipleFailures as exc:
+            if not IS_HYPOTHESIS_ABOVE_6_54:
+                exceptions = exc.args[1]
             else:
-                context = None
-            check_result = result.add_failure(check_name, copied_case, copied_response, elapsed_time, message, context)
-            check_results.append(check_result)
+                exceptions = exc.exceptions
+            for exception in exceptions:
+                add_single_failure(exception)
 
     if max_response_time:
         if elapsed_time > max_response_time:

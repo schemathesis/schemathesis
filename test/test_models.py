@@ -7,6 +7,7 @@ import requests
 from hypothesis import given, settings
 
 import schemathesis
+from schemathesis._compat import MultipleFailures
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.exceptions import CheckFailed, UsageError
@@ -536,7 +537,7 @@ def test_checks_errors_deduplication(empty_open_api_3_schema):
     response.request = requests.PreparedRequest()
     response.request.prepare(method="GET", url="http://example.com")
     # When there are two checks that raise the same failure
-    with pytest.raises(CheckFailed, match="The response is missing the `Content-Type` header") as exc:
+    with pytest.raises(MultipleFailures, match="The response is missing the `Content-Type` header") as exc:
         case.validate_response(response, checks=(content_type_conformance, response_schema_conformance))
     # Then the resulting output should be deduplicated
     assert "2. " not in str(exc.value)

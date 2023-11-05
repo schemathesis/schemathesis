@@ -22,10 +22,10 @@ from ...constants import (
 )
 from ...exceptions import RuntimeErrorType
 from ...experimental import GLOBAL_EXPERIMENTS
-from ...models import Response, Status
+from ...models import Status
 from ...runner import events
 from ...runner.events import InternalErrorType, SchemaErrorType
-from ...runner.serialization import SerializedCase, SerializedError, SerializedTestResult, deduplicate_failures
+from ...runner.serialization import SerializedError, SerializedTestResult, deduplicate_failures, SerializedCheck
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
 
@@ -259,12 +259,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
         click.echo()
     checks = deduplicate_failures(result.checks)
     for idx, check in enumerate(checks, 1):
-        message: Optional[str]
-        if check.message:
-            message = f"{idx}. {check.message}"
-        else:
-            message = None
-        display_example(context, check.example, check.response, message, result.seed)
+        display_example(context, idx, check, result.seed)
         # Display every time except the last check
         if idx != len(checks):
             click.echo("\n")
@@ -278,35 +273,30 @@ def reduce_schema_error(message: str) -> str:
     return message
 
 
-def display_example(
-    context: ExecutionContext,
-    case: SerializedCase,
-    response: Optional[Response] = None,
-    message: Optional[str] = None,
-    seed: Optional[int] = None,
-) -> None:
-    if message is not None:
+def display_example(context: ExecutionContext, idx: int, check: SerializedCheck, seed: Optional[int] = None) -> None:
+    if check.message:
+        message = f"{idx}. {check.message}"
         if not context.verbosity:
             message = reduce_schema_error(message)
         click.secho(message, fg="red")
         click.echo()
-    if response is not None and response.body is not None:
-        payload = base64.b64decode(response.body).decode(response.encoding or "utf8", errors="replace")
-        click.secho(f"Response status: {response.status_code}\nResponse payload: `{payload}`\n", fg="red")
-    request_body = base64.b64decode(case.body).decode() if case.body is not None else None
+    if check.response is not None and check.response.body is not None:
+        payload = base64.b64decode(check.response.body).decode(check.response.encoding or "utf8", errors="replace")
+        click.secho(f"Response status: {check.response.status_code}\nResponse payload: `{payload}`\n", fg="red")
+    request_body = base64.b64decode(check.example.body).decode() if check.example.body is not None else None
     code_sample = context.code_sample_style.generate(
-        method=case.method,
-        url=case.url,
+        method=check.example.method,
+        url=check.example.url,
         body=request_body,
-        headers=case.headers,
-        verify=case.verify,
-        extra_headers=case.extra_headers,
+        headers=check.example.headers,
+        verify=check.example.verify,
+        extra_headers=check.example.extra_headers,
     )
     click.secho(
         f"Run this {context.code_sample_style.verbose_name} to reproduce this failure: \n\n    {code_sample}\n",
         fg="red",
     )
-    click.secho(f"{SCHEMATHESIS_TEST_CASE_HEADER}: {case.id}\n", fg="red")
+    click.secho(f"{SCHEMATHESIS_TEST_CASE_HEADER}: {check.example.id}\n", fg="red")
     if seed is not None:
         click.secho(f"Or add this option to your command line parameters: --hypothesis-seed={seed}", fg="red")
 

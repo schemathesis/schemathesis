@@ -276,6 +276,7 @@ class CliSnapshotConfig:
     replace_multi_worker_progress: Union[bool, str] = True
     replace_statistic: bool = False
     replace_error_codes: bool = True
+    replace_test_case_id: bool = True
 
     @classmethod
     def from_request(cls, request: FixtureRequest) -> "CliSnapshotConfig":
@@ -321,6 +322,12 @@ class CliSnapshotConfig:
             data = re.sub(r"It took [0-9]+\.[0-9]{2}ms", "It took 500.00ms", data)
             lines = data.splitlines()
             lines[-1] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", lines[-1])
+            data = "\n".join(lines) + "\n"
+        if self.replace_test_case_id:
+            lines = data.splitlines()
+            for idx, line in enumerate(lines):
+                if "X-Schemathesis-TestCaseId:" in line:
+                    lines[idx] = "X-Schemathesis-TestCaseId: <PLACEHOLDER>"
             data = "\n".join(lines) + "\n"
         return data
 
