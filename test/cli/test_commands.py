@@ -2073,3 +2073,28 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
     else:
         expected = "curl -X GET -H 'Authorization: [Filtered]'"
     assert expected in result.stdout
+
+
+@pytest.mark.operations("success")
+def test_multiple_failures_in_single_check(
+    testdir, mocker, response_factory, cli, empty_open_api_3_schema, openapi3_base_url
+):
+    empty_open_api_3_schema["paths"] = {
+        "/success": {
+            "get": {
+                "responses": {
+                    "default": {"description": "text", "content": {"application/json": {"schema": {"type": "integer"}}}}
+                }
+            },
+        },
+    }
+    schema_file = testdir.make_schema_file(empty_open_api_3_schema)
+    response = response_factory.requests(content_type=None, status_code=200)
+    mocker.patch("requests.Session.request", return_value=response)
+    result = cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--checks=all")
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    assert "The received response does not conform to the defined schema!" in result.stdout
+    assert (
+        "The response is missing the `Content-Type` header. The schema defines the following media types:"
+        in result.stdout
+    )

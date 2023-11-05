@@ -43,6 +43,7 @@ from ...exceptions import (
     get_response_parsing_error,
     get_schema_validation_error,
 )
+from ..._compat import MultipleFailures
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, should_skip_operation
 from ...internal.result import Ok, Err, Result
 from ...models import APIOperation, Case, OperationDefinition
@@ -512,15 +513,20 @@ class BaseOpenAPISchema(BaseSchema):
             # No schema to check against
             return
         content_type = response.headers.get("Content-Type")
+        errors = []
         if content_type is None:
             media_types = self.get_content_types(operation, response)
             formatted_media_types = "\n    ".join(media_types)
-            raise get_missing_content_type_error()(
-                "The response is missing the `Content-Type` header. The schema defines the following media types:\n\n"
-                f"    {formatted_media_types}",
-                context=failures.MissingContentType(media_types),
-            )
-        if not is_json_media_type(content_type):
+            try:
+                raise get_missing_content_type_error()(
+                    "The response is missing the `Content-Type` header. "
+                    f"The schema defines the following media types:\n\n    {formatted_media_types}",
+                    context=failures.MissingContentType(media_types),
+                )
+            except Exception as exc:
+                errors.append(exc)
+        if content_type and not is_json_media_type(content_type):
+            _maybe_raise_one_or_more(errors)
             return
         try:
             if isinstance(response, requests.Response):
@@ -530,12 +536,20 @@ class BaseOpenAPISchema(BaseSchema):
         except JSONDecodeError as exc:
             exc_class = get_response_parsing_error(exc)
             payload = get_payload(response)
-            raise exc_class(
-                f"The received response is not valid JSON:\n\n    {payload}\n\nException: \n\n    {exc}",
-                context=failures.JSONDecodeErrorContext(
-                    validation_message=exc.msg, document=exc.doc, position=exc.pos, lineno=exc.lineno, colno=exc.colno
-                ),
-            ) from exc
+            try:
+                raise exc_class(
+                    f"The received response is not valid JSON:\n\n    {payload}\n\nException: \n\n    {exc}",
+                    context=failures.JSONDecodeErrorContext(
+                        validation_message=exc.msg,
+                        document=exc.doc,
+                        position=exc.pos,
+                        lineno=exc.lineno,
+                        colno=exc.colno,
+                    ),
+                ) from exc
+            except Exception as exc:
+                errors.append(exc)
+                _maybe_raise_one_or_more(errors)
         resolver = ConvertingResolver(
             self.location or "", self.raw_schema, nullable_name=self.nullable_name, is_response_schema=True
         )
@@ -548,16 +562,20 @@ class BaseOpenAPISchema(BaseSchema):
                 jsonschema.validate(data, schema, cls=cls, resolver=resolver)
             except jsonschema.ValidationError as exc:
                 exc_class = get_schema_validation_error(exc)
-                raise exc_class(
-                    f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}",
-                    context=failures.ValidationErrorContext(
-                        validation_message=exc.message,
-                        schema_path=list(exc.absolute_schema_path),
-                        schema=exc.schema,
-                        instance_path=list(exc.absolute_path),
-                        instance=exc.instance,
-                    ),
-                ) from exc
+                try:
+                    raise exc_class(
+                        f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}",
+                        context=failures.ValidationErrorContext(
+                            validation_message=exc.message,
+                            schema_path=list(exc.absolute_schema_path),
+                            schema=exc.schema,
+                            instance_path=list(exc.absolute_path),
+                            instance=exc.instance,
+                        ),
+                    ) from exc
+                except Exception as exc:
+                    errors.append(exc)
+        _maybe_raise_one_or_more(errors)
         return None  # explicitly return None for mypy
 
     @property
@@ -642,6 +660,15 @@ class BaseOpenAPISchema(BaseSchema):
             # Rewrite the reference with the new location
             schema["$ref"] = f"#/{INLINED_REFERENCES_KEY}/{key}"
         return schema
+
+
+def _maybe_raise_one_or_more(errors: List[Exception]) -> None:
+    if not errors:
+        return
+    elif len(errors) == 1:
+        raise errors[0]
+    else:
+        raise MultipleFailures("\n\n".join(str(error) for error in errors), errors)
 
 
 def _make_reference_key(scopes: List[str], reference: str) -> str:

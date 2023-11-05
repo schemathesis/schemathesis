@@ -2,7 +2,6 @@ import json
 from typing import Any, Dict
 
 import pytest
-import requests
 from hypothesis import given, settings
 
 import schemathesis
@@ -14,6 +13,7 @@ from schemathesis.checks import (
     response_schema_conformance,
     status_code_conformance,
 )
+from schemathesis._compat import MultipleFailures
 from schemathesis.exceptions import CheckFailed, OperationSchemaError
 from schemathesis.models import OperationDefinition, TestResult
 from schemathesis.runner.impl.core import run_checks
@@ -385,11 +385,7 @@ def test_response_conformance_no_content_type(request, spec, response_factory):
     # And no "Content-Type" header in the received response
     response = response_factory.requests(content_type=None, status_code=200)
     # Then the check should fail
-    with pytest.raises(
-        CheckFailed,
-        match="The response is missing the `Content-Type` header. "
-        "The schema defines the following media types:\n\n    application/json",
-    ):
+    with pytest.raises(MultipleFailures, match="The response is missing the `Content-Type` header"):
         response_schema_conformance(response, case)
 
 
@@ -499,7 +495,7 @@ def test_response_schema_conformance_references_valid(complex_schema, value, res
     test()
 
 
-def test_deduplication(empty_open_api_3_schema):
+def test_deduplication(empty_open_api_3_schema, response_factory):
     # See GH-1394
     empty_open_api_3_schema["paths"] = {
         "/data": {
@@ -513,10 +509,7 @@ def test_deduplication(empty_open_api_3_schema):
     schema = schemathesis.from_dict(empty_open_api_3_schema)
     operation = schema["/data"]["GET"]
     case = operation.make_case()
-    response = requests.Response()
-    response.status_code = 200
-    response.request = requests.PreparedRequest()
-    response.request.prepare(method="GET", url="http://example.com")
+    response = response_factory.requests()
     result = TestResult(
         method=operation.method.upper(),
         path=operation.full_path,
