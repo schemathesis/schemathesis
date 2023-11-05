@@ -18,6 +18,7 @@ Changelog
 - Refined documentation strings for CLI options.
 - Added an error message if an internal error happened inside CLI event handler.
 - Unified CLI messages for errors arising from network, configuration, and Hypothesis-related issues. `#1600`_, `#1607`_, `#1782`_, `#1835`_
+- Try to validate JSON data even if there is no proper ``Content-Type`` header. `#1787`_
 
 .. _v3.20.2:
 
@@ -3524,6 +3525,7 @@ Deprecated
 .. _#1794: https://github.com/schemathesis/schemathesis/issues/1794
 .. _#1789: https://github.com/schemathesis/schemathesis/issues/1789
 .. _#1788: https://github.com/schemathesis/schemathesis/issues/1788
+.. _#1787: https://github.com/schemathesis/schemathesis/issues/1787
 .. _#1783: https://github.com/schemathesis/schemathesis/issues/1783
 .. _#1782: https://github.com/schemathesis/schemathesis/issues/1782
 .. _#1781: https://github.com/schemathesis/schemathesis/issues/1781
