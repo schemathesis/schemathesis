@@ -12,6 +12,7 @@ USER_AGENT = f"schemathesis/{SCHEMATHESIS_VERSION}"
 SCHEMATHESIS_TEST_CASE_HEADER = "X-Schemathesis-TestCaseId"
 HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER = ":memory:"
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
+GITHUB_APP_LINK = "https://github.com/apps/schemathesis"
 # Maximum test running time
 DEFAULT_DEADLINE = 15000
 DEFAULT_RESPONSE_TIMEOUT = 10000

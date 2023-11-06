@@ -42,6 +42,7 @@ Experimental Features:
 
 Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
 
-Hint: You can visualize test results in Schemathesis.io by using `--report` in your CLI command.
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
 
 ============================== 1 errored in 1.00s ==============================
