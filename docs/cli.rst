@@ -576,6 +576,19 @@ Note that ``--force-color`` and ``--no-color`` are not compatible with each othe
 
 .. note:: See Docker volumes `documentation <https://docs.docker.com/storage/volumes/>`_ for more information.
 
+Docker on MacOS
+~~~~~~~~~~~~~~~
+
+Due to the networking behavior of Docker on MacOS, the containerized application cannot directly reach ``localhost`` of the host machine.
+To address this, MacOS users should use the special DNS name ``host.docker.internal`` when referring to the host within Docker.
+
+.. code-block:: bash
+
+    docker run schemathesis/schemathesis:stable \
+        run http://host.docker.internal:8080/swagger.json
+
+.. note:: See `Docker on MacOS documentation <https://docs.docker.com/desktop/networking/#i-want-to-connect-from-a-container-to-a-service-on-the-host>`_ for more details
+
 Full list of CLI options
 ------------------------
 
