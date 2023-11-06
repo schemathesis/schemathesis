@@ -15,6 +15,7 @@ Collected API operations: 1
 Performed checks:
     unique_test_cases                    30 / 30 passed          PASSED 
 
-Hint: You can visualize test results in Schemathesis.io by using `--report` in your CLI command.
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
 
 ============================== 1 passed in 1.00s ===============================
