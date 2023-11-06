@@ -49,6 +49,13 @@ def test_no_failures(cli, schema_url, service, next_url, upload_message):
 
 
 @pytest.mark.operations("success")
+@pytest.mark.openapi_version("3.0")
+def test_github_suggestion(monkeypatch, cli, schema_url, snapshot_cli):
+    monkeypatch.setenv(ci.GitHubActionsEnvironment.variable_name, "true")
+    assert cli.run(schema_url) == snapshot_cli
+
+
+@pytest.mark.operations("success")
 @pytest.mark.service(data={"detail": "Internal Server Error"}, status=500, method="POST", path="/reports/upload/")
 @pytest.mark.openapi_version("3.0")
 def test_server_error(cli, schema_url, service):

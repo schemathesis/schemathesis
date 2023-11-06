@@ -19,6 +19,7 @@ from ...constants import (
     SCHEMATHESIS_VERSION,
     FALSE_VALUES,
     ISSUE_TRACKER_URL,
+    GITHUB_APP_LINK,
 )
 from ...exceptions import RuntimeErrorType
 from ...experimental import GLOBAL_EXPERIMENTS
@@ -377,11 +378,15 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
         env_var = os.getenv(REPORT_SUGGESTION_ENV_VAR)
         if env_var is not None and env_var.lower() in FALSE_VALUES:
             return
-        click.echo()
-        category = click.style("Hint", bold=True)
         click.echo(
-            f"{category}: You can visualize test results in Schemathesis.io by using `--report` in your CLI command."
+            f"\n{bold('Tip')}: Use the {bold('`--report`')} CLI option to visualize test results via Schemathesis.io.\n"
+            "We run additional conformance checks on reports from public repos."
         )
+        if service.ci.detect() == service.ci.CIProvider.GITHUB:
+            click.echo(
+                "Optionally, for reporting results as PR comments, install the Schemathesis GitHub App:\n\n"
+                f"    {GITHUB_APP_LINK}"
+            )
 
 
 def handle_service_integration(context: ServiceReportContext) -> None:
