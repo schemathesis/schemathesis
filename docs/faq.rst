@@ -273,6 +273,13 @@ On Linux, the connection fails immediately if refused, allowing a quick switch t
 
 **Solution**: To avoid this delay, simply use http://127.0.0.1/ instead of http://localhost/. This ensures that Schemathesis will use IPv4 directly.
 
+Why can’t Schemathesis connect to my locally running application when run via Docker on MacOS?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The host has a changing IP address, or none if you have no network access. As a result, the Docker container cannot use ``localhost`` to reach the host machine.
+
+**Solution**: Instead, use ``host.docker.internal`` as the hostname to allow Schemathesis to connect to services running on the host.
+
 Working with API schemas
 ------------------------
 
