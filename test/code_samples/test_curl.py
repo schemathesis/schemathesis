@@ -51,7 +51,7 @@ def test_explicit_headers(curl):
 def test_cli_output(cli, base_url, schema_url, curl):
     result = cli.run(schema_url, "--code-sample-style=curl")
     lines = result.stdout.splitlines()
-    assert "Run this cURL command to reproduce this failure: " in lines
+    assert "Reproduce with: " in lines
     line = f"    curl -X GET {base_url}/failure"
     assert line in lines
     command = line.strip()
@@ -84,9 +84,7 @@ def test_(case):
     )
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1, failed=1)
-    result.stdout.re_match_lines(
-        [r"E +Run this cURL command to reproduce this response:", rf"E + curl -X GET {openapi3_base_url}/failure"]
-    )
+    result.stdout.re_match_lines([r"E +Reproduce with:", rf"E + curl -X GET {openapi3_base_url}/failure"])
 
 
 @pytest.mark.hypothesis_nested

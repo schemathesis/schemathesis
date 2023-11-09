@@ -93,6 +93,7 @@ class SerializedCheck:
     response: Optional[Response]
     # Generated example
     example: SerializedCase
+    # Message could be absent for plain `assert` statements
     message: Optional[str] = None
     # Failure-specific context
     context: Optional[FailureContext] = None

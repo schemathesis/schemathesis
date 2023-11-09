@@ -33,10 +33,10 @@ def load_schema_from_url(loader: Callable[[], R]) -> R:
 
 
 def _raise_for_status(response: "GenericResponse") -> None:
-    import http.client
+    from .transports.responses import get_reason
 
     status_code = response.status_code
-    reason = http.client.responses.get(status_code, "Unknown")
+    reason = get_reason(status_code)
     if status_code >= 500:
         message = f"Failed to load schema due to server error (HTTP {status_code} {reason})"
         type_ = SchemaErrorType.HTTP_SERVER_ERROR

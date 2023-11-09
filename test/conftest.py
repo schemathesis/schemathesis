@@ -22,6 +22,7 @@ from syrupy.types import PropertyFilter, PropertyMatcher
 from urllib3 import HTTPResponse
 
 import schemathesis.cli
+from schemathesis.cli.output.default import TEST_CASE_ID_TITLE
 from schemathesis.models import Case
 from schemathesis._compat import metadata
 from schemathesis._dependency_versions import IS_HYPOTHESIS_ABOVE_6_54
@@ -184,8 +185,13 @@ def server(_app):
 
 
 @pytest.fixture()
-def server_address(server):
-    return f"http://127.0.0.1:{server['port']}"
+def server_host(server):
+    return f"127.0.0.1:{server['port']}"
+
+
+@pytest.fixture()
+def server_address(server_host):
+    return f"http://{server_host}"
 
 
 @pytest.fixture()
@@ -270,13 +276,16 @@ def keep_cwd():
 @dataclass()
 class CliSnapshotConfig:
     request: FixtureRequest
-    replace_schema_location: bool = True
+    replace_server_host: bool = True
     replace_tmp_dir: bool = True
     replace_duration: bool = True
     replace_multi_worker_progress: Union[bool, str] = True
     replace_statistic: bool = False
     replace_error_codes: bool = True
     replace_test_case_id: bool = True
+    replace_uuid: bool = True
+    replace_response_time: bool = True
+    replace_seed: bool = True
 
     @classmethod
     def from_request(cls, request: FixtureRequest) -> "CliSnapshotConfig":
@@ -290,10 +299,10 @@ class CliSnapshotConfig:
         return self.request.getfixturevalue("testdir")
 
     def serialize(self, data: str) -> str:
-        if self.replace_schema_location:
+        if self.replace_server_host:
             try:
-                server_address = self.request.getfixturevalue("server_address")
-                data = data.replace(server_address, "http://127.0.0.1")
+                host = self.request.getfixturevalue("server_host")
+                data = data.replace(host, "127.0.0.1")
             except LookupError:
                 pass
             with keep_cwd():
@@ -311,7 +320,7 @@ class CliSnapshotConfig:
                         lines[idx] = "".join(sorted(line))
             data = "\n".join(lines) + "\n"
         if self.replace_statistic:
-            data = re.sub("[0-9]+ / [0-9]+ passed", "N / N passed", data)
+            data = re.sub("[0-9]+ / [0-9]+ passed", replace_statistic, data)
             data = re.sub("([0-9]+ passed,? )|([0-9]+ errored,? )", "", data)
         if self.replace_error_codes:
             data = data.replace("Errno 111", "Error NUM").replace("WinError 10061", "Error NUM")
@@ -326,10 +335,28 @@ class CliSnapshotConfig:
         if self.replace_test_case_id:
             lines = data.splitlines()
             for idx, line in enumerate(lines):
-                if "X-Schemathesis-TestCaseId:" in line:
-                    lines[idx] = "X-Schemathesis-TestCaseId: <PLACEHOLDER>"
+                if re.match(rf"\d+\. {TEST_CASE_ID_TITLE}", line):
+                    sequential_id = lines[idx].split(".")[0]
+                    lines[idx] = f"{sequential_id}. {TEST_CASE_ID_TITLE}: <PLACEHOLDER>"
             data = "\n".join(lines) + "\n"
+        if self.replace_uuid:
+            data = re.sub(r"\b[0-9a-fA-F]{32}\b", EXAMPLE_UUID, data)
+        if self.replace_response_time:
+            data = re.sub(r"Actual: \d+\.\d+ms", "Actual: 105.00ms", data)
+        if self.replace_seed:
+            data = re.sub(r"--hypothesis-seed=\d+", "--hypothesis-seed=42", data)
         return data
+
+
+def replace_statistic(match):
+    replaced = "N / N passed"
+    padding = len(match.group()) - len(replaced)
+    if padding > 0:
+        replaced += " " * padding
+    return replaced
+
+
+EXAMPLE_UUID = "e32ab85ed4634c38a320eb0b22460da9"
 
 
 @pytest.fixture

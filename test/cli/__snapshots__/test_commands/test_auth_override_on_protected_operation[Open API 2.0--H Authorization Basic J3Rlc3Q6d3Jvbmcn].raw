@@ -1,0 +1,47 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Swagger 2.0
+Workers: 1
+Collected API operations: 1
+
+GET /api/basic F                                                          [100%]
+
+=================================== FAILURES ===================================
+________________________________ GET /api/basic ________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 401
+    Documented: 200
+
+[401] Unauthorized:
+
+    `{"detail": "Unauthorized"}`
+
+Reproduce with: 
+
+    curl -X GET -H 'Authorization: Basic J3Rlc3Q6d3Jvbmcn' http://127.0.0.1/api/basic
+
+Or add this option to your command line parameters: --hypothesis-seed=42
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                              N / N passed          PASSED 
+    status_code_conformance                         N / N passed          FAILED 
+    content_type_conformance                        N / N passed          PASSED 
+    response_headers_conformance                    N / N passed          PASSED 
+    response_schema_conformance                     N / N passed          PASSED 
+
+WARNING: Most of the responses from `GET /api/basic` have a 401 status code. Did you specify proper API credentials?
+
+Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 failed in 1.00s ===============================

@@ -1,7 +1,7 @@
 from __future__ import annotations
 import datetime
-import http
 import inspect
+import textwrap
 from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -50,6 +50,7 @@ from .exceptions import (
     deduplicate_failed_checks,
     get_grouped_exception,
     get_timeout_error,
+    prepare_response_payload,
 )
 from .internal.deprecation import deprecated_property
 from .internal.copy import fast_deepcopy
@@ -359,9 +360,10 @@ class Case:
             timeout = 1000 * data["timeout"]  # It is defined and not empty, since the exception happened
             request = cast(requests.PreparedRequest, exc.request)
             code_message = self._get_code_message(self.operation.schema.code_sample_style, request, verify=verify)
+            message = f"The server failed to respond within the specified limit of {timeout:.2f}ms"
             raise get_timeout_error(timeout)(
-                f"\n\n1. Request timed out after {timeout:.2f}ms\n\n----------\n\n{code_message}",
-                context=failures.RequestTimeout(timeout=timeout),
+                f"\n\n1. {failures.RequestTimeout.title}\n\n{message}\n\n{code_message}",
+                context=failures.RequestTimeout(message=message, timeout=timeout),
             ) from None
         response.verify = verify  # type: ignore[attr-defined]
         dispatch("after_call", hook_context, self, response)
@@ -463,7 +465,7 @@ class Case:
         """
         __tracebackhide__ = True
         from .checks import ALL_CHECKS
-        from .transports.responses import get_payload, copy_response
+        from .transports.responses import get_payload, copy_response, get_reason
 
         checks = checks or ALL_CHECKS
         checks = tuple(check for check in checks if check not in excluded_checks)
@@ -480,7 +482,32 @@ class Case:
         failed_checks = list(deduplicate_failed_checks(failed_checks))
         if failed_checks:
             exception_cls = get_grouped_exception(self.operation.verbose_name, *failed_checks)
-            formatted_failures = "\n\n".join(f"{idx}. {error.args[0]}" for idx, error in enumerate(failed_checks, 1))
+            formatted = ""
+            for idx, failed in enumerate(failed_checks, 1):
+                if isinstance(failed, CheckFailed) and failed.context is not None:
+                    title = failed.context.title
+                    if failed.context.message:
+                        message = failed.context.message
+                    else:
+                        message = None
+                else:
+                    title, message = failed.args
+                formatted += "\n\n"
+                formatted += f"{idx}. {title}"
+                if message is not None:
+                    formatted += "\n\n"
+                    formatted += textwrap.indent(message, prefix="    ")
+
+            status_code = response.status_code
+            reason = get_reason(status_code)
+            formatted += f"\n\n[{response.status_code}] {reason}:"
+            payload = get_payload(response)
+            if not payload:
+                formatted += "\n\n    <EMPTY>"
+            else:
+                payload = prepare_response_payload(payload)
+                payload = textwrap.indent(f"\n`{payload}`", prefix="    ")
+                formatted += f"\n{payload}"
             code_sample_style = (
                 CodeSampleStyle.from_str(code_sample_style)
                 if code_sample_style is not None
@@ -491,13 +518,8 @@ class Case:
                 sanitize_request(response.request)
                 sanitize_response(response)
             code_message = self._get_code_message(code_sample_style, response.request, verify=verify)
-            payload = get_payload(response)
             raise exception_cls(
-                f"\n\n{formatted_failures}\n\n"
-                f"----------\n\n"
-                f"Response status: {response.status_code}\n"
-                f"Response payload: `{payload}`\n\n"
-                f"{code_message}",
+                f"{formatted}\n\n" f"{code_message}",
                 causes=tuple(failed_checks),
             )
 
@@ -506,11 +528,11 @@ class Case:
     ) -> str:
         if code_sample_style == CodeSampleStyle.python:
             code = self.get_code_to_reproduce(request=request, verify=verify)
-            return f"Run this Python code to reproduce this response: \n\n    {code}\n"
-        if code_sample_style == CodeSampleStyle.curl:
+        elif code_sample_style == CodeSampleStyle.curl:
             code = self.as_curl_command(headers=dict(request.headers), verify=verify)
-            return f"Run this cURL command to reproduce this response: \n\n    {code}\n"
-        raise ValueError(f"Unknown code sample style: {code_sample_style.name}")
+        else:
+            raise ValueError(f"Unknown code sample style: {code_sample_style.name}")
+        return f"Reproduce with: \n\n    {code}\n"
 
     def call_and_validate(
         self,
@@ -946,7 +968,9 @@ class Response:
     @classmethod
     def from_wsgi(cls, response: WSGIResponse, elapsed: float) -> "Response":
         """Create a response from WSGI response."""
-        message = http.client.responses.get(response.status_code, "UNKNOWN")
+        from .transports.responses import get_reason
+
+        message = get_reason(response.status_code)
         headers = {name: response.headers.getlist(name) for name in response.headers.keys()}
         # Note, this call ensures that `response.response` is a sequence, which is needed for comparison
         data = response.get_data()

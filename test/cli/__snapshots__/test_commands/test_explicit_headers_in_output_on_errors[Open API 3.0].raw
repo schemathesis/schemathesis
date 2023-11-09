@@ -1,0 +1,49 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Workers: 1
+Collected API operations: 1
+
+GET /api/flaky F                                                          [100%]
+
+=================================== FAILURES ===================================
+________________________________ GET /api/flaky ________________________________
+[FLAKY] Schemathesis was not able to reliably reproduce this failure
+
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+- Undocumented HTTP status code
+
+    Received: 500
+    Documented: 200
+
+[500] Internal Server Error:
+
+    `500: Internal Server Error`
+
+Reproduce with: 
+
+    curl -X GET -H 'Authorization: Basic J3Rlc3Q6d3Jvbmcn' 'http://127.0.0.1/api/flaky?id=0'
+
+Or add this option to your command line parameters: --hypothesis-seed=42
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                              2 / 3 passed          FAILED 
+    status_code_conformance                         2 / 3 passed          FAILED 
+    content_type_conformance                        3 / 3 passed          PASSED 
+    response_headers_conformance                    3 / 3 passed          PASSED 
+    response_schema_conformance                     3 / 3 passed          PASSED 
+
+Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 failed in 1.00s ===============================

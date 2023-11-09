@@ -51,7 +51,12 @@ def create_app(
 
     app = web.Application()
     app.add_routes(
-        [web.get("/schema.yaml", schema), web.get("/api/cookies", set_cookies)]
+        [
+            web.get("/schema.yaml", schema),
+            web.get("/api/cookies", set_cookies),
+            web.get("/api/binary", handlers.binary),
+            web.get("/api/long", handlers.long),
+        ]
         + [web.route(item.value[0], item.value[1], wrapper(item.name)) for item in Operation if item.name != "all"]
     )
 

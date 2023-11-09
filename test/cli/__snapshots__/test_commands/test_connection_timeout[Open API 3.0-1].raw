@@ -1,0 +1,38 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Workers: 1
+Collected API operations: 2
+
+GET /api/slow F                                                           [ 50%]
+GET /api/success .                                                        [100%]
+
+=================================== FAILURES ===================================
+________________________________ GET /api/slow _________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Response timeout
+
+    The server failed to respond within the specified limit of 80.00ms
+
+Reproduce with: 
+
+    curl -X GET http://127.0.0.1/api/slow
+
+Or add this option to your command line parameters: --hypothesis-seed=42
+=================================== SUMMARY ====================================
+
+Performed checks:
+    request_timeout                       0 / 2 passed          FAILED 
+    not_a_server_error                    1 / 1 passed          PASSED 
+
+Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+========================= 1 passed, 1 failed in 1.00s ==========================

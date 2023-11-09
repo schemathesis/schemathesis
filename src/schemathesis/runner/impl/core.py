@@ -532,7 +532,7 @@ def run_checks(
 
     if max_response_time:
         if elapsed_time > max_response_time:
-            message = f"Response time exceeded the limit of {max_response_time} ms"
+            message = f"Actual: {elapsed_time:.2f}ms\nLimit: {max_response_time}.00ms"
             errors.append(AssertionError(message))
             result.add_failure(
                 "max_response_time",
@@ -540,7 +540,7 @@ def run_checks(
                 response,
                 elapsed_time,
                 message,
-                failures.ResponseTimeExceeded(elapsed=elapsed_time, deadline=max_response_time),
+                failures.ResponseTimeExceeded(message=message, elapsed=elapsed_time, deadline=max_response_time),
             )
         else:
             result.add_success("max_response_time", case, response, elapsed_time)

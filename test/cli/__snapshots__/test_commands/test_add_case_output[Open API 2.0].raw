@@ -1,0 +1,57 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Swagger 2.0
+Workers: 1
+Collected API operations: 2
+
+GET /api/failure F                                                        [ 50%]
+GET /api/success F                                                        [100%]
+
+=================================== FAILURES ===================================
+_______________________________ GET /api/failure _______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Custom check failed: `add_case_check`
+
+    failing cases from second add_case hook
+
+[500] Internal Server Error:
+
+    `500: Internal Server Error`
+
+Reproduce with: 
+
+    curl -X GET -H 'second: second header' http://127.0.0.1/api/failure
+
+Or add this option to your command line parameters: --hypothesis-seed=42
+_______________________________ GET /api/success _______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Custom check failed: `add_case_check`
+
+    failing cases from second add_case hook
+
+[200] OK:
+
+    `{"success": true}`
+
+Reproduce with: 
+
+    curl -X GET -H 'second: second header' http://127.0.0.1/api/success
+
+Or add this option to your command line parameters: --hypothesis-seed=42
+=================================== SUMMARY ====================================
+
+Performed checks:
+    add_case_check                    8 / 12 passed           FAILED 
+
+Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 2 failed in 1.00s ===============================

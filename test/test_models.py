@@ -299,16 +299,16 @@ def test_(case):
         assert exc.args[0].split("\n") == [
           "",
           "",
-          "1. Received a response with a status code, which is not defined in the schema: 418",
+          "1. Undocumented HTTP status code",
           "",
-          "Declared status codes: 200",
+          "    Received: 418",
+          "    Documented: 200",
           "",
-          "----------",
+          "[418] I'm a Teapot:",
           "",
-          "Response status: 418",
-          "Response payload: ``",
+          "    <EMPTY>",
           "",
-          "Run this cURL command to reproduce this response: ",
+          "Reproduce with: ",
           "",
           f"    curl -X GET http://localhost/v1/users",
           "",
@@ -537,7 +537,7 @@ def test_checks_errors_deduplication(empty_open_api_3_schema):
     response.request = requests.PreparedRequest()
     response.request.prepare(method="GET", url="http://example.com")
     # When there are two checks that raise the same failure
-    with pytest.raises(MultipleFailures, match="The response is missing the `Content-Type` header") as exc:
+    with pytest.raises(MultipleFailures, match="Missing Content-Type header") as exc:
         case.validate_response(response, checks=(content_type_conformance, response_schema_conformance))
     # Then the resulting output should be deduplicated
     assert "2. " not in str(exc.value)

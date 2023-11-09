@@ -24,9 +24,6 @@ For example, if your API schema has three operations, then you will see a simila
 .. code:: text
 
     ================ Schemathesis test session starts ===============
-    platform Linux -- Python 3.8.5, schemathesis-2.5.0, ...
-    rootdir: /
-    hypothesis profile 'default' -> ...
     Schema location: http://127.0.0.1:8081/schema.yaml
     Base URL: http://127.0.0.1:8081/api
     Specification version: Swagger 2.0
@@ -114,9 +111,6 @@ To make Schemathesis perform all built-in checks use ``--checks all`` CLI option
 
     $ st run --checks all https://example.schemathesis.io/openapi.json
     ================ Schemathesis test session starts ===============
-    platform Linux -- Python 3.8.5, schemathesis-2.5.0, ...
-    rootdir: /
-    hypothesis profile 'default' -> ...
     Schema location: https://example.schemathesis.io/openapi.json
     Base URL: http://api.com/
     Specification version: Swagger 2.0
@@ -143,9 +137,6 @@ You can also define a list of checks to exclude using the ``--exclude-checks`` C
 
     $ st run --checks all --exclude-checks not_a_server_error https://example.schemathesis.io/openapi.json
     ================ Schemathesis test session starts ===============
-    platform Linux -- Python 3.8.5, schemathesis-2.5.0, ...
-    rootdir: /
-    hypothesis profile 'default' -> ...
     Schema location: https://example.schemathesis.io/openapi.json
     Base URL: http://api.com/
     Specification version: Swagger 2.0
@@ -172,9 +163,6 @@ If any response will take longer than the provided value (in milliseconds) than 
 
     $ st run --max-response-time=50 ...
     ================ Schemathesis test session starts ===============
-    platform Linux -- Python 3.8.5, schemathesis-2.5.0, ...
-    rootdir: /
-    hypothesis profile 'default' -> ...
     Schema location: https://example.schemathesis.io/openapi.json
     Base URL: https://example.schemathesis.io/api
     Specification version: Swagger 2.0
@@ -185,11 +173,20 @@ If any response will take longer than the provided value (in milliseconds) than 
 
     ============================ FAILURES ===========================
     __________________________ GET /api/slow ________________________
-    1. Response time exceeded the limit of 50 ms
+    1. Test Case ID: 9Yjzd8
 
-    Run this Python code to reproduce this failure:
+    - Response time limit exceeded
 
-        requests.get('http://127.0.0.1:8081/api/slow')
+        Actual: 101.92ms
+        Limit: 50.00ms
+
+    [200] OK:
+
+        `{"success": true}`
+
+    Reproduce with:
+
+        curl -X GET http://127.0.0.1:8081/api/slow
 
     Or add this option to your command line parameters:
         --hypothesis-seed=103697217851787640556597810346466192664
