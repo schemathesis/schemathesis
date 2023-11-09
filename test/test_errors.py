@@ -1,4 +1,6 @@
-from schemathesis.exceptions import truncated_json
+import pytest
+
+from schemathesis.exceptions import truncated_json, prepare_response_payload
 
 
 def test_truncate_simple_dict():
@@ -10,3 +12,15 @@ def test_truncate_simple_dict():
     // Output truncated...
 }"""
     )
+
+
+@pytest.mark.parametrize(
+    "payload, expected",
+    (
+        ("ABCDEF\r\n", "ABCDEF"),
+        ("ABCDEF\n", "ABCDEF"),
+        ("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "ABCDEFGHIJ // Output truncated..."),
+    ),
+)
+def test_prepare_response_payload(payload, expected):
+    assert prepare_response_payload(payload, max_size=10) == expected

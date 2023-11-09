@@ -1,0 +1,4 @@
+Exit code: 1
+---
+Stdout:
+❌ Failed to upload report to 127.0.0.1: Your report is too large. The limit is 100 KB, but your report is 101 KB.

@@ -10,7 +10,7 @@ from .. import cli, hooks
 def collect(args: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
     """Collect anonymized CLI usage data."""
     context: Optional[click.Context] = click.get_current_context(silent=True)
-    if context is not None:
+    if context is not None and not sys.argv[0].endswith("pytest"):
         args = args or sys.argv[2:]
         parameters, _, types = parse_cli_args(context, args)
         parameters_data: Dict[str, Dict[str, Any]] = {}
