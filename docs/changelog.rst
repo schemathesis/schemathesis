@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Add Python 3.12 compatibility. `#1809`_
+- Separate command for report upload.
 
 **Changed**
 

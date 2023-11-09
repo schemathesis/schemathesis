@@ -9,9 +9,9 @@ from requests.adapters import HTTPAdapter, Retry
 
 from ..constants import USER_AGENT
 from .ci import CIProvider
-from .constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT
+from .constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT, UPLOAD_SOURCE_HEADER
 from .metadata import Metadata
-from .models import ApiDetails, AuthResponse, FailedUploadResponse, UploadResponse
+from .models import ApiDetails, AuthResponse, FailedUploadResponse, UploadResponse, UploadSource
 
 
 def response_hook(response: requests.Response, **_kwargs: Any) -> None:
@@ -56,10 +56,18 @@ class ServiceClient(requests.Session):
         return AuthResponse(username=data["username"])
 
     def upload_report(
-        self, report: bytes, correlation_id: Optional[str] = None, ci_provider: Optional[CIProvider] = None
+        self,
+        report: bytes,
+        correlation_id: Optional[str] = None,
+        ci_provider: Optional[CIProvider] = None,
+        source: UploadSource = UploadSource.DEFAULT,
     ) -> Union[UploadResponse, FailedUploadResponse]:
         """Upload test run report to Schemathesis.io."""
-        headers = {"Content-Type": "application/x-gtar", "X-Checksum-Blake2s256": hashlib.blake2s(report).hexdigest()}
+        headers = {
+            "Content-Type": "application/x-gtar",
+            "X-Checksum-Blake2s256": hashlib.blake2s(report).hexdigest(),
+            UPLOAD_SOURCE_HEADER: source.value,
+        }
         if correlation_id is not None:
             headers[REPORT_CORRELATION_ID_HEADER] = correlation_id
         if ci_provider is not None:

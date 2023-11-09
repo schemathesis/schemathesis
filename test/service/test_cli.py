@@ -11,7 +11,12 @@ from requests import Timeout
 from schemathesis.cli.output.default import SERVICE_ERROR_MESSAGE, wait_for_report_handler
 from schemathesis.constants import USER_AGENT
 from schemathesis.service import ci, events
-from schemathesis.service.constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REPORT_ENV_VAR
+from schemathesis.service.constants import (
+    CI_PROVIDER_HEADER,
+    REPORT_CORRELATION_ID_HEADER,
+    REPORT_ENV_VAR,
+    UPLOAD_SOURCE_HEADER,
+)
 from schemathesis.service.hosts import load_for_host
 
 from ..utils import strip_style_win32
@@ -472,14 +477,15 @@ def test_send_provider_header(monkeypatch, cli, schema_url, service):
 
 
 PAYLOAD_TOO_LARGE_MESSAGE = "Your report is too large. The limit is 100 KB, but your report is 101 KB."
+PAYLOAD_TOO_LARGE = {
+    "data": {"title": "Payload Too Large", "status": 413, "detail": PAYLOAD_TOO_LARGE_MESSAGE},
+    "status": 413,
+    "method": "POST",
+    "path": "/reports/upload/",
+}
 
 
-@pytest.mark.service(
-    data={"title": "Payload Too Large", "status": 413, "detail": PAYLOAD_TOO_LARGE_MESSAGE},
-    status=413,
-    method="POST",
-    path="/reports/upload/",
-)
+@pytest.mark.service(**PAYLOAD_TOO_LARGE)
 @pytest.mark.openapi_version("3.0")
 def test_too_large_payload(cli, schema_url, service):
     # When the report exceeds the size limit
@@ -495,3 +501,41 @@ def test_too_large_payload(cli, schema_url, service):
     lines = get_stdout_lines(result.stdout)
     assert "Upload: FAILED" in lines
     assert PAYLOAD_TOO_LARGE_MESSAGE in lines
+
+
+@pytest.fixture
+def report_file(tmp_path, cli, schema_url):
+    report_file = tmp_path / "report.tar.gz"
+    result = cli.run(schema_url, f"--report={report_file}")
+    assert result.exit_code == ExitCode.OK, result.stdout
+    return report_file
+
+
+@pytest.mark.operations("success")
+@pytest.mark.openapi_version("3.0")
+def test_upload_success(cli, snapshot_cli, service, report_file):
+    assert (
+        cli.main(
+            "upload",
+            str(report_file),
+            f"--schemathesis-io-token={service.token}",
+            f"--schemathesis-io-url={service.base_url}",
+        )
+        == snapshot_cli
+    )
+    assert service.server.log[0][0].headers[UPLOAD_SOURCE_HEADER] == "upload_command"
+
+
+@pytest.mark.service(**PAYLOAD_TOO_LARGE)
+@pytest.mark.operations("success")
+@pytest.mark.openapi_version("3.0")
+def test_upload_failure(cli, snapshot_cli, service, report_file):
+    assert (
+        cli.main(
+            "upload",
+            str(report_file),
+            f"--schemathesis-io-token={service.token}",
+            f"--schemathesis-io-url={service.base_url}",
+        )
+        == snapshot_cli
+    )

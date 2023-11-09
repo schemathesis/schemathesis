@@ -13,3 +13,4 @@ Commands:
   auth    Authenticate with Schemathesis.io.
   replay  Replay requests from a saved cassette.
   run     Execute automated tests based on API specifications.
+  upload  Upload report to Schemathesis.io.

@@ -1,5 +1,11 @@
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional
+
+
+class UploadSource(str, Enum):
+    DEFAULT = "default"
+    UPLOAD_COMMAND = "upload_command"
 
 
 @dataclass
