@@ -13,6 +13,8 @@ Uploading Reports to Schemathesis.io
 When you use the Schemathesis CLI to run tests, you have the option to upload test reports to Schemathesis.io for a more detailed analysis and continuous tracking over time.
 This can be done by using the ``--report`` flag with your CLI commands.
 
+To store a report for later upload, you can first save it using the ``--report=report.tar.gz`` CLI option. Afterward, you can upload it with the ``st upload report.tar.gz`` command.
+
 What Data is Sent?
 ------------------
 
