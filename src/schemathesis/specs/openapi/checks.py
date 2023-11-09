@@ -30,14 +30,11 @@ def status_code_conformance(response: GenericResponse, case: "Case") -> Optional
     if response.status_code not in allowed_status_codes:
         defined_status_codes = list(map(str, responses))
         responses_list = ", ".join(defined_status_codes)
-        message = (
-            f"Received a response with a status code, which is not defined in the schema: "
-            f"{response.status_code}\n\nDeclared status codes: {responses_list}"
-        )
         exc_class = get_status_code_error(response.status_code)
         raise exc_class(
-            message,
+            failures.UndefinedStatusCode.title,
             context=failures.UndefinedStatusCode(
+                message=f"Received: {response.status_code}\nDocumented: {responses_list}",
                 status_code=response.status_code,
                 defined_status_codes=defined_status_codes,
                 allowed_status_codes=allowed_status_codes,
@@ -56,18 +53,20 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> Optiona
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         raise TypeError("This check can be used only with Open API schemas")
-    defined_content_types = case.operation.schema.get_content_types(case.operation, response)
-    if not defined_content_types:
+    documented_content_types = case.operation.schema.get_content_types(case.operation, response)
+    if not documented_content_types:
         return None
     content_type = response.headers.get("Content-Type")
     if not content_type:
-        formatted_media_types = "\n    ".join(defined_content_types)
+        formatted_content_types = [f"\n- `{content_type}`" for content_type in documented_content_types]
         raise get_missing_content_type_error()(
-            "The response is missing the `Content-Type` header. The schema defines the following media types:\n\n"
-            f"    {formatted_media_types}",
-            context=failures.MissingContentType(defined_content_types),
+            failures.MissingContentType.title,
+            context=failures.MissingContentType(
+                message=f"The following media types are documented in the schema:{''.join(formatted_content_types)}",
+                media_types=documented_content_types,
+            ),
         )
-    for option in defined_content_types:
+    for option in documented_content_types:
         try:
             expected_main, expected_sub = parse_content_type(option)
         except ValueError as exc:
@@ -80,20 +79,20 @@ def content_type_conformance(response: GenericResponse, case: "Case") -> Optiona
             return None
     exc_class = get_response_type_error(f"{expected_main}_{expected_sub}", f"{received_main}_{received_sub}")
     raise exc_class(
-        f"Received a response with '{content_type}' Content-Type, "
-        f"but it is not declared in the schema.\n\n"
-        f"Defined content types: {', '.join(defined_content_types)}",
-        context=failures.UndefinedContentType(content_type=content_type, defined_content_types=defined_content_types),
+        failures.UndefinedContentType.title,
+        context=failures.UndefinedContentType(
+            message=f"Received: {content_type}\nDocumented: {', '.join(documented_content_types)}",
+            content_type=content_type,
+            defined_content_types=documented_content_types,
+        ),
     )
 
 
 def _reraise_malformed_media_type(exc: ValueError, location: str, actual: str, defined: str) -> NoReturn:
-    message = (
-        f"{location} has a malformed media type: `{actual}`. Please, ensure that this media type conforms to "
-        f"the `type-name/subtype-name` format defined by RFC 6838."
-    )
+    message = f"Media type for {location} is incorrect\n\nReceived: {actual}\nDocumented: {defined}"
     raise get_malformed_media_type_error(message)(
-        message, context=failures.MalformedMediaType(actual=actual, defined=defined)
+        failures.MalformedMediaType.title,
+        context=failures.MalformedMediaType(message=message, actual=actual, defined=defined),
     ) from exc
 
 
@@ -113,11 +112,12 @@ def response_headers_conformance(response: GenericResponse, case: "Case") -> Opt
     ]
     if not missing_headers:
         return None
-    message = ",".join(missing_headers)
+    formatted_headers = [f"\n- `{header}`" for header in missing_headers]
+    message = f"The following required headers are missing from the response:{''.join(formatted_headers)}"
     exc_class = get_headers_error(message)
     raise exc_class(
-        f"Received a response with missing headers: {message}",
-        context=failures.MissingHeaders(missing_headers=missing_headers),
+        failures.MissingHeaders.title,
+        context=failures.MissingHeaders(message=message, missing_headers=missing_headers),
     )
 
 

@@ -276,19 +276,19 @@ def test(case):
     result.assert_outcomes(failed=1)
     if style == "python":
         lines = [
-            r".+Run this Python code to reproduce this response:",
+            r".+Reproduce with:",
             rf".+requests.get\('{openapi3_base_url}/failure'",
         ]
     else:
         lines = [
-            r".+Run this cURL command to reproduce this response:",
+            r".+Reproduce with:",
             rf".+curl -X GET {openapi3_base_url}/failure",
         ]
     result.stdout.re_match_lines(
         [
-            r".+1. Received a response with 5xx status code: 500",
-            r".+2. Received a response with a status code, which is not defined in the schema: 500",
-            r".+Declared status codes: 200",
+            r".+1. Server error",
+            r".+2. Undocumented HTTP status code",
+            r".+Documented: 200",
         ]
         + lines
     )
@@ -354,8 +354,8 @@ def test(case):
 @pytest.mark.parametrize(
     "body, expected",
     (
-        ("raise AssertionError", "1. Check 'my_check' failed"),
-        ("raise AssertionError('My message')", "1. My message"),
+        ("raise AssertionError", "Custom check failed: `my_check`"),
+        ("raise AssertionError('My message')", "My message"),
     ),
 )
 def test_failing_custom_check(testdir, openapi3_base_url, body, expected):

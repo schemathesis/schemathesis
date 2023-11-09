@@ -225,7 +225,7 @@ def create_app(
 
     @app.route("/api/malformed_json", methods=["GET"])
     def malformed_json():
-        return Response("{malformed}" + str(uuid4()), content_type="application/json")
+        return Response("{malformed}", content_type="application/json")
 
     @app.route("/api/invalid_response", methods=["GET"])
     def invalid_response():

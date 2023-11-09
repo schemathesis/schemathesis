@@ -17,12 +17,10 @@ if TYPE_CHECKING:
 
 def not_a_server_error(response: GenericResponse, case: Case) -> Optional[bool]:
     """A check to verify that the response is not a server-side error."""
-    if response.status_code >= 500:
-        exc_class = get_server_error(response.status_code)
-        raise exc_class(
-            f"Received a response with 5xx status code: {response.status_code}",
-            context=failures.ServerError(status_code=response.status_code),
-        )
+    status_code = response.status_code
+    if status_code >= 500:
+        exc_class = get_server_error(status_code)
+        raise exc_class(failures.ServerError.title, context=failures.ServerError(status_code=status_code))
     return None
 
 

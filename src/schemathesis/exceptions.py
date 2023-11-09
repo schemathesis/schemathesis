@@ -244,6 +244,19 @@ def truncated_json(data: Any, max_lines: int = 10, max_width: int = 80) -> str:
     return "\n".join(truncated_lines)
 
 
+MAX_PAYLOAD_SIZE = 512
+
+
+def prepare_response_payload(payload: str, max_size: int = MAX_PAYLOAD_SIZE) -> str:
+    if payload.endswith("\r\n"):
+        payload = payload[:-2]
+    elif payload.endswith("\n"):
+        payload = payload[:-1]
+    if len(payload) > max_size:
+        payload = payload[:max_size] + " // Output truncated..."
+    return payload
+
+
 class DeadlineExceeded(Exception):
     """Test took too long to run."""
 
@@ -399,9 +412,11 @@ class UsageError(Exception):
 
 def maybe_set_assertion_message(exc: AssertionError, check_name: str) -> str:
     message = str(exc)
+    title = f"Custom check failed: `{check_name}`"
     if not message:
-        message = f"Check '{check_name}' failed"
-        exc.args = (message,)
+        exc.args = (title, None)
+    else:
+        exc.args = (title, message)
     return message
 
 

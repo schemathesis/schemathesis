@@ -1,0 +1,44 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Workers: 1
+Collected API operations: 1
+
+GET /api/multiple_failures F                                              [100%]
+
+=================================== FAILURES ===================================
+__________________________ GET /api/multiple_failures __________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+- Undocumented HTTP status code
+
+    Received: 500
+    Documented: 200
+
+[500] Internal Server Error:
+
+    `500: Internal Server Error`
+
+Reproduce with: 
+
+    curl -X GET 'http://127.0.0.1/api/multiple_failures?id=0'
+
+Or add this option to your command line parameters: --hypothesis-seed=42
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                         N / N passed            FAILED 
+    status_code_conformance                    N / N passed            FAILED 
+
+Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 failed in 1.00s ===============================

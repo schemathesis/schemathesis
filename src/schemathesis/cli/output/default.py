@@ -3,7 +3,9 @@ import base64
 import os
 import platform
 import shutil
+import textwrap
 import time
+from itertools import groupby
 from queue import Queue
 from typing import Any, Dict, Generator, List, Optional, Tuple, Union, cast
 
@@ -11,6 +13,7 @@ import click
 
 from ... import service
 from ..._compat import metadata
+from ...code_samples import CodeSampleStyle
 from ...constants import (
     DISCORD_LINK,
     FLAKY_FAILURE_MESSAGE,
@@ -21,7 +24,7 @@ from ...constants import (
     ISSUE_TRACKER_URL,
     GITHUB_APP_LINK,
 )
-from ...exceptions import RuntimeErrorType
+from ...exceptions import RuntimeErrorType, prepare_response_payload
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...models import Status
 from ...runner import events
@@ -252,40 +255,76 @@ def display_failures(context: ExecutionContext, event: events.Finished) -> None:
         display_failures_for_single_test(context, result)
 
 
+TEST_CASE_ID_TITLE = "Test Case ID"
+
+
 def display_failures_for_single_test(context: ExecutionContext, result: SerializedTestResult) -> None:
     """Display a failure for a single method / path."""
+    from ...transports.responses import get_reason
+
     display_subsection(result)
     if result.is_flaky:
         click.secho(FLAKY_FAILURE_MESSAGE, fg="red")
         click.echo()
-    checks = deduplicate_failures(result.checks)
-    for idx, check in enumerate(checks, 1):
-        display_example(context, idx, check, result.seed)
-        # Display every time except the last check
-        if idx != len(checks):
-            click.echo("\n")
+    for idx, (code_sample, group) in enumerate(group_by_case(result.checks, context.code_sample_style), 1):
+        # Make server errors appear first in the list of checks
+        checks = sorted(group, key=lambda c: c.name != "not_a_server_error")
+
+        for check_idx, check in enumerate(checks):
+            if check_idx == 0:
+                click.secho(f"{idx}. {TEST_CASE_ID_TITLE}: {check.example.id}", bold=True)
+            if check.context is not None:
+                title = check.context.title
+                if check.context.message:
+                    message = check.context.message
+                else:
+                    message = None
+            else:
+                title = f"Custom check failed: `{check.name}`"
+                message = check.message
+            click.secho(f"\n- {title}", fg="red", bold=True)
+            if message:
+                message = textwrap.indent(message, prefix="    ")
+                click.secho(f"\n{message}", fg="red")
+            if check_idx + 1 == len(checks):
+                if check.response is not None:
+                    status_code = check.response.status_code
+                    reason = get_reason(status_code)
+                    response = bold(f"[{check.response.status_code}] {reason}")
+                    click.echo(f"\n{response}:")
+
+                    response_body = check.response.body
+                    if check.response is not None and response_body is not None:
+                        if not response_body:
+                            click.echo("\n    <EMPTY>")
+                        else:
+                            encoding = check.response.encoding or "utf8"
+                            try:
+                                payload = base64.b64decode(response_body).decode(encoding)
+                                payload = prepare_response_payload(payload)
+                                payload = textwrap.indent(f"\n`{payload}`", prefix="    ")
+                                click.echo(payload)
+                            except UnicodeDecodeError:
+                                click.echo("\n    <BINARY>")
+
+        click.echo(
+            f"\n{bold('Reproduce with')}: \n\n    {code_sample}\n",
+        )
+    if result.seed is not None:
+        click.secho(f"Or add this option to your command line parameters: --hypothesis-seed={result.seed}", fg="red")
 
 
-def reduce_schema_error(message: str) -> str:
-    """Reduce the error schema output."""
-    end_of_message_index = message.find(":", message.find("Failed validating"))
-    if end_of_message_index != -1:
-        return message[:end_of_message_index]
-    return message
+def group_by_case(
+    checks: List[SerializedCheck], code_sample_style: CodeSampleStyle
+) -> Generator[Tuple[str, Generator[SerializedCheck, None, None]], None, None]:
+    checks = deduplicate_failures(checks)
+    checks = sorted(checks, key=lambda c: _by_unique_code_sample(c, code_sample_style))
+    yield from groupby(checks, lambda c: _by_unique_code_sample(c, code_sample_style))
 
 
-def display_example(context: ExecutionContext, idx: int, check: SerializedCheck, seed: Optional[int] = None) -> None:
-    if check.message:
-        message = f"{idx}. {check.message}"
-        if not context.verbosity:
-            message = reduce_schema_error(message)
-        click.secho(message, fg="red")
-        click.echo()
-    if check.response is not None and check.response.body is not None:
-        payload = base64.b64decode(check.response.body).decode(check.response.encoding or "utf8", errors="replace")
-        click.secho(f"Response status: {check.response.status_code}\nResponse payload: `{payload}`\n", fg="red")
+def _by_unique_code_sample(check: SerializedCheck, code_sample_style: CodeSampleStyle) -> str:
     request_body = base64.b64decode(check.example.body).decode() if check.example.body is not None else None
-    code_sample = context.code_sample_style.generate(
+    return code_sample_style.generate(
         method=check.example.method,
         url=check.example.url,
         body=request_body,
@@ -293,13 +332,6 @@ def display_example(context: ExecutionContext, idx: int, check: SerializedCheck,
         verify=check.example.verify,
         extra_headers=check.example.extra_headers,
     )
-    click.secho(
-        f"Run this {context.code_sample_style.verbose_name} to reproduce this failure: \n\n    {code_sample}\n",
-        fg="red",
-    )
-    click.secho(f"{SCHEMATHESIS_TEST_CASE_HEADER}: {check.example.id}\n", fg="red")
-    if seed is not None:
-        click.secho(f"Or add this option to your command line parameters: --hypothesis-seed={seed}", fg="red")
 
 
 def display_application_logs(context: ExecutionContext, event: events.Finished) -> None:
@@ -363,7 +395,8 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
 
     if event.failed_count > 0:
         click.echo(
-            f"\n{bold('Note')}: The '{SCHEMATHESIS_TEST_CASE_HEADER}' header can be used to correlate test cases with server logs for debugging."
+            f"\n{bold('Note')}: Use the '{SCHEMATHESIS_TEST_CASE_HEADER}' header to correlate test case ids "
+            "from failure messages with server logs for debugging."
         )
 
     if context.report is not None and not context.is_interrupted:

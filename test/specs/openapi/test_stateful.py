@@ -126,7 +126,7 @@ APIWorkflow = schema.as_state_machine()
         schema=app_schema,
     )
     result = testdir.runpytest()
-    assert "Received a response with 5xx status code: 500" in "\n".join(result.outlines)
+    assert "1. Server error" in "\n".join(result.outlines)
 
 
 def removeprefix(value: str, prefix: str) -> str:
@@ -169,7 +169,7 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
 
     state_machine = schema.as_state_machine()
 
-    with pytest.raises(CheckFailed, match="Received a response with 5xx status code: 500"):
+    with pytest.raises(CheckFailed, match="Server error"):
         state_machine.run(
             settings=settings(
                 max_examples=2000,

@@ -436,11 +436,31 @@ def test_response_conformance_invalid(any_app_schema):
     # Then there should be a failure
     assert finished.has_failures
     check = others[1].result.checks[-1]
-    lines = check.message.split("\n")
-    assert lines[0] == "The received response does not conform to the defined schema!"
-    assert lines[2] == "Details: "
-    validation_message = "'success' is a required property"
-    assert lines[4] == validation_message
+    assert check.message == "Response violates schema"
+    assert (
+        check.context.message
+        == """'success' is a required property
+
+Schema:
+
+    {
+        "properties": {
+            "success": {
+                "type": "boolean"
+            }
+        },
+        "required": [
+            "success"
+        ],
+        "type": "object"
+    }
+
+Value:
+
+    {
+        "random": "key"
+    }"""
+    )
     assert check.context.instance == {"random": "key"}
     assert check.context.instance_path == []
     assert check.context.schema == {
@@ -449,7 +469,7 @@ def test_response_conformance_invalid(any_app_schema):
         "type": "object",
     }
     assert check.context.schema_path == ["required"]
-    assert check.context.validation_message == validation_message
+    assert check.context.validation_message == "'success' is a required property"
 
 
 @pytest.mark.operations("success")
@@ -507,10 +527,7 @@ def test_response_conformance_malformed_json(any_app_schema):
     assert finished.has_failures
     assert not finished.has_errors
     check = others[1].result.checks[-1]
-    message = check.message
-    assert "The received response is not valid JSON:" in message
-    assert "{malformed}" in message
-    assert "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)" in message
+    assert check.message == "JSON deserialization error"
     assert check.context.validation_message == "Expecting property name enclosed in double quotes"
     assert check.context.position == 1
 

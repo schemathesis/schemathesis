@@ -62,7 +62,7 @@ def before_call(context, case):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_after_call(testdir, cli, cli_args):
+def test_after_call(testdir, cli, cli_args, snapshot_cli):
     # When the `after_call` hook is registered
     # And it modifies the response and making it incorrect
     module = testdir.make_importable_pyfile(
@@ -79,10 +79,8 @@ def after_call(context, case, response):
         response.set_data(data)
         """
     )
-    result = cli.main("run", *cli_args, "-c", "all", hooks=module.purebasename)
     # Then the tests should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    assert 'Response payload: `{"wrong": 42}`' in result.stdout.splitlines()
+    assert cli.main("run", *cli_args, "-c", "all", hooks=module.purebasename) == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")

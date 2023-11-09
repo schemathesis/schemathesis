@@ -144,13 +144,10 @@ def test_content_type_conformance_default_response(response_factory, content_typ
 
 
 @pytest.mark.parametrize(
-    "schema_media_type, response_media_type, expected",
-    (
-        ("application:json", "application/json", "Schema has a malformed media type: `application:json`"),
-        ("application/json", "application:json", "Response has a malformed media type: `application:json`"),
-    ),
+    "schema_media_type, response_media_type",
+    (("application:json", "application/json"), ("application/json", "application:json")),
 )
-def test_malformed_content_type(schema_media_type, response_media_type, expected, response_factory):
+def test_malformed_content_type(schema_media_type, response_media_type, response_factory):
     # When the verified content type is malformed
     raw_schema = {
         "openapi": "3.0.2",
@@ -164,7 +161,7 @@ def test_malformed_content_type(schema_media_type, response_media_type, expected
         },
     }
     # Then it should raise an assertion error, rather than an internal one
-    assert_content_type_conformance(response_factory, raw_schema, response_media_type, True, expected)
+    assert_content_type_conformance(response_factory, raw_schema, response_media_type, True, "Malformed media type")
 
 
 def test_content_type_conformance_another_status_code(response_factory):
@@ -232,13 +229,12 @@ def test_status_code_conformance_invalid(value, swagger_20, response_factory):
     indirect=["response", "case"],
 )
 def test_content_type_conformance_invalid(spec, response, case):
-    message = (
-        f"^Received a response with '{response.headers['Content-Type']}' Content-Type, "
-        "but it is not declared in the schema.\n\nDefined content types: application/json$"
-    )
-    with pytest.raises(AssertionError, match=message) as exc_info:
+    with pytest.raises(AssertionError, match="Undocumented Content-Type") as exc_info:
         content_type_conformance(response, case)
     assert exc_info.type.__name__ == "CheckFailed"
+    assert (
+        exc_info.value.context.message == f"Received: {response.headers['Content-Type']}\nDocumented: application/json"
+    )
 
 
 def test_invalid_schema_on_content_type_check(response_factory):
@@ -263,7 +259,7 @@ def test_missing_content_type_header(case, response_factory):
     # When the response has no `Content-Type` header
     response = response_factory.requests(content_type=None)
     # Then an error should be risen
-    with pytest.raises(CheckFailed, match="The response is missing the `Content-Type` header"):
+    with pytest.raises(CheckFailed, match="Missing Content-Type header"):
         content_type_conformance(response, case)
 
 
@@ -385,7 +381,7 @@ def test_response_conformance_no_content_type(request, spec, response_factory):
     # And no "Content-Type" header in the received response
     response = response_factory.requests(content_type=None, status_code=200)
     # Then the check should fail
-    with pytest.raises(MultipleFailures, match="The response is missing the `Content-Type` header"):
+    with pytest.raises(MultipleFailures, match="Missing Content-Type header"):
         response_schema_conformance(response, case)
 
 
