@@ -804,11 +804,9 @@ def test_(case):
     result = testdir.runpytest()
     result.assert_outcomes(passed=1, failed=1)
     stdout = result.stdout.str()
-    assert "Received a response with 5xx status code: 500" in stdout
-    assert "Received a response with 5xx status code: 504" in stdout
+    assert "[500] Internal Server Error" in stdout
     # And internal frames should not be displayed
     assert "def run_subtest" not in stdout
-    assert "Falsifying example" not in stdout
 
 
 @pytest.mark.operations("multiple_failures")
@@ -835,8 +833,7 @@ def test_(case):
     result = testdir.runpytest()
     result.assert_outcomes(passed=1, failed=1)
     stdout = result.stdout.str()
-    assert "Received a response with 5xx status code: 500" in stdout
-    assert "Received a response with 5xx status code: 504" in stdout
+    assert "[500] Internal Server Error" in stdout
     assert "assert 1 == 2" in stdout
     # And internal frames should not be displayed
     assert "def run_subtest" not in stdout
@@ -863,7 +860,7 @@ def test_(case):
     result = testdir.runpytest()
     result.assert_outcomes(passed=1, failed=1)
     stdout = result.stdout.str()
-    assert "Received a response with 5xx status code: 500" in stdout
+    assert "[500] Internal Server Error" in stdout
     # And internal frames should not be displayed
     assert "def run_subtest" not in stdout
     assert "def collecting_wrapper" not in stdout

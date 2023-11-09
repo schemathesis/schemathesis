@@ -2,6 +2,7 @@ import asyncio
 import cgi
 import csv
 import io
+import json
 from typing import Dict
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ import jsonschema
 from aiohttp import web
 
 from schemathesis.constants import BOM_MARK
+from schemathesis.exceptions import MAX_PAYLOAD_SIZE
 
 try:
     from ..schema import PAYLOAD_VALIDATOR
@@ -47,6 +49,16 @@ async def empty(request: web.Request) -> web.Response:
 
 async def empty_string(request: web.Request) -> web.Response:
     return web.Response(body="")
+
+
+async def binary(request: web.Request) -> web.Response:
+    return web.Response(
+        body=b"\xa7\xf5=\x18H\xc7\xff'\xf0\xeep\x06M-RX", content_type="application/octet-stream", status=500
+    )
+
+
+async def long(request: web.Request) -> web.Response:
+    return web.Response(body=json.dumps(["A"] * MAX_PAYLOAD_SIZE), content_type="application/json", status=500)
 
 
 async def payload(request: web.Request) -> web.Response:
@@ -111,7 +123,7 @@ async def headers(request: web.Request) -> web.Response:
 
 
 async def malformed_json(request: web.Request) -> web.Response:
-    return web.Response(body="{malformed}" + str(uuid4()), content_type="application/json")
+    return web.Response(body="{malformed}", content_type="application/json")
 
 
 async def failure(request: web.Request) -> web.Response:

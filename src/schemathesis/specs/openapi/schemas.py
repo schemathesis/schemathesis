@@ -54,7 +54,6 @@ from ...types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Q
 from ...internal.jsonschema import traverse_schema
 from ...internal.copy import fast_deepcopy
 from ...transports.content_types import is_json_media_type
-from ...transports.responses import get_payload
 from . import links, serialization
 from ._hypothesis import get_case_strategy
 from .converter import to_json_schema, to_json_schema_recursive
@@ -516,12 +515,12 @@ class BaseOpenAPISchema(BaseSchema):
         errors = []
         if content_type is None:
             media_types = self.get_content_types(operation, response)
-            formatted_media_types = "\n    ".join(media_types)
+            formatted_content_types = [f"\n- `{content_type}`" for content_type in media_types]
+            message = f"The following media types are documented in the schema:{''.join(formatted_content_types)}"
             try:
                 raise get_missing_content_type_error()(
-                    "The response is missing the `Content-Type` header. "
-                    f"The schema defines the following media types:\n\n    {formatted_media_types}",
-                    context=failures.MissingContentType(media_types),
+                    failures.MissingContentType.title,
+                    context=failures.MissingContentType(message=message, media_types=media_types),
                 )
             except Exception as exc:
                 errors.append(exc)
@@ -535,18 +534,9 @@ class BaseOpenAPISchema(BaseSchema):
                 data = response.json
         except JSONDecodeError as exc:
             exc_class = get_response_parsing_error(exc)
-            payload = get_payload(response)
+            context = failures.JSONDecodeErrorContext.from_exception(exc)
             try:
-                raise exc_class(
-                    f"The received response is not valid JSON:\n\n    {payload}\n\nException: \n\n    {exc}",
-                    context=failures.JSONDecodeErrorContext(
-                        validation_message=exc.msg,
-                        document=exc.doc,
-                        position=exc.pos,
-                        lineno=exc.lineno,
-                        colno=exc.colno,
-                    ),
-                ) from exc
+                raise exc_class(context.title, context=context) from exc
             except Exception as exc:
                 errors.append(exc)
                 _maybe_raise_one_or_more(errors)
@@ -562,17 +552,9 @@ class BaseOpenAPISchema(BaseSchema):
                 jsonschema.validate(data, schema, cls=cls, resolver=resolver)
             except jsonschema.ValidationError as exc:
                 exc_class = get_schema_validation_error(exc)
+                ctx = failures.ValidationErrorContext.from_exception(exc)
                 try:
-                    raise exc_class(
-                        f"The received response does not conform to the defined schema!\n\nDetails: \n\n{exc}",
-                        context=failures.ValidationErrorContext(
-                            validation_message=exc.message,
-                            schema_path=list(exc.absolute_schema_path),
-                            schema=exc.schema,
-                            instance_path=list(exc.absolute_path),
-                            instance=exc.instance,
-                        ),
-                    ) from exc
+                    raise exc_class(ctx.title, context=ctx) from exc
                 except Exception as exc:
                     errors.append(exc)
         _maybe_raise_one_or_more(errors)

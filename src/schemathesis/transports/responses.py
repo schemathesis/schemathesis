@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from copy import deepcopy, copy
 from json import JSONDecodeError
 from typing import Union, TYPE_CHECKING, NoReturn
@@ -48,6 +49,16 @@ def copy_response(response: GenericResponse) -> GenericResponse:
     copied_response = copy(response)
     copied_response.request = deepcopy(response.request)
     return copied_response
+
+
+def get_reason(status_code: int) -> str:
+    if sys.version_info < (3, 9) and status_code == 418:
+        # Python 3.7 & 3.8 do not have 418 status in the `HTTPStatus` enum
+        return "I'm a Teapot"
+
+    import http.client
+
+    return http.client.responses.get(status_code, "Unknown")
 
 
 GenericResponse = Union["Response", WSGIResponse]

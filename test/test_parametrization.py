@@ -800,4 +800,5 @@ def test_(case):
     )
     result = testdir.runpytest()
     # Then it should be reported as any other test failure
-    assert "E           1. Request timed out after 1.00ms" in result.outlines
+    assert "E           1. Response timeout" in result.outlines
+    assert "E           The server failed to respond within the specified limit of 1.00ms" in result.outlines

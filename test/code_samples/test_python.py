@@ -116,11 +116,8 @@ def test_graphql_code_sample(graphql_url, graphql_schema, graphql_strategy):
 
 
 @pytest.mark.operations("failure")
-def test_cli_output(cli, base_url, schema_url):
-    result = cli.run(schema_url, "--code-sample-style=python")
-    lines = result.stdout.splitlines()
-    assert "Run this Python code to reproduce this failure: " in lines
-    assert f"    requests.get('{base_url}/failure')" in lines
+def test_cli_output(cli, base_url, schema_url, snapshot_cli):
+    assert cli.run(schema_url, "--code-sample-style=python") == snapshot_cli
 
 
 @pytest.mark.operations("failure")

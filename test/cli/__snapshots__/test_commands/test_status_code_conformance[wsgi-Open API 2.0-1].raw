@@ -1,0 +1,41 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: /schema.yaml
+Base URL: /api
+Specification version: Swagger 2.0
+Workers: 1
+Collected API operations: 1
+
+POST /api/teapot F                                                        [100%]
+
+=================================== FAILURES ===================================
+_______________________________ POST /api/teapot _______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 418
+    Documented: 200
+
+[418] I'm a Teapot:
+
+    `{"success":true}`
+
+Reproduce with: 
+
+    curl -X POST http://localhost/api/teapot
+
+Or add this option to your command line parameters: --hypothesis-seed=42
+=================================== SUMMARY ====================================
+
+Performed checks:
+    status_code_conformance                    0 / 2 passed          FAILED 
+
+Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 failed in 1.00s ===============================

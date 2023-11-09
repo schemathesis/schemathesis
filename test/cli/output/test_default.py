@@ -287,34 +287,6 @@ def test_after_execution_attributes(execution_context, after_execution):
     assert execution_context.current_line_length == 2
 
 
-@pytest.mark.parametrize("verbosity", (0, 1))
-def test_display_failures(swagger_20, capsys, execution_context, results_set, verbosity, response):
-    del response.request.headers["Content-Type"]
-    execution_context.verbosity = verbosity
-    # Given two test results - success and failure
-    operation = models.APIOperation("/api/failure", "GET", {}, base_url="http://127.0.0.1:8080", schema=swagger_20)
-    failure = models.TestResult(
-        operation.method,
-        operation.full_path,
-        verbose_name=f"{operation.method} {operation.full_path}",
-        data_generation_method=[DataGenerationMethod.default()],
-    )
-    failure.add_failure("test", models.Case(operation), response, 0, "Message", None)
-    execution_context.results.append(SerializedTestResult.from_test_result(failure))
-    results_set.append(failure)
-    event = Finished.from_results(results_set, 1.0)
-    # When the failures are displayed
-    default.display_failures(execution_context, event)
-    out = capsys.readouterr().out.strip()
-    # Then section title is displayed
-    assert " FAILURES " in out
-    # And operation with a failure is displayed as a subsection
-    assert " GET /v1/api/failure " in out
-    assert "Message" in out
-    assert "Run this cURL command to reproduce this failure:" in out
-    assert "curl -X GET http://127.0.0.1:8080/api/failure" in out
-
-
 @pytest.mark.parametrize("show_errors_tracebacks", (True, False))
 def test_display_internal_error(capsys, execution_context, show_errors_tracebacks):
     execution_context.show_errors_tracebacks = show_errors_tracebacks
@@ -338,26 +310,3 @@ def test_display_summary(capsys, results_set, swagger_20):
     assert "=== 1 passed in 1.26s ===" in out
     # And it should be in green & bold style
     assert strip_style_win32(click.style(click.unstyle(out), fg="green", bold=True)) == out
-
-
-@pytest.mark.parametrize(
-    "value, expected",
-    (
-        ("message", "message"),
-        (
-            """Details:
-
-'apikey' is a required property
-
-Failed validating 'required' in schema:
-    {'description': 'Response body format for service ID V1 REST requests',""",
-            """Details:
-
-'apikey' is a required property
-
-Failed validating 'required' in schema""",
-        ),
-    ),
-)
-def test_reduce_schema_error(value, expected):
-    assert default.reduce_schema_error(value) == expected

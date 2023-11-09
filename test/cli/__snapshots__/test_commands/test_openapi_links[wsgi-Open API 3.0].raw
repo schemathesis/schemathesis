@@ -1,0 +1,26 @@
+Exit code: 0
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: /schema.yaml
+Base URL: /api
+Specification version: Swagger 2.0
+Workers: 1
+Collected API operations: 3
+
+POST /api/users/ .                                                        [ 33%]
+    -> GET /api/users/{user_id} .                                         [ 50%]
+        -> PATCH /api/users/{user_id} .                                   [ 60%]
+    -> PATCH /api/users/{user_id} .                                       [ 66%]
+GET /api/users/{user_id} .                                                [ 83%]
+PATCH /api/users/{user_id} .                                              [100%]
+
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                    12 / 12 passed          PASSED 
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 6 passed in 1.00s ===============================
