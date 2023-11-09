@@ -151,7 +151,7 @@ How to customize tests
 If you want to change a single scenario's behavior, you need to extend the state machine. Each scenario
 gets a freshly created state machine instance that runs a sequence of steps.
 
-.. autoclass:: schemathesis.stateful.APIStateMachine
+.. autoclass:: schemathesis.stateful.state_machine.APIStateMachine
 
     The following methods are executed only once per test scenario.
 

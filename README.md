@@ -1,5 +1,5 @@
 <p align="center">
-    <em>Automate your API Testing: catch crashes, validate specs, and save time</em>
+    <em>Schemathesis: catch crashes, validate specs, and save time</em>
 </p>
 
 <p align="center">
@@ -27,13 +27,13 @@
 
 **Documentation**: <a href="https://schemathesis.readthedocs.io/en/stable/" target="_blank">https://schemathesis.readthedocs.io/en/stable/ </a>
 
-**Chat**: <a href="https://discord.gg/R9ASRAmHnA" target="_blank">https://discord.gg/R9ASRAmHnA </a> - active community support available
+**Chat**: <a href="https://discord.gg/R9ASRAmHnA" target="_blank">https://discord.gg/R9ASRAmHnA </a>
 
 ---
 
 ## Why Schemathesis?
 
-Schemathesis focuses on automating your API testing to catch crashes and spec violations. Built on top of the widely-used <a href="https://hypothesis.works/" target="_blank">Hypothesis</a> framework for property-based testing, it offers the following advantages:
+Schemathesis is a tool that automates your API testing to catch crashes and spec violations. Built on top of the widely-used <a href="https://hypothesis.works/" target="_blank">Hypothesis</a> framework for property-based testing, it offers the following advantages:
 
 🕒 **Time-Saving**
 

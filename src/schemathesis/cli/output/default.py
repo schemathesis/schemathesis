@@ -311,7 +311,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
             f"\n{bold('Reproduce with')}: \n\n    {code_sample}\n",
         )
     if result.seed is not None:
-        click.secho(f"Or add this option to your command line parameters: --hypothesis-seed={result.seed}", fg="red")
+        click.secho(f"Or add this option to your command line parameters: --hypothesis-seed={result.seed}")
 
 
 def group_by_case(
