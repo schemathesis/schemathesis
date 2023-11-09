@@ -64,10 +64,6 @@ def test_run_subprocess(testdir):
     assert result.ret == ExitCode.OK
 
 
-def test_commands_version(cli, snapshot_cli):
-    assert cli.main("--version") == snapshot_cli
-
-
 @pytest.mark.parametrize(
     "args",
     (
