@@ -57,7 +57,9 @@ Generates code samples to help you quickly replicate and investigate any failing
 
 ## Quick Demo
 
-![image](https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/demo.gif)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/demo.gif" alt="Schemathesis Demo"/>
+</p>
 
 With a summary right in your PRs:
 
