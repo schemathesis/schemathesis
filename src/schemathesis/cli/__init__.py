@@ -1,6 +1,7 @@
 from __future__ import annotations
 import base64
 import enum
+import io
 import os
 import sys
 import traceback
@@ -1405,7 +1406,7 @@ def replay(
     """Replay a cassette.
 
     Cassettes in VCR-compatible format can be replayed.
-    For example, ones that are recorded with ``store-network-log`` option of `st run` command.
+    For example, ones that are recorded with the ``--cassette-path`` option of the `st run` command.
     """
     if no_color and force_color:
         raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
@@ -1444,6 +1445,54 @@ def replay(
         click.echo()
 
 
+@schemathesis.command(short_help="Upload report to Schemathesis.io.")
+@click.argument("report", type=click.File(mode="rb"))
+@click.option(
+    "--schemathesis-io-token",
+    help="Schemathesis.io authentication token.",
+    type=str,
+    envvar=service.TOKEN_ENV_VAR,
+)
+@click.option(
+    "--schemathesis-io-url",
+    help="Schemathesis.io base URL.",
+    default=service.DEFAULT_URL,
+    type=str,
+    envvar=service.URL_ENV_VAR,
+)
+@with_request_tls_verify
+@with_hosts_file
+def upload(
+    report: io.BufferedReader,
+    hosts_file: str,
+    request_tls_verify: bool = True,
+    schemathesis_io_url: str = service.DEFAULT_URL,
+    schemathesis_io_token: Optional[str] = None,
+) -> None:
+    """Upload report to Schemathesis.io."""
+    from ..service.client import ServiceClient
+    from ..service.models import UploadResponse, UploadSource
+
+    schemathesis_io_hostname = urlparse(schemathesis_io_url).netloc
+    host_data = service.hosts.HostData(schemathesis_io_hostname, hosts_file)
+    token = schemathesis_io_token or service.hosts.get_token(hostname=schemathesis_io_hostname, hosts_file=hosts_file)
+    client = ServiceClient(base_url=schemathesis_io_url, token=token, verify=request_tls_verify)
+    ci_environment = service.ci.environment()
+    provider = ci_environment.provider if ci_environment is not None else None
+    response = client.upload_report(
+        report=report.read(),
+        correlation_id=host_data.correlation_id,
+        ci_provider=provider,
+        source=UploadSource.UPLOAD_COMMAND,
+    )
+    if isinstance(response, UploadResponse):
+        host_data.store_correlation_id(response.correlation_id)
+        click.echo(f"{response.message}\n{response.next_url}")
+    else:
+        error_message(f"Failed to upload report to {schemathesis_io_hostname}: " + bold(response.detail))
+        sys.exit(1)
+
+
 @schemathesis.group(short_help="Authenticate with Schemathesis.io.")
 def auth() -> None:
     pass
@@ -1467,13 +1516,7 @@ def auth() -> None:
 @with_request_tls_verify
 @with_hosts_file
 def login(token: str, hostname: str, hosts_file: str, protocol: str, request_tls_verify: bool = True) -> None:
-    """Authenticate with a Schemathesis.io host.
-
-    Example:
-    -------
-        st auth login MY_TOKEN
-
-    """
+    """Authenticate with a Schemathesis.io host."""
     import requests
 
     try:

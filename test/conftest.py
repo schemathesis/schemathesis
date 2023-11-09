@@ -277,6 +277,7 @@ def keep_cwd():
 class CliSnapshotConfig:
     request: FixtureRequest
     replace_server_host: bool = True
+    replace_service_host: bool = True
     replace_tmp_dir: bool = True
     replace_duration: bool = True
     replace_multi_worker_progress: Union[bool, str] = True
@@ -299,6 +300,12 @@ class CliSnapshotConfig:
         return self.request.getfixturevalue("testdir")
 
     def serialize(self, data: str) -> str:
+        if self.replace_service_host:
+            try:
+                host = self.request.getfixturevalue("hostname")
+                data = data.replace(host, "127.0.0.1")
+            except LookupError:
+                pass
         if self.replace_server_host:
             try:
                 host = self.request.getfixturevalue("server_host")
