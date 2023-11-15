@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Basic support for ``httpx`` in ``Case.validate_response``.
+
 .. _v3.21.0:
 
 `3.21.0`_ - 2023-11-09
