@@ -72,4 +72,4 @@ def get_reason(status_code: int) -> str:
     return http.client.responses.get(status_code, "Unknown")
 
 
-GenericResponse = Union["httpxResponse", "Response", WSGIResponse]
+GenericResponse = Union["httpxResponse", "requestsResponse", WSGIResponse]

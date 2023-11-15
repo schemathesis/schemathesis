@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from textwrap import dedent
 from types import SimpleNamespace
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import httpx
 import pytest
