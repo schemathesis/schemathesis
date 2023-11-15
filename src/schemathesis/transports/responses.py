@@ -33,10 +33,9 @@ def get_payload(response: GenericResponse) -> str:
 
 def copy_response(response: GenericResponse) -> GenericResponse:
     """Create a copy of the given response as far as it makes sense."""
-    from httpx import Response as httpxResponse
-    from requests import Response as requestsResponse
+    from requests import Response
 
-    if isinstance(response, requestsResponse):
+    if isinstance(response, Response):
         # Hooks are not copyable. Keep them out and copy the rest
         hooks = None
         if response.request is not None:
@@ -46,12 +45,6 @@ def copy_response(response: GenericResponse) -> GenericResponse:
         if hooks is not None:
             copied_response.request.hooks["response"] = hooks
         copied_response.raw = response.raw
-        copied_response.verify = getattr(response, "verify", True)  # type: ignore[union-attr]
-        return copied_response
-
-    if isinstance(response, httpxResponse):
-        copied_response = deepcopy(response)
-        copied_response.raw = response.content
         copied_response.verify = getattr(response, "verify", True)  # type: ignore[union-attr]
         return copied_response
 
