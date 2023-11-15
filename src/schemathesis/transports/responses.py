@@ -49,7 +49,8 @@ def copy_response(response: GenericResponse) -> GenericResponse:
         return copied_response
 
     # Can't deepcopy WSGI response due to generators inside (`response.freeze` doesn't completely help)
-    response.freeze()
+    if isinstance(response, WSGIResponse):
+        response.freeze()
     copied_response = copy(response)
     copied_response.request = deepcopy(response.request)
     return copied_response
