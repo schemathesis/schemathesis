@@ -336,6 +336,7 @@ def test_(case):
     result.assert_outcomes(passed=1)
 
 
+@pytest.mark.parametrize("factory_type", ("httpx", "requests"))
 @pytest.mark.parametrize(
     "response_schema, payload, schema_path, instance, instance_path",
     (
@@ -351,7 +352,14 @@ def test_(case):
     ),
 )
 def test_validate_response_schema_path(
-    empty_open_api_3_schema, response_schema, payload, schema_path, instance, instance_path
+    response_factory,
+    factory_type,
+    empty_open_api_3_schema,
+    response_schema,
+    payload,
+    schema_path,
+    instance,
+    instance_path,
 ):
     empty_open_api_3_schema["paths"] = {
         "/test": {
@@ -367,10 +375,7 @@ def test_validate_response_schema_path(
     }
     empty_open_api_3_schema["components"] = {"schemas": {"Foo": {"type": "object"}}}
     schema = schemathesis.from_dict(empty_open_api_3_schema)
-    response = requests.Response()
-    response.status_code = 200
-    response.headers = {"Content-Type": "application/json"}
-    response._content = json.dumps(payload).encode("utf-8")
+    response = getattr(response_factory, factory_type)(content=json.dumps(payload).encode("utf-8"))
     with pytest.raises(CheckFailed) as exc:
         schema["/test"]["POST"].validate_response(response)
     assert exc.value.context.schema_path == schema_path

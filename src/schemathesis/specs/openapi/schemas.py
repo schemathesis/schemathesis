@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import itertools
 import json
 from collections import defaultdict
@@ -9,6 +10,7 @@ from hashlib import sha1
 from json import JSONDecodeError
 from threading import RLock
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     ClassVar,
@@ -23,16 +25,17 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    TYPE_CHECKING,
 )
 from urllib.parse import urlsplit
 
+import httpx
 import jsonschema
 import requests
 from hypothesis.strategies import SearchStrategy
 from requests.structures import CaseInsensitiveDict
 
 from ... import experimental, failures
+from ..._compat import MultipleFailures
 from ...auths import AuthStorage
 from ...generation import DataGenerationMethod
 from ...constants import HTTP_METHODS, NOT_SET
@@ -43,17 +46,16 @@ from ...exceptions import (
     get_response_parsing_error,
     get_schema_validation_error,
 )
-from ..._compat import MultipleFailures
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, should_skip_operation
-from ...internal.result import Ok, Err, Result
+from ...internal.copy import fast_deepcopy
+from ...internal.jsonschema import traverse_schema
+from ...internal.result import Err, Ok, Result
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import BaseSchema
 from ...stateful import Stateful, StatefulTest
 from ...stateful.state_machine import APIStateMachine
-from ...types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
-from ...internal.jsonschema import traverse_schema
-from ...internal.copy import fast_deepcopy
 from ...transports.content_types import is_json_media_type
+from ...types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
 from . import links, serialization
 from ._hypothesis import get_case_strategy
 from .converter import to_json_schema, to_json_schema_recursive
@@ -528,7 +530,7 @@ class BaseOpenAPISchema(BaseSchema):
             _maybe_raise_one_or_more(errors)
             return
         try:
-            if isinstance(response, requests.Response):
+            if isinstance(response, (requests.Response, httpx.Response)):
                 data = json.loads(response.text)
             else:
                 data = response.json

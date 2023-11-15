@@ -8,7 +8,9 @@ from .._compat import JSONMixin
 from werkzeug.wrappers import Response as BaseResponse
 
 if TYPE_CHECKING:
-    from requests import Response, PreparedRequest
+    from httpx import Response as httpxResponse
+    from requests import Response as requestsResponse
+    from requests import PreparedRequest
 
 
 class WSGIResponse(BaseResponse, JSONMixin):
@@ -21,9 +23,10 @@ class WSGIResponse(BaseResponse, JSONMixin):
 
 
 def get_payload(response: GenericResponse) -> str:
-    from requests import Response
+    from httpx import Response as httpxResponse
+    from requests import Response as requestsResponse
 
-    if isinstance(response, Response):
+    if isinstance(response, (httpxResponse, requestsResponse)):
         return response.text
     return response.get_data(as_text=True)
 
@@ -44,8 +47,10 @@ def copy_response(response: GenericResponse) -> GenericResponse:
         copied_response.raw = response.raw
         copied_response.verify = getattr(response, "verify", True)  # type: ignore[union-attr]
         return copied_response
+
     # Can't deepcopy WSGI response due to generators inside (`response.freeze` doesn't completely help)
-    response.freeze()
+    if isinstance(response, WSGIResponse):
+        response.freeze()
     copied_response = copy(response)
     copied_response.request = deepcopy(response.request)
     return copied_response
@@ -61,4 +66,4 @@ def get_reason(status_code: int) -> str:
     return http.client.responses.get(status_code, "Unknown")
 
 
-GenericResponse = Union["Response", WSGIResponse]
+GenericResponse = Union["httpxResponse", "requestsResponse", WSGIResponse]
