@@ -10,6 +10,7 @@ from textwrap import dedent
 from types import SimpleNamespace
 from typing import Any, Dict, Optional, Union
 
+import httpx
 import pytest
 import requests
 import yaml
@@ -1048,6 +1049,24 @@ def is_older_subtests():
 
 @pytest.fixture
 def response_factory():
+    def httpx_factory(
+        *,
+        content: bytes = b"{}",
+        content_type: Optional[str] = "application/json",
+        status_code: int = 200,
+        headers: Optional[Dict[str, Any]] = None,
+    ) -> httpx.Response:
+        headers = headers or {}
+        if content_type:
+            headers.setdefault("Content-Type", content_type)
+        response = httpx.Response(
+            status_code=status_code,
+            headers=headers,
+            content=content,
+            request=httpx.Request(method="POST", url="http://127.0.0.1", headers=headers),
+        )
+        return response
+
     def requests_factory(
         *,
         content: bytes = b"{}",
@@ -1076,6 +1095,7 @@ def response_factory():
         return response
 
     return SimpleNamespace(
+        httpx=httpx_factory,
         requests=requests_factory,
         werkzeug=werkzeug_factory,
     )
