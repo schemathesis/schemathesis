@@ -4,6 +4,11 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+.. _v3.21.1:
+
+`3.21.1`_ - 2023-11-16
+----------------------
+
 **Added**
 
 - Basic support for ``httpx`` in ``Case.validate_response``.
@@ -3295,7 +3300,8 @@ Deprecated
 
 - Initial public release
 
-.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.21.0...HEAD
+.. _Unreleased: https://github.com/schemathesis/schemathesis/compare/v3.21.1...HEAD
+.. _3.21.1: https://github.com/schemathesis/schemathesis/compare/v3.21.0...v3.21.1
 .. _3.21.0: https://github.com/schemathesis/schemathesis/compare/v3.20.2...v3.21.0
 .. _3.20.2: https://github.com/schemathesis/schemathesis/compare/v3.20.1...v3.20.2
 .. _3.20.1: https://github.com/schemathesis/schemathesis/compare/v3.20.0...v3.20.1
