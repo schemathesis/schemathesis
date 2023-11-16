@@ -8,6 +8,10 @@ Changelog
 
 - Basic support for ``httpx`` in ``Case.validate_response``.
 
+**Changed**
+
+- Restore the ability to import ``NOT_SET`` from ``schemathesis.utils``. `#1890`_
+
 .. _v3.21.0:
 
 `3.21.0`_ - 2023-11-09
@@ -3526,6 +3530,7 @@ Deprecated
 .. _0.3.0: https://github.com/schemathesis/schemathesis/compare/v0.2.0...v0.3.0
 .. _0.2.0: https://github.com/schemathesis/schemathesis/compare/v0.1.0...v0.2.0
 
+.. _#1890: https://github.com/schemathesis/schemathesis/issues/1890
 .. _#1835: https://github.com/schemathesis/schemathesis/issues/1835
 .. _#1820: https://github.com/schemathesis/schemathesis/issues/1820
 .. _#1819: https://github.com/schemathesis/schemathesis/issues/1819

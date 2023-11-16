@@ -21,6 +21,9 @@ from hypothesis.reporting import with_reporter
 from hypothesis.strategies import SearchStrategy
 
 from ._compat import InferType, get_signature
+
+# Backward-compat
+from .constants import NOT_SET  # noqa: F401
 from .exceptions import SkipTest, UsageError
 from .types import GenericTest
 
