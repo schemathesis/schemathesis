@@ -212,7 +212,7 @@ Your feedback is essential for improving Schemathesis.
 By sharing your thoughts, you help us develop features that meet your needs and expedite bug fixes.
 
 1. **Why Give Feedback**: Your input directly influences future updates, making the tool more effective for you.
-2. **How to Provide Feedback**: Use [this form](<(https://forms.gle/kJ4hSxc1Yp6Ga96t5)>) to share your experience.
+2. **How to Provide Feedback**: Use [this form](https://forms.gle/kJ4hSxc1Yp6Ga96t5) to share your experience.
 3. **Data Privacy**: We value your privacy. All data is kept confidential and may be used in anonymized form to improve our test suite and documentation.
 
 Thank you for contributing to making Schemathesis better! 👍
