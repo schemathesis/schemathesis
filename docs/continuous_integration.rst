@@ -6,6 +6,10 @@ This guide outlines how to set up Schemathesis for automated API testing in your
 GitHub Actions
 --------------
 
+.. note::
+
+    💡 See our `GitHub Tutorial <https://docs.schemathesis.io/tutorials/github>`_ for a step-by-step guidance.
+
 For initial setup in a GitHub Actions workflow:
 
 .. code-block:: yaml

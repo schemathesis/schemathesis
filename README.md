@@ -135,6 +135,8 @@ api-tests:
 
 For more details, check out our [GitHub Action](https://github.com/schemathesis/action) repository.
 
+> 💡 See our [GitHub Tutorial](https://docs.schemathesis.io/tutorials/github) for a step-by-step guidance.
+
 **GitHub App**
 
 Receive automatic comments in your pull requests and updates on GitHub checks status. Requires usage of our SaaS platform.
