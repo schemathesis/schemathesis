@@ -274,6 +274,9 @@ def keep_cwd():
         os.chdir(cwd)
 
 
+FLASK_MARKERS = ("* Serving Flask app", "* Debug mode")
+
+
 @dataclass()
 class CliSnapshotConfig:
     request: FixtureRequest
@@ -301,6 +304,9 @@ class CliSnapshotConfig:
         return self.request.getfixturevalue("testdir")
 
     def serialize(self, data: str) -> str:
+        lines = data.splitlines()
+        lines = [line for line in lines if not any(marker in line for marker in FLASK_MARKERS)]
+        data = "\n".join(lines)
         if self.replace_service_host:
             try:
                 host = self.request.getfixturevalue("hostname")
