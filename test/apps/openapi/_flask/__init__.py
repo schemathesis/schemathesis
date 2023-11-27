@@ -1,6 +1,7 @@
 import cgi
 import csv
 import json
+import logging
 from time import sleep
 from typing import Tuple
 from uuid import uuid4
@@ -13,6 +14,8 @@ from werkzeug.exceptions import BadRequest, GatewayTimeout, InternalServerError
 from schemathesis.constants import BOM_MARK
 
 from ..schema import PAYLOAD_VALIDATOR, OpenAPIVersion, make_openapi_schema
+
+logging.getLogger("werkzeug").setLevel(logging.CRITICAL)
 
 SUCCESS_RESPONSE = {"read": "success!"}
 
