@@ -2,9 +2,19 @@ import binascii
 import os
 from dataclasses import dataclass
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Callable, Collection, Dict, Generator, Optional, Type, cast
-
-from typing_extensions import Protocol, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Collection,
+    Dict,
+    Generator,
+    Optional,
+    Type,
+    cast,
+    Protocol,
+    runtime_checkable,
+)
 
 from .internal.copy import fast_deepcopy
 from ._xml import _to_xml

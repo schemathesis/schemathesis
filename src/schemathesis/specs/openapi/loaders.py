@@ -3,7 +3,7 @@ import io
 import json
 import pathlib
 import re
-from typing import IO, Any, Callable, Dict, List, Optional, Tuple, Union, cast, TYPE_CHECKING
+from typing import IO, Any, Callable, cast, TYPE_CHECKING
 from urllib.parse import urljoin
 
 from ... import experimental, fixups
@@ -47,17 +47,17 @@ def from_path(
     path: PathLike,
     *,
     app: Any = None,
-    base_url: Optional[str] = None,
-    method: Optional[Filter] = None,
-    endpoint: Optional[Filter] = None,
-    tag: Optional[Filter] = None,
-    operation_id: Optional[Filter] = None,
+    base_url: str | None = None,
+    method: Filter | None = None,
+    endpoint: Filter | None = None,
+    tag: Filter | None = None,
+    operation_id: Filter | None = None,
     skip_deprecated_operations: bool = False,
     validate_schema: bool = False,
-    force_schema_version: Optional[str] = None,
+    force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    rate_limit: Optional[str] = None,
+    rate_limit: str | None = None,
     encoding: str = "utf8",
     sanitize_output: bool = True,
 ) -> BaseOpenAPISchema:
@@ -91,19 +91,19 @@ def from_uri(
     uri: str,
     *,
     app: Any = None,
-    base_url: Optional[str] = None,
-    port: Optional[int] = None,
-    method: Optional[Filter] = None,
-    endpoint: Optional[Filter] = None,
-    tag: Optional[Filter] = None,
-    operation_id: Optional[Filter] = None,
+    base_url: str | None = None,
+    port: int | None = None,
+    method: Filter | None = None,
+    endpoint: Filter | None = None,
+    tag: Filter | None = None,
+    operation_id: Filter | None = None,
     skip_deprecated_operations: bool = False,
     validate_schema: bool = False,
-    force_schema_version: Optional[str] = None,
+    force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    wait_for_schema: Optional[float] = None,
-    rate_limit: Optional[str] = None,
+    wait_for_schema: float | None = None,
+    rate_limit: str | None = None,
     sanitize_output: bool = True,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
@@ -160,7 +160,7 @@ def from_uri(
 SCHEMA_LOADING_ERROR = "Received unsupported content while expecting a JSON or YAML payload for Open API"
 
 
-def _load_yaml(data: str) -> Dict[str, Any]:
+def _load_yaml(data: str) -> dict[str, Any]:
     import yaml
 
     try:
@@ -170,21 +170,21 @@ def _load_yaml(data: str) -> Dict[str, Any]:
 
 
 def from_file(
-    file: Union[IO[str], str],
+    file: IO[str] | str,
     *,
     app: Any = None,
-    base_url: Optional[str] = None,
-    method: Optional[Filter] = None,
-    endpoint: Optional[Filter] = None,
-    tag: Optional[Filter] = None,
-    operation_id: Optional[Filter] = None,
+    base_url: str | None = None,
+    method: Filter | None = None,
+    endpoint: Filter | None = None,
+    tag: Filter | None = None,
+    operation_id: Filter | None = None,
     skip_deprecated_operations: bool = False,
     validate_schema: bool = False,
-    force_schema_version: Optional[str] = None,
+    force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    location: Optional[str] = None,
-    rate_limit: Optional[str] = None,
+    location: str | None = None,
+    rate_limit: str | None = None,
     sanitize_output: bool = True,
     __expects_json: bool = False,
     **kwargs: Any,  # needed in the runner to have compatible API across all loaders
@@ -234,21 +234,21 @@ def _is_fast_api(app: Any) -> bool:
 
 
 def from_dict(
-    raw_schema: Dict[str, Any],
+    raw_schema: dict[str, Any],
     *,
     app: Any = None,
-    base_url: Optional[str] = None,
-    method: Optional[Filter] = None,
-    endpoint: Optional[Filter] = None,
-    tag: Optional[Filter] = None,
-    operation_id: Optional[Filter] = None,
+    base_url: str | None = None,
+    method: Filter | None = None,
+    endpoint: Filter | None = None,
+    tag: Filter | None = None,
+    operation_id: Filter | None = None,
     skip_deprecated_operations: bool = False,
     validate_schema: bool = False,
-    force_schema_version: Optional[str] = None,
+    force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    location: Optional[str] = None,
-    rate_limit: Optional[str] = None,
+    location: str | None = None,
+    rate_limit: str | None = None,
     sanitize_output: bool = True,
 ) -> BaseOpenAPISchema:
     """Load Open API schema from a Python dictionary.
@@ -266,7 +266,7 @@ def from_dict(
     elif _is_fast_api(app):
         fixups.fast_api.adjust_schema(raw_schema)
     dispatch("before_load_schema", hook_context, raw_schema)
-    rate_limiter: Optional[Limiter] = None
+    rate_limiter: Limiter | None = None
     if rate_limit is not None:
         rate_limiter = build_limiter(rate_limit)
 
@@ -356,7 +356,7 @@ NON_STRING_OBJECT_KEY_MESSAGE = (
 )
 
 
-def _format_status_codes(status_codes: List[Tuple[int, List[Union[str, int]]]]) -> str:
+def _format_status_codes(status_codes: list[tuple[int, list[str | int]]]) -> str:
     buffer = io.StringIO()
     for status_code, path in status_codes:
         buffer.write(f" - {status_code} at schema['paths']")
@@ -367,7 +367,7 @@ def _format_status_codes(status_codes: List[Tuple[int, List[Union[str, int]]]]) 
 
 
 def _maybe_validate_schema(
-    instance: Dict[str, Any], validator: jsonschema.validators.Draft4Validator, validate_schema: bool
+    instance: dict[str, Any], validator: jsonschema.validators.Draft4Validator, validate_schema: bool
 ) -> None:
     from jsonschema import ValidationError
 
@@ -397,16 +397,16 @@ def from_pytest_fixture(
     fixture_name: str,
     *,
     app: Any = NOT_SET,
-    base_url: Union[Optional[str], NotSet] = NOT_SET,
-    method: Optional[Filter] = NOT_SET,
-    endpoint: Optional[Filter] = NOT_SET,
-    tag: Optional[Filter] = NOT_SET,
-    operation_id: Optional[Filter] = NOT_SET,
+    base_url: str | None | NotSet = NOT_SET,
+    method: Filter | None = NOT_SET,
+    endpoint: Filter | None = NOT_SET,
+    tag: Filter | None = NOT_SET,
+    operation_id: Filter | None = NOT_SET,
     skip_deprecated_operations: bool = False,
     validate_schema: bool = False,
-    data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
+    data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
     code_sample_style: str = CodeSampleStyle.default().name,
-    rate_limit: Optional[str] = None,
+    rate_limit: str | None = None,
     sanitize_output: bool = True,
 ) -> LazySchema:
     """Load schema from a ``pytest`` fixture.
@@ -421,13 +421,13 @@ def from_pytest_fixture(
     from ...lazy import LazySchema
 
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
-    _data_generation_methods: Union[DataGenerationMethodInput, NotSet]
+    _data_generation_methods: DataGenerationMethodInput | NotSet
     if data_generation_methods is not NOT_SET:
         data_generation_methods = cast(DataGenerationMethodInput, data_generation_methods)
         _data_generation_methods = DataGenerationMethod.ensure_list(data_generation_methods)
     else:
         _data_generation_methods = data_generation_methods
-    rate_limiter: Optional[Limiter] = None
+    rate_limiter: Limiter | None = None
     if rate_limit is not None:
         rate_limiter = build_limiter(rate_limit)
     return LazySchema(
@@ -451,17 +451,17 @@ def from_wsgi(
     schema_path: str,
     app: Any,
     *,
-    base_url: Optional[str] = None,
-    method: Optional[Filter] = None,
-    endpoint: Optional[Filter] = None,
-    tag: Optional[Filter] = None,
-    operation_id: Optional[Filter] = None,
+    base_url: str | None = None,
+    method: Filter | None = None,
+    endpoint: Filter | None = None,
+    tag: Filter | None = None,
+    operation_id: Filter | None = None,
     skip_deprecated_operations: bool = False,
     validate_schema: bool = False,
-    force_schema_version: Optional[str] = None,
+    force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    rate_limit: Optional[str] = None,
+    rate_limit: str | None = None,
     sanitize_output: bool = True,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
@@ -511,17 +511,17 @@ def from_aiohttp(
     schema_path: str,
     app: Any,
     *,
-    base_url: Optional[str] = None,
-    method: Optional[Filter] = None,
-    endpoint: Optional[Filter] = None,
-    tag: Optional[Filter] = None,
-    operation_id: Optional[Filter] = None,
+    base_url: str | None = None,
+    method: Filter | None = None,
+    endpoint: Filter | None = None,
+    tag: Filter | None = None,
+    operation_id: Filter | None = None,
     skip_deprecated_operations: bool = False,
     validate_schema: bool = False,
-    force_schema_version: Optional[str] = None,
+    force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    rate_limit: Optional[str] = None,
+    rate_limit: str | None = None,
     sanitize_output: bool = True,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:
@@ -557,17 +557,17 @@ def from_asgi(
     schema_path: str,
     app: Any,
     *,
-    base_url: Optional[str] = None,
-    method: Optional[Filter] = None,
-    endpoint: Optional[Filter] = None,
-    tag: Optional[Filter] = None,
-    operation_id: Optional[Filter] = None,
+    base_url: str | None = None,
+    method: Filter | None = None,
+    endpoint: Filter | None = None,
+    tag: Filter | None = None,
+    operation_id: Filter | None = None,
     skip_deprecated_operations: bool = False,
     validate_schema: bool = False,
-    force_schema_version: Optional[str] = None,
+    force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    rate_limit: Optional[str] = None,
+    rate_limit: str | None = None,
     sanitize_output: bool = True,
     **kwargs: Any,
 ) -> BaseOpenAPISchema:

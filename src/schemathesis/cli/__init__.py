@@ -66,7 +66,7 @@ if TYPE_CHECKING:
     from .handlers import EventHandler
 
 
-def _get_callable_names(items: Tuple[Callable, ...]) -> Tuple[str, ...]:
+def _get_callable_names(items: tuple[Callable, ...]) -> tuple[str, ...]:
     return tuple(item.__name__ for item in items)
 
 
@@ -114,7 +114,7 @@ class DeprecatedOption(click.Option):
         super().__init__(*args, **kwargs)
         self.removed_in = removed_in
 
-    def handle_parse_result(self, ctx: click.Context, opts: Dict[str, Any], args: List[str]) -> Tuple[Any, List[str]]:
+    def handle_parse_result(self, ctx: click.Context, opts: dict[str, Any], args: list[str]) -> tuple[Any, list[str]]:
         if self.name in opts:
             opt_names = "/".join(f"`{name}`" for name in self.opts)
             verb = "is" if len(self.opts) == 1 else "are"
@@ -128,10 +128,10 @@ class DeprecatedOption(click.Option):
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.option("--pre-run", help="A module to execute before running the tests.", type=str, hidden=True)
 @click.version_option()
-def schemathesis(pre_run: Optional[str] = None) -> None:
+def schemathesis(pre_run: str | None = None) -> None:
     """Automated API testing employing fuzzing techniques for OpenAPI and GraphQL."""
     # Don't use `envvar=HOOKS_MODULE_ENV_VAR` arg to raise a deprecation warning for hooks
-    hooks: Optional[str]
+    hooks: str | None
     if pre_run:
         click.secho(DEPRECATED_PRE_RUN_OPTION_WARNING, fg="yellow")
         hooks = pre_run
@@ -656,61 +656,61 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 def run(
     ctx: click.Context,
     schema: str,
-    api_name: Optional[str],
-    auth: Optional[Tuple[str, str]],
+    api_name: str | None,
+    auth: tuple[str, str] | None,
     auth_type: str,
-    headers: Dict[str, str],
+    headers: dict[str, str],
     experimental: list,
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
     exclude_checks: Iterable[str] = (),
-    data_generation_methods: Tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
-    max_response_time: Optional[int] = None,
+    data_generation_methods: tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
+    max_response_time: int | None = None,
     targets: Iterable[str] = DEFAULT_TARGETS_NAMES,
     exit_first: bool = False,
-    max_failures: Optional[int] = None,
+    max_failures: int | None = None,
     dry_run: bool = False,
-    endpoints: Optional[Filter] = None,
-    methods: Optional[Filter] = None,
-    tags: Optional[Filter] = None,
-    operation_ids: Optional[Filter] = None,
+    endpoints: Filter | None = None,
+    methods: Filter | None = None,
+    tags: Filter | None = None,
+    operation_ids: Filter | None = None,
     workers_num: int = DEFAULT_WORKERS,
-    base_url: Optional[str] = None,
-    app: Optional[str] = None,
-    request_timeout: Optional[int] = None,
+    base_url: str | None = None,
+    app: str | None = None,
+    request_timeout: int | None = None,
     request_tls_verify: bool = True,
-    request_cert: Optional[str] = None,
-    request_cert_key: Optional[str] = None,
+    request_cert: str | None = None,
+    request_cert_key: str | None = None,
     validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
-    junit_xml: Optional[click.utils.LazyFile] = None,
-    debug_output_file: Optional[click.utils.LazyFile] = None,
+    junit_xml: click.utils.LazyFile | None = None,
+    debug_output_file: click.utils.LazyFile | None = None,
     show_errors_tracebacks: bool = False,
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default(),
-    cassette_path: Optional[click.utils.LazyFile] = None,
+    cassette_path: click.utils.LazyFile | None = None,
     cassette_preserve_exact_body_bytes: bool = False,
-    store_network_log: Optional[click.utils.LazyFile] = None,
-    wait_for_schema: Optional[float] = None,
-    fixups: Tuple[str] = (),  # type: ignore
-    rate_limit: Optional[str] = None,
-    stateful: Optional[Stateful] = None,
+    store_network_log: click.utils.LazyFile | None = None,
+    wait_for_schema: float | None = None,
+    fixups: tuple[str] = (),  # type: ignore
+    rate_limit: str | None = None,
+    stateful: Stateful | None = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
-    force_schema_version: Optional[str] = None,
+    force_schema_version: str | None = None,
     sanitize_output: bool = True,
     contrib_unique_data: bool = False,
     contrib_openapi_formats_uuid: bool = False,
-    hypothesis_database: Optional[str] = None,
-    hypothesis_deadline: Optional[Union[int, NotSet]] = None,
-    hypothesis_derandomize: Optional[bool] = None,
-    hypothesis_max_examples: Optional[int] = None,
-    hypothesis_phases: Optional[List[Phase]] = None,
-    hypothesis_report_multiple_bugs: Optional[bool] = None,
-    hypothesis_suppress_health_check: Optional[List[HealthCheck]] = None,
-    hypothesis_seed: Optional[int] = None,
-    hypothesis_verbosity: Optional[hypothesis.Verbosity] = None,
+    hypothesis_database: str | None = None,
+    hypothesis_deadline: int | NotSet | None = None,
+    hypothesis_derandomize: bool | None = None,
+    hypothesis_max_examples: int | None = None,
+    hypothesis_phases: list[Phase] | None = None,
+    hypothesis_report_multiple_bugs: bool | None = None,
+    hypothesis_suppress_health_check: list[HealthCheck] | None = None,
+    hypothesis_seed: int | None = None,
+    hypothesis_verbosity: hypothesis.Verbosity | None = None,
     verbosity: int = 0,
     no_color: bool = False,
-    report_value: Optional[str] = None,
-    schemathesis_io_token: Optional[str] = None,
+    report_value: str | None = None,
+    schemathesis_io_token: str | None = None,
     schemathesis_io_url: str = service.DEFAULT_URL,
     schemathesis_io_telemetry: bool = True,
     hosts_file: PathLike = service.DEFAULT_HOSTS_PATH,
@@ -722,10 +722,10 @@ def run(
 
     [Optional] API_NAME: Identifier for uploading test data to Schemathesis.io.
     """
-    _hypothesis_phases: Optional[List[hypothesis.Phase]] = None
+    _hypothesis_phases: list[hypothesis.Phase] | None = None
     if hypothesis_phases is not None:
         _hypothesis_phases = [phase.as_hypothesis() for phase in hypothesis_phases]
-    _hypothesis_suppress_health_check: Optional[List[hypothesis.HealthCheck]] = None
+    _hypothesis_suppress_health_check: list[hypothesis.HealthCheck] | None = None
     if hypothesis_suppress_health_check is not None:
         _hypothesis_suppress_health_check = [
             health_check.as_hypothesis() for health_check in hypothesis_suppress_health_check
@@ -735,7 +735,7 @@ def run(
     for experiment in experimental:
         experiment.enable()
 
-    report: Optional[Union[ReportToService, click.utils.LazyFile]]
+    report: ReportToService | click.utils.LazyFile | None
     if report_value is None:
         report = None
     elif report_value:
@@ -904,7 +904,7 @@ def run(
     )
 
 
-def prepare_request_cert(cert: Optional[str], key: Optional[str]) -> Optional[RequestCert]:
+def prepare_request_cert(cert: str | None, key: str | None) -> RequestCert | None:
     if cert is not None and key is not None:
         return cert, key
     return cert
@@ -919,62 +919,62 @@ class LoaderConfig:
 
     schema_location: str
     app: Any
-    base_url: Optional[str]
+    base_url: str | None
     validate_schema: bool
     skip_deprecated_operations: bool
-    data_generation_methods: Tuple[DataGenerationMethod, ...]
-    force_schema_version: Optional[str]
-    request_tls_verify: Union[bool, str]
-    request_cert: Optional[RequestCert]
-    wait_for_schema: Optional[float]
-    rate_limit: Optional[str]
+    data_generation_methods: tuple[DataGenerationMethod, ...]
+    force_schema_version: str | None
+    request_tls_verify: bool | str
+    request_cert: RequestCert | None
+    wait_for_schema: float | None
+    rate_limit: str | None
     # Network request parameters
-    auth: Optional[Tuple[str, str]]
-    auth_type: Optional[str]
-    headers: Optional[Dict[str, str]]
+    auth: tuple[str, str] | None
+    auth_type: str | None
+    headers: dict[str, str] | None
     # Schema filters
-    endpoint: Optional[Filter]
-    method: Optional[Filter]
-    tag: Optional[Filter]
-    operation_id: Optional[Filter]
+    endpoint: Filter | None
+    method: Filter | None
+    tag: Filter | None
+    operation_id: Filter | None
 
 
 def into_event_stream(
     schema_location: str,
     *,
     app: Any,
-    base_url: Optional[str],
+    base_url: str | None,
     started_at: str,
     validate_schema: bool,
     skip_deprecated_operations: bool,
-    data_generation_methods: Tuple[DataGenerationMethod, ...],
-    force_schema_version: Optional[str],
-    request_tls_verify: Union[bool, str],
-    request_cert: Optional[RequestCert],
+    data_generation_methods: tuple[DataGenerationMethod, ...],
+    force_schema_version: str | None,
+    request_tls_verify: bool | str,
+    request_cert: RequestCert | None,
     # Network request parameters
-    auth: Optional[Tuple[str, str]],
-    auth_type: Optional[str],
-    headers: Optional[Dict[str, str]],
-    request_timeout: Optional[int],
-    wait_for_schema: Optional[float],
+    auth: tuple[str, str] | None,
+    auth_type: str | None,
+    headers: dict[str, str] | None,
+    request_timeout: int | None,
+    wait_for_schema: float | None,
     # Schema filters
-    endpoint: Optional[Filter],
-    method: Optional[Filter],
-    tag: Optional[Filter],
-    operation_id: Optional[Filter],
+    endpoint: Filter | None,
+    method: Filter | None,
+    tag: Filter | None,
+    operation_id: Filter | None,
     # Runtime behavior
     checks: Iterable[CheckFunction],
-    max_response_time: Optional[int],
+    max_response_time: int | None,
     targets: Iterable[Target],
     workers_num: int,
-    hypothesis_settings: Optional[hypothesis.settings],
-    seed: Optional[int],
+    hypothesis_settings: hypothesis.settings | None,
+    seed: int | None,
     exit_first: bool,
-    max_failures: Optional[int],
-    rate_limit: Optional[str],
+    max_failures: int | None,
+    rate_limit: str | None,
     dry_run: bool,
     store_interactions: bool,
-    stateful: Optional[Stateful],
+    stateful: Stateful | None,
     stateful_recursion_limit: int,
 ) -> Generator[events.ExecutionEvent, None, None]:
     try:
@@ -1091,7 +1091,7 @@ def detect_loader(schema_location: str, app: Any, is_openapi: bool) -> Callable:
     return oas_loaders.from_uri if is_openapi else gql_loaders.from_url  # type: ignore
 
 
-def get_loader_kwargs(loader: Callable, config: LoaderConfig) -> Dict[str, Any]:
+def get_loader_kwargs(loader: Callable, config: LoaderConfig) -> dict[str, Any]:
     """Detect the proper set of parameters for a loader."""
     # These kwargs are shared by all loaders
     kwargs = {
@@ -1117,7 +1117,7 @@ def get_loader_kwargs(loader: Callable, config: LoaderConfig) -> Dict[str, Any]:
 def get_graphql_loader_kwargs(
     loader: Callable,
     config: LoaderConfig,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Detect the proper set of parameters for a loader."""
     # These kwargs are shared by all loaders
     kwargs = {
@@ -1133,7 +1133,7 @@ def get_graphql_loader_kwargs(
     return kwargs
 
 
-def _add_requests_kwargs(kwargs: Dict[str, Any], config: LoaderConfig) -> None:
+def _add_requests_kwargs(kwargs: dict[str, Any], config: LoaderConfig) -> None:
     kwargs["verify"] = config.request_tls_verify
     if config.request_cert is not None:
         kwargs["cert"] = config.request_cert
@@ -1148,7 +1148,7 @@ def is_probably_graphql(location: str) -> bool:
     return location.endswith(("/graphql", "/graphql/"))
 
 
-def check_auth(auth: Optional[Tuple[str, str]], headers: Dict[str, str]) -> None:
+def check_auth(auth: tuple[str, str] | None, headers: dict[str, str]) -> None:
     if auth is not None and "authorization" in {header.lower() for header in headers}:
         raise click.BadParameter(
             "The `--auth` and `--header` options were both used to set "
@@ -1199,30 +1199,30 @@ def execute(
     *,
     hypothesis_settings: hypothesis.settings,
     workers_num: int,
-    rate_limit: Optional[str],
+    rate_limit: str | None,
     show_errors_tracebacks: bool,
-    wait_for_schema: Optional[float],
+    wait_for_schema: float | None,
     validate_schema: bool,
-    cassette_path: Optional[click.utils.LazyFile],
+    cassette_path: click.utils.LazyFile | None,
     cassette_preserve_exact_body_bytes: bool,
-    junit_xml: Optional[click.utils.LazyFile],
+    junit_xml: click.utils.LazyFile | None,
     verbosity: int,
     code_sample_style: CodeSampleStyle,
-    data_generation_methods: Tuple[DataGenerationMethod, ...],
-    debug_output_file: Optional[click.utils.LazyFile],
+    data_generation_methods: tuple[DataGenerationMethod, ...],
+    debug_output_file: click.utils.LazyFile | None,
     sanitize_output: bool,
     host_data: service.hosts.HostData,
-    client: Optional[ServiceClient],
-    report: Optional[Union[ReportToService, click.utils.LazyFile]],
+    client: ServiceClient | None,
+    report: ReportToService | click.utils.LazyFile | None,
     telemetry: bool,
-    api_name: Optional[str],
+    api_name: str | None,
     location: str,
-    base_url: Optional[str],
+    base_url: str | None,
     started_at: str,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
-    handlers: List[EventHandler] = []
-    report_context: Optional[Union[ServiceReportContext, FileReportContext]] = None
+    handlers: list[EventHandler] = []
+    report_context: ServiceReportContext | FileReportContext | None = None
     report_queue: Queue
     if client:
         # If API name is specified, validate it
@@ -1392,15 +1392,15 @@ def get_exit_code(event: events.ExecutionEvent) -> int:
 def replay(
     ctx: click.Context,
     cassette_path: str,
-    id_: Optional[str],
-    status: Optional[str] = None,
-    uri: Optional[str] = None,
-    method: Optional[str] = None,
+    id_: str | None,
+    status: str | None = None,
+    uri: str | None = None,
+    method: str | None = None,
     no_color: bool = False,
     verbosity: int = 0,
     request_tls_verify: bool = True,
-    request_cert: Optional[str] = None,
-    request_cert_key: Optional[str] = None,
+    request_cert: str | None = None,
+    request_cert_key: str | None = None,
     force_color: bool = False,
 ) -> None:
     """Replay a cassette.
@@ -1467,7 +1467,7 @@ def upload(
     hosts_file: str,
     request_tls_verify: bool = True,
     schemathesis_io_url: str = service.DEFAULT_URL,
-    schemathesis_io_token: Optional[str] = None,
+    schemathesis_io_token: str | None = None,
 ) -> None:
     """Upload report to Schemathesis.io."""
     from ..service.client import ServiceClient
@@ -1579,7 +1579,7 @@ def decide_color_output(ctx: click.Context, no_color: bool, force_color: bool) -
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
 def after_init_cli_run_handlers(
-    context: HookContext, handlers: List[EventHandler], execution_context: ExecutionContext
+    context: HookContext, handlers: list[EventHandler], execution_context: ExecutionContext
 ) -> None:
     """Called after CLI hooks are initialized.
 
@@ -1588,7 +1588,7 @@ def after_init_cli_run_handlers(
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
-def process_call_kwargs(context: HookContext, case: Case, kwargs: Dict[str, Any]) -> None:
+def process_call_kwargs(context: HookContext, case: Case, kwargs: dict[str, Any]) -> None:
     """Called before every network call in CLI tests.
 
     Aims to modify the argument passed to `case.call` / `case.call_wsgi` / `case.call_asgi`.

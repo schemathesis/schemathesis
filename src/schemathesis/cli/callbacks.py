@@ -4,7 +4,7 @@ import os
 import re
 import traceback
 from contextlib import contextmanager
-from typing import Dict, Generator, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Generator, TYPE_CHECKING
 from urllib.parse import urlparse
 
 import click
@@ -77,7 +77,7 @@ class SchemaInputKind(enum.Enum):
     NAME = 4
 
 
-def parse_schema_kind(schema: str, app: Optional[str]) -> SchemaInputKind:
+def parse_schema_kind(schema: str, app: str | None) -> SchemaInputKind:
     """Detect what kind the input schema is."""
     try:
         netloc = urlparse(schema).netloc
@@ -99,10 +99,10 @@ def validate_schema(
     schema: str,
     kind: SchemaInputKind,
     *,
-    base_url: Optional[str],
+    base_url: str | None,
     dry_run: bool,
-    app: Optional[str],
-    api_name: Optional[str],
+    app: str | None,
+    api_name: str | None,
 ) -> None:
     if kind == SchemaInputKind.URL:
         validate_url(schema)
@@ -138,9 +138,7 @@ def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_
     return raw_value
 
 
-def validate_rate_limit(
-    ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]
-) -> Optional[str]:
+def validate_rate_limit(ctx: click.core.Context, param: click.core.Parameter, raw_value: str | None) -> str | None:
     if raw_value is None:
         return raw_value
     try:
@@ -150,7 +148,7 @@ def validate_rate_limit(
         raise click.UsageError(exc.args[0]) from exc
 
 
-def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]) -> Optional[str]:
+def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value: str | None) -> str | None:
     if raw_value is None:
         return raw_value
     try:
@@ -176,8 +174,8 @@ def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value
 
 
 def validate_hypothesis_database(
-    ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]
-) -> Optional[str]:
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: str | None
+) -> str | None:
     if raw_value is None:
         return raw_value
     if ctx.params.get("hypothesis_derandomize"):
@@ -186,8 +184,8 @@ def validate_hypothesis_database(
 
 
 def validate_auth(
-    ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]
-) -> Optional[Tuple[str, str]]:
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: str | None
+) -> tuple[str, str] | None:
     if raw_value is not None:
         with reraise_format_error(raw_value):
             user, password = tuple(raw_value.split(":"))
@@ -202,8 +200,8 @@ def validate_auth(
 
 
 def validate_headers(
-    ctx: click.core.Context, param: click.core.Parameter, raw_value: Tuple[str, ...]
-) -> Dict[str, str]:
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: tuple[str, ...]
+) -> dict[str, str]:
     headers = {}
     for header in raw_value:
         with reraise_format_error(header):
@@ -222,7 +220,7 @@ def validate_headers(
     return headers
 
 
-def validate_regex(ctx: click.core.Context, param: click.core.Parameter, raw_value: Tuple[str, ...]) -> Tuple[str, ...]:
+def validate_regex(ctx: click.core.Context, param: click.core.Parameter, raw_value: tuple[str, ...]) -> tuple[str, ...]:
     for value in raw_value:
         try:
             re.compile(value)
@@ -232,8 +230,8 @@ def validate_regex(ctx: click.core.Context, param: click.core.Parameter, raw_val
 
 
 def validate_request_cert_key(
-    ctx: click.core.Context, param: click.core.Parameter, raw_value: Optional[str]
-) -> Optional[str]:
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: str | None
+) -> str | None:
     if raw_value is not None and "request_cert" not in ctx.params:
         raise click.UsageError(MISSING_REQUEST_CERT_MESSAGE)
     return raw_value
@@ -246,8 +244,8 @@ def validate_preserve_exact_body_bytes(ctx: click.core.Context, param: click.cor
 
 
 def convert_verbosity(
-    ctx: click.core.Context, param: click.core.Parameter, value: Optional[str]
-) -> Optional[hypothesis.Verbosity]:
+    ctx: click.core.Context, param: click.core.Parameter, value: str | None
+) -> hypothesis.Verbosity | None:
     import hypothesis
 
     if value is None:
@@ -255,15 +253,15 @@ def convert_verbosity(
     return hypothesis.Verbosity[value]
 
 
-def convert_stateful(ctx: click.core.Context, param: click.core.Parameter, value: str) -> Optional[Stateful]:
+def convert_stateful(ctx: click.core.Context, param: click.core.Parameter, value: str) -> Stateful | None:
     if value == "none":
         return None
     return Stateful[value]
 
 
 def convert_experimental(
-    ctx: click.core.Context, param: click.core.Parameter, value: Tuple[str, ...]
-) -> List[experimental.Experiment]:
+    ctx: click.core.Context, param: click.core.Parameter, value: tuple[str, ...]
+) -> list[experimental.Experiment]:
     return [
         feature
         for feature in experimental.GLOBAL_EXPERIMENTS.available
@@ -271,7 +269,7 @@ def convert_experimental(
     ]
 
 
-def convert_checks(ctx: click.core.Context, param: click.core.Parameter, value: Tuple[List[str]]) -> List[str]:
+def convert_checks(ctx: click.core.Context, param: click.core.Parameter, value: tuple[list[str]]) -> list[str]:
     return sum(value, [])
 
 
@@ -281,7 +279,7 @@ def convert_code_sample_style(ctx: click.core.Context, param: click.core.Paramet
 
 def convert_data_generation_method(
     ctx: click.core.Context, param: click.core.Parameter, value: str
-) -> List[DataGenerationMethod]:
+) -> list[DataGenerationMethod]:
     if value == "all":
         return DataGenerationMethod.all()
     return [DataGenerationMethod[value]]
@@ -307,7 +305,7 @@ def convert_hosts_file(ctx: click.core.Context, param: click.core.Parameter, val
     return value
 
 
-def convert_boolean_string(ctx: click.core.Context, param: click.core.Parameter, value: str) -> Union[str, bool]:
+def convert_boolean_string(ctx: click.core.Context, param: click.core.Parameter, value: str) -> str | bool:
     if value.lower() in TRUE_VALUES:
         return True
     if value.lower() in FALSE_VALUES:

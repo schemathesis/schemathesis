@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
 
 
-STRING_FORMATS: Dict[str, st.SearchStrategy] = {}
+STRING_FORMATS: dict[str, st.SearchStrategy] = {}
 
 
 def register_string_format(name: str, strategy: st.SearchStrategy) -> None:

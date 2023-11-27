@@ -2,7 +2,7 @@ from __future__ import annotations
 from enum import Enum
 from functools import lru_cache
 from shlex import quote
-from typing import Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from .constants import SCHEMATHESIS_TEST_CASE_HEADER
 from .types import Headers
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
 
 
-@lru_cache()
+@lru_cache
 def get_excluded_headers() -> CaseInsensitiveDict:
     from requests.structures import CaseInsensitiveDict
     from requests.utils import default_headers
@@ -43,11 +43,11 @@ class CodeSampleStyle(str, Enum):
         }[self]
 
     @classmethod
-    def default(cls) -> "CodeSampleStyle":
+    def default(cls) -> CodeSampleStyle:
         return cls.curl
 
     @classmethod
-    def from_str(cls, value: str) -> "CodeSampleStyle":
+    def from_str(cls, value: str) -> CodeSampleStyle:
         try:
             return cls[value]
         except KeyError:
@@ -61,10 +61,10 @@ class CodeSampleStyle(str, Enum):
         *,
         method: str,
         url: str,
-        body: Optional[Union[str, bytes]],
-        headers: Optional[Headers],
+        body: str | bytes | None,
+        headers: Headers | None,
         verify: bool,
-        extra_headers: Optional[Headers] = None,
+        extra_headers: Headers | None = None,
     ) -> str:
         """Generate a code snippet for making HTTP requests."""
         handlers = {
@@ -76,7 +76,7 @@ class CodeSampleStyle(str, Enum):
         )
 
 
-def _filter_headers(headers: Optional[Headers], extra: Optional[Headers] = None) -> Headers:
+def _filter_headers(headers: Headers | None, extra: Headers | None = None) -> Headers:
     headers = headers.copy() if headers else {}
     if extra is not None:
         for key, value in extra.items():
@@ -89,7 +89,7 @@ def _generate_curl(
     *,
     method: str,
     url: str,
-    body: Optional[Union[str, bytes]],
+    body: str | bytes | None,
     headers: Headers,
     verify: bool,
 ) -> str:
@@ -111,7 +111,7 @@ def _generate_requests(
     *,
     method: str,
     url: str,
-    body: Optional[Union[str, bytes]],
+    body: str | bytes | None,
     headers: Headers,
     verify: bool,
 ) -> str:

@@ -9,7 +9,7 @@ from contextlib import suppress
 from dataclasses import asdict, dataclass, field
 from io import BytesIO
 from queue import Queue
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 import click
 
@@ -51,13 +51,13 @@ class ReportWriter:
     def add_metadata(
         self,
         *,
-        api_name: Optional[str],
+        api_name: str | None,
         location: str,
         base_url: str,
         started_at: str,
         metadata: Metadata,
-        ci_environment: Optional[ci.Environment],
-        usage_data: Optional[Dict[str, Any]],
+        ci_environment: ci.Environment | None,
+        usage_data: dict[str, Any] | None,
     ) -> None:
         data = {
             # API identifier on the Schemathesis.io side (optional)
@@ -105,9 +105,9 @@ class BaseReportHandler(EventHandler):
 class ServiceReportHandler(BaseReportHandler):
     client: ServiceClient
     host_data: HostData
-    api_name: Optional[str]
+    api_name: str | None
     location: str
-    base_url: Optional[str]
+    base_url: str | None
     started_at: str
     telemetry: bool
     out_queue: Queue
@@ -156,13 +156,13 @@ def consume_events(writer: ReportWriter, in_queue: Queue) -> ConsumeResult:
 def write_remote(
     client: ServiceClient,
     host_data: HostData,
-    api_name: Optional[str],
+    api_name: str | None,
     location: str,
     base_url: str,
     started_at: str,
     in_queue: Queue,
     out_queue: Queue,
-    usage_data: Optional[Dict[str, Any]],
+    usage_data: dict[str, Any] | None,
 ) -> None:
     """Create a compressed ``tar.gz`` file during the run & upload it to Schemathesis.io when the run is finished."""
     payload = BytesIO()
@@ -199,9 +199,9 @@ def write_remote(
 @dataclass
 class FileReportHandler(BaseReportHandler):
     file_handle: click.utils.LazyFile
-    api_name: Optional[str]
+    api_name: str | None
     location: str
-    base_url: Optional[str]
+    base_url: str | None
     started_at: str
     telemetry: bool
     out_queue: Queue
@@ -227,13 +227,13 @@ class FileReportHandler(BaseReportHandler):
 
 def write_file(
     file_handle: click.utils.LazyFile,
-    api_name: Optional[str],
+    api_name: str | None,
     location: str,
     base_url: str,
     started_at: str,
     in_queue: Queue,
     out_queue: Queue,
-    usage_data: Optional[Dict[str, Any]],
+    usage_data: dict[str, Any] | None,
 ) -> None:
     with file_handle.open() as fileobj, tarfile.open(mode="w:gz", fileobj=fileobj) as tar:
         writer = ReportWriter(tar)

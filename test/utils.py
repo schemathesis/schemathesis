@@ -35,7 +35,7 @@ def make_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> Dict
     return merge_recursively(kwargs, schema)
 
 
-@lru_cache()
+@lru_cache
 def load_schema(schema_name: str) -> Dict[str, Any]:
     path = get_schema_path(schema_name)
     with open(path) as fd:
