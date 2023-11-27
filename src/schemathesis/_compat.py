@@ -12,6 +12,7 @@ __all__ = [  # noqa: F822
     "InferType",
     "MultipleFailures",
     "get_signature",
+    "get_interesting_origin",
     "metadata",
     "_install_hypothesis_jsonschema_compatibility_shim",
 ]
@@ -37,6 +38,17 @@ def _load_infer_type() -> Type:
         return InferType
     except ImportError:
         return type(...)
+
+
+def _load_get_interesting_origin() -> Callable:
+    try:
+        from hypothesis.internal.escalation import get_interesting_origin
+
+        return get_interesting_origin
+    except ImportError:
+        from hypothesis.internal.escalation import InterestingOrigin
+
+        return InterestingOrigin.from_exception
 
 
 def _load_multiple_failures() -> Type:
@@ -69,6 +81,7 @@ _imports = {
     "InferType": _load_infer_type,
     "MultipleFailures": _load_multiple_failures,
     "get_signature": _load_get_signature,
+    "get_interesting_origin": _load_get_interesting_origin,
 }
 
 
