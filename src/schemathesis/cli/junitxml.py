@@ -1,7 +1,7 @@
 from __future__ import annotations
 import platform
 from dataclasses import dataclass, field
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from junit_xml import TestCase, TestSuite, to_xml_report_file
 
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 @dataclass
 class JunitXMLHandler(EventHandler):
     file_handle: LazyFile
-    test_cases: List = field(default_factory=list)
+    test_cases: list = field(default_factory=list)
 
     def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
         if isinstance(event, events.AfterExecution):

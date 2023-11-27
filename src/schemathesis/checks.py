@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING
 
 from . import failures
 from .exceptions import get_server_error
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from .models import Case, CheckFunction
 
 
-def not_a_server_error(response: GenericResponse, case: Case) -> Optional[bool]:
+def not_a_server_error(response: GenericResponse, case: Case) -> bool | None:
     """A check to verify that the response is not a server-side error."""
     status_code = response.status_code
     if status_code >= 500:
@@ -24,14 +24,14 @@ def not_a_server_error(response: GenericResponse, case: Case) -> Optional[bool]:
     return None
 
 
-DEFAULT_CHECKS: Tuple["CheckFunction", ...] = (not_a_server_error,)
+DEFAULT_CHECKS: tuple[CheckFunction, ...] = (not_a_server_error,)
 OPTIONAL_CHECKS = (
     status_code_conformance,
     content_type_conformance,
     response_headers_conformance,
     response_schema_conformance,
 )
-ALL_CHECKS: Tuple["CheckFunction", ...] = DEFAULT_CHECKS + OPTIONAL_CHECKS
+ALL_CHECKS: tuple[CheckFunction, ...] = DEFAULT_CHECKS + OPTIONAL_CHECKS
 
 
 def register(check: CheckFunction) -> CheckFunction:

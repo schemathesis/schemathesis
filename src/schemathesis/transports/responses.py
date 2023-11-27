@@ -58,7 +58,7 @@ def copy_response(response: GenericResponse) -> GenericResponse:
 
 def get_reason(status_code: int) -> str:
     if sys.version_info < (3, 9) and status_code == 418:
-        # Python 3.7 & 3.8 do not have 418 status in the `HTTPStatus` enum
+        # Python 3.8 does not have 418 status in the `HTTPStatus` enum
         return "I'm a Teapot"
 
     import http.client

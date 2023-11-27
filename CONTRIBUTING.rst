@@ -12,7 +12,7 @@ Prerequisites for Code Contributions
 
 **For code contributions**: Make sure you have the following installed:
 
-- Python 3.7 or higher
+- Python 3.8 or higher
 - ``pre-commit``
 - ``tox``
 

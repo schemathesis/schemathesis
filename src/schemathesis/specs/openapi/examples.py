@@ -19,7 +19,7 @@ def get_object_example_from_properties(object_schema: Dict[str, Any]) -> Dict[st
     }
 
 
-@lru_cache()
+@lru_cache
 def load_external_example(url: str) -> bytes:
     """Load examples the `externalValue` keyword."""
     response = requests.get(url, timeout=DEFAULT_RESPONSE_TIMEOUT / 1000)

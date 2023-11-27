@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple, Union, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from ..transports import serialize_payload
 from ..code_samples import get_excluded_headers
@@ -33,13 +33,13 @@ if TYPE_CHECKING:
 class SerializedCase:
     # Case data
     id: str
-    path_parameters: Optional[Dict[str, Any]]
-    headers: Optional[Dict[str, Any]]
-    cookies: Optional[Dict[str, Any]]
-    query: Optional[Dict[str, Any]]
-    body: Optional[str]
-    media_type: Optional[str]
-    data_generation_method: Optional[str]
+    path_parameters: dict[str, Any] | None
+    headers: dict[str, Any] | None
+    cookies: dict[str, Any] | None
+    query: dict[str, Any] | None
+    body: str | None
+    media_type: str | None
+    data_generation_method: str | None
     # Operation data
     method: str
     url: str
@@ -48,10 +48,10 @@ class SerializedCase:
     # Transport info
     verify: bool
     # Headers coming from sources outside data generation
-    extra_headers: Dict[str, Any]
+    extra_headers: dict[str, Any]
 
     @classmethod
-    def from_case(cls, case: Case, headers: Optional[Dict[str, Any]], verify: bool) -> "SerializedCase":
+    def from_case(cls, case: Case, headers: dict[str, Any] | None, verify: bool) -> SerializedCase:
         # `headers` include not only explicitly provided headers but also ones added by hooks, custom auth, etc.
         request_data = case.prepare_code_sample_data(headers)
         serialized_body = _serialize_body(request_data.body)
@@ -75,7 +75,7 @@ class SerializedCase:
         )
 
 
-def _serialize_body(body: Optional[Union[str, bytes]]) -> Optional[str]:
+def _serialize_body(body: str | bytes | None) -> str | None:
     if body is None:
         return None
     if isinstance(body, str):
@@ -90,18 +90,18 @@ class SerializedCheck:
     # Check result
     value: Status
     request: Request
-    response: Optional[Response]
+    response: Response | None
     # Generated example
     example: SerializedCase
     # Message could be absent for plain `assert` statements
-    message: Optional[str] = None
+    message: str | None = None
     # Failure-specific context
-    context: Optional[FailureContext] = None
+    context: FailureContext | None = None
     # Cases & responses that were made before this one
-    history: List["SerializedHistoryEntry"] = field(default_factory=list)
+    history: list[SerializedHistoryEntry] = field(default_factory=list)
 
     @classmethod
-    def from_check(cls, check: Check) -> "SerializedCheck":
+    def from_check(cls, check: Check) -> SerializedCheck:
         import requests
         from ..transports.responses import WSGIResponse
 
@@ -113,7 +113,7 @@ class SerializedCheck:
         else:
             raise InternalError("Can not find request data")
 
-        response: Optional[Response]
+        response: Response | None
         if isinstance(check.response, requests.Response):
             response = Response.from_requests(check.response)
         elif isinstance(check.response, WSGIResponse):
@@ -136,7 +136,7 @@ class SerializedCheck:
         )
 
 
-def _get_headers(headers: Union[Dict[str, Any], CaseInsensitiveDict]) -> Dict[str, str]:
+def _get_headers(headers: dict[str, Any] | CaseInsensitiveDict) -> dict[str, str]:
     return {key: value[0] for key, value in headers.items() if key not in get_excluded_headers()}
 
 
@@ -146,7 +146,7 @@ class SerializedHistoryEntry:
     response: Response
 
 
-def get_serialized_history(case: Case) -> List[SerializedHistoryEntry]:
+def get_serialized_history(case: Case) -> list[SerializedHistoryEntry]:
     import requests
 
     history = []
@@ -170,9 +170,9 @@ def get_serialized_history(case: Case) -> List[SerializedHistoryEntry]:
 @dataclass
 class SerializedError:
     type: RuntimeErrorType
-    title: Optional[str]
-    message: Optional[str]
-    extras: List[str]
+    title: str | None
+    message: str | None
+    extras: list[str]
 
     # Exception info
     exception: str
@@ -182,11 +182,11 @@ class SerializedError:
     def with_exception(
         cls,
         type_: RuntimeErrorType,
-        title: Optional[str],
-        message: Optional[str],
-        extras: List[str],
+        title: str | None,
+        message: str | None,
+        extras: list[str],
         exception: Exception,
-    ) -> "SerializedError":
+    ) -> SerializedError:
         return cls(
             type=type_,
             title=title,
@@ -197,13 +197,13 @@ class SerializedError:
         )
 
     @classmethod
-    def from_exception(cls, exception: Exception) -> "SerializedError":
+    def from_exception(cls, exception: Exception) -> SerializedError:
         import requests
         import hypothesis.errors
         from hypothesis import HealthCheck
 
         title = "Runtime Error"
-        message: Optional[str]
+        message: str | None
         if isinstance(exception, requests.RequestException):
             if isinstance(exception, requests.exceptions.SSLError):
                 type_ = RuntimeErrorType.CONNECTION_SSL
@@ -290,7 +290,7 @@ Consider revising the schema to more accurately represent typical use cases
 or applying constraints to reduce the data size."""
 
 
-def _health_check_from_error(exception: hypothesis.errors.FailedHealthCheck) -> Optional[hypothesis.HealthCheck]:
+def _health_check_from_error(exception: hypothesis.errors.FailedHealthCheck) -> hypothesis.HealthCheck | None:
     from hypothesis import HealthCheck
 
     match = re.search(r"add HealthCheck\.(\w+) to the suppress_health_check ", str(exception))
@@ -308,12 +308,12 @@ def _health_check_from_error(exception: hypothesis.errors.FailedHealthCheck) -> 
 class SerializedInteraction:
     request: Request
     response: Response
-    checks: List[SerializedCheck]
+    checks: list[SerializedCheck]
     status: Status
     recorded_at: str
 
     @classmethod
-    def from_interaction(cls, interaction: Interaction) -> "SerializedInteraction":
+    def from_interaction(cls, interaction: Interaction) -> SerializedInteraction:
         return cls(
             request=interaction.request,
             response=interaction.response,
@@ -334,15 +334,15 @@ class SerializedTestResult:
     is_errored: bool
     is_flaky: bool
     is_skipped: bool
-    seed: Optional[int]
-    data_generation_method: List[str]
-    checks: List[SerializedCheck]
-    logs: List[str]
-    errors: List[SerializedError]
-    interactions: List[SerializedInteraction]
+    seed: int | None
+    data_generation_method: list[str]
+    checks: list[SerializedCheck]
+    logs: list[str]
+    errors: list[SerializedError]
+    interactions: list[SerializedInteraction]
 
     @classmethod
-    def from_test_result(cls, result: TestResult) -> "SerializedTestResult":
+    def from_test_result(cls, result: TestResult) -> SerializedTestResult:
         formatter = logging.Formatter("[%(asctime)s] %(levelname)s in %(module)s: %(message)s")
         return cls(
             method=result.method,
@@ -363,9 +363,9 @@ class SerializedTestResult:
         )
 
 
-def deduplicate_failures(checks: List[SerializedCheck]) -> List[SerializedCheck]:
+def deduplicate_failures(checks: list[SerializedCheck]) -> list[SerializedCheck]:
     """Return only unique checks that should be displayed in the output."""
-    seen: Set[Tuple[Optional[str], ...]] = set()
+    seen: set[tuple[str | None, ...]] = set()
     unique_checks = []
     for check in reversed(checks):
         # There are also could be checks that didn't fail

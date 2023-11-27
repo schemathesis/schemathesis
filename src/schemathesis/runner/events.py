@@ -3,7 +3,7 @@ import enum
 import threading
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from ..internal.datetime import current_datetime
 from ..generation import DataGenerationMethod
@@ -23,7 +23,7 @@ class ExecutionEvent:
     # Whether this event is expected to be the last one in the event stream
     is_terminal = False
 
-    def asdict(self, **kwargs: Any) -> Dict[str, Any]:
+    def asdict(self, **kwargs: Any) -> dict[str, Any]:
         data = asdict(self, **kwargs)
         # An internal tag for simpler type identification
         data["event_type"] = self.__class__.__name__
@@ -34,11 +34,11 @@ class ExecutionEvent:
 class Initialized(ExecutionEvent):
     """Runner is initialized, settings are prepared, requests session is ready."""
 
-    schema: Dict[str, Any]
+    schema: dict[str, Any]
     # Total number of operations in the schema
-    operations_count: Optional[int]
+    operations_count: int | None
     # The place, where the API schema is located
-    location: Optional[str]
+    location: str | None
     # The base URL against which the tests are running
     base_url: str
     # API schema specification name
@@ -52,8 +52,8 @@ class Initialized(ExecutionEvent):
 
     @classmethod
     def from_schema(
-        cls, *, schema: BaseSchema, count_operations: bool = True, started_at: Optional[str] = None
-    ) -> "Initialized":
+        cls, *, schema: BaseSchema, count_operations: bool = True, started_at: str | None = None
+    ) -> Initialized:
         """Computes all needed data from a schema instance."""
         return cls(
             schema=schema.raw_schema,
@@ -92,7 +92,7 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
     # The current level of recursion during stateful testing
     recursion_level: int
     # The way data will be generated
-    data_generation_method: List[DataGenerationMethod]
+    data_generation_method: list[DataGenerationMethod]
     # A unique ID which connects events that happen during testing of the same API operation
     # It may be useful when multiple threads are involved where incoming events are not ordered
     correlation_id: str
@@ -103,9 +103,9 @@ class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
         cls,
         operation: APIOperation,
         recursion_level: int,
-        data_generation_method: List[DataGenerationMethod],
+        data_generation_method: list[DataGenerationMethod],
         correlation_id: str,
-    ) -> "BeforeExecution":
+    ) -> BeforeExecution:
         return cls(
             method=operation.method.upper(),
             path=operation.full_path,
@@ -130,14 +130,14 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
     # APIOperation test status - success / failure / error
     status: Status
     # The way data was generated
-    data_generation_method: List[DataGenerationMethod]
+    data_generation_method: list[DataGenerationMethod]
     result: SerializedTestResult
     # Test running time
     elapsed_time: float
     correlation_id: str
     thread_id: int = field(default_factory=threading.get_ident)
     # Captured hypothesis stdout
-    hypothesis_output: List[str] = field(default_factory=list)
+    hypothesis_output: list[str] = field(default_factory=list)
 
     @classmethod
     def from_result(
@@ -145,11 +145,11 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
         result: TestResult,
         status: Status,
         elapsed_time: float,
-        hypothesis_output: List[str],
+        hypothesis_output: list[str],
         operation: APIOperation,
-        data_generation_method: List[DataGenerationMethod],
+        data_generation_method: list[DataGenerationMethod],
         correlation_id: str,
-    ) -> "AfterExecution":
+    ) -> AfterExecution:
         return cls(
             method=operation.method.upper(),
             path=operation.full_path,
@@ -185,10 +185,10 @@ class InternalError(ExecutionEvent):
 
     # Main error info
     type: InternalErrorType
-    subtype: Optional[SchemaErrorType]
+    subtype: SchemaErrorType | None
     title: str
     message: str
-    extras: List[str]
+    extras: list[str]
 
     # Exception info
     exception_type: str
@@ -198,7 +198,7 @@ class InternalError(ExecutionEvent):
     thread_id: int = field(default_factory=threading.get_ident)
 
     @classmethod
-    def from_schema_error(cls, error: SchemaError) -> "InternalError":
+    def from_schema_error(cls, error: SchemaError) -> InternalError:
         return cls.with_exception(
             error,
             type_=InternalErrorType.SCHEMA,
@@ -209,7 +209,7 @@ class InternalError(ExecutionEvent):
         )
 
     @classmethod
-    def from_exc(cls, exc: Exception) -> "InternalError":
+    def from_exc(cls, exc: Exception) -> InternalError:
         return cls.with_exception(
             exc,
             type_=InternalErrorType.OTHER,
@@ -224,11 +224,11 @@ class InternalError(ExecutionEvent):
         cls,
         exc: Exception,
         type_: InternalErrorType,
-        subtype: Optional[SchemaErrorType],
+        subtype: SchemaErrorType | None,
         title: str,
         message: str,
-        extras: List[str],
-    ) -> "InternalError":
+        extras: list[str],
+    ) -> InternalError:
         exception_type = f"{exc.__class__.__module__}.{exc.__class__.__qualname__}"
         exception = format_exception(exc)
         exception_with_traceback = format_exception(exc, include_traceback=True)
@@ -262,17 +262,17 @@ class Finished(ExecutionEvent):
     has_errors: bool
     has_logs: bool
     is_empty: bool
-    generic_errors: List[SerializedError]
-    warnings: List[str]
+    generic_errors: list[SerializedError]
+    warnings: list[str]
 
-    total: Dict[str, Dict[Union[str, Status], int]]
+    total: dict[str, dict[str | Status, int]]
 
     # Total test run execution time
     running_time: float
     thread_id: int = field(default_factory=threading.get_ident)
 
     @classmethod
-    def from_results(cls, results: TestResultSet, running_time: float) -> "Finished":
+    def from_results(cls, results: TestResultSet, running_time: float) -> Finished:
         return cls(
             passed_count=results.passed_count,
             skipped_count=results.skipped_count,

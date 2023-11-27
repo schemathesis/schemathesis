@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 #
 # platform documentation build configuration file, created by
 # sphinx-quickstart on Fri Jan 13 12:59:16 2017.
@@ -51,7 +49,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "Schemathesis"
-copyright = "{year}, Dmitry Dygalo".format(year=datetime.date.today().year)
+copyright = f"{datetime.date.today().year}, Dmitry Dygalo"
 author = "Dmitry Dygalo"
 
 # The version info for the project you're documenting, acts as replacement for

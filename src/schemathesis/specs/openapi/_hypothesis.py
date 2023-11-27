@@ -37,7 +37,7 @@ SLASH = "/"
 StrategyFactory = Callable[[Dict[str, Any], str, str, Optional[str]], st.SearchStrategy]
 
 
-@lru_cache()
+@lru_cache
 def get_default_format_strategies() -> Dict[str, st.SearchStrategy]:
     """Get all default "format" strategies."""
 

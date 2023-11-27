@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Dict, Generator, NoReturn, Optional, Union
+from typing import TYPE_CHECKING, Any, Generator, NoReturn
 
 from ... import failures
 from ...exceptions import (
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from ...models import Case
 
 
-def status_code_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
+def status_code_conformance(response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -43,12 +43,12 @@ def status_code_conformance(response: GenericResponse, case: "Case") -> Optional
     return None  # explicitly return None for mypy
 
 
-def _expand_responses(responses: Dict[Union[str, int], Any]) -> Generator[int, None, None]:
+def _expand_responses(responses: dict[str | int, Any]) -> Generator[int, None, None]:
     for code in responses:
         yield from expand_status_code(code)
 
 
-def content_type_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
+def content_type_conformance(response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -96,7 +96,7 @@ def _reraise_malformed_media_type(exc: ValueError, location: str, actual: str, d
     ) from exc
 
 
-def response_headers_conformance(response: GenericResponse, case: "Case") -> Optional[bool]:
+def response_headers_conformance(response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -121,7 +121,7 @@ def response_headers_conformance(response: GenericResponse, case: "Case") -> Opt
     )
 
 
-def response_schema_conformance(response: GenericResponse, case: "Case") -> None:
+def response_schema_conformance(response: GenericResponse, case: Case) -> None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):

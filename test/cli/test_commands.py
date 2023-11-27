@@ -50,8 +50,8 @@ from schemathesis.stateful import Stateful
 from schemathesis.targets import DEFAULT_TARGETS
 from schemathesis.internal.datetime import current_datetime
 
-PHASES = ", ".join((x.name for x in Phase))
-HEALTH_CHECKS = "|".join((x.name for x in HealthCheck))
+PHASES = ", ".join(x.name for x in Phase)
+HEALTH_CHECKS = "|".join(x.name for x in HealthCheck)
 
 
 def test_commands_help(cli, snapshot_cli):

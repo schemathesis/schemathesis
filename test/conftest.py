@@ -20,12 +20,12 @@ from hypothesis import settings
 from packaging import version
 from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
 from syrupy.types import PropertyFilter, PropertyMatcher
+from importlib import metadata
 from urllib3 import HTTPResponse
 
 import schemathesis.cli
 from schemathesis.cli.output.default import TEST_CASE_ID_TITLE
 from schemathesis.models import Case
-from schemathesis._compat import metadata
 from schemathesis._dependency_versions import IS_HYPOTHESIS_ABOVE_6_54
 from schemathesis.cli import reset_checks
 from schemathesis.constants import HOOKS_MODULE_ENV_VAR

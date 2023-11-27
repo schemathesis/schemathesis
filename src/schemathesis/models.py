@@ -13,18 +13,14 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Dict,
     Generator,
     Generic,
     Iterator,
-    List,
     NoReturn,
     Optional,
     Sequence,
-    Tuple,
     Type,
     TypeVar,
-    Union,
     cast,
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
@@ -76,11 +72,11 @@ if TYPE_CHECKING:
 class CaseSource:
     """Data sources, used to generate a test case."""
 
-    case: "Case"
+    case: Case
     response: GenericResponse
     elapsed: float
 
-    def partial_deepcopy(self) -> "CaseSource":
+    def partial_deepcopy(self) -> CaseSource:
         from .transports.responses import copy_response
 
         return self.__class__(
@@ -98,7 +94,7 @@ def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
     reject()  # type: ignore
 
 
-@lru_cache()
+@lru_cache
 def get_request_signature() -> inspect.Signature:
     import requests
 
@@ -109,11 +105,11 @@ def get_request_signature() -> inspect.Signature:
 class PreparedRequestData:
     method: str
     url: str
-    body: Optional[Union[str, bytes]]
+    body: str | bytes | None
     headers: Headers
 
 
-def prepare_request_data(kwargs: Dict[str, Any]) -> PreparedRequestData:
+def prepare_request_data(kwargs: dict[str, Any]) -> PreparedRequestData:
     """Prepare request data for generating code samples."""
     import requests
 
@@ -128,23 +124,23 @@ def prepare_request_data(kwargs: Dict[str, Any]) -> PreparedRequestData:
 class Case:
     """A single test case parameters."""
 
-    operation: "APIOperation"
+    operation: APIOperation
     # Unique test case identifier
     id: str = field(default_factory=generate_random_case_id, compare=False)
-    path_parameters: Optional[PathParameters] = None
-    headers: Optional[CaseInsensitiveDict] = None
-    cookies: Optional[Cookies] = None
-    query: Optional[Query] = None
+    path_parameters: PathParameters | None = None
+    headers: CaseInsensitiveDict | None = None
+    cookies: Cookies | None = None
+    query: Query | None = None
     # By default, there is no body, but we can't use `None` as the default value because it clashes with `null`
     # which is a valid payload.
-    body: Union[Body, NotSet] = NOT_SET
+    body: Body | NotSet = NOT_SET
     # The media type for cases with a payload. For example, "application/json"
-    media_type: Optional[str] = None
-    source: Optional[CaseSource] = None
+    media_type: str | None = None
+    source: CaseSource | None = None
 
     # The way the case was generated (None for manually crafted ones)
-    data_generation_method: Optional[DataGenerationMethod] = None
-    _auth: Optional[requests.auth.AuthBase] = None
+    data_generation_method: DataGenerationMethod | None = None
+    _auth: requests.auth.AuthBase | None = None
 
     def __repr__(self) -> str:
         parts = [f"{self.__class__.__name__}("]
@@ -163,7 +159,7 @@ class Case:
         return hash(self.as_curl_command({SCHEMATHESIS_TEST_CASE_HEADER: "0"}))
 
     @deprecated_property(removed_in="4.0", replacement="operation")
-    def endpoint(self) -> "APIOperation":
+    def endpoint(self) -> APIOperation:
         return self.operation
 
     @property
@@ -179,14 +175,14 @@ class Case:
         return self.operation.method.upper()
 
     @property
-    def base_url(self) -> Optional[str]:
+    def base_url(self) -> str | None:
         return self.operation.base_url
 
     @property
     def app(self) -> Any:
         return self.operation.app
 
-    def set_source(self, response: GenericResponse, case: "Case", elapsed: float) -> None:
+    def set_source(self, response: GenericResponse, case: Case, elapsed: float) -> None:
         self.source = CaseSource(case=case, response=response, elapsed=elapsed)
 
     @property
@@ -202,7 +198,7 @@ class Case:
             # A single unmatched `}` inside the path template may cause this
             raise OperationSchemaError(f"Malformed path template: `{self.path}`\n\n  {exc}") from exc
 
-    def get_full_base_url(self) -> Optional[str]:
+    def get_full_base_url(self) -> str | None:
         """Create a full base url, adding "localhost" for WSGI apps."""
         parts = urlsplit(self.base_url)
         if not parts.hostname:
@@ -210,15 +206,15 @@ class Case:
             return urlunsplit(("http", "localhost", path or "", "", ""))
         return self.base_url
 
-    def prepare_code_sample_data(self, headers: Optional[Dict[str, Any]]) -> PreparedRequestData:
+    def prepare_code_sample_data(self, headers: dict[str, Any] | None) -> PreparedRequestData:
         base_url = self.get_full_base_url()
         kwargs = self.as_requests_kwargs(base_url, headers=headers)
         return prepare_request_data(kwargs)
 
     def get_code_to_reproduce(
         self,
-        headers: Optional[Dict[str, Any]] = None,
-        request: Optional[requests.PreparedRequest] = None,
+        headers: dict[str, Any] | None = None,
+        request: requests.PreparedRequest | None = None,
         verify: bool = True,
     ) -> str:
         """Construct a Python code to reproduce this case with `requests`."""
@@ -242,7 +238,7 @@ class Case:
             extra_headers=request_data.headers,
         )
 
-    def as_curl_command(self, headers: Optional[Dict[str, Any]] = None, verify: bool = True) -> str:
+    def as_curl_command(self, headers: dict[str, Any] | None = None, verify: bool = True) -> str:
         """Construct a curl command for a given case."""
         request_data = self.prepare_code_sample_data(headers)
         return CodeSampleStyle.curl.generate(
@@ -254,7 +250,7 @@ class Case:
             extra_headers=request_data.headers,
         )
 
-    def _get_base_url(self, base_url: Optional[str] = None) -> str:
+    def _get_base_url(self, base_url: str | None = None) -> str:
         if base_url is None:
             if self.base_url is not None:
                 base_url = self.base_url
@@ -265,7 +261,7 @@ class Case:
                 )
         return base_url
 
-    def _get_headers(self, headers: Optional[Dict[str, str]] = None) -> CaseInsensitiveDict:
+    def _get_headers(self, headers: dict[str, str] | None = None) -> CaseInsensitiveDict:
         from requests.structures import CaseInsensitiveDict
 
         final_headers = self.headers.copy() if self.headers is not None else CaseInsensitiveDict()
@@ -275,7 +271,7 @@ class Case:
         final_headers.setdefault(SCHEMATHESIS_TEST_CASE_HEADER, self.id)
         return final_headers
 
-    def _get_serializer(self) -> Optional[Serializer]:
+    def _get_serializer(self) -> Serializer | None:
         """Get a serializer for the payload, if there is any."""
         if self.media_type is not None:
             media_type = serializers.get_first_matching_media_type(self.media_type)
@@ -288,9 +284,7 @@ class Case:
             return cls()
         return None
 
-    def as_requests_kwargs(
-        self, base_url: Optional[str] = None, headers: Optional[Dict[str, str]] = None
-    ) -> Dict[str, Any]:
+    def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         """Convert the case into a dictionary acceptable by requests."""
         final_headers = self._get_headers(headers)
         if self.media_type and self.media_type != "multipart/form-data" and not isinstance(self.body, NotSet):
@@ -302,7 +296,7 @@ class Case:
         if not base_url.endswith("/"):
             base_url += "/"
         url = unquote(urljoin(base_url, quote(formatted_path)))
-        extra: Dict[str, Any]
+        extra: dict[str, Any]
         serializer = self._get_serializer()
         if serializer is not None and not isinstance(self.body, NotSet):
             context = SerializerContext(case=self)
@@ -327,11 +321,11 @@ class Case:
 
     def call(
         self,
-        base_url: Optional[str] = None,
-        session: Optional[requests.Session] = None,
-        headers: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        cookies: Optional[Dict[str, Any]] = None,
+        base_url: str | None = None,
+        session: requests.Session | None = None,
+        headers: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+        cookies: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> requests.Response:
         import requests
@@ -371,13 +365,13 @@ class Case:
             session.close()
         return response
 
-    def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    def as_werkzeug_kwargs(self, headers: dict[str, str] | None = None) -> dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
         final_headers = self._get_headers(headers)
         if self.media_type and not isinstance(self.body, NotSet):
             # If we need to send a payload, then the Content-Type header should be set
             final_headers["Content-Type"] = self.media_type
-        extra: Dict[str, Any]
+        extra: dict[str, Any]
         serializer = self._get_serializer()
         if serializer is not None and not isinstance(self.body, NotSet):
             context = SerializerContext(case=self)
@@ -396,8 +390,8 @@ class Case:
     def call_wsgi(
         self,
         app: Any = None,
-        headers: Optional[Dict[str, str]] = None,
-        query_string: Optional[Dict[str, str]] = None,
+        headers: dict[str, str] | None = None,
+        query_string: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> WSGIResponse:
         from .transports.responses import WSGIResponse
@@ -426,8 +420,8 @@ class Case:
     def call_asgi(
         self,
         app: Any = None,
-        base_url: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
+        base_url: str | None = None,
+        headers: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> requests.Response:
         from starlette_testclient import TestClient as ASGIClient
@@ -447,10 +441,10 @@ class Case:
     def validate_response(
         self,
         response: GenericResponse,
-        checks: Tuple["CheckFunction", ...] = (),
-        additional_checks: Tuple["CheckFunction", ...] = (),
-        excluded_checks: Tuple["CheckFunction", ...] = (),
-        code_sample_style: Optional[str] = None,
+        checks: tuple[CheckFunction, ...] = (),
+        additional_checks: tuple[CheckFunction, ...] = (),
+        excluded_checks: tuple[CheckFunction, ...] = (),
+        code_sample_style: str | None = None,
     ) -> None:
         """Validate application response.
 
@@ -536,11 +530,11 @@ class Case:
 
     def call_and_validate(
         self,
-        base_url: Optional[str] = None,
-        session: Optional[requests.Session] = None,
-        headers: Optional[Dict[str, Any]] = None,
-        checks: Tuple["CheckFunction", ...] = (),
-        code_sample_style: Optional[str] = None,
+        base_url: str | None = None,
+        session: requests.Session | None = None,
+        headers: dict[str, Any] | None = None,
+        checks: tuple[CheckFunction, ...] = (),
+        code_sample_style: str | None = None,
         **kwargs: Any,
     ) -> requests.Response:
         __tracebackhide__ = True
@@ -558,7 +552,7 @@ class Case:
         prepared = requests.Session().prepare_request(request)  # type: ignore
         return cast(str, prepared.url)
 
-    def partial_deepcopy(self) -> "Case":
+    def partial_deepcopy(self) -> Case:
         return self.__class__(
             operation=self.operation.partial_deepcopy(),
             data_generation_method=self.data_generation_method,
@@ -572,14 +566,14 @@ class Case:
         )
 
 
-def _merge_dict_to(data: Dict[str, Any], data_key: str, new: Dict[str, Any]) -> None:
+def _merge_dict_to(data: dict[str, Any], data_key: str, new: dict[str, Any]) -> None:
     original = data[data_key] or {}
     for key, value in new.items():
         original[key] = value
     data[data_key] = original
 
 
-def validate_vanilla_requests_kwargs(data: Dict[str, Any]) -> None:
+def validate_vanilla_requests_kwargs(data: dict[str, Any]) -> None:
     """Check arguments for `requests.Session.request`.
 
     Some arguments can be valid for cases like ASGI integration, but at the same time they won't work for the regular
@@ -595,7 +589,7 @@ def validate_vanilla_requests_kwargs(data: Dict[str, Any]) -> None:
 
 
 @contextmanager
-def cookie_handler(client: werkzeug.Client, cookies: Optional[Cookies]) -> Generator[None, None, None]:
+def cookie_handler(client: werkzeug.Client, cookies: Cookies | None) -> Generator[None, None, None]:
     """Set cookies required for a call."""
     if not cookies:
         yield
@@ -631,13 +625,13 @@ class OperationDefinition(Generic[P, D]):
     scope: str
     parameters: Sequence[P]
 
-    def __contains__(self, item: Union[str, int]) -> bool:
+    def __contains__(self, item: str | int) -> bool:
         return item in self.resolved
 
-    def __getitem__(self, item: Union[str, int]) -> Union[None, bool, float, str, list, Dict[str, Any]]:
+    def __getitem__(self, item: str | int) -> None | bool | float | str | list | dict[str, Any]:
         return self.resolved[item]
 
-    def get(self, item: Union[str, int], default: Any = None) -> Union[None, bool, float, str, list, Dict[str, Any]]:
+    def get(self, item: str | int, default: Any = None) -> None | bool | float | str | list | dict[str, Any]:
         return self.resolved.get(item, default)
 
 
@@ -663,16 +657,16 @@ class APIOperation(Generic[P, C]):
     path: str
     method: str
     definition: OperationDefinition = field(repr=False)
-    schema: "BaseSchema"
+    schema: BaseSchema
     verbose_name: str = None  # type: ignore
     app: Any = None
-    base_url: Optional[str] = None
+    base_url: str | None = None
     path_parameters: ParameterSet[P] = field(default_factory=ParameterSet)
     headers: ParameterSet[P] = field(default_factory=ParameterSet)
     cookies: ParameterSet[P] = field(default_factory=ParameterSet)
     query: ParameterSet[P] = field(default_factory=ParameterSet)
     body: PayloadAlternatives[P] = field(default_factory=PayloadAlternatives)
-    case_cls: Type[C] = Case  # type: ignore
+    case_cls: type[C] = Case  # type: ignore
 
     def __post_init__(self) -> None:
         if self.verbose_name is None:
@@ -683,14 +677,14 @@ class APIOperation(Generic[P, C]):
         return self.schema.get_full_path(self.path)
 
     @property
-    def links(self) -> Dict[str, Dict[str, Any]]:
+    def links(self) -> dict[str, dict[str, Any]]:
         return self.schema.get_links(self)
 
     def iter_parameters(self) -> Iterator[P]:
         """Iterate over all operation's parameters."""
         return chain(self.path_parameters, self.headers, self.cookies, self.query)
 
-    def _lookup_container(self, location: str) -> Union[ParameterSet[P], PayloadAlternatives[P], None]:
+    def _lookup_container(self, location: str) -> ParameterSet[P] | PayloadAlternatives[P] | None:
         return {
             "path": self.path_parameters,
             "header": self.headers,
@@ -713,7 +707,7 @@ class APIOperation(Generic[P, C]):
         if container is not None:
             container.add(parameter)
 
-    def get_parameter(self, name: str, location: str) -> Optional[P]:
+    def get_parameter(self, name: str, location: str) -> P | None:
         container = self._lookup_container(location)
         if container is not None:
             return container.get(name)
@@ -721,8 +715,8 @@ class APIOperation(Generic[P, C]):
 
     def as_strategy(
         self,
-        hooks: Optional["HookDispatcher"] = None,
-        auth_storage: Optional[AuthStorage] = None,
+        hooks: HookDispatcher | None = None,
+        auth_storage: AuthStorage | None = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
         **kwargs: Any,
     ) -> st.SearchStrategy:
@@ -750,17 +744,17 @@ class APIOperation(Generic[P, C]):
             strategy = _apply_hooks(hooks, strategy)
         return strategy
 
-    def get_security_requirements(self) -> List[str]:
+    def get_security_requirements(self) -> list[str]:
         return self.schema.get_security_requirements(self)
 
-    def get_strategies_from_examples(self) -> List[st.SearchStrategy[Case]]:
+    def get_strategies_from_examples(self) -> list[st.SearchStrategy[Case]]:
         """Get examples from the API operation."""
         return self.schema.get_strategies_from_examples(self)
 
-    def get_stateful_tests(self, response: GenericResponse, stateful: Optional["Stateful"]) -> Sequence["StatefulTest"]:
+    def get_stateful_tests(self, response: GenericResponse, stateful: Stateful | None) -> Sequence[StatefulTest]:
         return self.schema.get_stateful_tests(response, self, stateful)
 
-    def get_parameter_serializer(self, location: str) -> Optional[Callable]:
+    def get_parameter_serializer(self, location: str) -> Callable | None:
         """Get a function that serializes parameters for the given location.
 
         It handles serializing data into various `collectionFormat` options and similar.
@@ -768,13 +762,13 @@ class APIOperation(Generic[P, C]):
         """
         return self.schema.get_parameter_serializer(self, location)
 
-    def prepare_multipart(self, form_data: FormData) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
+    def prepare_multipart(self, form_data: FormData) -> tuple[list | None, dict[str, Any] | None]:
         return self.schema.prepare_multipart(form_data, self)
 
-    def get_request_payload_content_types(self) -> List[str]:
+    def get_request_payload_content_types(self) -> list[str]:
         return self.schema.get_request_payload_content_types(self)
 
-    def partial_deepcopy(self) -> "APIOperation":
+    def partial_deepcopy(self) -> APIOperation:
         return self.__class__(
             path=self.path,  # string, immutable
             method=self.method,  # string, immutable
@@ -790,7 +784,7 @@ class APIOperation(Generic[P, C]):
             body=fast_deepcopy(self.body),
         )
 
-    def clone(self, **components: Any) -> "APIOperation":
+    def clone(self, **components: Any) -> APIOperation:
         """Create a new instance of this API operation with updated components."""
         return self.__class__(
             path=self.path,
@@ -810,12 +804,12 @@ class APIOperation(Generic[P, C]):
     def make_case(
         self,
         *,
-        path_parameters: Optional[PathParameters] = None,
-        headers: Optional[Headers] = None,
-        cookies: Optional[Cookies] = None,
-        query: Optional[Query] = None,
-        body: Union[Body, NotSet] = NOT_SET,
-        media_type: Optional[str] = None,
+        path_parameters: PathParameters | None = None,
+        headers: Headers | None = None,
+        cookies: Cookies | None = None,
+        query: Query | None = None,
+        body: Body | NotSet = NOT_SET,
+        media_type: str | None = None,
     ) -> C:
         """Create a new example for this API operation.
 
@@ -852,10 +846,10 @@ class APIOperation(Generic[P, C]):
         except CheckFailed:
             return False
 
-    def get_raw_payload_schema(self, media_type: str) -> Optional[Dict[str, Any]]:
+    def get_raw_payload_schema(self, media_type: str) -> dict[str, Any] | None:
         return self.schema._get_payload_schema(self.definition.raw, media_type)
 
-    def get_resolved_payload_schema(self, media_type: str) -> Optional[Dict[str, Any]]:
+    def get_resolved_payload_schema(self, media_type: str) -> dict[str, Any] | None:
         return self.schema._get_payload_schema(self.definition.resolved, media_type)
 
 
@@ -878,13 +872,13 @@ class Check:
 
     name: str
     value: Status
-    response: Optional[GenericResponse]
+    response: GenericResponse | None
     elapsed: float
     example: Case
-    message: Optional[str] = None
+    message: str | None = None
     # Failure-specific context
-    context: Optional[FailureContext] = None
-    request: Optional[requests.PreparedRequest] = None
+    context: FailureContext | None = None
+    request: requests.PreparedRequest | None = None
 
 
 @dataclass(repr=False)
@@ -893,11 +887,11 @@ class Request:
 
     method: str
     uri: str
-    body: Optional[str]
+    body: str | None
     headers: Headers
 
     @classmethod
-    def from_case(cls, case: Case, session: requests.Session) -> "Request":
+    def from_case(cls, case: Case, session: requests.Session) -> Request:
         """Create a new `Request` instance from `Case`."""
         import requests
 
@@ -908,7 +902,7 @@ class Request:
         return cls.from_prepared_request(prepared)
 
     @classmethod
-    def from_prepared_request(cls, prepared: requests.PreparedRequest) -> "Request":
+    def from_prepared_request(cls, prepared: requests.PreparedRequest) -> Request:
         """A prepared request version is already stored in `requests.Response`."""
         body = prepared.body
 
@@ -933,15 +927,15 @@ class Response:
 
     status_code: int
     message: str
-    headers: Dict[str, List[str]]
-    body: Optional[str]
-    encoding: Optional[str]
+    headers: dict[str, list[str]]
+    body: str | None
+    encoding: str | None
     http_version: str
     elapsed: float
     verify: bool
 
     @classmethod
-    def from_requests(cls, response: requests.Response) -> "Response":
+    def from_requests(cls, response: requests.Response) -> Response:
         """Create a response from requests.Response."""
         headers = {name: response.raw.headers.getlist(name) for name in response.raw.headers.keys()}
         # Similar to http.client:319 (HTTP version detection in stdlib's `http` package)
@@ -966,7 +960,7 @@ class Response:
         )
 
     @classmethod
-    def from_wsgi(cls, response: WSGIResponse, elapsed: float) -> "Response":
+    def from_wsgi(cls, response: WSGIResponse, elapsed: float) -> Response:
         """Create a response from WSGI response."""
         from .transports.responses import get_reason
 
@@ -975,7 +969,7 @@ class Response:
         # Note, this call ensures that `response.response` is a sequence, which is needed for comparison
         data = response.get_data()
         body = None if response.response == [] else serialize_payload(data)
-        encoding: Optional[str]
+        encoding: str | None
         if body is not None:
             # Werkzeug <3.0 had `charset` attr, newer versions always have UTF-8
             encoding = response.mimetype_params.get("charset", getattr(response, "charset", "utf-8"))
@@ -999,15 +993,13 @@ class Interaction:
 
     request: Request
     response: Response
-    checks: List[Check]
+    checks: list[Check]
     status: Status
     data_generation_method: DataGenerationMethod
     recorded_at: str = field(default_factory=lambda: datetime.datetime.now().isoformat())
 
     @classmethod
-    def from_requests(
-        cls, case: Case, response: requests.Response, status: Status, checks: List[Check]
-    ) -> "Interaction":
+    def from_requests(cls, case: Case, response: requests.Response, status: Status, checks: list[Check]) -> Interaction:
         return cls(
             request=Request.from_prepared_request(response.request),
             response=Response.from_requests(response),
@@ -1021,11 +1013,11 @@ class Interaction:
         cls,
         case: Case,
         response: WSGIResponse,
-        headers: Dict[str, Any],
+        headers: dict[str, Any],
         elapsed: float,
         status: Status,
-        checks: List[Check],
-    ) -> "Interaction":
+        checks: list[Check],
+    ) -> Interaction:
         import requests
 
         session = requests.Session()
@@ -1048,16 +1040,16 @@ class TestResult:
     method: str
     path: str
     verbose_name: str
-    data_generation_method: List[DataGenerationMethod]
-    checks: List[Check] = field(default_factory=list)
-    errors: List[Exception] = field(default_factory=list)
-    interactions: List[Interaction] = field(default_factory=list)
-    logs: List[LogRecord] = field(default_factory=list)
+    data_generation_method: list[DataGenerationMethod]
+    checks: list[Check] = field(default_factory=list)
+    errors: list[Exception] = field(default_factory=list)
+    interactions: list[Interaction] = field(default_factory=list)
+    logs: list[LogRecord] = field(default_factory=list)
     is_errored: bool = False
     is_flaky: bool = False
     is_skipped: bool = False
     is_executed: bool = False
-    seed: Optional[int] = None
+    seed: int | None = None
 
     def mark_errored(self) -> None:
         self.is_errored = True
@@ -1094,11 +1086,11 @@ class TestResult:
         self,
         name: str,
         example: Case,
-        response: Optional[GenericResponse],
+        response: GenericResponse | None,
         elapsed: float,
         message: str,
-        context: Optional[FailureContext],
-        request: Optional[requests.PreparedRequest] = None,
+        context: FailureContext | None,
+        request: requests.PreparedRequest | None = None,
     ) -> Check:
         check = Check(
             name=name,
@@ -1117,7 +1109,7 @@ class TestResult:
         self.errors.append(exception)
 
     def store_requests_response(
-        self, case: Case, response: requests.Response, status: Status, checks: List[Check]
+        self, case: Case, response: requests.Response, status: Status, checks: list[Check]
     ) -> None:
         self.interactions.append(Interaction.from_requests(case, response, status, checks))
 
@@ -1125,10 +1117,10 @@ class TestResult:
         self,
         case: Case,
         response: WSGIResponse,
-        headers: Dict[str, Any],
+        headers: dict[str, Any],
         elapsed: float,
         status: Status,
-        checks: List[Check],
+        checks: list[Check],
     ) -> None:
         self.interactions.append(Interaction.from_wsgi(case, response, headers, elapsed, status, checks))
 
@@ -1139,9 +1131,9 @@ class TestResultSet:
 
     __test__ = False
 
-    results: List[TestResult] = field(default_factory=list)
-    generic_errors: List[OperationSchemaError] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    results: list[TestResult] = field(default_factory=list)
+    generic_errors: list[OperationSchemaError] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     def __iter__(self) -> Iterator[TestResult]:
         return iter(self.results)
@@ -1186,9 +1178,9 @@ class TestResultSet:
         return self._count(lambda result: result.has_errors or result.is_errored) + len(self.generic_errors)
 
     @property
-    def total(self) -> Dict[str, Dict[Union[str, Status], int]]:
+    def total(self) -> dict[str, dict[str | Status, int]]:
         """An aggregated statistic about test results."""
-        output: Dict[str, Dict[Union[str, Status], int]] = {}
+        output: dict[str, dict[str | Status, int]] = {}
         for item in self.results:
             for check in item.checks:
                 output.setdefault(check.name, Counter())
