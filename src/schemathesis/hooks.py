@@ -5,7 +5,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum, unique
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, DefaultDict, Dict, List, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, DefaultDict, cast
 
 from .types import GenericTest
 from .internal.deprecation import deprecated_property
@@ -27,7 +27,7 @@ class HookScope(Enum):
 @dataclass
 class RegisteredHook:
     signature: inspect.Signature
-    scopes: List[HookScope]
+    scopes: list[HookScope]
 
 
 @dataclass
@@ -38,10 +38,10 @@ class HookContext:
                                             Might be absent in some cases.
     """
 
-    operation: Optional["APIOperation"] = None
+    operation: APIOperation | None = None
 
     @deprecated_property(removed_in="4.0", replacement="operation")
-    def endpoint(self) -> Optional["APIOperation"]:
+    def endpoint(self) -> APIOperation | None:
         return self.operation
 
 
@@ -53,10 +53,10 @@ class HookDispatcher:
     """
 
     scope: HookScope
-    _hooks: DefaultDict[str, List[Callable]] = field(default_factory=lambda: defaultdict(list))
-    _specs: ClassVar[Dict[str, RegisteredHook]] = {}
+    _hooks: DefaultDict[str, list[Callable]] = field(default_factory=lambda: defaultdict(list))
+    _specs: ClassVar[dict[str, RegisteredHook]] = {}
 
-    def register(self, hook: Union[str, Callable]) -> Callable:
+    def register(self, hook: str | Callable) -> Callable:
         """Register a new hook.
 
         :param hook: Either a hook function or a string.
@@ -87,7 +87,7 @@ class HookDispatcher:
             return decorator
         return self.register_hook_with_name(hook, hook.__name__)
 
-    def merge(self, other: "HookDispatcher") -> "HookDispatcher":
+    def merge(self, other: HookDispatcher) -> HookDispatcher:
         """Merge two dispatches together.
 
         The resulting dispatcher will call the `self` hooks first.
@@ -99,7 +99,7 @@ class HookDispatcher:
         instance._hooks = all_hooks
         return instance
 
-    def apply(self, hook: Callable, *, name: Optional[str] = None) -> Callable[[Callable], Callable]:
+    def apply(self, hook: Callable, *, name: str | None = None) -> Callable[[Callable], Callable]:
         """Register hook to run only on one test function.
 
         :param hook: A hook function.
@@ -130,7 +130,7 @@ class HookDispatcher:
         return decorator
 
     @classmethod
-    def add_dispatcher(cls, func: GenericTest) -> "HookDispatcher":
+    def add_dispatcher(cls, func: GenericTest) -> HookDispatcher:
         """Attach a new dispatcher instance to the test if it is not already present."""
         if not hasattr(func, "_schemathesis_hooks"):
             func._schemathesis_hooks = cls(scope=HookScope.TEST)  # type: ignore
@@ -143,7 +143,7 @@ class HookDispatcher:
         return hook
 
     @classmethod
-    def register_spec(cls, scopes: List[HookScope]) -> Callable:
+    def register_spec(cls, scopes: list[HookScope]) -> Callable:
         """Register hook specification.
 
         All hooks, registered with `register` should comply with corresponding registered specs.
@@ -173,10 +173,10 @@ class HookDispatcher:
                 f"Hook '{name}' takes {len(spec.signature.parameters)} arguments but {len(signature.parameters)} is defined"
             )
 
-    def collect_statistic(self) -> Dict[str, int]:
+    def collect_statistic(self) -> dict[str, int]:
         return {name: len(hooks) for name, hooks in self._hooks.items()}
 
-    def get_all_by_name(self, name: str) -> List[Callable]:
+    def get_all_by_name(self, name: str) -> list[Callable]:
         """Get a list of hooks registered for a name."""
         return self._hooks.get(name, [])
 
@@ -225,9 +225,9 @@ class HookDispatcher:
 
 
 def apply_to_all_dispatchers(
-    operation: "APIOperation",
+    operation: APIOperation,
     context: HookContext,
-    hooks: Optional[HookDispatcher],
+    hooks: HookDispatcher | None,
     strategy: st.SearchStrategy,
     container: str,
 ) -> st.SearchStrategy:
@@ -287,32 +287,32 @@ def before_generate_body(context: HookContext, strategy: st.SearchStrategy) -> s
 
 
 @all_scopes
-def before_generate_case(context: HookContext, strategy: st.SearchStrategy["Case"]) -> st.SearchStrategy["Case"]:
+def before_generate_case(context: HookContext, strategy: st.SearchStrategy[Case]) -> st.SearchStrategy[Case]:
     """Called on a strategy that generates ``Case`` instances."""
 
 
 @all_scopes
-def before_process_path(context: HookContext, path: str, methods: Dict[str, Any]) -> None:
+def before_process_path(context: HookContext, path: str, methods: dict[str, Any]) -> None:
     """Called before API path is processed."""
 
 
 @all_scopes
-def filter_operations(context: HookContext) -> Optional[bool]:
+def filter_operations(context: HookContext) -> bool | None:
     """Decide whether testing of this particular API operation should be skipped or not."""
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
-def before_load_schema(context: HookContext, raw_schema: Dict[str, Any]) -> None:
+def before_load_schema(context: HookContext, raw_schema: dict[str, Any]) -> None:
     """Called before schema instance is created."""
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
-def after_load_schema(context: HookContext, schema: "BaseSchema") -> None:
+def after_load_schema(context: HookContext, schema: BaseSchema) -> None:
     """Called after schema instance is created."""
 
 
 @all_scopes
-def before_add_examples(context: HookContext, examples: List["Case"]) -> None:
+def before_add_examples(context: HookContext, examples: list[Case]) -> None:
     """Called before explicit examples are added to a test via `@example` decorator.
 
     `examples` is a list that could be extended with examples provided by the user.
@@ -320,12 +320,12 @@ def before_add_examples(context: HookContext, examples: List["Case"]) -> None:
 
 
 @all_scopes
-def before_init_operation(context: HookContext, operation: "APIOperation") -> None:
+def before_init_operation(context: HookContext, operation: APIOperation) -> None:
     """Allows you to customize a newly created API operation."""
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
-def add_case(context: HookContext, case: "Case", response: GenericResponse) -> Optional["Case"]:
+def add_case(context: HookContext, case: Case, response: GenericResponse) -> Case | None:
     """Creates an additional test per API operation. If this hook returns None, no additional test created.
 
     Called with a copy of the original case object and the server's response to the original case.
@@ -333,7 +333,7 @@ def add_case(context: HookContext, case: "Case", response: GenericResponse) -> O
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
-def before_call(context: HookContext, case: "Case") -> None:
+def before_call(context: HookContext, case: Case) -> None:
     """Called before every network call in CLI tests.
 
     Use cases:
@@ -343,7 +343,7 @@ def before_call(context: HookContext, case: "Case") -> None:
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
-def after_call(context: HookContext, case: "Case", response: GenericResponse) -> None:
+def after_call(context: HookContext, case: Case, response: GenericResponse) -> None:
     """Called after every network call in CLI tests.
 
     Note that you need to modify the response in-place.

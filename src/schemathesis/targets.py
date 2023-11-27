@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Tuple
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from .models import Case
@@ -16,7 +16,7 @@ class TargetContext:
     :ivar float response_time: API response time.
     """
 
-    case: "Case"
+    case: Case
     response: GenericResponse
     response_time: float
 
@@ -28,7 +28,7 @@ def response_time(context: TargetContext) -> float:
 Target = Callable[[TargetContext], float]
 DEFAULT_TARGETS = ()
 OPTIONAL_TARGETS = (response_time,)
-ALL_TARGETS: Tuple[Target, ...] = DEFAULT_TARGETS + OPTIONAL_TARGETS
+ALL_TARGETS: tuple[Target, ...] = DEFAULT_TARGETS + OPTIONAL_TARGETS
 
 
 def register(target: Target) -> Target:

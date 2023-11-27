@@ -16,18 +16,12 @@ from typing import (
     Any,
     Callable,
     ContextManager,
-    Dict,
     Generator,
     Iterable,
     Iterator,
-    List,
     NoReturn,
-    Optional,
     Sequence,
-    Tuple,
-    Type,
     TypeVar,
-    Union,
     TYPE_CHECKING,
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
@@ -84,31 +78,31 @@ class MethodsDict(CaseInsensitiveDict):
 C = TypeVar("C", bound=Case)
 
 
-@lru_cache()
+@lru_cache
 def get_full_path(base_path: str, path: str) -> str:
     return unquote(urljoin(base_path, quote(path.lstrip("/"))))
 
 
 @dataclass(eq=False)
 class BaseSchema(Mapping):
-    raw_schema: Dict[str, Any]
-    location: Optional[str] = None
-    base_url: Optional[str] = None
-    method: Optional[Filter] = None
-    endpoint: Optional[Filter] = None
-    tag: Optional[Filter] = None
-    operation_id: Optional[Filter] = None
+    raw_schema: dict[str, Any]
+    location: str | None = None
+    base_url: str | None = None
+    method: Filter | None = None
+    endpoint: Filter | None = None
+    tag: Filter | None = None
+    operation_id: Filter | None = None
     app: Any = None
     hooks: HookDispatcher = field(default_factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))
     auth: AuthStorage = field(default_factory=AuthStorage)
-    test_function: Optional[GenericTest] = None
+    test_function: GenericTest | None = None
     validate_schema: bool = True
     skip_deprecated_operations: bool = False
-    data_generation_methods: List[DataGenerationMethod] = field(
+    data_generation_methods: list[DataGenerationMethod] = field(
         default_factory=lambda: list(DEFAULT_DATA_GENERATION_METHODS)
     )
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
-    rate_limiter: Optional[Limiter] = None
+    rate_limiter: Limiter | None = None
     sanitize_output: bool = True
 
     def __iter__(self) -> Iterator[str]:
@@ -127,7 +121,7 @@ class BaseSchema(Mapping):
     def __len__(self) -> int:
         return len(self.operations)
 
-    def hook(self, hook: Union[str, Callable]) -> Callable:
+    def hook(self, hook: str | Callable) -> Callable:
         return self.hooks.register(hook)
 
     @property
@@ -169,7 +163,7 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     @property
-    def operations(self) -> Dict[str, MethodsDict]:
+    def operations(self) -> dict[str, MethodsDict]:
         if not hasattr(self, "_operations"):
             operations = self.get_all_operations()
             self._operations = operations_to_dict(operations)
@@ -180,37 +174,37 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def get_all_operations(
-        self, hooks: Optional[HookDispatcher] = None
+        self, hooks: HookDispatcher | None = None
     ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
         raise NotImplementedError
 
-    def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, operation: APIOperation) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         raise NotImplementedError
 
-    def get_security_requirements(self, operation: APIOperation) -> List[str]:
+    def get_security_requirements(self, operation: APIOperation) -> list[str]:
         """Get applied security requirements for the given API operation."""
         raise NotImplementedError
 
     def get_stateful_tests(
-        self, response: GenericResponse, operation: APIOperation, stateful: Optional[Stateful]
+        self, response: GenericResponse, operation: APIOperation, stateful: Stateful | None
     ) -> Sequence[StatefulTest]:
         """Get a list of additional tests, that should be executed after this response from the API operation."""
         raise NotImplementedError
 
-    def get_parameter_serializer(self, operation: APIOperation, location: str) -> Optional[Callable]:
+    def get_parameter_serializer(self, operation: APIOperation, location: str) -> Callable | None:
         """Get a function that serializes parameters for the given location."""
         raise NotImplementedError
 
     def get_all_tests(
         self,
         func: Callable,
-        settings: Optional[hypothesis.settings] = None,
-        seed: Optional[int] = None,
-        as_strategy_kwargs: Optional[Dict[str, Any]] = None,
-        hooks: Optional[HookDispatcher] = None,
-        _given_kwargs: Optional[Dict[str, GivenInput]] = None,
-    ) -> Generator[Result[Tuple[APIOperation, Callable], OperationSchemaError], None, None]:
+        settings: hypothesis.settings | None = None,
+        seed: int | None = None,
+        as_strategy_kwargs: dict[str, Any] | None = None,
+        hooks: HookDispatcher | None = None,
+        _given_kwargs: dict[str, GivenInput] | None = None,
+    ) -> Generator[Result[tuple[APIOperation, Callable], OperationSchemaError], None, None]:
         """Generate all operations and Hypothesis tests for them."""
         for result in self.get_all_operations(hooks=hooks):
             if isinstance(result, Ok):
@@ -229,14 +223,14 @@ class BaseSchema(Mapping):
 
     def parametrize(
         self,
-        method: Optional[Filter] = NOT_SET,
-        endpoint: Optional[Filter] = NOT_SET,
-        tag: Optional[Filter] = NOT_SET,
-        operation_id: Optional[Filter] = NOT_SET,
-        validate_schema: Union[bool, NotSet] = NOT_SET,
-        skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
-        data_generation_methods: Union[Iterable[DataGenerationMethod], NotSet] = NOT_SET,
-        code_sample_style: Union[str, NotSet] = NOT_SET,
+        method: Filter | None = NOT_SET,
+        endpoint: Filter | None = NOT_SET,
+        tag: Filter | None = NOT_SET,
+        operation_id: Filter | None = NOT_SET,
+        validate_schema: bool | NotSet = NOT_SET,
+        skip_deprecated_operations: bool | NotSet = NOT_SET,
+        data_generation_methods: Iterable[DataGenerationMethod] | NotSet = NOT_SET,
+        code_sample_style: str | NotSet = NOT_SET,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
         _code_sample_style = (
@@ -278,22 +272,22 @@ class BaseSchema(Mapping):
     def clone(
         self,
         *,
-        base_url: Union[Optional[str], NotSet] = NOT_SET,
-        test_function: Optional[GenericTest] = None,
-        method: Optional[Filter] = NOT_SET,
-        endpoint: Optional[Filter] = NOT_SET,
-        tag: Optional[Filter] = NOT_SET,
-        operation_id: Optional[Filter] = NOT_SET,
+        base_url: str | None | NotSet = NOT_SET,
+        test_function: GenericTest | None = None,
+        method: Filter | None = NOT_SET,
+        endpoint: Filter | None = NOT_SET,
+        tag: Filter | None = NOT_SET,
+        operation_id: Filter | None = NOT_SET,
         app: Any = NOT_SET,
-        hooks: Union[HookDispatcher, NotSet] = NOT_SET,
-        auth: Union[AuthStorage, NotSet] = NOT_SET,
-        validate_schema: Union[bool, NotSet] = NOT_SET,
-        skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
-        data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
-        code_sample_style: Union[CodeSampleStyle, NotSet] = NOT_SET,
-        rate_limiter: Optional[Limiter] = NOT_SET,
-        sanitize_output: Optional[Union[bool, NotSet]] = NOT_SET,
-    ) -> "BaseSchema":
+        hooks: HookDispatcher | NotSet = NOT_SET,
+        auth: AuthStorage | NotSet = NOT_SET,
+        validate_schema: bool | NotSet = NOT_SET,
+        skip_deprecated_operations: bool | NotSet = NOT_SET,
+        data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
+        code_sample_style: CodeSampleStyle | NotSet = NOT_SET,
+        rate_limiter: Limiter | None = NOT_SET,
+        sanitize_output: bool | NotSet | None = NOT_SET,
+    ) -> BaseSchema:
         if base_url is NOT_SET:
             base_url = self.base_url
         if method is NOT_SET:
@@ -343,7 +337,7 @@ class BaseSchema(Mapping):
             sanitize_output=sanitize_output,  # type: ignore
         )
 
-    def get_local_hook_dispatcher(self) -> Optional[HookDispatcher]:
+    def get_local_hook_dispatcher(self) -> HookDispatcher | None:
         """Get a HookDispatcher instance bound to the test if present."""
         # It might be not present when it is used without pytest via `APIOperation.as_strategy()`
         if self.test_function is not None:
@@ -361,48 +355,48 @@ class BaseSchema(Mapping):
 
     def prepare_multipart(
         self, form_data: FormData, operation: APIOperation
-    ) -> Tuple[Optional[List], Optional[Dict[str, Any]]]:
+    ) -> tuple[list | None, dict[str, Any] | None]:
         """Split content of `form_data` into files & data.
 
         Forms may contain file fields, that we should send via `files` argument in `requests`.
         """
         raise NotImplementedError
 
-    def get_request_payload_content_types(self, operation: APIOperation) -> List[str]:
+    def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
         raise NotImplementedError
 
     def make_case(
         self,
         *,
-        case_cls: Type[C],
+        case_cls: type[C],
         operation: APIOperation,
-        path_parameters: Optional[PathParameters] = None,
-        headers: Optional[Headers] = None,
-        cookies: Optional[Cookies] = None,
-        query: Optional[Query] = None,
-        body: Union[Body, NotSet] = NOT_SET,
-        media_type: Optional[str] = None,
+        path_parameters: PathParameters | None = None,
+        headers: Headers | None = None,
+        cookies: Cookies | None = None,
+        query: Query | None = None,
+        body: Body | NotSet = NOT_SET,
+        media_type: str | None = None,
     ) -> C:
         raise NotImplementedError
 
     def get_case_strategy(
         self,
         operation: APIOperation,
-        hooks: Optional[HookDispatcher] = None,
-        auth_storage: Optional[AuthStorage] = None,
+        hooks: HookDispatcher | None = None,
+        auth_storage: AuthStorage | None = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
         **kwargs: Any,
     ) -> SearchStrategy:
         raise NotImplementedError
 
-    def as_state_machine(self) -> Type[APIStateMachine]:
+    def as_state_machine(self) -> type[APIStateMachine]:
         """Create a state machine class.
 
         Use it for stateful testing.
         """
         raise NotImplementedError
 
-    def get_links(self, operation: APIOperation) -> Dict[str, Dict[str, Any]]:
+    def get_links(self, operation: APIOperation) -> dict[str, dict[str, Any]]:
         raise NotImplementedError
 
     def validate_response(self, operation: APIOperation, response: GenericResponse) -> None:
@@ -418,14 +412,14 @@ class BaseSchema(Mapping):
             return self.rate_limiter.ratelimit(label, delay=True, max_delay=0)
         return nullcontext()
 
-    def _get_payload_schema(self, definition: Dict[str, Any], media_type: str) -> Optional[Dict[str, Any]]:
+    def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:
         raise NotImplementedError
 
 
 def operations_to_dict(
     operations: Generator[Result[APIOperation, OperationSchemaError], None, None]
-) -> Dict[str, MethodsDict]:
-    output: Dict[str, MethodsDict] = {}
+) -> dict[str, MethodsDict]:
+    output: dict[str, MethodsDict] = {}
     for result in operations:
         if isinstance(result, Ok):
             operation = result.ok()

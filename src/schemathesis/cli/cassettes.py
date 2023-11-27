@@ -6,7 +6,7 @@ import sys
 import threading
 from dataclasses import dataclass, field
 from queue import Queue
-from typing import IO, Any, Dict, Generator, Iterator, List, Optional, cast, TYPE_CHECKING
+from typing import IO, Any, Generator, Iterator, cast, TYPE_CHECKING
 
 from ..constants import SCHEMATHESIS_VERSION
 from ..runner import events
@@ -93,7 +93,7 @@ class Process:
     correlation_id: str
     thread_id: int
     data_generation_method: DataGenerationMethod
-    interactions: List[SerializedInteraction]
+    interactions: list[SerializedInteraction]
 
 
 @dataclass
@@ -123,16 +123,16 @@ def worker(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, q
     current_id = 1
     stream = file_handle.open()
 
-    def format_header_values(values: List[str]) -> str:
+    def format_header_values(values: list[str]) -> str:
         return "\n".join(f"      - {json.dumps(v)}" for v in values)
 
-    def format_headers(headers: Dict[str, List[str]]) -> str:
+    def format_headers(headers: dict[str, list[str]]) -> str:
         return "\n".join(f'      "{name}":\n{format_header_values(values)}' for name, values in headers.items())
 
-    def format_check_message(message: Optional[str]) -> str:
+    def format_check_message(message: str | None) -> str:
         return "~" if message is None else f"{repr(message)}"
 
-    def format_checks(checks: List[SerializedCheck]) -> str:
+    def format_checks(checks: list[SerializedCheck]) -> str:
         return "\n".join(
             f"    - name: '{check.name}'\n      status: '{check.value.name.upper()}'\n      message: {format_check_message(check.message)}"
             for check in checks
@@ -278,18 +278,18 @@ def write_double_quoted(stream: IO, text: str) -> None:
 
 @dataclass
 class Replayed:
-    interaction: Dict[str, Any]
+    interaction: dict[str, Any]
     response: requests.Response
 
 
 def replay(
-    cassette: Dict[str, Any],
-    id_: Optional[str] = None,
-    status: Optional[str] = None,
-    uri: Optional[str] = None,
-    method: Optional[str] = None,
+    cassette: dict[str, Any],
+    id_: str | None = None,
+    status: str | None = None,
+    uri: str | None = None,
+    method: str | None = None,
     request_tls_verify: bool = True,
-    request_cert: Optional[RequestCert] = None,
+    request_cert: RequestCert | None = None,
 ) -> Generator[Replayed, None, None]:
     """Replay saved interactions."""
     import requests
@@ -304,26 +304,26 @@ def replay(
 
 
 def filter_cassette(
-    interactions: List[Dict[str, Any]],
-    id_: Optional[str] = None,
-    status: Optional[str] = None,
-    uri: Optional[str] = None,
-    method: Optional[str] = None,
-) -> Iterator[Dict[str, Any]]:
+    interactions: list[dict[str, Any]],
+    id_: str | None = None,
+    status: str | None = None,
+    uri: str | None = None,
+    method: str | None = None,
+) -> Iterator[dict[str, Any]]:
     filters = []
 
-    def id_filter(item: Dict[str, Any]) -> bool:
+    def id_filter(item: dict[str, Any]) -> bool:
         return item["id"] == id_
 
-    def status_filter(item: Dict[str, Any]) -> bool:
+    def status_filter(item: dict[str, Any]) -> bool:
         status_ = cast(str, status)
         return item["status"].upper() == status_.upper()
 
-    def uri_filter(item: Dict[str, Any]) -> bool:
+    def uri_filter(item: dict[str, Any]) -> bool:
         uri_ = cast(str, uri)
         return bool(re.search(uri_, item["request"]["uri"]))
 
-    def method_filter(item: Dict[str, Any]) -> bool:
+    def method_filter(item: dict[str, Any]) -> bool:
         method_ = cast(str, method)
         return bool(re.search(method_, item["request"]["method"]))
 
@@ -339,13 +339,13 @@ def filter_cassette(
     if method is not None:
         filters.append(method_filter)
 
-    def is_match(interaction: Dict[str, Any]) -> bool:
+    def is_match(interaction: dict[str, Any]) -> bool:
         return all(filter_(interaction) for filter_ in filters)
 
     return filter(is_match, interactions)
 
 
-def get_prepared_request(data: Dict[str, Any]) -> requests.PreparedRequest:
+def get_prepared_request(data: dict[str, Any]) -> requests.PreparedRequest:
     """Create a `requests.PreparedRequest` from a serialized one."""
     from requests.structures import CaseInsensitiveDict
     from requests.cookies import RequestsCookieJar

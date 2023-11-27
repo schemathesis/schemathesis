@@ -22,13 +22,13 @@ def load_file_impl(location: str, opener: Callable) -> Dict[str, Any]:
         return load_yaml(fd)
 
 
-@lru_cache()
+@lru_cache
 def load_file(location: str) -> Dict[str, Any]:
     """Load a schema from the given file."""
     return load_file_impl(location, open)
 
 
-@lru_cache()
+@lru_cache
 def load_file_uri(location: str) -> Dict[str, Any]:
     """Load a schema from the given file uri."""
     return load_file_impl(location, urlopen)

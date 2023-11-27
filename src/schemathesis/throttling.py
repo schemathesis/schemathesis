@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from .exceptions import UsageError
 
@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from pyrate_limiter import Limiter
 
 
-def parse_units(rate: str) -> Tuple[int, int]:
+def parse_units(rate: str) -> tuple[int, int]:
     from pyrate_limiter import Duration
 
     try:

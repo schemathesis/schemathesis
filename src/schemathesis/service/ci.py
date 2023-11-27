@@ -1,9 +1,7 @@
 import enum
 import os
 from dataclasses import asdict, dataclass
-from typing import Dict, Optional
-
-from typing_extensions import Protocol, runtime_checkable
+from typing import Dict, Optional, Protocol, runtime_checkable
 
 
 @enum.unique

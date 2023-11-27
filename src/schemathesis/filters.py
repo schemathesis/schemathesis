@@ -3,9 +3,7 @@ import re
 from dataclasses import dataclass, field
 from functools import partial
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Callable, List, Optional, Set, Tuple, Union
-
-from typing_extensions import Protocol
+from typing import TYPE_CHECKING, Callable, List, Optional, Set, Tuple, Union, Protocol
 
 from .exceptions import UsageError
 

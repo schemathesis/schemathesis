@@ -1,11 +1,6 @@
 from typing import Any, Type, Callable
 from ._lazy_import import lazy_import
 
-try:
-    from importlib import metadata
-except ImportError:
-    import importlib_metadata as metadata  # type: ignore
-
 
 __all__ = [  # noqa: F822
     "JSONMixin",
@@ -13,7 +8,6 @@ __all__ = [  # noqa: F822
     "MultipleFailures",
     "get_signature",
     "get_interesting_origin",
-    "metadata",
     "_install_hypothesis_jsonschema_compatibility_shim",
 ]
 

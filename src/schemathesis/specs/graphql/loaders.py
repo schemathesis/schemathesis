@@ -2,7 +2,7 @@ from __future__ import annotations
 import pathlib
 from functools import lru_cache
 from json import JSONDecodeError
-from typing import IO, Any, Callable, Dict, Optional, Union, cast, TYPE_CHECKING
+from typing import IO, Any, Callable, Dict, cast, TYPE_CHECKING
 
 from ...code_samples import CodeSampleStyle
 from ...generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod, DataGenerationMethodInput
@@ -22,14 +22,14 @@ if TYPE_CHECKING:
     from .schemas import GraphQLSchema
 
 
-@lru_cache()
+@lru_cache
 def get_introspection_query() -> str:
     import graphql
 
     return graphql.get_introspection_query()
 
 
-@lru_cache()
+@lru_cache
 def get_introspection_query_ast() -> DocumentNode:
     import graphql
 
@@ -41,10 +41,10 @@ def from_path(
     path: PathLike,
     *,
     app: Any = None,
-    base_url: Optional[str] = None,
+    base_url: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    rate_limit: Optional[str] = None,
+    rate_limit: str | None = None,
     encoding: str = "utf8",
     sanitize_output: bool = True,
 ) -> GraphQLSchema:
@@ -66,7 +66,7 @@ def from_path(
         )
 
 
-def extract_schema_from_response(response: GenericResponse) -> Dict[str, Any]:
+def extract_schema_from_response(response: GenericResponse) -> dict[str, Any]:
     from requests import Response
 
     try:
@@ -86,12 +86,12 @@ def from_url(
     url: str,
     *,
     app: Any = None,
-    base_url: Optional[str] = None,
-    port: Optional[int] = None,
+    base_url: str | None = None,
+    port: int | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    wait_for_schema: Optional[float] = None,
-    rate_limit: Optional[str] = None,
+    wait_for_schema: float | None = None,
+    rate_limit: str | None = None,
     sanitize_output: bool = True,
     **kwargs: Any,
 ) -> GraphQLSchema:
@@ -145,14 +145,14 @@ def from_url(
 
 
 def from_file(
-    file: Union[IO[str], str],
+    file: IO[str] | str,
     *,
     app: Any = None,
-    base_url: Optional[str] = None,
+    base_url: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    location: Optional[str] = None,
-    rate_limit: Optional[str] = None,
+    location: str | None = None,
+    rate_limit: str | None = None,
     sanitize_output: bool = True,
 ) -> GraphQLSchema:
     """Load GraphQL schema from a file descriptor or a string.
@@ -187,14 +187,14 @@ def from_file(
 
 
 def from_dict(
-    raw_schema: Dict[str, Any],
+    raw_schema: dict[str, Any],
     *,
     app: Any = None,
-    base_url: Optional[str] = None,
-    location: Optional[str] = None,
+    base_url: str | None = None,
+    location: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    rate_limit: Optional[str] = None,
+    rate_limit: str | None = None,
     sanitize_output: bool = True,
 ) -> GraphQLSchema:
     """Load GraphQL schema from a Python dictionary.
@@ -212,7 +212,7 @@ def from_dict(
     if "data" in raw_schema:
         raw_schema = raw_schema["data"]
     dispatch("before_load_schema", hook_context, raw_schema)
-    rate_limiter: Optional[Limiter] = None
+    rate_limiter: Limiter | None = None
     if rate_limit is not None:
         rate_limiter = build_limiter(rate_limit)
     instance = GraphQLSchema(
@@ -233,10 +233,10 @@ def from_wsgi(
     schema_path: str,
     app: Any,
     *,
-    base_url: Optional[str] = None,
+    base_url: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    rate_limit: Optional[str] = None,
+    rate_limit: str | None = None,
     sanitize_output: bool = True,
     **kwargs: Any,
 ) -> GraphQLSchema:
@@ -272,10 +272,10 @@ def from_asgi(
     schema_path: str,
     app: Any,
     *,
-    base_url: Optional[str] = None,
+    base_url: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     code_sample_style: str = CodeSampleStyle.default().name,
-    rate_limit: Optional[str] = None,
+    rate_limit: str | None = None,
     sanitize_output: bool = True,
     **kwargs: Any,
 ) -> GraphQLSchema:

@@ -7,12 +7,12 @@ import textwrap
 import time
 from itertools import groupby
 from queue import Queue
-from typing import Any, Dict, Generator, List, Optional, Tuple, Union, cast
+from typing import Any, Generator, cast
 
 import click
+from importlib import metadata
 
 from ... import service
-from ..._compat import metadata
 from ...code_samples import CodeSampleStyle
 from ...constants import (
     DISCORD_LINK,
@@ -48,7 +48,7 @@ def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> Non
     click.secho(message, **kwargs)
 
 
-def display_subsection(result: SerializedTestResult, color: Optional[str] = "red") -> None:
+def display_subsection(result: SerializedTestResult, color: str | None = "red") -> None:
     display_section_name(result.verbose_name, "_", fg=color)
 
 
@@ -87,7 +87,7 @@ def display_summary(event: events.Finished) -> None:
     display_section_name(message, fg=color)
 
 
-def get_summary_message_parts(event: events.Finished) -> List[str]:
+def get_summary_message_parts(event: events.Finished) -> list[str]:
     parts = []
     passed = event.passed_count
     if passed:
@@ -104,7 +104,7 @@ def get_summary_message_parts(event: events.Finished) -> List[str]:
     return parts
 
 
-def get_summary_output(event: events.Finished) -> Tuple[str, str]:
+def get_summary_output(event: events.Finished) -> tuple[str, str]:
     parts = get_summary_message_parts(event)
     if not parts:
         message = "Empty test suite"
@@ -120,7 +120,7 @@ def get_summary_output(event: events.Finished) -> Tuple[str, str]:
     return message, color
 
 
-def display_hypothesis_output(hypothesis_output: List[str]) -> None:
+def display_hypothesis_output(hypothesis_output: list[str]) -> None:
     """Show falsifying examples from Hypothesis output if there are any."""
     if hypothesis_output:
         display_section_name("HYPOTHESIS OUTPUT")
@@ -166,7 +166,7 @@ def display_single_error(context: ExecutionContext, result: SerializedTestResult
     return should_display_full_traceback_message
 
 
-def display_generic_errors(context: ExecutionContext, errors: List[SerializedError]) -> None:
+def display_generic_errors(context: ExecutionContext, errors: list[SerializedError]) -> None:
     for error in errors:
         display_section_name(error.title or "Generic error", "_", fg="red")
         _display_error(context, error)
@@ -315,8 +315,8 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
 
 
 def group_by_case(
-    checks: List[SerializedCheck], code_sample_style: CodeSampleStyle
-) -> Generator[Tuple[str, Generator[SerializedCheck, None, None]], None, None]:
+    checks: list[SerializedCheck], code_sample_style: CodeSampleStyle
+) -> Generator[tuple[str, Generator[SerializedCheck, None, None]], None, None]:
     checks = deduplicate_failures(checks)
     checks = sorted(checks, key=lambda c: _by_unique_code_sample(c, code_sample_style))
     yield from groupby(checks, lambda c: _by_unique_code_sample(c, code_sample_style))
@@ -539,7 +539,7 @@ def create_spinner(repetitions: int) -> Generator[str, None, None]:
                 yield ch
 
 
-def display_checks_statistics(total: Dict[str, Dict[Union[str, Status], int]]) -> None:
+def display_checks_statistics(total: dict[str, dict[str | Status, int]]) -> None:
     padding = 20
     col1_len = max(map(len, total.keys())) + padding
     col2_len = len(str(max(total.values(), key=lambda v: v["total"])["total"])) * 2 + padding
@@ -550,7 +550,7 @@ def display_checks_statistics(total: Dict[str, Dict[Union[str, Status], int]]) -
         display_check_result(check_name, results, template)
 
 
-def display_check_result(check_name: str, results: Dict[Union[str, Status], int], template: str) -> None:
+def display_check_result(check_name: str, results: dict[str | Status, int], template: str) -> None:
     """Show results of single check execution."""
     if Status.failure in results:
         verdict = "FAILED"
@@ -591,18 +591,18 @@ def should_skip_suggestion(context: ExecutionContext, event: events.InternalErro
     return event.subtype == SchemaErrorType.CONNECTION_OTHER and context.wait_for_schema is not None
 
 
-def _split_traceback(traceback: str) -> List[str]:
+def _split_traceback(traceback: str) -> list[str]:
     return [entry for entry in traceback.splitlines() if entry]
 
 
-def _display_extras(extras: List[str]) -> None:
+def _display_extras(extras: list[str]) -> None:
     if extras:
         click.echo()
     for extra in extras:
         click.secho(f"    {extra}")
 
 
-def _maybe_display_tip(suggestion: Optional[str]) -> None:
+def _maybe_display_tip(suggestion: str | None) -> None:
     # Display suggestion if any
     if suggestion is not None:
         click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")

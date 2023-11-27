@@ -13,6 +13,11 @@ Changelog
 
 - Support for ``hypothesis>=6.90.1``.
 
+**Removed**
+
+- Support for Python 3.7.
+- Unnecessary dependencies on ``typing-extensions`` and ``importlib-metadata``.
+
 .. _v3.21.1:
 
 :version:`3.21.1 <v3.21.0...v3.21.1>` - 2023-11-16

@@ -27,14 +27,14 @@ class CacheKey:
         return hash((self.operation_name, self.location))
 
 
-@lru_cache()
+@lru_cache
 def get_validator(cache_key: CacheKey) -> jsonschema.Draft4Validator:
     """Get JSON Schema validator for the given schema."""
     # Each operation / location combo has only a single schema, therefore could be cached
     return jsonschema.Draft4Validator(cache_key.schema)
 
 
-@lru_cache()
+@lru_cache
 def split_schema(cache_key: CacheKey) -> Tuple[Schema, Schema]:
     """Split the schema in two parts.
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, List, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, List
 
 import hypothesis.strategies as st
 from requests.structures import CaseInsensitiveDict
@@ -18,15 +18,15 @@ FilterFunction = Callable[["StepResult"], bool]
 @dataclass
 class Connection:
     source: str
-    strategy: st.SearchStrategy[Tuple[StepResult, OpenAPILink]]
+    strategy: st.SearchStrategy[tuple[StepResult, OpenAPILink]]
 
 
 APIOperationConnections = Dict[str, List[Connection]]
 
 
 def apply(
-    operation: "APIOperation",
-    bundles: Dict[str, CaseInsensitiveDict],
+    operation: APIOperation,
+    bundles: dict[str, CaseInsensitiveDict],
     connections: APIOperationConnections,
 ) -> None:
     """Gather all connections based on Open API links definitions."""
@@ -42,12 +42,12 @@ def apply(
 
 def _convert_strategy(
     strategy: st.SearchStrategy[StepResult], link: OpenAPILink
-) -> st.SearchStrategy[Tuple[StepResult, OpenAPILink]]:
+) -> st.SearchStrategy[tuple[StepResult, OpenAPILink]]:
     # This function is required to capture values properly (it won't work properly when lambda is defined in a loop)
     return strategy.map(lambda out: (out, link))
 
 
-def make_response_filter(status_code: str, all_status_codes: List[str]) -> FilterFunction:
+def make_response_filter(status_code: str, all_status_codes: list[str]) -> FilterFunction:
     """Create a filter for stored responses.
 
     This filter will decide whether some response is suitable to use as a source for requesting some API operation.
@@ -76,7 +76,7 @@ def match_status_code(status_code: str) -> FilterFunction:
     return compare
 
 
-def default_status_code(status_codes: List[str]) -> FilterFunction:
+def default_status_code(status_codes: list[str]) -> FilterFunction:
     """Create a filter that matches all "default" responses.
 
     In Open API, the "default" response is the one that is used if no other options were matched.

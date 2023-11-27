@@ -5,15 +5,9 @@ from enum import unique
 from typing import (
     Any,
     Callable,
-    Dict,
     Generator,
-    List,
-    Optional,
     Sequence,
-    Tuple,
-    Type,
     TypeVar,
-    Union,
     cast,
     TYPE_CHECKING,
 )
@@ -58,12 +52,10 @@ class RootType(enum.Enum):
 
 @dataclass(repr=False)
 class GraphQLCase(Case):
-    def as_requests_kwargs(
-        self, base_url: Optional[str] = None, headers: Optional[Dict[str, str]] = None
-    ) -> Dict[str, Any]:
+    def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         final_headers = self._get_headers(headers)
         base_url = self._get_base_url(base_url)
-        kwargs: Dict[str, Any] = {"method": self.method, "url": base_url, "headers": final_headers}
+        kwargs: dict[str, Any] = {"method": self.method, "url": base_url, "headers": final_headers}
         # There is no direct way to have bytes here, but it is a useful pattern to support.
         # It also unifies GraphQLCase with its Open API counterpart where bytes may come from external examples
         if isinstance(self.body, bytes):
@@ -74,7 +66,7 @@ class GraphQLCase(Case):
             kwargs["json"] = {"query": self.body}
         return kwargs
 
-    def as_werkzeug_kwargs(self, headers: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    def as_werkzeug_kwargs(self, headers: dict[str, str] | None = None) -> dict[str, Any]:
         final_headers = self._get_headers(headers)
         return {
             "method": self.method,
@@ -88,10 +80,10 @@ class GraphQLCase(Case):
     def validate_response(
         self,
         response: GenericResponse,
-        checks: Tuple[CheckFunction, ...] = (),
-        additional_checks: Tuple[CheckFunction, ...] = (),
-        excluded_checks: Tuple[CheckFunction, ...] = (),
-        code_sample_style: Optional[str] = None,
+        checks: tuple[CheckFunction, ...] = (),
+        additional_checks: tuple[CheckFunction, ...] = (),
+        excluded_checks: tuple[CheckFunction, ...] = (),
+        code_sample_style: str | None = None,
     ) -> None:
         checks = checks or (not_a_server_error,)
         checks += additional_checks
@@ -101,8 +93,8 @@ class GraphQLCase(Case):
     def call_asgi(
         self,
         app: Any = None,
-        base_url: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
+        base_url: str | None = None,
+        headers: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> requests.Response:
         return super().call_asgi(app=app, base_url=base_url, headers=headers, **kwargs)
@@ -164,7 +156,7 @@ class GraphQLSchema(BaseSchema):
         return total
 
     def get_all_operations(
-        self, hooks: Optional[HookDispatcher] = None
+        self, hooks: HookDispatcher | None = None
     ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
         schema = self.client_schema
         for root_type, operation_type in (
@@ -205,8 +197,8 @@ class GraphQLSchema(BaseSchema):
     def get_case_strategy(
         self,
         operation: APIOperation,
-        hooks: Optional[HookDispatcher] = None,
-        auth_storage: Optional[AuthStorage] = None,
+        hooks: HookDispatcher | None = None,
+        auth_storage: AuthStorage | None = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
         **kwargs: Any,
     ) -> SearchStrategy:
@@ -219,25 +211,25 @@ class GraphQLSchema(BaseSchema):
             **kwargs,
         )
 
-    def get_strategies_from_examples(self, operation: APIOperation) -> List[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, operation: APIOperation) -> list[SearchStrategy[Case]]:
         return []
 
     def get_stateful_tests(
-        self, response: GenericResponse, operation: APIOperation, stateful: Optional[Stateful]
+        self, response: GenericResponse, operation: APIOperation, stateful: Stateful | None
     ) -> Sequence[StatefulTest]:
         return []
 
     def make_case(
         self,
         *,
-        case_cls: Type[C],
+        case_cls: type[C],
         operation: APIOperation,
-        path_parameters: Optional[PathParameters] = None,
-        headers: Optional[Headers] = None,
-        cookies: Optional[Cookies] = None,
-        query: Optional[Query] = None,
-        body: Union[Body, NotSet] = NOT_SET,
-        media_type: Optional[str] = None,
+        path_parameters: PathParameters | None = None,
+        headers: Headers | None = None,
+        cookies: Cookies | None = None,
+        query: Query | None = None,
+        body: Body | NotSet = NOT_SET,
+        media_type: str | None = None,
     ) -> C:
         return case_cls(
             operation=operation,
@@ -255,8 +247,8 @@ def get_case_strategy(
     draw: Callable,
     operation: APIOperation,
     client_schema: graphql.GraphQLSchema,
-    hooks: Optional[HookDispatcher] = None,
-    auth_storage: Optional[AuthStorage] = None,
+    hooks: HookDispatcher | None = None,
+    auth_storage: AuthStorage | None = None,
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
     **kwargs: Any,
 ) -> Any:

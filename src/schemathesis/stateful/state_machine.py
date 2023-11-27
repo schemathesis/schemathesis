@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Optional, Callable, Tuple, ClassVar
+from typing import TYPE_CHECKING, Any, Callable, ClassVar
 
 from hypothesis.stateful import RuleBasedStateMachine
 
@@ -34,8 +34,8 @@ class APIStateMachine(RuleBasedStateMachine):
     # This is a convenience attribute, which happened to clash with `RuleBasedStateMachine` instance level attribute
     # They don't interfere, since it is properly overridden on the Hypothesis side, but it is likely that this
     # attribute will be renamed in the future
-    bundles: ClassVar[Dict[str, CaseInsensitiveDict]]  # type: ignore
-    schema: "BaseSchema"
+    bundles: ClassVar[dict[str, CaseInsensitiveDict]]  # type: ignore
+    schema: BaseSchema
 
     def __init__(self) -> None:
         super().__init__()  # type: ignore
@@ -53,7 +53,7 @@ class APIStateMachine(RuleBasedStateMachine):
         return super()._pretty_print(value)  # type: ignore
 
     @classmethod
-    def run(cls, *, settings: Optional[hypothesis.settings] = None) -> None:
+    def run(cls, *, settings: hypothesis.settings | None = None) -> None:
         """Run state machine as a test."""
         from . import run_state_machine_as_test
 
@@ -74,14 +74,14 @@ class APIStateMachine(RuleBasedStateMachine):
     def transform(self, result: StepResult, direction: Direction, case: Case) -> Case:
         raise NotImplementedError
 
-    def _step(self, case: Case, previous: Optional[Tuple[StepResult, Direction]] = None) -> StepResult:
+    def _step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult:
         # This method is a proxy that is used under the hood during the state machine initialization.
         # The whole point of having it is to make it possible to override `step`; otherwise, custom "step" is ignored.
         # It happens because, at the point of initialization, the final class is not yet created.
         __tracebackhide__ = True
         return self.step(case, previous)
 
-    def step(self, case: Case, previous: Optional[Tuple[StepResult, Direction]] = None) -> StepResult:
+    def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult:
         """A single state machine step.
 
         :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
@@ -177,7 +177,7 @@ class APIStateMachine(RuleBasedStateMachine):
         method = self._get_call_method(case)
         return method(**kwargs)
 
-    def get_call_kwargs(self, case: Case) -> Dict[str, Any]:
+    def get_call_kwargs(self, case: Case) -> dict[str, Any]:
         """Create custom keyword arguments that will be passed to the :meth:`Case.call` method.
 
         Mostly they are proxied to the :func:`requests.request` call.
@@ -204,7 +204,7 @@ class APIStateMachine(RuleBasedStateMachine):
         return case.call
 
     def validate_response(
-        self, response: GenericResponse, case: Case, additional_checks: Tuple[CheckFunction, ...] = ()
+        self, response: GenericResponse, case: Case, additional_checks: tuple[CheckFunction, ...] = ()
     ) -> None:
         """Validate an API response.
 
@@ -242,7 +242,7 @@ class APIStateMachine(RuleBasedStateMachine):
         return StepResult(response, case, elapsed)
 
 
-def _print_case(case: Case, kwargs: Dict[str, Any]) -> str:
+def _print_case(case: Case, kwargs: dict[str, Any]) -> str:
     from requests.structures import CaseInsensitiveDict
 
     operation = f"state.schema['{case.operation.path}']['{case.operation.method.upper()}']"

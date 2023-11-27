@@ -16,10 +16,10 @@ def uninstall() -> None:
     unregister(before_generate_case)
 
 
-def before_generate_case(context: HookContext, strategy: st.SearchStrategy["Case"]) -> st.SearchStrategy["Case"]:
+def before_generate_case(context: HookContext, strategy: st.SearchStrategy[Case]) -> st.SearchStrategy[Case]:
     seen = set()
 
-    def is_not_seen(case: "Case") -> bool:
+    def is_not_seen(case: Case) -> bool:
         # Calculate hash just once as it is costly
         hashed = hash(case)
         if hashed not in seen:

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from hashlib import sha1
 from json import JSONDecodeError
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, NoReturn, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Callable, Generator, NoReturn
 
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE
 from .failures import FailureContext
@@ -23,14 +23,14 @@ class CheckFailed(AssertionError):
     """Custom error type to distinguish from arbitrary AssertionError that may happen in the dependent libraries."""
 
     __module__ = "builtins"
-    context: Optional[FailureContext]
-    causes: Optional[Tuple[Union["CheckFailed", AssertionError], ...]]
+    context: FailureContext | None
+    causes: tuple[CheckFailed | AssertionError, ...] | None
 
     def __init__(
         self,
         *args: Any,
-        context: Optional[FailureContext] = None,
-        causes: Optional[Tuple[Union["CheckFailed", AssertionError], ...]] = None,
+        context: FailureContext | None = None,
+        causes: tuple[CheckFailed | AssertionError, ...] | None = None,
     ):
         super().__init__(*args)
         self.context = context
@@ -38,8 +38,8 @@ class CheckFailed(AssertionError):
 
 
 def make_unique_by_key(
-    check_name: str, check_message: Optional[str], context: Optional[FailureContext]
-) -> Tuple[Optional[str], ...]:
+    check_name: str, check_message: str | None, context: FailureContext | None
+) -> tuple[str | None, ...]:
     """A key to distinguish different failed checks.
 
     It is not only based on `FailureContext`, because the end-user may raise plain `AssertionError` in their custom
@@ -51,8 +51,8 @@ def make_unique_by_key(
 
 
 def deduplicate_failed_checks(
-    checks: List[Union[CheckFailed, AssertionError]]
-) -> Generator[Union[CheckFailed, AssertionError], None, None]:
+    checks: list[CheckFailed | AssertionError]
+) -> Generator[CheckFailed | AssertionError, None, None]:
     """Keep only unique failed checks."""
     seen = set()
     for check in checks:
@@ -66,10 +66,10 @@ def deduplicate_failed_checks(
             seen.add(key)
 
 
-CACHE: Dict[Union[str, int], Type[CheckFailed]] = {}
+CACHE: dict[str | int, type[CheckFailed]] = {}
 
 
-def get_exception(name: str) -> Type[CheckFailed]:
+def get_exception(name: str) -> type[CheckFailed]:
     """Create a new exception class with provided name or fetch one from the cache."""
     if name in CACHE:
         exception_class = CACHE[name]
@@ -81,14 +81,14 @@ def get_exception(name: str) -> Type[CheckFailed]:
     return exception_class
 
 
-def _get_hashed_exception(prefix: str, message: str) -> Type[CheckFailed]:
+def _get_hashed_exception(prefix: str, message: str) -> type[CheckFailed]:
     """Give different exceptions for different error messages."""
     messages_digest = sha1(message.encode("utf-8")).hexdigest()
     name = f"{prefix}{messages_digest}"
     return get_exception(name)
 
 
-def get_grouped_exception(prefix: str, *exceptions: AssertionError) -> Type[CheckFailed]:
+def get_grouped_exception(prefix: str, *exceptions: AssertionError) -> type[CheckFailed]:
     # The prefix is needed to distinguish multiple operations with the same error messages
     # that are coming from different operations
     messages = [exception.args[0] for exception in exceptions]
@@ -96,50 +96,50 @@ def get_grouped_exception(prefix: str, *exceptions: AssertionError) -> Type[Chec
     return _get_hashed_exception("GroupedException", f"{prefix}{message}")
 
 
-def get_server_error(status_code: int) -> Type[CheckFailed]:
+def get_server_error(status_code: int) -> type[CheckFailed]:
     """Return new exception for the Internal Server Error cases."""
     name = f"ServerError{status_code}"
     return get_exception(name)
 
 
-def get_status_code_error(status_code: int) -> Type[CheckFailed]:
+def get_status_code_error(status_code: int) -> type[CheckFailed]:
     """Return new exception for an unexpected status code."""
     name = f"StatusCodeError{status_code}"
     return get_exception(name)
 
 
-def get_response_type_error(expected: str, received: str) -> Type[CheckFailed]:
+def get_response_type_error(expected: str, received: str) -> type[CheckFailed]:
     """Return new exception for an unexpected response type."""
     name = f"SchemaValidationError{expected}_{received}"
     return get_exception(name)
 
 
-def get_malformed_media_type_error(media_type: str) -> Type[CheckFailed]:
+def get_malformed_media_type_error(media_type: str) -> type[CheckFailed]:
     name = f"MalformedMediaType{media_type}"
     return get_exception(name)
 
 
-def get_missing_content_type_error() -> Type[CheckFailed]:
+def get_missing_content_type_error() -> type[CheckFailed]:
     """Return new exception for a missing Content-Type header."""
     return get_exception("MissingContentTypeError")
 
 
-def get_schema_validation_error(exception: ValidationError) -> Type[CheckFailed]:
+def get_schema_validation_error(exception: ValidationError) -> type[CheckFailed]:
     """Return new exception for schema validation error."""
     return _get_hashed_exception("SchemaValidationError", str(exception))
 
 
-def get_response_parsing_error(exception: JSONDecodeError) -> Type[CheckFailed]:
+def get_response_parsing_error(exception: JSONDecodeError) -> type[CheckFailed]:
     """Return new exception for response parsing error."""
     return _get_hashed_exception("ResponseParsingError", str(exception))
 
 
-def get_headers_error(message: str) -> Type[CheckFailed]:
+def get_headers_error(message: str) -> type[CheckFailed]:
     """Return new exception for missing headers."""
     return _get_hashed_exception("MissingHeadersError", message)
 
 
-def get_timeout_error(deadline: Union[float, int]) -> Type[CheckFailed]:
+def get_timeout_error(deadline: float | int) -> type[CheckFailed]:
     """Request took too long."""
     return _get_hashed_exception("TimeoutError", str(deadline))
 
@@ -152,15 +152,15 @@ class OperationSchemaError(Exception):
     """Schema associated with an API operation contains an error."""
 
     __module__ = "builtins"
-    message: Optional[str] = None
-    path: Optional[str] = None
-    method: Optional[str] = None
-    full_path: Optional[str] = None
+    message: str | None = None
+    path: str | None = None
+    method: str | None = None
+    full_path: str | None = None
 
     @classmethod
     def from_jsonschema_error(
-        cls, error: ValidationError, path: Optional[str], method: Optional[str], full_path: Optional[str]
-    ) -> "OperationSchemaError":
+        cls, error: ValidationError, path: str | None, method: str | None, full_path: str | None
+    ) -> OperationSchemaError:
         if error.absolute_path:
             part = error.absolute_path[-1]
             if isinstance(part, int) and len(error.absolute_path) > 1:
@@ -170,7 +170,7 @@ class OperationSchemaError(Exception):
                 message = f"Invalid `{part}` definition"
         else:
             message = "Invalid schema definition"
-        error_path = " -> ".join((str(entry) for entry in error.path)) or "[root]"
+        error_path = " -> ".join(str(entry) for entry in error.path) or "[root]"
         message += f"\n\nLocation:\n    {error_path}"
         instance = truncated_json(error.instance)
         message += f"\n\nProblematic definition:\n{instance}"
@@ -185,8 +185,8 @@ class OperationSchemaError(Exception):
 
     @classmethod
     def from_reference_resolution_error(
-        cls, error: RefResolutionError, path: Optional[str], method: Optional[str], full_path: Optional[str]
-    ) -> "OperationSchemaError":
+        cls, error: RefResolutionError, path: str | None, method: str | None, full_path: str | None
+    ) -> OperationSchemaError:
         message = "Unresolvable JSON pointer in the schema"
         # Get the pointer value from "Unresolvable JSON pointer: 'components/UnknownParameter'"
         pointer = str(error).split(": ", 1)[-1]
@@ -217,7 +217,7 @@ class InvalidRegularExpression(OperationSchemaError):
     __module__ = "builtins"
 
     @classmethod
-    def from_hypothesis_jsonschema_message(cls, message: str) -> "InvalidRegularExpression":
+    def from_hypothesis_jsonschema_message(cls, message: str) -> InvalidRegularExpression:
         match = re.search(r"pattern='(.*?)'.*?\((.*?)\)", message)
         if match:
             message = f"Invalid regular expression. Pattern `{match.group(1)}` is not recognized - `{match.group(2)}`"
@@ -263,7 +263,7 @@ class DeadlineExceeded(Exception):
     __module__ = "builtins"
 
     @classmethod
-    def from_exc(cls, exc: hypothesis.errors.DeadlineExceeded) -> "DeadlineExceeded":
+    def from_exc(cls, exc: hypothesis.errors.DeadlineExceeded) -> DeadlineExceeded:
         runtime = exc.runtime.total_seconds() * 1000
         deadline = exc.deadline.total_seconds() * 1000
         return cls(
@@ -327,9 +327,9 @@ class SchemaError(RuntimeError):
 
     type: SchemaErrorType
     message: str
-    url: Optional[str] = None
-    response: Optional["GenericResponse"] = None
-    extras: List[str] = field(default_factory=list)
+    url: str | None = None
+    response: GenericResponse | None = None
+    extras: list[str] = field(default_factory=list)
 
     def __str__(self) -> str:
         return self.message
@@ -398,11 +398,11 @@ class SerializationNotPossible(SerializationError):
     __module__ = "builtins"
 
     @classmethod
-    def from_media_types(cls, *media_types: str) -> "SerializationNotPossible":
+    def from_media_types(cls, *media_types: str) -> SerializationNotPossible:
         return cls(SERIALIZATION_NOT_POSSIBLE_MESSAGE.format(", ".join(media_types)))
 
     @classmethod
-    def for_media_type(cls, media_type: str) -> "SerializationNotPossible":
+    def for_media_type(cls, media_type: str) -> SerializationNotPossible:
         return cls(SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE.format(media_type))
 
 
@@ -430,7 +430,7 @@ def format_exception(error: Exception, include_traceback: bool = False) -> str:
     return "".join(lines).strip()
 
 
-def extract_nth_traceback(trace: Optional[TracebackType], n: int) -> Optional[TracebackType]:
+def extract_nth_traceback(trace: TracebackType | None, n: int) -> TracebackType | None:
     depth = 0
     while depth < n and trace is not None:
         trace = trace.tb_next
@@ -442,7 +442,7 @@ def remove_ssl_line_number(text: str) -> str:
     return re.sub(r"\(_ssl\.c:\d+\)", "", text)
 
 
-def extract_requests_exception_details(exc: RequestException) -> Tuple[str, List[str]]:
+def extract_requests_exception_details(exc: RequestException) -> tuple[str, list[str]]:
     from requests.exceptions import SSLError, ConnectionError, ChunkedEncodingError
 
     if isinstance(exc, SSLError):

@@ -2,7 +2,7 @@ from __future__ import annotations
 import threading
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Any, FrozenSet, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 from .constants import NOT_SET
@@ -87,26 +87,26 @@ class Config:
     :param str replacement: The replacement string for sanitized values.
     """
 
-    keys_to_sanitize: FrozenSet[str] = DEFAULT_KEYS_TO_SANITIZE
-    sensitive_markers: FrozenSet[str] = DEFAULT_SENSITIVE_MARKERS
+    keys_to_sanitize: frozenset[str] = DEFAULT_KEYS_TO_SANITIZE
+    sensitive_markers: frozenset[str] = DEFAULT_SENSITIVE_MARKERS
     replacement: str = DEFAULT_REPLACEMENT
 
-    def with_keys_to_sanitize(self, *keys: str) -> "Config":
+    def with_keys_to_sanitize(self, *keys: str) -> Config:
         """Create a new configuration with additional keys to sanitize."""
         new_keys_to_sanitize = self.keys_to_sanitize.union([key.lower() for key in keys])
         return replace(self, keys_to_sanitize=frozenset(new_keys_to_sanitize))
 
-    def without_keys_to_sanitize(self, *keys: str) -> "Config":
+    def without_keys_to_sanitize(self, *keys: str) -> Config:
         """Create a new configuration without certain keys to sanitize."""
         new_keys_to_sanitize = self.keys_to_sanitize.difference([key.lower() for key in keys])
         return replace(self, keys_to_sanitize=frozenset(new_keys_to_sanitize))
 
-    def with_sensitive_markers(self, *markers: str) -> "Config":
+    def with_sensitive_markers(self, *markers: str) -> Config:
         """Create a new configuration with additional sensitive markers."""
         new_sensitive_markers = self.sensitive_markers.union([key.lower() for key in markers])
         return replace(self, sensitive_markers=frozenset(new_sensitive_markers))
 
-    def without_sensitive_markers(self, *markers: str) -> "Config":
+    def without_sensitive_markers(self, *markers: str) -> Config:
         """Create a new configuration without certain sensitive markers."""
         new_sensitive_markers = self.sensitive_markers.difference([key.lower() for key in markers])
         return replace(self, sensitive_markers=frozenset(new_sensitive_markers))
@@ -126,7 +126,7 @@ def configure(config: Config) -> None:
     _thread_local.default_sanitization_config = config
 
 
-def sanitize_value(item: Any, *, config: Optional[Config] = None) -> None:
+def sanitize_value(item: Any, *, config: Config | None = None) -> None:
     """Sanitize sensitive values within a given item.
 
     This function is recursive and will sanitize sensitive data within nested
@@ -150,7 +150,7 @@ def sanitize_value(item: Any, *, config: Optional[Config] = None) -> None:
                 sanitize_value(value, config=config)
 
 
-def sanitize_case(case: "Case", *, config: Optional[Config] = None) -> None:
+def sanitize_case(case: Case, *, config: Config | None = None) -> None:
     """Sanitize sensitive values within a given case."""
     if case.path_parameters is not None:
         sanitize_value(case.path_parameters, config=config)
@@ -166,21 +166,21 @@ def sanitize_case(case: "Case", *, config: Optional[Config] = None) -> None:
         sanitize_history(case.source, config=config)
 
 
-def sanitize_history(source: "CaseSource", *, config: Optional[Config] = None) -> None:
+def sanitize_history(source: CaseSource, *, config: Config | None = None) -> None:
     """Recursively sanitize history of case/response pairs."""
-    current: Optional["CaseSource"] = source
+    current: CaseSource | None = source
     while current is not None:
         sanitize_case(current.case, config=config)
         sanitize_response(current.response, config=config)
         current = current.case.source
 
 
-def sanitize_response(response: "GenericResponse", *, config: Optional[Config] = None) -> None:
+def sanitize_response(response: GenericResponse, *, config: Config | None = None) -> None:
     # Sanitize headers
     sanitize_value(response.headers, config=config)
 
 
-def sanitize_request(request: Union[PreparedRequest, "Request"], *, config: Optional[Config] = None) -> None:
+def sanitize_request(request: PreparedRequest | Request, *, config: Config | None = None) -> None:
     from requests import PreparedRequest
 
     if isinstance(request, PreparedRequest) and request.url:
@@ -192,16 +192,14 @@ def sanitize_request(request: Union[PreparedRequest, "Request"], *, config: Opti
     sanitize_value(request.headers, config=config)
 
 
-def sanitize_output(
-    case: "Case", response: Optional["GenericResponse"] = None, *, config: Optional[Config] = None
-) -> None:
+def sanitize_output(case: Case, response: GenericResponse | None = None, *, config: Config | None = None) -> None:
     sanitize_case(case, config=config)
     if response is not None:
         sanitize_response(response, config=config)
         sanitize_request(response.request, config=config)
 
 
-def sanitize_url(url: str, *, config: Optional[Config] = None) -> str:
+def sanitize_url(url: str, *, config: Config | None = None) -> str:
     """Sanitize sensitive parts of a given URL.
 
     This function will sanitize the authority and query parameters in the URL.
@@ -226,7 +224,7 @@ def sanitize_url(url: str, *, config: Optional[Config] = None) -> str:
     return urlunsplit(sanitized_url_parts)
 
 
-def sanitize_serialized_check(check: "SerializedCheck", *, config: Optional[Config] = None) -> None:
+def sanitize_serialized_check(check: SerializedCheck, *, config: Config | None = None) -> None:
     sanitize_request(check.request, config=config)
     response = check.response
     if response:
@@ -237,13 +235,13 @@ def sanitize_serialized_check(check: "SerializedCheck", *, config: Optional[Conf
         sanitize_value(entry.response.headers, config=config)
 
 
-def sanitize_serialized_case(case: "SerializedCase", *, config: Optional[Config] = None) -> None:
+def sanitize_serialized_case(case: SerializedCase, *, config: Config | None = None) -> None:
     for value in (case.path_parameters, case.headers, case.cookies, case.query, case.extra_headers):
         if value is not None:
             sanitize_value(value, config=config)
 
 
-def sanitize_serialized_interaction(interaction: "SerializedInteraction", *, config: Optional[Config] = None) -> None:
+def sanitize_serialized_interaction(interaction: SerializedInteraction, *, config: Config | None = None) -> None:
     sanitize_request(interaction.request, config=config)
     sanitize_value(interaction.response.headers, config=config)
     for check in interaction.checks:

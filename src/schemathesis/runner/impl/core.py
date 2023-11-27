@@ -8,7 +8,7 @@ import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from types import TracebackType
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Type, Union, cast, TYPE_CHECKING
+from typing import Any, Callable, Generator, Iterable, cast, TYPE_CHECKING, Literal
 from warnings import WarningMessage, catch_warnings
 
 import hypothesis
@@ -61,25 +61,25 @@ def _should_count_towards_stop(event: events.ExecutionEvent) -> bool:
 class BaseRunner:
     schema: BaseSchema
     checks: Iterable[CheckFunction]
-    max_response_time: Optional[int]
+    max_response_time: int | None
     targets: Iterable[Target]
     hypothesis_settings: hypothesis.settings
-    auth: Optional[RawAuth] = None
-    auth_type: Optional[str] = None
-    headers: Optional[Dict[str, Any]] = None
-    request_timeout: Optional[int] = None
+    auth: RawAuth | None = None
+    auth_type: str | None = None
+    headers: dict[str, Any] | None = None
+    request_timeout: int | None = None
     store_interactions: bool = False
-    seed: Optional[int] = None
+    seed: int | None = None
     exit_first: bool = False
-    max_failures: Optional[int] = None
+    max_failures: int | None = None
     started_at: str = field(default_factory=current_datetime)
     dry_run: bool = False
-    stateful: Optional[Stateful] = None
+    stateful: Stateful | None = None
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT
     count_operations: bool = True
     _failures_counter: int = 0
 
-    def execute(self) -> "EventStream":
+    def execute(self) -> EventStream:
         """Common logic for all runners."""
         event = threading.Event()
         return EventStream(self._generate_events(event), event)
@@ -108,8 +108,7 @@ class BaseRunner:
             return
 
         try:
-            for event in self._execute(results, stop_event):
-                yield event
+            yield from self._execute(results, stop_event)
         except KeyboardInterrupt:
             yield events.Interrupted()
 
@@ -134,10 +133,10 @@ class BaseRunner:
         maker: Callable,
         template: Callable,
         settings: hypothesis.settings,
-        seed: Optional[int],
+        seed: int | None,
         results: TestResultSet,
         recursion_level: int = 0,
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Generator[events.ExecutionEvent, None, None]:
         """Run tests and recursively run additional tests."""
@@ -233,7 +232,7 @@ def handle_schema_error(
     data_generation_methods: Iterable[DataGenerationMethod],
     recursion_level: int,
     *,
-    before_execution_correlation_id: Optional[str] = None,
+    before_execution_correlation_id: str | None = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     if error.method is not None:
         assert error.path is not None
@@ -288,7 +287,7 @@ def run_test(
     data_generation_methods: Iterable[DataGenerationMethod],
     targets: Iterable[Target],
     results: TestResultSet,
-    headers: Optional[Dict[str, Any]],
+    headers: dict[str, Any] | None,
     recursion_level: int,
     **kwargs: Any,
 ) -> Generator[events.ExecutionEvent, None, None]:
@@ -308,8 +307,8 @@ def run_test(
         data_generation_method=data_generation_methods,
         correlation_id=correlation_id,
     )
-    hypothesis_output: List[str] = []
-    errors: List[Exception] = []
+    hypothesis_output: list[str] = []
+    errors: list[Exception] = []
     test_start_time = time.monotonic()
     setup_hypothesis_database_key(test, operation)
     try:
@@ -456,7 +455,7 @@ def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> No
     test.hypothesis.inner_test._hypothesis_internal_add_digest = extra  # type: ignore
 
 
-def get_invalid_regular_expression_message(warnings: List[WarningMessage]) -> Optional[str]:
+def get_invalid_regular_expression_message(warnings: list[WarningMessage]) -> str | None:
     for warning in warnings:
         message = str(warning.message)
         if "is not valid syntax for a Python regular expression" in message:
@@ -477,7 +476,7 @@ def reraise(operation: APIOperation) -> OperationSchemaError:
 MEMORY_ADDRESS_RE = re.compile("0x[0-9a-fA-F]+")
 
 
-def deduplicate_errors(errors: List[Exception]) -> Generator[Exception, None, None]:
+def deduplicate_errors(errors: list[Exception]) -> Generator[Exception, None, None]:
     """Deduplicate errors by their messages + tracebacks."""
     seen = set()
     for error in errors:
@@ -494,11 +493,11 @@ def run_checks(
     *,
     case: Case,
     checks: Iterable[CheckFunction],
-    check_results: List[Check],
+    check_results: list[Check],
     result: TestResult,
     response: GenericResponse,
     elapsed_time: float,
-    max_response_time: Optional[int] = None,
+    max_response_time: int | None = None,
 ) -> None:
     errors = []
 
@@ -577,16 +576,14 @@ class ErrorCollector:
     function signatures, which are used by Hypothesis.
     """
 
-    errors: List[Exception]
+    errors: list[Exception]
 
-    def __enter__(self) -> "ErrorCollector":
+    def __enter__(self) -> ErrorCollector:
         return self
 
-    # Typing: The return type suggested by mypy is `Literal[False]`, but I don't want to introduce dependency on the
-    # `typing_extensions` package for Python 3.7
     def __exit__(
-        self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]
-    ) -> Any:
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
+    ) -> Literal[False]:
         # Don't do anything special if:
         #   - Tests are successful
         #   - Checks failed
@@ -602,7 +599,7 @@ class ErrorCollector:
         raise NonCheckError from None
 
 
-def _force_data_generation_method(values: List[DataGenerationMethod], case: Case) -> None:
+def _force_data_generation_method(values: list[DataGenerationMethod], case: Case) -> None:
     # Set data generation method to the one that actually used
     data_generation_method = cast(DataGenerationMethod, case.data_generation_method)
     values[:] = [data_generation_method]
@@ -614,16 +611,16 @@ def network_test(
     targets: Iterable[Target],
     result: TestResult,
     session: requests.Session,
-    request_timeout: Optional[int],
+    request_timeout: int | None,
     request_tls_verify: bool,
-    request_cert: Optional[RequestCert],
+    request_cert: RequestCert | None,
     store_interactions: bool,
-    headers: Optional[Dict[str, Any]],
+    headers: dict[str, Any] | None,
     feedback: Feedback,
-    max_response_time: Optional[int],
-    data_generation_methods: List[DataGenerationMethod],
+    max_response_time: int | None,
+    data_generation_methods: list[DataGenerationMethod],
     dry_run: bool,
-    errors: List[Exception],
+    errors: list[Exception],
 ) -> None:
     """A single test body will be executed against the target."""
     with ErrorCollector(errors):
@@ -657,18 +654,18 @@ def _network_test(
     targets: Iterable[Target],
     result: TestResult,
     session: requests.Session,
-    timeout: Optional[float],
+    timeout: float | None,
     store_interactions: bool,
-    headers: Optional[Dict[str, Any]],
+    headers: dict[str, Any] | None,
     feedback: Feedback,
     request_tls_verify: bool,
-    request_cert: Optional[RequestCert],
-    max_response_time: Optional[int],
+    request_cert: RequestCert | None,
+    max_response_time: int | None,
 ) -> requests.Response:
-    check_results: List[Check] = []
+    check_results: list[Check] = []
     try:
         hook_context = HookContext(operation=case.operation)
-        kwargs: Dict[str, Any] = {
+        kwargs: dict[str, Any] = {
             "session": session,
             "headers": headers,
             "timeout": timeout,
@@ -711,16 +708,16 @@ def _network_test(
 
 
 @contextmanager
-def get_session(auth: Optional[Union[HTTPDigestAuth, RawAuth]] = None) -> Generator[requests.Session, None, None]:
+def get_session(auth: HTTPDigestAuth | RawAuth | None = None) -> Generator[requests.Session, None, None]:
     with requests.Session() as session:
         if auth is not None:
             session.auth = auth
         yield session
 
 
-def prepare_timeout(timeout: Optional[int]) -> Optional[float]:
+def prepare_timeout(timeout: int | None) -> float | None:
     """Request timeout is in milliseconds, but `requests` uses seconds."""
-    output: Optional[Union[int, float]] = timeout
+    output: int | float | None = timeout
     if timeout is not None:
         output = timeout / 1000
     return output
@@ -731,15 +728,15 @@ def wsgi_test(
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
     result: TestResult,
-    auth: Optional[RawAuth],
-    auth_type: Optional[str],
-    headers: Optional[Dict[str, Any]],
+    auth: RawAuth | None,
+    auth_type: str | None,
+    headers: dict[str, Any] | None,
     store_interactions: bool,
     feedback: Feedback,
-    max_response_time: Optional[int],
-    data_generation_methods: List[DataGenerationMethod],
+    max_response_time: int | None,
+    data_generation_methods: list[DataGenerationMethod],
     dry_run: bool,
-    errors: List[Exception],
+    errors: list[Exception],
 ) -> None:
     with ErrorCollector(errors):
         _force_data_generation_method(data_generation_methods, case)
@@ -764,10 +761,10 @@ def _wsgi_test(
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
     result: TestResult,
-    headers: Dict[str, Any],
+    headers: dict[str, Any],
     store_interactions: bool,
     feedback: Feedback,
-    max_response_time: Optional[int],
+    max_response_time: int | None,
 ) -> WSGIResponse:
     with catching_logs(LogCaptureHandler(), level=logging.DEBUG) as recorded:
         start = time.monotonic()
@@ -780,7 +777,7 @@ def _wsgi_test(
     run_targets(targets, context)
     result.logs.extend(recorded.records)
     status = Status.success
-    check_results: List[Check] = []
+    check_results: list[Check] = []
     try:
         run_checks(
             case=case,
@@ -802,8 +799,8 @@ def _wsgi_test(
 
 
 def _prepare_wsgi_headers(
-    headers: Optional[Dict[str, Any]], auth: Optional[RawAuth], auth_type: Optional[str]
-) -> Dict[str, Any]:
+    headers: dict[str, Any] | None, auth: RawAuth | None, auth_type: str | None
+) -> dict[str, Any]:
     headers = headers or {}
     if "user-agent" not in {header.lower() for header in headers}:
         headers["User-Agent"] = USER_AGENT
@@ -813,7 +810,7 @@ def _prepare_wsgi_headers(
     return headers
 
 
-def get_wsgi_auth(auth: Optional[RawAuth], auth_type: Optional[str]) -> Optional[str]:
+def get_wsgi_auth(auth: RawAuth | None, auth_type: str | None) -> str | None:
     if auth:
         if auth_type == "digest":
             raise ValueError("Digest auth is not supported for WSGI apps")
@@ -827,12 +824,12 @@ def asgi_test(
     targets: Iterable[Target],
     result: TestResult,
     store_interactions: bool,
-    headers: Optional[Dict[str, Any]],
+    headers: dict[str, Any] | None,
     feedback: Feedback,
-    max_response_time: Optional[int],
-    data_generation_methods: List[DataGenerationMethod],
+    max_response_time: int | None,
+    data_generation_methods: list[DataGenerationMethod],
     dry_run: bool,
-    errors: List[Exception],
+    errors: list[Exception],
 ) -> None:
     """A single test body will be executed against the target."""
     with ErrorCollector(errors):
@@ -860,18 +857,18 @@ def _asgi_test(
     targets: Iterable[Target],
     result: TestResult,
     store_interactions: bool,
-    headers: Optional[Dict[str, Any]],
+    headers: dict[str, Any] | None,
     feedback: Feedback,
-    max_response_time: Optional[int],
+    max_response_time: int | None,
 ) -> requests.Response:
     hook_context = HookContext(operation=case.operation)
-    kwargs: Dict[str, Any] = {"headers": headers}
+    kwargs: dict[str, Any] = {"headers": headers}
     hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
     response = case.call_asgi(**kwargs)
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
     status = Status.success
-    check_results: List[Check] = []
+    check_results: list[Check] = []
     try:
         run_checks(
             case=case,

@@ -5,9 +5,16 @@ import threading
 import time
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Generic, List, Optional, Type, TypeVar, Union, overload
-
-from typing_extensions import Protocol, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Generic,
+    TypeVar,
+    overload,
+    runtime_checkable,
+    Protocol,
+)
 
 from .exceptions import UsageError
 from .filters import FilterSet, FilterValue, MatcherFunc, attach_filter_chain
@@ -30,15 +37,15 @@ class AuthContext:
     :ivar app: Optional Python application if the WSGI / ASGI integration is used.
     """
 
-    operation: "APIOperation"
-    app: Optional[Any]
+    operation: APIOperation
+    app: Any | None
 
 
 @runtime_checkable
 class AuthProvider(Generic[Auth], Protocol):
     """Get authentication data for an API and set it on the generated test cases."""
 
-    def get(self, case: "Case", context: AuthContext) -> Optional[Auth]:
+    def get(self, case: Case, context: AuthContext) -> Auth | None:
         """Get the authentication data.
 
         :param Case case: Generated test case.
@@ -46,7 +53,7 @@ class AuthProvider(Generic[Auth], Protocol):
         :return: Any authentication data you find useful for your use case. For example, it could be an access token.
         """
 
-    def set(self, case: "Case", data: Auth, context: AuthContext) -> None:
+    def set(self, case: Case, data: Auth, context: AuthContext) -> None:
         """Set authentication data on a generated test case.
 
         :param Optional[Auth] data: Authentication data you got from the ``get`` method.
@@ -69,10 +76,10 @@ class RequestsAuth(Generic[Auth]):
 
     auth: requests.auth.AuthBase
 
-    def get(self, _: "Case", __: AuthContext) -> Optional[Auth]:
+    def get(self, _: Case, __: AuthContext) -> Auth | None:
         return self.auth  # type: ignore[return-value]
 
-    def set(self, case: "Case", _: Auth, __: AuthContext) -> None:
+    def set(self, case: Case, _: Auth, __: AuthContext) -> None:
         case._auth = self.auth
 
 
@@ -82,12 +89,12 @@ class CachingAuthProvider(Generic[Auth]):
 
     provider: AuthProvider
     refresh_interval: int = DEFAULT_REFRESH_INTERVAL
-    cache_entry: Optional[CacheEntry[Auth]] = None
+    cache_entry: CacheEntry[Auth] | None = None
     # The timer exists here to simplify testing
     timer: Callable[[], float] = time.monotonic
     _refresh_lock: threading.Lock = field(default_factory=threading.Lock)
 
-    def get(self, case: "Case", context: AuthContext) -> Optional[Auth]:
+    def get(self, case: Case, context: AuthContext) -> Auth | None:
         """Get cached auth value."""
         if self.cache_entry is None or self.timer() >= self.cache_entry.expires:
             with self._refresh_lock:
@@ -100,7 +107,7 @@ class CachingAuthProvider(Generic[Auth]):
                 return data
         return self.cache_entry.data
 
-    def set(self, case: "Case", data: Auth, context: AuthContext) -> None:
+    def set(self, case: Case, data: Auth, context: AuthContext) -> None:
         """Set auth data on the `Case` instance.
 
         This implementation delegates this to the actual provider.
@@ -111,33 +118,33 @@ class CachingAuthProvider(Generic[Auth]):
 class FilterableRegisterAuth(Protocol):
     """Protocol that adds filters to the return value of `register`."""
 
-    def __call__(self, provider_class: Type[AuthProvider]) -> Type[AuthProvider]:
+    def __call__(self, provider_class: type[AuthProvider]) -> type[AuthProvider]:
         pass
 
     def apply_to(
         self,
-        func: Optional[MatcherFunc] = None,
+        func: MatcherFunc | None = None,
         *,
-        name: Optional[FilterValue] = None,
-        name_regex: Optional[str] = None,
-        method: Optional[FilterValue] = None,
-        method_regex: Optional[str] = None,
-        path: Optional[FilterValue] = None,
-        path_regex: Optional[str] = None,
-    ) -> "FilterableRegisterAuth":
+        name: FilterValue | None = None,
+        name_regex: str | None = None,
+        method: FilterValue | None = None,
+        method_regex: str | None = None,
+        path: FilterValue | None = None,
+        path_regex: str | None = None,
+    ) -> FilterableRegisterAuth:
         pass
 
     def skip_for(
         self,
-        func: Optional[MatcherFunc] = None,
+        func: MatcherFunc | None = None,
         *,
-        name: Optional[FilterValue] = None,
-        name_regex: Optional[str] = None,
-        method: Optional[FilterValue] = None,
-        method_regex: Optional[str] = None,
-        path: Optional[FilterValue] = None,
-        path_regex: Optional[str] = None,
-    ) -> "FilterableRegisterAuth":
+        name: FilterValue | None = None,
+        name_regex: str | None = None,
+        method: FilterValue | None = None,
+        method_regex: str | None = None,
+        path: FilterValue | None = None,
+        path_regex: str | None = None,
+    ) -> FilterableRegisterAuth:
         pass
 
 
@@ -149,28 +156,28 @@ class FilterableApplyAuth(Protocol):
 
     def apply_to(
         self,
-        func: Optional[MatcherFunc] = None,
+        func: MatcherFunc | None = None,
         *,
-        name: Optional[FilterValue] = None,
-        name_regex: Optional[str] = None,
-        method: Optional[FilterValue] = None,
-        method_regex: Optional[str] = None,
-        path: Optional[FilterValue] = None,
-        path_regex: Optional[str] = None,
-    ) -> "FilterableApplyAuth":
+        name: FilterValue | None = None,
+        name_regex: str | None = None,
+        method: FilterValue | None = None,
+        method_regex: str | None = None,
+        path: FilterValue | None = None,
+        path_regex: str | None = None,
+    ) -> FilterableApplyAuth:
         pass
 
     def skip_for(
         self,
-        func: Optional[MatcherFunc] = None,
+        func: MatcherFunc | None = None,
         *,
-        name: Optional[FilterValue] = None,
-        name_regex: Optional[str] = None,
-        method: Optional[FilterValue] = None,
-        method_regex: Optional[str] = None,
-        path: Optional[FilterValue] = None,
-        path_regex: Optional[str] = None,
-    ) -> "FilterableApplyAuth":
+        name: FilterValue | None = None,
+        name_regex: str | None = None,
+        method: FilterValue | None = None,
+        method_regex: str | None = None,
+        path: FilterValue | None = None,
+        path_regex: str | None = None,
+    ) -> FilterableApplyAuth:
         pass
 
 
@@ -179,28 +186,28 @@ class FilterableRequestsAuth(Protocol):
 
     def apply_to(
         self,
-        func: Optional[MatcherFunc] = None,
+        func: MatcherFunc | None = None,
         *,
-        name: Optional[FilterValue] = None,
-        name_regex: Optional[str] = None,
-        method: Optional[FilterValue] = None,
-        method_regex: Optional[str] = None,
-        path: Optional[FilterValue] = None,
-        path_regex: Optional[str] = None,
-    ) -> "FilterableRequestsAuth":
+        name: FilterValue | None = None,
+        name_regex: str | None = None,
+        method: FilterValue | None = None,
+        method_regex: str | None = None,
+        path: FilterValue | None = None,
+        path_regex: str | None = None,
+    ) -> FilterableRequestsAuth:
         pass
 
     def skip_for(
         self,
-        func: Optional[MatcherFunc] = None,
+        func: MatcherFunc | None = None,
         *,
-        name: Optional[FilterValue] = None,
-        name_regex: Optional[str] = None,
-        method: Optional[FilterValue] = None,
-        method_regex: Optional[str] = None,
-        path: Optional[FilterValue] = None,
-        path_regex: Optional[str] = None,
-    ) -> "FilterableRequestsAuth":
+        name: FilterValue | None = None,
+        name_regex: str | None = None,
+        method: FilterValue | None = None,
+        method_regex: str | None = None,
+        path: FilterValue | None = None,
+        path_regex: str | None = None,
+    ) -> FilterableRequestsAuth:
         pass
 
 
@@ -211,12 +218,12 @@ class SelectiveAuthProvider(Generic[Auth]):
     provider: AuthProvider
     filter_set: FilterSet
 
-    def get(self, case: "Case", context: AuthContext) -> Optional[Auth]:
+    def get(self, case: Case, context: AuthContext) -> Auth | None:
         if self.filter_set.match(context):
             return _provider_get(self.provider, case, context)
         return None
 
-    def set(self, case: "Case", data: Auth, context: AuthContext) -> None:
+    def set(self, case: Case, data: Auth, context: AuthContext) -> None:
         self.provider.set(case, data, context)
 
 
@@ -224,7 +231,7 @@ class SelectiveAuthProvider(Generic[Auth]):
 class AuthStorage(Generic[Auth]):
     """Store and manage API authentication."""
 
-    providers: List[AuthProvider] = field(default_factory=list)
+    providers: list[AuthProvider] = field(default_factory=list)
 
     @property
     def is_defined(self) -> bool:
@@ -235,25 +242,25 @@ class AuthStorage(Generic[Auth]):
     def __call__(
         self,
         *,
-        refresh_interval: Optional[int] = DEFAULT_REFRESH_INTERVAL,
+        refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
     ) -> FilterableRegisterAuth:
         pass
 
     @overload
     def __call__(
         self,
-        provider_class: Type[AuthProvider],
+        provider_class: type[AuthProvider],
         *,
-        refresh_interval: Optional[int] = DEFAULT_REFRESH_INTERVAL,
+        refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
     ) -> FilterableApplyAuth:
         pass
 
     def __call__(
         self,
-        provider_class: Optional[Type[AuthProvider]] = None,
+        provider_class: type[AuthProvider] | None = None,
         *,
-        refresh_interval: Optional[int] = DEFAULT_REFRESH_INTERVAL,
-    ) -> Union[FilterableRegisterAuth, FilterableApplyAuth]:
+        refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
+    ) -> FilterableRegisterAuth | FilterableApplyAuth:
         if provider_class is not None:
             return self.apply(provider_class, refresh_interval=refresh_interval)
         return self.register(refresh_interval=refresh_interval)
@@ -274,8 +281,8 @@ class AuthStorage(Generic[Auth]):
     def _set_provider(
         self,
         *,
-        provider_class: Type[AuthProvider],
-        refresh_interval: Optional[int] = DEFAULT_REFRESH_INTERVAL,
+        provider_class: type[AuthProvider],
+        refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
         filter_set: FilterSet,
     ) -> None:
         if not issubclass(provider_class, AuthProvider):
@@ -294,7 +301,7 @@ class AuthStorage(Generic[Auth]):
             provider = SelectiveAuthProvider(provider, filter_set)
         self.providers.append(provider)
 
-    def register(self, *, refresh_interval: Optional[int] = DEFAULT_REFRESH_INTERVAL) -> FilterableRegisterAuth:
+    def register(self, *, refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL) -> FilterableRegisterAuth:
         """Register a new auth provider.
 
         .. code-block:: python
@@ -315,7 +322,7 @@ class AuthStorage(Generic[Auth]):
         """
         filter_set = FilterSet()
 
-        def wrapper(provider_class: Type[AuthProvider]) -> Type[AuthProvider]:
+        def wrapper(provider_class: type[AuthProvider]) -> type[AuthProvider]:
             self._set_provider(provider_class=provider_class, refresh_interval=refresh_interval, filter_set=filter_set)
             return provider_class
 
@@ -332,7 +339,7 @@ class AuthStorage(Generic[Auth]):
         self.providers = []
 
     def apply(
-        self, provider_class: Type[AuthProvider], *, refresh_interval: Optional[int] = DEFAULT_REFRESH_INTERVAL
+        self, provider_class: type[AuthProvider], *, refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL
     ) -> FilterableApplyAuth:
         """Register auth provider only on one test function.
 
@@ -366,7 +373,7 @@ class AuthStorage(Generic[Auth]):
         return wrapper  # type: ignore[return-value]
 
     @classmethod
-    def add_auth_storage(cls, test: GenericTest) -> "AuthStorage":
+    def add_auth_storage(cls, test: GenericTest) -> AuthStorage:
         """Attach a new auth storage instance to the test if it is not already present."""
         if not hasattr(test, AUTH_STORAGE_ATTRIBUTE_NAME):
             setattr(test, AUTH_STORAGE_ATTRIBUTE_NAME, cls())
@@ -374,18 +381,18 @@ class AuthStorage(Generic[Auth]):
             raise UsageError(f"`{test.__name__}` has already been decorated with `apply`.")
         return getattr(test, AUTH_STORAGE_ATTRIBUTE_NAME)
 
-    def set(self, case: "Case", context: AuthContext) -> None:
+    def set(self, case: Case, context: AuthContext) -> None:
         """Set authentication data on a generated test case."""
         if not self.is_defined:
             raise UsageError("No auth provider is defined.")
         for provider in self.providers:
-            data: Optional[Auth] = _provider_get(provider, case, context)
+            data: Auth | None = _provider_get(provider, case, context)
             if data is not None:
                 provider.set(case, data, context)
                 break
 
 
-def _provider_get(auth_provider: AuthProvider, case: "Case", context: AuthContext) -> Optional[Auth]:
+def _provider_get(auth_provider: AuthProvider, case: Case, context: AuthContext) -> Auth | None:
     # A shim to provide a compatibility layer between previously used convention for `AuthProvider.get`
     # where it used to accept a single `context` argument
     method = auth_provider.get
@@ -404,7 +411,7 @@ def _provider_get(auth_provider: AuthProvider, case: "Case", context: AuthContex
     return method(case, context)
 
 
-def set_on_case(case: "Case", context: AuthContext, auth_storage: Optional[AuthStorage]) -> None:
+def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | None) -> None:
     """Set authentication data on this case.
 
     If there is no auth defined, then this function is no-op.
@@ -417,7 +424,7 @@ def set_on_case(case: "Case", context: AuthContext, auth_storage: Optional[AuthS
         GLOBAL_AUTH_STORAGE.set(case, context)
 
 
-def get_auth_storage_from_test(test: GenericTest) -> Optional[AuthStorage]:
+def get_auth_storage_from_test(test: GenericTest) -> AuthStorage | None:
     """Extract the currently attached auth storage from a test function."""
     return getattr(test, AUTH_STORAGE_ATTRIBUTE_NAME, None)
 

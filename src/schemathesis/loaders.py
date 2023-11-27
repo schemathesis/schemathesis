@@ -2,7 +2,7 @@ from __future__ import annotations
 import re
 import sys
 from functools import lru_cache
-from typing import Callable, TypeVar, cast, TYPE_CHECKING, TextIO, Any, Dict, Type, BinaryIO
+from typing import Callable, TypeVar, cast, TYPE_CHECKING, TextIO, Any, BinaryIO
 
 from .exceptions import SchemaError, SchemaErrorType, extract_requests_exception_details
 
@@ -32,7 +32,7 @@ def load_schema_from_url(loader: Callable[[], R]) -> R:
     return response
 
 
-def _raise_for_status(response: "GenericResponse") -> None:
+def _raise_for_status(response: GenericResponse) -> None:
     from .transports.responses import get_reason
 
     status_code = response.status_code
@@ -63,8 +63,8 @@ def load_app(path: str) -> Any:
     return getattr(module, name)
 
 
-@lru_cache()
-def get_yaml_loader() -> Type[yaml.SafeLoader]:
+@lru_cache
+def get_yaml_loader() -> type[yaml.SafeLoader]:
     """Create a YAML loader, that doesn't parse specific tokens into Python objects."""
     import yaml
 
@@ -73,7 +73,7 @@ def get_yaml_loader() -> Type[yaml.SafeLoader]:
     except ImportError:
         from yaml import SafeLoader  # type: ignore
 
-    cls: Type[yaml.SafeLoader] = type("YAMLLoader", (SafeLoader,), {})
+    cls: type[yaml.SafeLoader] = type("YAMLLoader", (SafeLoader,), {})
     cls.yaml_implicit_resolvers = {
         key: [(tag, regexp) for tag, regexp in mapping if tag != "tag:yaml.org,2002:timestamp"]
         for key, mapping in cls.yaml_implicit_resolvers.copy().items()
@@ -95,7 +95,7 @@ def get_yaml_loader() -> Type[yaml.SafeLoader]:
         list("-+0123456789."),
     )
 
-    def construct_mapping(self: SafeLoader, node: yaml.Node, deep: bool = False) -> Dict[str, Any]:
+    def construct_mapping(self: SafeLoader, node: yaml.Node, deep: bool = False) -> dict[str, Any]:
         if isinstance(node, yaml.MappingNode):
             self.flatten_mapping(node)  # type: ignore
         mapping = {}

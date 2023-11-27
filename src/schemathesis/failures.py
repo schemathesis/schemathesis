@@ -2,7 +2,7 @@ from __future__ import annotations
 import textwrap
 from dataclasses import dataclass
 from json import JSONDecodeError
-from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from jsonschema import ValidationError
@@ -17,7 +17,7 @@ class FailureContext:
     message: str
     type: str
 
-    def unique_by_key(self, check_message: Optional[str]) -> Tuple[str, ...]:
+    def unique_by_key(self, check_message: str | None) -> tuple[str, ...]:
         """A key to distinguish different failure contexts."""
         return (check_message or self.message,)
 
@@ -27,20 +27,20 @@ class ValidationErrorContext(FailureContext):
     """Additional information about JSON Schema validation errors."""
 
     validation_message: str
-    schema_path: List[Union[str, int]]
-    schema: Union[Dict[str, Any], bool]
-    instance_path: List[Union[str, int]]
-    instance: Union[None, bool, float, str, list, Dict[str, Any]]
+    schema_path: list[str | int]
+    schema: dict[str, Any] | bool
+    instance_path: list[str | int]
+    instance: None | bool | float | str | list | dict[str, Any]
     message: str
     title: str = "Response violates schema"
     type: str = "json_schema"
 
-    def unique_by_key(self, check_message: Optional[str]) -> Tuple[str, ...]:
+    def unique_by_key(self, check_message: str | None) -> tuple[str, ...]:
         # Deduplicate by JSON Schema path. All errors that happened on this sub-schema will be deduplicated
         return ("/".join(map(str, self.schema_path)),)
 
     @classmethod
-    def from_exception(cls, exc: "ValidationError") -> "ValidationErrorContext":
+    def from_exception(cls, exc: ValidationError) -> ValidationErrorContext:
         from .exceptions import truncated_json
 
         schema = textwrap.indent(truncated_json(exc.schema, max_lines=20), prefix="    ")
@@ -69,14 +69,14 @@ class JSONDecodeErrorContext(FailureContext):
     title: str = "JSON deserialization error"
     type: str = "json_decode"
 
-    def unique_by_key(self, check_message: Optional[str]) -> Tuple[str, ...]:
+    def unique_by_key(self, check_message: str | None) -> tuple[str, ...]:
         # Treat different JSON decoding failures as the same issue
         # Payloads often contain dynamic data and distinguishing it by the error location still would not be sufficient
         # as it may be different on different dynamic payloads
         return (self.title,)
 
     @classmethod
-    def from_exception(cls, exc: JSONDecodeError) -> "JSONDecodeErrorContext":
+    def from_exception(cls, exc: JSONDecodeError) -> JSONDecodeErrorContext:
         return cls(
             message=str(exc),
             validation_message=exc.msg,
@@ -99,7 +99,7 @@ class ServerError(FailureContext):
 class MissingContentType(FailureContext):
     """Content type header is missing."""
 
-    media_types: List[str]
+    media_types: list[str]
     message: str
     title: str = "Missing Content-Type header"
     type: str = "missing_content_type"
@@ -110,7 +110,7 @@ class UndefinedContentType(FailureContext):
     """Response has Content-Type that is not documented in the schema."""
 
     content_type: str
-    defined_content_types: List[str]
+    defined_content_types: list[str]
     message: str
     title: str = "Undocumented Content-Type"
     type: str = "undefined_content_type"
@@ -123,9 +123,9 @@ class UndefinedStatusCode(FailureContext):
     # Response's status code
     status_code: int
     # Status codes as defined in schema
-    defined_status_codes: List[str]
+    defined_status_codes: list[str]
     # Defined status code with expanded wildcards
-    allowed_status_codes: List[int]
+    allowed_status_codes: list[int]
     message: str
     title: str = "Undocumented HTTP status code"
     type: str = "undefined_status_code"
@@ -135,7 +135,7 @@ class UndefinedStatusCode(FailureContext):
 class MissingHeaders(FailureContext):
     """Some required headers are missing."""
 
-    missing_headers: List[str]
+    missing_headers: list[str]
     message: str
     title: str = "Missing required headers"
     type: str = "missing_headers"
@@ -165,7 +165,7 @@ class ResponseTimeExceeded(FailureContext):
     title: str = "Response time limit exceeded"
     type: str = "response_time_exceeded"
 
-    def unique_by_key(self, check_message: Optional[str]) -> Tuple[str, ...]:
+    def unique_by_key(self, check_message: str | None) -> tuple[str, ...]:
         return (self.title,)
 
 

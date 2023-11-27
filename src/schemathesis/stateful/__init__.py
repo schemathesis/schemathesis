@@ -29,7 +29,7 @@ class ParsedData:
     It is used later to create a new version of an API operation that will reuse this data.
     """
 
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
     body: Any = NOT_SET
 
     def __hash__(self) -> int:
@@ -54,7 +54,7 @@ class StatefulTest:
     def parse(self, case: Case, response: GenericResponse) -> ParsedData:
         raise NotImplementedError
 
-    def make_operation(self, collected: List[ParsedData]) -> APIOperation:
+    def make_operation(self, collected: list[ParsedData]) -> APIOperation:
         raise NotImplementedError
 
 
@@ -63,7 +63,7 @@ class StatefulData:
     """Storage for data that will be used in later tests."""
 
     stateful_test: StatefulTest
-    container: List[ParsedData] = field(default_factory=list)
+    container: list[ParsedData] = field(default_factory=list)
 
     def make_operation(self) -> APIOperation:
         return self.stateful_test.make_operation(self.container)
@@ -81,9 +81,9 @@ class Feedback:
     Provides a way to control runner's behavior from tests.
     """
 
-    stateful: Optional[Stateful]
+    stateful: Stateful | None
     operation: APIOperation = field(repr=False)
-    stateful_tests: Dict[str, StatefulData] = field(default_factory=dict, repr=False)
+    stateful_tests: dict[str, StatefulData] = field(default_factory=dict, repr=False)
 
     def add_test_case(self, case: Case, response: GenericResponse) -> None:
         """Store test data to reuse it in the future additional tests."""
@@ -94,10 +94,10 @@ class Feedback:
     def get_stateful_tests(
         self,
         test: Callable,
-        settings: Optional[hypothesis.settings],
-        seed: Optional[int],
-        as_strategy_kwargs: Optional[Dict[str, Any]],
-    ) -> Generator[Result[Tuple[APIOperation, Callable], OperationSchemaError], None, None]:
+        settings: hypothesis.settings | None,
+        seed: int | None,
+        as_strategy_kwargs: dict[str, Any] | None,
+    ) -> Generator[Result[tuple[APIOperation, Callable], OperationSchemaError], None, None]:
         """Generate additional tests that use data from the previous ones."""
         from .._hypothesis import create_test
 
@@ -115,7 +115,7 @@ class Feedback:
 
 
 def run_state_machine_as_test(
-    state_machine_factory: Type[APIStateMachine], *, settings: Optional[hypothesis.settings] = None
+    state_machine_factory: type[APIStateMachine], *, settings: hypothesis.settings | None = None
 ) -> None:
     """Run a state machine as a test.
 

@@ -1,6 +1,6 @@
 # These schemas are copied from https://github.com/OAI/OpenAPI-Specification/tree/master/schemas
 from __future__ import annotations
-from typing import Any, Dict, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from ..._lazy_import import lazy_import
 
@@ -1919,7 +1919,7 @@ _imports = {
 }
 
 
-def make_validator(schema: Dict[str, Any]) -> Validator:
+def make_validator(schema: dict[str, Any]) -> Validator:
     import jsonschema
 
     return jsonschema.validators.validator_for(schema)(schema)

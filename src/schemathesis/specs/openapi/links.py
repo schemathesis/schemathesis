@@ -5,7 +5,7 @@ Based on https://swagger.io/docs/specification/links/
 from __future__ import annotations
 from dataclasses import dataclass, field
 from difflib import get_close_matches
-from typing import Any, Dict, Generator, List, NoReturn, Optional, Sequence, Tuple, Union, TYPE_CHECKING
+from typing import Any, Generator, NoReturn, Sequence, Union, TYPE_CHECKING
 
 from ...models import APIOperation, Case
 from ...parameters import ParameterSet
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 @dataclass(repr=False)
 class Link(StatefulTest):
     operation: APIOperation
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
     request_body: Any = NOT_SET
 
     def __post_init__(self) -> None:
@@ -38,9 +38,7 @@ class Link(StatefulTest):
             )
 
     @classmethod
-    def from_definition(
-        cls, name: str, definition: Dict[str, Dict[str, Any]], source_operation: APIOperation
-    ) -> "Link":
+    def from_definition(cls, name: str, definition: dict[str, dict[str, Any]], source_operation: APIOperation) -> Link:
         # Links can be behind a reference
         _, definition = source_operation.schema.resolver.resolve_in_scope(  # type: ignore
             definition, source_operation.definition.scope
@@ -73,7 +71,7 @@ class Link(StatefulTest):
             body=expressions.evaluate(self.request_body, context),
         )
 
-    def make_operation(self, collected: List[ParsedData]) -> APIOperation:
+    def make_operation(self, collected: list[ParsedData]) -> APIOperation:
         """Create a modified version of the original API operation with additional data merged in."""
         # We split the gathered data among all locations & store the original parameter
         containers = {
@@ -91,7 +89,7 @@ class Link(StatefulTest):
             if "body" in containers["body"] and item.body is not NOT_SET:
                 containers["body"]["body"]["options"].append(item.body)
         # These are the final `path_parameters`, `query`, and other API operation components
-        components: Dict[str, ParameterSet] = {
+        components: dict[str, ParameterSet] = {
             container_name: getattr(self.operation, container_name).__class__()
             for location, container_name in LOCATION_TO_CONTAINER.items()
         }
@@ -123,9 +121,9 @@ class Link(StatefulTest):
                     components[LOCATION_TO_CONTAINER[location]].add(parameter)
         return self.operation.clone(**components)
 
-    def _get_container_by_parameter_name(self, full_name: str, templates: Dict[str, Dict[str, Dict[str, Any]]]) -> List:
+    def _get_container_by_parameter_name(self, full_name: str, templates: dict[str, dict[str, dict[str, Any]]]) -> list:
         """Detect in what request part the parameters is defined."""
-        location: Optional[str]
+        location: str | None
         try:
             # The parameter name is prefixed with its location. Example: `path.id`
             location, name = full_name.split(".")
@@ -174,10 +172,10 @@ class OpenAPILink(Direction):
 
     name: str
     status_code: str
-    definition: Dict[str, Any]
+    definition: dict[str, Any]
     operation: APIOperation
-    parameters: List[Tuple[Optional[str], str, str]] = field(init=False)
-    body: Union[Dict[str, Any], NotSet] = field(init=False)
+    parameters: list[tuple[str | None, str, str]] = field(init=False)
+    body: dict[str, Any] | NotSet = field(init=False)
 
     def __post_init__(self) -> None:
         self.parameters = [
@@ -218,7 +216,7 @@ class OpenAPILink(Direction):
         return self.operation.schema.get_operation_by_reference(self.definition["operationRef"])  # type: ignore
 
 
-def get_container(case: Case, location: Optional[str], name: str) -> Optional[Dict[str, Any]]:
+def get_container(case: Case, location: str | None, name: str) -> dict[str, Any] | None:
     """Get a container that suppose to store the given parameter."""
     if location:
         container_name = LOCATION_TO_CONTAINER[location]
@@ -232,7 +230,7 @@ def get_container(case: Case, location: Optional[str], name: str) -> Optional[Di
     return getattr(case, container_name)
 
 
-def normalize_parameter(parameter: str, expression: str) -> Tuple[Optional[str], str, str]:
+def normalize_parameter(parameter: str, expression: str) -> tuple[str | None, str, str]:
     """Normalize runtime expressions.
 
     Runtime expressions may have parameter names prefixed with their location - `path.id`.
@@ -247,7 +245,7 @@ def normalize_parameter(parameter: str, expression: str) -> Tuple[Optional[str],
         return None, parameter, expression
 
 
-def get_all_links(operation: APIOperation) -> Generator[Tuple[str, OpenAPILink], None, None]:
+def get_all_links(operation: APIOperation) -> Generator[tuple[str, OpenAPILink], None, None]:
     for status_code, definition in operation.definition.resolved["responses"].items():
         for name, link_definition in definition.get(operation.schema.links_field, {}).items():  # type: ignore
             yield status_code, OpenAPILink(name, status_code, link_definition, operation)
@@ -256,7 +254,7 @@ def get_all_links(operation: APIOperation) -> Generator[Tuple[str, OpenAPILink],
 StatusCode = Union[str, int]
 
 
-def _get_response_by_status_code(responses: Dict[StatusCode, Dict[str, Any]], status_code: Union[str, int]) -> Dict:
+def _get_response_by_status_code(responses: dict[StatusCode, dict[str, Any]], status_code: str | int) -> dict:
     if isinstance(status_code, int):
         # Invalid schemas may contain status codes as integers
         if status_code in responses:
@@ -275,17 +273,17 @@ def _get_response_by_status_code(responses: Dict[StatusCode, Dict[str, Any]], st
 
 
 def add_link(
-    responses: Dict[StatusCode, Dict[str, Any]],
+    responses: dict[StatusCode, dict[str, Any]],
     links_field: str,
-    parameters: Optional[Dict[str, str]],
+    parameters: dict[str, str] | None,
     request_body: Any,
     status_code: StatusCode,
-    target: Union[str, APIOperation],
-    name: Optional[str] = None,
+    target: str | APIOperation,
+    name: str | None = None,
 ) -> None:
     response = _get_response_by_status_code(responses, status_code)
     links_definition = response.setdefault(links_field, {})
-    new_link: Dict[str, Union[str, Dict[str, str]]] = {}
+    new_link: dict[str, str | dict[str, str]] = {}
     if parameters is not None:
         new_link["parameters"] = parameters
     if request_body is not None:
