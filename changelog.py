@@ -25,9 +25,17 @@ def bump(new_version: str) -> None:
     changelog = _read_changelog()
 
     # Find the position of the "Unreleased" block
-    unreleased_idx = _find_line_by_prefix(changelog, "`Unreleased`_ -")
+    unreleased_idx = _find_line_by_prefix(changelog, ":version:`Unreleased")
     if unreleased_idx is None:
         raise RuntimeError("Changelog has no `Unreleased` section")
+
+    # Extract the old version
+    old_version = changelog[unreleased_idx].split("<")[1].split("...")[0][1:]
+
+    # Replace it with the new version
+    unreleased_line = f":version:`Unreleased <v{new_version}...HEAD>` - TBD"
+    changelog[unreleased_idx] = f"{unreleased_line}\n"
+    changelog[unreleased_idx + 1] = "-" * len(unreleased_line) + "\n"
 
     # Place to insert the new release block
     new_version_idx = unreleased_idx + 3
@@ -35,25 +43,11 @@ def bump(new_version: str) -> None:
     if changelog[new_version_idx].startswith(".. _v"):
         raise RuntimeError("New version has no changes")
 
-    # Insert the new release block before the "Unreleased" block
+    # Insert the new release block after the "Unreleased" block
     new_version_link = f".. _v{new_version}:\n\n"
-    new_version_line = f"`{new_version}`_ - {today}"
+    new_version_line = f":version:`{new_version} <v{old_version}...v{new_version}>` - {today}"
     new_version_underline = f"\n{'-' * len(new_version_line)}\n\n"
     changelog.insert(new_version_idx, f"{new_version_link}{new_version_line}{new_version_underline}")
-
-    # Find the position of the link for the "Unreleased" diff & rewrite it with the new version
-    unreleased_diff_idx = _find_line_by_prefix(changelog, f".. _Unreleased: {COMPARE_URL_PREFIX}")
-    if unreleased_diff_idx is None:
-        raise RuntimeError("Changelog has no diff for the `Unreleased` section")
-    changelog[unreleased_diff_idx] = f".. _Unreleased: {COMPARE_URL_PREFIX}v{new_version}...HEAD\n"
-
-    # Extract the old version from the next line
-    # `.. _3.18.2: ...` => `3.18.2`
-    old_version_diff_idx = unreleased_diff_idx + 1
-    old_version = changelog[old_version_diff_idx].split(":")[0][4:]
-    # Insert the diff for the new version
-    new_version_diff = f".. _{new_version}: {COMPARE_URL_PREFIX}v{old_version}...v{new_version}\n"
-    changelog.insert(old_version_diff_idx, new_version_diff)
 
     # Write the updated changelog back to the file
     with open(CHANGELOG_PATH, "w") as f:
@@ -100,12 +94,12 @@ def _format_section(section: str) -> str:
     return f"\n### :{emoji}: {section}\n"
 
 
-# Matches strings that look like "`#123`_"
-GITHUB_LINK_RE = re.compile(r"`#([0-9]+)`_")
+# Matches strings that look like ":issue:`1890`"
+GITHUB_LINK_RE = re.compile(r":issue:`([0-9]+)`")
 
 
 def clean_line(text: str) -> str:
-    return GITHUB_LINK_RE.sub(lambda m: m.group().strip("`_"), text).replace("``", "`")
+    return GITHUB_LINK_RE.sub(r"#\1", text).replace("``", "`")
 
 
 def _rst_to_md(lines: List[str]) -> Generator[str, None, None]:
