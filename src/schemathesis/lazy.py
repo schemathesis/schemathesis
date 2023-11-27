@@ -6,12 +6,12 @@ import pytest
 from _pytest.fixtures import FixtureRequest
 from hypothesis.core import HypothesisHandle
 from hypothesis.errors import Flaky
-from hypothesis.internal.escalation import format_exception, get_interesting_origin, get_trimmed_traceback
+from hypothesis.internal.escalation import format_exception, get_trimmed_traceback
 from hypothesis.internal.reflection import impersonate
 from pyrate_limiter import Limiter
 from pytest_subtests import SubTests, nullcontext
 
-from ._compat import MultipleFailures
+from ._compat import MultipleFailures, get_interesting_origin
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import FLAKY_FAILURE_MESSAGE, NOT_SET

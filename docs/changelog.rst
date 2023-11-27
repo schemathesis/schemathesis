@@ -4,6 +4,10 @@ Changelog
 `Unreleased`_ - TBD
 -------------------
 
+**Added**
+
+- Support for ``hypothesis>=6.90.1``.
+
 .. _v3.21.1:
 
 `3.21.1`_ - 2023-11-16
