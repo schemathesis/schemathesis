@@ -47,6 +47,11 @@ Articles
 Videos
 ------
 
+- `API Fuzzing: What it is and why you should use it <https://youtu.be/wX3GMJY9B6A>`_ by **José Haro Peralta**
+
+  - **Description**: A comprehensive overview and demo of Schemathesis.
+
+  - **Date**: 14 Feb 2023
 - `Schemathesis tutorial <https://appdev.consulting.redhat.com/tracks/contract-first/automated-testing-with-schemathesis.html>`_ with an accompanying `video <https://www.youtube.com/watch?v=4r7OC-lBKMg>`_ by **Red Hat**
 
   - **Description**: Provides a hands-on tutorial for API testing with Schemathesis.
