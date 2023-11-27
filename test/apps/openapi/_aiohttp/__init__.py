@@ -1,7 +1,9 @@
+import warnings
 from functools import wraps
 from typing import Callable, Tuple
 
 import yaml
+from aiohttp.web_exceptions import NotAppKeyWarning
 from aiohttp import web
 
 from ..schema import OpenAPIVersion, Operation, make_openapi_schema
@@ -20,6 +22,7 @@ def create_app(
     >>>     # make some request to the app here
     >>>     assert app["incoming_requests"][0].method == "GET"
     """
+    warnings.simplefilter("ignore", NotAppKeyWarning)
     incoming_requests = []
     schema_requests = []
 
