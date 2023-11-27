@@ -60,3 +60,5 @@ repos:
           - sphinx==7.1.2
           - sphinx_rtd_theme==1.3
           - sphinx-click==5.1
+        args:
+          - --ignore-roles=issue,version

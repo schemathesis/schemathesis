@@ -25,12 +25,17 @@ import schemathesis
 
 # If your documentation needs a minimal Sphinx version, state it here.
 #
-needs_sphinx = "4.5.0"
+needs_sphinx = "7.1.0"
+
+extlinks = {
+    "issue": ("https://github.com/schemathesis/schemathesis/issues/%s", "#%s"),
+    "version": ("https://github.com/schemathesis/schemathesis/compare/%s", "%s"),
+}
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ["sphinx.ext.autodoc", "sphinx.ext.viewcode", "sphinx_click"]
+extensions = ["sphinx.ext.extlinks", "sphinx.ext.autodoc", "sphinx.ext.viewcode", "sphinx_click"]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
