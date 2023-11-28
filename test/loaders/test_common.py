@@ -57,6 +57,8 @@ def test_port_override(request, loader, url_fixture, expected):
         loader(url, port=8081)
     if platform.system() == "Windows":
         detail = "[WinError 10061] No connection could be made because the target machine actively refused it"
+    elif platform.system() == "Darwin":
+        detail = "[Errno 61] Connection refused"
     else:
         detail = "[Errno 111] Connection refused"
     assert exc.value.extras == [f"Failed to establish a new connection: {detail}"]
