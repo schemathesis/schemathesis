@@ -27,7 +27,6 @@ from packaging import version
 
 from schemathesis.models import Case
 from schemathesis.generation import DataGenerationMethod
-from schemathesis._dependency_versions import IS_HYPOTHESIS_ABOVE_6_54
 from schemathesis.checks import ALL_CHECKS, not_a_server_error, DEFAULT_CHECKS
 from schemathesis.cli import (
     DEPRECATED_PRE_RUN_OPTION_WARNING,
@@ -1030,18 +1029,6 @@ def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
     # There are many scenarios possible, depends on how many tests will be executed before interruption
     # and in what order. it could be no tests at all, some of them or all of them.
     assert_threaded_executor_interruption(lines, ("F", ".", "F.", ".F", ""), True)
-
-
-@pytest.mark.operations("failure")
-@pytest.mark.parametrize("workers", (1, 2))
-@pytest.mark.skipif(IS_HYPOTHESIS_ABOVE_6_54, reason="Newer Hypothesis versions handle it via exception notes.")
-def test_hypothesis_output_capture(mocker, cli, cli_args, workers):
-    mocker.patch("schemathesis.utils.IGNORED_PATTERNS", ())
-
-    result = cli.run(*cli_args, f"--workers={workers}")
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    assert "= HYPOTHESIS OUTPUT =" in result.stdout
-    assert "Falsifying example" in result.stdout
 
 
 async def test_multiple_files_schema(openapi_2_app, testdir, cli, hypothesis_max_examples, openapi2_base_url):

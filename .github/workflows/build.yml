@@ -53,11 +53,8 @@ jobs:
       matrix:
         os: [ubuntu-20.04, windows-2019]
         python: ["3.8", "3.9", "3.10", "3.11", "3.12"]
-        # Set the patch version for "python", so GitHub adds 3 configurations instead of expanding existing ones
+        # Set the patch version for "python", so GitHub adds these configurations instead of expanding existing ones
         include:
-          - os: ubuntu-20.04
-            python: "3.9.16"
-            tox_env: hypothesis648
           - os: ubuntu-20.04
             python: "3.9.16"
             tox_env: pytest6
