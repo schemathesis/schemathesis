@@ -337,7 +337,11 @@ class CliSnapshotConfig:
             data = re.sub("[0-9]+ / [0-9]+ passed", replace_statistic, data)
             data = re.sub("([0-9]+ passed,? )|([0-9]+ errored,? )", "", data)
         if self.replace_error_codes:
-            data = data.replace("Errno 111", "Error NUM").replace("WinError 10061", "Error NUM")
+            data = (
+                data.replace("Errno 111", "Error NUM")
+                .replace("Errno 61", "Error NUM")
+                .replace("WinError 10061", "Error NUM")
+            )
             data = data.replace(
                 "No connection could be made because the target machine actively refused it", "Connection refused"
             )
