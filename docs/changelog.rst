@@ -4,6 +4,11 @@ Changelog
 :version:`Unreleased <v3.21.2...HEAD>` - TBD
 --------------------------------------------
 
+**Removed**
+
+- Support for Python 3.7.
+- Unnecessary dependencies on ``typing-extensions`` and ``importlib-metadata``.
+
 .. _v3.21.2:
 
 :version:`3.21.2 <v3.21.1...v3.21.2>` - 2023-11-27
@@ -12,11 +17,6 @@ Changelog
 **Added**
 
 - Support for ``hypothesis>=6.90.1``.
-
-**Removed**
-
-- Support for Python 3.7.
-- Unnecessary dependencies on ``typing-extensions`` and ``importlib-metadata``.
 
 .. _v3.21.1:
 
