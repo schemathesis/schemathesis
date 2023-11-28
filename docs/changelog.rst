@@ -11,6 +11,7 @@ Changelog
 **Changed**
 
 - Bump the minimum supported Hypothesis version to ``6.84.3``.
+- Bump the minimum supported ``jsonschema`` version to ``4.18.0``.
 
 **Removed**
 
