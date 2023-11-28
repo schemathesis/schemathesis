@@ -157,4 +157,4 @@ skip-magic-trailing-comma = false
 
 [tool.ruff.isort]
 known-first-party = ["schemathesis"]
-known-third-party = ["_pytest", "aiohttp", "click", "curlify", "fastapi", "flask", "graphene", "graphql", "graphql_server", "hypothesis", "hypothesis_graphql", "hypothesis_jsonschema", "jsonschema", "junit_xml", "packaging", "pydantic", "pytest", "pytest_subtests", "requests", "starlette", "urllib3", "werkzeug", "yaml", "yarl"]
+known-third-party = ["_pytest", "aiohttp", "click", "fastapi", "flask", "graphene", "graphql", "graphql_server", "hypothesis", "hypothesis_graphql", "hypothesis_jsonschema", "jsonschema", "junit_xml", "packaging", "pydantic", "pytest", "pytest_subtests", "requests", "starlette", "urllib3", "werkzeug", "yaml", "yarl"]
