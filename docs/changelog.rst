@@ -4,6 +4,14 @@ Changelog
 :version:`Unreleased <v3.21.2...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Support for ``hypothesis-jsonschema==0.23``.
+
+**Changed**
+
+- Bump the minimum supported Hypothesis version to ``6.84.3``.
+
 **Removed**
 
 - Support for Python 3.7.

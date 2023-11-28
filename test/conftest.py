@@ -26,7 +26,6 @@ from urllib3 import HTTPResponse
 import schemathesis.cli
 from schemathesis.cli.output.default import TEST_CASE_ID_TITLE
 from schemathesis.models import Case
-from schemathesis._dependency_versions import IS_HYPOTHESIS_ABOVE_6_54
 from schemathesis.cli import reset_checks
 from schemathesis.constants import HOOKS_MODULE_ENV_VAR
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
@@ -69,11 +68,6 @@ def reset_hooks():
     schemathesis.hooks.unregister_all()
     schemathesis.auth.unregister()
     reset_checks()
-
-
-@pytest.fixture(scope="session")
-def is_hypothesis_above_6_54():
-    return IS_HYPOTHESIS_ABOVE_6_54
 
 
 @pytest.fixture(scope="session")
