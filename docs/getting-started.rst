@@ -58,6 +58,10 @@ GitHub Integration
 GitHub Actions
 ^^^^^^^^^^^^^^
 
+.. note::
+
+    💡 See our `GitHub Tutorial <https://docs.schemathesis.io/tutorials/github>`_ for a step-by-step guidance.
+
 Run Schemathesis tests as a part of your CI/CD pipeline. Add this YAML configuration to your GitHub Actions:
 
 .. code-block:: yaml
