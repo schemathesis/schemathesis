@@ -165,6 +165,7 @@ def with_on_event(data: dict):
 
 
 @pytest.mark.parametrize("setup", (with_lifespan, with_on_event))
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_events(setup):
     data = {}
     app = setup(data)
