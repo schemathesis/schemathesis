@@ -46,26 +46,16 @@ def _load_get_interesting_origin() -> Callable:
 
 
 def _load_multiple_failures() -> Type:
-    from ._dependency_versions import IS_HYPOTHESIS_ABOVE_6_54
-
     try:
         return BaseExceptionGroup  # type: ignore
     except NameError:
-        if IS_HYPOTHESIS_ABOVE_6_54:
-            from exceptiongroup import BaseExceptionGroup as MultipleFailures  # type: ignore
-        else:
-            from hypothesis.errors import MultipleFailures  # type: ignore
+        from exceptiongroup import BaseExceptionGroup as MultipleFailures  # type: ignore
 
         return MultipleFailures
 
 
 def _load_get_signature() -> Callable:
-    from ._dependency_versions import IS_HYPOTHESIS_ABOVE_6_49
-
-    if IS_HYPOTHESIS_ABOVE_6_49:
-        from hypothesis.internal.reflection import get_signature
-    else:
-        from inspect import getfullargspec as get_signature
+    from hypothesis.internal.reflection import get_signature
 
     return get_signature
 

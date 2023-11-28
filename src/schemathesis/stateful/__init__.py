@@ -2,9 +2,8 @@ from __future__ import annotations
 import enum
 import json
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, Callable, Generator
 
-from .._dependency_versions import IS_HYPOTHESIS_ABOVE_6_68_1
 from ..exceptions import OperationSchemaError
 from ..models import APIOperation, Case
 from ..constants import NOT_SET
@@ -123,7 +122,4 @@ def run_state_machine_as_test(
     """
     from hypothesis.stateful import run_state_machine_as_test as _run_state_machine_as_test
 
-    if IS_HYPOTHESIS_ABOVE_6_68_1:
-        # Newer Hypothesis contains an argument to set the minimum number of steps for a state machine execution
-        return _run_state_machine_as_test(state_machine_factory, settings=settings, _min_steps=2)
-    return _run_state_machine_as_test(state_machine_factory, settings=settings)
+    return _run_state_machine_as_test(state_machine_factory, settings=settings, _min_steps=2)

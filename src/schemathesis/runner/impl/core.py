@@ -21,7 +21,6 @@ from requests.auth import HTTPDigestAuth, _basic_auth_str
 
 from ... import failures, hooks
 from ..._compat import MultipleFailures
-from ..._dependency_versions import IS_HYPOTHESIS_ABOVE_6_54
 from ...auths import unregister as unregister_auth
 from ...generation import DataGenerationMethod
 from ...constants import DEFAULT_STATEFUL_RECURSION_LIMIT, RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
@@ -522,11 +521,7 @@ def run_checks(
         except AssertionError as exc:
             add_single_failure(exc)
         except MultipleFailures as exc:
-            if not IS_HYPOTHESIS_ABOVE_6_54:
-                exceptions = exc.args[1]
-            else:
-                exceptions = exc.exceptions
-            for exception in exceptions:
+            for exception in exc.exceptions:
                 add_single_failure(exception)
 
     if max_response_time:
