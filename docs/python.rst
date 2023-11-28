@@ -226,6 +226,7 @@ This approach requires an initialized application instance to generate the API s
 
 .. code:: python
 
+    from contextlib import asynccontextmanager
     from fastapi import FastAPI
     import pytest
     import schemathesis
@@ -237,12 +238,10 @@ This approach requires an initialized application instance to generate the API s
         # that depends on other fixtures
         app = FastAPI()
 
-        @app.on_event("startup")
-        async def startup():
+        @asynccontextmanager
+        async def lifespan(_: FastAPI):
             await db.connect()
-
-        @app.on_event("shutdown")
-        async def shutdown():
+            yield
             await db.disconnect()
 
         return schemathesis.from_dict(app.openapi())
