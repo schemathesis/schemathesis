@@ -10,6 +10,7 @@ from hypothesis_jsonschema import from_schema
 from ..constants import ALL_KEYWORDS
 from .mutations import MutationContext
 from .types import Draw, Schema
+from ....generation import GenerationConfig
 
 
 @dataclass
@@ -54,6 +55,7 @@ def negative_schema(
     operation_name: str,
     location: str,
     media_type: Optional[str],
+    generation_config: GenerationConfig,
     *,
     custom_formats: Dict[str, st.SearchStrategy[str]],
 ) -> st.SearchStrategy:
@@ -78,7 +80,9 @@ def negative_schema(
             return not validator.is_valid(value)
 
     return mutated(keywords, non_keywords, location, media_type).flatmap(
-        lambda s: from_schema(s, custom_formats=custom_formats).filter(filter_values)
+        lambda s: from_schema(
+            s, custom_formats=custom_formats, allow_x00=generation_config.allow_x00, codec=generation_config.codec
+        ).filter(filter_values)
     )
 
 

@@ -175,6 +175,10 @@ Generic:
                                   codes.
   --experimental [openapi-3.1]    Enable experimental support for specific
                                   features.
+  --generation-allow-x00 TEXT     Determines whether to allow the generation of
+                                  ` ` bytes within strings.  [default: true]
+  --generation-codec TEXT         Specifies the codec used for generating
+                                  strings.
   --schemathesis-io-token TEXT    Schemathesis.io authentication token.
   --schemathesis-io-url TEXT      Schemathesis.io base URL.
   --schemathesis-io-telemetry TEXT

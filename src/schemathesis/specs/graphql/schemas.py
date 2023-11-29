@@ -23,7 +23,7 @@ from requests.structures import CaseInsensitiveDict
 from ... import auths
 from ...auths import AuthStorage
 from ...checks import not_a_server_error
-from ...generation import DataGenerationMethod
+from ...generation import DataGenerationMethod, GenerationConfig
 from ...exceptions import OperationSchemaError
 from ...constants import NOT_SET
 from ...hooks import (
@@ -200,6 +200,7 @@ class GraphQLSchema(BaseSchema):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
         return get_case_strategy(
@@ -208,6 +209,7 @@ class GraphQLSchema(BaseSchema):
             hooks=hooks,
             auth_storage=auth_storage,
             data_generation_method=data_generation_method,
+            generation_config=generation_config,
             **kwargs,
         )
 
@@ -250,6 +252,7 @@ def get_case_strategy(
     hooks: HookDispatcher | None = None,
     auth_storage: AuthStorage | None = None,
     data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+    generation_config: GenerationConfig | None = None,
     **kwargs: Any,
 ) -> Any:
     definition = cast(GraphQLOperationDefinition, operation.definition)
@@ -258,11 +261,14 @@ def get_case_strategy(
         RootType.MUTATION: gql_st.mutations,
     }[definition.root_type]
     hook_context = HookContext(operation)
+    generation_config = generation_config or GenerationConfig()
     strategy = strategy_factory(
         client_schema,
         fields=[definition.field_name],
         custom_scalars=CUSTOM_SCALARS,
         print_ast=_noop,  # type: ignore
+        allow_x00=generation_config.allow_x00,
+        codec=generation_config.codec,
     )
     strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body").map(graphql.print_ast)
     body = draw(strategy)

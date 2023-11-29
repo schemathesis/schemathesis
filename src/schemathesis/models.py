@@ -29,7 +29,7 @@ from . import failures, serializers
 from ._dependency_versions import IS_WERKZEUG_ABOVE_3
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
-from .generation import DataGenerationMethod
+from .generation import DataGenerationMethod, GenerationConfig
 from .constants import (
     DEFAULT_RESPONSE_TIMEOUT,
     SCHEMATHESIS_TEST_CASE_HEADER,
@@ -718,10 +718,13 @@ class APIOperation(Generic[P, C]):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> st.SearchStrategy:
         """Turn this API operation into a Hypothesis strategy."""
-        strategy = self.schema.get_case_strategy(self, hooks, auth_storage, data_generation_method, **kwargs)
+        strategy = self.schema.get_case_strategy(
+            self, hooks, auth_storage, data_generation_method, generation_config=generation_config, **kwargs
+        )
 
         def _apply_hooks(dispatcher: HookDispatcher, _strategy: st.SearchStrategy[Case]) -> st.SearchStrategy[Case]:
             context = HookContext(self)

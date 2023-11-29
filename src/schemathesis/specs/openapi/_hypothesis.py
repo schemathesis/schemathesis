@@ -16,7 +16,7 @@ from requests.structures import CaseInsensitiveDict
 from ...constants import NOT_SET
 from .formats import STRING_FORMATS
 from ... import auths, serializers
-from ...generation import DataGenerationMethod
+from ...generation import DataGenerationMethod, GenerationConfig
 from ...internal.copy import fast_deepcopy
 from ...exceptions import SerializationNotPossible, BodyInGetRequestError
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
@@ -34,7 +34,7 @@ from .utils import is_header_location
 HEADER_FORMAT = "_header_value"
 PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
 SLASH = "/"
-StrategyFactory = Callable[[Dict[str, Any], str, str, Optional[str]], st.SearchStrategy]
+StrategyFactory = Callable[[Dict[str, Any], str, str, Optional[str], GenerationConfig], st.SearchStrategy]
 
 
 @lru_cache
@@ -101,6 +101,7 @@ def get_case_strategy(
     hooks: Optional[HookDispatcher] = None,
     auth_storage: Optional[auths.AuthStorage] = None,
     generator: DataGenerationMethod = DataGenerationMethod.default(),
+    generation_config: Optional[GenerationConfig] = None,
     path_parameters: Union[NotSet, Dict[str, Any]] = NOT_SET,
     headers: Union[NotSet, Dict[str, Any]] = NOT_SET,
     cookies: Union[NotSet, Dict[str, Any]] = NOT_SET,
@@ -123,10 +124,14 @@ def get_case_strategy(
 
     context = HookContext(operation)
 
-    path_parameters_ = generate_parameter("path", path_parameters, operation, draw, context, hooks, generator)
-    headers_ = generate_parameter("header", headers, operation, draw, context, hooks, generator)
-    cookies_ = generate_parameter("cookie", cookies, operation, draw, context, hooks, generator)
-    query_ = generate_parameter("query", query, operation, draw, context, hooks, generator)
+    generation_config = generation_config or GenerationConfig()
+
+    path_parameters_ = generate_parameter(
+        "path", path_parameters, operation, draw, context, hooks, generator, generation_config
+    )
+    headers_ = generate_parameter("header", headers, operation, draw, context, hooks, generator, generation_config)
+    cookies_ = generate_parameter("cookie", cookies, operation, draw, context, hooks, generator, generation_config)
+    query_ = generate_parameter("query", query, operation, draw, context, hooks, generator, generation_config)
 
     media_type = None
     if body is NOT_SET:
@@ -143,7 +148,7 @@ def get_case_strategy(
             else:
                 candidates = operation.body.items
             parameter = draw(st.sampled_from(candidates))
-            strategy = _get_body_strategy(parameter, strategy_factory, operation)
+            strategy = _get_body_strategy(parameter, strategy_factory, operation, generation_config)
             strategy = apply_hooks(operation, context, hooks, strategy, "body")
             # Parameter may have a wildcard media type. In this case, choose any supported one
             possible_media_types = sorted(serializers.get_matching_media_types(parameter.media_type))
@@ -198,6 +203,7 @@ def _get_body_strategy(
     parameter: OpenAPIBody,
     strategy_factory: StrategyFactory,
     operation: APIOperation,
+    generation_config: GenerationConfig,
 ) -> st.SearchStrategy:
     # The cache key relies on object ids, which means that the parameter should not be mutated
     # Note, the parent schema is not included as each parameter belong only to one schema
@@ -205,7 +211,7 @@ def _get_body_strategy(
         return _BODY_STRATEGIES_CACHE[parameter][strategy_factory]
     schema = parameter.as_json_schema(operation)
     schema = operation.schema.prepare_schema(schema)
-    strategy = strategy_factory(schema, operation.verbose_name, "body", parameter.media_type)
+    strategy = strategy_factory(schema, operation.verbose_name, "body", parameter.media_type, generation_config)
     if not parameter.is_required:
         strategy |= st.just(NOT_SET)
     _BODY_STRATEGIES_CACHE.setdefault(parameter, {})[strategy_factory] = strategy
@@ -220,6 +226,7 @@ def get_parameters_value(
     context: HookContext,
     hooks: Optional[HookDispatcher],
     strategy_factory: StrategyFactory,
+    generation_config: GenerationConfig,
 ) -> Optional[Dict[str, Any]]:
     """Get the final value for the specified location.
 
@@ -227,10 +234,10 @@ def get_parameters_value(
     generate those parts.
     """
     if isinstance(value, NotSet) or not value:
-        strategy = get_parameters_strategy(operation, strategy_factory, location)
+        strategy = get_parameters_strategy(operation, strategy_factory, location, generation_config)
         strategy = apply_hooks(operation, context, hooks, strategy, location)
         return draw(strategy)
-    strategy = get_parameters_strategy(operation, strategy_factory, location, exclude=value.keys())
+    strategy = get_parameters_strategy(operation, strategy_factory, location, generation_config, exclude=value.keys())
     strategy = apply_hooks(operation, context, hooks, strategy, location)
     new = draw(strategy)
     if new is not None:
@@ -270,6 +277,7 @@ def generate_parameter(
     context: HookContext,
     hooks: Optional[HookDispatcher],
     generator: DataGenerationMethod,
+    generation_config: GenerationConfig,
 ) -> ValueContainer:
     """Generate a value for a parameter.
 
@@ -285,7 +293,9 @@ def generate_parameter(
         generator = DataGenerationMethod.positive
     else:
         strategy_factory = DATA_GENERATION_METHOD_TO_STRATEGY_FACTORY[generator]
-    value = get_parameters_value(explicit, location, draw, operation, context, hooks, strategy_factory)
+    value = get_parameters_value(
+        explicit, location, draw, operation, context, hooks, strategy_factory, generation_config
+    )
     used_generator: Optional[DataGenerationMethod] = generator
     if value == explicit:
         # When we pass `explicit`, then its parts are excluded from generation of the final value
@@ -319,6 +329,7 @@ def get_parameters_strategy(
     operation: APIOperation,
     strategy_factory: StrategyFactory,
     location: str,
+    generation_config: GenerationConfig,
     exclude: Iterable[str] = (),
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
@@ -345,7 +356,7 @@ def get_parameters_strategy(
             # Nothing to negate - all properties were excluded
             strategy = st.none()
         else:
-            strategy = strategy_factory(schema, operation.verbose_name, location, None)
+            strategy = strategy_factory(schema, operation.verbose_name, location, None, generation_config)
             serialize = operation.get_parameter_serializer(location)
             if serialize is not None:
                 strategy = strategy.map(serialize)
@@ -399,6 +410,7 @@ def make_positive_strategy(
     operation_name: str,
     location: str,
     media_type: Optional[str],
+    generation_config: GenerationConfig,
     custom_formats: Optional[Dict[str, st.SearchStrategy]] = None,
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
@@ -410,7 +422,10 @@ def make_positive_strategy(
             if list(sub_schema) == ["type"] and sub_schema["type"] == "string":
                 sub_schema.setdefault("format", HEADER_FORMAT)
     return from_schema(
-        schema, custom_formats={**get_default_format_strategies(), **STRING_FORMATS, **(custom_formats or {})}
+        schema,
+        custom_formats={**get_default_format_strategies(), **STRING_FORMATS, **(custom_formats or {})},
+        allow_x00=generation_config.allow_x00,
+        codec=generation_config.codec,
     )
 
 
@@ -424,6 +439,7 @@ def make_negative_strategy(
     operation_name: str,
     location: str,
     media_type: Optional[str],
+    generation_config: GenerationConfig,
     custom_formats: Optional[Dict[str, st.SearchStrategy]] = None,
 ) -> st.SearchStrategy:
     return negative_schema(
@@ -432,6 +448,7 @@ def make_negative_strategy(
         location=location,
         media_type=media_type,
         custom_formats={**get_default_format_strategies(), **STRING_FORMATS, **(custom_formats or {})},
+        generation_config=generation_config,
     )
 
 

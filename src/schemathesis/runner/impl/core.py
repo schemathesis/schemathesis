@@ -22,7 +22,7 @@ from requests.auth import HTTPDigestAuth, _basic_auth_str
 from ... import failures, hooks
 from ..._compat import MultipleFailures
 from ...auths import unregister as unregister_auth
-from ...generation import DataGenerationMethod
+from ...generation import DataGenerationMethod, GenerationConfig
 from ...constants import DEFAULT_STATEFUL_RECURSION_LIMIT, RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
 from ...exceptions import (
     CheckFailed,
@@ -63,6 +63,7 @@ class BaseRunner:
     max_response_time: int | None
     targets: Iterable[Target]
     hypothesis_settings: hypothesis.settings
+    generation_config: GenerationConfig
     auth: RawAuth | None = None
     auth_type: str | None = None
     headers: dict[str, Any] | None = None
@@ -134,6 +135,7 @@ class BaseRunner:
         maker: Callable,
         template: Callable,
         settings: hypothesis.settings,
+        generation_config: GenerationConfig,
         seed: int | None,
         results: TestResultSet,
         recursion_level: int = 0,
@@ -148,7 +150,13 @@ class BaseRunner:
             as_strategy_kwargs["headers"] = {
                 key: value for key, value in headers.items() if key.lower() != "user-agent"
             }
-        for result in maker(template, settings, seed, as_strategy_kwargs=as_strategy_kwargs):
+        for result in maker(
+            template,
+            settings=settings,
+            generation_config=generation_config,
+            seed=seed,
+            as_strategy_kwargs=as_strategy_kwargs,
+        ):
             if isinstance(result, Ok):
                 operation, test = result.ok()
                 feedback = Feedback(self.stateful, operation)
@@ -176,8 +184,9 @@ class BaseRunner:
                     yield from self._run_tests(
                         feedback.get_stateful_tests,
                         template,
-                        settings,
-                        seed,
+                        settings=settings,
+                        generation_config=generation_config,
+                        seed=seed,
                         recursion_level=recursion_level + 1,
                         results=results,
                         headers=headers,

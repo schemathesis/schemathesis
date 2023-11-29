@@ -6,6 +6,12 @@ Checks
 
 .. autofunction:: schemathesis.check
 
+Data Generation
+~~~~~~~~~~~~~~~
+
+.. autoclass:: schemathesis.GenerationConfig
+   :members:
+
 Fixups
 ~~~~~~
 

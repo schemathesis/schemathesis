@@ -1,4 +1,6 @@
+from __future__ import annotations
 import random
+from dataclasses import dataclass
 from enum import Enum
 from typing import List, Union, Iterable
 
@@ -54,3 +56,13 @@ def generate_random_case_id(length: int = 6) -> str:
         number, rem = divmod(number, BASE)
         output += CASE_ID_ALPHABET[rem]
     return output
+
+
+@dataclass
+class GenerationConfig:
+    """Holds various configuration options relevant for data generation."""
+
+    # Allow generating `\x00` bytes in strings
+    allow_x00: bool = True
+    # Generate strings using the given codec
+    codec: str | None = "utf-8"

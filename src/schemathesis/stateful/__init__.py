@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Generator
 
+from .. import GenerationConfig
 from ..exceptions import OperationSchemaError
 from ..models import APIOperation, Case
 from ..constants import NOT_SET
@@ -94,6 +95,7 @@ class Feedback:
         self,
         test: Callable,
         settings: hypothesis.settings | None,
+        generation_config: GenerationConfig | None,
         seed: int | None,
         as_strategy_kwargs: dict[str, Any] | None,
     ) -> Generator[Result[tuple[APIOperation, Callable], OperationSchemaError], None, None]:
@@ -108,6 +110,7 @@ class Feedback:
                 settings=settings,
                 seed=seed,
                 data_generation_methods=operation.schema.data_generation_methods,
+                generation_config=generation_config,
                 as_strategy_kwargs=as_strategy_kwargs,
             )
             yield Ok((operation, test_function))

@@ -10,7 +10,7 @@ from hypothesis_jsonschema._canonicalise import FALSEY, canonicalish
 from jsonschema import Draft4Validator
 
 import schemathesis
-from schemathesis import DataGenerationMethod
+from schemathesis.generation import DataGenerationMethod, GenerationConfig
 from schemathesis.specs.openapi._hypothesis import is_valid_header, get_default_format_strategies
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.specs.openapi.negative import mutated, negative_schema
@@ -83,6 +83,7 @@ def test_top_level_strategy(data, location, schema):
             location=location,
             media_type="application/json",
             custom_formats=get_default_format_strategies(),
+            generation_config=GenerationConfig(),
         )
     )
     assert not validator.is_valid(instance)

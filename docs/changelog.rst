@@ -7,11 +7,13 @@ Changelog
 **Added**
 
 - Support for ``hypothesis-jsonschema==0.23``.
+- A way to control what characters are used for string generation. :issue:`1142`, :issue:`1286`,:issue:`1562`, :issue:`1668`
 
 **Changed**
 
 - Bump the minimum supported Hypothesis version to ``6.84.3``.
 - Bump the minimum supported ``jsonschema`` version to ``4.18.0``.
+- Bump the minimum supported ``hypothesis_graphql`` version to ``0.11.0``.
 - Use the same random seed for all tests in CLI. :issue:`1384`.
 
 **Removed**

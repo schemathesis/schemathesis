@@ -108,6 +108,7 @@ class SchemathesisCase(PyCollector):
                     test=self.test_function,
                     _given_kwargs=self.given_kwargs,
                     data_generation_methods=self.schemathesis_case.data_generation_methods,
+                    generation_config=self.schemathesis_case.generation_config,
                 )
             name = self._get_test_name(operation)
         else:

@@ -54,6 +54,7 @@ It generally follows the operational workflow of Schemathesis, detailing steps f
    :maxdepth: 2
 
    getting-started
+   data-generation
    cli
    python
    continuous_integration
@@ -62,7 +63,6 @@ It generally follows the operational workflow of Schemathesis, detailing steps f
    auth
    contrib
    stateful
-   how
    sanitizing
    compatibility
    examples

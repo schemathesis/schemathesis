@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 import click
 
 from .. import checks as checks_module
-from .. import contrib, experimental
+from .. import contrib, experimental, generation
 from .. import fixups as _fixups
 from .. import runner, service
 from .. import targets as targets_module
@@ -629,6 +629,20 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     multiple=True,
 )
 @click.option(
+    "--generation-allow-x00",
+    help="Determines whether to allow the generation of `\x00` bytes within strings.",
+    type=str,
+    default="true",
+    show_default=True,
+    callback=callbacks.convert_boolean_string,
+)
+@click.option(
+    "--generation-codec",
+    help="Specifies the codec used for generating strings.",
+    type=str,
+    default="utf-8",
+)
+@click.option(
     "--schemathesis-io-token",
     help="Schemathesis.io authentication token.",
     type=str,
@@ -710,6 +724,8 @@ def run(
     verbosity: int = 0,
     no_color: bool = False,
     report_value: str | None = None,
+    generation_allow_x00: bool = True,
+    generation_codec: str = "utf-8",
     schemathesis_io_token: str | None = None,
     schemathesis_io_url: str = service.DEFAULT_URL,
     schemathesis_io_telemetry: bool = True,
@@ -734,6 +750,8 @@ def run(
     # Enable selected experiments
     for experiment in experimental:
         experiment.enable()
+
+    generation_config = generation.GenerationConfig(allow_x00=generation_allow_x00, codec=generation_codec)
 
     report: ReportToService | click.utils.LazyFile | None
     if report_value is None:
@@ -876,6 +894,7 @@ def run(
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,
         hypothesis_settings=hypothesis_settings,
+        generation_config=generation_config,
     )
     execute(
         event_stream,
@@ -968,6 +987,7 @@ def into_event_stream(
     targets: Iterable[Target],
     workers_num: int,
     hypothesis_settings: hypothesis.settings | None,
+    generation_config: generation.GenerationConfig,
     seed: int | None,
     exit_first: bool,
     max_failures: int | None,
@@ -1022,6 +1042,7 @@ def into_event_stream(
             stateful=stateful,
             stateful_recursion_limit=stateful_recursion_limit,
             hypothesis_settings=hypothesis_settings,
+            generation_config=generation_config,
         ).execute()
     except SchemaError as error:
         yield events.InternalError.from_schema_error(error)

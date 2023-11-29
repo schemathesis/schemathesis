@@ -11,7 +11,7 @@ from hypothesis.internal.reflection import proxies
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
 from .auths import get_auth_storage_from_test
-from .generation import DataGenerationMethod
+from .generation import DataGenerationMethod, GenerationConfig
 from .constants import DEFAULT_DEADLINE
 from .exceptions import OperationSchemaError
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
@@ -26,6 +26,7 @@ def create_test(
     settings: Optional[hypothesis.settings] = None,
     seed: Optional[int] = None,
     data_generation_methods: List[DataGenerationMethod],
+    generation_config: Optional[GenerationConfig] = None,
     as_strategy_kwargs: Optional[Dict[str, Any]] = None,
     _given_args: Tuple[GivenInput, ...] = (),
     _given_kwargs: Optional[Dict[str, GivenInput]] = None,
@@ -40,6 +41,7 @@ def create_test(
                 hooks=hook_dispatcher,
                 auth_storage=auth_storage,
                 data_generation_method=data_generation_method,
+                generation_config=generation_config,
                 **(as_strategy_kwargs or {}),
             )
         )

@@ -12,6 +12,38 @@ Schemathesis converts Open API schemas to compatible JSON Schemas and passes the
     There are many tradeoffs in this process, and Hypothesis tries to give reasonable defaults for a typical case
     and not be too slow for pathological cases.
 
+Generating strings
+------------------
+
+In Schemathesis, you can control how strings are generated:
+
+- ``allow_x00`` (default ``True``): Determines whether to allow the generation of ``\x00`` bytes within strings. It is useful to avoid rejecting tests as invalid by some web servers.
+- ``codec`` (default ``utf-8``): Specifies the codec used for generating strings. It helps if you need to restrict the inputs to, for example, the ASCII range.
+
+Global configuration
+~~~~~~~~~~~~~~~~~~~~
+
+CLI:
+
+.. code:: text
+
+    $ st run --generation-allow-x00=false ...
+    $ st run --generation-codec=ascii ...
+
+Python:
+
+.. code:: python
+
+    import schemathesis
+    from schemathesis import GenerationConfig
+
+    schema = schemathesis.from_uri(
+        "https://example.schemathesis.io/openapi.json",
+        generation_config=GenerationConfig(allow_x00=False, codec='ascii'),
+    )
+
+This configuration sets the string generation to disallow ``\x00`` bytes and use the ASCII codec for all strings.
+
 Negative testing
 ----------------
 
