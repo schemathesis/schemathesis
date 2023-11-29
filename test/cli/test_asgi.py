@@ -51,11 +51,11 @@ def test_cli_run_output_success(testdir, cli, workers):
 
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
-    assert lines[4] == f"Workers: {workers}"
+    assert lines[5] == f"Workers: {workers}"
     if workers == 1:
-        assert lines[7].startswith("GET /api/success .")
+        assert lines[8].startswith("GET /api/success .")
     else:
-        assert lines[7] == "."
+        assert lines[8] == "."
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
 

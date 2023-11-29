@@ -310,8 +310,6 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
         click.echo(
             f"\n{bold('Reproduce with')}: \n\n    {code_sample}\n",
         )
-    if result.seed is not None:
-        click.secho(f"Or add this option to your command line parameters: --hypothesis-seed={result.seed}")
 
 
 def group_by_case(
@@ -398,6 +396,9 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
             f"\n{bold('Note')}: Use the '{SCHEMATHESIS_TEST_CASE_HEADER}' header to correlate test case ids "
             "from failure messages with server logs for debugging."
         )
+        if context.seed is not None:
+            seed_option = f"`--hypothesis-seed={context.seed}`"
+            click.secho(f"\n{bold('Note')}: To replicate these test failures, rerun with {bold(seed_option)}")
 
     if context.report is not None and not context.is_interrupted:
         if isinstance(context.report, FileReportContext):
@@ -634,6 +635,7 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
 def handle_initialized(context: ExecutionContext, event: events.Initialized) -> None:
     """Display information about the test session."""
     context.operations_count = cast(int, event.operations_count)  # INVARIANT: should not be `None`
+    context.seed = event.seed
     display_section_name("Schemathesis test session starts")
     if context.verbosity > 0:
         versions = (
@@ -651,6 +653,8 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
         click.secho(f"Schema location: {event.location}", bold=True)
     click.secho(f"Base URL: {event.base_url}", bold=True)
     click.secho(f"Specification version: {event.specification_name}", bold=True)
+    if context.seed is not None:
+        click.secho(f"Random seed: {context.seed}", bold=True)
     click.secho(f"Workers: {context.workers_num}", bold=True)
     if context.rate_limit is not None:
         click.secho(f"Rate limit: {context.rate_limit}", bold=True)

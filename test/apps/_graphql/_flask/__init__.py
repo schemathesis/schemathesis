@@ -1,7 +1,11 @@
+import logging
+
 from flask import Flask
 from strawberry.flask.views import GraphQLView
 
 from ..schema import schema
+
+logging.getLogger("werkzeug").setLevel(logging.CRITICAL)
 
 
 def create_app(path="/graphql", **kwargs):

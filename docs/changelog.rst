@@ -12,6 +12,7 @@ Changelog
 
 - Bump the minimum supported Hypothesis version to ``6.84.3``.
 - Bump the minimum supported ``jsonschema`` version to ``4.18.0``.
+- Use the same random seed for all tests in CLI. :issue:`1384`.
 
 **Removed**
 

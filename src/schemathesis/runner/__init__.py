@@ -1,5 +1,7 @@
 from __future__ import annotations
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union, TYPE_CHECKING
+
+from random import Random
+from typing import Any, Callable, Generator, Iterable, TYPE_CHECKING
 from urllib.parse import urlparse
 
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
@@ -342,6 +344,11 @@ def from_schema(
     checks = checks or DEFAULT_CHECKS
 
     hypothesis_settings = hypothesis_settings or hypothesis.settings(deadline=DEFAULT_DEADLINE)
+
+    # Use the same seed for all tests unless `derandomize=True` is used
+    if seed is None and not hypothesis_settings.derandomize:
+        seed = Random().getrandbits(128)
+
     started_at = started_at or current_datetime()
     if workers_num > 1:
         if not schema.app:

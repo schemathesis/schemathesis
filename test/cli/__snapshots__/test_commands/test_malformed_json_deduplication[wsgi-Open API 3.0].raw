@@ -5,6 +5,7 @@ Stdout:
 Schema location: /schema.yaml
 Base URL: /api
 Specification version: Swagger 2.0
+Random seed: 42
 Workers: 1
 Collected API operations: 1
 
@@ -26,13 +27,14 @@ Reproduce with:
 
     curl -X GET http://localhost/api/malformed_json
 
-Or add this option to your command line parameters: --hypothesis-seed=42
 =================================== SUMMARY ====================================
 
 Performed checks:
     response_schema_conformance                    0 / 2 passed          FAILED 
 
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+
+Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
 
 Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
 We run additional conformance checks on reports from public repos.

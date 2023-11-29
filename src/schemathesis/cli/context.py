@@ -36,8 +36,9 @@ class ExecutionContext:
     wait_for_schema: float | None = None
     validate_schema: bool = True
     operations_processed: int = 0
-    # It is set in runtime, from a `Initialized` event
+    # It is set in runtime, from the `Initialized` event
     operations_count: int | None = None
+    seed: int | None = None
     current_line_length: int = 0
     terminal_size: os.terminal_size = field(default_factory=shutil.get_terminal_size)
     results: list[SerializedTestResult] = field(default_factory=list)

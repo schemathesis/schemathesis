@@ -11,7 +11,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum
 from queue import Queue
-from typing import Any, Callable, Dict, Generator, Iterable, List, NoReturn, Optional, Tuple, Union, cast, TYPE_CHECKING
+from typing import Any, Callable, Generator, Iterable, NoReturn, cast, TYPE_CHECKING
 from urllib.parse import urlparse
 
 import click
