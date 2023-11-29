@@ -64,6 +64,7 @@ def prepare(
     skip_deprecated_operations: bool = False,
     force_schema_version: str | None = None,
     count_operations: bool = True,
+    count_links: bool = True,
     # Hypothesis-specific configuration
     hypothesis_deadline: int | NotSet | None = None,
     hypothesis_derandomize: bool | None = None,
@@ -123,6 +124,7 @@ def prepare(
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,
         count_operations=count_operations,
+        count_links=count_links,
     )
 
 
@@ -181,6 +183,7 @@ def execute_from_schema(
     stateful: Stateful | None = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     count_operations: bool = True,
+    count_links: bool = True,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Execute tests for the given schema.
 
@@ -228,6 +231,7 @@ def execute_from_schema(
             stateful=stateful,
             stateful_recursion_limit=stateful_recursion_limit,
             count_operations=count_operations,
+            count_links=count_links,
         ).execute()
     except SchemaError as error:
         yield events.InternalError.from_schema_error(error)
@@ -329,6 +333,7 @@ def from_schema(
     stateful: Stateful | None = None,
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     count_operations: bool = True,
+    count_links: bool = True,
 ) -> BaseRunner:
     from starlette.applications import Starlette
     import hypothesis
@@ -377,6 +382,7 @@ def from_schema(
                 stateful=stateful,
                 stateful_recursion_limit=stateful_recursion_limit,
                 count_operations=count_operations,
+                count_links=count_links,
             )
         if isinstance(schema.app, Starlette):
             return ThreadPoolASGIRunner(
@@ -398,6 +404,7 @@ def from_schema(
                 stateful=stateful,
                 stateful_recursion_limit=stateful_recursion_limit,
                 count_operations=count_operations,
+                count_links=count_links,
             )
         return ThreadPoolWSGIRunner(
             schema=schema,
@@ -419,6 +426,7 @@ def from_schema(
             stateful=stateful,
             stateful_recursion_limit=stateful_recursion_limit,
             count_operations=count_operations,
+            count_links=count_links,
         )
     if not schema.app:
         return SingleThreadRunner(
@@ -443,6 +451,7 @@ def from_schema(
             stateful=stateful,
             stateful_recursion_limit=stateful_recursion_limit,
             count_operations=count_operations,
+            count_links=count_links,
         )
     if isinstance(schema.app, Starlette):
         return SingleThreadASGIRunner(
@@ -464,6 +473,7 @@ def from_schema(
             stateful=stateful,
             stateful_recursion_limit=stateful_recursion_limit,
             count_operations=count_operations,
+            count_links=count_links,
         )
     return SingleThreadWSGIRunner(
         schema=schema,
@@ -484,6 +494,7 @@ def from_schema(
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,
         count_operations=count_operations,
+        count_links=count_links,
     )
 
 

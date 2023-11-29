@@ -77,6 +77,7 @@ class BaseRunner:
     stateful: Stateful | None = None
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT
     count_operations: bool = True
+    count_links: bool = True
     _failures_counter: int = 0
 
     def execute(self) -> EventStream:
@@ -91,7 +92,7 @@ class BaseRunner:
         results = TestResultSet(seed=self.seed)
 
         initialized = events.Initialized.from_schema(
-            schema=self.schema, count_operations=self.count_operations, seed=self.seed
+            schema=self.schema, count_operations=self.count_operations, count_links=self.count_links, seed=self.seed
         )
 
         def _finish() -> events.Finished:

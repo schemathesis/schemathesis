@@ -155,6 +155,11 @@ class GraphQLSchema(BaseSchema):
                         total += len(type_def["fields"])
         return total
 
+    @property
+    def links_count(self) -> int:
+        # Links are not supported for GraphQL
+        return 0
+
     def get_all_operations(
         self, hooks: HookDispatcher | None = None
     ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
