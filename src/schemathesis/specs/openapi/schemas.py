@@ -31,7 +31,7 @@ from requests.structures import CaseInsensitiveDict
 from ... import experimental, failures
 from ..._compat import MultipleFailures
 from ...auths import AuthStorage
-from ...generation import DataGenerationMethod
+from ...generation import DataGenerationMethod, GenerationConfig
 from ...constants import HTTP_METHODS, NOT_SET
 from ...exceptions import (
     OperationSchemaError,
@@ -362,6 +362,7 @@ class BaseOpenAPISchema(BaseSchema):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
         return get_case_strategy(
@@ -369,6 +370,7 @@ class BaseOpenAPISchema(BaseSchema):
             auth_storage=auth_storage,
             hooks=hooks,
             generator=data_generation_method,
+            generation_config=generation_config,
             **kwargs,
         )
 

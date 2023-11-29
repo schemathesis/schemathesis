@@ -4,7 +4,7 @@ from random import Random
 from typing import Any, Callable, Generator, Iterable, TYPE_CHECKING
 from urllib.parse import urlparse
 
-from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
+from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod, GenerationConfig
 from ..constants import (
     DEFAULT_DEADLINE,
     DEFAULT_STATEFUL_RECURSION_LIMIT,
@@ -313,6 +313,7 @@ def from_schema(
     targets: Iterable[Target] = DEFAULT_TARGETS,
     workers_num: int = 1,
     hypothesis_settings: hypothesis.settings | None = None,
+    generation_config: GenerationConfig | None = None,
     auth: RawAuth | None = None,
     auth_type: str | None = None,
     headers: dict[str, Any] | None = None,
@@ -344,6 +345,7 @@ def from_schema(
     checks = checks or DEFAULT_CHECKS
 
     hypothesis_settings = hypothesis_settings or hypothesis.settings(deadline=DEFAULT_DEADLINE)
+    generation_config = generation_config or GenerationConfig()
 
     # Use the same seed for all tests unless `derandomize=True` is used
     if seed is None and not hypothesis_settings.derandomize:
@@ -358,6 +360,7 @@ def from_schema(
                 max_response_time=max_response_time,
                 targets=targets,
                 hypothesis_settings=hypothesis_settings,
+                generation_config=generation_config,
                 auth=auth,
                 auth_type=auth_type,
                 headers=headers,
@@ -382,6 +385,7 @@ def from_schema(
                 max_response_time=max_response_time,
                 targets=targets,
                 hypothesis_settings=hypothesis_settings,
+                generation_config=generation_config,
                 auth=auth,
                 auth_type=auth_type,
                 headers=headers,
@@ -401,6 +405,7 @@ def from_schema(
             max_response_time=max_response_time,
             targets=targets,
             hypothesis_settings=hypothesis_settings,
+            generation_config=generation_config,
             auth=auth,
             auth_type=auth_type,
             headers=headers,
@@ -422,6 +427,7 @@ def from_schema(
             max_response_time=max_response_time,
             targets=targets,
             hypothesis_settings=hypothesis_settings,
+            generation_config=generation_config,
             auth=auth,
             auth_type=auth_type,
             headers=headers,
@@ -445,6 +451,7 @@ def from_schema(
             max_response_time=max_response_time,
             targets=targets,
             hypothesis_settings=hypothesis_settings,
+            generation_config=generation_config,
             auth=auth,
             auth_type=auth_type,
             headers=headers,
@@ -464,6 +471,7 @@ def from_schema(
         max_response_time=max_response_time,
         targets=targets,
         hypothesis_settings=hypothesis_settings,
+        generation_config=generation_config,
         auth=auth,
         auth_type=auth_type,
         headers=headers,

@@ -5,6 +5,7 @@ from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.generation import GenerationConfig
 from schemathesis.specs.openapi import _hypothesis, formats
 from schemathesis.specs.openapi._hypothesis import get_case_strategy, is_valid_header, make_positive_strategy
 from schemathesis.specs.openapi.references import load_file
@@ -143,6 +144,7 @@ def test_valid_headers(keywords):
         "GET /users/",
         "header",
         None,
+        GenerationConfig(),
     )
 
     @given(strategy)
@@ -167,6 +169,7 @@ def test_no_much_filtering_in_headers():
         "GET /users/",
         "header",
         None,
+        GenerationConfig(),
     )
 
     @given(strategy)
