@@ -179,6 +179,10 @@ class BaseSchema(Mapping):
     def operations_count(self) -> int:
         raise NotImplementedError
 
+    @property
+    def links_count(self) -> int:
+        raise NotImplementedError
+
     def get_all_operations(
         self, hooks: HookDispatcher | None = None
     ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:

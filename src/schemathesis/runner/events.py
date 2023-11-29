@@ -37,6 +37,8 @@ class Initialized(ExecutionEvent):
     schema: dict[str, Any]
     # Total number of operations in the schema
     operations_count: int | None
+    # Total number of links in the schema
+    links_count: int | None
     # The place, where the API schema is located
     location: str | None
     seed: int | None
@@ -53,12 +55,19 @@ class Initialized(ExecutionEvent):
 
     @classmethod
     def from_schema(
-        cls, *, schema: BaseSchema, count_operations: bool = True, started_at: str | None = None, seed: int | None
+        cls,
+        *,
+        schema: BaseSchema,
+        count_operations: bool = True,
+        count_links: bool = True,
+        started_at: str | None = None,
+        seed: int | None,
     ) -> Initialized:
         """Computes all needed data from a schema instance."""
         return cls(
             schema=schema.raw_schema,
             operations_count=schema.operations_count if count_operations else None,
+            links_count=schema.links_count if count_links else None,
             location=schema.location,
             base_url=schema.get_base_url(),
             started_at=started_at or current_datetime(),

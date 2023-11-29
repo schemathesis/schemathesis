@@ -118,13 +118,11 @@ class BaseOpenAPISchema(BaseSchema):
             or should_skip_by_operation_id(definition.get("operationId"), self.operation_id)
         )
 
-    @property
-    def operations_count(self) -> int:
+    def _operation_iter(self) -> Generator[dict[str, Any], None, None]:
         try:
             paths = self.raw_schema["paths"]
         except KeyError:
-            return 0
-        total = 0
+            return
         resolve = self.resolver.resolve
         for path, methods in paths.items():
             full_path = self.get_full_path(path)
@@ -139,10 +137,29 @@ class BaseOpenAPISchema(BaseSchema):
                 for method, definition in resolved_methods.items():
                     if self._should_skip(method, definition):
                         continue
-                    total += 1
+                    yield definition
             except SCHEMA_PARSING_ERRORS:
                 # Ignore errors
                 continue
+
+    @property
+    def operations_count(self) -> int:
+        total = 0
+        # Do not build a list from it
+        for _ in self._operation_iter():
+            total += 1
+        return total
+
+    @property
+    def links_count(self) -> int:
+        total = 0
+        for definition in self._operation_iter():
+            for response in definition.get("responses", {}).values():
+                if "$ref" in response:
+                    _, response = self.resolver.resolve(response["$ref"])
+                defined_links = response.get(self.links_field)
+                if defined_links is not None:
+                    total += len(defined_links)
         return total
 
     def get_all_operations(
