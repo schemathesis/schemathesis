@@ -87,9 +87,11 @@ class BaseRunner:
         # If auth is explicitly provided, then the global provider is ignored
         if self.auth is not None:
             unregister_auth()
-        results = TestResultSet()
+        results = TestResultSet(seed=self.seed)
 
-        initialized = events.Initialized.from_schema(schema=self.schema, count_operations=self.count_operations)
+        initialized = events.Initialized.from_schema(
+            schema=self.schema, count_operations=self.count_operations, seed=self.seed
+        )
 
         def _finish() -> events.Finished:
             if has_all_not_found(results):
@@ -382,6 +384,7 @@ def run_test(
         status = Status.error
         result.add_error(error)
     test_elapsed_time = time.monotonic() - test_start_time
+    # DEPRECATED: Seed is the same per test run
     # Fetch seed value, hypothesis generates it during test execution
     # It may be `None` if the `derandomize` config option is set to `True`
     result.seed = getattr(test, "_hypothesis_internal_use_seed", None) or getattr(

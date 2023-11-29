@@ -1135,3 +1135,19 @@ def test_skip_non_negated_headers(empty_open_api_3_schema):
     # There should not be unsatisfiable
     assert finished.errored_count == 0
     assert event.status == Status.skip
+
+
+@pytest.mark.parametrize("derandomize", (True, False))
+def test_use_the_same_seed(empty_open_api_3_schema, derandomize):
+    definition = {"get": {"responses": {"200": {"description": ""}}}}
+    empty_open_api_3_schema["paths"] = {"/first": definition, "/second": definition}
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    after_execution = [
+        event
+        for event in from_schema(
+            schema, dry_run=True, hypothesis_settings=hypothesis.settings(derandomize=derandomize)
+        ).execute()
+        if isinstance(event, events.AfterExecution)
+    ]
+    seed = after_execution[0].result.seed
+    assert all(event.result.seed == seed for event in after_execution)
