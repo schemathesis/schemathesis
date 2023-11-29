@@ -60,7 +60,7 @@ def results_set(operation):
         data_generation_method=[DataGenerationMethod.default()],
         verbose_name=f"{operation.method} {operation.full_path}",
     )
-    return models.TestResultSet([statistic])
+    return models.TestResultSet(seed=42, results=[statistic])
 
 
 @pytest.fixture()
@@ -103,7 +103,7 @@ def test_display_section_name(capsys, title, separator, printed, expected):
 def test_handle_initialized(capsys, execution_context, results_set, swagger_20, verbosity):
     execution_context.verbosity = verbosity
     # Given Initialized event
-    event = runner.events.Initialized.from_schema(schema=swagger_20)
+    event = runner.events.Initialized.from_schema(schema=swagger_20, seed=42)
     # When this even is handled
     default.handle_initialized(execution_context, event)
     out = capsys.readouterr().out
@@ -139,7 +139,7 @@ def test_display_statistic(capsys, swagger_20, execution_context, operation, res
             models.Check("different_check", models.Status.success, response, 0, models.Case(operation)),
         ],
     )
-    results = models.TestResultSet([single_test_statistic])
+    results = models.TestResultSet(seed=42, results=[single_test_statistic])
     event = Finished.from_results(results, running_time=1.0)
     # When test results are displayed
     default.display_statistic(execution_context, event)
@@ -155,7 +155,7 @@ def test_display_statistic(capsys, swagger_20, execution_context, operation, res
 
 
 def test_display_multiple_warnings(capsys, swagger_20, execution_context, operation, response):
-    results = models.TestResultSet([])
+    results = models.TestResultSet(seed=42, results=[])
     results.add_warning("Foo")
     results.add_warning("Bar")
     event = Finished.from_results(results, running_time=1.0)
@@ -170,7 +170,7 @@ def test_display_multiple_warnings(capsys, swagger_20, execution_context, operat
 
 
 def test_display_statistic_empty(capsys, execution_context, results_set):
-    default.display_statistic(execution_context, results_set)
+    default.display_statistic(execution_context, Finished.from_results(results_set, running_time=1.23))
     assert capsys.readouterr().out.split("\n")[2] == strip_style_win32(
         click.style("No checks were performed.", bold=True)
     )
@@ -179,7 +179,7 @@ def test_display_statistic_empty(capsys, execution_context, results_set):
 def test_display_statistic_junitxml(capsys, execution_context, results_set):
     xml_path = "/tmp/junit.xml"
     execution_context.junit_xml_file = xml_path
-    default.display_statistic(execution_context, results_set)
+    default.display_statistic(execution_context, Finished.from_results(results_set, running_time=1.23))
     assert capsys.readouterr().out.split("\n")[4] == strip_style_win32(
         click.style("JUnit XML file", bold=True) + click.style(f": {xml_path}")
     )

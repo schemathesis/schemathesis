@@ -357,6 +357,7 @@ class CliSnapshotConfig:
             data = re.sub(r"Actual: \d+\.\d+ms", "Actual: 105.00ms", data)
         if self.replace_seed:
             data = re.sub(r"--hypothesis-seed=\d+", "--hypothesis-seed=42", data)
+            data = re.sub(r"Random seed: \d+", "Random seed: 42", data)
         return data
 
 

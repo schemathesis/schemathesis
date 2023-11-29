@@ -1049,6 +1049,7 @@ class TestResult:
     is_flaky: bool = False
     is_skipped: bool = False
     is_executed: bool = False
+    # DEPRECATED: Seed is the same per test run
     seed: int | None = None
 
     def mark_errored(self) -> None:
@@ -1131,6 +1132,7 @@ class TestResultSet:
 
     __test__ = False
 
+    seed: int | None
     results: list[TestResult] = field(default_factory=list)
     generic_errors: list[OperationSchemaError] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)

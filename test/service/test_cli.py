@@ -138,10 +138,10 @@ def test_server_timeout(cli, schema_url, service, mocker):
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = get_stdout_lines(result.stdout)
     # And meta information should be displayed
-    assert lines[15] == "Compressed report size: 1 KB"
-    assert lines[16] == f"Uploading reports to {service.base_url} ..."
+    assert lines[16] == "Compressed report size: 1 KB"
+    assert lines[17] == f"Uploading reports to {service.base_url} ..."
     # Then the output indicates timeout
-    assert lines[17] == "Upload: TIMEOUT"
+    assert lines[18] == "Upload: TIMEOUT"
 
 
 def test_wait_for_report_handler():
@@ -448,9 +448,9 @@ def test_ci_environment(monkeypatch, cli, schema_url, tmp_path, read_report, ser
     assert result.exit_code == ExitCode.OK, result.stdout
     # And CI information is displayed in stdout
     lines = get_stdout_lines(result.stdout)
-    assert lines[14] == f"{environment.verbose_name} detected:"
+    assert lines[15] == f"{environment.verbose_name} detected:"
     key, value = next(iter(environment.as_env().items()))
-    assert lines[15] == f"  -> {key}: {value}"
+    assert lines[16] == f"  -> {key}: {value}"
     # And missing env vars are not displayed
     key, _ = next(filter(lambda kv: kv[1] is None, iter(environment.as_env().items())))
     assert key not in result.stdout

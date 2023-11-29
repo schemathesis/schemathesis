@@ -12,7 +12,6 @@ from test.apps.openapi._flask import create_app as create_openapi_app
 from test.utils import HERE, SIMPLE_PATH, strip_style_win32
 from unittest.mock import ANY
 from urllib.parse import urljoin
-from warnings import catch_warnings
 
 import pytest
 import requests
@@ -21,9 +20,7 @@ import yaml
 from _pytest.main import ExitCode
 from aiohttp.test_utils import unused_port
 import hypothesis
-from hypothesis.configuration import set_hypothesis_home_dir, storage_directory
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
-from packaging import version
 
 from schemathesis.models import Case
 from schemathesis.generation import DataGenerationMethod
@@ -377,32 +374,6 @@ def test_metadata(cli, schema_url):
     assert lines[3].startswith("Hypothesis")
 
 
-@pytest.fixture
-def tmp_hypothesis_dir(tmp_path):
-    original = storage_directory()
-    tmp_path.chmod(0o222)
-    set_hypothesis_home_dir(str(tmp_path))
-    yield tmp_path
-    set_hypothesis_home_dir(original)
-    tmp_path.chmod(0o777)
-
-
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-@pytest.mark.xfail(
-    version.parse(hypothesis.__version__) >= version.parse("6.87.3") and platform.system() != "Windows",
-    reason="PermissionError due to the usage of `Path.exists`",
-)
-def test_hypothesis_settings_no_warning_on_unusable_dir(tmp_hypothesis_dir, cli, schema_url):
-    # When the `.hypothesis` directory is unusable
-    # And an in-memory DB version is used
-    with catch_warnings(record=True) as warnings:
-        result = cli.run(schema_url, "--hypothesis-database=:memory:")
-    assert result.exit_code == ExitCode.OK, result.stdout
-    # Then there should be no warnings
-    assert not warnings
-
-
 def test_all_checks(cli, mocker, swagger_20):
     mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
@@ -451,11 +422,11 @@ def test_cli_run_output_success(cli, cli_args, workers):
     result = cli.run(*cli_args, f"--workers={workers}")
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
-    assert lines[4] == f"Workers: {workers}"
+    assert lines[5] == f"Workers: {workers}"
     if workers == 1:
-        assert lines[7].startswith("GET /api/success .")
+        assert lines[8].startswith("GET /api/success .")
     else:
-        assert lines[7] == "."
+        assert lines[8] == "."
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
 
@@ -551,11 +522,11 @@ def test_default_hypothesis_settings(cli, cli_args, workers):
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[7].startswith("GET /api/slow .")
-        assert lines[8].startswith("GET /api/success .")
+        assert lines[8].startswith("GET /api/slow .")
+        assert lines[9].startswith("GET /api/success .")
     else:
         # It could be in any sequence, because of multiple threads
-        assert lines[7] == ".."
+        assert lines[8] == ".."
 
 
 @pytest.mark.operations("unsatisfiable")
@@ -605,8 +576,8 @@ def test_invalid_operation(cli, cli_args, workers):
     assert "You can add @seed" not in result.stdout
     # And this operation should be marked as errored in the progress line
     lines = result.stdout.split("\n")
-    assert lines[7].startswith("POST /api/invalid E")
-    assert " POST /api/invalid " in lines[10]
+    assert lines[8].startswith("POST /api/invalid E")
+    assert " POST /api/invalid " in lines[11]
     # There shouldn't be a section end immediately after section start - there should be error text
     assert (
         """Invalid definition for element at index 0 in `parameters`
@@ -998,11 +969,11 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
     lines = result.stdout.strip().split("\n")
     # And summary is still displayed in the end of the output
     if workers == 1:
-        assert lines[7].startswith("GET /api/failure .")
-        assert lines[7].endswith("[ 50%]")
-        assert lines[8] == "GET /api/success "
-        assert "!! KeyboardInterrupt !!" in lines[9]
-        assert "== SUMMARY ==" in lines[11]
+        assert lines[8].startswith("GET /api/failure .")
+        assert lines[8].endswith("[ 50%]")
+        assert lines[9] == "GET /api/success "
+        assert "!! KeyboardInterrupt !!" in lines[10]
+        assert "== SUMMARY ==" in lines[12]
     else:
         assert_threaded_executor_interruption(lines, ("", "."))
 
@@ -1873,7 +1844,7 @@ def test_wait_for_schema_not_enough(cli, snapshot_cli):
 def test_rate_limit(cli, schema_url):
     result = cli.run(schema_url, "--rate-limit=1/s")
     lines = result.stdout.splitlines()
-    assert lines[5] == "Rate limit: 1/s"
+    assert lines[6] == "Rate limit: 1/s"
 
 
 @pytest.mark.openapi_version("3.0")
