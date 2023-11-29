@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Uni
 import hypothesis
 
 from ..._hypothesis import create_test
-from ...generation import DataGenerationMethod
+from ...generation import DataGenerationMethod, GenerationConfig
 from ...internal.result import Ok
 from ...models import CheckFunction, TestResultSet
 from ...stateful import Feedback, Stateful
@@ -30,6 +30,7 @@ def _run_task(
     targets: Iterable[Target],
     data_generation_methods: Iterable[DataGenerationMethod],
     settings: hypothesis.settings,
+    generation_config: GenerationConfig,
     seed: Optional[int],
     results: TestResultSet,
     stateful: Optional[Stateful],
@@ -44,7 +45,13 @@ def _run_task(
     def _run_tests(maker: Callable, recursion_level: int = 0) -> None:
         if recursion_level > stateful_recursion_limit:
             return
-        for _result in maker(test_template, settings, seed, as_strategy_kwargs=as_strategy_kwargs):
+        for _result in maker(
+            test_template,
+            settings=settings,
+            generation_config=generation_config,
+            seed=seed,
+            as_strategy_kwargs=as_strategy_kwargs,
+        ):
             # `result` is always `Ok` here
             _operation, test = _result.ok()
             feedback = Feedback(stateful, _operation)
@@ -81,6 +88,7 @@ def _run_task(
                     settings=settings,
                     seed=seed,
                     data_generation_methods=list(data_generation_methods),
+                    generation_config=generation_config,
                     as_strategy_kwargs=as_strategy_kwargs,
                 )
                 items = Ok((operation, test_function))
@@ -100,6 +108,7 @@ def thread_task(
     targets: Iterable[Target],
     data_generation_methods: Iterable[DataGenerationMethod],
     settings: hypothesis.settings,
+    generation_config: GenerationConfig,
     auth: Optional[RawAuth],
     auth_type: Optional[str],
     headers: Optional[Dict[str, Any]],
@@ -124,6 +133,7 @@ def thread_task(
             targets,
             data_generation_methods,
             settings,
+            generation_config,
             seed,
             results,
             stateful=stateful,
@@ -142,6 +152,7 @@ def wsgi_thread_task(
     targets: Iterable[Target],
     data_generation_methods: Iterable[DataGenerationMethod],
     settings: hypothesis.settings,
+    generation_config: GenerationConfig,
     seed: Optional[int],
     results: TestResultSet,
     stateful: Optional[Stateful],
@@ -157,6 +168,7 @@ def wsgi_thread_task(
         targets,
         data_generation_methods,
         settings,
+        generation_config,
         seed,
         results,
         stateful=stateful,
@@ -173,6 +185,7 @@ def asgi_thread_task(
     targets: Iterable[Target],
     data_generation_methods: Iterable[DataGenerationMethod],
     settings: hypothesis.settings,
+    generation_config: GenerationConfig,
     headers: Optional[Dict[str, Any]],
     seed: Optional[int],
     results: TestResultSet,
@@ -189,6 +202,7 @@ def asgi_thread_task(
         targets,
         data_generation_methods,
         settings,
+        generation_config,
         seed,
         results,
         stateful=stateful,
@@ -303,6 +317,7 @@ class ThreadPoolRunner(BaseRunner):
             "checks": self.checks,
             "targets": self.targets,
             "settings": self.hypothesis_settings,
+            "generation_config": self.generation_config,
             "auth": self.auth,
             "auth_type": self.auth_type,
             "headers": self.headers,
@@ -336,6 +351,7 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
             "checks": self.checks,
             "targets": self.targets,
             "settings": self.hypothesis_settings,
+            "generation_config": self.generation_config,
             "seed": self.seed,
             "results": results,
             "stateful": self.stateful,
@@ -366,6 +382,7 @@ class ThreadPoolASGIRunner(ThreadPoolRunner):
             "checks": self.checks,
             "targets": self.targets,
             "settings": self.hypothesis_settings,
+            "generation_config": self.generation_config,
             "headers": self.headers,
             "seed": self.seed,
             "results": results,

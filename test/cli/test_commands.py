@@ -23,7 +23,7 @@ import hypothesis
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
 from schemathesis.models import Case
-from schemathesis.generation import DataGenerationMethod
+from schemathesis.generation import DataGenerationMethod, GenerationConfig
 from schemathesis.checks import ALL_CHECKS, not_a_server_error, DEFAULT_CHECKS
 from schemathesis.cli import (
     DEPRECATED_PRE_RUN_OPTION_WARNING,
@@ -254,6 +254,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "store_interactions": False,
         "seed": None,
         "max_response_time": None,
+        "generation_config": GenerationConfig(),
         **expected,
     }
     hypothesis_settings = expected.pop("hypothesis_settings", None)
@@ -1951,3 +1952,33 @@ def test_long_payload(testdir, cli, empty_open_api_3_schema, snapshot_cli, opena
     }
     schema_file = testdir.make_schema_file(empty_open_api_3_schema)
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--checks=all") == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("plain_text_body")
+def test_custom_strings(testdir, cli, hypothesis_max_examples, schema_url):
+    module = testdir.make_importable_pyfile(
+        hook="""
+            import schemathesis
+
+            @schemathesis.check
+            def custom_strings(response, case):
+                try:
+                    case.body.encode("ascii")
+                except Exception as exc:
+                    raise AssertionError(str(exc))
+                assert "\\x00" not in case.body
+            """
+    )
+
+    result = cli.main(
+        "run",
+        "-c",
+        "custom_strings",
+        "--generation-allow-x00=false",
+        "--generation-codec=ascii",
+        schema_url,
+        f"--hypothesis-max-examples={hypothesis_max_examples or 100}",
+        hooks=module.purebasename,
+    )
+    assert result.exit_code == ExitCode.OK, result.stdout

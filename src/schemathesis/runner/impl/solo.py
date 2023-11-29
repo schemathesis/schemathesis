@@ -28,10 +28,11 @@ class SingleThreadRunner(BaseRunner):
         auth = get_requests_auth(self.auth, self.auth_type)
         with get_session(auth) as session:
             yield from self._run_tests(
-                self.schema.get_all_tests,
-                network_test,
-                self.hypothesis_settings,
-                self.seed,
+                maker=self.schema.get_all_tests,
+                template=network_test,
+                settings=self.hypothesis_settings,
+                generation_config=self.generation_config,
+                seed=self.seed,
                 checks=self.checks,
                 max_response_time=self.max_response_time,
                 targets=self.targets,
@@ -50,10 +51,11 @@ class SingleThreadRunner(BaseRunner):
 class SingleThreadWSGIRunner(SingleThreadRunner):
     def _execute_impl(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         yield from self._run_tests(
-            self.schema.get_all_tests,
-            wsgi_test,
-            self.hypothesis_settings,
-            self.seed,
+            maker=self.schema.get_all_tests,
+            template=wsgi_test,
+            settings=self.hypothesis_settings,
+            generation_config=self.generation_config,
+            seed=self.seed,
             checks=self.checks,
             max_response_time=self.max_response_time,
             targets=self.targets,
@@ -70,10 +72,11 @@ class SingleThreadWSGIRunner(SingleThreadRunner):
 class SingleThreadASGIRunner(SingleThreadRunner):
     def _execute_impl(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         yield from self._run_tests(
-            self.schema.get_all_tests,
-            asgi_test,
-            self.hypothesis_settings,
-            self.seed,
+            maker=self.schema.get_all_tests,
+            template=asgi_test,
+            settings=self.hypothesis_settings,
+            generation_config=self.generation_config,
+            seed=self.seed,
             checks=self.checks,
             max_response_time=self.max_response_time,
             targets=self.targets,

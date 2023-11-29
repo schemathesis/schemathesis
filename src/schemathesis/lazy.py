@@ -15,7 +15,7 @@ from ._compat import MultipleFailures, get_interesting_origin
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import FLAKY_FAILURE_MESSAGE, NOT_SET
-from .generation import DataGenerationMethodInput
+from .generation import DataGenerationMethodInput, GenerationConfig
 from .exceptions import CheckFailed, OperationSchemaError, SkipTest, get_grouped_exception
 from .hooks import HookDispatcher, HookScope
 from .internal.result import Ok
@@ -48,6 +48,7 @@ class LazySchema:
     validate_schema: bool = True
     skip_deprecated_operations: bool = False
     data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET
+    generation_config: Union[GenerationConfig, NotSet] = NOT_SET
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
     rate_limiter: Optional[Limiter] = None
     sanitize_output: bool = True
@@ -64,6 +65,7 @@ class LazySchema:
         validate_schema: Union[bool, NotSet] = NOT_SET,
         skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
         data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
+        generation_config: Union[GenerationConfig, NotSet] = NOT_SET,
         code_sample_style: Union[str, NotSet] = NOT_SET,
     ) -> Callable:
         if method is NOT_SET:
@@ -76,6 +78,8 @@ class LazySchema:
             operation_id = self.operation_id
         if data_generation_methods is NOT_SET:
             data_generation_methods = self.data_generation_methods
+        if generation_config is NOT_SET:
+            generation_config = self.generation_config
         if isinstance(code_sample_style, str):
             _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
         else:
@@ -114,6 +118,7 @@ class LazySchema:
                     validate_schema=validate_schema,
                     skip_deprecated_operations=skip_deprecated_operations,
                     data_generation_methods=data_generation_methods,
+                    generation_config=generation_config,
                     code_sample_style=_code_sample_style,
                     app=self.app,
                     rate_limiter=self.rate_limiter,
@@ -276,6 +281,7 @@ def get_schema(
     validate_schema: Union[bool, NotSet] = NOT_SET,
     skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
     data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
+    generation_config: Union[GenerationConfig, NotSet] = NOT_SET,
     code_sample_style: CodeSampleStyle,
     rate_limiter: Optional[Limiter],
     sanitize_output: bool,
@@ -297,6 +303,7 @@ def get_schema(
         validate_schema=validate_schema,
         skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
+        generation_config=generation_config,
         code_sample_style=code_sample_style,
         rate_limiter=rate_limiter,
         sanitize_output=sanitize_output,

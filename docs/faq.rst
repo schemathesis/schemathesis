@@ -280,6 +280,33 @@ The host has a changing IP address, or none if you have no network access. As a 
 
 **Solution**: Instead, use ``host.docker.internal`` as the hostname to allow Schemathesis to connect to services running on the host.
 
+How to prevent Schemathesis from generating NULL bytes in strings?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+By default, Schemathesis generates ``NULL`` bytes for all strings in order to cover more possible edge cases.
+
+**Solution**: To prevent Schemathesis from generating ``NULL`` bytes in strings, you need to set the ``allow_x00`` configuration to ``False``.
+
+CLI:
+
+.. code:: text
+
+    $ st run --generation-allow-x00=false ...
+
+Python:
+
+.. code:: python
+
+    import schemathesis
+    from schemathesis import GenerationConfig
+
+    schema = schemathesis.from_uri(
+        "https://example.schemathesis.io/openapi.json",
+        generation_config=GenerationConfig(allow_x00=False),
+    )
+
+This adjustment ensures that Schemathesis does not include NULL bytes in strings for all your tests, making them compatible with systems that reject such inputs.
+
 Working with API schemas
 ------------------------
 
