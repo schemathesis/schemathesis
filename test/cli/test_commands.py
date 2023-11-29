@@ -425,9 +425,9 @@ def test_cli_run_output_success(cli, cli_args, workers):
     lines = result.stdout.split("\n")
     assert lines[5] == f"Workers: {workers}"
     if workers == 1:
-        assert lines[8].startswith("GET /api/success .")
+        assert lines[9].startswith("GET /api/success .")
     else:
-        assert lines[8] == "."
+        assert lines[9] == "."
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
 
@@ -523,11 +523,11 @@ def test_default_hypothesis_settings(cli, cli_args, workers):
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[8].startswith("GET /api/slow .")
-        assert lines[9].startswith("GET /api/success .")
+        assert lines[9].startswith("GET /api/slow .")
+        assert lines[10].startswith("GET /api/success .")
     else:
         # It could be in any sequence, because of multiple threads
-        assert lines[8] == ".."
+        assert lines[9] == ".."
 
 
 @pytest.mark.operations("unsatisfiable")
@@ -553,9 +553,9 @@ def test_flaky(cli, cli_args, workers):
     # And this operation should be marked as failed in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[7].startswith("GET /api/flaky F")
+        assert lines[8].startswith("GET /api/flaky F")
     else:
-        assert lines[7] == "F"
+        assert lines[8] == "F"
     # And it should be displayed only once in "FAILURES" section
     assert "= FAILURES =" in result.stdout
     assert "_ GET /api/flaky _" in result.stdout
@@ -577,8 +577,8 @@ def test_invalid_operation(cli, cli_args, workers):
     assert "You can add @seed" not in result.stdout
     # And this operation should be marked as errored in the progress line
     lines = result.stdout.split("\n")
-    assert lines[8].startswith("POST /api/invalid E")
-    assert " POST /api/invalid " in lines[11]
+    assert lines[9].startswith("POST /api/invalid E")
+    assert " POST /api/invalid " in lines[12]
     # There shouldn't be a section end immediately after section start - there should be error text
     assert (
         """Invalid definition for element at index 0 in `parameters`
@@ -934,10 +934,10 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
     # its output might occur in the captured stdout.
     if IS_PYTEST_ABOVE_54:
         ignored_exception = "Exception ignored in: " in lines[7]
-        assert lines[7] in expected or ignored_exception, lines
+        assert lines[8] in expected or ignored_exception, lines
     if not optional_interrupt:
-        assert any("!! KeyboardInterrupt !!" in line for line in lines[8:]), lines
-    assert any("=== SUMMARY ===" in line for line in lines[7:])
+        assert any("!! KeyboardInterrupt !!" in line for line in lines[9:]), lines
+    assert any("=== SUMMARY ===" in line for line in lines[8:])
 
 
 @pytest.mark.parametrize("workers", (1, 2))
@@ -970,11 +970,11 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
     lines = result.stdout.strip().split("\n")
     # And summary is still displayed in the end of the output
     if workers == 1:
-        assert lines[8].startswith("GET /api/failure .")
-        assert lines[8].endswith("[ 50%]")
-        assert lines[9] == "GET /api/success "
-        assert "!! KeyboardInterrupt !!" in lines[10]
-        assert "== SUMMARY ==" in lines[12]
+        assert lines[9].startswith("GET /api/failure .")
+        assert lines[9].endswith("[ 50%]")
+        assert lines[10] == "GET /api/success "
+        assert "!! KeyboardInterrupt !!" in lines[11]
+        assert "== SUMMARY ==" in lines[13]
     else:
         assert_threaded_executor_interruption(lines, ("", "."))
 
@@ -1100,12 +1100,12 @@ def test_wsgi_app_internal_exception(testdir, cli):
     result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--hypothesis-derandomize")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
-    assert "== APPLICATION LOGS ==" in lines[45], result.stdout.strip()
-    assert "ERROR in app: Exception on /api/success [GET]" in lines[47]
+    assert "== APPLICATION LOGS ==" in lines[46], result.stdout.strip()
+    assert "ERROR in app: Exception on /api/success [GET]" in lines[48]
     if sys.version_info >= (3, 11):
-        assert lines[63] == "ZeroDivisionError: division by zero"
+        assert lines[64] == "ZeroDivisionError: division by zero"
     else:
-        assert lines[58] == '    raise ZeroDivisionError("division by zero")'
+        assert lines[59] == '    raise ZeroDivisionError("division by zero")'
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))

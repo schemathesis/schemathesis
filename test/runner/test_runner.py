@@ -833,6 +833,13 @@ def test_count_operations(real_app_schema):
     assert event.operations_count is None
 
 
+def test_count_links(real_app_schema):
+    # When `count_links` is set to `False`
+    event = next(from_schema(real_app_schema, count_links=False).execute())
+    # Then the total number of links is not calculated in the `Initialized` event
+    assert event.links_count is None
+
+
 def test_hypothesis_errors_propagation(empty_open_api_3_schema, openapi3_base_url):
     # See: GH-1046
     # When the operation contains a media type, that Schemathesis can't serialize

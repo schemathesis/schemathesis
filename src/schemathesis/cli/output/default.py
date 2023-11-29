@@ -659,6 +659,8 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     if context.rate_limit is not None:
         click.secho(f"Rate limit: {context.rate_limit}", bold=True)
     click.secho(f"Collected API operations: {context.operations_count}", bold=True)
+    links_count = cast(int, event.links_count)
+    click.secho(f"Collected API links: {links_count}", bold=True)
     if isinstance(context.report, ServiceReportContext):
         click.secho("Report to Schemathesis.io: ENABLED", bold=True)
     if context.operations_count >= 1:
