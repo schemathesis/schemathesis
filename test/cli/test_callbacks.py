@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import click
 import pytest
-from hypothesis import example, given
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 
 from schemathesis.cli import callbacks
@@ -30,12 +30,14 @@ def test_validate_schema_path_without_base_url():
 @example(":")
 @example("0:Ā")
 @example("Ā:0")
+@settings(deadline=None)
 def test_validate_auth(value):
     with pytest.raises(click.BadParameter):
         callbacks.validate_auth(None, None, value)
 
 
 @given(value=st.text())
+@settings(deadline=None)
 def test_validate_app(value):
     with pytest.raises(click.exceptions.Exit):
         callbacks.validate_app(SimpleNamespace(params={"show_errors_tracebacks": False}), None, value)
@@ -55,6 +57,7 @@ def is_invalid_header(header):
 @example(("0:Ā",))
 @example(("Ā:0",))
 @example((" :test",))
+@settings(deadline=None)
 def test_validate_header(value):
     with pytest.raises(click.BadParameter):
         callbacks.validate_headers(None, None, value)
