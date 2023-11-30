@@ -47,6 +47,7 @@ from .exceptions import (
     get_grouped_exception,
     get_timeout_error,
     prepare_response_payload,
+    SkipTest,
 )
 from .internal.deprecation import deprecated_property
 from .internal.copy import fast_deepcopy
@@ -60,6 +61,7 @@ from .generation import generate_random_case_id
 
 if TYPE_CHECKING:
     import werkzeug
+    import unittest
     from requests.structures import CaseInsensitiveDict
     from hypothesis import strategies as st
     import requests.auth
@@ -1051,6 +1053,7 @@ class TestResult:
     is_errored: bool = False
     is_flaky: bool = False
     is_skipped: bool = False
+    skip_reason: str | None = None
     is_executed: bool = False
     # DEPRECATED: Seed is the same per test run
     seed: int | None = None
@@ -1061,8 +1064,10 @@ class TestResult:
     def mark_flaky(self) -> None:
         self.is_flaky = True
 
-    def mark_skipped(self) -> None:
+    def mark_skipped(self, exc: SkipTest | unittest.case.SkipTest | None) -> None:
         self.is_skipped = True
+        if exc is not None:
+            self.skip_reason = str(exc)
 
     def mark_executed(self) -> None:
         self.is_executed = True
