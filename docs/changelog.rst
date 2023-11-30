@@ -16,6 +16,7 @@ Changelog
 - Bump the minimum supported ``jsonschema`` version to ``4.18.0``.
 - Bump the minimum supported ``hypothesis_graphql`` version to ``0.11.0``.
 - Use the same random seed for all tests in CLI. :issue:`1384`.
+- Improve serialization error messages in CLI.
 
 **Removed**
 

@@ -21,6 +21,8 @@ from ..exceptions import (
     OperationSchemaError,
     BodyInGetRequestError,
     InvalidRegularExpression,
+    SerializationError,
+    UnboundPrefixError,
 )
 from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
 
@@ -261,6 +263,15 @@ class SerializedError:
             message = exception.message
             extras = []
             title = "Schema Error"
+        elif isinstance(exception, SerializationError):
+            if isinstance(exception, UnboundPrefixError):
+                type_ = RuntimeErrorType.SERIALIZATION_UNBOUNDED_PREFIX
+                title = "XML serialization error"
+            else:
+                title = "Serialization not possible"
+                type_ = RuntimeErrorType.SERIALIZATION_NOT_POSSIBLE
+            message = str(exception)
+            extras = []
         else:
             type_ = RuntimeErrorType.UNCLASSIFIED
             message = str(exception)

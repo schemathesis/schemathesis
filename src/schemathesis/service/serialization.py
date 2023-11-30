@@ -76,13 +76,7 @@ def serialize_after_execution(event: events.AfterExecution) -> Optional[Dict[str
                 }
                 for check in event.result.checks
             ],
-            "errors": [
-                {
-                    "exception": error.exception,
-                    "exception_with_traceback": error.exception_with_traceback,
-                }
-                for error in event.result.errors
-            ],
+            "errors": [asdict(error) for error in event.result.errors],
         },
     }
 

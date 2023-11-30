@@ -290,6 +290,9 @@ class RuntimeErrorType(str, enum.Enum):
     SCHEMA_INVALID_REGULAR_EXPRESSION = "schema_invalid_regular_expression"
     SCHEMA_GENERIC = "schema_generic"
 
+    SERIALIZATION_NOT_POSSIBLE = "serialization_not_possible"
+    SERIALIZATION_UNBOUNDED_PREFIX = "serialization_unbounded_prefix"
+
     # Unclassified
     UNCLASSIFIED = "unclassified"
 

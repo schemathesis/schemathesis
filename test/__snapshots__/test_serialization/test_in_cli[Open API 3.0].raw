@@ -14,7 +14,7 @@ POST /api/csv E                                                           [100%]
 
 ==================================== ERRORS ====================================
 ________________________________ POST /api/csv _________________________________
-Runtime Error
+Serialization not possible
 
 Schemathesis can't serialize data to any of the defined media types: text/csv 
 You can register your own serializer with `schemathesis.serializer` and Schemathesis will be able to make API calls with this media type. 
