@@ -1,0 +1,3 @@
+Flask
+flask_sqlalchemy
+sqlalchemy<2.0
