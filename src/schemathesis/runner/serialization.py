@@ -345,6 +345,7 @@ class SerializedTestResult:
     is_errored: bool
     is_flaky: bool
     is_skipped: bool
+    skip_reason: str | None
     seed: int | None
     data_generation_method: list[str]
     checks: list[SerializedCheck]
@@ -365,6 +366,7 @@ class SerializedTestResult:
             is_errored=result.is_errored,
             is_flaky=result.is_flaky,
             is_skipped=result.is_skipped,
+            skip_reason=result.skip_reason,
             seed=result.seed,
             data_generation_method=[m.as_short_name() for m in result.data_generation_method],
             checks=[SerializedCheck.from_check(check) for check in result.checks],

@@ -336,13 +336,13 @@ def run_test(
         # Test body was not executed at all - Hypothesis did not generate any tests, but there is no error
         if not result.is_executed:
             status = Status.skip
-            result.mark_skipped()
+            result.mark_skipped(None)
         else:
             status = Status.success
-    except unittest.case.SkipTest:
+    except unittest.case.SkipTest as exc:
         # Newer Hypothesis versions raise this exception if no tests were executed
         status = Status.skip
-        result.mark_skipped()
+        result.mark_skipped(exc)
     except CheckFailed:
         status = Status.failure
     except NonCheckError:
@@ -369,9 +369,9 @@ def run_test(
     except KeyboardInterrupt:
         yield events.Interrupted()
         return
-    except SkipTest:
+    except SkipTest as exc:
         status = Status.skip
-        result.mark_skipped()
+        result.mark_skipped(exc)
     except AssertionError:  # comes from `hypothesis-jsonschema`
         error = reraise(operation)
         status = Status.error

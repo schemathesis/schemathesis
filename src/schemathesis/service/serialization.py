@@ -77,6 +77,7 @@ def serialize_after_execution(event: events.AfterExecution) -> Optional[Dict[str
                 for check in event.result.checks
             ],
             "errors": [asdict(error) for error in event.result.errors],
+            "skip_reason": event.result.skip_reason,
         },
     }
 
