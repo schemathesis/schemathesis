@@ -17,9 +17,9 @@ schemathesis.openapi.format("fullname", fullname())
 
 
 @schemathesis.hook
-def before_generate_body(context, strategy):
+def filter_body(context, body):
     """Modification over the default strategy for payload generation."""
-    return strategy.filter(lambda x: x.get("id", 10001) > 10000)
+    return body.get("id", 10001) > 10000
 
 
 @schemathesis.check

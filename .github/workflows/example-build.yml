@@ -15,45 +15,26 @@ jobs:
     name: Example app
     runs-on: ubuntu-22.04
 
-    # Setup PostgreSQL
-    services:
-      db:
-        image: postgres
-        env:
-          POSTGRES_PASSWORD: test
-          POSTGRES_USER: test
-          POSTGRES_DB: schemathesis-example
-        # Wait until Postgres is ready
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
     steps:
       - uses: actions/checkout@v4.1.1
 
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
-
-      - name: Install dependencies
-        run: pip install -r example/requirements.txt
-
-      # Starts the API in the background
-      - name: Start API
-        run: python example/main.py &
-        env:
-          DB_URL: "postgresql://test:test@127.0.0.1/schemathesis-example"
+      - name: Start containers
+        run: docker compose up -d --build
+        working-directory: "./example"
 
       # Runs positive Schemathesis tests
       - uses: schemathesis/action@v1
         continue-on-error: true
         with:
           # A local API schema location
-          schema: "http://127.0.0.1:5000/api/openapi.json"
+          schema: "http://127.0.0.1:5123/openapi.json"
           # Set your token from secrets
           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
           max-examples: "10"
+          # To avoid failing the build
           args: "-E does-not-exist"
+
+      - name: Stop containers
+        if: always()
+        run: docker-compose down
+        working-directory: "./example"
