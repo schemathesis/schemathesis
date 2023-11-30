@@ -1,0 +1,481 @@
+{
+  "openapi": "3.0.2",
+  "info": {
+    "title": "Schemathesis.io Demo Project",
+    "description": "This service demonstrates the range of issues Schemathesis.io can identify in your API automatically",
+    "version": "0.1",
+    "contact": {
+      "name": "Schemathesis.io Support Team",
+      "email": "support@schemathesis.io"
+    }
+  },
+  "paths": {
+    "/response-conformance/incorrect-content-type": {
+      "get": {
+        "summary": "Returning a response with a content type that differs from what is specified in the API schema, leading to potential client-side issues as the clients might be expecting a different data format.",
+        "description": "In this scenario, when the `item_id` parameter is set to \"error\", the server returns a plain text response, violating the API schema and potentially causing bugs and failures in client applications.",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/response-conformance/missing-field": {
+      "get": {
+        "summary": "Returning a response that misses some fields specified in the API schema. This discrepancy can lead to integration issues, as clients expecting the missing field might encounter errors or incorrect behavior.",
+        "description": "In this instance, the \"age\" field, as defined in the API schema, is absent from the response, which might result in errors or unexpected behavior in client applications.",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "age": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["id", "name", "age"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/response-conformance/undocumented-status-code": {
+      "get": {
+        "summary": "An issue where the server responds with a status code that is not documented in the OpenAPI schema.",
+        "description": "In this scenario, the API endpoint can potentially return a 404 status code when the requested ID does not exist in the database,\nleading to unexpected behaviors in client applications.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "The ID of the item to fetch",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["message"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "A descriptive error message indicating the input validation failure."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/response-conformance/malformed-json": {
+      "get": {
+        "summary": "An issue where the server responds with unstructured error messages instead of the expected structured JSON format, leading to potential confusion and improper handling of the response.",
+        "description": "In this scenario, the server returns a malformed JSON string due to a typo while bypassing regular JSON serialization for perceived simplicity.\nThis could lead to errors in clients using standard JSON parsers to interpret the response.",
+        "responses": {
+          "default": {
+            "description": "Default response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Indicates whether response is successful."
+                    }
+                  },
+                  "required": ["success"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal-server-errors/improper-unicode-encoding": {
+      "post": {
+        "summary": "The section highlights issues stemming from the improper handling of Unicode inputs, including emojis and other non-standard text elements.",
+        "description": "Here, the improper handling of a text input containing Unicode characters during an attempt to encode it to ASCII format triggers a `UnicodeDecodeError`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "The input text to be encoded to ASCII."
+                  }
+                },
+                "required": ["text"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully encoded the text to ASCII.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Indicates whether the text encoding was successful.",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request, missing 'text' field in the request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Always false for this response.",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error message indicating the missing 'text' field.",
+                      "example": "Missing text field"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error due to Unicode handling error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Always false for this response.",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error message indicating Unicode handling error.",
+                      "example": "Unicode handling error"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal-server-errors/improper-input-type-handling": {
+      "post": {
+        "summary": "An issue originating from improper input validation, allowing non-numeric inputs to cause a server error during the card number validation process.",
+        "description": "In this example, the server errors when it attempts to convert non-numeric characters to integers, which is not properly handled in the card number validation process.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "string",
+                    "description": "The credit card number to validate.",
+                    "example": "1234567812345670"
+                  }
+                },
+                "required": ["number"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "Card number validation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Indicates whether the card number is valid."
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error text if any."
+                    }
+                  },
+                  "required": ["success"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal-server-errors/exceeding-column-size": {
+      "post": {
+        "summary": "A server error can occur when attempting to store an input exceeding the database column's restricted size, resulting in a database error.",
+        "description": "In this scenario, an attempt to store input text that exceeds the 255 character limit of the database column results in a database error and server failure.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "The input text to be stored in the database."
+                  }
+                },
+                "required": ["text"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully stored the input text in the database.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Indicates whether the text was successfully stored in the database.",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request, missing 'text' field in the request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Always false for this response.",
+                      "example": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error due to a database error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "description": "Always false for this response.",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Error message indicating a database error.",
+                      "example": "Database error"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/performance/inefficient-algorithm": {
+      "get": {
+        "summary": "Inefficient algorithms can significantly slow down API responses, especially when handling large input, leading to poor performance and potential timeouts.",
+        "description": "In this scenario, generating a large Fibonacci sequence using an inefficient algorithm results in slow response times. The impact is particularly noticeable when searching for a term within the sequence, as the delay compounds, potentially leading to timeouts and degraded user experience. Setting reasonable limits on input sizes and optimizing algorithms are essential to mitigate such performance issues.",
+        "parameters": [
+          {
+            "name": "n",
+            "in": "query",
+            "description": "The length of the Fibonacci sequence to be generated.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "searchTerm",
+            "in": "query",
+            "description": "The term to search for within the generated Fibonacci sequence.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully found the search term in the Fibonacci sequence.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "foundAt": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "description": "The indices at which the search term was found in the Fibonacci sequence."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input. The 'n' should be less than or equal to 30 and 'searchTerm' must be a non-negative integer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "A descriptive error message indicating the input validation failure."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/performance/unbounded-result-set": {
+      "get": {
+        "summary": "Endpoints returning extensive, unbounded result sets can significantly strain server resources, leading to performance degradation and potentially rendering the service unresponsive.",
+        "description": "This case illustrates an endpoint that allows clients to request a large number of items without proper limitations. Implementing pagination or enforcing limitations on result set sizes is essential to prevent server strain, maintain optimal performance, and keep the service responsive.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The number of items to fetch. Must be greater than 0 and not exceed the maximum limit.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "default": 120,
+              "maximum": 120,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully fetched items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "description": "The data for each item."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. Limit must be greater than 0.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Limit must be greater than 0"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "https://example.schemathesis.io/"
+    }
+  ]
+}
