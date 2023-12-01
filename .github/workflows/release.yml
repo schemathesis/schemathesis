@@ -13,17 +13,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: linux/amd64
-            dockerfile: Dockerfile
+          - dockerfile: Dockerfile
             tag-suffix: ""
-          - platform: linux/amd64
-            dockerfile: Dockerfile.buster
-            tag-suffix: "-buster"
-          - platform: linux/arm64
-            dockerfile: Dockerfile
-            tag-suffix: ""
-          - platform: linux/arm64
-            dockerfile: Dockerfile.buster
+          - dockerfile: Dockerfile.buster
             tag-suffix: "-buster"
 
     steps:
@@ -65,7 +57,7 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          platforms: ${{ matrix.platform }}
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
