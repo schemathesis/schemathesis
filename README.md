@@ -124,7 +124,7 @@ Add this YAML configuration to your GitHub Actions:
 
 ```yaml
 api-tests:
-  runs-on: ubuntu-20.04
+  runs-on: ubuntu-22.04
   steps:
     - uses: schemathesis/action@v1
       with:

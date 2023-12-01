@@ -67,7 +67,7 @@ Run Schemathesis tests as a part of your CI/CD pipeline. Add this YAML configura
 .. code-block:: yaml
 
    api-tests:
-     runs-on: ubuntu-20.04
+     runs-on: ubuntu-22.04
      steps:
        - uses: schemathesis/action@v1
          with:
