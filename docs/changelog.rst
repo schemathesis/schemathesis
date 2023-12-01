@@ -9,6 +9,8 @@ Changelog
 - Support for ``hypothesis-jsonschema==0.23``.
 - A way to control what characters are used for string generation. :issue:`1142`, :issue:`1286`,:issue:`1562`, :issue:`1668`.
 - Display the total number of collected links in the CLI output. :issue:`1383`.
+- ``arm64`` Docker builds. :issue:`1740`.
+- Use Python 3.12 in Docker images.
 
 **Changed**
 
