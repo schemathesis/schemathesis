@@ -2,7 +2,7 @@ from __future__ import annotations
 import re
 import sys
 from functools import lru_cache
-from typing import Callable, TypeVar, cast, TYPE_CHECKING, TextIO, Any, BinaryIO
+from typing import Callable, TypeVar, TYPE_CHECKING, TextIO, Any, BinaryIO
 
 from .exceptions import SchemaError, SchemaErrorType, extract_requests_exception_details
 
@@ -19,7 +19,7 @@ def load_schema_from_url(loader: Callable[[], R]) -> R:
     try:
         response = loader()
     except requests.RequestException as exc:
-        request = cast(requests.PreparedRequest, exc.request)
+        url = exc.request.url if exc.request is not None else None
         if isinstance(exc, requests.exceptions.SSLError):
             type_ = SchemaErrorType.CONNECTION_SSL
         elif isinstance(exc, requests.exceptions.ConnectionError):
@@ -27,7 +27,7 @@ def load_schema_from_url(loader: Callable[[], R]) -> R:
         else:
             type_ = SchemaErrorType.NETWORK_OTHER
         message, extras = extract_requests_exception_details(exc)
-        raise SchemaError(message=message, type=type_, url=request.url, response=exc.response, extras=extras) from exc
+        raise SchemaError(message=message, type=type_, url=url, response=exc.response, extras=extras) from exc
     _raise_for_status(response)
     return response
 
