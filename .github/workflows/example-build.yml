@@ -13,7 +13,7 @@ on:
 jobs:
   local-ci:
     name: Example app
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     # Setup PostgreSQL
     services:
