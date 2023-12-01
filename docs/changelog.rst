@@ -25,6 +25,7 @@ Changelog
 **Fixed**
 
 - Internal error when a non-existing schema file is passed together with ``--base-url``. :issue:`1912`.
+- Internal error during schema loading from invalid URLs.
 
 **Removed**
 
