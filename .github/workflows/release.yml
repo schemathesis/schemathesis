@@ -15,8 +15,8 @@ jobs:
         include:
           - dockerfile: Dockerfile
             tag-suffix: ""
-          - dockerfile: Dockerfile.buster
-            tag-suffix: "-buster"
+          - dockerfile: Dockerfile.bookworm
+            tag-suffix: "-bookworm"
 
     steps:
       - uses: actions/checkout@v4.1.1

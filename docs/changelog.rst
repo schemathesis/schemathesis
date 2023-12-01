@@ -20,6 +20,7 @@ Changelog
 - Use the same random seed for all tests in CLI. :issue:`1384`.
 - Improve serialization error messages in CLI.
 - Store skip reason in the runner events.
+- Build ``bookworm``-based Debian Docker images instead of ``buster``-based.
 
 **Removed**
 
