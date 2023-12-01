@@ -5,64 +5,70 @@ on:
     types: [published]
 
 jobs:
-  container:
-    name: Container image
+  containers:
+    name: Build container images
     runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            dockerfile: Dockerfile
+            tag-suffix: ""
+          - platform: linux/amd64
+            dockerfile: Dockerfile.buster
+            tag-suffix: "-buster"
+          - platform: linux/arm64
+            dockerfile: Dockerfile
+            tag-suffix: ""
+          - platform: linux/arm64
+            dockerfile: Dockerfile.buster
+            tag-suffix: "-buster"
 
     steps:
       - uses: actions/checkout@v4.1.1
 
-      - name: GitHub Package Registry
-        uses: aevea/action-kaniko@v0.6.2
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
         with:
-          registry: docker.pkg.github.com
+          images: |
+            schemathesis/schemathesis
+            ghcr.io/schemathesis/schemathesis
+          tags: |
+            type=semver,pattern={{raw}}${{ matrix.tag-suffix }}
+            type=semver,pattern={{version}}${{ matrix.tag-suffix }}
+            type=raw,value=stable${{ matrix.tag-suffix }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          image: server
-          cache: true
-          cache_registry: cache
 
-      - name: Alpine. Dockerhub
-        uses: aevea/action-kaniko@v0.6.2
+      - name: Build and push
+        uses: docker/build-push-action@v5
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-          image: schemathesis/schemathesis
-          cache: true
-          cache_registry: schemathesis/cache
-
-      - name: Alpine. Dockerhub stable
-        uses: aevea/action-kaniko@v0.6.2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-          image: schemathesis/schemathesis
-          cache: true
-          tag: stable
-          cache_registry: schemathesis/cache
-
-      - run: echo "buster_tag=$(echo -n ${GITHUB_REF} | sed -E 's/refs\/(heads|tags)\///g' | sed -e 's/\//-/g' | cat - <(echo "-buster"))" >> $GITHUB_ENV
-
-      - name: Buster. Dockerhub
-        uses: aevea/action-kaniko@v0.6.2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-          image: schemathesis/schemathesis
-          build_file: Dockerfile.buster
-          tag: ${{ env.buster_tag }}
-          cache: true
-          cache_registry: schemathesis/cache
-
-      - name: Buster. Dockerhub stable
-        uses: aevea/action-kaniko@v0.6.2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-          image: schemathesis/schemathesis
-          build_file: Dockerfile.buster
-          cache: true
-          tag: stable-buster
-          cache_registry: schemathesis/cache
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
   release_package:
     name: Build and publish package to pypi.org
