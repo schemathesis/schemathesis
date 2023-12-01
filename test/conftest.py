@@ -328,7 +328,7 @@ class CliSnapshotConfig:
                         lines[idx] = "".join(sorted(line))
             data = "\n".join(lines) + "\n"
         if self.replace_statistic:
-            data = re.sub("[0-9]+ / [0-9]+ passed", replace_statistic, data)
+            data = re.sub("[0-9]+ / [0-9]+ passed", "N / N passed", data)
             data = re.sub("([0-9]+ passed,? )|([0-9]+ errored,? )", "", data)
         if self.replace_error_codes:
             data = (
@@ -359,14 +359,6 @@ class CliSnapshotConfig:
             data = re.sub(r"--hypothesis-seed=\d+", "--hypothesis-seed=42", data)
             data = re.sub(r"Random seed: \d+", "Random seed: 42", data)
         return data
-
-
-def replace_statistic(match):
-    replaced = "N / N passed"
-    padding = len(match.group()) - len(replaced)
-    if padding > 0:
-        replaced += " " * padding
-    return replaced
 
 
 EXAMPLE_UUID = "e32ab85ed4634c38a320eb0b22460da9"
