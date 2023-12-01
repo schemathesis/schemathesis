@@ -86,6 +86,7 @@ def test_run_subprocess(testdir):
         ("//test",),
         ("http://127.0.0.1", "--max-response-time=0"),
         ("unknown.json",),
+        ("unknown.json", "--base-url=http://127.0.0.1"),
         ("--help",),
     ),
 )
