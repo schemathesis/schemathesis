@@ -107,13 +107,12 @@ def validate_schema(
     if kind == SchemaInputKind.URL:
         validate_url(schema)
     if kind == SchemaInputKind.PATH:
-        # Base URL is required if it is not a dry run
-        if app is None and base_url is None and not dry_run:
+        if app is None:
             if not file_exists(schema):
-                message = FILE_DOES_NOT_EXIST_MESSAGE
-            else:
-                message = MISSING_BASE_URL_MESSAGE
-            raise click.UsageError(message)
+                raise click.UsageError(FILE_DOES_NOT_EXIST_MESSAGE)
+            # Base URL is required if it is not a dry run
+            if base_url is None and not dry_run:
+                raise click.UsageError(MISSING_BASE_URL_MESSAGE)
     if kind == SchemaInputKind.NAME:
         if api_name is not None:
             raise click.UsageError(f"Got unexpected extra argument ({api_name})")
