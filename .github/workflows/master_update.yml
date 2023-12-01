@@ -16,8 +16,8 @@ jobs:
         include:
           - dockerfile: Dockerfile
             tag: "latest"
-          - dockerfile: Dockerfile.buster
-            tag: "latest-buster"
+          - dockerfile: Dockerfile.bookworm
+            tag: "latest-bookworm"
 
     steps:
       - uses: actions/checkout@v4.1.1
