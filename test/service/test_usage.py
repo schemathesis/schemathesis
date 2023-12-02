@@ -62,7 +62,8 @@ def test_collect(args, expected):
         collected = usage.collect(args)
         # Hooks are global, and could be modified by other tests.
         # Drop them, as it is simpler than introducing locking
-        del collected["hooks"]
+        if collected is not None:
+            del collected["hooks"]
         assert collected == expected
 
     result = cli_runner.invoke(run)

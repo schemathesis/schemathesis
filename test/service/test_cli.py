@@ -155,38 +155,72 @@ def test_wait_for_report_handler():
     path=re.compile("/apis/.*/"),
 )
 @pytest.mark.openapi_version("3.0")
-def test_unauthorized(cli, schema_url, service):
+def test_unauthorized(cli, schema_url, service, snapshot_cli):
     # When the token is invalid
-    result = cli.run("my-api", "--schemathesis-io-token=invalid", f"--schemathesis-io-url={service.base_url}")
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then a proper error message should be displayed
-    lines = get_stdout_lines(result.stdout)
-    assert "Please, check that you use the proper CLI access token" in lines
+    assert (
+        cli.run("my-api", "--schemathesis-io-token=invalid", f"--schemathesis-io-url={service.base_url}")
+        == snapshot_cli
+    )
 
 
 @pytest.mark.service(
-    data={"title": "Bad request", "status": 400, "detail": "Something wrong"},
+    data={"title": "Bad request", "status": 400, "detail": "Please, upgrade your CLI"},
     status=400,
     method="POST",
     path="/reports/upload/",
 )
 @pytest.mark.openapi_version("3.0")
-def test_invalid_payload(cli, schema_url, service):
-    # When there is no token or invalid token
-    result = cli.run(
-        schema_url,
-        "my-api",
-        f"--schemathesis-io-token={service.token}",
-        f"--schemathesis-io-url={service.base_url}",
-        "--report",
+def test_client_error_on_upload(cli, schema_url, service, snapshot_cli):
+    assert (
+        cli.run(
+            schema_url,
+            "my-api",
+            f"--schemathesis-io-token={service.token}",
+            f"--schemathesis-io-url={service.base_url}",
+            "--report",
+        )
+        == snapshot_cli
     )
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # Then a proper error message should be displayed
-    lines = get_stdout_lines(result.stdout)
-    assert f"{SERVICE_ERROR_MESSAGE}:" in lines
-    assert "Please, consider" in result.stdout
-    assert "Response: " in result.stdout
-    assert "400 Client Error" in result.stdout
+
+
+@pytest.mark.service(
+    data="Content-Type error",
+    status=400,
+    method="POST",
+    path="/reports/upload/",
+)
+@pytest.mark.openapi_version("3.0")
+def test_unknown_error_on_upload(cli, schema_url, service, snapshot_cli):
+    assert (
+        cli.run(
+            schema_url,
+            "my-api",
+            f"--schemathesis-io-token={service.token}",
+            f"--schemathesis-io-url={service.base_url}",
+            "--report",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.service(
+    data={"title": "Bad request", "status": 400, "detail": "Please, upgrade your CLI"},
+    status=400,
+    method="GET",
+    path="/apis/my-api/",
+)
+@pytest.mark.openapi_version("3.0")
+def test_client_error_on_project_details(cli, schema_url, service, snapshot_cli):
+    assert (
+        cli.run(
+            "my-api",
+            f"--schemathesis-io-token={service.token}",
+            f"--schemathesis-io-url={service.base_url}",
+            "--report",
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.openapi_version("3.0")

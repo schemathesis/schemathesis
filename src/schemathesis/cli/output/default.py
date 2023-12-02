@@ -466,31 +466,52 @@ def display_report_metadata(meta: service.Metadata) -> None:
     click.secho(f"Compressed report size: {meta.size / 1024.:,.0f} KB", bold=True)
 
 
-def display_service_error(event: service.Error) -> None:
+def display_service_unauthorized(hostname: str) -> None:
+    click.secho("\nTo authenticate:")
+    click.secho(f"1. Retrieve your token from {bold(hostname)}")
+    click.secho(f"2. Execute {bold('`st auth login <TOKEN>`')}")
+    env_var = bold(f"`{service.TOKEN_ENV_VAR}`")
+    click.secho(
+        f"\nAs an alternative, supply the token directly "
+        f"using the {bold('`--schemathesis-io-token`')} option "
+        f"or the {env_var} environment variable."
+    )
+    click.echo("\nFor more information, please visit: https://schemathesis.readthedocs.io/en/stable/service.html")
+
+
+def display_service_error(event: service.Error, message_prefix: str = "") -> None:
     """Show information about an error during communication with Schemathesis.io."""
     from requests import RequestException, HTTPError, Response
 
     if isinstance(event.exception, HTTPError):
         response = cast(Response, event.exception.response)
         status_code = response.status_code
-        click.secho(f"Schemathesis.io responded with HTTP {status_code}", fg="red")
         if 500 <= status_code <= 599:
+            click.secho(f"Schemathesis.io responded with HTTP {status_code}", fg="red")
             # Server error, should be resolved soon
             click.secho(
-                "It is likely that we are already notified about the issue and working on a fix\n"
+                "\nIt is likely that we are already notified about the issue and working on a fix\n"
                 "Please, try again in 30 minutes",
                 fg="red",
             )
         elif status_code == 401:
             # Likely an invalid token
-            click.secho(
-                "Please, check that you use the proper CLI access token\n"
-                "See https://schemathesis.readthedocs.io/en/stable/service.html for more details",
-                fg="red",
-            )
+            click.echo("Your CLI is not authenticated.")
+            display_service_unauthorized("schemathesis.io")
         else:
-            # Other client-side errors are likely caused by a bug on the CLI side
-            ask_to_report(event)
+            try:
+                data = response.json()
+                detail = data["detail"]
+                click.secho(f"{message_prefix}{detail}", fg="red")
+            except Exception:
+                # Other client-side errors are likely caused by a bug on the CLI side
+                click.secho(
+                    "We apologize for the inconvenience. This appears to be an internal issue.\n"
+                    "Please, consider reporting the following details to our issue "
+                    f"tracker:\n\n  {ISSUE_TRACKER_URL}\n\nResponse: {response.text!r}\n"
+                    f"Headers: {response.headers!r}",
+                    fg="red",
+                )
     elif isinstance(event.exception, RequestException):
         ask_to_report(event, report_to_issues=False)
     else:
@@ -510,7 +531,7 @@ def ask_to_report(event: service.Error, report_to_issues: bool = True, extra: st
     else:
         response = ""
     if report_to_issues:
-        ask = f"Please, consider reporting the traceback below it to our issue tracker:\n\n  {ISSUE_TRACKER_URL}\n"
+        ask = f"Please, consider reporting the following details to our issue tracker:\n\n  {ISSUE_TRACKER_URL}\n\n"
     else:
         ask = ""
     click.secho(
