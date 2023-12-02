@@ -1,4 +1,5 @@
-from typing import Any, List, Tuple, Union
+from __future__ import annotations
+from typing import Any
 
 from ...constants import HTTP_METHODS
 
@@ -9,7 +10,7 @@ def is_pattern_error(exception: TypeError) -> bool:
     return "expected string or bytes-like object" in str(exception)
 
 
-def find_numeric_http_status_codes(schema: Any) -> List[Tuple[int, List[Union[str, int]]]]:
+def find_numeric_http_status_codes(schema: Any) -> list[tuple[int, list[str | int]]]:
     if not isinstance(schema, dict):
         return []
     found = []

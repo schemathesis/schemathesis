@@ -1,13 +1,14 @@
+from __future__ import annotations
 from itertools import chain
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable
 
 from ...internal.jsonschema import traverse_schema
 from ...internal.copy import fast_deepcopy
 
 
 def to_json_schema(
-    schema: Dict[str, Any], *, nullable_name: str, copy: bool = True, is_response_schema: bool = False
-) -> Dict[str, Any]:
+    schema: dict[str, Any], *, nullable_name: str, copy: bool = True, is_response_schema: bool = False
+) -> dict[str, Any]:
     """Convert Open API parameters to JSON Schema.
 
     NOTE. This function is applied to all keywords (including nested) during a schema resolving, thus it is not recursive.
@@ -32,7 +33,7 @@ def to_json_schema(
     return schema
 
 
-def rewrite_properties(schema: Dict[str, Any], predicate: Callable[[Dict[str, Any]], bool]) -> None:
+def rewrite_properties(schema: dict[str, Any], predicate: Callable[[dict[str, Any]], bool]) -> None:
     required = schema.get("required", [])
     forbidden = []
     for name, subschema in list(schema.get("properties", {}).items()):
@@ -49,7 +50,7 @@ def rewrite_properties(schema: Dict[str, Any], predicate: Callable[[Dict[str, An
         schema.pop("properties", None)
 
 
-def forbid_properties(schema: Dict[str, Any], forbidden: List[str]) -> None:
+def forbid_properties(schema: dict[str, Any], forbidden: list[str]) -> None:
     """Explicitly forbid properties via the `not` keyword."""
     not_schema = schema.setdefault("not", {})
     already_forbidden = not_schema.setdefault("required", [])
@@ -57,15 +58,15 @@ def forbid_properties(schema: Dict[str, Any], forbidden: List[str]) -> None:
     not_schema["required"] = list(set(chain(already_forbidden, forbidden)))
 
 
-def is_write_only(schema: Dict[str, Any]) -> bool:
+def is_write_only(schema: dict[str, Any]) -> bool:
     return schema.get("writeOnly", False) or schema.get("x-writeOnly", False)
 
 
-def is_read_only(schema: Dict[str, Any]) -> bool:
+def is_read_only(schema: dict[str, Any]) -> bool:
     return schema.get("readOnly", False)
 
 
 def to_json_schema_recursive(
-    schema: Dict[str, Any], nullable_name: str, is_response_schema: bool = False
-) -> Dict[str, Any]:
+    schema: dict[str, Any], nullable_name: str, is_response_schema: bool = False
+) -> dict[str, Any]:
     return traverse_schema(schema, to_json_schema, nullable_name=nullable_name, is_response_schema=is_response_schema)

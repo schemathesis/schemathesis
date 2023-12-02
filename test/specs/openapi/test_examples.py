@@ -1,5 +1,6 @@
+from __future__ import annotations
 from test.utils import assert_requests_call
-from typing import Any, Dict
+from typing import Any
 
 import jsonschema
 import pytest
@@ -17,7 +18,7 @@ from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
 
 @pytest.fixture(scope="module")
-def dict_with_examples() -> Dict[str, Any]:
+def dict_with_examples() -> dict[str, Any]:
     return {
         "openapi": "3.0.2",
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -62,7 +63,7 @@ def dict_with_examples() -> Dict[str, Any]:
 
 
 @pytest.fixture(scope="module")
-def dict_with_property_examples() -> Dict[str, Any]:
+def dict_with_property_examples() -> dict[str, Any]:
     return {
         "openapi": "3.0.2",
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -251,7 +252,7 @@ def test_examples_from_cli(app, testdir, cli, base_url, schema_with_examples):
 
 
 def test_get_object_example_from_properties():
-    mock_object_schema: Dict[str, Any] = {
+    mock_object_schema: dict[str, Any] = {
         "type": "object",
         "properties": {
             "prop1": {"type": "string", "example": "prop1 example string"},
@@ -270,7 +271,7 @@ def test_get_object_example_from_properties():
 
 
 def test_get_parameter_example_from_properties():
-    schema: Dict[str, Any] = {
+    schema: dict[str, Any] = {
         "parameters": [
             {
                 "name": "param1",
@@ -292,7 +293,7 @@ def test_get_parameter_example_from_properties():
 
 
 def test_get_request_body_example_from_properties():
-    schema: Dict[str, Any] = {
+    schema: dict[str, Any] = {
         "requestBody": {
             "content": {
                 "application/json": {

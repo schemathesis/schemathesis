@@ -1,6 +1,7 @@
+from __future__ import annotations
 from contextlib import contextmanager
 from functools import partial
-from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Type, TypeVar, cast
+from typing import Any, Callable, Generator, Type, TypeVar, cast
 
 import pytest
 from _pytest import fixtures, nodes
@@ -32,7 +33,7 @@ from ..utils import (
 T = TypeVar("T", bound=Node)
 
 
-def create(cls: Type[T], *args: Any, **kwargs: Any) -> T:
+def create(cls: type[T], *args: Any, **kwargs: Any) -> T:
     if IS_PYTEST_ABOVE_54:
         return cls.from_parent(*args, **kwargs)  # type: ignore
     return cls(*args, **kwargs)
@@ -43,7 +44,7 @@ class SchemathesisFunction(Function):
         self,
         *args: Any,
         test_func: Callable,
-        test_name: Optional[str] = None,
+        test_name: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
@@ -62,11 +63,11 @@ class SchemathesisFunction(Function):
 
 class SchemathesisCase(PyCollector):
     def __init__(self, test_function: Callable, *args: Any, **kwargs: Any) -> None:
-        self.given_kwargs: Optional[Dict[str, Any]]
+        self.given_kwargs: dict[str, Any] | None
         given_args = get_given_args(test_function)
         given_kwargs = get_given_kwargs(test_function)
 
-        def _init_with_valid_test(_test_function: Callable, _args: Tuple, _kwargs: Dict[str, Any]) -> None:
+        def _init_with_valid_test(_test_function: Callable, _args: tuple, _kwargs: dict[str, Any]) -> None:
             self.test_function = _test_function
             self.is_invalid_test = False
             self.given_kwargs = merge_given_args(test_function, _args, _kwargs)
@@ -159,13 +160,11 @@ class SchemathesisCase(PyCollector):
                     test_func=self.test_function,
                 )
 
-    def _get_class_parent(self) -> Optional[Type]:
+    def _get_class_parent(self) -> type | None:
         clscol = self.getparent(Class)
         return clscol.obj if clscol else None
 
-    def _parametrize(
-        self, cls: Optional[Type], definition: FunctionDefinition, fixtureinfo: FuncFixtureInfo
-    ) -> Metafunc:
+    def _parametrize(self, cls: type | None, definition: FunctionDefinition, fixtureinfo: FuncFixtureInfo) -> Metafunc:
         parent = self.getparent(Module)
         module = parent.obj if parent is not None else parent
         kwargs = {"cls": cls, "module": module}
@@ -182,7 +181,7 @@ class SchemathesisCase(PyCollector):
         self.ihook.pytest_generate_tests.call_extra(methods, {"metafunc": metafunc})
         return metafunc
 
-    def collect(self) -> List[Function]:  # type: ignore
+    def collect(self) -> list[Function]:  # type: ignore
         """Generate different test items for all API operations available in the given schema."""
         try:
             items = [

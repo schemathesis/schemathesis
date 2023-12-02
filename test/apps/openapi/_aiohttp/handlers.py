@@ -1,9 +1,9 @@
+from __future__ import annotations
 import asyncio
 import cgi
 import csv
 import io
 import json
-from typing import Dict
 from uuid import uuid4
 
 import jsonschema
@@ -173,7 +173,7 @@ async def multiple_failures(request: web.Request) -> web.Response:
     return web.json_response({"result": "OK"})
 
 
-def _decode_multipart(content: bytes, content_type: str) -> Dict[str, str]:
+def _decode_multipart(content: bytes, content_type: str) -> dict[str, str]:
     # a simplified version of multipart encoding that satisfies testing purposes
     _, options = cgi.parse_header(content_type)
     options["boundary"] = options["boundary"].encode()

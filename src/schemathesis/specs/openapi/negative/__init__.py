@@ -1,6 +1,7 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 from urllib.parse import urlencode
 
 import jsonschema
@@ -36,7 +37,7 @@ def get_validator(cache_key: CacheKey) -> jsonschema.Draft4Validator:
 
 
 @lru_cache
-def split_schema(cache_key: CacheKey) -> Tuple[Schema, Schema]:
+def split_schema(cache_key: CacheKey) -> tuple[Schema, Schema]:
     """Split the schema in two parts.
 
     The first one contains only validation JSON Schema keywords, the second one everything else.
@@ -54,10 +55,10 @@ def negative_schema(
     schema: Schema,
     operation_name: str,
     location: str,
-    media_type: Optional[str],
+    media_type: str | None,
     generation_config: GenerationConfig,
     *,
-    custom_formats: Dict[str, st.SearchStrategy[str]],
+    custom_formats: dict[str, st.SearchStrategy[str]],
 ) -> st.SearchStrategy:
     """A strategy for instances that DO NOT match the input schema.
 
@@ -71,12 +72,12 @@ def negative_schema(
 
     if location == "query":
 
-        def filter_values(value: Dict[str, Any]) -> bool:
+        def filter_values(value: dict[str, Any]) -> bool:
             return is_non_empty_query(value) and not validator.is_valid(value)
 
     else:
 
-        def filter_values(value: Dict[str, Any]) -> bool:
+        def filter_values(value: dict[str, Any]) -> bool:
             return not validator.is_valid(value)
 
     return mutated(keywords, non_keywords, location, media_type).flatmap(
@@ -86,7 +87,7 @@ def negative_schema(
     )
 
 
-def is_non_empty_query(query: Dict[str, Any]) -> bool:
+def is_non_empty_query(query: dict[str, Any]) -> bool:
     # Whether this query parameters will be encoded to a non-empty query string
     result = []
     for key, values in query.items():
@@ -104,7 +105,7 @@ def is_non_empty_query(query: Dict[str, Any]) -> bool:
 
 
 @st.composite  # type: ignore
-def mutated(draw: Draw, keywords: Schema, non_keywords: Schema, location: str, media_type: Optional[str]) -> Any:
+def mutated(draw: Draw, keywords: Schema, non_keywords: Schema, location: str, media_type: str | None) -> Any:
     return MutationContext(
         keywords=keywords, non_keywords=non_keywords, location=location, media_type=media_type
     ).mutate(draw)

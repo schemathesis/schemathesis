@@ -1,7 +1,8 @@
+from __future__ import annotations
 import hashlib
 import http
 from dataclasses import asdict
-from typing import Any, Optional, Union
+from typing import Any
 from urllib.parse import urljoin
 
 import requests
@@ -22,7 +23,7 @@ def response_hook(response: requests.Response, **_kwargs: Any) -> None:
 class ServiceClient(requests.Session):
     """A more convenient session to send requests to Schemathesis.io."""
 
-    def __init__(self, base_url: str, token: Optional[str], *, timeout: int = REQUEST_TIMEOUT, verify: bool = True):
+    def __init__(self, base_url: str, token: str | None, *, timeout: int = REQUEST_TIMEOUT, verify: bool = True):
         super().__init__()
         self.timeout = timeout
         self.verify = verify
@@ -58,10 +59,10 @@ class ServiceClient(requests.Session):
     def upload_report(
         self,
         report: bytes,
-        correlation_id: Optional[str] = None,
-        ci_provider: Optional[CIProvider] = None,
+        correlation_id: str | None = None,
+        ci_provider: CIProvider | None = None,
         source: UploadSource = UploadSource.DEFAULT,
-    ) -> Union[UploadResponse, FailedUploadResponse]:
+    ) -> UploadResponse | FailedUploadResponse:
         """Upload test run report to Schemathesis.io."""
         headers = {
             "Content-Type": "application/x-gtar",

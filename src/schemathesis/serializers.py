@@ -1,3 +1,4 @@
+from __future__ import annotations
 import binascii
 import os
 from dataclasses import dataclass
@@ -9,8 +10,6 @@ from typing import (
     Collection,
     Dict,
     Generator,
-    Optional,
-    Type,
     cast,
     Protocol,
     runtime_checkable,
@@ -29,7 +28,7 @@ if TYPE_CHECKING:
     from .models import Case
 
 
-SERIALIZERS: Dict[str, Type["Serializer"]] = {}
+SERIALIZERS: dict[str, type[Serializer]] = {}
 
 
 @dataclass
@@ -50,7 +49,7 @@ class SerializerContext:
     :ivar Case case: Generated example that is being processed.
     """
 
-    case: "Case"
+    case: Case
 
     @property
     def media_type(self) -> str:
@@ -62,11 +61,11 @@ class SerializerContext:
     # Therefore `schema` is never `None` if called from here. However, `APIOperation.get_raw_payload_schema` is
     # generic and can be called from other places where it may return `None`
 
-    def get_raw_payload_schema(self) -> Dict[str, Any]:
+    def get_raw_payload_schema(self) -> dict[str, Any]:
         schema = self.case.operation.get_raw_payload_schema(self.media_type)
         return cast(Dict[str, Any], schema)
 
-    def get_resolved_payload_schema(self) -> Dict[str, Any]:
+    def get_resolved_payload_schema(self) -> dict[str, Any]:
         schema = self.case.operation.get_resolved_payload_schema(self.media_type)
         return cast(Dict[str, Any], schema)
 
@@ -79,14 +78,14 @@ class Serializer(Protocol):
     `requests` and `werkzeug` transports.
     """
 
-    def as_requests(self, context: SerializerContext, payload: Any) -> Dict[str, Any]:
+    def as_requests(self, context: SerializerContext, payload: Any) -> dict[str, Any]:
         raise NotImplementedError
 
-    def as_werkzeug(self, context: SerializerContext, payload: Any) -> Dict[str, Any]:
+    def as_werkzeug(self, context: SerializerContext, payload: Any) -> dict[str, Any]:
         raise NotImplementedError
 
 
-def register(media_type: str, *, aliases: Collection[str] = ()) -> Callable[[Type[Serializer]], Type[Serializer]]:
+def register(media_type: str, *, aliases: Collection[str] = ()) -> Callable[[type[Serializer]], type[Serializer]]:
     """Register a serializer for the given media type.
 
     Schemathesis uses ``requests`` for regular network calls and ``werkzeug`` for WSGI applications. Your serializer
@@ -109,7 +108,7 @@ def register(media_type: str, *, aliases: Collection[str] = ()) -> Callable[[Typ
 
     """
 
-    def wrapper(serializer: Type[Serializer]) -> Type[Serializer]:
+    def wrapper(serializer: type[Serializer]) -> type[Serializer]:
         if not issubclass(serializer, Serializer):
             raise TypeError(
                 f"`{serializer.__name__}` is not a valid serializer. "
@@ -128,7 +127,7 @@ def unregister(media_type: str) -> None:
     del SERIALIZERS[media_type]
 
 
-def _to_json(value: Any) -> Dict[str, Any]:
+def _to_json(value: Any) -> dict[str, Any]:
     if isinstance(value, bytes):
         # Possible to get via explicit examples, e.g. `externalValue`
         return {"data": value}
@@ -142,14 +141,14 @@ def _to_json(value: Any) -> Dict[str, Any]:
 
 @register("application/json")
 class JSONSerializer:
-    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+    def as_requests(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         return _to_json(value)
 
-    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         return _to_json(value)
 
 
-def _to_yaml(value: Any) -> Dict[str, Any]:
+def _to_yaml(value: Any) -> dict[str, Any]:
     import yaml
 
     try:
@@ -164,19 +163,19 @@ def _to_yaml(value: Any) -> Dict[str, Any]:
 
 @register("text/yaml", aliases=("text/x-yaml", "application/x-yaml", "text/vnd.yaml"))
 class YAMLSerializer:
-    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+    def as_requests(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         return _to_yaml(value)
 
-    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         return _to_yaml(value)
 
 
 @register("application/xml")
 class XMLSerializer:
-    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+    def as_requests(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         return _to_xml(value, context.get_raw_payload_schema(), context.get_resolved_payload_schema())
 
-    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         return _to_xml(value, context.get_raw_payload_schema(), context.get_resolved_payload_schema())
 
 
@@ -186,7 +185,7 @@ def _should_coerce_to_bytes(item: Any) -> bool:
     return isinstance(item, Binary) or not isinstance(item, (bytes, str, int))
 
 
-def _prepare_form_data(data: Dict[str, Any]) -> Dict[str, Any]:
+def _prepare_form_data(data: dict[str, Any]) -> dict[str, Any]:
     """Make the generated data suitable for sending as multipart.
 
     If the schema is loose, Schemathesis can generate data that can't be sent as multipart. In these cases,
@@ -232,7 +231,7 @@ def _encode_multipart(value: Any, boundary: str) -> bytes:
 
 @register("multipart/form-data")
 class MultipartSerializer:
-    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+    def as_requests(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         if isinstance(value, bytes):
             return {"data": value}
         if isinstance(value, dict):
@@ -246,27 +245,27 @@ class MultipartSerializer:
         content_type = f"multipart/form-data; boundary={boundary}"
         return {"data": raw_data, "headers": {"Content-Type": content_type}}
 
-    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         return {"data": value}
 
 
 @register("application/x-www-form-urlencoded")
 class URLEncodedFormSerializer:
-    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+    def as_requests(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         return {"data": value}
 
-    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         return {"data": value}
 
 
 @register("text/plain")
 class TextSerializer:
-    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+    def as_requests(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         if isinstance(value, bytes):
             return {"data": value}
         return {"data": str(value).encode("utf8")}
 
-    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         if isinstance(value, bytes):
             return {"data": value}
         return {"data": str(value)}
@@ -274,10 +273,10 @@ class TextSerializer:
 
 @register("application/octet-stream")
 class OctetStreamSerializer:
-    def as_requests(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+    def as_requests(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         return {"data": _to_bytes(value)}
 
-    def as_werkzeug(self, context: SerializerContext, value: Any) -> Dict[str, Any]:
+    def as_werkzeug(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         return {"data": _to_bytes(value)}
 
 
@@ -297,11 +296,11 @@ def get_matching_media_types(media_type: str) -> Generator[str, None, None]:
                     yield registered_media_type
 
 
-def get_first_matching_media_type(media_type: str) -> Optional[str]:
+def get_first_matching_media_type(media_type: str) -> str | None:
     return next(get_matching_media_types(media_type), None)
 
 
-def get(media_type: str) -> Optional[Type[Serializer]]:
+def get(media_type: str) -> type[Serializer] | None:
     """Get an appropriate serializer for the given media type."""
     if is_json_media_type(media_type):
         media_type = "application/json"

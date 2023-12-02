@@ -1,15 +1,16 @@
+from __future__ import annotations
 from typing import overload, Dict, Union, Any, List, Callable
 
 JsonValue = Union[Dict[str, Any], List, str, float, int]
 
 
 @overload
-def traverse_schema(schema: Dict[str, Any], callback: Callable, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+def traverse_schema(schema: dict[str, Any], callback: Callable, *args: Any, **kwargs: Any) -> dict[str, Any]:
     pass
 
 
 @overload
-def traverse_schema(schema: List, callback: Callable, *args: Any, **kwargs: Any) -> List:
+def traverse_schema(schema: list, callback: Callable, *args: Any, **kwargs: Any) -> list:
     pass
 
 
@@ -23,7 +24,7 @@ def traverse_schema(schema: float, callback: Callable, *args: Any, **kwargs: Any
     pass
 
 
-def traverse_schema(schema: JsonValue, callback: Callable[..., Dict[str, Any]], *args: Any, **kwargs: Any) -> JsonValue:
+def traverse_schema(schema: JsonValue, callback: Callable[..., dict[str, Any]], *args: Any, **kwargs: Any) -> JsonValue:
     """Apply callback recursively to the given schema."""
     if isinstance(schema, dict):
         schema = callback(schema, *args, **kwargs)

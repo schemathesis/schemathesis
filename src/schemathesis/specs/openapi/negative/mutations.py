@@ -1,8 +1,9 @@
 """Schema mutations."""
+from __future__ import annotations
 import enum
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Callable, List, Optional, Sequence, Set, Tuple, TypeVar
+from typing import Any, Callable, Sequence, TypeVar
 
 from hypothesis import reject
 from hypothesis import strategies as st
@@ -28,10 +29,10 @@ class MutationResult(enum.Enum):
     SUCCESS = 1
     FAILURE = 2
 
-    def __ior__(self, other: Any) -> "MutationResult":
+    def __ior__(self, other: Any) -> MutationResult:
         return self | other
 
-    def __or__(self, other: Any) -> "MutationResult":
+    def __or__(self, other: Any) -> MutationResult:
         # Syntactic sugar to simplify handling of multiple results
         if self == MutationResult.SUCCESS:
             return self
@@ -68,7 +69,7 @@ class MutationContext:
     # Schema location within API operation (header, query, etc)
     location: str
     # Payload media type, if available
-    media_type: Optional[str]
+    media_type: str | None
 
     @property
     def is_header_location(self) -> bool:
@@ -81,7 +82,7 @@ class MutationContext:
     def mutate(self, draw: Draw) -> Schema:
         # On the top level, Schemathesis creates "object" schemas for all parameter "in" values except "body", which is
         # taken as-is. Therefore, we can only apply mutations that won't change the Open API semantics of the schema.
-        mutations: List[Mutation]
+        mutations: list[Mutation]
         if self.location in ("header", "cookie", "query"):
             # These objects follow this pattern:
             # {
@@ -225,7 +226,7 @@ def change_type(context: MutationContext, draw: Draw, schema: Schema) -> Mutatio
     return MutationResult.SUCCESS
 
 
-def _get_type_candidates(context: MutationContext, schema: Schema) -> Set[str]:
+def _get_type_candidates(context: MutationContext, schema: Schema) -> set[str]:
     types = set(get_type(schema))
     if context.is_path_location:
         candidates = {"string", "integer", "number", "boolean", "null"} - types
@@ -334,7 +335,7 @@ def _change_items_object(context: MutationContext, draw: Draw, schema: Schema, i
     return MutationResult.SUCCESS
 
 
-def _change_items_array(context: MutationContext, draw: Draw, schema: Schema, items: List) -> MutationResult:
+def _change_items_array(context: MutationContext, draw: Draw, schema: Schema, items: list) -> MutationResult:
     latest_success_index = None
     for idx, item in enumerate(items):
         result = MutationResult.FAILURE
@@ -397,12 +398,12 @@ def negate_constraints(context: MutationContext, draw: Draw, schema: Schema) -> 
 DEPENDENCIES = {"exclusiveMaximum": "maximum", "exclusiveMinimum": "minimum"}
 
 
-def get_mutations(draw: Draw, schema: Schema) -> Tuple[Mutation, ...]:
+def get_mutations(draw: Draw, schema: Schema) -> tuple[Mutation, ...]:
     """Get mutations possible for a schema."""
     types = get_type(schema)
     # On the top-level of Open API schemas, types are always strings, but inside "schema" objects, they are the same as
     # in JSON Schema, where it could be either a string or an array of strings.
-    options: List[Mutation] = [negate_constraints, change_type]
+    options: list[Mutation] = [negate_constraints, change_type]
     if "object" in types:
         options.extend([change_properties, remove_required_property])
     elif "array" in types:
@@ -414,7 +415,7 @@ def ident(x: T) -> T:
     return x
 
 
-def ordered(items: Sequence[T], unique_by: Callable[[T], Any] = ident) -> st.SearchStrategy[List[T]]:
+def ordered(items: Sequence[T], unique_by: Callable[[T], Any] = ident) -> st.SearchStrategy[list[T]]:
     """Returns a strategy that generates randomly ordered lists of T.
 
     NOTE. Items should be unique.
