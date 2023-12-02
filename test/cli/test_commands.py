@@ -1070,7 +1070,7 @@ def test_wsgi_app_exception(testdir, cli):
         1 / 0
         """
     )
-    result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--show-errors-tracebacks")
+    result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--show-trace")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert "Traceback (most recent call last):" in result.stdout
     assert "ZeroDivisionError: division by zero" in result.stdout
@@ -1188,7 +1188,7 @@ def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_b
         str(schema_file),
         f"--base-url={openapi3_base_url}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
-        "--show-errors-tracebacks",
+        "--show-trace",
         "--hypothesis-derandomize",
         f"--cassette-path={cassette_path}",
     )
@@ -1308,7 +1308,7 @@ def test_openapi_links(cli, cli_args, schema_url, hypothesis_max_examples, snaps
             "--hypothesis-seed=1",
             "--hypothesis-derandomize",
             "--hypothesis-deadline=None",
-            "--show-errors-tracebacks",
+            "--show-trace",
         )
         == snapshot_cli
     )
@@ -1324,7 +1324,7 @@ def test_openapi_links_disabled(cli, schema_url, hypothesis_max_examples, snapsh
             "--hypothesis-seed=1",
             "--hypothesis-derandomize",
             "--hypothesis-deadline=None",
-            "--show-errors-tracebacks",
+            "--show-trace",
             "--stateful=none",
         )
         == snapshot_cli
@@ -1343,7 +1343,7 @@ def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_lim
         "--hypothesis-derandomize",
         "--hypothesis-deadline=None",
         "--hypothesis-suppress-health-check=too_slow,filter_too_much",
-        "--show-errors-tracebacks",
+        "--show-trace",
         f"--stateful-recursion-limit={recursion_limit}",
         "--workers=2",
     )
@@ -1617,7 +1617,7 @@ def assert_exit_code(event_stream, code):
             hypothesis_settings=hypothesis.settings(),
             workers_num=1,
             rate_limit=None,
-            show_errors_tracebacks=False,
+            show_trace=False,
             wait_for_schema=None,
             validate_schema=False,
             cassette_path=None,

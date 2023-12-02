@@ -147,9 +147,9 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
         should_display_full_traceback_message |= display_single_error(context, result)
     if event.generic_errors:
         display_generic_errors(context, event.generic_errors)
-    if should_display_full_traceback_message and not context.show_errors_tracebacks:
+    if should_display_full_traceback_message and not context.show_trace:
         click.secho(
-            "\nAdd this option to your command line parameters to see full tracebacks: --show-errors-tracebacks",
+            "\nAdd this option to your command line parameters to see full tracebacks: --show-trace",
             fg="red",
         )
     click.secho(
@@ -231,7 +231,7 @@ def _display_error(context: ExecutionContext, error: SerializedError) -> bool:
         click.echo(error.exception)
     if error.extras:
         extras = error.extras
-    elif context.show_errors_tracebacks:
+    elif context.show_trace:
         extras = _split_traceback(error.exception_with_traceback)
     else:
         extras = []
@@ -615,7 +615,7 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
     click.secho(event.message)
     if event.type == InternalErrorType.SCHEMA:
         extras = event.extras
-    elif context.show_errors_tracebacks:
+    elif context.show_trace:
         extras = _split_traceback(event.exception_with_traceback)
     else:
         extras = [event.exception]
@@ -623,12 +623,12 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
     if not should_skip_suggestion(context, event):
         if event.type == InternalErrorType.SCHEMA and isinstance(event.subtype, SchemaErrorType):
             suggestion = SCHEMA_ERROR_SUGGESTIONS.get(event.subtype)
-        elif context.show_errors_tracebacks:
+        elif context.show_trace:
             suggestion = (
                 f"Please consider reporting the traceback above to our issue tracker:\n\n  {ISSUE_TRACKER_URL}."
             )
         else:
-            suggestion = f"To see full tracebacks, add {bold('`--show-errors-tracebacks`')} to your CLI options"
+            suggestion = f"To see full tracebacks, add {bold('`--show-trace`')} to your CLI options"
         _maybe_display_tip(suggestion)
 
 

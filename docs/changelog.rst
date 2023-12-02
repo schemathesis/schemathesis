@@ -23,6 +23,10 @@ Changelog
 - Store skip reason in the runner events.
 - Build ``bookworm``-based Debian Docker images instead of ``buster``-based.
 
+**Deprecated**
+
+- Using the ``--show-errors-tracebacks`` CLI option. Use ``--show-trace`` instead.
+
 **Fixed**
 
 - Internal error when a non-existing schema file is passed together with ``--base-url``. :issue:`1912`.

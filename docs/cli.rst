@@ -537,7 +537,7 @@ Debugging
 ---------
 
 If Schemathesis produces an internal error, its traceback is hidden. To show error tracebacks in the CLI output, use
-the ``--show-errors-tracebacks`` option.
+the ``--show-trace`` option.
 
 Additionally you can dump all internal events to a JSON Lines file with the ``--debug-output-file`` CLI option.
 

@@ -91,6 +91,10 @@ DEPRECATED_PRE_RUN_OPTION_WARNING = (
     "Warning: Option `--pre-run` is deprecated and will be removed in Schemathesis 4.0. "
     f"Use the `{HOOKS_MODULE_ENV_VAR}` environment variable instead"
 )
+DEPRECATED_SHOW_ERROR_TRACEBACKS_OPTION_WARNING = (
+    "Warning: Option `--show-errors-tracebacks` is deprecated and will be removed in Schemathesis 4.0. "
+    "Use `--show-trace` instead"
+)
 CASSETTES_PATH_INVALID_USAGE_MESSAGE = "Can't use `--store-network-log` and `--cassette-path` simultaneously"
 COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
 
@@ -107,22 +111,6 @@ def reset_targets() -> None:
     # Useful in tests
     targets_module.ALL_TARGETS = targets_module.DEFAULT_TARGETS + targets_module.OPTIONAL_TARGETS
     TARGETS_TYPE.choices = _get_callable_names(targets_module.ALL_TARGETS) + ("all",)
-
-
-class DeprecatedOption(click.Option):
-    def __init__(self, *args: Any, removed_in: str, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.removed_in = removed_in
-
-    def handle_parse_result(self, ctx: click.Context, opts: dict[str, Any], args: list[str]) -> tuple[Any, list[str]]:
-        if self.name in opts:
-            opt_names = "/".join(f"`{name}`" for name in self.opts)
-            verb = "is" if len(self.opts) == 1 else "are"
-            click.secho(
-                f"\nWARNING: {opt_names} {verb} deprecated and will be removed in Schemathesis {self.removed_in}\n",
-                fg="yellow",
-            )
-        return super().handle_parse_result(ctx, opts, args)
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -463,6 +451,15 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     is_flag=True,
     is_eager=True,
     default=False,
+    hidden=True,
+    show_default=True,
+)
+@click.option(
+    "--show-trace",
+    help="Displays complete traceback information for internal errors.",
+    is_flag=True,
+    is_eager=True,
+    default=False,
     show_default=True,
 )
 @click.option(
@@ -486,8 +483,9 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 )
 @click.option(
     "--store-network-log",
-    help="[DEPRECATED] Saves the test outcomes in a VCR-compatible format.",
+    help="Saves the test outcomes in a VCR-compatible format.",
     type=click.File("w", encoding="utf-8"),
+    hidden=True,
 )
 @click.option(
     "--fixups",
@@ -515,8 +513,7 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     default=DEFAULT_STATEFUL_RECURSION_LIMIT,
     show_default=True,
     type=click.IntRange(1, 100),
-    cls=DeprecatedOption,
-    removed_in="4.0",
+    hidden=True,
 )
 @click.option(
     "--force-schema-version",
@@ -699,6 +696,7 @@ def run(
     junit_xml: click.utils.LazyFile | None = None,
     debug_output_file: click.utils.LazyFile | None = None,
     show_errors_tracebacks: bool = False,
+    show_trace: bool = False,
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default(),
     cassette_path: click.utils.LazyFile | None = None,
     cassette_preserve_exact_body_bytes: bool = False,
@@ -746,6 +744,10 @@ def run(
         _hypothesis_suppress_health_check = [
             health_check.as_hypothesis() for health_check in hypothesis_suppress_health_check
         ]
+
+    if show_errors_tracebacks:
+        click.secho(DEPRECATED_SHOW_ERROR_TRACEBACKS_OPTION_WARNING, fg="yellow")
+        show_trace = show_errors_tracebacks
 
     # Enable selected experiments
     for experiment in experimental:
@@ -901,7 +903,7 @@ def run(
         hypothesis_settings=hypothesis_settings,
         workers_num=workers_num,
         rate_limit=rate_limit,
-        show_errors_tracebacks=show_errors_tracebacks,
+        show_trace=show_trace,
         wait_for_schema=wait_for_schema,
         validate_schema=validate_schema,
         cassette_path=cassette_path,
@@ -1221,7 +1223,7 @@ def execute(
     hypothesis_settings: hypothesis.settings,
     workers_num: int,
     rate_limit: str | None,
-    show_errors_tracebacks: bool,
+    show_trace: bool,
     wait_for_schema: float | None,
     validate_schema: bool,
     cassette_path: click.utils.LazyFile | None,
@@ -1291,7 +1293,7 @@ def execute(
         hypothesis_settings=hypothesis_settings,
         workers_num=workers_num,
         rate_limit=rate_limit,
-        show_errors_tracebacks=show_errors_tracebacks,
+        show_trace=show_trace,
         wait_for_schema=wait_for_schema,
         validate_schema=validate_schema,
         cassette_path=cassette_path.name if cassette_path is not None else None,

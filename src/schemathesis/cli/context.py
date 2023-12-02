@@ -6,6 +6,7 @@ from queue import Queue
 from typing import TYPE_CHECKING
 
 from ..code_samples import CodeSampleStyle
+from ..internal.deprecation import deprecated_property
 from ..runner.serialization import SerializedTestResult
 
 if TYPE_CHECKING:
@@ -32,7 +33,7 @@ class ExecutionContext:
     hypothesis_output: list[str] = field(default_factory=list)
     workers_num: int = 1
     rate_limit: str | None = None
-    show_errors_tracebacks: bool = False
+    show_trace: bool = False
     wait_for_schema: float | None = None
     validate_schema: bool = True
     operations_processed: int = 0
@@ -48,3 +49,7 @@ class ExecutionContext:
     verbosity: int = 0
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
     report: ServiceReportContext | FileReportContext | None = None
+
+    @deprecated_property(removed_in="4.0", replacement="show_trace")
+    def show_errors_tracebacks(self) -> bool:
+        return self.show_trace

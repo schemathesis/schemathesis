@@ -289,7 +289,7 @@ def test_after_execution_attributes(execution_context, after_execution):
 
 @pytest.mark.parametrize("show_errors_tracebacks", (True, False))
 def test_display_internal_error(capsys, execution_context, show_errors_tracebacks):
-    execution_context.show_errors_tracebacks = show_errors_tracebacks
+    execution_context.show_trace = show_errors_tracebacks
     try:
         raise ZeroDivisionError("division by zero")
     except ZeroDivisionError as exc:
