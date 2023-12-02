@@ -1,7 +1,8 @@
+from __future__ import annotations
 import os
 import platform
 from functools import lru_cache
-from typing import Any, Callable, Dict, Type
+from typing import Any, Callable
 
 import click
 import pytest
@@ -30,23 +31,23 @@ def get_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> BaseS
     return schemathesis.from_dict(schema)
 
 
-def make_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> Dict[str, Any]:
+def make_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> dict[str, Any]:
     schema = load_schema(schema_name)
     return merge_recursively(kwargs, schema)
 
 
 @lru_cache
-def load_schema(schema_name: str) -> Dict[str, Any]:
+def load_schema(schema_name: str) -> dict[str, Any]:
     path = get_schema_path(schema_name)
     with open(path) as fd:
         return load_yaml(fd)
 
 
-def integer(**kwargs: Any) -> Dict[str, Any]:
+def integer(**kwargs: Any) -> dict[str, Any]:
     return {"type": "integer", "in": "query", **kwargs}
 
 
-def as_param(*parameters: Any) -> Dict[str, Any]:
+def as_param(*parameters: Any) -> dict[str, Any]:
     return {"paths": {"/users": {"get": {"parameters": list(parameters), "responses": {"200": {"description": "OK"}}}}}}
 
 
@@ -54,7 +55,7 @@ def noop(value: Any) -> bool:
     return True
 
 
-def _assert_value(value: Any, type: Type, predicate: Callable = noop) -> None:
+def _assert_value(value: Any, type: type, predicate: Callable = noop) -> None:
     assert isinstance(value, type)
     assert predicate(value)
 

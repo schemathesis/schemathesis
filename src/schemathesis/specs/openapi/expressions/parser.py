@@ -1,19 +1,20 @@
+from __future__ import annotations
 from functools import lru_cache
-from typing import Generator, List, Union
+from typing import Generator
 
 from . import lexer, nodes
 from .errors import RuntimeExpressionError, UnknownToken
 
 
 @lru_cache
-def parse(expr: str) -> List[nodes.Node]:
+def parse(expr: str) -> list[nodes.Node]:
     """Parse lexical tokens into concrete expression nodes."""
     return list(_parse(expr))
 
 
 def _parse(expr: str) -> Generator[nodes.Node, None, None]:
     tokens = lexer.tokenize(expr)
-    brackets_stack: List[str] = []
+    brackets_stack: list[str] = []
     for token in tokens:
         if token.is_string or token.is_dot:
             yield nodes.String(token.value)
@@ -46,7 +47,7 @@ def _parse_variable(tokens: lexer.TokenGenerator, token: lexer.Token, expr: str)
         raise UnknownToken(token.value)
 
 
-def _parse_request(tokens: lexer.TokenGenerator, expr: str) -> Union[nodes.BodyRequest, nodes.NonBodyRequest]:
+def _parse_request(tokens: lexer.TokenGenerator, expr: str) -> nodes.BodyRequest | nodes.NonBodyRequest:
     skip_dot(tokens, "$request")
     location = next(tokens)
     if location.value in ("query", "path", "header"):
@@ -63,7 +64,7 @@ def _parse_request(tokens: lexer.TokenGenerator, expr: str) -> Union[nodes.BodyR
     raise RuntimeExpressionError(f"Invalid expression: {expr}")
 
 
-def _parse_response(tokens: lexer.TokenGenerator, expr: str) -> Union[nodes.HeaderResponse, nodes.BodyResponse]:
+def _parse_response(tokens: lexer.TokenGenerator, expr: str) -> nodes.HeaderResponse | nodes.BodyResponse:
     skip_dot(tokens, "$response")
     location = next(tokens)
     if location.value == "header":

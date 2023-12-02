@@ -1,5 +1,6 @@
+from __future__ import annotations
 import json
-from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, List
 
 from ...utils import compose
 
@@ -10,11 +11,11 @@ MapFunction = Callable[[Generated], Generated]
 
 
 def make_serializer(
-    func: Callable[[DefinitionList], Generator[Optional[Callable], None, None]]
-) -> Callable[[DefinitionList], Optional[Callable]]:
+    func: Callable[[DefinitionList], Generator[Callable | None, None, None]]
+) -> Callable[[DefinitionList], Callable | None]:
     """A maker function to avoid code duplication."""
 
-    def _wrapper(definitions: DefinitionList) -> Optional[Callable]:
+    def _wrapper(definitions: DefinitionList) -> Callable | None:
         conversions = list(func(definitions))
         if conversions:
             return compose(*[conv for conv in conversions if conv is not None])
@@ -23,7 +24,7 @@ def make_serializer(
     return _wrapper
 
 
-def _serialize_openapi3(definitions: DefinitionList) -> Generator[Optional[Callable], None, None]:
+def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | None, None, None]:
     """Different collection styles for Open API 3.0."""
     for definition in definitions:
         name = definition["name"]
@@ -49,8 +50,8 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Optional[Calla
 
 
 def _serialize_path_openapi3(
-    name: str, type_: str, style: Optional[str], explode: Optional[bool]
-) -> Generator[Optional[Callable], None, None]:
+    name: str, type_: str, style: str | None, explode: bool | None
+) -> Generator[Callable | None, None, None]:
     if style == "simple":
         if type_ == "object":
             if explode is False:
@@ -76,8 +77,8 @@ def _serialize_path_openapi3(
 
 
 def _serialize_query_openapi3(
-    name: str, type_: str, style: Optional[str], explode: Optional[bool]
-) -> Generator[Optional[Callable], None, None]:
+    name: str, type_: str, style: str | None, explode: bool | None
+) -> Generator[Callable | None, None, None]:
     if type_ == "object":
         if style == "deepObject":
             yield deep_object(name)
@@ -95,9 +96,7 @@ def _serialize_query_openapi3(
             yield delimited(name, delimiter=",")
 
 
-def _serialize_header_openapi3(
-    name: str, type_: str, explode: Optional[bool]
-) -> Generator[Optional[Callable], None, None]:
+def _serialize_header_openapi3(name: str, type_: str, explode: bool | None) -> Generator[Callable | None, None, None]:
     # Headers should be coerced to a string so we can check it for validity later
     yield to_string(name)
     # Header parameters always use the "simple" style, that is, comma-separated values
@@ -110,9 +109,7 @@ def _serialize_header_openapi3(
             yield delimited_object(name)
 
 
-def _serialize_cookie_openapi3(
-    name: str, type_: str, explode: Optional[bool]
-) -> Generator[Optional[Callable], None, None]:
+def _serialize_cookie_openapi3(name: str, type_: str, explode: bool | None) -> Generator[Callable | None, None, None]:
     # Cookies should be coerced to a string so we can check it for validity later
     yield to_string(name)
     # Cookie parameters always use the "form" style
@@ -129,7 +126,7 @@ def _serialize_cookie_openapi3(
             yield comma_delimited_object(name)
 
 
-def _serialize_swagger2(definitions: DefinitionList) -> Generator[Optional[Callable], None, None]:
+def _serialize_swagger2(definitions: DefinitionList) -> Generator[Callable | None, None, None]:
     """Different collection formats for Open API 2.0."""
     for definition in definitions:
         name = definition["name"]
@@ -165,11 +162,11 @@ def conversion(func: Callable[..., None]) -> Callable:
     return _wrapper
 
 
-def make_delimited(data: Optional[Dict[str, Any]], delimiter: str = ",") -> str:
+def make_delimited(data: dict[str, Any] | None, delimiter: str = ",") -> str:
     return delimiter.join(f"{key}={value}" for key, value in force_dict(data or {}).items())
 
 
-def force_iterable(value: Any) -> Union[List, Tuple]:
+def force_iterable(value: Any) -> list | tuple:
     """Converts the value to a list or a tuple.
 
     Only relevant for negative test scenarios where the original types might be changed.
@@ -179,7 +176,7 @@ def force_iterable(value: Any) -> Union[List, Tuple]:
     return [value]
 
 
-def force_dict(value: Any) -> Dict:
+def force_dict(value: Any) -> dict:
     """Converts the value to a dictionary.
 
     Only relevant for negative test scenarios where the original types might be changed.
@@ -247,7 +244,7 @@ def label_primitive(item: Generated, name: str) -> None:
 
 
 @conversion
-def label_array(item: Generated, name: str, explode: Optional[bool]) -> None:
+def label_array(item: Generated, name: str, explode: bool | None) -> None:
     """Serialize an array with the `label` style.
 
     Explode=True
@@ -270,7 +267,7 @@ def label_array(item: Generated, name: str, explode: Optional[bool]) -> None:
 
 
 @conversion
-def label_object(item: Generated, name: str, explode: Optional[bool]) -> None:
+def label_object(item: Generated, name: str, explode: bool | None) -> None:
     """Serialize an object with the `label` style.
 
     Explode=True
@@ -306,7 +303,7 @@ def matrix_primitive(item: Generated, name: str) -> None:
 
 
 @conversion
-def matrix_array(item: Generated, name: str, explode: Optional[bool]) -> None:
+def matrix_array(item: Generated, name: str, explode: bool | None) -> None:
     """Serialize an array with the `matrix` style.
 
     Explode=True
@@ -328,7 +325,7 @@ def matrix_array(item: Generated, name: str, explode: Optional[bool]) -> None:
 
 
 @conversion
-def matrix_object(item: Generated, name: str, explode: Optional[bool]) -> None:
+def matrix_object(item: Generated, name: str, explode: bool | None) -> None:
     """Serialize an object with the `matrix` style.
 
     Explode=True

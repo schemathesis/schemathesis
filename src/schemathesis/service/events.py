@@ -1,5 +1,5 @@
+from __future__ import annotations
 from dataclasses import dataclass
-from typing import Optional
 
 from . import ci
 from ..exceptions import format_exception
@@ -21,7 +21,7 @@ class Metadata(Event):
     """Meta-information about the report."""
 
     size: int
-    ci_environment: Optional[ci.Environment]
+    ci_environment: ci.Environment | None
 
 
 @dataclass

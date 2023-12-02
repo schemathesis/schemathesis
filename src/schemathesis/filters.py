@@ -1,9 +1,10 @@
 """Filtering system that allows users to filter API operations based on certain criteria."""
+from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from functools import partial
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Callable, List, Optional, Set, Tuple, Union, Protocol
+from typing import TYPE_CHECKING, Callable, List, Union, Protocol
 
 from .exceptions import UsageError
 
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class HasAPIOperation(Protocol):
-    operation: "APIOperation"
+    operation: APIOperation
 
 
 MatcherFunc = Callable[[HasAPIOperation], bool]
@@ -37,12 +38,12 @@ class Matcher:
         return f"<{self.__class__.__name__}: {self.label}>"
 
     @classmethod
-    def for_function(cls, func: MatcherFunc) -> "Matcher":
+    def for_function(cls, func: MatcherFunc) -> Matcher:
         """Matcher that uses the given function for matching operations."""
         return cls(func, label=func.__name__, _hash=hash(func))
 
     @classmethod
-    def for_value(cls, attribute: str, expected: FilterValue) -> "Matcher":
+    def for_value(cls, attribute: str, expected: FilterValue) -> Matcher:
         """Matcher that checks whether the specified attribute has the expected value."""
         if isinstance(expected, list):
             func = partial(by_value_list, attribute=attribute, expected=expected)
@@ -52,7 +53,7 @@ class Matcher:
         return cls(func, label=label, _hash=hash(label))
 
     @classmethod
-    def for_regex(cls, attribute: str, regex: RegexValue) -> "Matcher":
+    def for_regex(cls, attribute: str, regex: RegexValue) -> Matcher:
         """Matcher that checks whether the specified attribute has the provided regex."""
         if isinstance(regex, str):
             regex = re.compile(regex)
@@ -65,7 +66,7 @@ class Matcher:
         return self.func(ctx)
 
 
-def get_operation_attribute(operation: "APIOperation", attribute: str) -> str:
+def get_operation_attribute(operation: APIOperation, attribute: str) -> str:
     # Just uppercase `method`
     value = getattr(operation, attribute)
     if attribute == "method":
@@ -77,7 +78,7 @@ def by_value(ctx: HasAPIOperation, attribute: str, expected: str) -> bool:
     return get_operation_attribute(ctx.operation, attribute) == expected
 
 
-def by_value_list(ctx: HasAPIOperation, attribute: str, expected: List[str]) -> bool:
+def by_value_list(ctx: HasAPIOperation, attribute: str, expected: list[str]) -> bool:
     return get_operation_attribute(ctx.operation, attribute) in expected
 
 
@@ -90,7 +91,7 @@ def by_regex(ctx: HasAPIOperation, attribute: str, regex: re.Pattern) -> bool:
 class Filter:
     """Match API operations against a list of matchers."""
 
-    matchers: Tuple[Matcher, ...]
+    matchers: tuple[Matcher, ...]
 
     def __repr__(self) -> str:
         inner = " && ".join(matcher.label for matcher in self.matchers)
@@ -108,10 +109,10 @@ class Filter:
 class FilterSet:
     """Combines multiple filters to apply inclusion and exclusion rules on API operations."""
 
-    _includes: Set[Filter] = field(default_factory=set)
-    _excludes: Set[Filter] = field(default_factory=set)
+    _includes: set[Filter] = field(default_factory=set)
+    _excludes: set[Filter] = field(default_factory=set)
 
-    def apply_to(self, operations: List["APIOperation"]) -> List["APIOperation"]:
+    def apply_to(self, operations: list[APIOperation]) -> list[APIOperation]:
         """Get a filtered list of the given operations that match the filters."""
         return [operation for operation in operations if self.match(SimpleNamespace(operation=operation))]
 
@@ -139,14 +140,14 @@ class FilterSet:
 
     def include(
         self,
-        func: Optional[MatcherFunc] = None,
+        func: MatcherFunc | None = None,
         *,
-        name: Optional[FilterValue] = None,
-        name_regex: Optional[RegexValue] = None,
-        method: Optional[FilterValue] = None,
-        method_regex: Optional[RegexValue] = None,
-        path: Optional[FilterValue] = None,
-        path_regex: Optional[RegexValue] = None,
+        name: FilterValue | None = None,
+        name_regex: RegexValue | None = None,
+        method: FilterValue | None = None,
+        method_regex: RegexValue | None = None,
+        path: FilterValue | None = None,
+        path_regex: RegexValue | None = None,
     ) -> None:
         """Add a new INCLUDE filter."""
         self._add_filter(
@@ -162,14 +163,14 @@ class FilterSet:
 
     def exclude(
         self,
-        func: Optional[MatcherFunc] = None,
+        func: MatcherFunc | None = None,
         *,
-        name: Optional[FilterValue] = None,
-        name_regex: Optional[RegexValue] = None,
-        method: Optional[FilterValue] = None,
-        method_regex: Optional[RegexValue] = None,
-        path: Optional[FilterValue] = None,
-        path_regex: Optional[RegexValue] = None,
+        name: FilterValue | None = None,
+        name_regex: RegexValue | None = None,
+        method: FilterValue | None = None,
+        method_regex: RegexValue | None = None,
+        path: FilterValue | None = None,
+        path_regex: RegexValue | None = None,
     ) -> None:
         """Add a new EXCLUDE filter."""
         self._add_filter(
@@ -187,13 +188,13 @@ class FilterSet:
         self,
         include: bool,
         *,
-        func: Optional[MatcherFunc] = None,
-        name: Optional[FilterValue] = None,
-        name_regex: Optional[RegexValue] = None,
-        method: Optional[FilterValue] = None,
-        method_regex: Optional[RegexValue] = None,
-        path: Optional[FilterValue] = None,
-        path_regex: Optional[RegexValue] = None,
+        func: MatcherFunc | None = None,
+        name: FilterValue | None = None,
+        name_regex: RegexValue | None = None,
+        method: FilterValue | None = None,
+        method_regex: RegexValue | None = None,
+        path: FilterValue | None = None,
+        path_regex: RegexValue | None = None,
     ) -> None:
         matchers = []
         if func is not None:
@@ -240,14 +241,14 @@ def attach_filter_chain(
     """
 
     def proxy(
-        func: Optional[MatcherFunc] = None,
+        func: MatcherFunc | None = None,
         *,
-        name: Optional[FilterValue] = None,
-        name_regex: Optional[str] = None,
-        method: Optional[FilterValue] = None,
-        method_regex: Optional[str] = None,
-        path: Optional[FilterValue] = None,
-        path_regex: Optional[str] = None,
+        name: FilterValue | None = None,
+        name_regex: str | None = None,
+        method: FilterValue | None = None,
+        method_regex: str | None = None,
+        path: FilterValue | None = None,
+        path_regex: str | None = None,
     ) -> Callable:
         __tracebackhide__ = True
         filter_func(

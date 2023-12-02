@@ -1,10 +1,11 @@
+from __future__ import annotations
 import ctypes
 import queue
 import threading
 import time
 from dataclasses import dataclass
 from queue import Queue
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Union, cast
+from typing import Any, Callable, Generator, Iterable, cast
 
 import hypothesis
 
@@ -31,11 +32,11 @@ def _run_task(
     data_generation_methods: Iterable[DataGenerationMethod],
     settings: hypothesis.settings,
     generation_config: GenerationConfig,
-    seed: Optional[int],
+    seed: int | None,
     results: TestResultSet,
-    stateful: Optional[Stateful],
+    stateful: Stateful | None,
     stateful_recursion_limit: int,
-    headers: Optional[Dict[str, Any]] = None,
+    headers: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> None:
     as_strategy_kwargs = {}
@@ -109,12 +110,12 @@ def thread_task(
     data_generation_methods: Iterable[DataGenerationMethod],
     settings: hypothesis.settings,
     generation_config: GenerationConfig,
-    auth: Optional[RawAuth],
-    auth_type: Optional[str],
-    headers: Optional[Dict[str, Any]],
-    seed: Optional[int],
+    auth: RawAuth | None,
+    auth_type: str | None,
+    headers: dict[str, Any] | None,
+    seed: int | None,
     results: TestResultSet,
-    stateful: Optional[Stateful],
+    stateful: Stateful | None,
     stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
@@ -153,9 +154,9 @@ def wsgi_thread_task(
     data_generation_methods: Iterable[DataGenerationMethod],
     settings: hypothesis.settings,
     generation_config: GenerationConfig,
-    seed: Optional[int],
+    seed: int | None,
     results: TestResultSet,
-    stateful: Optional[Stateful],
+    stateful: Stateful | None,
     stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
@@ -186,10 +187,10 @@ def asgi_thread_task(
     data_generation_methods: Iterable[DataGenerationMethod],
     settings: hypothesis.settings,
     generation_config: GenerationConfig,
-    headers: Optional[Dict[str, Any]],
-    seed: Optional[int],
+    headers: dict[str, Any] | None,
+    seed: int | None,
     results: TestResultSet,
-    stateful: Optional[Stateful],
+    stateful: Stateful | None,
     stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
@@ -222,8 +223,8 @@ class ThreadPoolRunner(BaseRunner):
     """Spread different tests among multiple worker threads."""
 
     workers_num: int = 2
-    request_tls_verify: Union[bool, str] = True
-    request_cert: Optional[RequestCert] = None
+    request_tls_verify: bool | str = True
+    request_cert: RequestCert | None = None
 
     def _execute(
         self, results: TestResultSet, stop_event: threading.Event
@@ -290,7 +291,7 @@ class ThreadPoolRunner(BaseRunner):
 
     def _init_workers(
         self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet, generator_done: threading.Event
-    ) -> List[threading.Thread]:
+    ) -> list[threading.Thread]:
         """Initialize & start workers that will execute tests."""
         workers = [
             threading.Thread(
@@ -309,7 +310,7 @@ class ThreadPoolRunner(BaseRunner):
 
     def _get_worker_kwargs(
         self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet, generator_done: threading.Event
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return {
             "tasks_queue": tasks_queue,
             "events_queue": events_queue,
@@ -343,7 +344,7 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
 
     def _get_worker_kwargs(
         self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet, generator_done: threading.Event
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return {
             "tasks_queue": tasks_queue,
             "events_queue": events_queue,
@@ -374,7 +375,7 @@ class ThreadPoolASGIRunner(ThreadPoolRunner):
 
     def _get_worker_kwargs(
         self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet, generator_done: threading.Event
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return {
             "tasks_queue": tasks_queue,
             "events_queue": events_queue,

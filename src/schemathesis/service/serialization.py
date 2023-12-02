@@ -1,5 +1,6 @@
+from __future__ import annotations
 from dataclasses import asdict
-from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
+from typing import Any, Callable, Dict, Optional, TypeVar, cast
 
 from ..models import Response
 from ..runner import events
@@ -10,7 +11,7 @@ S = TypeVar("S", bound=events.ExecutionEvent)
 SerializeFunc = Callable[[S], Optional[Dict[str, Any]]]
 
 
-def serialize_initialized(event: events.Initialized) -> Optional[Dict[str, Any]]:
+def serialize_initialized(event: events.Initialized) -> dict[str, Any] | None:
     return {
         "operations_count": event.operations_count,
         "location": event.location or "",
@@ -18,7 +19,7 @@ def serialize_initialized(event: events.Initialized) -> Optional[Dict[str, Any]]
     }
 
 
-def serialize_before_execution(event: events.BeforeExecution) -> Optional[Dict[str, Any]]:
+def serialize_before_execution(event: events.BeforeExecution) -> dict[str, Any] | None:
     return {
         "correlation_id": event.correlation_id,
         "verbose_name": event.verbose_name,
@@ -26,7 +27,7 @@ def serialize_before_execution(event: events.BeforeExecution) -> Optional[Dict[s
     }
 
 
-def _serialize_case(case: SerializedCase) -> Dict[str, Any]:
+def _serialize_case(case: SerializedCase) -> dict[str, Any]:
     return {
         "verbose_name": case.verbose_name,
         "path_template": case.path_template,
@@ -37,7 +38,7 @@ def _serialize_case(case: SerializedCase) -> Dict[str, Any]:
     }
 
 
-def _serialize_response(response: Response) -> Dict[str, Any]:
+def _serialize_response(response: Response) -> dict[str, Any]:
     return {
         "status_code": response.status_code,
         "headers": response.headers,
@@ -47,7 +48,7 @@ def _serialize_response(response: Response) -> Dict[str, Any]:
     }
 
 
-def serialize_after_execution(event: events.AfterExecution) -> Optional[Dict[str, Any]]:
+def serialize_after_execution(event: events.AfterExecution) -> dict[str, Any] | None:
     return {
         "correlation_id": event.correlation_id,
         "verbose_name": event.verbose_name,
@@ -82,11 +83,11 @@ def serialize_after_execution(event: events.AfterExecution) -> Optional[Dict[str
     }
 
 
-def serialize_interrupted(_: events.Interrupted) -> Optional[Dict[str, Any]]:
+def serialize_interrupted(_: events.Interrupted) -> dict[str, Any] | None:
     return None
 
 
-def serialize_internal_error(event: events.InternalError) -> Optional[Dict[str, Any]]:
+def serialize_internal_error(event: events.InternalError) -> dict[str, Any] | None:
     return {
         "type": event.type.value,
         "subtype": event.subtype.value if event.subtype else event.subtype,
@@ -99,7 +100,7 @@ def serialize_internal_error(event: events.InternalError) -> Optional[Dict[str, 
     }
 
 
-def serialize_finished(event: events.Finished) -> Optional[Dict[str, Any]]:
+def serialize_finished(event: events.Finished) -> dict[str, Any] | None:
     return {
         "generic_errors": [
             {
@@ -126,14 +127,14 @@ SERIALIZER_MAP = {
 def serialize_event(
     event: events.ExecutionEvent,
     *,
-    on_initialized: Optional[SerializeFunc] = None,
-    on_before_execution: Optional[SerializeFunc] = None,
-    on_after_execution: Optional[SerializeFunc] = None,
-    on_interrupted: Optional[SerializeFunc] = None,
-    on_internal_error: Optional[SerializeFunc] = None,
-    on_finished: Optional[SerializeFunc] = None,
-    extra: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Optional[Dict[str, Any]]]:
+    on_initialized: SerializeFunc | None = None,
+    on_before_execution: SerializeFunc | None = None,
+    on_after_execution: SerializeFunc | None = None,
+    on_interrupted: SerializeFunc | None = None,
+    on_internal_error: SerializeFunc | None = None,
+    on_finished: SerializeFunc | None = None,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, dict[str, Any] | None]:
     """Turn an event into JSON-serializable structure."""
     # Use the explicitly provided serializer for this event and fallback to default one if it is not provided
     serializer = {
@@ -158,7 +159,7 @@ def serialize_event(
     return {event.__class__.__name__: data}
 
 
-def stringify_path_parameters(path_parameters: Optional[Dict[str, Any]]) -> Dict[str, str]:
+def stringify_path_parameters(path_parameters: dict[str, Any] | None) -> dict[str, str]:
     """Cast all path parameter values to strings.
 
     Path parameter values may be of arbitrary type, but to display them properly they should be casted to strings.
@@ -166,14 +167,14 @@ def stringify_path_parameters(path_parameters: Optional[Dict[str, Any]]) -> Dict
     return {key: str(value) for key, value in (path_parameters or {}).items()}
 
 
-def prepare_query(query: Optional[Dict[str, Any]]) -> Dict[str, List[str]]:
+def prepare_query(query: dict[str, Any] | None) -> dict[str, list[str]]:
     """Convert all query values to list of strings.
 
     Query parameters may be generated in different shapes, including integers, strings, list of strings, etc.
     It can also be an object, if the schema contains an object, but `style` and `explode` combo is not applicable.
     """
 
-    def to_list_of_strings(value: Any) -> List[str]:
+    def to_list_of_strings(value: Any) -> list[str]:
         if isinstance(value, list):
             return list(map(str, value))
         if isinstance(value, str):

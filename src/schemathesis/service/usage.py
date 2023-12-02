@@ -1,5 +1,6 @@
+from __future__ import annotations
 import sys
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import click
 from click.types import StringParamType
@@ -7,14 +8,14 @@ from click.types import StringParamType
 from .. import cli, hooks
 
 
-def collect(args: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
+def collect(args: list[str] | None = None) -> dict[str, Any] | None:
     """Collect anonymized CLI usage data."""
-    context: Optional[click.Context] = click.get_current_context(silent=True)
+    context: click.Context | None = click.get_current_context(silent=True)
     if context is not None and not sys.argv[0].endswith("pytest"):
         args = args or sys.argv[2:]
         parameters, _, types = parse_cli_args(context, args)
-        parameters_data: Dict[str, Dict[str, Any]] = {}
-        used_headers: List[str] = []
+        parameters_data: dict[str, dict[str, Any]] = {}
+        used_headers: list[str] = []
         schema = parameters["schema"]
         app = parameters.get("app")
         if not schema:
@@ -43,7 +44,7 @@ def collect(args: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _collect_option(option: str, option_type: click.Parameter, used_headers: List[str], value: Any) -> Dict[str, Any]:
+def _collect_option(option: str, option_type: click.Parameter, used_headers: list[str], value: Any) -> dict[str, Any]:
     entry = {}
     if isinstance(option_type.type, (StringParamType, click.types.File)):
         if option == "headers" and value:
@@ -59,6 +60,6 @@ def _collect_option(option: str, option_type: click.Parameter, used_headers: Lis
     return entry
 
 
-def parse_cli_args(context: click.Context, args: List[str]) -> Tuple[Dict[str, Any], List, List[click.Parameter]]:
+def parse_cli_args(context: click.Context, args: list[str]) -> tuple[dict[str, Any], list, list[click.Parameter]]:
     parser = cli.run.make_parser(context)
     return parser.parse_args(args=args)

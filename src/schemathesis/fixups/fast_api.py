@@ -1,4 +1,5 @@
-from typing import Any, Dict
+from __future__ import annotations
+from typing import Any
 
 from ..hooks import HookContext
 from ..hooks import is_installed as global_is_installed
@@ -18,15 +19,15 @@ def is_installed() -> bool:
     return global_is_installed("before_load_schema", before_load_schema)
 
 
-def before_load_schema(context: HookContext, schema: Dict[str, Any]) -> None:
+def before_load_schema(context: HookContext, schema: dict[str, Any]) -> None:
     adjust_schema(schema)
 
 
-def adjust_schema(schema: Dict[str, Any]) -> None:
+def adjust_schema(schema: dict[str, Any]) -> None:
     traverse_schema(schema, _handle_boundaries)
 
 
-def _handle_boundaries(schema: Dict[str, Any]) -> Dict[str, Any]:
+def _handle_boundaries(schema: dict[str, Any]) -> dict[str, Any]:
     """Convert Draft 7 keywords to Draft 4 compatible versions.
 
     FastAPI uses ``pydantic``, which generates Draft 7 compatible schemas.

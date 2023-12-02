@@ -1,3 +1,4 @@
+from __future__ import annotations
 import io
 import json
 import os
@@ -8,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from textwrap import dedent
 from types import SimpleNamespace
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 import httpx
 import pytest
@@ -283,7 +284,7 @@ class CliSnapshotConfig:
     replace_service_host: bool = True
     replace_tmp_dir: bool = True
     replace_duration: bool = True
-    replace_multi_worker_progress: Union[bool, str] = True
+    replace_multi_worker_progress: bool | str = True
     replace_statistic: bool = False
     replace_error_codes: bool = True
     replace_test_case_id: bool = True
@@ -292,7 +293,7 @@ class CliSnapshotConfig:
     replace_seed: bool = True
 
     @classmethod
-    def from_request(cls, request: FixtureRequest) -> "CliSnapshotConfig":
+    def from_request(cls, request: FixtureRequest) -> CliSnapshotConfig:
         marker = request.node.get_closest_marker("snapshot")
         if marker is not None:
             return cls(request, **marker.kwargs)
@@ -383,9 +384,9 @@ def snapshot_cli(request, snapshot, tmp_path):
             self,
             data: Result,
             *,
-            exclude: Optional["PropertyFilter"] = None,
-            include: Optional["PropertyFilter"] = None,
-            matcher: Optional["PropertyMatcher"] = None,
+            exclude: PropertyFilter | None = None,
+            include: PropertyFilter | None = None,
+            matcher: PropertyMatcher | None = None,
         ) -> str:
             serialized = f"Exit code: {data.exit_code}"
             if data.stdout_bytes:
@@ -1057,9 +1058,9 @@ def response_factory():
     def httpx_factory(
         *,
         content: bytes = b"{}",
-        content_type: Optional[str] = "application/json",
+        content_type: str | None = "application/json",
         status_code: int = 200,
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ) -> httpx.Response:
         headers = headers or {}
         if content_type:
@@ -1075,9 +1076,9 @@ def response_factory():
     def requests_factory(
         *,
         content: bytes = b"{}",
-        content_type: Optional[str] = "application/json",
+        content_type: str | None = "application/json",
         status_code: int = 200,
-        headers: Optional[Dict[str, Any]] = None,
+        headers: dict[str, Any] | None = None,
     ) -> requests.Response:
         response = requests.Response()
         response._content = content
@@ -1091,7 +1092,7 @@ def response_factory():
         response.request.prepare(method="POST", url="http://127.0.0.1", headers=headers)
         return response
 
-    def werkzeug_factory(*, status_code: int = 200, headers: Optional[Dict[str, Any]] = None):
+    def werkzeug_factory(*, status_code: int = 200, headers: dict[str, Any] | None = None):
         response = WSGIResponse(response=b'{"some": "value"}', status=status_code)
         response.request = requests.PreparedRequest()
         response.request.prepare(
