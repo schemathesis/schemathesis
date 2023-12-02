@@ -1,8 +1,11 @@
 """Useful info to collect from CLI usage."""
+from __future__ import annotations
+import os
 import platform
 from dataclasses import dataclass, field
 
 from ..constants import SCHEMATHESIS_VERSION
+from .constants import DOCKER_IMAGE_ENV_VAR
 
 
 @dataclass
@@ -39,3 +42,5 @@ class Metadata:
     interpreter: InterpreterMetadata = field(default_factory=InterpreterMetadata)
     # CLI info itself.
     cli: CliMetadata = field(default_factory=CliMetadata)
+    # Used Docker image if any
+    docker_image: str | None = field(default_factory=lambda: os.getenv(DOCKER_IMAGE_ENV_VAR))
