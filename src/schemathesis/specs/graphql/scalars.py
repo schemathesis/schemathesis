@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 
@@ -24,3 +26,25 @@ def scalar(name: str, strategy: st.SearchStrategy[graphql.ValueNode]) -> None:
     if not isinstance(strategy, SearchStrategy):
         raise UsageError(f"{strategy!r} must be a Hypothesis strategy which generates AST nodes matching this scalar")
     CUSTOM_SCALARS[name] = strategy
+
+
+@lru_cache
+def get_extra_scalar_strategies() -> dict[str, st.SearchStrategy]:
+    """Get all extra GraphQL strategies."""
+    from . import nodes
+    from hypothesis import strategies as st
+
+    dates = st.dates().map(str)
+    times = st.times().map("%sZ".__mod__)
+
+    return {
+        "Date": dates.map(nodes.String),
+        "Time": times.map(nodes.String),
+        "DateTime": st.tuples(dates, times).map("T".join).map(nodes.String),
+        "IP": st.ip_addresses().map(str).map(nodes.String),
+        "IPv4": st.ip_addresses(v=4).map(str).map(nodes.String),
+        "IPv6": st.ip_addresses(v=6).map(str).map(nodes.String),
+        "BigInt": st.integers().map(nodes.Int),
+        "Long": st.integers(min_value=-(2**63), max_value=2**63 - 1).map(nodes.Int),
+        "UUID": st.uuids().map(str).map(nodes.String),
+    }

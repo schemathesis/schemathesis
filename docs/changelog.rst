@@ -12,6 +12,7 @@ Changelog
 - ``arm64`` Docker builds. :issue:`1740`.
 - Use Python 3.12 in Docker images.
 - Store Docker image name in ``Metadata``.
+- GraphQL scalar strategies for ``Date``, ``Time``, ``DateTime``, ``IP``, ``IPv4``, ``IPv6``, ``Long``, ``BigInt`` and ``UUID``. :issue:`1690`
 
 **Changed**
 
