@@ -338,6 +338,8 @@ class CliSnapshotConfig:
             data = "\n".join(lines) + "\n"
         if self.replace_statistic:
             data = re.sub("[0-9]+ / [0-9]+ passed", "N / N passed", data)
+            data = re.sub("N / N passed +PASSED", "N / N passed          PASSED", data)
+            data = re.sub("N / N passed +FAILED", "N / N passed          FAILED", data)
             data = re.sub("([0-9]+ passed,? )|([0-9]+ errored,? )", "", data)
         if self.replace_error_codes:
             data = (

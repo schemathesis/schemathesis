@@ -34,8 +34,8 @@ Reproduce with:
 =================================== SUMMARY ====================================
 
 Performed checks:
-    not_a_server_error                         N / N passed           FAILED 
-    status_code_conformance                    N / N passed           FAILED 
+    not_a_server_error                         N / N passed          FAILED 
+    status_code_conformance                    N / N passed          FAILED 
 
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
 

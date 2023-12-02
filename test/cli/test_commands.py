@@ -1507,6 +1507,7 @@ def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra, 
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("flaky")
+@pytest.mark.snapshot(replace_statistic=True)
 def test_explicit_headers_in_output_on_errors(cli, schema_url, snapshot_cli):
     # When there is a non-fatal error during testing (e.g. flakiness)
     # And custom headers were passed explicitly
