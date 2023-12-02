@@ -20,7 +20,7 @@ from ...hooks import HookContext, dispatch
 from ...loaders import load_schema_from_url, load_yaml
 from ...throttling import build_limiter
 from ...types import Filter, NotSet, PathLike
-from ...transports.content_types import is_json_media_type
+from ...transports.content_types import is_json_media_type, is_yaml_media_type
 from ...transports.headers import setup_default_headers
 from ...internal.validation import require_relative_url
 from ...constants import NOT_SET
@@ -42,10 +42,26 @@ def _is_json_response(response: GenericResponse) -> bool:
     return False
 
 
-def _is_json_path(path: PathLike) -> bool:
+def _has_suffix(path: PathLike, suffix: str) -> bool:
     if isinstance(path, str):
-        return path.endswith(".json")
-    return path.suffix == ".json"
+        return path.endswith(suffix)
+    return path.suffix == suffix
+
+
+def _is_json_path(path: PathLike) -> bool:
+    return _has_suffix(path, ".json")
+
+
+def _is_yaml_response(response: GenericResponse) -> bool:
+    """Guess if the response contains YAML."""
+    content_type = response.headers.get("Content-Type")
+    if content_type is not None:
+        return is_yaml_media_type(content_type)
+    return False
+
+
+def _is_yaml_path(path: PathLike) -> bool:
+    return _has_suffix(path, ".yaml") or _has_suffix(path, ".yml")
 
 
 def from_path(
@@ -91,6 +107,7 @@ def from_path(
             rate_limit=rate_limit,
             sanitize_output=sanitize_output,
             __expects_json=_is_json_path(path),
+            __expects_yaml=_is_yaml_path(path),
         )
 
 
@@ -163,19 +180,29 @@ def from_uri(
         rate_limit=rate_limit,
         sanitize_output=sanitize_output,
         __expects_json=_is_json_response(response),
+        __expects_yaml=_is_yaml_response(response),
     )
 
 
 SCHEMA_LOADING_ERROR = "Received unsupported content while expecting a JSON or YAML payload for Open API"
+SCHEMA_SYNTAX_ERROR = "API schema does not appear syntactically valid"
 
 
-def _load_yaml(data: str) -> dict[str, Any]:
+def _load_yaml(data: str, include_details_on_error: bool = False) -> dict[str, Any]:
     import yaml
 
     try:
         return load_yaml(data)
     except yaml.YAMLError as exc:
-        raise SchemaError(SchemaErrorType.UNEXPECTED_CONTENT_TYPE, SCHEMA_LOADING_ERROR) from exc
+        if include_details_on_error:
+            type_ = SchemaErrorType.SYNTAX_ERROR
+            message = SCHEMA_SYNTAX_ERROR
+            extras = [entry for entry in str(exc).splitlines() if entry]
+        else:
+            type_ = SchemaErrorType.UNEXPECTED_CONTENT_TYPE
+            message = SCHEMA_LOADING_ERROR
+            extras = []
+        raise SchemaError(type_, message, extras=extras) from exc
 
 
 def from_file(
@@ -197,6 +224,7 @@ def from_file(
     rate_limit: str | None = None,
     sanitize_output: bool = True,
     __expects_json: bool = False,
+    __expects_yaml: bool = False,
     **kwargs: Any,  # needed in the runner to have compatible API across all loaders
 ) -> BaseOpenAPISchema:
     """Load Open API schema from a file descriptor, string or bytes.
@@ -210,13 +238,20 @@ def from_file(
     if __expects_json:
         try:
             raw = json.loads(data)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as exc:
             # Fallback to a slower YAML loader. This way we'll still load schemas from responses with
             # invalid `Content-Type` headers or YAML files that have the `.json` extension.
             # This is a rare case, and it will be slower but trying JSON first improves a more common use case
-            raw = _load_yaml(data)
+            try:
+                raw = _load_yaml(data)
+            except SchemaError:
+                raise SchemaError(
+                    SchemaErrorType.SYNTAX_ERROR,
+                    SCHEMA_SYNTAX_ERROR,
+                    extras=[entry for entry in str(exc).splitlines() if entry],
+                ) from exc
     else:
-        raw = _load_yaml(data)
+        raw = _load_yaml(data, include_details_on_error=__expects_yaml)
     return from_dict(
         raw,
         app=app,
