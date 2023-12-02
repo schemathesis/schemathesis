@@ -35,6 +35,20 @@ type Query {
     test()
 
 
+def test_custom_scalar_in_cli(testdir, cli, snapshot_cli):
+    schema_file = testdir.makefile(
+        ".gql",
+        schema="""
+scalar Date
+
+type Query {
+  getByDate(created: Date!): Int!
+}
+    """,
+    )
+    assert cli.run(str(schema_file), "--dry-run") == snapshot_cli
+
+
 @pytest.mark.parametrize(
     "name, value, expected",
     (
