@@ -36,11 +36,11 @@ Reproduce with:
 =================================== SUMMARY ====================================
 
 Performed checks:
-    not_a_server_error                              2 / 3 passed          FAILED 
-    status_code_conformance                         2 / 3 passed          FAILED 
-    content_type_conformance                        3 / 3 passed          PASSED 
-    response_headers_conformance                    3 / 3 passed          PASSED 
-    response_schema_conformance                     3 / 3 passed          PASSED 
+    not_a_server_error                              N / N passed          FAILED 
+    status_code_conformance                         N / N passed          FAILED 
+    content_type_conformance                        N / N passed          PASSED 
+    response_headers_conformance                    N / N passed          PASSED 
+    response_schema_conformance                     N / N passed          PASSED 
 
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
 
