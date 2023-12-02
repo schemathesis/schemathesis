@@ -804,18 +804,7 @@ def run(
                     f"\nYou've specified an API name, suggesting you want to upload data to {bold(hostname)}. "
                     "However, your CLI is not currently authenticated."
                 )
-                click.secho("\nTo authenticate:")
-                click.secho(f"1. Retrieve your token from {bold(hostname)}")
-                click.secho(f"2. Execute {bold('`st auth login <TOKEN>`')}")
-                env_var = bold(f"`{service.TOKEN_ENV_VAR}`")
-                click.secho(
-                    f"\nAs an alternative, supply the token directly "
-                    f"using the {bold('`--schemathesis-io-token`')} option "
-                    f"or the {env_var} environment variable."
-                )
-                click.echo(
-                    "\nFor more information, please visit: https://schemathesis.readthedocs.io/en/stable/service.html"
-                )
+                output.default.display_service_unauthorized(hostname)
                 raise click.exceptions.Exit(1) from None
             name: str = cast(str, api_name)
             import requests
@@ -1396,7 +1385,7 @@ def handle_service_error(exc: requests.HTTPError, api_name: str) -> NoReturn:
     elif response.status_code == 404:
         error_message(f"API with name `{api_name}` not found!")
     else:
-        output.default.display_service_error(service.Error(exc))
+        output.default.display_service_error(service.Error(exc), message_prefix="❌ ")
     sys.exit(1)
 
 
