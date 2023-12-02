@@ -45,7 +45,7 @@ def test_cli_run_output_success(testdir, cli, workers):
         "--app",
         f"{module.purebasename}:app",
         f"--workers={workers}",
-        "--show-errors-tracebacks",
+        "--show-trace",
         "--force-schema-version=30",
     )
 

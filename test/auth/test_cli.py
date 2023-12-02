@@ -65,7 +65,7 @@ def after_call(context, case, response):
     )
     # Then it overrides the one from the auth provider
     # And the auth should be used
-    assert cli.main("run", schema_url, "--show-errors-tracebacks", *args, hooks=module.purebasename) == snapshot_cli
+    assert cli.main("run", schema_url, "--show-trace", *args, hooks=module.purebasename) == snapshot_cli
 
 
 def test_multiple_auth_mechanisms_with_explicit_auth(testdir, empty_open_api_3_schema, cli, snapshot_cli):
@@ -138,7 +138,7 @@ def test_multiple_threads(testdir, cli, schema_url, snapshot_cli):
             "--workers",
             "2",
             "--hypothesis-max-examples=1",
-            "--show-errors-tracebacks",
+            "--show-trace",
             hooks=module.purebasename,
         )
         == snapshot_cli
