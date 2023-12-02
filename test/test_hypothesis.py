@@ -507,6 +507,6 @@ def test_health_check_failed_large_base_example(testdir, empty_open_api_3_schema
             },
         },
     }
-    schema_file = testdir.make_schema_file(empty_open_api_3_schema)
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
     # Then it should be able to generate requests
     assert cli.run(str(schema_file), "--dry-run", "--hypothesis-max-examples=1") == snapshot_cli

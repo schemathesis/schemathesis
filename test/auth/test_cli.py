@@ -95,7 +95,7 @@ def test_multiple_auth_mechanisms_with_explicit_auth(testdir, empty_open_api_3_s
         }
     }
     empty_open_api_3_schema["security"] = [{"bearerAuth": []}, {"basicAuth": []}]
-    schema_file = testdir.make_schema_file(empty_open_api_3_schema)
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
     # Then it should be able to generate requests
     assert cli.run(str(schema_file), "--dry-run", "-H", "Authorization: Bearer foo") == snapshot_cli
 
