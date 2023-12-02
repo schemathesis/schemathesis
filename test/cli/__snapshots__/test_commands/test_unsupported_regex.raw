@@ -19,7 +19,8 @@ Schema Error
 
 Invalid regular expression. Pattern `\\p{Alpha}` is not recognized - `bad escape \p at position 0`
 
-Tip: Ensure your regex is compatible with Python's syntax. For guidance, visit: https://docs.python.org/3/library/re.html
+Tip: Ensure your regex is compatible with Python's syntax.
+For guidance, visit: https://docs.python.org/3/library/re.html
 
 Add this option to your command line parameters to see full tracebacks: --show-trace
 

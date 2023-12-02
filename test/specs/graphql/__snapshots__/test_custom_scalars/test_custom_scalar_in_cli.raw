@@ -1,0 +1,33 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/schema.gql
+Base URL: file:///tmp/schema.gql
+Specification version: GraphQL
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+
+Query.getByDate E                                                         [100%]
+
+==================================== ERRORS ====================================
+_______________________________ Query.getByDate ________________________________
+Unknown GraphQL Scalar
+
+Scalar type 'Date' is not recognized
+
+Tip: Define a custom strategy for it.
+For guidance, visit: https://schemathesis.readthedocs.io/en/stable/graphql.html#custom-scalars
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 errored in 1.00s ==============================

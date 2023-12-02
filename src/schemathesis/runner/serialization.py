@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING, cast
 
 from ..transports import serialize_payload
 from ..code_samples import get_excluded_headers
@@ -219,6 +219,13 @@ class SerializedError:
             type_ = RuntimeErrorType.HYPOTHESIS_DEADLINE_EXCEEDED
             message = str(exception).strip()
             extras = []
+        elif isinstance(exception, hypothesis.errors.InvalidArgument) and str(exception).startswith("Scalar "):
+            # Comes from `hypothesis-graphql`
+            scalar_name = _scalar_name_from_error(exception)
+            type_ = RuntimeErrorType.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR
+            message = f"Scalar type '{scalar_name}' is not recognized"
+            extras = []
+            title = "Unknown GraphQL Scalar"
         elif isinstance(exception, hypothesis.errors.Unsatisfiable):
             type_ = RuntimeErrorType.HYPOTHESIS_UNSATISFIABLE
             message = f"{exception}. Possible reasons:"
@@ -313,6 +320,13 @@ def _health_check_from_error(exception: hypothesis.errors.FailedHealthCheck) -> 
             "large_base_example": HealthCheck.large_base_example,
         }.get(match.group(1))
     return None
+
+
+def _scalar_name_from_error(exception: hypothesis.errors.InvalidArgument) -> str:
+    # This one is always available as the format is checked upfront
+    match = re.search(r"Scalar '(\w+)' is not supported", str(exception))
+    match = cast(re.Match, match)
+    return match.group(1)
 
 
 @dataclass

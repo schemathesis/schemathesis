@@ -281,6 +281,7 @@ class RuntimeErrorType(str, enum.Enum):
     # Hypothesis issues
     HYPOTHESIS_DEADLINE_EXCEEDED = "hypothesis_deadline_exceeded"
     HYPOTHESIS_UNSATISFIABLE = "hypothesis_unsatisfiable"
+    HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR = "hypothesis_unsupported_graphql_scalar"
     HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE = "hypothesis_health_check_data_too_large"
     HYPOTHESIS_HEALTH_CHECK_FILTER_TOO_MUCH = "hypothesis_health_check_filter_too_much"
     HYPOTHESIS_HEALTH_CHECK_TOO_SLOW = "hypothesis_health_check_too_slow"
