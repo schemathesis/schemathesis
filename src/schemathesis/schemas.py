@@ -416,7 +416,7 @@ class BaseSchema(Mapping):
     def get_links(self, operation: APIOperation) -> dict[str, dict[str, Any]]:
         raise NotImplementedError
 
-    def validate_response(self, operation: APIOperation, response: GenericResponse) -> None:
+    def validate_response(self, operation: APIOperation, response: GenericResponse) -> bool | None:
         raise NotImplementedError
 
     def prepare_schema(self, schema: Any) -> Any:

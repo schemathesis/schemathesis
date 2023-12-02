@@ -512,7 +512,7 @@ class BaseOpenAPISchema(BaseSchema):
             result[status_code][link.name] = link
         return result
 
-    def validate_response(self, operation: APIOperation, response: GenericResponse) -> None:
+    def validate_response(self, operation: APIOperation, response: GenericResponse) -> bool | None:
         responses = {str(key): value for key, value in operation.definition.raw.get("responses", {}).items()}
         status_code = str(response.status_code)
         if status_code in responses:
@@ -521,11 +521,11 @@ class BaseOpenAPISchema(BaseSchema):
             definition = responses["default"]
         else:
             # No response defined for the received response status code
-            return
+            return None
         scopes, schema = self.get_response_schema(definition, operation.definition.scope)
         if not schema:
             # No schema to check against
-            return
+            return None
         content_type = response.headers.get("Content-Type")
         errors = []
         if content_type is None:
@@ -541,7 +541,7 @@ class BaseOpenAPISchema(BaseSchema):
                 errors.append(exc)
         if content_type and not is_json_media_type(content_type):
             _maybe_raise_one_or_more(errors)
-            return
+            return None
         try:
             if isinstance(response, (requests.Response, httpx.Response)):
                 data = json.loads(response.text)

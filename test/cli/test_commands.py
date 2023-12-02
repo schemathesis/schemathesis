@@ -1589,25 +1589,22 @@ def test_force_color(cli, schema_url):
     assert "[1m" in result.stdout
 
 
+@pytest.mark.parametrize(
+    "args",
+    (
+        (),
+        ("--checks", "all"),
+    ),
+)
 @pytest.mark.parametrize("graphql_path", ("/graphql", "/foo"))
-def test_graphql_url(cli, graphql_url, graphql_path):
+def test_graphql_url(cli, graphql_url, graphql_path, args, snapshot_cli):
     # When the target API is GraphQL
-    result = cli.run(graphql_url, "--hypothesis-max-examples=5")
-    assert_graphql(result)
+    assert cli.run(graphql_url, "--hypothesis-max-examples=5", *args) == snapshot_cli
 
 
-def test_graphql_asgi(cli, loadable_graphql_fastapi_app, graphql_path):
+def test_graphql_asgi(cli, loadable_graphql_fastapi_app, graphql_path, snapshot_cli):
     # When the target API is GraphQL
-    result = cli.run(f"--app={loadable_graphql_fastapi_app}", "--hypothesis-max-examples=5", graphql_path)
-    assert_graphql(result)
-
-
-def assert_graphql(result):
-    assert result.exit_code == ExitCode.OK, result.stdout
-    # Then it should be detected automatically
-    assert "Specification version: GraphQL" in result.stdout
-    assert "getBooks . " in result.stdout
-    assert "getAuthors . " in result.stdout
+    assert cli.run(f"--app={loadable_graphql_fastapi_app}", "--hypothesis-max-examples=5", graphql_path) == snapshot_cli
 
 
 def assert_exit_code(event_stream, code):

@@ -836,7 +836,7 @@ class APIOperation(Generic[P, C]):
         path = self.path.replace("~", "~0").replace("/", "~1")
         return f"#/paths/{path}/{self.method}"
 
-    def validate_response(self, response: GenericResponse) -> None:
+    def validate_response(self, response: GenericResponse) -> bool | None:
         """Validate API response for conformance.
 
         :raises CheckFailed: If the response does not conform to the API schema.

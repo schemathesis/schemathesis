@@ -245,8 +245,13 @@ def graphql_server(graphql_app):
 
 
 @pytest.fixture()
-def graphql_url(graphql_server, graphql_path):
-    return f"http://127.0.0.1:{graphql_server['port']}{graphql_path}"
+def graphql_server_host(graphql_server):
+    return f"127.0.0.1:{graphql_server['port']}"
+
+
+@pytest.fixture()
+def graphql_url(graphql_server_host, graphql_path):
+    return f"http://{graphql_server_host}{graphql_path}"
 
 
 @pytest.fixture()
@@ -308,11 +313,14 @@ class CliSnapshotConfig:
             except LookupError:
                 pass
         if self.replace_server_host:
-            try:
-                host = self.request.getfixturevalue("server_host")
-                data = data.replace(host, "127.0.0.1")
-            except LookupError:
-                pass
+            used_fixtures = self.request.fixturenames
+            for fixture in ("graphql_server_host", "server_host"):
+                if fixture in used_fixtures:
+                    try:
+                        host = self.request.getfixturevalue(fixture)
+                        data = data.replace(host, "127.0.0.1")
+                    except LookupError:
+                        pass
             with keep_cwd():
                 data = data.replace(Path(self.testdir.tmpdir).as_uri(), "file:///tmp")
         if self.replace_tmp_dir:
