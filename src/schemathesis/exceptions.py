@@ -312,6 +312,7 @@ class SchemaErrorType(str, enum.Enum):
     HTTP_FORBIDDEN = "http_forbidden"
 
     # Content decoding issues
+    SYNTAX_ERROR = "syntax_error"
     UNEXPECTED_CONTENT_TYPE = "unexpected_content_type"
     YAML_NUMERIC_STATUS_CODES = "yaml_numeric_status_codes"
     YAML_NON_STRING_KEYS = "yaml_non_string_keys"

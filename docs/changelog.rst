@@ -25,6 +25,7 @@ Changelog
 - Build ``bookworm``-based Debian Docker images instead of ``buster``-based.
 - Improve error message on unknown scalar types in GraphQL.
 - Better auto-detection of GraphQL schemas.
+- Display parsing errors for schemas that are expected to be JSON or YAML.
 
 **Deprecated**
 

@@ -21,6 +21,11 @@ def is_json_media_type(value: str) -> bool:
     return main == "application" and (sub == "json" or sub.endswith("+json"))
 
 
+def is_yaml_media_type(value: str) -> bool:
+    """Detect whether the content type is YAML-compatible."""
+    return value in ("text/yaml", "text/x-yaml", "application/x-yaml", "text/vnd.yaml")
+
+
 def is_plain_text_media_type(value: str) -> bool:
     """Detect variations of the ``text/plain`` media type."""
     return parse_content_type(value) == ("text", "plain")
