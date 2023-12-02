@@ -20,7 +20,7 @@ GET requests should not contain body parameters.
 
 Tip: Bypass validation using `--validate-schema=false`. Caution: May cause unexpected errors.
 
-Add this option to your command line parameters to see full tracebacks: --show-errors-tracebacks
+Add this option to your command line parameters to see full tracebacks: --show-trace
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

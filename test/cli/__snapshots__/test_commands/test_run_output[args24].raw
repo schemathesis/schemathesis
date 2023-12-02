@@ -140,7 +140,7 @@ Generic:
                                   multiple JSON files, is subject to change.
   --debug-output-file FILENAME    Saves debugging information in a JSONL format
                                   at the specified file path.
-  --show-errors-tracebacks        Displays complete traceback information for
+  --show-trace                    Displays complete traceback information for
                                   internal errors.
   --code-sample-style [python|curl]
                                   Selects the code sample style for reproducing
@@ -150,8 +150,6 @@ Generic:
   --cassette-preserve-exact-body-bytes
                                   Retains exact byte sequence of payloads in
                                   cassettes, encoded as base64.
-  --store-network-log FILENAME    [DEPRECATED] Saves the test outcomes in a VCR-
-                                  compatible format.
   --fixups [fast_api|utf8_bom|all]
                                   Applies compatibility adjustments like
                                   'fast_api', 'utf8_bom'.
@@ -159,9 +157,6 @@ Generic:
                                   '<limit>/<duration>' format. Example - `100/m`
                                   for 100 requests per minute.
   --stateful [none|links]         Enables or disables stateful testing features.
-  --stateful-recursion-limit INTEGER RANGE
-                                  Sets the recursion depth limit for stateful
-                                  testing.  [default: 5; 1<=x<=100]
   --force-schema-version [20|30]  Forces the schema to be interpreted as a
                                   particular OpenAPI version.
   --sanitize-output BOOLEAN       Enable or disable automatic output
