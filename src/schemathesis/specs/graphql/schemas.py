@@ -38,7 +38,7 @@ from ...models import APIOperation, Case, CheckFunction, OperationDefinition
 from ...schemas import BaseSchema
 from ...stateful import Stateful, StatefulTest
 from ...types import Body, Cookies, Headers, NotSet, PathParameters, Query
-from .scalars import CUSTOM_SCALARS
+from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
 
 if TYPE_CHECKING:
     from ...transports.responses import GenericResponse
@@ -267,10 +267,11 @@ def get_case_strategy(
     }[definition.root_type]
     hook_context = HookContext(operation)
     generation_config = generation_config or GenerationConfig()
+    custom_scalars = {**get_extra_scalar_strategies(), **CUSTOM_SCALARS}
     strategy = strategy_factory(
         client_schema,
         fields=[definition.field_name],
-        custom_scalars=CUSTOM_SCALARS,
+        custom_scalars=custom_scalars,
         print_ast=_noop,  # type: ignore
         allow_x00=generation_config.allow_x00,
         codec=generation_config.codec,

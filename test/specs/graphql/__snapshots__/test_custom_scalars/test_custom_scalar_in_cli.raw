@@ -16,7 +16,7 @@ Query.getByDate E                                                         [100%]
 _______________________________ Query.getByDate ________________________________
 Unknown GraphQL Scalar
 
-Scalar type 'Date' is not recognized
+Scalar type 'FooBar' is not recognized
 
 Tip: Define a custom strategy for it.
 For guidance, visit: https://schemathesis.readthedocs.io/en/stable/graphql.html#custom-scalars
