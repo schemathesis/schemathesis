@@ -282,6 +282,7 @@ class CliSnapshotConfig:
     request: FixtureRequest
     replace_server_host: bool = True
     replace_service_host: bool = True
+    replace_service_error_report: bool = True
     replace_tmp_dir: bool = True
     replace_duration: bool = True
     replace_multi_worker_progress: bool | str = True
@@ -369,6 +370,13 @@ class CliSnapshotConfig:
         if self.replace_seed:
             data = re.sub(r"--hypothesis-seed=\d+", "--hypothesis-seed=42", data)
             data = re.sub(r"Random seed: \d+", "Random seed: 42", data)
+        if self.replace_service_error_report:
+            lines = data.splitlines()
+            for idx, line in enumerate(lines):
+                if line.startswith("Headers: "):
+                    lines[idx] = "Headers: {'X-Foo': 'Bar'}"
+                    break
+            data = "\n".join(lines) + "\n"
         return data
 
 
