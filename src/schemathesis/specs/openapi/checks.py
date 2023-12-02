@@ -21,7 +21,7 @@ def status_code_conformance(response: GenericResponse, case: Case) -> bool | Non
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
-        raise TypeError("This check can be used only with Open API schemas")
+        return True
     responses = case.operation.definition.raw.get("responses", {})
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
     if "default" in responses:
@@ -52,7 +52,7 @@ def content_type_conformance(response: GenericResponse, case: Case) -> bool | No
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
-        raise TypeError("This check can be used only with Open API schemas")
+        return True
     documented_content_types = case.operation.schema.get_content_types(case.operation, response)
     if not documented_content_types:
         return None
@@ -100,7 +100,7 @@ def response_headers_conformance(response: GenericResponse, case: Case) -> bool 
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
-        raise TypeError("This check can be used only with Open API schemas")
+        return True
     defined_headers = case.operation.schema.get_headers(case.operation, response)
     if not defined_headers:
         return None
@@ -121,9 +121,9 @@ def response_headers_conformance(response: GenericResponse, case: Case) -> bool 
     )
 
 
-def response_schema_conformance(response: GenericResponse, case: Case) -> None:
+def response_schema_conformance(response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
-        raise TypeError("This check can be used only with Open API schemas")
+        return True
     return case.operation.validate_response(response)
