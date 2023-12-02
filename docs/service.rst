@@ -23,7 +23,7 @@ When you choose to upload your test reports, the following data is included in t
 - **Metadata**:
 
   - Information about your host machine to help us understand our users better.
-  - Collected data includes your Python interpreter version, implementation, system/OS name, and release.
+  - Collected data includes your Python interpreter version, implementation, system/OS name, the used Docker image name (if any) and release.
 
 - **Test Runs**:
 

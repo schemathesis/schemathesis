@@ -11,6 +11,7 @@ Changelog
 - Display the total number of collected links in the CLI output. :issue:`1383`.
 - ``arm64`` Docker builds. :issue:`1740`.
 - Use Python 3.12 in Docker images.
+- Store Docker image name in ``Metadata``.
 
 **Changed**
 

@@ -20,4 +20,7 @@ RUN apk add --no-cache --virtual=.build-deps build-base libffi-dev curl openssl-
 RUN chown -R 1000:1000 /app
 
 USER schemathesis
+
+ENV SCHEMATHESIS_DOCKER_IMAGE=3.12-alpine
+
 ENTRYPOINT ["schemathesis"]
