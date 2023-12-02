@@ -120,7 +120,7 @@ def unique_hook(testdir):
 
 
 def run(testdir, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_examples, *args):
-    schema_file = testdir.make_schema_file(schema)
+    schema_file = testdir.make_openapi_schema_file(schema)
     return cli.main(
         "run",
         str(schema_file),

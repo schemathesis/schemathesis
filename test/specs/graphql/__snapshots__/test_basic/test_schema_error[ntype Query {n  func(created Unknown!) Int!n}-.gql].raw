@@ -1,0 +1,8 @@
+Exit code: 1
+---
+Stdout:
+Schema Loading Error
+
+The provided API schema does not appear to be a valid GraphQL schema
+
+    Unknown type 'Unknown'.

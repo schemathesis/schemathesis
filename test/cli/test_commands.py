@@ -1661,7 +1661,7 @@ def test_missing_content_and_schema(cli, base_url, tmp_path, testdir, empty_open
     empty_open_api_3_schema["paths"] = {
         "/foo": {"get": {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}}
     }
-    schema_file = testdir.make_schema_file(empty_open_api_3_schema)
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
     args = [
         str(schema_file),
         f"--debug-output-file={debug_file}",
@@ -1867,7 +1867,7 @@ def test_invalid_schema_with_disabled_validation(
 ):
     # When there is an error in the schema
     openapi_3_schema_with_invalid_security["openapi"] = version
-    schema_file = testdir.make_schema_file(openapi_3_schema_with_invalid_security)
+    schema_file = testdir.make_openapi_schema_file(openapi_3_schema_with_invalid_security)
     # And the validation is disabled (default)
     # Then we should show an error message derived from JSON Schema
     assert cli.run(str(schema_file), "--dry-run", "--experimental=openapi-3.1") == snapshot_cli
@@ -1877,7 +1877,7 @@ def test_unresolvable_reference_with_disabled_validation(
     testdir, cli, open_api_3_schema_with_recoverable_errors, snapshot_cli
 ):
     # When there is an error in the schema
-    schema_file = testdir.make_schema_file(open_api_3_schema_with_recoverable_errors)
+    schema_file = testdir.make_openapi_schema_file(open_api_3_schema_with_recoverable_errors)
     # And the validation is disabled (default)
     # Then we should show an error message derived from JSON Schema
     assert cli.run(str(schema_file), "--dry-run") == snapshot_cli
@@ -1916,7 +1916,7 @@ def test_multiple_failures_in_single_check(
             },
         },
     }
-    schema_file = testdir.make_schema_file(empty_open_api_3_schema)
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
     response = response_factory.requests(content_type=None, status_code=200)
     mocker.patch("requests.Session.request", return_value=response)
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--checks=all") == snapshot_cli
@@ -1935,7 +1935,7 @@ def test_binary_payload(testdir, cli, empty_open_api_3_schema, snapshot_cli, ope
             },
         },
     }
-    schema_file = testdir.make_schema_file(empty_open_api_3_schema)
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--checks=all") == snapshot_cli
 
 
@@ -1949,7 +1949,7 @@ def test_long_payload(testdir, cli, empty_open_api_3_schema, snapshot_cli, opena
             },
         },
     }
-    schema_file = testdir.make_schema_file(empty_open_api_3_schema)
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--checks=all") == snapshot_cli
 
 

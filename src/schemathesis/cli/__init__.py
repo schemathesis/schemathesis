@@ -7,7 +7,6 @@ import sys
 import traceback
 import warnings
 from collections import defaultdict
-from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum
 from queue import Queue
@@ -35,7 +34,7 @@ from ..constants import (
     EXTENSIONS_DOCUMENTATION_URL,
     ISSUE_TRACKER_URL,
 )
-from ..exceptions import SchemaError, extract_nth_traceback
+from ..exceptions import SchemaError, extract_nth_traceback, SchemaErrorType
 from ..fixups import ALL_FIXUPS
 from ..loaders import load_app, load_yaml
 from ..transports.auth import get_requests_auth
@@ -1072,9 +1071,10 @@ def should_try_more(exc: SchemaError) -> bool:
     return not isinstance(exc.__cause__, requests.exceptions.ConnectionError)
 
 
-def _try_load_schema(
-    config: LoaderConfig, first: Callable[[LoaderConfig], BaseSchema], second: Callable[[LoaderConfig], BaseSchema]
-) -> BaseSchema:
+Loader = Callable[[LoaderConfig], "BaseSchema"]
+
+
+def _try_load_schema(config: LoaderConfig, first: Loader, second: Loader) -> BaseSchema:
     from urllib3.exceptions import InsecureRequestWarning
 
     with warnings.catch_warnings():
@@ -1083,10 +1083,21 @@ def _try_load_schema(
             return first(config)
         except SchemaError as exc:
             if should_try_more(exc):
-                with suppress(Exception):
+                try:
                     return second(config)
+                except Exception as second_exc:
+                    if is_specific_exception(second, second_exc):
+                        raise second_exc
             # Re-raise the original error
             raise exc
+
+
+def is_specific_exception(loader: Loader, exc: Exception) -> bool:
+    return (
+        loader is _load_graphql_schema
+        and isinstance(exc, SchemaError)
+        and exc.type == SchemaErrorType.GRAPHQL_INVALID_SCHEMA
+    )
 
 
 def _load_graphql_schema(config: LoaderConfig) -> GraphQLSchema:
@@ -1168,7 +1179,7 @@ def _add_requests_kwargs(kwargs: dict[str, Any], config: LoaderConfig) -> None:
 
 def is_probably_graphql(location: str) -> bool:
     """Detect whether it is likely that the given location is a GraphQL endpoint."""
-    return location.endswith(("/graphql", "/graphql/"))
+    return location.endswith(("/graphql", "/graphql/", ".graphql", ".gql"))
 
 
 def check_auth(auth: tuple[str, str] | None, headers: dict[str, str]) -> None:
