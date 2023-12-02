@@ -3,12 +3,13 @@ import json
 from pathlib import Path
 
 import pytest
-from flask import Response
+from flask import Response, Flask
 
 import schemathesis
 from schemathesis.exceptions import SchemaError
+from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.specs.openapi import loaders
-from schemathesis.specs.openapi.loaders import NON_STRING_OBJECT_KEY_MESSAGE, SCHEMA_LOADING_ERROR
+from schemathesis.specs.openapi.loaders import NON_STRING_OBJECT_KEY_MESSAGE, SCHEMA_LOADING_ERROR, SCHEMA_SYNTAX_ERROR
 from schemathesis.specs.openapi.schemas import OpenApi30, SwaggerV20
 
 
@@ -90,8 +91,16 @@ def test_unsupported_type():
         loaders.from_dict({})
 
 
-@pytest.mark.parametrize("content_type", (True, None, "application/json", "application/x-yaml"))
-def test_invalid_content_type(httpserver, content_type):
+@pytest.mark.parametrize(
+    "content_type, expected",
+    (
+        (True, SCHEMA_LOADING_ERROR),
+        (None, SCHEMA_LOADING_ERROR),
+        ("application/json", SCHEMA_SYNTAX_ERROR),
+        ("application/x-yaml", SCHEMA_SYNTAX_ERROR),
+    ),
+)
+def test_invalid_content_type(httpserver, content_type, expected: str):
     # When the user tries to load an HTML as a schema
     content = """
 <html>
@@ -114,7 +123,7 @@ def test_invalid_content_type(httpserver, content_type):
     schema_url = httpserver.url_for(path)
     # And loading cause an error
     # Then it should be suggested to the user that they should provide JSON or YAML
-    with pytest.raises(SchemaError, match=SCHEMA_LOADING_ERROR):
+    with pytest.raises(SchemaError, match=expected):
         schemathesis.from_uri(schema_url)
 
 
@@ -158,3 +167,48 @@ def test_non_string_keys(empty_open_api_3_schema):
     # Then it should be reported with a proper message
     with pytest.raises(SchemaError, match=NON_STRING_OBJECT_KEY_MESSAGE):
         schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
+
+
+JSON_ERROR = ["Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"]
+YAML_ERROR = [
+    "unacceptable character #x0080: control characters are not allowed",
+    '  in "<unicode string>", position 2',
+]
+
+
+@pytest.mark.parametrize(
+    "schema_url, content_type, payload, expected",
+    (
+        ("openapi.json", "application/json", b"{1", JSON_ERROR),
+        ("openapi.yaml", "text/yaml", b'{"\x80": 1}', YAML_ERROR),
+    ),
+)
+def test_parsing_errors_uri(schema_url, content_type, payload, expected):
+    app = Flask("test_app")
+
+    @app.route(f"/{schema_url}")
+    def schema():
+        return Response(payload, content_type=content_type)
+
+    port = run_flask_server(app)
+
+    with pytest.raises(SchemaError) as exc:
+        schemathesis.from_uri(f"http://127.0.0.1:{port}/{schema_url}")
+    assert exc.value.extras == expected
+
+
+@pytest.mark.parametrize(
+    "schema_path, content_type, payload, expected",
+    (
+        ("openapi.json", "application/json", "{1", JSON_ERROR),
+        ("openapi.yaml", "text/yaml", '{"\x80": 1}', YAML_ERROR),
+    ),
+)
+def test_parsing_errors_path(testdir, schema_path, content_type, payload, expected):
+    name, ext = schema_path.split(".")
+    schema_file = testdir.makefile(f".{ext}", **{name: payload})
+
+    with pytest.raises(SchemaError) as exc:
+        schemathesis.from_path(str(schema_file))
+
+    assert exc.value.extras == expected
