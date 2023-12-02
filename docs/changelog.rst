@@ -24,6 +24,7 @@ Changelog
 - Store skip reason in the runner events.
 - Build ``bookworm``-based Debian Docker images instead of ``buster``-based.
 - Improve error message on unknown scalar types in GraphQL.
+- Better auto-detection of GraphQL schemas.
 
 **Deprecated**
 

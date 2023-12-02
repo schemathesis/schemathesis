@@ -321,6 +321,9 @@ class SchemaErrorType(str, enum.Enum):
     OPEN_API_UNSPECIFIED_VERSION = "open_api_unspecified_version"
     OPEN_API_UNSUPPORTED_VERSION = "open_api_unsupported_version"
 
+    # GraphQL validation
+    GRAPHQL_INVALID_SCHEMA = "graphql_invalid_schema"
+
     # Unclassified
     UNCLASSIFIED = "unclassified"
 

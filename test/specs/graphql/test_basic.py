@@ -140,3 +140,27 @@ def test_type_names():
         pass
 
     test()
+
+
+@pytest.mark.parametrize(
+    "schema, extension",
+    (
+        (
+            """
+type Query {
+  func(created: Unknown!): Int!
+}""",
+            ".gql",
+        ),
+        (
+            """
+type Query {
+  123(created: Int!): Int!
+}""",
+            ".whatever",
+        ),
+    ),
+)
+def test_schema_error(testdir, cli, snapshot_cli, schema, extension):
+    schema_file = testdir.make_graphql_schema_file(schema, extension=extension)
+    assert cli.run(str(schema_file), "--dry-run") == snapshot_cli

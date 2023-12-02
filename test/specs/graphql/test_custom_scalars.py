@@ -36,9 +36,8 @@ type Query {
 
 
 def test_custom_scalar_in_cli(testdir, cli, snapshot_cli):
-    schema_file = testdir.makefile(
-        ".gql",
-        schema="""
+    schema_file = testdir.make_graphql_schema_file(
+        """
 scalar FooBar
 
 type Query {
@@ -50,9 +49,8 @@ type Query {
 
 
 def test_built_in_scalars_in_cli(testdir, cli, snapshot_cli):
-    schema_file = testdir.makefile(
-        ".gql",
-        schema="""
+    schema_file = testdir.make_graphql_schema_file(
+        """
 scalar Date
 scalar Time
 scalar DateTime

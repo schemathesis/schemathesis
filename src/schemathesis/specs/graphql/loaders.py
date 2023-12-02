@@ -165,7 +165,14 @@ def from_file(
         data = file
     else:
         data = file.read()
-    document = graphql.build_schema(data)
+    try:
+        document = graphql.build_schema(data)
+    except Exception as exc:
+        raise SchemaError(
+            SchemaErrorType.GRAPHQL_INVALID_SCHEMA,
+            "The provided API schema does not appear to be a valid GraphQL schema",
+            extras=[entry for entry in str(exc).splitlines() if entry],
+        ) from exc
     result = graphql.execute(document, get_introspection_query_ast())
     # TYPES: We don't pass `is_awaitable` above, therefore `result` is of the `ExecutionResult` type
     result = cast(graphql.ExecutionResult, result)
