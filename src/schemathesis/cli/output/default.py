@@ -181,6 +181,7 @@ def display_full_traceback_message(error: SerializedError) -> bool:
             "requests.exceptions",
             "SerializationNotPossible",
             "hypothesis.errors.FailedHealthCheck",
+            "hypothesis.errors.InvalidArgument: Scalar ",
         )
     )
 
@@ -207,8 +208,10 @@ RUNTIME_ERROR_SUGGESTIONS = {
     ),
     RuntimeErrorType.HYPOTHESIS_UNSATISFIABLE: "Examine the schema for inconsistencies and consider simplifying it.",
     RuntimeErrorType.SCHEMA_BODY_IN_GET_REQUEST: DISABLE_SCHEMA_VALIDATION_SUGGESTION,
-    RuntimeErrorType.SCHEMA_INVALID_REGULAR_EXPRESSION: "Ensure your regex is compatible with Python's syntax. "
+    RuntimeErrorType.SCHEMA_INVALID_REGULAR_EXPRESSION: "Ensure your regex is compatible with Python's syntax.\n"
     "For guidance, visit: https://docs.python.org/3/library/re.html",
+    RuntimeErrorType.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR: "Define a custom strategy for it.\n"
+    "For guidance, visit: https://schemathesis.readthedocs.io/en/stable/graphql.html#custom-scalars",
     RuntimeErrorType.HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE: _format_health_check_suggestion("data_too_large"),
     RuntimeErrorType.HYPOTHESIS_HEALTH_CHECK_FILTER_TOO_MUCH: _format_health_check_suggestion("filter_too_much"),
     RuntimeErrorType.HYPOTHESIS_HEALTH_CHECK_TOO_SLOW: _format_health_check_suggestion("too_slow"),
