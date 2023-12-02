@@ -1,6 +1,7 @@
+from __future__ import annotations
 import threading
 from dataclasses import dataclass
-from typing import Generator, Optional, Union
+from typing import Generator
 
 from ...models import TestResultSet
 from ...types import RequestCert
@@ -13,8 +14,8 @@ from .core import BaseRunner, asgi_test, get_session, network_test, wsgi_test
 class SingleThreadRunner(BaseRunner):
     """Fast runner that runs tests sequentially in the main thread."""
 
-    request_tls_verify: Union[bool, str] = True
-    request_cert: Optional[RequestCert] = None
+    request_tls_verify: bool | str = True
+    request_cert: RequestCert | None = None
 
     def _execute(
         self, results: TestResultSet, stop_event: threading.Event

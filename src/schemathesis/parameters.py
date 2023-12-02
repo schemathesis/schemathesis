@@ -2,8 +2,9 @@
 
 These are basic entities that describe what data could be sent to the API.
 """
+from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, Generator, Generic, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Generator, Generic, TypeVar
 
 if TYPE_CHECKING:
     from .models import APIOperation
@@ -43,7 +44,7 @@ class Parameter:
         """Parameter example."""
         raise NotImplementedError
 
-    def serialize(self, operation: "APIOperation") -> str:
+    def serialize(self, operation: APIOperation) -> str:
         """Get parameter's string representation."""
         raise NotImplementedError
 
@@ -55,13 +56,13 @@ P = TypeVar("P", bound=Parameter)
 class ParameterSet(Generic[P]):
     """A set of parameters for the same location."""
 
-    items: List[P] = field(default_factory=list)
+    items: list[P] = field(default_factory=list)
 
     def add(self, parameter: P) -> None:
         """Add a new parameter."""
         self.items.append(parameter)
 
-    def get(self, name: str) -> Optional[P]:
+    def get(self, name: str) -> P | None:
         for parameter in self:
             if parameter.name == name:
                 return parameter
@@ -71,7 +72,7 @@ class ParameterSet(Generic[P]):
         return self.get(name) is not None
 
     @property
-    def example(self) -> Dict[str, Any]:
+    def example(self) -> dict[str, Any]:
         """Composite example gathered from individual parameters."""
         return {item.name: item.example for item in self.items if item.example}
 

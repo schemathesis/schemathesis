@@ -1,4 +1,5 @@
-from typing import Iterable, Optional
+from __future__ import annotations
+from typing import Iterable
 
 from . import fast_api, utf8_bom
 
@@ -6,7 +7,7 @@ ALL_FIXUPS = {"fast_api": fast_api, "utf8_bom": utf8_bom}
 ALL_FIXUP_NAMES = list(ALL_FIXUPS.keys())
 
 
-def install(fixups: Optional[Iterable[str]] = None) -> None:
+def install(fixups: Iterable[str] | None = None) -> None:
     """Install fixups.
 
     Without the first argument installs all available fixups.
@@ -18,7 +19,7 @@ def install(fixups: Optional[Iterable[str]] = None) -> None:
         ALL_FIXUPS[name].install()  # type: ignore
 
 
-def uninstall(fixups: Optional[Iterable[str]] = None) -> None:
+def uninstall(fixups: Iterable[str] | None = None) -> None:
     """Uninstall fixups.
 
     Without the first argument uninstalls all available fixups.

@@ -1,7 +1,8 @@
 """High-level API for creating Hypothesis tests."""
+from __future__ import annotations
 import asyncio
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable
 
 import hypothesis
 from hypothesis import Phase
@@ -23,13 +24,13 @@ def create_test(
     *,
     operation: APIOperation,
     test: Callable,
-    settings: Optional[hypothesis.settings] = None,
-    seed: Optional[int] = None,
-    data_generation_methods: List[DataGenerationMethod],
-    generation_config: Optional[GenerationConfig] = None,
-    as_strategy_kwargs: Optional[Dict[str, Any]] = None,
-    _given_args: Tuple[GivenInput, ...] = (),
-    _given_kwargs: Optional[Dict[str, GivenInput]] = None,
+    settings: hypothesis.settings | None = None,
+    seed: int | None = None,
+    data_generation_methods: list[DataGenerationMethod],
+    generation_config: GenerationConfig | None = None,
+    as_strategy_kwargs: dict[str, Any] | None = None,
+    _given_args: tuple[GivenInput, ...] = (),
+    _given_kwargs: dict[str, GivenInput] | None = None,
 ) -> Callable:
     """Create a Hypothesis test."""
     hook_dispatcher = getattr(test, "_schemathesis_hooks", None)
@@ -94,7 +95,7 @@ def remove_explain_phase(settings: hypothesis.settings) -> hypothesis.settings:
     return settings
 
 
-def _get_hypothesis_settings(test: Callable) -> Optional[hypothesis.settings]:
+def _get_hypothesis_settings(test: Callable) -> hypothesis.settings | None:
     return getattr(test, "_hypothesis_internal_use_settings", None)
 
 
@@ -108,10 +109,10 @@ def make_async_test(test: Callable) -> Callable:
     return async_run
 
 
-def add_examples(test: Callable, operation: APIOperation, hook_dispatcher: Optional[HookDispatcher] = None) -> Callable:
+def add_examples(test: Callable, operation: APIOperation, hook_dispatcher: HookDispatcher | None = None) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
     try:
-        examples: List[Case] = [get_single_example(strategy) for strategy in operation.get_strategies_from_examples()]
+        examples: list[Case] = [get_single_example(strategy) for strategy in operation.get_strategies_from_examples()]
     except (OperationSchemaError, HypothesisRefResolutionError, Unsatisfiable):
         # Invalid schema:
         # In this case, the user didn't pass `--validate-schema=false` and see an error in the output anyway,
@@ -145,6 +146,6 @@ def get_single_example(strategy: st.SearchStrategy[Case]) -> Case:
     def example_generating_inner_function(ex: Case) -> None:
         examples.append(ex)
 
-    examples: List[Case] = []
+    examples: list[Case] = []
     example_generating_inner_function()
     return examples[0]

@@ -1,5 +1,6 @@
+from __future__ import annotations
 import json
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from hypothesis import given, settings
@@ -21,7 +22,7 @@ from schemathesis.runner.serialization import deduplicate_failures
 from schemathesis.schemas import BaseSchema
 
 
-def make_case(schema: BaseSchema, definition: Dict[str, Any]) -> models.Case:
+def make_case(schema: BaseSchema, definition: dict[str, Any]) -> models.Case:
     operation = models.APIOperation(
         "/path", "GET", definition=OperationDefinition(definition, definition, None, []), schema=schema
     )

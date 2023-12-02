@@ -1,5 +1,6 @@
+from __future__ import annotations
 from enum import Enum
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import jsonschema
 
@@ -62,7 +63,7 @@ class OpenAPIVersion(Enum):
         return self.value == "3.0"
 
 
-def make_openapi_schema(operations: Tuple[str, ...], version: OpenAPIVersion = OpenAPIVersion("2.0")) -> Dict:
+def make_openapi_schema(operations: tuple[str, ...], version: OpenAPIVersion = OpenAPIVersion("2.0")) -> dict:
     """Generate an OAS 2/3 schemas with the given API operations.
 
     Example:
@@ -113,8 +114,8 @@ PAYLOAD = {
 PAYLOAD_VALIDATOR = jsonschema.validators.Draft4Validator({"anyOf": [{"type": "null"}, PAYLOAD]})
 
 
-def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
-    template: Dict[str, Any] = {
+def _make_openapi_2_schema(operations: tuple[str, ...]) -> dict:
+    template: dict[str, Any] = {
         "swagger": "2.0",
         "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},
         "host": "127.0.0.1:8888",
@@ -449,9 +450,9 @@ def _make_openapi_2_schema(operations: Tuple[str, ...]) -> Dict:
     return template
 
 
-def _make_openapi_3_schema(operations: Tuple[str, ...]) -> Dict:
+def _make_openapi_3_schema(operations: tuple[str, ...]) -> dict:
     _base_path = "api"
-    template: Dict[str, Any] = {
+    template: dict[str, Any] = {
         "openapi": "3.0.2",
         "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},
         "paths": {},

@@ -1,5 +1,5 @@
+from __future__ import annotations
 import asyncio
-from typing import Optional
 
 from aiohttp import web
 
@@ -22,6 +22,6 @@ def _run_server(app: web.Application, port: int) -> None:
     loop.run_forever()
 
 
-def run_server(app: web.Application, port: Optional[int] = None, timeout: float = 0.05) -> int:
+def run_server(app: web.Application, port: int | None = None, timeout: float = 0.05) -> int:
     """Start a thread with the given aiohttp application."""
     return _server.run(_run_server, app=app, port=port, timeout=timeout)

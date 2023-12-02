@@ -1,7 +1,8 @@
+from __future__ import annotations
 import enum
 import os
 from dataclasses import asdict, dataclass
-from typing import Dict, Optional, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 
 @enum.unique
@@ -23,17 +24,17 @@ class Environment(Protocol):
         pass
 
     @classmethod
-    def from_env(cls) -> "Environment":
+    def from_env(cls) -> Environment:
         pass
 
-    def asdict(self) -> Dict[str, Optional[str]]:
+    def asdict(self) -> dict[str, str | None]:
         pass
 
-    def as_env(self) -> Dict[str, Optional[str]]:
+    def as_env(self) -> dict[str, str | None]:
         pass
 
 
-def environment() -> Optional[Environment]:
+def environment() -> Environment | None:
     """Collect environment data for a supported CI provider."""
     provider = detect()
     if provider == CIProvider.GITHUB:
@@ -43,7 +44,7 @@ def environment() -> Optional[Environment]:
     return None
 
 
-def detect() -> Optional[CIProvider]:
+def detect() -> CIProvider | None:
     """Detect the current CI provider."""
     if GitHubActionsEnvironment.is_set():
         return GitHubActionsEnvironment.provider
@@ -52,7 +53,7 @@ def detect() -> Optional[CIProvider]:
     return None
 
 
-def _asdict(env: Environment) -> Dict[str, Optional[str]]:
+def _asdict(env: Environment) -> dict[str, str | None]:
     data = asdict(env)  # type: ignore
     data["provider"] = env.provider.value
     return data
@@ -87,24 +88,24 @@ class GitHubActionsEnvironment:
     workflow: str
     # The head ref or source branch of the pull request in a workflow run.
     # For example, `dd/report-ci`.
-    head_ref: Optional[str]
+    head_ref: str | None
     # The name of the base ref or target branch of the pull request in a workflow run.
     # For example, `main`.
-    base_ref: Optional[str]
+    base_ref: str | None
     # The branch or tag ref that triggered the workflow run.
     # This is only set if a branch or tag is available for the event type.
     # For example, `refs/pull/1533/merge`
-    ref: Optional[str]
+    ref: str | None
     # The Schemathesis GitHub Action version.
     # For example `v1.0.1`
-    action_ref: Optional[str]
+    action_ref: str | None
 
     @classmethod
     def is_set(cls) -> bool:
         return os.getenv(cls.variable_name) == "true"
 
     @classmethod
-    def from_env(cls) -> "GitHubActionsEnvironment":
+    def from_env(cls) -> GitHubActionsEnvironment:
         return cls(
             api_url=os.environ["GITHUB_API_URL"],
             repository=os.environ["GITHUB_REPOSITORY"],
@@ -118,7 +119,7 @@ class GitHubActionsEnvironment:
             action_ref=os.getenv("SCHEMATHESIS_ACTION_REF"),
         )
 
-    def as_env(self) -> Dict[str, Optional[str]]:
+    def as_env(self) -> dict[str, str | None]:
         return {
             "GITHUB_API_URL": self.api_url,
             "GITHUB_REPOSITORY": self.repository,
@@ -159,23 +160,23 @@ class GitLabCIEnvironment:
     # not documented.
     # The commit branch name. Not available in merge request pipelines or tag pipelines.
     # For example, `dd/report-ci`.
-    commit_branch: Optional[str]
+    commit_branch: str | None
     # The source branch name of the merge request. Only available in merge request pipelines.
     # For example, `dd/report-ci`.
-    merge_request_source_branch_name: Optional[str]
+    merge_request_source_branch_name: str | None
     # The target branch name of the merge request.
     # For example, `main`.
-    merge_request_target_branch_name: Optional[str]
+    merge_request_target_branch_name: str | None
     # The project-level internal ID of the merge request.
     # For example, `42`.
-    merge_request_iid: Optional[str]
+    merge_request_iid: str | None
 
     @classmethod
     def is_set(cls) -> bool:
         return os.getenv(cls.variable_name) == "true"
 
     @classmethod
-    def from_env(cls) -> "GitLabCIEnvironment":
+    def from_env(cls) -> GitLabCIEnvironment:
         return cls(
             api_v4_url=os.environ["CI_API_V4_URL"],
             project_id=os.environ["CI_PROJECT_ID"],
@@ -187,7 +188,7 @@ class GitLabCIEnvironment:
             merge_request_iid=os.getenv("CI_MERGE_REQUEST_IID"),
         )
 
-    def as_env(self) -> Dict[str, Optional[str]]:
+    def as_env(self) -> dict[str, str | None]:
         return {
             "CI_API_V4_URL": self.api_v4_url,
             "CI_PROJECT_ID": self.project_id,

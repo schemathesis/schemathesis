@@ -1,8 +1,8 @@
+from __future__ import annotations
 import base64
 import json
 import platform
 from dataclasses import asdict
-from typing import Dict, Optional
 from unittest.mock import ANY
 
 import hypothesis
@@ -35,7 +35,7 @@ def execute(schema, **options) -> events.Finished:
 
 
 def assert_request(
-    app: web.Application, idx: int, method: str, path: str, headers: Optional[Dict[str, str]] = None
+    app: web.Application, idx: int, method: str, path: str, headers: dict[str, str] | None = None
 ) -> None:
     request = get_incoming_requests(app)[idx]
     assert request.method == method

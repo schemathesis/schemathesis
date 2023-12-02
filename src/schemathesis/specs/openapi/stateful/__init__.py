@@ -1,5 +1,6 @@
+from __future__ import annotations
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type, cast
+from typing import TYPE_CHECKING, Any, List, cast
 
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
@@ -18,13 +19,13 @@ if TYPE_CHECKING:
 
 
 class OpenAPIStateMachine(APIStateMachine):
-    def transform(self, result: StepResult, direction: Direction, case: "Case") -> "Case":
+    def transform(self, result: StepResult, direction: Direction, case: Case) -> Case:
         context = expressions.ExpressionContext(case=result.case, response=result.response)
         direction.set_data(case, elapsed=result.elapsed, context=context)
         return case
 
 
-def create_state_machine(schema: "BaseOpenAPISchema") -> Type[APIStateMachine]:
+def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
     """Create a state machine class.
 
     It aims to avoid making calls that are not likely to lead to a stateful call later. For example:
@@ -42,17 +43,17 @@ def create_state_machine(schema: "BaseOpenAPISchema") -> Type[APIStateMachine]:
 
     rules = make_all_rules(operations, bundles, connections)
 
-    kwargs: Dict[str, Any] = {"bundles": bundles, "schema": schema}
+    kwargs: dict[str, Any] = {"bundles": bundles, "schema": schema}
     return type("APIWorkflow", (OpenAPIStateMachine,), {**kwargs, **rules})
 
 
-def init_bundles(schema: "BaseOpenAPISchema") -> Dict[str, CaseInsensitiveDict]:
+def init_bundles(schema: BaseOpenAPISchema) -> dict[str, CaseInsensitiveDict]:
     """Create bundles for all operations in the given schema.
 
     Each API operation has a bundle that stores all responses from that operation.
     We need to create bundles first, so they can be referred when building connections between operations.
     """
-    output: Dict[str, CaseInsensitiveDict] = {}
+    output: dict[str, CaseInsensitiveDict] = {}
     for result in schema.get_all_operations():
         if isinstance(result, Ok):
             operation = result.ok()
@@ -62,10 +63,10 @@ def init_bundles(schema: "BaseOpenAPISchema") -> Dict[str, CaseInsensitiveDict]:
 
 
 def make_all_rules(
-    operations: List["APIOperation"],
-    bundles: Dict[str, CaseInsensitiveDict],
+    operations: list[APIOperation],
+    bundles: dict[str, CaseInsensitiveDict],
     connections: APIOperationConnections,
-) -> Dict[str, Rule]:
+) -> dict[str, Rule]:
     """Create rules for all API operations, based on the provided connections."""
     rules = {}
     for operation in operations:
@@ -76,10 +77,10 @@ def make_all_rules(
 
 
 def make_rule(
-    operation: "APIOperation",
+    operation: APIOperation,
     bundle: Bundle,
     connections: APIOperationConnections,
-) -> Optional[Rule]:
+) -> Rule | None:
     """Create a rule for an API operation."""
 
     def _make_rule(previous: st.SearchStrategy) -> Rule:

@@ -1,5 +1,5 @@
+from __future__ import annotations
 import logging
-from typing import List
 
 import click
 from aiohttp import web
@@ -28,7 +28,7 @@ AvailableOperations = CsvEnumChoice(openapi.schema.Operation)
 @click.option("--operations", type=AvailableOperations)
 @click.option("--spec", type=click.Choice(["openapi2", "openapi3", "graphql"]), default="openapi2")
 @click.option("--framework", type=click.Choice(["aiohttp", "flask"]), default="aiohttp")
-def run_app(port: int, operations: List[openapi.schema.Operation], spec: str, framework: str) -> None:
+def run_app(port: int, operations: list[openapi.schema.Operation], spec: str, framework: str) -> None:
     if spec == "graphql":
         app = _graphql._flask.create_app()
         app.run(port=port)

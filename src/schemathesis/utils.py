@@ -1,3 +1,4 @@
+from __future__ import annotations
 import functools
 import operator
 from contextlib import contextmanager
@@ -5,12 +6,8 @@ from inspect import getfullargspec
 from typing import (
     Any,
     Callable,
-    Dict,
     Generator,
-    List,
     NoReturn,
-    Optional,
-    Tuple,
     Union,
 )
 
@@ -57,7 +54,7 @@ IGNORED_PATTERNS = (
 
 
 @contextmanager
-def capture_hypothesis_output() -> Generator[List[str], None, None]:
+def capture_hypothesis_output() -> Generator[list[str], None, None]:
     """Capture all output of Hypothesis into a list of strings.
 
     It allows us to have more granular control over Schemathesis output.
@@ -91,11 +88,11 @@ GIVEN_ARGS_MARKER = "_schemathesis_given_args"
 GIVEN_KWARGS_MARKER = "_schemathesis_given_kwargs"
 
 
-def get_given_args(func: GenericTest) -> Tuple:
+def get_given_args(func: GenericTest) -> tuple:
     return getattr(func, GIVEN_ARGS_MARKER, ())
 
 
-def get_given_kwargs(func: GenericTest) -> Dict[str, Any]:
+def get_given_kwargs(func: GenericTest) -> dict[str, Any]:
     return getattr(func, GIVEN_KWARGS_MARKER, {})
 
 
@@ -124,7 +121,7 @@ def given_proxy(*args: GivenInput, **kwargs: GivenInput) -> Callable[[GenericTes
     return wrapper
 
 
-def merge_given_args(func: GenericTest, args: Tuple, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+def merge_given_args(func: GenericTest, args: tuple, kwargs: dict[str, Any]) -> dict[str, Any]:
     """Merge positional arguments to ``@schema.given`` into a dictionary with keyword arguments.
 
     Kwargs are modified inplace.
@@ -136,7 +133,7 @@ def merge_given_args(func: GenericTest, args: Tuple, kwargs: Dict[str, Any]) -> 
     return kwargs
 
 
-def validate_given_args(func: GenericTest, args: Tuple, kwargs: Dict[str, Any]) -> Optional[Callable]:
+def validate_given_args(func: GenericTest, args: tuple, kwargs: dict[str, Any]) -> Callable | None:
     signature = get_signature(func)
     return is_invalid_test(func, signature, args, kwargs)  # type: ignore
 
@@ -150,7 +147,7 @@ def compose(*functions: Callable) -> Callable:
     return functools.reduce(lambda f, g: lambda x: f(g(x)), functions, noop)
 
 
-def combine_strategies(strategies: List[st.SearchStrategy]) -> st.SearchStrategy:
+def combine_strategies(strategies: list[st.SearchStrategy]) -> st.SearchStrategy:
     """Combine a list of strategies into a single one.
 
     If the input is `[a, b, c]`, then the result is equivalent to `a | b | c`.

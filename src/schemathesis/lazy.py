@@ -1,6 +1,7 @@
+from __future__ import annotations
 from dataclasses import dataclass, field
 from inspect import signature
-from typing import Any, Callable, Dict, Generator, Optional, Type, Union
+from typing import Any, Callable, Generator
 
 import pytest
 from _pytest.fixtures import FixtureRequest
@@ -37,36 +38,36 @@ from .utils import (
 @dataclass
 class LazySchema:
     fixture_name: str
-    base_url: Union[Optional[str], NotSet] = NOT_SET
-    method: Optional[Filter] = NOT_SET
-    endpoint: Optional[Filter] = NOT_SET
-    tag: Optional[Filter] = NOT_SET
-    operation_id: Optional[Filter] = NOT_SET
+    base_url: str | None | NotSet = NOT_SET
+    method: Filter | None = NOT_SET
+    endpoint: Filter | None = NOT_SET
+    tag: Filter | None = NOT_SET
+    operation_id: Filter | None = NOT_SET
     app: Any = NOT_SET
     hooks: HookDispatcher = field(default_factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))
     auth: AuthStorage = field(default_factory=AuthStorage)
     validate_schema: bool = True
     skip_deprecated_operations: bool = False
-    data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET
-    generation_config: Union[GenerationConfig, NotSet] = NOT_SET
+    data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET
+    generation_config: GenerationConfig | NotSet = NOT_SET
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
-    rate_limiter: Optional[Limiter] = None
+    rate_limiter: Limiter | None = None
     sanitize_output: bool = True
 
-    def hook(self, hook: Union[str, Callable]) -> Callable:
+    def hook(self, hook: str | Callable) -> Callable:
         return self.hooks.register(hook)
 
     def parametrize(
         self,
-        method: Optional[Filter] = NOT_SET,
-        endpoint: Optional[Filter] = NOT_SET,
-        tag: Optional[Filter] = NOT_SET,
-        operation_id: Optional[Filter] = NOT_SET,
-        validate_schema: Union[bool, NotSet] = NOT_SET,
-        skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
-        data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
-        generation_config: Union[GenerationConfig, NotSet] = NOT_SET,
-        code_sample_style: Union[str, NotSet] = NOT_SET,
+        method: Filter | None = NOT_SET,
+        endpoint: Filter | None = NOT_SET,
+        tag: Filter | None = NOT_SET,
+        operation_id: Filter | None = NOT_SET,
+        validate_schema: bool | NotSet = NOT_SET,
+        skip_deprecated_operations: bool | NotSet = NOT_SET,
+        data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
+        generation_config: GenerationConfig | NotSet = NOT_SET,
+        code_sample_style: str | NotSet = NOT_SET,
     ) -> Callable:
         if method is NOT_SET:
             method = self.method
@@ -188,7 +189,7 @@ def _get_partial_node_name(node_id: str, **kwargs: Any) -> str:
 
 def run_subtest(
     operation: APIOperation,
-    fixtures: Dict[str, Any],
+    fixtures: dict[str, Any],
     sub_test: Callable,
     subtests: SubTests,
 ) -> None:
@@ -213,7 +214,7 @@ def run_subtest(
             exceptions.append(exception)
             raise
 
-    def get_exception_class() -> Type[CheckFailed]:
+    def get_exception_class() -> type[CheckFailed]:
         return get_grouped_exception("Lazy", *failed_checks.values())
 
     sub_test.hypothesis.inner_test = collecting_wrapper  # type: ignore
@@ -269,21 +270,21 @@ def get_schema(
     *,
     request: FixtureRequest,
     name: str,
-    base_url: Union[Optional[str], NotSet] = None,
-    method: Optional[Filter] = None,
-    endpoint: Optional[Filter] = None,
-    tag: Optional[Filter] = None,
-    operation_id: Optional[Filter] = None,
+    base_url: str | None | NotSet = None,
+    method: Filter | None = None,
+    endpoint: Filter | None = None,
+    tag: Filter | None = None,
+    operation_id: Filter | None = None,
     app: Any = None,
     test_function: GenericTest,
     hooks: HookDispatcher,
-    auth: Union[AuthStorage, NotSet],
-    validate_schema: Union[bool, NotSet] = NOT_SET,
-    skip_deprecated_operations: Union[bool, NotSet] = NOT_SET,
-    data_generation_methods: Union[DataGenerationMethodInput, NotSet] = NOT_SET,
-    generation_config: Union[GenerationConfig, NotSet] = NOT_SET,
+    auth: AuthStorage | NotSet,
+    validate_schema: bool | NotSet = NOT_SET,
+    skip_deprecated_operations: bool | NotSet = NOT_SET,
+    data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
+    generation_config: GenerationConfig | NotSet = NOT_SET,
     code_sample_style: CodeSampleStyle,
-    rate_limiter: Optional[Limiter],
+    rate_limiter: Limiter | None,
     sanitize_output: bool,
 ) -> BaseSchema:
     """Loads a schema from the fixture."""
@@ -310,7 +311,7 @@ def get_schema(
     )
 
 
-def get_fixtures(func: Callable, request: FixtureRequest, given_kwargs: Dict[str, Any]) -> Dict[str, Any]:
+def get_fixtures(func: Callable, request: FixtureRequest, given_kwargs: dict[str, Any]) -> dict[str, Any]:
     """Load fixtures, needed for the test function."""
     sig = signature(func)
     return {

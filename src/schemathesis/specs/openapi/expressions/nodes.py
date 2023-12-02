@@ -1,7 +1,8 @@
 """Expression nodes description and evaluation logic."""
+from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum, unique
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from requests.structures import CaseInsensitiveDict
 
@@ -74,7 +75,7 @@ class NonBodyRequest(Node):
     parameter: str
 
     def evaluate(self, context: ExpressionContext) -> str:
-        container: Union[Dict, CaseInsensitiveDict] = {
+        container: dict | CaseInsensitiveDict = {
             "query": context.case.query,
             "path": context.case.path_parameters,
             "header": context.case.headers,
@@ -88,7 +89,7 @@ class NonBodyRequest(Node):
 class BodyRequest(Node):
     """A node for `$request` expressions where location is `body`."""
 
-    pointer: Optional[str] = None
+    pointer: str | None = None
 
     def evaluate(self, context: ExpressionContext) -> Any:
         document = context.case.body
@@ -111,7 +112,7 @@ class HeaderResponse(Node):
 class BodyResponse(Node):
     """A node for `$response.body` expressions."""
 
-    pointer: Optional[str] = None
+    pointer: str | None = None
 
     def evaluate(self, context: ExpressionContext) -> Any:
         from ....transports.responses import WSGIResponse

@@ -1,10 +1,11 @@
+from __future__ import annotations
 import re
 import string
 from base64 import b64encode
 from contextlib import suppress
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, Optional
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
 
@@ -38,10 +39,10 @@ StrategyFactory = Callable[[Dict[str, Any], str, str, Optional[str], GenerationC
 
 
 @lru_cache
-def get_default_format_strategies() -> Dict[str, st.SearchStrategy]:
+def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
     """Get all default "format" strategies."""
 
-    def make_basic_auth_str(item: Tuple[str, str]) -> str:
+    def make_basic_auth_str(item: tuple[str, str]) -> str:
         return _basic_auth_str(*item)
 
     latin1_text = st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255))
@@ -63,7 +64,7 @@ def get_default_format_strategies() -> Dict[str, st.SearchStrategy]:
     }
 
 
-def is_valid_header(headers: Dict[str, Any]) -> bool:
+def is_valid_header(headers: dict[str, Any]) -> bool:
     """Verify if the generated headers are valid."""
     for name, value in headers.items():
         if not is_latin_1_encodable(value):
@@ -83,7 +84,7 @@ def is_illegal_surrogate(item: Any) -> bool:
     return isinstance(item, str) and bool(has_surrogate_pair(item))
 
 
-def is_valid_query(query: Dict[str, Any]) -> bool:
+def is_valid_query(query: dict[str, Any]) -> bool:
     """Surrogates are not allowed in a query string.
 
     `requests` and `werkzeug` will fail to send it to the application.
@@ -98,14 +99,14 @@ def is_valid_query(query: Dict[str, Any]) -> bool:
 def get_case_strategy(
     draw: Callable,
     operation: APIOperation,
-    hooks: Optional[HookDispatcher] = None,
-    auth_storage: Optional[auths.AuthStorage] = None,
+    hooks: HookDispatcher | None = None,
+    auth_storage: auths.AuthStorage | None = None,
     generator: DataGenerationMethod = DataGenerationMethod.default(),
-    generation_config: Optional[GenerationConfig] = None,
-    path_parameters: Union[NotSet, Dict[str, Any]] = NOT_SET,
-    headers: Union[NotSet, Dict[str, Any]] = NOT_SET,
-    cookies: Union[NotSet, Dict[str, Any]] = NOT_SET,
-    query: Union[NotSet, Dict[str, Any]] = NOT_SET,
+    generation_config: GenerationConfig | None = None,
+    path_parameters: NotSet | dict[str, Any] = NOT_SET,
+    headers: NotSet | dict[str, Any] = NOT_SET,
+    cookies: NotSet | dict[str, Any] = NOT_SET,
+    query: NotSet | dict[str, Any] = NOT_SET,
     body: Any = NOT_SET,
 ) -> Any:
     """A strategy that creates `Case` instances.
@@ -219,15 +220,15 @@ def _get_body_strategy(
 
 
 def get_parameters_value(
-    value: Union[NotSet, Dict[str, Any]],
+    value: NotSet | dict[str, Any],
     location: str,
     draw: Callable,
     operation: APIOperation,
     context: HookContext,
-    hooks: Optional[HookDispatcher],
+    hooks: HookDispatcher | None,
     strategy_factory: StrategyFactory,
     generation_config: GenerationConfig,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Get the final value for the specified location.
 
     If the value is not set, then generate it from the relevant strategy. Otherwise, check what is missing in it and
@@ -256,7 +257,7 @@ class ValueContainer:
 
     value: Any
     location: str
-    generator: Optional[DataGenerationMethod]
+    generator: DataGenerationMethod | None
 
     @property
     def is_generated(self) -> bool:
@@ -264,18 +265,18 @@ class ValueContainer:
         return self.generator is not None and (self.location == "body" or self.value is not None)
 
 
-def any_negated_values(values: List[ValueContainer]) -> bool:
+def any_negated_values(values: list[ValueContainer]) -> bool:
     """Check if any generated values are negated."""
     return any(value.generator == DataGenerationMethod.negative for value in values if value.is_generated)
 
 
 def generate_parameter(
     location: str,
-    explicit: Union[NotSet, Dict[str, Any]],
+    explicit: NotSet | dict[str, Any],
     operation: APIOperation,
     draw: Callable,
     context: HookContext,
-    hooks: Optional[HookDispatcher],
+    hooks: HookDispatcher | None,
     generator: DataGenerationMethod,
     generation_config: GenerationConfig,
 ) -> ValueContainer:
@@ -296,7 +297,7 @@ def generate_parameter(
     value = get_parameters_value(
         explicit, location, draw, operation, context, hooks, strategy_factory, generation_config
     )
-    used_generator: Optional[DataGenerationMethod] = generator
+    used_generator: DataGenerationMethod | None = generator
     if value == explicit:
         # When we pass `explicit`, then its parts are excluded from generation of the final value
         # If the final value is the same, then other parameters were generated at all
@@ -385,7 +386,7 @@ def get_parameters_strategy(
     return st.none()
 
 
-def jsonify_python_specific_types(value: Dict[str, Any]) -> Dict[str, Any]:
+def jsonify_python_specific_types(value: dict[str, Any]) -> dict[str, Any]:
     """Convert Python-specific values to their JSON equivalents."""
     stack: list = [value]
     while stack:
@@ -406,12 +407,12 @@ def jsonify_python_specific_types(value: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def make_positive_strategy(
-    schema: Dict[str, Any],
+    schema: dict[str, Any],
     operation_name: str,
     location: str,
-    media_type: Optional[str],
+    media_type: str | None,
     generation_config: GenerationConfig,
-    custom_formats: Optional[Dict[str, st.SearchStrategy]] = None,
+    custom_formats: dict[str, st.SearchStrategy] | None = None,
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
     if is_header_location(location):
@@ -429,18 +430,18 @@ def make_positive_strategy(
     )
 
 
-def _can_skip_header_filter(schema: Dict[str, Any]) -> bool:
+def _can_skip_header_filter(schema: dict[str, Any]) -> bool:
     # All headers should contain HEADER_FORMAT in order to avoid header filter
     return all(sub_schema.get("format") == HEADER_FORMAT for sub_schema in schema.get("properties", {}).values())
 
 
 def make_negative_strategy(
-    schema: Dict[str, Any],
+    schema: dict[str, Any],
     operation_name: str,
     location: str,
-    media_type: Optional[str],
+    media_type: str | None,
     generation_config: GenerationConfig,
-    custom_formats: Optional[Dict[str, st.SearchStrategy]] = None,
+    custom_formats: dict[str, st.SearchStrategy] | None = None,
 ) -> st.SearchStrategy:
     return negative_schema(
         schema,
@@ -458,7 +459,7 @@ DATA_GENERATION_METHOD_TO_STRATEGY_FACTORY = {
 }
 
 
-def is_valid_path(parameters: Dict[str, Any]) -> bool:
+def is_valid_path(parameters: dict[str, Any]) -> bool:
     """Empty strings ("") are excluded from path by urllib3.
 
     A path containing to "/" or "%2F" will lead to ambiguous path resolution in
@@ -476,7 +477,7 @@ def is_valid_path(parameters: Dict[str, Any]) -> bool:
     )
 
 
-def quote_all(parameters: Dict[str, Any]) -> Dict[str, Any]:
+def quote_all(parameters: dict[str, Any]) -> dict[str, Any]:
     """Apply URL quotation for all values in a dictionary."""
     # Even though, "." is an unreserved character, it has a special meaning in "." and ".." strings.
     # It will change the path:
@@ -498,7 +499,7 @@ def quote_all(parameters: Dict[str, Any]) -> Dict[str, Any]:
 def apply_hooks(
     operation: APIOperation,
     context: HookContext,
-    hooks: Optional[HookDispatcher],
+    hooks: HookDispatcher | None,
     strategy: st.SearchStrategy,
     location: str,
 ) -> st.SearchStrategy:

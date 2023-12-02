@@ -1,7 +1,8 @@
-from typing import Dict, Any, Callable
+from __future__ import annotations
+from typing import Any, Callable
 
 
-def lazy_import(module: str, name: str, imports: Dict[str, Callable[[], Any]], _globals: Dict[str, Any]) -> Any:
+def lazy_import(module: str, name: str, imports: dict[str, Callable[[], Any]], _globals: dict[str, Any]) -> Any:
     value = _globals.get(name)
     if value is not None:
         return value

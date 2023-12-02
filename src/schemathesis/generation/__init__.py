@@ -2,7 +2,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Union, Iterable
+from typing import Union, Iterable
 
 
 class DataGenerationMethod(str, Enum):
@@ -14,11 +14,11 @@ class DataGenerationMethod(str, Enum):
     negative = "negative"
 
     @classmethod
-    def default(cls) -> "DataGenerationMethod":
+    def default(cls) -> DataGenerationMethod:
         return cls.positive
 
     @classmethod
-    def all(cls) -> List["DataGenerationMethod"]:
+    def all(cls) -> list[DataGenerationMethod]:
         return list(DataGenerationMethod)
 
     def as_short_name(self) -> str:
@@ -32,7 +32,7 @@ class DataGenerationMethod(str, Enum):
         return self == DataGenerationMethod.negative
 
     @classmethod
-    def ensure_list(cls, value: "DataGenerationMethodInput") -> List["DataGenerationMethod"]:
+    def ensure_list(cls, value: DataGenerationMethodInput) -> list[DataGenerationMethod]:
         if isinstance(value, DataGenerationMethod):
             return [value]
         return list(value)

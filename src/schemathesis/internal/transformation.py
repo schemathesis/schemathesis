@@ -1,7 +1,8 @@
-from typing import Dict, Any
+from __future__ import annotations
+from typing import Any
 
 
-def merge_recursively(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
+def merge_recursively(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     """Merge two dictionaries recursively."""
     for key in b:
         if key in a:

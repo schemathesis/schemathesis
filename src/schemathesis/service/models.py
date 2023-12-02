@@ -1,6 +1,6 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class UploadSource(str, Enum):
@@ -11,7 +11,7 @@ class UploadSource(str, Enum):
 @dataclass
 class ApiDetails:
     location: str
-    base_url: Optional[str]
+    base_url: str | None
 
 
 @dataclass

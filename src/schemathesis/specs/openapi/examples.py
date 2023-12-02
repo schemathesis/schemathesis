@@ -1,6 +1,7 @@
+from __future__ import annotations
 from contextlib import suppress
 from functools import lru_cache
-from typing import Any, Dict, Generator, List
+from typing import Any, Generator
 
 import requests
 from hypothesis.strategies import SearchStrategy
@@ -11,7 +12,7 @@ from ._hypothesis import PARAMETERS, get_case_strategy
 from .constants import LOCATION_TO_CONTAINER
 
 
-def get_object_example_from_properties(object_schema: Dict[str, Any]) -> Dict[str, Any]:
+def get_object_example_from_properties(object_schema: dict[str, Any]) -> dict[str, Any]:
     return {
         prop_name: prop["example"]
         for prop_name, prop in object_schema.get("properties", {}).items()
@@ -27,7 +28,7 @@ def load_external_example(url: str) -> bytes:
     return response.content
 
 
-def get_examples(examples: Dict[str, Any]) -> Generator[Any, None, None]:
+def get_examples(examples: dict[str, Any]) -> Generator[Any, None, None]:
     for example in examples.values():
         # IDEA: report when it is not a dictionary
         if isinstance(example, dict):
@@ -39,7 +40,7 @@ def get_examples(examples: Dict[str, Any]) -> Generator[Any, None, None]:
                     yield load_external_example(example["externalValue"])
 
 
-def get_parameter_examples(operation_definition: Dict[str, Any], examples_field: str) -> List[Dict[str, Any]]:
+def get_parameter_examples(operation_definition: dict[str, Any], examples_field: str) -> list[dict[str, Any]]:
     """Gets parameter examples from OAS3 `examples` keyword or `x-examples` for Swagger 2."""
     return [
         {
@@ -52,8 +53,8 @@ def get_parameter_examples(operation_definition: Dict[str, Any], examples_field:
     ]
 
 
-def get_parameter_example_from_properties(operation_definition: Dict[str, Any]) -> Dict[str, Any]:
-    static_parameters: Dict[str, Any] = {}
+def get_parameter_example_from_properties(operation_definition: dict[str, Any]) -> dict[str, Any]:
+    static_parameters: dict[str, Any] = {}
     for parameter in operation_definition.get("parameters", []):
         parameter_schema = parameter["schema"] if "schema" in parameter else parameter
         example = get_object_example_from_properties(parameter_schema)
@@ -69,7 +70,7 @@ def get_parameter_example_from_properties(operation_definition: Dict[str, Any]) 
     return static_parameters
 
 
-def get_request_body_examples(operation_definition: Dict[str, Any], examples_field: str) -> Dict[str, Any]:
+def get_request_body_examples(operation_definition: dict[str, Any], examples_field: str) -> dict[str, Any]:
     """Gets request body examples from OAS3 `examples` keyword or `x-examples` for Swagger 2."""
     # NOTE. `requestBody` is OAS3-specific. How should it work with OAS2?
     request_bodies_items = operation_definition.get("requestBody", {}).get("content", {}).items()
@@ -84,8 +85,8 @@ def get_request_body_examples(operation_definition: Dict[str, Any], examples_fie
     }
 
 
-def get_request_body_example_from_properties(operation_definition: Dict[str, Any]) -> Dict[str, Any]:
-    static_parameters: Dict[str, Any] = {}
+def get_request_body_example_from_properties(operation_definition: dict[str, Any]) -> dict[str, Any]:
+    static_parameters: dict[str, Any] = {}
     request_bodies_items = operation_definition.get("requestBody", {}).get("content", {}).items()
     if request_bodies_items:
         _, request_body_schema = next(iter(request_bodies_items))
@@ -96,7 +97,7 @@ def get_request_body_example_from_properties(operation_definition: Dict[str, Any
     return static_parameters
 
 
-def get_static_parameters_from_example(operation: APIOperation) -> Dict[str, Any]:
+def get_static_parameters_from_example(operation: APIOperation) -> dict[str, Any]:
     static_parameters = {}
     for name in PARAMETERS:
         parameters = getattr(operation, name)
@@ -106,7 +107,7 @@ def get_static_parameters_from_example(operation: APIOperation) -> Dict[str, Any
     return static_parameters
 
 
-def get_static_parameters_from_examples(operation: APIOperation, examples_field: str) -> List[Dict[str, Any]]:
+def get_static_parameters_from_examples(operation: APIOperation, examples_field: str) -> list[dict[str, Any]]:
     """Get static parameters from OpenAPI examples keyword."""
     operation_definition = operation.definition.resolved
     return merge_examples(
@@ -115,7 +116,7 @@ def get_static_parameters_from_examples(operation: APIOperation, examples_field:
     )
 
 
-def get_static_parameters_from_properties(operation: APIOperation) -> Dict[str, Any]:
+def get_static_parameters_from_properties(operation: APIOperation) -> dict[str, Any]:
     operation_definition = operation.definition.resolved
     return {
         **get_parameter_example_from_properties(operation_definition),
@@ -125,7 +126,7 @@ def get_static_parameters_from_properties(operation: APIOperation) -> Dict[str, 
 
 def get_strategies_from_examples(
     operation: APIOperation, examples_field: str = "examples"
-) -> List[SearchStrategy[Case]]:
+) -> list[SearchStrategy[Case]]:
     maps = {}
     for location, container in LOCATION_TO_CONTAINER.items():
         serializer = operation.get_parameter_serializer(location)
@@ -155,12 +156,12 @@ def get_strategies_from_examples(
 
 
 def merge_examples(
-    parameter_examples: List[Dict[str, Any]], request_body_examples: Dict[str, Any]
-) -> List[Dict[str, Any]]:
+    parameter_examples: list[dict[str, Any]], request_body_examples: dict[str, Any]
+) -> list[dict[str, Any]]:
     """Create list of static parameter objects from the parameter and request body examples."""
     static_parameter_list = []
     for idx in range(num_examples(parameter_examples, request_body_examples)):
-        static_parameters: Dict[str, Any] = {}
+        static_parameters: dict[str, Any] = {}
         for parameter in parameter_examples:
             container = static_parameters.setdefault(parameter["type"], {})
             container[parameter["name"]] = parameter["examples"][min(idx, len(parameter["examples"]) - 1)]
@@ -172,18 +173,18 @@ def merge_examples(
     return static_parameter_list
 
 
-def static_parameters_union(sp_1: Dict[str, Any], sp_2: Dict[str, Any]) -> List[Dict[str, Any]]:
+def static_parameters_union(sp_1: dict[str, Any], sp_2: dict[str, Any]) -> list[dict[str, Any]]:
     """Fill missing parameters in each static parameter dict with parameters provided in the other dict."""
     full_static_parameters = (_static_parameters_union(sp_1, sp_2), _static_parameters_union(sp_2, sp_1))
     return [static_parameter for static_parameter in full_static_parameters if static_parameter]
 
 
-def _static_parameters_union(base_obj: Dict[str, Any], fill_obj: Dict[str, Any]) -> Dict[str, Any]:
+def _static_parameters_union(base_obj: dict[str, Any], fill_obj: dict[str, Any]) -> dict[str, Any]:
     """Fill base_obj with parameter examples in fill_obj that were not in base_obj."""
     if not base_obj:
         return {}
 
-    full_static_parameters: Dict[str, Any] = {**base_obj}
+    full_static_parameters: dict[str, Any] = {**base_obj}
 
     for parameter_type, examples in fill_obj.items():
         if parameter_type not in full_static_parameters:
@@ -197,7 +198,7 @@ def _static_parameters_union(base_obj: Dict[str, Any], fill_obj: Dict[str, Any])
     return full_static_parameters
 
 
-def num_examples(parameter_examples: List[Dict[str, Any]], request_body_examples: Dict[str, Any]) -> int:
+def num_examples(parameter_examples: list[dict[str, Any]], request_body_examples: dict[str, Any]) -> int:
     max_parameter_examples = (
         max(len(parameter["examples"]) for parameter in parameter_examples) if parameter_examples else 0
     )

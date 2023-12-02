@@ -1,21 +1,22 @@
 """Simple CLI for changelog management."""
+from __future__ import annotations
 import argparse
 import datetime
 import re
 import sys
-from typing import Generator, List, Optional
+from typing import Generator
 
 PYPROJECT_PATH = "pyproject.toml"
 CHANGELOG_PATH = "docs/changelog.rst"
 COMPARE_URL_PREFIX = "https://github.com/schemathesis/schemathesis/compare/"
 
 
-def _read_changelog() -> List[str]:
+def _read_changelog() -> list[str]:
     with open(CHANGELOG_PATH) as f:
         return f.readlines()
 
 
-def _find_line_by_prefix(lines: List[str], prefix: str) -> Optional[int]:
+def _find_line_by_prefix(lines: list[str], prefix: str) -> int | None:
     return next((i for i, line in enumerate(lines) if line.startswith(prefix)), None)
 
 
@@ -102,7 +103,7 @@ def clean_line(text: str) -> str:
     return GITHUB_LINK_RE.sub(r"#\1", text).replace("``", "`")
 
 
-def _rst_to_md(lines: List[str]) -> Generator[str, None, None]:
+def _rst_to_md(lines: list[str]) -> Generator[str, None, None]:
     for line in lines:
         line = line.strip()
         if line.startswith("**"):

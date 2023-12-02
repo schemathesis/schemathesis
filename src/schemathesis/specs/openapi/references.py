@@ -1,5 +1,6 @@
+from __future__ import annotations
 from functools import lru_cache
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union, overload
+from typing import Any, Callable, Dict, Union, overload
 from urllib.request import urlopen
 
 import jsonschema
@@ -16,20 +17,20 @@ from .utils import get_type
 RECURSION_DEPTH_LIMIT = 100
 
 
-def load_file_impl(location: str, opener: Callable) -> Dict[str, Any]:
+def load_file_impl(location: str, opener: Callable) -> dict[str, Any]:
     """Load a schema from the given file."""
     with opener(location) as fd:
         return load_yaml(fd)
 
 
 @lru_cache
-def load_file(location: str) -> Dict[str, Any]:
+def load_file(location: str) -> dict[str, Any]:
     """Load a schema from the given file."""
     return load_file_impl(location, open)
 
 
 @lru_cache
-def load_file_uri(location: str) -> Dict[str, Any]:
+def load_file_uri(location: str) -> dict[str, Any]:
     """Load a schema from the given file uri."""
     return load_file_impl(location, urlopen)
 
@@ -53,11 +54,11 @@ class InliningResolver(jsonschema.RefResolver):
         super().__init__(*args, **kwargs)
 
     @overload
-    def resolve_all(self, item: Dict[str, Any], recursion_level: int = 0) -> Dict[str, Any]:
+    def resolve_all(self, item: dict[str, Any], recursion_level: int = 0) -> dict[str, Any]:
         pass
 
     @overload
-    def resolve_all(self, item: List, recursion_level: int = 0) -> List:
+    def resolve_all(self, item: list, recursion_level: int = 0) -> list:
         pass
 
     def resolve_all(self, item: JSONType, recursion_level: int = 0) -> JSONType:
@@ -79,7 +80,7 @@ class InliningResolver(jsonschema.RefResolver):
             return [self.resolve_all(sub_item, recursion_level) for sub_item in item]
         return item
 
-    def resolve_in_scope(self, definition: Dict[str, Any], scope: str) -> Tuple[List[str], Dict[str, Any]]:
+    def resolve_in_scope(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any]]:
         scopes = [scope]
         # if there is `$ref` then we have a scope change that should be used during validation later to
         # resolve nested references correctly
@@ -105,7 +106,7 @@ class ConvertingResolver(InliningResolver):
         self.nullable_name = nullable_name
         self.is_response_schema = is_response_schema
 
-    def resolve(self, ref: str) -> Tuple[str, Any]:
+    def resolve(self, ref: str) -> tuple[str, Any]:
         url, document = super().resolve(ref)
         document = to_json_schema_recursive(
             document, nullable_name=self.nullable_name, is_response_schema=self.is_response_schema
@@ -113,14 +114,14 @@ class ConvertingResolver(InliningResolver):
         return url, document
 
 
-def remove_optional_references(schema: Dict[str, Any]) -> None:
+def remove_optional_references(schema: dict[str, Any]) -> None:
     """Remove optional parts of the schema that contain references.
 
     It covers only the most popular cases, as removing all optional parts is complicated.
     We might fall back to filtering out invalid cases in the future.
     """
 
-    def clean_properties(s: Dict[str, Any]) -> None:
+    def clean_properties(s: dict[str, Any]) -> None:
         properties = s["properties"]
         required = s.get("required", [])
         for name, value in list(properties.items()):
@@ -132,7 +133,7 @@ def remove_optional_references(schema: Dict[str, Any]) -> None:
             else:
                 stack.append(value)
 
-    def clean_items(s: Dict[str, Any]) -> None:
+    def clean_items(s: dict[str, Any]) -> None:
         items = s["items"]
         min_items = s.get("minItems", 0)
         if not min_items:
@@ -141,25 +142,25 @@ def remove_optional_references(schema: Dict[str, Any]) -> None:
             if isinstance(items, list) and any_ref(items):
                 force_empty_list(s)
 
-    def clean_additional_properties(s: Dict[str, Any]) -> None:
+    def clean_additional_properties(s: dict[str, Any]) -> None:
         additional_properties = s["additionalProperties"]
         if isinstance(additional_properties, dict) and "$ref" in additional_properties:
             s["additionalProperties"] = False
 
-    def force_empty_list(s: Dict[str, Any]) -> None:
+    def force_empty_list(s: dict[str, Any]) -> None:
         del s["items"]
         s["maxItems"] = 0
 
-    def any_ref(i: List[Dict[str, Any]]) -> bool:
+    def any_ref(i: list[dict[str, Any]]) -> bool:
         return any("$ref" in item for item in i)
 
-    def contains_ref(s: Dict[str, Any]) -> bool:
+    def contains_ref(s: dict[str, Any]) -> bool:
         if "$ref" in s:
             return True
         i = s.get("items")
         return (isinstance(i, dict) and "$ref" in i) or isinstance(i, list) and any_ref(i)
 
-    def can_elide(s: Dict[str, Any]) -> bool:
+    def can_elide(s: dict[str, Any]) -> bool:
         # Whether this schema could be dropped from a list of schemas
         type_ = get_type(s)
         if type_ == ["object"]:
@@ -168,7 +169,7 @@ def remove_optional_references(schema: Dict[str, Any]) -> None:
         # Has at least one keyword -> should not be removed
         return not any(k in ALL_KEYWORDS for k in s)
 
-    def on_single_item_combinators(s: Dict[str, Any]) -> List[str]:
+    def on_single_item_combinators(s: dict[str, Any]) -> list[str]:
         # Schema example:
         # {
         #     "type": "object",
@@ -203,7 +204,7 @@ def remove_optional_references(schema: Dict[str, Any]) -> None:
             del definition[k]
 
 
-def resolve_pointer(document: Any, pointer: str) -> Optional[Union[Dict, List, str, int, float]]:
+def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | float | None:
     """Implementation is adapted from Rust's `serde-json` crate.
 
     Ref: https://github.com/serde-rs/json/blob/master/src/value/mod.rs#L751

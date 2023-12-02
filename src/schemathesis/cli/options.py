@@ -1,5 +1,6 @@
+from __future__ import annotations
 from enum import Enum
-from typing import Any, List, NoReturn, Optional, Set, Tuple, Type, Union
+from typing import Any, NoReturn
 
 import click
 
@@ -19,12 +20,12 @@ class CustomHelpMessageChoice(click.Choice):
 
 
 class BaseCsvChoice(click.Choice):
-    def parse_value(self, value: str) -> Tuple[List[str], Set[str]]:
+    def parse_value(self, value: str) -> tuple[list[str], set[str]]:
         selected = [item for item in value.split(",") if item]
         invalid_options = set(selected) - set(self.choices)
         return selected, invalid_options
 
-    def fail_on_invalid_options(self, invalid_options: Set[str], selected: List[str]) -> NoReturn:
+    def fail_on_invalid_options(self, invalid_options: set[str], selected: list[str]) -> NoReturn:
         # Sort to keep the error output consistent with the passed values
         sorted_options = ", ".join(sorted(invalid_options, key=selected.index))
         available_options = ", ".join(self.choices)
@@ -32,13 +33,13 @@ class BaseCsvChoice(click.Choice):
 
 
 class CsvEnumChoice(BaseCsvChoice):
-    def __init__(self, choices: Type[Enum]):
+    def __init__(self, choices: type[Enum]):
         self.enum = choices
         super().__init__(tuple(el.name for el in choices))
 
     def convert(  # type: ignore[return]
-        self, value: str, param: Optional[click.core.Parameter], ctx: Optional[click.core.Context]
-    ) -> List[Enum]:
+        self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None
+    ) -> list[Enum]:
         selected, invalid_options = self.parse_value(value)
         if not invalid_options and selected:
             return [self.enum[item] for item in selected]
@@ -46,9 +47,7 @@ class CsvEnumChoice(BaseCsvChoice):
 
 
 class CsvChoice(BaseCsvChoice):
-    def convert(
-        self, value: str, param: Optional[click.core.Parameter], ctx: Optional[click.core.Context]
-    ) -> List[str]:
+    def convert(self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None) -> list[str]:
         selected, invalid_options = self.parse_value(value)
         if not invalid_options and selected:
             return selected
@@ -57,8 +56,8 @@ class CsvChoice(BaseCsvChoice):
 
 class OptionalInt(click.types.IntRange):
     def convert(  # type: ignore
-        self, value: str, param: Optional[click.core.Parameter], ctx: Optional[click.core.Context]
-    ) -> Union[int, NotSet]:
+        self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None
+    ) -> int | NotSet:
         if value.lower() == "none":
             return NOT_SET
         try:
