@@ -781,6 +781,7 @@ def run(
     schema_kind = callbacks.parse_schema_kind(schema, app)
     callbacks.validate_schema(schema, schema_kind, base_url=base_url, dry_run=dry_run, app=app, api_name=api_name)
     client = None
+    schema_or_location: str | dict[str, Any] = schema
     if schema_kind == callbacks.SchemaInputKind.NAME:
         api_name = schema
     if (
@@ -812,8 +813,9 @@ def run(
             try:
                 details = client.get_api_details(name)
                 # Replace config values with ones loaded from the service
-                schema = details.location
-                base_url = base_url or details.base_url
+                schema_or_location = details.specification.schema
+                default_environment = details.default_environment
+                base_url = base_url or (default_environment.url if default_environment else None)
             except requests.HTTPError as exc:
                 handle_service_error(exc, name)
     if report is REPORT_TO_SERVICE and not client:
@@ -852,7 +854,7 @@ def run(
         verbosity=hypothesis_verbosity,
     )
     event_stream = into_event_stream(
-        schema,
+        schema_or_location,
         app=app,
         base_url=base_url,
         started_at=started_at,
@@ -926,7 +928,7 @@ class LoaderConfig:
     The main goal is to avoid too many parameters in function signatures.
     """
 
-    schema_location: str
+    schema_or_location: str | dict[str, Any]
     app: Any
     base_url: str | None
     validate_schema: bool
@@ -949,7 +951,7 @@ class LoaderConfig:
 
 
 def into_event_stream(
-    schema_location: str,
+    schema_or_location: str | dict[str, Any],
     *,
     app: Any,
     base_url: str | None,
@@ -991,7 +993,7 @@ def into_event_stream(
         if app is not None:
             app = load_app(app)
         config = LoaderConfig(
-            schema_location=schema_location,
+            schema_or_location=schema_or_location,
             app=app,
             base_url=base_url,
             validate_schema=validate_schema,
@@ -1044,7 +1046,7 @@ def load_schema(config: LoaderConfig) -> BaseSchema:
     """Automatically load API schema."""
     first: Callable[[LoaderConfig], BaseSchema]
     second: Callable[[LoaderConfig], BaseSchema]
-    if is_probably_graphql(config.schema_location):
+    if is_probably_graphql(config.schema_or_location):
         # Try GraphQL first, then fallback to Open API
         first, second = (_load_graphql_schema, _load_openapi_schema)
     else:
@@ -1090,28 +1092,30 @@ def is_specific_exception(loader: Loader, exc: Exception) -> bool:
 
 
 def _load_graphql_schema(config: LoaderConfig) -> GraphQLSchema:
-    loader = detect_loader(config.schema_location, config.app, is_openapi=False)
+    loader = detect_loader(config.schema_or_location, config.app, is_openapi=False)
     kwargs = get_graphql_loader_kwargs(loader, config)
-    return loader(config.schema_location, **kwargs)
+    return loader(config.schema_or_location, **kwargs)
 
 
 def _load_openapi_schema(config: LoaderConfig) -> BaseSchema:
-    loader = detect_loader(config.schema_location, config.app, is_openapi=True)
+    loader = detect_loader(config.schema_or_location, config.app, is_openapi=True)
     kwargs = get_loader_kwargs(loader, config)
-    return loader(config.schema_location, **kwargs)
+    return loader(config.schema_or_location, **kwargs)
 
 
-def detect_loader(schema_location: str, app: Any, is_openapi: bool) -> Callable:
+def detect_loader(schema_or_location: str | dict[str, Any], app: Any, is_openapi: bool) -> Callable:
     """Detect API schema loader."""
-    if file_exists(schema_location):
-        # If there is an existing file with the given name,
-        # then it is likely that the user wants to load API schema from there
-        return oas_loaders.from_path if is_openapi else gql_loaders.from_path  # type: ignore
-    if app is not None and not urlparse(schema_location).netloc:
-        # App is passed & location is relative
-        return oas_loaders.get_loader_for_app(app) if is_openapi else gql_loaders.get_loader_for_app(app)
-    # Default behavior
-    return oas_loaders.from_uri if is_openapi else gql_loaders.from_url  # type: ignore
+    if isinstance(schema_or_location, str):
+        if file_exists(schema_or_location):
+            # If there is an existing file with the given name,
+            # then it is likely that the user wants to load API schema from there
+            return oas_loaders.from_path if is_openapi else gql_loaders.from_path  # type: ignore
+        if app is not None and not urlparse(schema_or_location).netloc:
+            # App is passed & location is relative
+            return oas_loaders.get_loader_for_app(app) if is_openapi else gql_loaders.get_loader_for_app(app)
+        # Default behavior
+        return oas_loaders.from_uri if is_openapi else gql_loaders.from_url  # type: ignore
+    return oas_loaders.from_dict if is_openapi else gql_loaders.from_dict  # type: ignore
 
 
 def get_loader_kwargs(loader: Callable, config: LoaderConfig) -> dict[str, Any]:
@@ -1130,7 +1134,7 @@ def get_loader_kwargs(loader: Callable, config: LoaderConfig) -> dict[str, Any]:
         "data_generation_methods": config.data_generation_methods,
         "rate_limit": config.rate_limit,
     }
-    if loader is not oas_loaders.from_path:
+    if loader not in (oas_loaders.from_path, oas_loaders.from_dict):
         kwargs["headers"] = config.headers
     if loader in (oas_loaders.from_uri, oas_loaders.from_aiohttp):
         _add_requests_kwargs(kwargs, config)
@@ -1149,7 +1153,7 @@ def get_graphql_loader_kwargs(
         "data_generation_methods": config.data_generation_methods,
         "rate_limit": config.rate_limit,
     }
-    if loader is not gql_loaders.from_path:
+    if loader not in (gql_loaders.from_path, gql_loaders.from_dict):
         kwargs["headers"] = config.headers
     if loader is gql_loaders.from_url:
         _add_requests_kwargs(kwargs, config)
@@ -1166,9 +1170,13 @@ def _add_requests_kwargs(kwargs: dict[str, Any], config: LoaderConfig) -> None:
         kwargs["wait_for_schema"] = config.wait_for_schema
 
 
-def is_probably_graphql(location: str) -> bool:
+def is_probably_graphql(schema_or_location: str | dict[str, Any]) -> bool:
     """Detect whether it is likely that the given location is a GraphQL endpoint."""
-    return location.endswith(("/graphql", "/graphql/", ".graphql", ".gql"))
+    if isinstance(schema_or_location, str):
+        return schema_or_location.endswith(("/graphql", "/graphql/", ".graphql", ".gql"))
+    return "__schema" in schema_or_location or (
+        "data" in schema_or_location and "__schema" in schema_or_location["data"]
+    )
 
 
 def check_auth(auth: tuple[str, str] | None, headers: dict[str, str]) -> None:

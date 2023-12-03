@@ -12,7 +12,15 @@ from ..constants import USER_AGENT
 from .ci import CIProvider
 from .constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT, UPLOAD_SOURCE_HEADER
 from .metadata import Metadata
-from .models import ApiDetails, AuthResponse, FailedUploadResponse, UploadResponse, UploadSource
+from .models import (
+    ProjectDetails,
+    AuthResponse,
+    FailedUploadResponse,
+    UploadResponse,
+    UploadSource,
+    ProjectEnvironment,
+    Specification,
+)
 
 
 def response_hook(response: requests.Response, **_kwargs: Any) -> None:
@@ -44,11 +52,22 @@ class ServiceClient(requests.Session):
         url = urljoin(self.base_url, url)
         return super().request(method, url, *args, **kwargs)
 
-    def get_api_details(self, name: str) -> ApiDetails:
+    def get_api_details(self, name: str) -> ProjectDetails:
         """Get information about an API."""
-        response = self.get(f"/apis/{name}/")
+        response = self.get(f"/cli/projects/{name}/")
         data = response.json()
-        return ApiDetails(location=data["location"], base_url=data["base_url"])
+        return ProjectDetails(
+            environments=[
+                ProjectEnvironment(
+                    url=environment["url"],
+                    name=environment["name"],
+                    description=environment["description"],
+                    is_default=environment["is_default"],
+                )
+                for environment in data["environments"]
+            ],
+            specification=Specification(schema=data["specification"]["schema"]),
+        )
 
     def login(self, metadata: Metadata) -> AuthResponse:
         """Send a login request."""

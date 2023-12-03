@@ -63,14 +63,22 @@ def service_setup(request, setup_server):
 
 
 @pytest.fixture
-def get_api_details(setup_server, openapi3_schema_url):
+def get_project_details(setup_server, openapi3_base_url, openapi3_schema):
     return setup_server(
         lambda h: h.respond_with_json(
-            {"location": openapi3_schema_url, "base_url": None},
+            {
+                "specification": {
+                    "schema": openapi3_schema.raw_schema,
+                    "type": "openapi",
+                    "version": openapi3_schema.spec_version,
+                    "operations_count": openapi3_schema.operations_count,
+                },
+                "environments": [{"name": "Default", "description": "", "is_default": True, "url": openapi3_base_url}],
+            },
             status=200,
         ),
         "GET",
-        re.compile("/apis/.*/"),
+        re.compile("/cli/projects/.*/"),
     )
 
 
@@ -123,7 +131,7 @@ def hostname(httpserver):
 
 
 @pytest.fixture
-def service(httpserver, hostname, service_setup, get_api_details, report_upload, service_token):
+def service(httpserver, hostname, service_setup, get_project_details, report_upload, service_token):
     return Service(server=httpserver, hostname=hostname, token=service_token)
 
 

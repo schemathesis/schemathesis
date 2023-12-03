@@ -42,7 +42,7 @@ def test_no_failures(cli, schema_url, service, next_url, upload_message):
     # And all requests should have the proper User-Agent
     for request, _ in service.server.log:
         assert request.headers["User-Agent"] == USER_AGENT
-    service.assert_call(0, "/apis/my-api/", 200)
+    service.assert_call(0, "/cli/projects/my-api/", 200)
     service.assert_call(1, "/reports/upload/", 202)
     # And it should be noted in the output
     lines = get_stdout_lines(result.stdout)
@@ -152,7 +152,7 @@ def test_wait_for_report_handler():
     data={"title": "Unauthorized", "status": 401, "detail": "Could not validate credentials"},
     status=401,
     method="GET",
-    path=re.compile("/apis/.*/"),
+    path=re.compile("/cli/projects/.*/"),
 )
 @pytest.mark.openapi_version("3.0")
 def test_unauthorized(cli, schema_url, service, snapshot_cli):
@@ -208,7 +208,7 @@ def test_unknown_error_on_upload(cli, schema_url, service, snapshot_cli):
     data={"title": "Bad request", "status": 400, "detail": "Please, upgrade your CLI"},
     status=400,
     method="GET",
-    path="/apis/my-api/",
+    path="/cli/projects/my-api/",
 )
 @pytest.mark.openapi_version("3.0")
 def test_client_error_on_project_details(cli, schema_url, service, snapshot_cli):
@@ -274,10 +274,10 @@ def test_api_name(cli, schema_url, service, next_url):
 
 
 @pytest.mark.service(
-    data={"title": "Not found", "status": 404, "detail": "Resource not found"},
+    data={"title": "Not found", "status": 404, "detail": "Project not found"},
     status=404,
     method="GET",
-    path=re.compile("/apis/.*/"),
+    path=re.compile("/cli/projects/.*/"),
 )
 @pytest.mark.openapi_version("3.0")
 def test_invalid_name(cli, schema_url, service, next_url):
@@ -298,7 +298,7 @@ def test_invalid_name(cli, schema_url, service, next_url):
     data={"title": "Forbidden", "status": 403, "detail": "FORBIDDEN!"},
     status=403,
     method="GET",
-    path=re.compile("/apis/.*/"),
+    path=re.compile("/cli/projects/.*/"),
 )
 @pytest.mark.openapi_version("3.0")
 def test_forbidden(cli, schema_url, service):
