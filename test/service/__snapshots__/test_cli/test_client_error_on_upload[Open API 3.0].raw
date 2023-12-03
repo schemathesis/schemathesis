@@ -39,7 +39,6 @@ Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
 
 Compressed report size: 2 KB
 Uploading reports to http://127.0.0.1 ...
-Upload: ⠋
 Upload: ERROR
 
 Please, upgrade your CLI

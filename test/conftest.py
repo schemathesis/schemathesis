@@ -376,6 +376,7 @@ class CliSnapshotConfig:
                 if line.startswith("Headers: "):
                     lines[idx] = "Headers: {'X-Foo': 'Bar'}"
                     break
+            lines = [line for line in lines if not (line.startswith("Upload: ") and line.endswith(tuple("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")))]
             data = "\n".join(lines) + "\n"
         return data
 
