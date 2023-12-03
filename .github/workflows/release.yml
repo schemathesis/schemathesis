@@ -25,6 +25,8 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
+          flavor: |
+            latest=false
           images: |
             schemathesis/schemathesis
             ghcr.io/schemathesis/schemathesis
