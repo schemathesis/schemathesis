@@ -1,0 +1,10 @@
+Exit code: 1
+---
+Stdout:
+Schema Loading Error
+
+Connection failed
+
+    Connection aborted. Remote end closed connection without response
+
+Tip: Use `--wait-for-schema=NUM` to wait up to NUM seconds for schema availability.

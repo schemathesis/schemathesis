@@ -452,6 +452,7 @@ def remove_ssl_line_number(text: str) -> str:
 
 def extract_requests_exception_details(exc: RequestException) -> tuple[str, list[str]]:
     from requests.exceptions import SSLError, ConnectionError, ChunkedEncodingError
+    from urllib3.exceptions import MaxRetryError
 
     if isinstance(exc, SSLError):
         message = "SSL verification problem"
@@ -459,8 +460,12 @@ def extract_requests_exception_details(exc: RequestException) -> tuple[str, list
         extra = [remove_ssl_line_number(reason)]
     elif isinstance(exc, ConnectionError):
         message = "Connection failed"
-        _, reason = exc.args[0].reason.args[0].split(":", maxsplit=1)
-        extra = [reason.strip()]
+        inner = exc.args[0]
+        if isinstance(inner, MaxRetryError) and inner.reason is not None:
+            _, reason = inner.reason.args[0].split(":", maxsplit=1)
+            extra = [reason.strip()]
+        else:
+            extra = [" ".join(map(str, inner.args))]
     elif isinstance(exc, ChunkedEncodingError):
         message = "Connection broken. The server declared chunked encoding but sent an invalid chunk"
         extra = [str(exc.args[0].args[1])]

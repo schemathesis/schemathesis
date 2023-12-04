@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.22.0...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Internal error during network error handling. :issue:`1933`
+
 .. _v3.22.0:
 
 :version:`3.22.0 <v3.21.2...v3.22.0>` - 2023-12-03
@@ -40,7 +44,7 @@ Changelog
 
 - Internal error when a non-existing schema file is passed together with ``--base-url``. :issue:`1912`.
 - Internal error during schema loading from invalid URLs.
-- Ignore incompatible GraphQL checks in CLI rather than fail the whole test run. :issue:`#1918`.
+- Ignore incompatible GraphQL checks in CLI rather than fail the whole test run. :issue:`1918`.
 
 **Removed**
 

@@ -1,3 +1,4 @@
+import http.client
 import json
 import os
 import pathlib
@@ -655,6 +656,16 @@ def test_chunked_encoding_error(mocker, cli, schema_url, app, snapshot_cli):
             raise urllib3.exceptions.InvalidChunkLength(response, value) from e
 
     mocker.patch("urllib3.response.HTTPResponse._update_chunk_length", _update_chunk_length)
+    assert cli.run(schema_url) == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_remote_disconnected_error(mocker, cli, schema_url, app, snapshot_cli):
+    mocker.patch(
+        "http.client.HTTPResponse.begin",
+        side_effect=http.client.RemoteDisconnected("Remote end closed connection without response"),
+    )
     assert cli.run(schema_url) == snapshot_cli
 
 
