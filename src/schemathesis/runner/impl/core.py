@@ -40,7 +40,6 @@ from ...internal.result import Ok
 from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResult, TestResultSet
 from ...runner import events
 from ...internal.datetime import current_datetime
-from ...transports.responses import copy_response
 from ...schemas import BaseSchema
 from ...stateful import Feedback, Stateful
 from ...targets import Target, TargetContext
@@ -520,16 +519,15 @@ def run_checks(
             context = error.context
         else:
             context = None
-        check_results.append(result.add_failure(check_name, copied_case, copied_response, elapsed_time, msg, context))
+        check_results.append(result.add_failure(check_name, copied_case, response, elapsed_time, msg, context))
 
     for check in checks:
         check_name = check.__name__
         copied_case = case.partial_deepcopy()
-        copied_response = copy_response(response)
         try:
-            skip_check = check(copied_response, copied_case)
+            skip_check = check(response, copied_case)
             if not skip_check:
-                check_result = result.add_success(check_name, copied_case, copied_response, elapsed_time)
+                check_result = result.add_success(check_name, copied_case, response, elapsed_time)
                 check_results.append(check_result)
         except AssertionError as exc:
             add_single_failure(exc)

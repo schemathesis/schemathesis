@@ -144,7 +144,6 @@ def test_interactions(request, any_app_schema, workers):
         assert failure.response.headers == {
             "Content-Type": ["text/html; charset=utf-8"],
             "Content-Length": ["265"],
-            "ETag": ANY,
         }
     else:
         assert failure.response.headers["Content-Type"] == ["text/plain; charset=utf-8"]
@@ -172,7 +171,7 @@ def test_interactions(request, any_app_schema, workers):
     assert json.loads(base64.b64decode(success.response.body)) == {"success": True}
     assert success.response.encoding == "utf-8"
     if isinstance(any_app_schema.app, Flask):
-        assert success.response.headers == {"Content-Type": ["application/json"], "Content-Length": ["17"], "ETag": ANY}
+        assert success.response.headers == {"Content-Type": ["application/json"], "Content-Length": ["17"]}
     else:
         assert success.response.headers["Content-Type"] == ["application/json; charset=utf-8"]
 
@@ -1018,27 +1017,6 @@ def test_case_mutation(real_app_schema):
     # Then these mutations should not interfere
     assert event.result.checks[0].example.headers["Foo"] == "BAR"
     assert event.result.checks[1].example.headers["Foo"] == "BAZ"
-
-
-@pytest.mark.operations("success")
-@pytest.mark.openapi_version("3.0")
-def test_response_mutation(any_app_schema):
-    # When two checks mutate the response
-
-    def check1(response, case):
-        response.request.headers["Foo"] = "BAR"
-        raise AssertionError("Bar!")
-
-    def check2(response, case):
-        response.request.headers["Foo"] = "BAZ"
-        raise AssertionError("Baz!")
-
-    _, _, event, _ = from_schema(any_app_schema, checks=[check1, check2]).execute()
-    # Then these mutations should not interfere
-    assert event.result.checks[0].example.extra_headers["Foo"] == "BAR"
-    assert event.result.checks[0].request.headers["Foo"] == ["BAR"]
-    assert event.result.checks[1].example.extra_headers["Foo"] == "BAZ"
-    assert event.result.checks[1].request.headers["Foo"] == ["BAZ"]
 
 
 def test_malformed_path_template(empty_open_api_3_schema):
