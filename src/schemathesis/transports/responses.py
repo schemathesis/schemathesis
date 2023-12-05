@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-from copy import deepcopy, copy
 from json import JSONDecodeError
 from typing import Union, TYPE_CHECKING, NoReturn
 from .._compat import JSONMixin
@@ -29,31 +28,6 @@ def get_payload(response: GenericResponse) -> str:
     if isinstance(response, (httpxResponse, requestsResponse)):
         return response.text
     return response.get_data(as_text=True)
-
-
-def copy_response(response: GenericResponse) -> GenericResponse:
-    """Create a copy of the given response as far as it makes sense."""
-    from requests import Response
-
-    if isinstance(response, Response):
-        # Hooks are not copyable. Keep them out and copy the rest
-        hooks = None
-        if response.request is not None:
-            hooks = response.request.hooks["response"]
-            response.request.hooks["response"] = []
-        copied_response = deepcopy(response)
-        if hooks is not None:
-            copied_response.request.hooks["response"] = hooks
-        copied_response.raw = response.raw
-        copied_response.verify = getattr(response, "verify", True)  # type: ignore[union-attr]
-        return copied_response
-
-    # Can't deepcopy WSGI response due to generators inside (`response.freeze` doesn't completely help)
-    if isinstance(response, WSGIResponse):
-        response.freeze()
-    copied_response = copy(response)
-    copied_response.request = deepcopy(response.request)
-    return copied_response
 
 
 def get_reason(status_code: int) -> str:

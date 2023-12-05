@@ -79,11 +79,7 @@ class CaseSource:
     elapsed: float
 
     def partial_deepcopy(self) -> CaseSource:
-        from .transports.responses import copy_response
-
-        return self.__class__(
-            case=self.case.partial_deepcopy(), response=copy_response(self.response), elapsed=self.elapsed
-        )
+        return self.__class__(case=self.case.partial_deepcopy(), response=self.response, elapsed=self.elapsed)
 
 
 def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
@@ -461,7 +457,7 @@ class Case:
         """
         __tracebackhide__ = True
         from .checks import ALL_CHECKS
-        from .transports.responses import get_payload, copy_response, get_reason
+        from .transports.responses import get_payload, get_reason
 
         checks = checks or ALL_CHECKS
         checks = tuple(check for check in checks if check not in excluded_checks)
@@ -469,9 +465,8 @@ class Case:
         failed_checks = []
         for check in chain(checks, additional_checks):
             copied_case = self.partial_deepcopy()
-            copied_response = copy_response(response)
             try:
-                check(copied_response, copied_case)
+                check(response, copied_case)
             except AssertionError as exc:
                 maybe_set_assertion_message(exc, check.__name__)
                 failed_checks.append(exc)
