@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.22.1...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Do not deepcopy responses before passing to checks. They are not supposed to be mutated inside checks.
+
 .. _v3.22.1:
 
 :version:`3.22.1 <v3.22.0...v3.22.1>` - 2023-12-04
