@@ -89,6 +89,7 @@ def test_run_subprocess(testdir):
         ("unknown.json",),
         ("unknown.json", "--base-url=http://127.0.0.1"),
         ("--help",),
+        ("http://127.0.0.1", "--generation-codec=foobar"),
     ),
 )
 def test_run_output(cli, args, snapshot_cli):
