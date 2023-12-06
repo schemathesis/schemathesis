@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import codecs
 import enum
 import os
 import re
@@ -134,6 +136,14 @@ def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_
         raise click.UsageError(INVALID_BASE_URL_MESSAGE) from exc
     if raw_value and not netloc:
         raise click.UsageError(INVALID_BASE_URL_MESSAGE)
+    return raw_value
+
+
+def validate_generation_codec(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
+    try:
+        codecs.getencoder(raw_value)
+    except LookupError as exc:
+        raise click.UsageError(f"Codec `{raw_value}` is unknown") from exc
     return raw_value
 
 

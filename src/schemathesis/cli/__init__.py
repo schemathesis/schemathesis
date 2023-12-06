@@ -637,6 +637,7 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     help="Specifies the codec used for generating strings.",
     type=str,
     default="utf-8",
+    callback=callbacks.validate_generation_codec,
 )
 @click.option(
     "--schemathesis-io-token",
