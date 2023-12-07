@@ -51,7 +51,7 @@ def make_unique_by_key(
 
 
 def deduplicate_failed_checks(
-    checks: list[CheckFailed | AssertionError]
+    checks: list[CheckFailed | AssertionError],
 ) -> Generator[CheckFailed | AssertionError, None, None]:
     """Keep only unique failed checks."""
     seen = set()

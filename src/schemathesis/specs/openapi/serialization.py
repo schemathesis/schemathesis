@@ -11,7 +11,7 @@ MapFunction = Callable[[Generated], Generated]
 
 
 def make_serializer(
-    func: Callable[[DefinitionList], Generator[Callable | None, None, None]]
+    func: Callable[[DefinitionList], Generator[Callable | None, None, None]],
 ) -> Callable[[DefinitionList], Callable | None]:
     """A maker function to avoid code duplication."""
 

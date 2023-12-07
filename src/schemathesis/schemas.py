@@ -434,7 +434,7 @@ class BaseSchema(Mapping):
 
 
 def operations_to_dict(
-    operations: Generator[Result[APIOperation, OperationSchemaError], None, None]
+    operations: Generator[Result[APIOperation, OperationSchemaError], None, None],
 ) -> dict[str, MethodsDict]:
     output: dict[str, MethodsDict] = {}
     for result in operations:
