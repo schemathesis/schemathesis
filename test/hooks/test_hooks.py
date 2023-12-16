@@ -189,7 +189,7 @@ def test_hooks_via_parametrize(testdir, simple_openapi):
         """
 @schema.hook("filter_query")
 def extra(context, query):
-    return query["id"].isdigit() and int(query["id"]) % 2 == 0
+    return query["id"].isdigit() and query["id"].isascii() and int(query["id"]) % 2 == 0
 
 @schema.parametrize()
 @settings(max_examples=1)
@@ -275,7 +275,7 @@ def test_local_dispatcher(wsgi_app_schema, apply_first):
 def test_multiple_hooks_per_spec(wsgi_app_schema):
     @wsgi_app_schema.hook("filter_query")
     def first_hook(context, query):
-        return query["id"].isdigit()
+        return query["id"].isdigit() and query["id"].isascii()
 
     @wsgi_app_schema.hook("filter_query")
     def second_hook(context, query):
