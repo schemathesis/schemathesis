@@ -332,6 +332,7 @@ Then, with this hook, you can query the database for some existing order and set
     database = ...  # Init the DB
 
 
+    @schemathesis.hook
     def before_process_path(
         context: schemathesis.hooks.HookContext, path: str, methods: Dict[str, Any]
     ) -> None:
@@ -350,6 +351,7 @@ Called just before schema instance is created. Takes a raw schema representation
     from typing import Any, Dict
 
 
+    @schemathesis.hook
     def before_load_schema(
         context: schemathesis.hooks.HookContext,
         raw_schema: Dict[str, Any],
@@ -370,6 +372,7 @@ Called just after schema instance is created. Takes a loaded schema:
     import schemathesis
 
 
+    @schemathesis.hook
     def after_load_schema(
         context: schemathesis.hooks.HookContext,
         schema: schemathesis.schemas.BaseSchema,
@@ -389,6 +392,7 @@ Allows you to modify just initialized API operation:
     from schemathesis.models import APIOperation
 
 
+    @schemathesis.hook
     def before_init_operation(
         context: schemathesis.hooks.HookContext, operation: APIOperation
     ) -> None:
@@ -407,6 +411,7 @@ With this hook, you can add additional test cases that will be executed in Hypot
     from typing import List
 
 
+    @schemathesis.hook
     def before_add_examples(
         context: schemathesis.hooks.HookContext,
         examples: List[Case],
@@ -458,10 +463,12 @@ behavior in the API by changing the duplicate request's specific details.
 
 .. code:: python
 
+    import schemathesis
     from schemathesis import Case, GenericResponse, hooks
     from typing import Optional
 
 
+    @schemathesis.hook
     def add_case(
         context: hooks.HookContext, case: Case, response: GenericResponse
     ) -> Optional[Case]:
@@ -475,10 +482,12 @@ an additional test case if the original case received a successful response from
 
 .. code:: python
 
+    import schemathesis
     from schemathesis import Case, GenericResponse, hooks
     from typing import Optional
 
 
+    @schemathesis.hook
     def add_case(
         context: hooks.HookContext, case: Case, response: GenericResponse
     ) -> Optional[Case]:
