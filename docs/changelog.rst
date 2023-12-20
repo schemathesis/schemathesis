@@ -6,7 +6,7 @@ Changelog
 
 **Added**
 
-- New CLI option ``--contrib-openapi-fill-missing-examples`` to automatically generate random examples for API operations that lack explicit examples. :issue:`1728`
+- New CLI option ``--contrib-openapi-fill-missing-examples`` to automatically generate random examples for API operations that lack explicit examples. :issue:`1728`, :issue:`1376`
 
 **Changed**
 
