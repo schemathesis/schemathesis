@@ -134,6 +134,12 @@ def add_examples(test: Callable, operation: APIOperation, hook_dispatcher: HookD
 
 
 def get_single_example(strategy: st.SearchStrategy[Case]) -> Case:
+    examples: list[Case] = []
+    add_single_example(strategy, examples)
+    return examples[0]
+
+
+def add_single_example(strategy: st.SearchStrategy[Case], examples: list[Case]) -> None:
     @hypothesis.given(strategy)  # type: ignore
     @hypothesis.settings(  # type: ignore
         database=None,
@@ -146,6 +152,4 @@ def get_single_example(strategy: st.SearchStrategy[Case]) -> Case:
     def example_generating_inner_function(ex: Case) -> None:
         examples.append(ex)
 
-    examples: list[Case] = []
     example_generating_inner_function()
-    return examples[0]

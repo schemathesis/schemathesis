@@ -50,6 +50,14 @@ Dredd works more in a way that requires you to write some sort of example-based 
 There are a lot of features that Dredd has are Schemathesis has not (e.g., API Blueprint support, that powerful hook system, and many more) and probably vice versa.
 Definitely, Schemathesis can learn a lot from Dredd and if you miss any feature that exists in Dredd but doesn't exist in Schemathesis, let us know.
 
+Why are no examples generated in Schemathesis when using ``--hypothesis-phase=explicit``?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``--hypothesis-phase=explicit`` option is designed to test only the examples that are explicitly defined in the API schema.
+It avoids generating new examples to maintain predictability and adhere strictly to the documented API behavior.
+
+If you need random examples for API operations without explicit examples, consider using the ``--contrib-openapi-fill-missing-examples`` CLI option.
+
 How should I run Schemathesis?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
