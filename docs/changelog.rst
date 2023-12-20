@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.22.1...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- New CLI option ``--contrib-openapi-fill-missing-examples`` to automatically generate random examples for API operations that lack explicit examples. :issue:`1728`
+
 **Changed**
 
 - Validate ``--generation-codec`` values in CLI.
