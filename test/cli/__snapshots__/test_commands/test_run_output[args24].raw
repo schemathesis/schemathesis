@@ -165,6 +165,10 @@ Generic:
   --contrib-unique-data           Forces the generation of unique test cases.
   --contrib-openapi-formats-uuid  Enables support for the 'uuid' string format
                                   in OpenAPI.
+  --contrib-openapi-fill-missing-examples
+                                  Enables generation of random examples for API
+                                  operations that do not have explicit examples
+                                  defined.
   --no-color                      Disable ANSI color escape codes.
   --force-color                   Explicitly tells to enable ANSI color escape
                                   codes.

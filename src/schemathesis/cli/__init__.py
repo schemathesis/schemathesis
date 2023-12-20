@@ -543,6 +543,14 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     show_default=True,
 )
 @click.option(
+    "--contrib-openapi-fill-missing-examples",
+    "contrib_openapi_fill_missing_examples",
+    help="Enables generation of random examples for API operations that do not have explicit examples defined.",
+    is_flag=True,
+    default=False,
+    show_default=True,
+)
+@click.option(
     "--hypothesis-database",
     help="Configures storage for examples discovered by Hypothesis. "
     f"Use 'none' to disable, '{HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER}' for temporary storage, "
@@ -710,6 +718,7 @@ def run(
     sanitize_output: bool = True,
     contrib_unique_data: bool = False,
     contrib_openapi_formats_uuid: bool = False,
+    contrib_openapi_fill_missing_examples: bool = False,
     hypothesis_database: str | None = None,
     hypothesis_deadline: int | NotSet | None = None,
     hypothesis_derandomize: bool | None = None,
@@ -843,6 +852,8 @@ def run(
         contrib.unique_data.install()
     if contrib_openapi_formats_uuid:
         contrib.openapi.formats.uuid.install()
+    if contrib_openapi_fill_missing_examples:
+        contrib.openapi.fill_missing_examples.install()
 
     hypothesis_settings = prepare_hypothesis_settings(
         database=hypothesis_database,
