@@ -119,6 +119,7 @@ Generic:
   --request-timeout INTEGER RANGE
                                   Sets a timeout limit, in milliseconds, for
                                   each network request during tests.  [x>=1]
+  --request-proxy TEXT            Set the proxy for all network requests.
   --request-tls-verify TEXT       Configures TLS certificate verification for
                                   server requests. Can specify path to CA_BUNDLE
                                   for custom certs.  [default: true]

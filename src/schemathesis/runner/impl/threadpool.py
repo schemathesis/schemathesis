@@ -224,6 +224,7 @@ class ThreadPoolRunner(BaseRunner):
 
     workers_num: int = 2
     request_tls_verify: bool | str = True
+    request_proxy: str | None = None
     request_cert: RequestCert | None = None
 
     def _execute(
@@ -330,6 +331,7 @@ class ThreadPoolRunner(BaseRunner):
             "kwargs": {
                 "request_timeout": self.request_timeout,
                 "request_tls_verify": self.request_tls_verify,
+                "request_proxy": self.request_proxy,
                 "request_cert": self.request_cert,
                 "store_interactions": self.store_interactions,
                 "max_response_time": self.max_response_time,

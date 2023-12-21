@@ -619,6 +619,7 @@ def network_test(
     session: requests.Session,
     request_timeout: int | None,
     request_tls_verify: bool,
+    request_proxy: str | None,
     request_cert: RequestCert | None,
     store_interactions: bool,
     headers: dict[str, Any] | None,
@@ -647,6 +648,7 @@ def network_test(
                 headers,
                 feedback,
                 request_tls_verify,
+                request_proxy,
                 request_cert,
                 max_response_time,
             )
@@ -665,6 +667,7 @@ def _network_test(
     headers: dict[str, Any] | None,
     feedback: Feedback,
     request_tls_verify: bool,
+    request_proxy: str | None,
     request_cert: RequestCert | None,
     max_response_time: int | None,
 ) -> requests.Response:
@@ -678,6 +681,8 @@ def _network_test(
             "verify": request_tls_verify,
             "cert": request_cert,
         }
+        if request_proxy is not None:
+            kwargs["proxies"] = {"all": request_proxy}
         hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
         response = case.call(**kwargs)
     except CheckFailed as exc:

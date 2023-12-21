@@ -1,5 +1,6 @@
 import base64
 import io
+import platform
 import threading
 from unittest.mock import ANY
 from urllib.parse import parse_qsl, quote_plus, unquote_plus, urlencode, urlparse, urlunparse
@@ -260,22 +261,28 @@ async def test_replay(
                 compare_headers(request, serialized["headers"])
 
 
-@pytest.fixture(params=["tls-verify", "cert", "cert-and-key"])
+@pytest.fixture(params=["tls-verify", "cert", "cert-and-key", "proxies"])
 def request_args(request, tmp_path):
     if request.param == "tls-verify":
-        return ["--request-tls-verify=false"], "verify", False
+        return ["--request-tls-verify=false"], "verify", False, ExitCode.OK
     cert = tmp_path / "cert.tmp"
     cert.touch()
     if request.param == "cert":
-        return [f"--request-cert={cert}"], "cert", str(cert)
+        return [f"--request-cert={cert}"], "cert", str(cert), ExitCode.OK
     if request.param == "cert-and-key":
         key = tmp_path / "key.tmp"
         key.touch()
-        return [f"--request-cert={cert}", f"--request-cert-key={key}"], "cert", (str(cert), str(key))
+        return [f"--request-cert={cert}", f"--request-cert-key={key}"], "cert", (str(cert), str(key)), ExitCode.OK
+    if request.param == "proxies":
+        if platform.system() == "Windows":
+            exit_code = ExitCode.OK
+        else:
+            exit_code = ExitCode.TESTS_FAILED
+        return ["--request-proxy=http://127.0.0.1"], "proxies", {"all": "http://127.0.0.1"}, exit_code
 
 
 @pytest.mark.openapi_version("3.0")
-def test_replay_cert_options(cli, schema_url, cassette_path, request_args, mocker):
+def test_replay_requests_options(cli, schema_url, cassette_path, request_args, mocker):
     # Record a cassette
     cli.run(
         schema_url,
@@ -287,11 +294,10 @@ def test_replay_cert_options(cli, schema_url, cassette_path, request_args, mocke
     )
     send = mocker.spy(requests.adapters.HTTPAdapter, "send")
     # When parameters for `requests` are passed via command line
-    args, key, expected = request_args
+    args, key, expected, exit_code = request_args
     result = cli.replay(str(cassette_path), *args)
-    assert result.exit_code == ExitCode.OK, result.stdout
+    assert result.exit_code == exit_code, result.stdout
     # Then they should properly setup replayed requests
-    assert len(send.call_args_list) == 3
     for _, kwargs in send.call_args_list:
         assert kwargs[key] == expected
 

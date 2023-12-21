@@ -253,6 +253,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "headers": {},
         "request_timeout": DEFAULT_RESPONSE_TIMEOUT,
         "request_tls_verify": True,
+        "request_proxy": None,
         "request_cert": None,
         "store_interactions": False,
         "seed": None,
@@ -310,6 +311,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
                 "skip_deprecated_operations": False,
                 "force_schema_version": None,
                 "request_tls_verify": True,
+                "request_proxy": None,
                 "request_cert": None,
             },
             **expected,
@@ -668,6 +670,13 @@ def test_remote_disconnected_error(mocker, cli, schema_url, app, snapshot_cli):
         side_effect=http.client.RemoteDisconnected("Remote end closed connection without response"),
     )
     assert cli.run(schema_url) == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+@pytest.mark.skipif(platform.system() == "Windows", reason="Linux specific error")
+def test_proxy_error(cli, schema_url, app, snapshot_cli):
+    assert cli.run(schema_url, "--request-proxy=http://127.0.0.1") == snapshot_cli
 
 
 @pytest.fixture

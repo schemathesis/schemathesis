@@ -15,6 +15,7 @@ class SingleThreadRunner(BaseRunner):
     """Fast runner that runs tests sequentially in the main thread."""
 
     request_tls_verify: bool | str = True
+    request_proxy: str | None = None
     request_cert: RequestCert | None = None
 
     def _execute(
@@ -42,6 +43,7 @@ class SingleThreadRunner(BaseRunner):
                 headers=self.headers,
                 request_timeout=self.request_timeout,
                 request_tls_verify=self.request_tls_verify,
+                request_proxy=self.request_proxy,
                 request_cert=self.request_cert,
                 store_interactions=self.store_interactions,
                 dry_run=self.dry_run,
