@@ -290,6 +290,7 @@ def replay(
     method: str | None = None,
     request_tls_verify: bool = True,
     request_cert: RequestCert | None = None,
+    request_proxy: str | None = None,
 ) -> Generator[Replayed, None, None]:
     """Replay saved interactions."""
     import requests
@@ -297,9 +298,12 @@ def replay(
     session = requests.Session()
     session.verify = request_tls_verify
     session.cert = request_cert
+    kwargs = {}
+    if request_proxy is not None:
+        kwargs["proxies"] = {"all": request_proxy}
     for interaction in filter_cassette(cassette["http_interactions"], id_, status, uri, method):
         request = get_prepared_request(interaction["request"])
-        response = session.send(request)  # type: ignore
+        response = session.send(request, **kwargs)  # type: ignore
         yield Replayed(interaction, response)
 
 
