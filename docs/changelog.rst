@@ -7,11 +7,16 @@ Changelog
 **Added**
 
 - New CLI option ``--contrib-openapi-fill-missing-examples`` to automatically generate random examples for API operations that lack explicit examples. :issue:`1728`, :issue:`1376`
+- New CLI option ``--request-proxy`` to set HTTP(s) proxies for network calls. :issue:`1723`
 
 **Changed**
 
 - Validate ``--generation-codec`` values in CLI.
 - Do not deepcopy responses before passing to checks. They are not supposed to be mutated inside checks.
+
+**Fixed**
+
+- Internal error when the configured proxy is not available.
 
 .. _v3.22.1:
 

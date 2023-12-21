@@ -165,6 +165,11 @@ class GroupedOption(click.Option):
         self.group = group
 
 
+with_request_proxy = click.option(
+    "--request-proxy",
+    help="Set the proxy for all network requests.",
+    type=str,
+)
 with_request_tls_verify = click.option(
     "--request-tls-verify",
     help="Configures TLS certificate verification for server requests. Can specify path to CA_BUNDLE for custom certs.",
@@ -398,6 +403,7 @@ REPORT_TO_SERVICE = ReportToService()
     type=click.IntRange(1),
     default=DEFAULT_RESPONSE_TIMEOUT,
 )
+@with_request_proxy
 @with_request_tls_verify
 @with_request_cert
 @with_request_cert_key
@@ -699,6 +705,7 @@ def run(
     request_tls_verify: bool = True,
     request_cert: str | None = None,
     request_cert_key: str | None = None,
+    request_proxy: str | None = None,
     validate_schema: bool = True,
     skip_deprecated_operations: bool = False,
     junit_xml: click.utils.LazyFile | None = None,
@@ -875,6 +882,7 @@ def run(
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
         request_tls_verify=request_tls_verify,
+        request_proxy=request_proxy,
         request_cert=prepare_request_cert(request_cert, request_cert_key),
         wait_for_schema=wait_for_schema,
         auth=auth,
@@ -948,6 +956,7 @@ class LoaderConfig:
     data_generation_methods: tuple[DataGenerationMethod, ...]
     force_schema_version: str | None
     request_tls_verify: bool | str
+    request_proxy: str | None
     request_cert: RequestCert | None
     wait_for_schema: float | None
     rate_limit: str | None
@@ -973,6 +982,7 @@ def into_event_stream(
     data_generation_methods: tuple[DataGenerationMethod, ...],
     force_schema_version: str | None,
     request_tls_verify: bool | str,
+    request_proxy: str | None,
     request_cert: RequestCert | None,
     # Network request parameters
     auth: tuple[str, str] | None,
@@ -1012,6 +1022,7 @@ def into_event_stream(
             skip_deprecated_operations=skip_deprecated_operations,
             data_generation_methods=data_generation_methods,
             force_schema_version=force_schema_version,
+            request_proxy=request_proxy,
             request_tls_verify=request_tls_verify,
             request_cert=request_cert,
             wait_for_schema=wait_for_schema,
@@ -1032,6 +1043,7 @@ def into_event_stream(
             headers=headers,
             request_timeout=request_timeout,
             request_tls_verify=request_tls_verify,
+            request_proxy=request_proxy,
             request_cert=request_cert,
             seed=seed,
             exit_first=exit_first,
@@ -1429,6 +1441,7 @@ def get_exit_code(event: events.ExecutionEvent) -> int:
 @click.option("--force-color", help="Explicitly tells to enable ANSI color escape codes.", type=bool, is_flag=True)
 @click.option("--verbosity", "-v", help="Increase verbosity of the output.", count=True)
 @with_request_tls_verify
+@with_request_proxy
 @with_request_cert
 @with_request_cert_key
 @click.pass_context
@@ -1444,6 +1457,7 @@ def replay(
     request_tls_verify: bool = True,
     request_cert: str | None = None,
     request_cert_key: str | None = None,
+    request_proxy: str | None = None,
     force_color: bool = False,
 ) -> None:
     """Replay a cassette.
@@ -1467,6 +1481,7 @@ def replay(
         method=method,
         request_tls_verify=request_tls_verify,
         request_cert=prepare_request_cert(request_cert, request_cert_key),
+        request_proxy=request_proxy,
     ):
         click.secho(f"  {bold('ID')}              : {replayed.interaction['id']}")
         click.secho(f"  {bold('URI')}             : {replayed.interaction['request']['uri']}")
