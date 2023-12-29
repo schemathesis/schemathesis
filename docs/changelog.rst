@@ -18,6 +18,7 @@ Changelog
 **Fixed**
 
 - Internal error when the configured proxy is not available.
+- Not using ``examples` from shared ``parameters``. :issue:`1729`, :issue:`1513`
 
 .. _v3.22.1:
 
