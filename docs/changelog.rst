@@ -13,6 +13,7 @@ Changelog
 
 - Validate ``--generation-codec`` values in CLI.
 - Do not deepcopy responses before passing to checks. They are not supposed to be mutated inside checks.
+- Pin ``anyio`` to ``<4`` due to incompatibility with ``starlette-testclient``.
 
 **Fixed**
 
