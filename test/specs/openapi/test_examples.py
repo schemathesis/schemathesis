@@ -12,7 +12,11 @@ import schemathesis
 from schemathesis._hypothesis import get_single_example
 from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import examples
-from schemathesis.specs.openapi.examples import get_examples
+from schemathesis.specs.openapi.examples import (
+    get_examples,
+    get_static_parameters_from_examples,
+    get_static_parameters_from_example,
+)
 from schemathesis.specs.openapi.parameters import parameters_to_json_schema
 from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
@@ -500,3 +504,66 @@ def test_external_value_network_error(empty_open_api_3_schema):
 )
 def test_empty_example(value, expected, server):
     assert list(get_examples(value)) == expected
+
+
+def test_shared_parameters(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/api/{dir}/{filename}/{id}": {
+            "parameters": [
+                {
+                    "name": "dir",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string", "enum": ["favorite", "best", "new"]},
+                    "examples": {"favorite": {"value": "favorite"}, "best": {"value": "best"}, "new": {"value": "new"}},
+                },
+                {
+                    "name": "filename",
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "strin"},
+                    "example": "test.mp4",
+                    "examples": {
+                        "some_file": {"value": "some_file.txt"},
+                        "other_file": {"value": "other_file.txt"},
+                        "extra_file": {"value": "extra_file.txt"},
+                    },
+                },
+            ],
+            "get": {
+                "parameters": [{"$ref": "#/components/parameters/Id"}],
+                "responses": {"200": {"description": "OK"}},
+            },
+        }
+    }
+    empty_open_api_3_schema["components"] = {
+        "parameters": {
+            "Id": {
+                "name": "Id",
+                "in": "path",
+                "required": True,
+                "schema": {
+                    "type": "string",
+                    "example": "000000120816216",
+                    "pattern": "^[0-9]{15}$",
+                },
+            }
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    operation = schema["/api/{dir}/{filename}/{id}"]["get"]
+    from_examples = get_static_parameters_from_examples(operation, "examples")
+    assert from_examples == [
+        {"path_parameters": {"dir": "favorite", "filename": "some_file.txt"}},
+        {"path_parameters": {"dir": "best", "filename": "other_file.txt"}},
+        {"path_parameters": {"dir": "new", "filename": "extra_file.txt"}},
+    ]
+    assert get_static_parameters_from_example(operation) == {
+        "path_parameters": {"Id": "000000120816216", "filename": "test.mp4"}
+    }
+    assert [get_single_example(strategy).path_parameters for strategy in operation.get_strategies_from_examples()] == [
+        {"Id": "000000000000000", "dir": "favorite", "filename": "some_file.txt"},
+        {"Id": "000000000000000", "dir": "best", "filename": "other_file.txt"},
+        {"Id": "000000000000000", "dir": "new", "filename": "extra_file.txt"},
+        {"Id": "000000120816216", "dir": "new", "filename": "test.mp4"},
+    ]

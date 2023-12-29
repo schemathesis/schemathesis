@@ -7,6 +7,7 @@ import requests
 from hypothesis.strategies import SearchStrategy
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
+from ...internal.copy import fast_deepcopy
 from ...models import APIOperation, Case
 from ._hypothesis import PARAMETERS, get_case_strategy
 from .constants import LOCATION_TO_CONTAINER
@@ -109,7 +110,13 @@ def get_static_parameters_from_example(operation: APIOperation) -> dict[str, Any
 
 def get_static_parameters_from_examples(operation: APIOperation, examples_field: str) -> list[dict[str, Any]]:
     """Get static parameters from OpenAPI examples keyword."""
-    operation_definition = operation.definition.resolved
+    operation_definition = fast_deepcopy(operation.definition.resolved)
+    # Add shared parameters excluding body
+    for parameter in operation.definition.parameters:
+        parameters = operation_definition.setdefault("parameters", [])
+        if parameter.location == "body" or parameter.name in {parameter["name"] for parameter in parameters}:
+            continue
+        parameters.append(parameter.definition)
     return merge_examples(
         get_parameter_examples(operation_definition, examples_field),
         get_request_body_examples(operation_definition, examples_field),
