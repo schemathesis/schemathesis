@@ -1097,7 +1097,7 @@ def _try_load_schema(config: LoaderConfig, first: Loader, second: Loader) -> Bas
         try:
             return first(config)
         except SchemaError as exc:
-            if should_try_more(exc):
+            if config.force_schema_version is None and should_try_more(exc):
                 try:
                     return second(config)
                 except Exception as second_exc:
