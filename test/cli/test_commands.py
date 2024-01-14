@@ -171,6 +171,15 @@ def test_schema_not_available_wsgi(cli, loadable_flask_app, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
+def test_empty_schema_file(testdir, cli, snapshot_cli):
+    # When the schema file is empty
+    filename = testdir.makefile(".json", schema="")
+    # Then a proper error should be reported
+    assert cli.run(str(filename), "--base-url=http://127.0.0.1:1") == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
 def test_force_color_nocolor(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url, "--force-color", "--no-color") == snapshot_cli
 

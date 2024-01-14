@@ -1,0 +1,11 @@
+Exit code: 1
+---
+Stdout:
+Schema Loading Error
+
+The provided API schema does not appear to be a valid GraphQL schema
+
+    Syntax Error: Unexpected <EOF>.
+    GraphQL request:1:1
+    1 |
+      | ^

@@ -184,6 +184,7 @@ def from_uri(
     )
 
 
+SCHEMA_INVALID_ERROR = "The provided API schema does not appear to be a valid OpenAPI schema"
 SCHEMA_LOADING_ERROR = "Received unsupported content while expecting a JSON or YAML payload for Open API"
 SCHEMA_SYNTAX_ERROR = "API schema does not appear syntactically valid"
 
@@ -304,6 +305,8 @@ def from_dict(
     """
     from .schemas import OpenApi30, SwaggerV20
 
+    if not isinstance(raw_schema, dict):
+        raise SchemaError(SchemaErrorType.OPEN_API_INVALID_SCHEMA, SCHEMA_INVALID_ERROR)
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     hook_context = HookContext()
     is_openapi_31 = raw_schema.get("openapi", "").startswith("3.1")
@@ -435,7 +438,7 @@ def _maybe_validate_schema(
         except ValidationError as exc:
             raise SchemaError(
                 SchemaErrorType.OPEN_API_INVALID_SCHEMA,
-                "The provided API schema does not appear to be a valid OpenAPI schema",
+                SCHEMA_INVALID_ERROR,
                 extras=[entry for entry in str(exc).splitlines() if entry],
             ) from exc
 

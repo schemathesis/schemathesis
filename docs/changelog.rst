@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.23.0...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Internal error when the schema file is empty.
+
 .. _v3.23.0:
 
 :version:`3.23.0 <v3.22.1...v3.23.0>` - 2023-12-29
