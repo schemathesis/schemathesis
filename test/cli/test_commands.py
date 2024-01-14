@@ -169,13 +169,14 @@ def test_schema_not_available_wsgi(cli, loadable_flask_app, snapshot_cli):
     assert cli.run("unknown.yaml", f"--app={loadable_flask_app}") == snapshot_cli
 
 
+@pytest.mark.parametrize("args", ((), ("--force-schema-version=30",)))
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_empty_schema_file(testdir, cli, snapshot_cli):
+def test_empty_schema_file(testdir, cli, snapshot_cli, args):
     # When the schema file is empty
     filename = testdir.makefile(".json", schema="")
     # Then a proper error should be reported
-    assert cli.run(str(filename), "--base-url=http://127.0.0.1:1") == snapshot_cli
+    assert cli.run(str(filename), "--base-url=http://127.0.0.1:1", *args) == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
