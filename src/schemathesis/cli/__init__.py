@@ -1112,6 +1112,8 @@ def is_specific_exception(loader: Loader, exc: Exception) -> bool:
         loader is _load_graphql_schema
         and isinstance(exc, SchemaError)
         and exc.type == SchemaErrorType.GRAPHQL_INVALID_SCHEMA
+        # In some cases it is not clear that the schema is even supposed to be GraphQL, e.g. an empty input
+        and "Syntax Error: Unexpected <EOF>." not in exc.extras
     )
 
 

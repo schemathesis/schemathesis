@@ -7,6 +7,7 @@ Changelog
 **Changed**
 
 - Do not auto-detect spec if the ``--force-schema-version`` CLI option is present.
+- Do not assume GraphQL when trying to auto-detect spec in an empty input file.
 
 **Fixed**
 
