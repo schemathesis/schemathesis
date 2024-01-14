@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.23.0...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Do not auto-detect spec if the ``--force-schema-version`` CLI option is present.
+
 **Fixed**
 
 - Internal error when the schema file is empty.
