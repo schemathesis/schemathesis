@@ -105,6 +105,14 @@ Generic:
                                   the 'USER:PASSWORD' format.
   -A, --auth-type [basic|digest]  Specifies the authentication method. Default
                                   is 'basic'.  [default: basic]
+  --set-query TEXT                OpenAPI: Override a specific query parameter
+                                  by specifying 'parameter=value'
+  --set-header TEXT               OpenAPI: Override a specific header parameter
+                                  by specifying 'parameter=value'
+  --set-cookie TEXT               OpenAPI: Override a specific cookie parameter
+                                  by specifying 'parameter=value'
+  --set-path TEXT                 OpenAPI: Override a specific path parameter by
+                                  specifying 'parameter=value'
   -H, --header TEXT               Adds a custom HTTP header to all API requests.
                                   Format: 'Header-Name: Value'.
   -w, --workers [auto|1-64]       Sets the number of concurrent workers for
