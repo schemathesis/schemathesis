@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.23.1...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- CLI options for overriding Open API parameters in test cases. :issue:`1676`
+
 .. _v3.23.1:
 
 :version:`3.23.1 <v3.23.0...v3.23.1>` - 2024-01-14

@@ -4,6 +4,7 @@ from random import Random
 from typing import Any, Callable, Generator, Iterable, TYPE_CHECKING
 from urllib.parse import urlparse
 
+from .override import CaseOverride
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod, GenerationConfig
 from ..constants import (
     DEFAULT_DEADLINE,
@@ -51,6 +52,7 @@ def prepare(
     base_url: str | None = None,
     auth: tuple[str, str] | None = None,
     auth_type: str | None = None,
+    override: CaseOverride | None = None,
     headers: dict[str, str] | None = None,
     request_timeout: int | None = None,
     request_tls_verify: bool | str = True,
@@ -116,6 +118,7 @@ def prepare(
         dry_run=dry_run,
         auth=auth,
         auth_type=auth_type,
+        override=override,
         headers=headers,
         request_timeout=request_timeout,
         request_tls_verify=request_tls_verify,
@@ -172,6 +175,7 @@ def execute_from_schema(
     hypothesis_settings: hypothesis.settings,
     auth: RawAuth | None = None,
     auth_type: str | None = None,
+    override: CaseOverride | None = None,
     headers: dict[str, Any] | None = None,
     request_timeout: int | None = None,
     request_tls_verify: bool | str = True,
@@ -219,6 +223,7 @@ def execute_from_schema(
             hypothesis_settings=hypothesis_settings,
             auth=auth,
             auth_type=auth_type,
+            override=override,
             headers=headers,
             seed=seed,
             workers_num=workers_num,
@@ -312,6 +317,7 @@ def load_schema(
 def from_schema(
     schema: BaseSchema,
     *,
+    override: CaseOverride | None = None,
     checks: Iterable[CheckFunction] | None = None,
     max_response_time: int | None = None,
     targets: Iterable[Target] = DEFAULT_TARGETS,
@@ -369,6 +375,7 @@ def from_schema(
                 generation_config=generation_config,
                 auth=auth,
                 auth_type=auth_type,
+                override=override,
                 headers=headers,
                 seed=seed,
                 workers_num=workers_num,
@@ -396,6 +403,7 @@ def from_schema(
                 generation_config=generation_config,
                 auth=auth,
                 auth_type=auth_type,
+                override=override,
                 headers=headers,
                 seed=seed,
                 exit_first=exit_first,
@@ -417,6 +425,7 @@ def from_schema(
             generation_config=generation_config,
             auth=auth,
             auth_type=auth_type,
+            override=override,
             headers=headers,
             seed=seed,
             workers_num=workers_num,
@@ -440,6 +449,7 @@ def from_schema(
             generation_config=generation_config,
             auth=auth,
             auth_type=auth_type,
+            override=override,
             headers=headers,
             seed=seed,
             request_timeout=request_timeout,
@@ -466,6 +476,7 @@ def from_schema(
             generation_config=generation_config,
             auth=auth,
             auth_type=auth_type,
+            override=override,
             headers=headers,
             seed=seed,
             exit_first=exit_first,
@@ -487,6 +498,7 @@ def from_schema(
         generation_config=generation_config,
         auth=auth,
         auth_type=auth_type,
+        override=override,
         headers=headers,
         seed=seed,
         exit_first=exit_first,

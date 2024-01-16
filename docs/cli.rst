@@ -77,6 +77,26 @@ then you can skip them by passing ``--skip-deprecated-operations``:
 
     $ st run --skip-deprecated-operations ...
 
+Overriding test data
+--------------------
+
+You can set specific values for Open API parameters in test cases, such as query parameters, headers and cookies.
+
+This is particularly useful for scenarios where specific parameter values are required for deeper testing.
+For instance, when dealing with values that represent data in a database, which Schemathesis might not automatically know or generate.
+
+Each override follows the general form of ``--set-[part] name=value``.
+For Open API, the ``[part]`` corresponds to the ``in`` value of a parameter which is ``query``, ``header``, ``cookie``, or ``path``.
+You can specify multiple overrides in a single command and each of them will be applied only to API operations that use such a parameter.
+
+For example, to override a query parameter and path:
+
+.. code:: bash
+
+    $ st run --set-query apiKey=secret --set-path user_id=42 ...
+
+This command overrides the ``apiKey`` query parameter and ``user_id`` path parameter, using ``secret`` and ``42`` as their respective values in all applicable test cases.
+
 Tests configuration
 -------------------
 

@@ -212,24 +212,30 @@ class BaseSchema(Mapping):
         settings: hypothesis.settings | None = None,
         generation_config: GenerationConfig | None = None,
         seed: int | None = None,
-        as_strategy_kwargs: dict[str, Any] | None = None,
+        as_strategy_kwargs: dict[str, Any] | Callable[[APIOperation], dict[str, Any]] | None = None,
         hooks: HookDispatcher | None = None,
         _given_kwargs: dict[str, GivenInput] | None = None,
     ) -> Generator[Result[tuple[APIOperation, Callable], OperationSchemaError], None, None]:
         """Generate all operations and Hypothesis tests for them."""
         for result in self.get_all_operations(hooks=hooks):
             if isinstance(result, Ok):
+                operation = result.ok()
+                _as_strategy_kwargs: dict[str, Any] | None
+                if callable(as_strategy_kwargs):
+                    _as_strategy_kwargs = as_strategy_kwargs(operation)
+                else:
+                    _as_strategy_kwargs = as_strategy_kwargs
                 test = create_test(
-                    operation=result.ok(),
+                    operation=operation,
                     test=func,
                     settings=settings,
                     seed=seed,
                     data_generation_methods=self.data_generation_methods,
                     generation_config=generation_config,
-                    as_strategy_kwargs=as_strategy_kwargs,
+                    as_strategy_kwargs=_as_strategy_kwargs,
                     _given_kwargs=_given_kwargs,
                 )
-                yield Ok((result.ok(), test))
+                yield Ok((operation, test))
             else:
                 yield result
 

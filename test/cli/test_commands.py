@@ -39,7 +39,7 @@ from schemathesis._dependency_versions import IS_PYTEST_ABOVE_54
 from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT, FLAKY_FAILURE_MESSAGE, REPORT_SUGGESTION_ENV_VAR
 from schemathesis.extra._flask import run_server
 from schemathesis.models import APIOperation
-from schemathesis.runner import from_schema
+from schemathesis.runner import from_schema, CaseOverride
 from schemathesis.runner.impl import threadpool
 from schemathesis.specs.openapi import unregister_string_format
 from schemathesis.specs.openapi.checks import status_code_conformance
@@ -90,6 +90,15 @@ def test_run_subprocess(testdir):
         ("unknown.json", "--base-url=http://127.0.0.1"),
         ("--help",),
         ("http://127.0.0.1", "--generation-codec=foobar"),
+        ("http://127.0.0.1", "--set-query", "key=a\ud800b"),
+        ("http://127.0.0.1", "--set-query", "key"),
+        ("http://127.0.0.1", "--set-query", "=v"),
+        ("http://127.0.0.1", "--set-header", "Token=тест"),
+        ("http://127.0.0.1", "--set-cookie", "SESSION_ID=тест"),
+        ("http://127.0.0.1", "--set-path", "user_id=\ud800b"),
+        ("http://127.0.0.1", "--set-query", "key=value", "--set-query", "key=value"),
+        ("http://127.0.0.1", "--set-header", "Authorization=value", "--auth", "foo:bar"),
+        ("http://127.0.0.1", "--set-header", "Authorization=value", "-H", "Authorization: value"),
     ),
 )
 def test_run_output(cli, args, snapshot_cli):
@@ -260,6 +269,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "stateful_recursion_limit": 5,
         "auth": None,
         "auth_type": "basic",
+        "override": CaseOverride({}, {}, {}, {}),
         "headers": {},
         "request_timeout": DEFAULT_RESPONSE_TIMEOUT,
         "request_tls_verify": True,
@@ -2009,6 +2019,38 @@ def test_custom_strings(testdir, cli, hypothesis_max_examples, schema_url):
         "--generation-codec=ascii",
         schema_url,
         f"--hypothesis-max-examples={hypothesis_max_examples or 100}",
+        hooks=module.purebasename,
+    )
+    assert result.exit_code == ExitCode.OK, result.stdout
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("path_variable", "custom_format")
+def test_parameter_overrides(testdir, cli, schema_url):
+    module = testdir.make_importable_pyfile(
+        hook="""
+            import schemathesis
+
+            @schemathesis.check
+            def verify_overrides(response, case):
+                if case.operation.path_parameters.contains("key"):
+                    assert case.path_parameters["key"] == "foo"
+                    assert "id" not in (case.query or {}), "`id` is present"
+                if case.operation.query.contains("id"):
+                    assert case.query["id"] == "bar"
+                    assert "key" not in (case.path_parameters or {}), "`key` is present"
+            """
+    )
+
+    result = cli.main(
+        "run",
+        "-c",
+        "verify_overrides",
+        "--set-path",
+        "key=foo",
+        "--set-query",
+        "id=bar",
+        schema_url,
         hooks=module.purebasename,
     )
     assert result.exit_code == ExitCode.OK, result.stdout

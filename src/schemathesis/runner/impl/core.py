@@ -19,6 +19,7 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.exceptions import ValidationError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
+from ..override import CaseOverride
 from ... import failures, hooks
 from ..._compat import MultipleFailures
 from ...auths import unregister as unregister_auth
@@ -63,6 +64,7 @@ class BaseRunner:
     targets: Iterable[Target]
     hypothesis_settings: hypothesis.settings
     generation_config: GenerationConfig
+    override: CaseOverride | None = None
     auth: RawAuth | None = None
     auth_type: str | None = None
     headers: dict[str, Any] | None = None
@@ -145,11 +147,17 @@ class BaseRunner:
         """Run tests and recursively run additional tests."""
         if recursion_level > self.stateful_recursion_limit:
             return
-        as_strategy_kwargs = {}
-        if headers is not None:
-            as_strategy_kwargs["headers"] = {
-                key: value for key, value in headers.items() if key.lower() != "user-agent"
-            }
+
+        def as_strategy_kwargs(_operation: APIOperation) -> dict[str, Any]:
+            kw = {}
+            if self.override is not None:
+                for location, override in self.override.for_operation(_operation).items():
+                    if override:
+                        kw[location] = override
+            if headers:
+                kw["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
+            return kw
+
         for result in maker(
             template,
             settings=settings,

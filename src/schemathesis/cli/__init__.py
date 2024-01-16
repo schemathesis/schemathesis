@@ -37,6 +37,7 @@ from ..constants import (
 from ..exceptions import SchemaError, extract_nth_traceback, SchemaErrorType
 from ..fixups import ALL_FIXUPS
 from ..loaders import load_app, load_yaml
+from ..runner.override import CaseOverride
 from ..transports.auth import get_requests_auth
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..models import Case, CheckFunction
@@ -309,6 +310,38 @@ REPORT_TO_SERVICE = ReportToService()
     default="basic",
     help="Specifies the authentication method. Default is 'basic'.",
     show_default=True,
+)
+@click.option(
+    "--set-query",
+    "set_query",
+    help=r"OpenAPI: Override a specific query parameter by specifying 'parameter=value'",
+    multiple=True,
+    type=str,
+    callback=callbacks.validate_set_query,
+)
+@click.option(
+    "--set-header",
+    "set_header",
+    help=r"OpenAPI: Override a specific header parameter by specifying 'parameter=value'",
+    multiple=True,
+    type=str,
+    callback=callbacks.validate_set_header,
+)
+@click.option(
+    "--set-cookie",
+    "set_cookie",
+    help=r"OpenAPI: Override a specific cookie parameter by specifying 'parameter=value'",
+    multiple=True,
+    type=str,
+    callback=callbacks.validate_set_cookie,
+)
+@click.option(
+    "--set-path",
+    "set_path",
+    help=r"OpenAPI: Override a specific path parameter by specifying 'parameter=value'",
+    multiple=True,
+    type=str,
+    callback=callbacks.validate_set_path,
 )
 @click.option(
     "--header",
@@ -685,6 +718,10 @@ def run(
     auth: tuple[str, str] | None,
     auth_type: str,
     headers: dict[str, str],
+    set_query: dict[str, str],
+    set_header: dict[str, str],
+    set_cookie: dict[str, str],
+    set_path: dict[str, str],
     experimental: list,
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
     exclude_checks: Iterable[str] = (),
@@ -769,6 +806,8 @@ def run(
     for experiment in experimental:
         experiment.enable()
 
+    override = CaseOverride(query=set_query, headers=set_header, cookies=set_cookie, path_parameters=set_path)
+
     generation_config = generation.GenerationConfig(allow_x00=generation_allow_x00, codec=generation_codec)
 
     report: ReportToService | click.utils.LazyFile | None
@@ -784,7 +823,7 @@ def run(
         raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
     decide_color_output(ctx, no_color, force_color)
 
-    check_auth(auth, headers)
+    check_auth(auth, headers, override)
     selected_targets = tuple(target for target in targets_module.ALL_TARGETS if target.__name__ in targets)
 
     if store_network_log and cassette_path:
@@ -887,6 +926,7 @@ def run(
         wait_for_schema=wait_for_schema,
         auth=auth,
         auth_type=auth_type,
+        override=override,
         headers=headers,
         endpoint=endpoints or None,
         method=methods or None,
@@ -987,6 +1027,7 @@ def into_event_stream(
     # Network request parameters
     auth: tuple[str, str] | None,
     auth_type: str | None,
+    override: CaseOverride,
     headers: dict[str, str] | None,
     request_timeout: int | None,
     wait_for_schema: float | None,
@@ -1040,6 +1081,7 @@ def into_event_stream(
             loaded_schema,
             auth=auth,
             auth_type=auth_type,
+            override=override,
             headers=headers,
             request_timeout=request_timeout,
             request_tls_verify=request_tls_verify,
@@ -1205,12 +1247,22 @@ def is_probably_graphql(schema_or_location: str | dict[str, Any]) -> bool:
     )
 
 
-def check_auth(auth: tuple[str, str] | None, headers: dict[str, str]) -> None:
-    if auth is not None and "authorization" in {header.lower() for header in headers}:
-        raise click.BadParameter(
-            "The `--auth` and `--header` options were both used to set "
-            "the 'Authorization' header, which is not permitted."
-        )
+def check_auth(auth: tuple[str, str] | None, headers: dict[str, str], override: CaseOverride) -> None:
+    auth_is_set = auth is not None
+    header_is_set = "authorization" in {header.lower() for header in headers}
+    override_is_set = "authorization" in {header.lower() for header in override.headers}
+    if len([is_set for is_set in (auth_is_set, header_is_set, override_is_set) if is_set]) > 1:
+        message = "The "
+        used = []
+        if auth_is_set:
+            used.append("`--auth`")
+        if header_is_set:
+            used.append("`--header`")
+        if override_is_set:
+            used.append("`--set-header`")
+        message += " and ".join(used)
+        message += " options were both used to set the 'Authorization' header, which is not permitted."
+        raise click.BadParameter(message)
 
 
 def get_output_handler(workers_num: int) -> EventHandler:

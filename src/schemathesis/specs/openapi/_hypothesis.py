@@ -1,5 +1,4 @@
 from __future__ import annotations
-import re
 import string
 from base64 import b64encode
 from contextlib import suppress
@@ -21,6 +20,7 @@ from ...generation import DataGenerationMethod, GenerationConfig
 from ...internal.copy import fast_deepcopy
 from ...exceptions import SerializationNotPossible, BodyInGetRequestError
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
+from ...internal.validation import is_illegal_surrogate
 from ...models import APIOperation, Case, cant_serialize
 from ...transports.headers import has_invalid_characters, is_latin_1_encodable
 from ...types import NotSet
@@ -72,16 +72,6 @@ def is_valid_header(headers: dict[str, Any]) -> bool:
         if has_invalid_characters(name, value):
             return False
     return True
-
-
-SURROGATE_PAIR_RE = re.compile(r"[\ud800-\udfff]")
-has_surrogate_pair = SURROGATE_PAIR_RE.search
-
-
-def is_illegal_surrogate(item: Any) -> bool:
-    if isinstance(item, list):
-        return any(isinstance(item_, str) and bool(has_surrogate_pair(item_)) for item_ in item)
-    return isinstance(item, str) and bool(has_surrogate_pair(item))
 
 
 def is_valid_query(query: dict[str, Any]) -> bool:

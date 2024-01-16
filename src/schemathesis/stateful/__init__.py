@@ -97,13 +97,18 @@ class Feedback:
         settings: hypothesis.settings | None,
         generation_config: GenerationConfig | None,
         seed: int | None,
-        as_strategy_kwargs: dict[str, Any] | None,
+        as_strategy_kwargs: dict[str, Any] | Callable[[APIOperation], dict[str, Any]] | None,
     ) -> Generator[Result[tuple[APIOperation, Callable], OperationSchemaError], None, None]:
         """Generate additional tests that use data from the previous ones."""
         from .._hypothesis import create_test
 
         for data in self.stateful_tests.values():
             operation = data.make_operation()
+            _as_strategy_kwargs: dict[str, Any] | None
+            if callable(as_strategy_kwargs):
+                _as_strategy_kwargs = as_strategy_kwargs(operation)
+            else:
+                _as_strategy_kwargs = as_strategy_kwargs
             test_function = create_test(
                 operation=operation,
                 test=test,
@@ -111,7 +116,7 @@ class Feedback:
                 seed=seed,
                 data_generation_methods=operation.schema.data_generation_methods,
                 generation_config=generation_config,
-                as_strategy_kwargs=as_strategy_kwargs,
+                as_strategy_kwargs=_as_strategy_kwargs,
             )
             yield Ok((operation, test_function))
 
