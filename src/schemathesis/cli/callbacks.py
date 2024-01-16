@@ -6,7 +6,8 @@ import os
 import re
 import traceback
 from contextlib import contextmanager
-from typing import Generator, TYPE_CHECKING
+from functools import partial
+from typing import Generator, TYPE_CHECKING, Callable
 from urllib.parse import urlparse
 
 import click
@@ -18,7 +19,7 @@ from ..code_samples import CodeSampleStyle
 from ..exceptions import extract_nth_traceback
 from ..generation import DataGenerationMethod
 from ..constants import TRUE_VALUES, FALSE_VALUES
-from ..internal.validation import file_exists, is_filename
+from ..internal.validation import file_exists, is_filename, is_illegal_surrogate
 from ..loaders import load_app
 from ..service.hosts import get_temporary_hosts_file
 from ..transports.headers import has_invalid_characters, is_latin_1_encodable
@@ -208,6 +209,71 @@ def validate_auth(
     return None
 
 
+def _validate_and_build_multiple_options(
+    values: tuple[str, ...], name: str, callback: Callable[[str, str], None]
+) -> dict[str, str]:
+    output = {}
+    for raw in values:
+        try:
+            key, value = raw.split("=", maxsplit=1)
+        except ValueError as exc:
+            raise click.BadParameter(f"Expected NAME=VALUE format, received {raw}.") from exc
+        key = key.strip()
+        if not key:
+            raise click.BadParameter(f"{name} parameter name should not be empty.")
+        if key in output:
+            raise click.BadParameter(f"{name} parameter {key} is specified multiple times.")
+        value = value.strip()
+        callback(key, value)
+        output[key] = value
+    return output
+
+
+def _validate_set_query(_: str, value: str) -> None:
+    if is_illegal_surrogate(value):
+        raise click.BadParameter("Query parameter value should not contain surrogates.")
+
+
+def validate_set_query(
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: tuple[str, ...]
+) -> dict[str, str]:
+    return _validate_and_build_multiple_options(raw_value, "Query", _validate_set_query)
+
+
+def validate_set_header(
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: tuple[str, ...]
+) -> dict[str, str]:
+    return _validate_and_build_multiple_options(raw_value, "Header", partial(_validate_header, where="Header"))
+
+
+def validate_set_cookie(
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: tuple[str, ...]
+) -> dict[str, str]:
+    return _validate_and_build_multiple_options(raw_value, "Cookie", partial(_validate_header, where="Cookie"))
+
+
+def _validate_set_path(_: str, value: str) -> None:
+    if is_illegal_surrogate(value):
+        raise click.BadParameter("Path parameter value should not contain surrogates.")
+
+
+def validate_set_path(
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: tuple[str, ...]
+) -> dict[str, str]:
+    return _validate_and_build_multiple_options(raw_value, "Path", _validate_set_path)
+
+
+def _validate_header(key: str, value: str, where: str) -> None:
+    if not key:
+        raise click.BadParameter(f"{where} name should not be empty.")
+    if not is_latin_1_encodable(key):
+        raise click.BadParameter(f"{where} name should be latin-1 encodable.")
+    if not is_latin_1_encodable(value):
+        raise click.BadParameter(f"{where} value should be latin-1 encodable.")
+    if has_invalid_characters(key, value):
+        raise click.BadParameter(f"Invalid return character or leading space in {where.lower()}.")
+
+
 def validate_headers(
     ctx: click.core.Context, param: click.core.Parameter, raw_value: tuple[str, ...]
 ) -> dict[str, str]:
@@ -217,14 +283,7 @@ def validate_headers(
             key, value = header.split(":", maxsplit=1)
         value = value.lstrip()
         key = key.strip()
-        if not key:
-            raise click.BadParameter("Header name should not be empty.")
-        if not is_latin_1_encodable(key):
-            raise click.BadParameter("Header name should be latin-1 encodable.")
-        if not is_latin_1_encodable(value):
-            raise click.BadParameter("Header value should be latin-1 encodable.")
-        if has_invalid_characters(key, value):
-            raise click.BadParameter("Invalid return character or leading space in header.")
+        _validate_header(key, value, where="Header")
         headers[key] = value
     return headers
 
