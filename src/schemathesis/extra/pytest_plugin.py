@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import unittest
 from contextlib import contextmanager
 from functools import partial
 from typing import Any, Callable, Generator, Type, TypeVar, cast
@@ -10,10 +12,10 @@ from _pytest.fixtures import FuncFixtureInfo
 from _pytest.nodes import Node
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from hypothesis import reporting
-from hypothesis.errors import InvalidArgument
+from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
-from .._hypothesis import create_test
+from .._hypothesis import create_test, get_unsatisfied_example_mark
 from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from .._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54
 from ..exceptions import OperationSchemaError, SkipTest
@@ -234,6 +236,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
 
     For example - kwargs validation is failed for some strategy.
     """
+    __tracebackhide__ = True
     if isinstance(pyfuncitem, SchemathesisFunction):
         with skip_unnecessary_hypothesis_output():
             outcome = yield
@@ -243,8 +246,12 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
             raise OperationSchemaError(exc.args[0]) from None
         except HypothesisRefResolutionError:
             pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)
-        except SkipTest as exc:
-            pytest.skip(exc.args[0])
+        except (SkipTest, unittest.SkipTest) as exc:
+            unsatisfiable = get_unsatisfied_example_mark(pyfuncitem.obj)
+            if unsatisfiable is not None:
+                raise Unsatisfiable("Failed to generate test cases from examples for this API operation") from None
+            else:
+                pytest.skip(exc.args[0])
         except Exception as exc:
             if hasattr(exc, "__notes__"):
                 exc.__notes__ = [note for note in exc.__notes__ if not _should_ignore_entry(note)]  # type: ignore

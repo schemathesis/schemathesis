@@ -647,3 +647,53 @@ def test(case):
     else:
         expected = rf"E           curl -X GET -H 'Authorization: {auth}' {openapi3_base_url}/failure"
     assert expected in result.stdout.lines
+
+
+def test_unsatisfiable_example(testdir, openapi3_base_url):
+    testdir.make_test(
+        f"""
+
+schema.base_url = "{openapi3_base_url}"
+
+@schema.parametrize(endpoint="success")
+@settings(phases=[Phase.explicit])
+def test(case):
+    case.validate_response(response)
+""",
+        paths={
+            "/success": {
+                "post": {
+                    "parameters": [
+                        # This parameter is not satisfiable
+                        {
+                            "name": "key",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "integer", "minimum": 5, "maximum": 4},
+                        }
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "foo": {"type": "string", "example": "foo example string"},
+                                    },
+                                },
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest()
+    # We should skip checking for a server error
+    result.assert_outcomes(failed=1)
+    assert (
+        "hypothesis.errors.Unsatisfiable: Failed to generate test cases from examples for this API operation"
+        in result.stdout.str()
+    )
