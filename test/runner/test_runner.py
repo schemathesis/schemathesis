@@ -741,7 +741,14 @@ def test_skip_operations_with_recursive_references(schema_with_recursive_referen
     assert RECURSIVE_REFERENCE_ERROR_MESSAGE in after.result.errors[0].exception
 
 
-def test_unsatisfiable_example(empty_open_api_3_schema):
+@pytest.mark.parametrize(
+    "phases, expected, total_errors",
+    (
+        ([Phase.explicit, Phase.generate], "Failed to generate test cases for this API operation", 2),
+        ([Phase.explicit], "Failed to generate test cases from examples for this API operation", 1),
+    ),
+)
+def test_unsatisfiable_example(empty_open_api_3_schema, phases, expected, total_errors):
     # See GH-904
     # When filling missing properties during examples generation leads to unsatisfiable schemas
     empty_open_api_3_schema["paths"] = {
@@ -775,11 +782,12 @@ def test_unsatisfiable_example(empty_open_api_3_schema):
     # Then the testing process should not raise an internal error
     schema = oas_loaders.from_dict(empty_open_api_3_schema)
     *_, after, finished = from_schema(
-        schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None)
+        schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=phases)
     ).execute()
     # And the tests are failing because of the unsatisfiable schema
     assert finished.has_errors
-    assert "Failed to generate test cases for this API operation" in after.result.errors[0].exception
+    assert expected in after.result.errors[0].exception
+    assert len(after.result.errors) == total_errors
 
 
 @pytest.mark.operations("success")
