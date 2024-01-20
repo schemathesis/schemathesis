@@ -8,6 +8,10 @@ Changelog
 
 - CLI options for overriding Open API parameters in test cases. :issue:`1676`
 
+**Changed**
+
+- Raise an error if it is not possible to generate explicit examples. :issue:`1771`
+
 .. _v3.23.1:
 
 :version:`3.23.1 <v3.23.0...v3.23.1>` - 2024-01-14

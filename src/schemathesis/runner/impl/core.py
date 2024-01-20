@@ -22,6 +22,7 @@ from requests.auth import HTTPDigestAuth, _basic_auth_str
 from ..override import CaseOverride
 from ... import failures, hooks
 from ..._compat import MultipleFailures
+from ..._hypothesis import has_unsatisfied_example_mark
 from ...auths import unregister as unregister_auth
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...constants import DEFAULT_STATEFUL_RECURSION_LIMIT, RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
@@ -400,6 +401,11 @@ def run_test(
     except Exception as error:
         status = Status.error
         result.add_error(error)
+    if has_unsatisfied_example_mark(test):
+        status = Status.error
+        result.add_error(
+            hypothesis.errors.Unsatisfiable("Failed to generate test cases from examples for this API operation")
+        )
     test_elapsed_time = time.monotonic() - test_start_time
     # DEPRECATED: Seed is the same per test run
     # Fetch seed value, hypothesis generates it during test execution
