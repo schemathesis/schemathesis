@@ -1,8 +1,6 @@
 from __future__ import annotations
 import asyncio
-import cgi
 import csv
-import io
 import json
 from uuid import uuid4
 
@@ -11,6 +9,7 @@ from aiohttp import web
 
 from schemathesis.constants import BOM_MARK
 from schemathesis.exceptions import MAX_PAYLOAD_SIZE
+from schemathesis.transports.content_types import parse_content_type
 
 try:
     from ..schema import PAYLOAD_VALIDATOR
@@ -20,8 +19,8 @@ except (ImportError, ValueError):
 
 async def expect_content_type(request: web.Request, value: str):
     content_type = request.headers.get("Content-Type", "")
-    content_type, _ = cgi.parse_header(content_type)
-    if content_type != value:
+    main, sub = parse_content_type(content_type)
+    if f"{main}/{sub}" != value:
         raise web.HTTPInternalServerError(text=f"Expected {value} payload")
     return await request.read()
 
@@ -173,23 +172,18 @@ async def multiple_failures(request: web.Request) -> web.Response:
     return web.json_response({"result": "OK"})
 
 
-def _decode_multipart(content: bytes, content_type: str) -> dict[str, str]:
-    # a simplified version of multipart encoding that satisfies testing purposes
-    _, options = cgi.parse_header(content_type)
-    options["boundary"] = options["boundary"].encode()
-    options["CONTENT-LENGTH"] = len(content)
-    return {
-        key: value[0].decode() if isinstance(value[0], bytes) else value[0]
-        for key, value in cgi.parse_multipart(io.BytesIO(content), options).items()
-    }
-
-
 async def multipart(request: web.Request) -> web.Response:
     if not request.headers.get("Content-Type", "").startswith("multipart/"):
         raise web.HTTPBadRequest(text="Not a multipart request!")
-    # We need to have payload stored in the request, thus can't use `request.multipart` that consumes the reader
-    content = await request.read()
-    data = _decode_multipart(content, request.headers["Content-Type"])
+    raw_payload = await request.read()
+    multipart_reader = await request.multipart()
+    multipart_reader._content._buffer.append(raw_payload)
+    data = {}
+    while True:
+        part = await multipart_reader.next()
+        if part is None:
+            break
+        data[part.name] = (await part.read()).decode("utf-8")
     return web.json_response(data)
 
 

@@ -1,11 +1,39 @@
-import cgi
-from typing import Tuple
+from typing import Tuple, Generator
+
+
+def _parseparam(s: str) -> Generator[str, None, None]:
+    while s[:1] == ";":
+        s = s[1:]
+        end = s.find(";")
+        while end > 0 and (s.count('"', 0, end) - s.count('\\"', 0, end)) % 2:
+            end = s.find(";", end + 1)
+        if end < 0:
+            end = len(s)
+        f = s[:end]
+        yield f.strip()
+        s = s[end:]
+
+
+def parse_header(line: str) -> Tuple[str, dict]:
+    parts = _parseparam(";" + line)
+    key = parts.__next__()
+    pdict = {}
+    for p in parts:
+        i = p.find("=")
+        if i >= 0:
+            name = p[:i].strip().lower()
+            value = p[i + 1 :].strip()
+            if len(value) >= 2 and value[0] == value[-1] == '"':
+                value = value[1:-1]
+                value = value.replace("\\\\", "\\").replace('\\"', '"')
+            pdict[name] = value
+    return key, pdict
 
 
 def parse_content_type(content_type: str) -> Tuple[str, str]:
     """Parse Content Type and return main type and subtype."""
     try:
-        content_type, _ = cgi.parse_header(content_type)
+        content_type, _ = parse_header(content_type)
         main_type, sub_type = content_type.split("/", 1)
     except ValueError as exc:
         raise ValueError(f"Malformed media type: `{content_type}`") from exc

@@ -1,4 +1,3 @@
-import cgi
 import csv
 import json
 import logging
@@ -12,6 +11,7 @@ from flask import Flask, Response, jsonify, request
 from werkzeug.exceptions import BadRequest, GatewayTimeout, InternalServerError
 
 from schemathesis.constants import BOM_MARK
+from schemathesis.transports.content_types import parse_content_type
 
 from ..schema import PAYLOAD_VALIDATOR, OpenAPIVersion, make_openapi_schema
 
@@ -22,8 +22,8 @@ SUCCESS_RESPONSE = {"read": "success!"}
 
 def expect_content_type(value: str):
     content_type = request.headers["Content-Type"]
-    content_type, _ = cgi.parse_header(content_type)
-    if content_type != value:
+    main, sub = parse_content_type(content_type)
+    if f"{main}/{sub}" != value:
         raise InternalServerError(f"Expected {value} payload")
 
 
