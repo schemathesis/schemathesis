@@ -1,11 +1,12 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from ..parameters import ParameterSet
+from .parameters import ParameterSet
+from .types import GenericTest
 
 if TYPE_CHECKING:
-    from ..models import APIOperation
+    from .models import APIOperation
 
 
 @dataclass
@@ -32,3 +33,15 @@ def _for_parameters(overridden: dict[str, str], defined: ParameterSet) -> dict[s
         if param.name in overridden:
             output[param.name] = overridden[param.name]
     return output
+
+
+def has_override_mark(test: GenericTest) -> bool:
+    return hasattr(test, "_schemathesis_override")
+
+
+def get_override_from_mark(test: GenericTest) -> Optional[CaseOverride]:
+    return getattr(test, "_schemathesis_override", None)
+
+
+def set_override_mark(test: GenericTest, override: CaseOverride) -> None:
+    test._schemathesis_override = override  # type: ignore[attr-defined]

@@ -16,6 +16,7 @@ from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
 from .._hypothesis import create_test, get_unsatisfied_example_mark
+from .._override import get_override_from_mark
 from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from .._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54
 from ..exceptions import OperationSchemaError, SkipTest
@@ -106,12 +107,22 @@ class SchemathesisCase(PyCollector):
             if self.is_invalid_test:
                 funcobj = self.test_function
             else:
+                override = get_override_from_mark(self.test_function)
+                as_strategy_kwargs: dict | None
+                if override is not None:
+                    as_strategy_kwargs = {}
+                    for location, entry in override.for_operation(operation).items():
+                        if entry:
+                            as_strategy_kwargs[location] = entry
+                else:
+                    as_strategy_kwargs = None
                 funcobj = create_test(
                     operation=operation,
                     test=self.test_function,
                     _given_kwargs=self.given_kwargs,
                     data_generation_methods=self.schemathesis_case.data_generation_methods,
                     generation_config=self.schemathesis_case.generation_config,
+                    as_strategy_kwargs=as_strategy_kwargs,
                 )
             name = self._get_test_name(operation)
         else:

@@ -19,7 +19,7 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.exceptions import ValidationError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
-from ..override import CaseOverride
+from ..._override import CaseOverride
 from ... import failures, hooks
 from ..._compat import MultipleFailures
 from ..._hypothesis import has_unsatisfied_example_mark

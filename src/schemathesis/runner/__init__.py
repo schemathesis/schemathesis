@@ -4,7 +4,7 @@ from random import Random
 from typing import Any, Callable, Generator, Iterable, TYPE_CHECKING
 from urllib.parse import urlparse
 
-from .override import CaseOverride
+from .._override import CaseOverride
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod, GenerationConfig
 from ..constants import (
     DEFAULT_DEADLINE,

@@ -30,6 +30,7 @@ from requests.structures import CaseInsensitiveDict
 
 from ... import experimental, failures
 from ..._compat import MultipleFailures
+from ..._override import CaseOverride, set_override_mark, has_override_mark
 from ...auths import AuthStorage
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...constants import HTTP_METHODS, NOT_SET
@@ -49,7 +50,7 @@ from ...schemas import BaseSchema
 from ...stateful import Stateful, StatefulTest
 from ...stateful.state_machine import APIStateMachine
 from ...transports.content_types import is_json_media_type
-from ...types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
+from ...types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query, GenericTest
 from . import links, serialization
 from ._hypothesis import get_case_strategy
 from .converter import to_json_schema, to_json_schema_recursive
@@ -92,6 +93,7 @@ class BaseOpenAPISchema(BaseSchema):
     # Inline references cache can be populated from multiple threads, therefore we need some synchronisation to avoid
     # excessive resolving
     _inline_reference_cache_lock: RLock = field(default_factory=RLock)
+    _override: CaseOverride | None = field(default=None)
     component_locations: ClassVar[tuple[tuple[str, ...], ...]] = ()
 
     @property
@@ -161,6 +163,27 @@ class BaseOpenAPISchema(BaseSchema):
                 if defined_links is not None:
                     total += len(defined_links)
         return total
+
+    def override(
+        self,
+        *,
+        query: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
+        cookies: dict[str, str] | None = None,
+        path_parameters: dict[str, str] | None = None,
+    ) -> Callable[[GenericTest], GenericTest]:
+        """Override Open API parameters with fixed values."""
+
+        def _add_override(test: GenericTest) -> GenericTest:
+            if has_override_mark(test):
+                raise UsageError(f"`{test.__name__}` has already been decorated with `override`.")
+            override = CaseOverride(
+                query=query or {}, headers=headers or {}, cookies=cookies or {}, path_parameters=path_parameters or {}
+            )
+            set_override_mark(test, override)
+            return test
+
+        return _add_override
 
     def get_all_operations(
         self, hooks: HookDispatcher | None = None

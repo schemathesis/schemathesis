@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - CLI options for overriding Open API parameters in test cases. :issue:`1676`
+- A way to override Open API parameters the ``pytest`` integration with the ``override`` decorator. :issue:`8`
 - **Open API**: Support for the ``examples`` keyword inside individual property schemas. :issue:`1730`, :issue:`1320`
 - **Open API**: Extract explicit examples from all defined media types. :issue:`921`
 
@@ -53,7 +54,7 @@ Changelog
 **Fixed**
 
 - Internal error when the configured proxy is not available.
-- Not using ``examples` from shared ``parameters``. :issue:`1729`, :issue:`1513`
+- Not using ``examples`` from shared ``parameters``. :issue:`1729`, :issue:`1513`
 
 .. _v3.22.1:
 
