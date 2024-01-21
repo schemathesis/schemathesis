@@ -13,6 +13,7 @@ Changelog
 **Changed**
 
 - Raise an error if it is not possible to generate explicit examples. :issue:`1771`
+- Avoid using the deprecated ``cgi`` module. :issue:`1962`
 
 **Fixed**
 
