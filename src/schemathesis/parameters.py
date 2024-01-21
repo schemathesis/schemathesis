@@ -39,11 +39,6 @@ class Parameter:
         """Whether the parameter is required for a successful API call."""
         raise NotImplementedError
 
-    @property
-    def example(self) -> Any:
-        """Parameter example."""
-        raise NotImplementedError
-
     def serialize(self, operation: APIOperation) -> str:
         """Get parameter's string representation."""
         raise NotImplementedError
@@ -71,11 +66,6 @@ class ParameterSet(Generic[P]):
     def contains(self, name: str) -> bool:
         return self.get(name) is not None
 
-    @property
-    def example(self) -> dict[str, Any]:
-        """Composite example gathered from individual parameters."""
-        return {item.name: item.example for item in self.items if item.example}
-
     def __bool__(self) -> bool:
         return bool(self.items)
 
@@ -91,10 +81,3 @@ class ParameterSet(Generic[P]):
 
 class PayloadAlternatives(ParameterSet[P]):
     """A set of alternative payloads."""
-
-    @property
-    def example(self) -> Any:
-        """We take only the first example."""
-        # May be extended in the future
-        if self.items:
-            return self.items[0].example

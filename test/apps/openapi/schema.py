@@ -159,8 +159,11 @@ def _make_openapi_2_schema(operations: tuple[str, ...]) -> dict:
             definitions = template.setdefault("definitions", {})
             definitions["Node"] = make_node_definition(reference)
         elif name in ("payload", "get_payload"):
+            payload = {**PAYLOAD}
+            payload["x-example"] = payload["example"]
+            del payload["example"]
             schema = {
-                "parameters": [{"name": "body", "in": "body", "required": True, "schema": PAYLOAD}],
+                "parameters": [{"name": "body", "in": "body", "required": True, "schema": payload}],
                 "responses": {"200": {"description": "OK", "schema": PAYLOAD}},
             }
         elif name == "unsatisfiable":

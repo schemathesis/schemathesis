@@ -260,7 +260,7 @@ from hypothesis import Phase
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.query == {"id": "test"}
+    assert case.query in ({"id": "test1"}, {"id": "test2"})
 """,
         schema={
             "openapi": "3.0.2",
@@ -273,8 +273,8 @@ def test(request, case):
                                 "name": "id",
                                 "in": "query",
                                 "required": True,
-                                "example": "test",
-                                "schema": {"type": "string", "example": "NOT test"},
+                                "example": "test1",
+                                "schema": {"type": "string", "example": "test2"},
                             }
                         ],
                         "responses": {"200": {"description": "OK"}},
@@ -287,7 +287,7 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this example should be used in tests
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_specified_example_body_media_type_override(testdir):
@@ -300,7 +300,7 @@ from hypothesis import Phase
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.body == {"name": "John"}
+    assert case.body in ({"name": "John1"}, {"name": "John2"})
 """,
         schema={
             "openapi": "3.0.2",
@@ -315,9 +315,9 @@ def test(request, case):
                                         "type": "object",
                                         "properties": {"name": {"type": "string"}},
                                         "required": ["name"],
-                                        "example": {"name": "NOT John"},
+                                        "example": {"name": "John1"},
                                     },
-                                    "example": {"name": "John"},
+                                    "example": {"name": "John2"},
                                 }
                             }
                         },
@@ -331,7 +331,7 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this example should be used in tests, not the example from the schema
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_multiple_examples_different_locations(testdir):
@@ -344,7 +344,7 @@ from hypothesis import Phase
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.body == {"name": "John"}
+    assert case.body in ({"name": "John1"}, {"name": "John2"})
     assert case.query == {"age": 35}
 """,
         schema={
@@ -360,9 +360,9 @@ def test(request, case):
                                         "type": "object",
                                         "properties": {"name": {"type": "string"}},
                                         "required": ["name"],
-                                        "example": {"name": "NOT John"},
+                                        "example": {"name": "John1"},
                                     },
-                                    "example": {"name": "John"},
+                                    "example": {"name": "John2"},
                                 }
                             }
                         },
@@ -377,7 +377,7 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then these examples should be used in tests as a part of a single request, i.e. combined
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_multiple_examples_same_location(testdir):
@@ -390,7 +390,7 @@ from hypothesis import Phase
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.formatted_path == "/users/1/2"
+    assert case.formatted_path in ("/users/1/2", "/users/42/43")
 """,
         schema_name="simple_openapi.yaml",
         paths={
@@ -398,14 +398,14 @@ def test(request, case):
                 "post": {
                     "parameters": [
                         {
-                            "schema": {"type": "integer", "example": 42},  # This example should be overridden
+                            "schema": {"type": "integer", "example": 42},
                             "in": "path",
                             "name": "a",
                             "required": True,
                             "example": 1,
                         },
                         {
-                            "schema": {"type": "integer", "example": 43},  # and this one too
+                            "schema": {"type": "integer", "example": 43},
                             "in": "path",
                             "name": "b",
                             "required": True,
@@ -420,7 +420,7 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then these examples should be used combined in tests
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_deselecting(testdir):

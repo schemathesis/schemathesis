@@ -33,7 +33,6 @@ from .parameters import OpenAPIBody, parameters_to_json_schema
 from .utils import is_header_location
 
 HEADER_FORMAT = "_header_value"
-PARAMETERS = frozenset(("path_parameters", "headers", "cookies", "query", "body"))
 SLASH = "/"
 StrategyFactory = Callable[[Dict[str, Any], str, str, Optional[str], GenerationConfig], st.SearchStrategy]
 
@@ -98,6 +97,7 @@ def get_case_strategy(
     cookies: NotSet | dict[str, Any] = NOT_SET,
     query: NotSet | dict[str, Any] = NOT_SET,
     body: Any = NOT_SET,
+    media_type: str | None = None,
 ) -> Any:
     """A strategy that creates `Case` instances.
 
@@ -124,7 +124,6 @@ def get_case_strategy(
     cookies_ = generate_parameter("cookie", cookies, operation, draw, context, hooks, generator, generation_config)
     query_ = generate_parameter("query", query, operation, draw, context, hooks, generator, generation_config)
 
-    media_type = None
     if body is NOT_SET:
         if operation.body:
             body_generator = generator
@@ -155,13 +154,6 @@ def get_case_strategy(
         else:
             body_ = ValueContainer(value=body, location="body", generator=None)
     else:
-        media_types = operation.get_request_payload_content_types() or ["application/json"]
-        # Take the first available media type.
-        # POSSIBLE IMPROVEMENT:
-        #   - Test examples for each available media type on Open API 2.0;
-        #   - On Open API 3.0, media types are explicit, and each example has it.
-        #     We can pass `OpenAPIBody.media_type` here from the examples handling code.
-        media_type = media_types[0]
         body_ = ValueContainer(value=body, location="body", generator=None)
 
     if operation.schema.validate_schema and operation.method.upper() == "GET" and operation.body:

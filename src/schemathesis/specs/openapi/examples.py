@@ -1,139 +1,47 @@
 from __future__ import annotations
+
 from contextlib import suppress
+from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Generator
+from itertools import islice, cycle
+from typing import Any, Generator, Union, cast
 
 import requests
+import hypothesis
+from hypothesis_jsonschema import from_schema
 from hypothesis.strategies import SearchStrategy
 
+from .parameters import OpenAPIParameter, OpenAPIBody
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
-from ...internal.copy import fast_deepcopy
 from ...models import APIOperation, Case
-from ._hypothesis import PARAMETERS, get_case_strategy
+from ._hypothesis import get_case_strategy
 from .constants import LOCATION_TO_CONTAINER
 
 
-def get_object_example_from_properties(object_schema: dict[str, Any]) -> dict[str, Any]:
-    return {
-        prop_name: prop["example"]
-        for prop_name, prop in object_schema.get("properties", {}).items()
-        if "example" in prop
-    }
+@dataclass
+class ParameterExample:
+    """A single example for a named parameter."""
+
+    container: str
+    name: str
+    value: Any
 
 
-@lru_cache
-def load_external_example(url: str) -> bytes:
-    """Load examples the `externalValue` keyword."""
-    response = requests.get(url, timeout=DEFAULT_RESPONSE_TIMEOUT / 1000)
-    response.raise_for_status()
-    return response.content
+@dataclass
+class BodyExample:
+    """A single example for a body."""
+
+    value: Any
+    media_type: str
 
 
-def get_examples(examples: dict[str, Any]) -> Generator[Any, None, None]:
-    for example in examples.values():
-        # IDEA: report when it is not a dictionary
-        if isinstance(example, dict):
-            if "value" in example:
-                yield example["value"]
-            elif "externalValue" in example:
-                with suppress(requests.RequestException):
-                    # Report a warning if not available?
-                    yield load_external_example(example["externalValue"])
-
-
-def get_parameter_examples(operation_definition: dict[str, Any], examples_field: str) -> list[dict[str, Any]]:
-    """Gets parameter examples from OAS3 `examples` keyword or `x-examples` for Swagger 2."""
-    return [
-        {
-            "type": LOCATION_TO_CONTAINER.get(parameter["in"]),
-            "name": parameter["name"],
-            "examples": list(get_examples(parameter[examples_field])),
-        }
-        for parameter in operation_definition.get("parameters", [])
-        if examples_field in parameter
-    ]
-
-
-def get_parameter_example_from_properties(operation_definition: dict[str, Any]) -> dict[str, Any]:
-    static_parameters: dict[str, Any] = {}
-    for parameter in operation_definition.get("parameters", []):
-        parameter_schema = parameter["schema"] if "schema" in parameter else parameter
-        example = get_object_example_from_properties(parameter_schema)
-        if example:
-            parameter_type = LOCATION_TO_CONTAINER[parameter["in"]]
-            if parameter_type != "body":
-                if parameter_type not in static_parameters:
-                    static_parameters[parameter_type] = {}
-                static_parameters[parameter_type][parameter["name"]] = example
-            else:
-                # swagger 2 body and formData parameters should not include parameter names
-                static_parameters[parameter_type] = example
-    return static_parameters
-
-
-def get_request_body_examples(operation_definition: dict[str, Any], examples_field: str) -> dict[str, Any]:
-    """Gets request body examples from OAS3 `examples` keyword or `x-examples` for Swagger 2."""
-    # NOTE. `requestBody` is OAS3-specific. How should it work with OAS2?
-    request_bodies_items = operation_definition.get("requestBody", {}).get("content", {}).items()
-    if not request_bodies_items:
-        return {}
-    # first element in tuple is media type, second element is dict
-    _, schema = next(iter(request_bodies_items))
-    examples = schema.get(examples_field, {})
-    return {
-        "type": "body",
-        "examples": list(get_examples(examples)),
-    }
-
-
-def get_request_body_example_from_properties(operation_definition: dict[str, Any]) -> dict[str, Any]:
-    static_parameters: dict[str, Any] = {}
-    request_bodies_items = operation_definition.get("requestBody", {}).get("content", {}).items()
-    if request_bodies_items:
-        _, request_body_schema = next(iter(request_bodies_items))
-        example = get_object_example_from_properties(request_body_schema.get("schema", {}))
-        if example:
-            static_parameters["body"] = example
-
-    return static_parameters
-
-
-def get_static_parameters_from_example(operation: APIOperation) -> dict[str, Any]:
-    static_parameters = {}
-    for name in PARAMETERS:
-        parameters = getattr(operation, name)
-        example = parameters.example
-        if example:
-            static_parameters[name] = example
-    return static_parameters
-
-
-def get_static_parameters_from_examples(operation: APIOperation, examples_field: str) -> list[dict[str, Any]]:
-    """Get static parameters from OpenAPI examples keyword."""
-    operation_definition = fast_deepcopy(operation.definition.resolved)
-    # Add shared parameters excluding body
-    for parameter in operation.definition.parameters:
-        parameters = operation_definition.setdefault("parameters", [])
-        if parameter.location == "body" or parameter.name in {parameter["name"] for parameter in parameters}:
-            continue
-        parameters.append(parameter.definition)
-    return merge_examples(
-        get_parameter_examples(operation_definition, examples_field),
-        get_request_body_examples(operation_definition, examples_field),
-    )
-
-
-def get_static_parameters_from_properties(operation: APIOperation) -> dict[str, Any]:
-    operation_definition = operation.definition.resolved
-    return {
-        **get_parameter_example_from_properties(operation_definition),
-        **get_request_body_example_from_properties(operation_definition),
-    }
+Example = Union[ParameterExample, BodyExample]
 
 
 def get_strategies_from_examples(
-    operation: APIOperation, examples_field: str = "examples"
+    operation: APIOperation[OpenAPIParameter, Case], examples_field: str = "examples"
 ) -> list[SearchStrategy[Case]]:
+    """Build a set of strategies that generate test cases based on explicit examples in the schema."""
     maps = {}
     for location, container in LOCATION_TO_CONTAINER.items():
         serializer = operation.get_parameter_serializer(location)
@@ -150,64 +58,204 @@ def get_strategies_from_examples(
             setattr(case, container, map_func(value))
         return case
 
-    strategies = [
-        get_case_strategy(operation=operation, **static_parameters).map(serialize_components)
-        for static_parameters in get_static_parameters_from_examples(operation, examples_field)
-        if static_parameters
+    # Extract all top-level examples from the `examples` & `example` fields (`x-` prefixed versions in Open API 2)
+    examples = list(extract_top_level(operation))
+    # Add examples from parameter's schemas
+    examples.extend(extract_from_schemas(operation))
+    return [
+        get_case_strategy(operation=operation, **parameters).map(serialize_components)
+        for parameters in produce_combinations(examples)
     ]
-    for static_parameters in static_parameters_union(
-        get_static_parameters_from_example(operation), get_static_parameters_from_properties(operation)
-    ):
-        strategies.append(get_case_strategy(operation=operation, **static_parameters).map(serialize_components))
-    return strategies
 
 
-def merge_examples(
-    parameter_examples: list[dict[str, Any]], request_body_examples: dict[str, Any]
-) -> list[dict[str, Any]]:
-    """Create list of static parameter objects from the parameter and request body examples."""
-    static_parameter_list = []
-    for idx in range(num_examples(parameter_examples, request_body_examples)):
-        static_parameters: dict[str, Any] = {}
-        for parameter in parameter_examples:
-            container = static_parameters.setdefault(parameter["type"], {})
-            container[parameter["name"]] = parameter["examples"][min(idx, len(parameter["examples"]) - 1)]
-        if "examples" in request_body_examples and request_body_examples["examples"]:
-            static_parameters[request_body_examples["type"]] = request_body_examples["examples"][
-                min(idx, len(request_body_examples["examples"]) - 1)
-            ]
-        static_parameter_list.append(static_parameters)
-    return static_parameter_list
+def extract_top_level(operation: APIOperation[OpenAPIParameter, Case]) -> Generator[Example, None, None]:
+    """Extract top-level parameter examples from `examples` & `example` fields."""
+    for parameter in operation.iter_parameters():
+        if "schema" in parameter.definition:
+            definitions = [parameter.definition, parameter.definition["schema"]]
+        else:
+            definitions = [parameter.definition]
+        for definition in definitions:
+            # Open API 2 also supports `example`
+            for example_field in {"example", parameter.example_field}:
+                if example_field in definition:
+                    yield ParameterExample(
+                        container=LOCATION_TO_CONTAINER[parameter.location],
+                        name=parameter.name,
+                        value=definition[example_field],
+                    )
+        if parameter.examples_field in parameter.definition:
+            for value in extract_inner_examples(parameter.definition[parameter.examples_field]):
+                yield ParameterExample(
+                    container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
+                )
+        if "schema" in parameter.definition:
+            schema = parameter.definition["schema"]
+            if parameter.examples_field in schema:
+                for value in schema[parameter.examples_field]:
+                    yield ParameterExample(
+                        container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
+                    )
+    for alternative in operation.body:
+        alternative = cast(OpenAPIBody, alternative)
+        if "schema" in alternative.definition:
+            definitions = [alternative.definition, alternative.definition["schema"]]
+        else:
+            definitions = [alternative.definition]
+        for definition in definitions:
+            # Open API 2 also supports `example`
+            for example_field in {"example", alternative.example_field}:
+                if example_field in definition:
+                    yield BodyExample(value=definition[example_field], media_type=alternative.media_type)
+        if alternative.examples_field in alternative.definition:
+            for value in extract_inner_examples(alternative.definition[alternative.examples_field]):
+                yield BodyExample(value=value, media_type=alternative.media_type)
+        if "schema" in alternative.definition:
+            schema = alternative.definition["schema"]
+            if alternative.examples_field in schema:
+                for value in schema[alternative.examples_field]:
+                    yield BodyExample(value=value, media_type=alternative.media_type)
 
 
-def static_parameters_union(sp_1: dict[str, Any], sp_2: dict[str, Any]) -> list[dict[str, Any]]:
-    """Fill missing parameters in each static parameter dict with parameters provided in the other dict."""
-    full_static_parameters = (_static_parameters_union(sp_1, sp_2), _static_parameters_union(sp_2, sp_1))
-    return [static_parameter for static_parameter in full_static_parameters if static_parameter]
+def extract_inner_examples(examples: dict[str, Any]) -> Generator[Any, None, None]:
+    """Extract exact examples values from the `examples` dictionary."""
+    for example in examples.values():
+        # IDEA: report when it is not a dictionary
+        if isinstance(example, dict):
+            if "value" in example:
+                yield example["value"]
+            elif "externalValue" in example:
+                with suppress(requests.RequestException):
+                    # Report a warning if not available?
+                    yield load_external_example(example["externalValue"])
 
 
-def _static_parameters_union(base_obj: dict[str, Any], fill_obj: dict[str, Any]) -> dict[str, Any]:
-    """Fill base_obj with parameter examples in fill_obj that were not in base_obj."""
-    if not base_obj:
-        return {}
-
-    full_static_parameters: dict[str, Any] = {**base_obj}
-
-    for parameter_type, examples in fill_obj.items():
-        if parameter_type not in full_static_parameters:
-            full_static_parameters[parameter_type] = examples
-        elif parameter_type != "body":
-            # copy individual parameter names.
-            # body is unnamed, single examples, so we only do this for named parameters.
-            for parameter_name, example in examples.items():
-                if parameter_name not in full_static_parameters[parameter_type]:
-                    full_static_parameters[parameter_type][parameter_name] = example
-    return full_static_parameters
+@lru_cache
+def load_external_example(url: str) -> bytes:
+    """Load examples the `externalValue` keyword."""
+    response = requests.get(url, timeout=DEFAULT_RESPONSE_TIMEOUT / 1000)
+    response.raise_for_status()
+    return response.content
 
 
-def num_examples(parameter_examples: list[dict[str, Any]], request_body_examples: dict[str, Any]) -> int:
-    max_parameter_examples = (
-        max(len(parameter["examples"]) for parameter in parameter_examples) if parameter_examples else 0
+def extract_from_schemas(operation: APIOperation[OpenAPIParameter, Case]) -> Generator[Example, None, None]:
+    """Extract examples from parameters' schema definitions."""
+    for parameter in operation.iter_parameters():
+        schema = parameter.as_json_schema(operation)
+        for value in extract_from_schema(schema, parameter.example_field, parameter.examples_field):
+            yield ParameterExample(
+                container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
+            )
+    for alternative in operation.body:
+        alternative = cast(OpenAPIBody, alternative)
+        schema = alternative.as_json_schema(operation)
+        for value in extract_from_schema(schema, alternative.example_field, alternative.examples_field):
+            yield BodyExample(value=value, media_type=alternative.media_type)
+
+
+def extract_from_schema(
+    schema: dict[str, Any], example_field_name: str, examples_field_name: str
+) -> Generator[Any, None, None]:
+    """Extract all examples from a single schema definition."""
+    # This implementation supports only `properties` and `items`
+    if "properties" in schema:
+        variants = {}
+        required = schema.get("required", [])
+        to_generate = {}
+        for name, subschema in schema["properties"].items():
+            values = []
+            if example_field_name in subschema:
+                values.append(subschema[example_field_name])
+            if examples_field_name in subschema and isinstance(subschema[examples_field_name], list):
+                # These are JSON Schema examples, which is an array of values
+                values.extend(subschema[examples_field_name])
+            if not values:
+                if name in required:
+                    # Defer generation to only generate these variants if at least one property has examples
+                    to_generate[name] = subschema
+                continue
+            variants[name] = values
+        if variants:
+            for name, subschema in to_generate.items():
+                generated = _generate_single_example(subschema)
+                variants[name] = [generated]
+            # Calculate the maximum number of examples any property has
+            total_combos = max(len(examples) for examples in variants.values())
+            # Evenly distribute examples by cycling through them
+            for idx in range(total_combos):
+                yield {
+                    name: next(islice(cycle(property_variants), idx, None))
+                    for name, property_variants in variants.items()
+                }
+    elif "items" in schema and isinstance(schema["items"], dict):
+        # Each inner value should be wrapped in an array
+        for value in extract_from_schema(schema["items"], example_field_name, examples_field_name):
+            yield [value]
+
+
+def _generate_single_example(schema: dict[str, Any]) -> Any:
+    examples = []
+
+    @hypothesis.given(from_schema(schema))  # type: ignore
+    @hypothesis.settings(  # type: ignore
+        database=None,
+        max_examples=1,
+        deadline=None,
+        verbosity=hypothesis.Verbosity.quiet,
+        phases=(hypothesis.Phase.generate,),
+        suppress_health_check=list(hypothesis.HealthCheck),
     )
-    num_request_body_examples = len(request_body_examples["examples"]) if "examples" in request_body_examples else 0
-    return max(max_parameter_examples, num_request_body_examples)
+    def example_generating_inner_function(ex: Any) -> None:
+        examples.append(ex)
+
+    example_generating_inner_function()
+
+    return examples[0]
+
+
+def produce_combinations(examples: list[Example]) -> Generator[dict[str, Any], None, None]:
+    """Generate a minimal set of combinations for the given list of parameters."""
+    # Split regular parameters & body variants first
+    parameters: dict[str, dict[str, list]] = {}
+    bodies: dict[str, list] = {}
+    for example in examples:
+        if isinstance(example, ParameterExample):
+            container_examples = parameters.setdefault(example.container, {})
+            parameter_examples = container_examples.setdefault(example.name, [])
+            parameter_examples.append(example.value)
+        else:
+            values = bodies.setdefault(example.media_type, [])
+            values.append(example.value)
+
+    if bodies:
+        if parameters:
+            parameter_combos = list(_produce_parameter_combinations(parameters))
+            body_combos = [
+                {"media_type": media_type, "body": value} for media_type, values in bodies.items() for value in values
+            ]
+            total_combos = max(len(parameter_combos), len(body_combos))
+            for idx in range(total_combos):
+                yield {
+                    **next(islice(cycle(body_combos), idx, None)),
+                    **next(islice(cycle(parameter_combos), idx, None)),
+                }
+        else:
+            for media_type, values in bodies.items():
+                for body in values:
+                    yield {"media_type": media_type, "body": body}
+    elif parameters:
+        yield from _produce_parameter_combinations(parameters)
+
+
+def _produce_parameter_combinations(parameters: dict[str, dict[str, list]]) -> Generator[dict[str, Any], None, None]:
+    total_combos = max(
+        len(variants) for container_variants in parameters.values() for variants in container_variants.values()
+    )
+    for idx in range(total_combos):
+        yield {
+            container: {
+                name: next(islice(cycle(parameter_variants), idx, None))
+                for name, parameter_variants in variants.items()
+            }
+            for container, variants in parameters.items()
+        }
