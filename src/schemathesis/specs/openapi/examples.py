@@ -3,7 +3,7 @@ from __future__ import annotations
 from contextlib import suppress
 from dataclasses import dataclass
 from functools import lru_cache
-from itertools import islice, cycle
+from itertools import islice, cycle, chain
 from typing import Any, Generator, Union, cast
 
 import requests
@@ -85,7 +85,10 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter, Case]) -> Genera
                         value=definition[example_field],
                     )
         if parameter.examples_field in parameter.definition:
-            for value in extract_inner_examples(parameter.definition[parameter.examples_field]):
+            unresolved_definition = _find_parameter_examples_definition(
+                operation, parameter.name, parameter.examples_field
+            )
+            for value in extract_inner_examples(parameter.definition[parameter.examples_field], unresolved_definition):
                 yield ParameterExample(
                     container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
                 )
@@ -108,7 +111,10 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter, Case]) -> Genera
                 if example_field in definition:
                     yield BodyExample(value=definition[example_field], media_type=alternative.media_type)
         if alternative.examples_field in alternative.definition:
-            for value in extract_inner_examples(alternative.definition[alternative.examples_field]):
+            unresolved_definition = _find_request_body_examples_definition(operation, alternative)
+            for value in extract_inner_examples(
+                alternative.definition[alternative.examples_field], unresolved_definition
+            ):
                 yield BodyExample(value=value, media_type=alternative.media_type)
         if "schema" in alternative.definition:
             schema = alternative.definition["schema"]
@@ -117,10 +123,50 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter, Case]) -> Genera
                     yield BodyExample(value=value, media_type=alternative.media_type)
 
 
-def extract_inner_examples(examples: dict[str, Any]) -> Generator[Any, None, None]:
+def _find_parameter_examples_definition(
+    operation: APIOperation[OpenAPIParameter, Case], parameter_name: str, field_name: str
+) -> dict[str, Any]:
+    """Find the original, unresolved `examples` definition of a parameter."""
+    from .schemas import BaseOpenAPISchema
+
+    schema = cast(BaseOpenAPISchema, operation.schema)
+    raw_schema = schema.raw_schema
+    path_data = raw_schema["paths"][operation.path]
+    parameters = chain(path_data.get("parameters", []), path_data[operation.method].get("parameters", []))
+    for parameter in parameters:
+        if "$ref" in parameter:
+            _, parameter = schema.resolver.resolve(parameter["$ref"])
+        if parameter["name"] == parameter_name:
+            return parameter[field_name]
+    raise RuntimeError("Example definition is not found. It should not happen")
+
+
+def _find_request_body_examples_definition(
+    operation: APIOperation[OpenAPIParameter, Case], alternative: OpenAPIBody
+) -> dict[str, Any]:
+    """Find the original, unresolved `examples` definition of a request body variant."""
+    from .schemas import BaseOpenAPISchema
+
+    schema = cast(BaseOpenAPISchema, operation.schema)
+    if schema.spec_version == "2.0":
+        raw_schema = schema.raw_schema
+        path_data = raw_schema["paths"][operation.path]
+        parameters = chain(path_data.get("parameters", []), path_data[operation.method].get("parameters", []))
+        for parameter in parameters:
+            if parameter["in"] == "body":
+                return parameter[alternative.examples_field]
+        raise RuntimeError("Example definition is not found. It should not happen")
+    return operation.definition.raw["requestBody"]["content"][alternative.media_type][alternative.examples_field]
+
+
+def extract_inner_examples(
+    examples: dict[str, Any], unresolved_definition: dict[str, Any]
+) -> Generator[Any, None, None]:
     """Extract exact examples values from the `examples` dictionary."""
-    for example in examples.values():
-        # IDEA: report when it is not a dictionary
+    for name, example in examples.items():
+        if "$ref" in unresolved_definition[name]:
+            # The example here is a resolved example and should be yielded as is
+            yield example
         if isinstance(example, dict):
             if "value" in example:
                 yield example["value"]

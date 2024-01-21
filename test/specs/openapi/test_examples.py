@@ -35,7 +35,10 @@ def dict_with_examples() -> dict[str, Any]:
                         "required": True,
                         "schema": {"type": "string", "example": "cookie2", "examples": ["cookie3"]},
                         "example": "cookie0",
-                        "examples": {"cookie1": {"value": "cookie1"}},
+                        "examples": {
+                            "cookie1": {"value": "cookie1"},
+                            "cookie4": {"$ref": "#/components/examples/Referenced3"},
+                        },
                     },
                 ],
                 "post": {
@@ -54,7 +57,10 @@ def dict_with_examples() -> dict[str, Any]:
                             "required": True,
                             "schema": {"type": "string"},
                             "example": "query0",
-                            "examples": {"query1": {"value": "query1"}},
+                            "examples": {
+                                "query1": {"value": "query1"},
+                                "query3": {"$ref": "#/components/examples/Referenced3"},
+                            },
                         },
                         {"name": "genericObject", "in": "query", "schema": {"type": "string"}},
                         {"$ref": "#/components/parameters/Referenced"},
@@ -100,9 +106,13 @@ def dict_with_examples() -> dict[str, Any]:
                         "type": "string",
                         "example": "Ref-2",
                     },
+                    "examples": {"referenced-3": {"$ref": "#/components/examples/Referenced3"}},
                 }
             },
-            "examples": {"Referenced2": {"foo": "referenced-string3"}},
+            "examples": {
+                "Referenced2": {"bar": "referenced-body2"},
+                "Referenced3": "referenced-string3",
+            },
         },
     }
 
@@ -218,11 +228,14 @@ def test_extract_top_level(operation):
         {"container": "cookies", "name": "SESSION", "value": "cookie0"},
         {"container": "cookies", "name": "SESSION", "value": "cookie2"},
         {"container": "cookies", "name": "SESSION", "value": "cookie1"},
+        {"container": "cookies", "name": "SESSION", "value": "referenced-string3"},
         {"container": "cookies", "name": "SESSION", "value": "cookie3"},
         {"container": "query", "name": "id", "value": "query0"},
         {"container": "query", "name": "id", "value": "query1"},
+        {"container": "query", "name": "id", "value": "referenced-string3"},
         {"container": "query", "name": "Referenced", "value": "Ref-1"},
         {"container": "query", "name": "Referenced", "value": "Ref-2"},
+        {"container": "query", "name": "Referenced", "value": "referenced-string3"},
         {"media_type": "application/json", "value": {"foo": "string0"}},
         {"media_type": "application/json", "value": {"foo": "string4"}},
         {"media_type": "application/json", "value": {"foo": "string1"}},
@@ -231,6 +244,7 @@ def test_extract_top_level(operation):
         {"media_type": "application/json", "value": {"foo": "string5"}},
         {"media_type": "multipart/form-data", "value": {"bar": "string0"}},
         {"media_type": "multipart/form-data", "value": {"bar": "string1"}},
+        {"media_type": "multipart/form-data", "value": {"bar": "referenced-body2"}},
     ]
     assert list(examples.produce_combinations(top_level_examples)) == [
         {
@@ -252,42 +266,49 @@ def test_extract_top_level(operation):
             "cookies": {"SESSION": "cookie1"},
             "headers": {"anyKey": "header2"},
             "media_type": "application/json",
-            "query": {"Referenced": "Ref-1", "id": "query0"},
+            "query": {"Referenced": "referenced-string3", "id": "referenced-string3"},
         },
         {
             "body": {"foo": "string2"},
-            "cookies": {"SESSION": "cookie3"},
+            "cookies": {"SESSION": "referenced-string3"},
             "headers": {"anyKey": "header0"},
+            "media_type": "application/json",
+            "query": {"Referenced": "Ref-1", "id": "query0"},
+        },
+        {
+            "body": {"foo": "string3"},
+            "cookies": {"SESSION": "cookie3"},
+            "headers": {"anyKey": "header1"},
             "media_type": "application/json",
             "query": {"Referenced": "Ref-2", "id": "query1"},
         },
         {
-            "body": {"foo": "string3"},
+            "body": {"foo": "string5"},
             "cookies": {"SESSION": "cookie0"},
             "headers": {"anyKey": "header0"},
             "media_type": "application/json",
             "query": {"Referenced": "Ref-1", "id": "query0"},
         },
         {
-            "body": {"foo": "string5"},
+            "body": {"bar": "string0"},
             "cookies": {"SESSION": "cookie2"},
             "headers": {"anyKey": "header1"},
-            "media_type": "application/json",
-            "query": {"Referenced": "Ref-2", "id": "query1"},
-        },
-        {
-            "body": {"bar": "string0"},
-            "cookies": {"SESSION": "cookie1"},
-            "headers": {"anyKey": "header2"},
             "media_type": "multipart/form-data",
-            "query": {"Referenced": "Ref-1", "id": "query0"},
+            "query": {"Referenced": "Ref-2", "id": "query1"},
         },
         {
             "body": {"bar": "string1"},
-            "cookies": {"SESSION": "cookie3"},
+            "cookies": {"SESSION": "cookie1"},
+            "headers": {"anyKey": "header2"},
+            "media_type": "multipart/form-data",
+            "query": {"Referenced": "referenced-string3", "id": "referenced-string3"},
+        },
+        {
+            "body": {"bar": "referenced-body2"},
+            "cookies": {"SESSION": "referenced-string3"},
             "headers": {"anyKey": "header0"},
             "media_type": "multipart/form-data",
-            "query": {"Referenced": "Ref-2", "id": "query1"},
+            "query": {"Referenced": "Ref-1", "id": "query0"},
         },
     ]
 
@@ -306,7 +327,7 @@ def test_examples_from_cli(app, testdir, cli, base_url, schema_with_examples):
     # The request body has the 3 examples defined. Because 3 is the most examples defined
     # for any parameter, we expect to generate 3 requests.
     not_a_server_line = next(filter(lambda line: "not_a_server_error" in line, result.stdout.split("\n")))
-    assert "8 / 8 passed" in not_a_server_line
+    assert "9 / 9 passed" in not_a_server_line
 
 
 def test_extract_from_schemas(operation_with_property_examples):
@@ -472,4 +493,4 @@ def test_external_value_network_error(empty_open_api_3_schema):
     ),
 )
 def test_empty_example(value, expected, server):
-    assert list(extract_inner_examples(value)) == expected
+    assert list(extract_inner_examples(value, value)) == expected

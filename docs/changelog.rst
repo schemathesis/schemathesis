@@ -18,6 +18,7 @@ Changelog
 **Fixed**
 
 - **Open API**: Properly combine multiple explicit examples extracted from ``examples`` and ``example`` fields. :issue:`1360`
+- **Open API**: Ignoring examples referenced via the ``$ref`` keyword. :issue:`1692`
 
 .. _v3.23.1:
 
