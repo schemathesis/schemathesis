@@ -37,7 +37,7 @@ from ..constants import (
 from ..exceptions import SchemaError, extract_nth_traceback, SchemaErrorType
 from ..fixups import ALL_FIXUPS
 from ..loaders import load_app, load_yaml
-from ..runner.override import CaseOverride
+from .._override import CaseOverride
 from ..transports.auth import get_requests_auth
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..models import Case, CheckFunction

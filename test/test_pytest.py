@@ -697,3 +697,43 @@ def test(case):
         "hypothesis.errors.Unsatisfiable: Failed to generate test cases from examples for this API operation"
         in result.stdout.str()
     )
+
+
+@pytest.mark.operations("path_variable", "custom_format")
+def test_override(testdir, openapi3_base_url, openapi3_schema_url):
+    testdir.make_test(
+        f"""
+schema = schemathesis.from_uri('{openapi3_schema_url}')
+
+@schema.parametrize(endpoint=["path_variable", "custom_format"])
+@schema.override(path_parameters={{"key": "foo"}}, query={{"id": "bar"}})
+def test(case):
+    if case.operation.path_parameters.contains("key"):
+        assert case.path_parameters["key"] == "foo"
+        assert "id" not in (case.query or {{}}), "`id` is present"
+    if case.operation.query.contains("id"):
+        assert case.query["id"] == "bar"
+        assert "key" not in (case.path_parameters or {{}}), "`key` is present"
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=2)
+
+
+def test_override_double(testdir, openapi3_base_url, openapi3_schema_url):
+    testdir.make_test(
+        """
+@schema.parametrize()
+@schema.override(path_parameters={"key": "foo"}, query={"id": "bar"})
+@schema.override(path_parameters={"key": "foo"}, query={"id": "bar"})
+def test(case):
+    pass
+"""
+    )
+    result = testdir.runpytest()
+    if IS_PYTEST_ABOVE_54:
+        key = "errors"
+    else:
+        key = "error"
+    result.assert_outcomes(**{key: 1})
+    assert "`test` has already been decorated with `override`" in result.stdout.str()
