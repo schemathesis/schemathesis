@@ -1,6 +1,6 @@
-import cgi
-import io
 import json
+from email.message import EmailMessage
+
 from test.utils import assert_requests_call
 from urllib.parse import quote, unquote
 
@@ -561,10 +561,9 @@ def test_unusual_form_schema(empty_open_api_3_schema, type_name):
         content_type = kwargs["headers"]["Content-Type"]
         assert content_type.startswith("multipart/form-data; boundary=")
         # And data is a valid multipart
-        _, options = cgi.parse_header(content_type)
-        options["boundary"] = options["boundary"].encode()
-        options["CONTENT-LENGTH"] = len(kwargs["data"])
-        cgi.parse_multipart(io.BytesIO(kwargs["data"]), options)
+        message = EmailMessage()
+        message.attach(kwargs["data"])
+        assert message.is_multipart()
         # When custom headers are passed
         headers = case.as_requests_kwargs(headers={"Authorization": "Bearer FOO"})["headers"]
         # Then content type should be valid
