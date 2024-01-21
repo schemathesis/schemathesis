@@ -13,9 +13,8 @@ from schemathesis._hypothesis import get_single_example
 from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import examples
 from schemathesis.specs.openapi.examples import (
-    get_examples,
-    get_static_parameters_from_examples,
-    get_static_parameters_from_example,
+    extract_inner_examples,
+    ParameterExample,
 )
 from schemathesis.specs.openapi.parameters import parameters_to_json_schema
 from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
@@ -29,6 +28,16 @@ def dict_with_examples() -> dict[str, Any]:
         "servers": [{"url": "http://127.0.0.1:8081/{basePath}", "variables": {"basePath": {"default": "api"}}}],
         "paths": {
             "/success": {
+                "parameters": [
+                    {
+                        "name": "SESSION",
+                        "in": "cookie",
+                        "required": True,
+                        "schema": {"type": "string", "example": "cookie2", "examples": ["cookie3"]},
+                        "example": "cookie0",
+                        "examples": {"cookie1": {"value": "cookie1"}},
+                    },
+                ],
                 "post": {
                     "parameters": [
                         {
@@ -36,6 +45,7 @@ def dict_with_examples() -> dict[str, Any]:
                             "in": "header",
                             "required": True,
                             "schema": {"type": "string"},
+                            "example": "header0",
                             "examples": {"header1": {"value": "header1"}, "header2": {"value": "header2"}},
                         },
                         {
@@ -43,25 +53,56 @@ def dict_with_examples() -> dict[str, Any]:
                             "in": "query",
                             "required": True,
                             "schema": {"type": "string"},
+                            "example": "query0",
                             "examples": {"query1": {"value": "query1"}},
                         },
                         {"name": "genericObject", "in": "query", "schema": {"type": "string"}},
+                        {"$ref": "#/components/parameters/Referenced"},
                     ],
                     "requestBody": {
                         "content": {
                             "application/json": {
-                                "schema": {"type": "object", "properties": {"foo": {"type": "string"}}},
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"foo": {"type": "string"}},
+                                    "example": {"foo": "string4"},
+                                    "examples": [{"foo": "string5"}],
+                                },
+                                "example": {"foo": "string0"},
                                 "examples": {
                                     "body1": {"value": {"foo": "string1"}},
                                     "body2": {"value": {"foo": "string2"}},
                                     "body3": {"value": {"foo": "string3"}},
                                 },
-                            }
+                            },
+                            "multipart/form-data": {
+                                "schema": {"type": "object", "properties": {"bar": {"type": "string"}}},
+                                "example": {"bar": "string0"},
+                                "examples": {
+                                    "body1": {"value": {"bar": "string1"}},
+                                    "body2": {"$ref": "#/components/examples/Referenced2"},
+                                },
+                            },
                         }
                     },
                     "responses": {"200": {"description": "OK"}},
-                }
+                },
             }
+        },
+        "components": {
+            "parameters": {
+                "Referenced": {
+                    "name": "Referenced",
+                    "in": "query",
+                    "required": True,
+                    "example": "Ref-1",
+                    "schema": {
+                        "type": "string",
+                        "example": "Ref-2",
+                    },
+                }
+            },
+            "examples": {"Referenced2": {"foo": "referenced-string3"}},
         },
     }
 
@@ -77,26 +118,30 @@ def dict_with_property_examples() -> dict[str, Any]:
                 "post": {
                     "parameters": [
                         {
-                            "name": "param1",
+                            "name": "q-1",
                             "in": "query",
                             "schema": {
                                 "type": "object",
                                 "properties": {
-                                    "param1_prop1": {"type": "string", "example": "prop1 example string"},
-                                    "param1_prop2": {"type": "string", "example": "prop2 example string"},
-                                    "noExampleProp": {"type": "string"},
+                                    "foo-1": {"type": "string", "example": "foo-11", "examples": ["foo-12"]},
+                                    "bar-1": {"type": "string", "example": "bar-11"},
+                                    "spam-1": {"type": "string"},
                                 },
                             },
                         },
                         {
-                            "name": "param2",
+                            "name": "q-2",
                             "in": "query",
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "param2_prop1": {"type": "string", "example": "prop1 example string"},
-                                    "param2_prop2": {"type": "string", "example": "prop2 example string"},
-                                    "noExampleProp": {"type": "string"},
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "foo-2": {"type": "string", "example": "foo-21"},
+                                        "bar-2": {"type": "string", "example": "bar-21", "examples": ["bar-22"]},
+                                        "spam-2": {"type": "string"},
+                                    },
+                                    "required": ["spam-2"],
                                 },
                             },
                         },
@@ -106,9 +151,26 @@ def dict_with_property_examples() -> dict[str, Any]:
                             "application/json": {
                                 "schema": {
                                     "type": "object",
-                                    "properties": {"foo": {"type": "string", "example": "foo example string"}},
+                                    "properties": {
+                                        "key": {"type": "string", "example": "json-key-1", "examples": ["json-key-2"]}
+                                    },
                                 },
-                            }
+                            },
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "key": {
+                                                "type": "string",
+                                                "example": "form-key-1",
+                                                "examples": ["form-key-2"],
+                                            }
+                                        },
+                                    },
+                                },
+                            },
                         }
                     },
                     "responses": {"200": {"description": "OK"}},
@@ -140,102 +202,94 @@ def operation_with_property_examples(schema_with_property_examples) -> APIOperat
     return next(schema_with_property_examples.get_all_operations()).ok()
 
 
-def test_get_parameter_examples(operation):
-    param_examples = examples.get_parameter_examples(operation.definition.raw, "examples")
-
-    # length equals the number of parameters with examples
-    assert len(param_examples) == 2
-
-    assert param_examples[0]["type"] == "headers"
-    assert param_examples[0]["name"] == "anyKey"
-    assert len(param_examples[0]["examples"]) == 2
-
-    assert param_examples[1]["type"] == "query"
-    assert param_examples[1]["name"] == "id"
-    assert len(param_examples[1]["examples"]) == 1
+def example_to_dict(example):
+    if isinstance(example, ParameterExample):
+        return {"container": example.container, "name": example.name, "value": example.value}
+    return {"value": example.value, "media_type": example.media_type}
 
 
-def test_get_request_body_examples(operation):
-    request_body_examples = examples.get_request_body_examples(operation.definition.raw, "examples")
-
-    assert request_body_examples["type"] == "body"
-    assert len(request_body_examples["examples"]) == 3
-
-
-def test_get_static_parameters_from_examples(operation):
-    static_parameters_list = examples.get_static_parameters_from_examples(operation, "examples")
-
-    assert len(static_parameters_list) == 3
-
-    # ensure that each request body example is included at least once
-    assert all(
-        [
-            any(static_parameters["body"]["foo"] == "string1" for static_parameters in static_parameters_list),
-            any(static_parameters["body"]["foo"] == "string2" for static_parameters in static_parameters_list),
-            any(static_parameters["body"]["foo"] == "string3" for static_parameters in static_parameters_list),
-        ]
-    )
-    # ensure that each header parameter example is included at least once
-    assert all(
-        [
-            any("header1" in static_parameters["headers"]["anyKey"] for static_parameters in static_parameters_list),
-            any("header2" in static_parameters["headers"]["anyKey"] for static_parameters in static_parameters_list),
-        ]
-    )
-    # ensure that each query parameter example is included at least once
-    assert any("query1" in static_parameters["query"]["id"] for static_parameters in static_parameters_list)
-
-
-def test_get_strategies_from_examples(operation):
-    strategies = examples.get_strategies_from_examples(operation, "examples")
-
-    assert len(strategies) == 3
-    assert all(strategy is not None for strategy in strategies)
-
-
-def test_merge_examples_no_body_examples():
-    parameter_examples = [
-        {"type": "query", "name": "queryParam", "examples": ["example1", "example2", "example3"]},
-        {"type": "headers", "name": "headerParam", "examples": ["example1"]},
-        {"type": "path_parameters", "name": "pathParam", "examples": ["example1", "example2"]},
+def test_extract_top_level(operation):
+    top_level_examples = list(examples.extract_top_level(operation))
+    extracted = [example_to_dict(example) for example in top_level_examples]
+    assert extracted == [
+        {"container": "headers", "name": "anyKey", "value": "header0"},
+        {"container": "headers", "name": "anyKey", "value": "header1"},
+        {"container": "headers", "name": "anyKey", "value": "header2"},
+        {"container": "cookies", "name": "SESSION", "value": "cookie0"},
+        {"container": "cookies", "name": "SESSION", "value": "cookie2"},
+        {"container": "cookies", "name": "SESSION", "value": "cookie1"},
+        {"container": "cookies", "name": "SESSION", "value": "cookie3"},
+        {"container": "query", "name": "id", "value": "query0"},
+        {"container": "query", "name": "id", "value": "query1"},
+        {"container": "query", "name": "Referenced", "value": "Ref-1"},
+        {"container": "query", "name": "Referenced", "value": "Ref-2"},
+        {"media_type": "application/json", "value": {"foo": "string0"}},
+        {"media_type": "application/json", "value": {"foo": "string4"}},
+        {"media_type": "application/json", "value": {"foo": "string1"}},
+        {"media_type": "application/json", "value": {"foo": "string2"}},
+        {"media_type": "application/json", "value": {"foo": "string3"}},
+        {"media_type": "application/json", "value": {"foo": "string5"}},
+        {"media_type": "multipart/form-data", "value": {"bar": "string0"}},
+        {"media_type": "multipart/form-data", "value": {"bar": "string1"}},
     ]
-    request_body_examples = {}
-    result = examples.merge_examples(parameter_examples, request_body_examples)
-
-    assert len(result) == 3
-    assert all(
-        "query" in static_parameters and "queryParam" in static_parameters["query"] for static_parameters in result
-    )
-    assert all(
-        "headers" in static_parameters and "headerParam" in static_parameters["headers"] for static_parameters in result
-    )
-    assert all(
-        "path_parameters" in static_parameters and "pathParam" in static_parameters["path_parameters"]
-        for static_parameters in result
-    )
-
-
-def test_merge_examples_with_body_examples():
-    parameter_examples = []
-    request_body_examples = {
-        "type": "body",
-        "examples": [{"foo": "example1"}, {"foo": "example2"}, {"foo": "example3"}],
-    }
-    result = examples.merge_examples(parameter_examples, request_body_examples)
-
-    assert len(result) == 3
-    assert all("body" in static_parameters and "foo" in static_parameters["body"] for static_parameters in result)
-
-
-def test_merge_examples_with_empty_examples():
-    parameter_examples = []
-    request_body_examples = {
-        "type": "body",
-        "examples": [],
-    }
-    result = examples.merge_examples(parameter_examples, request_body_examples)
-
-    assert len(result) == 0
+    assert list(examples.produce_combinations(top_level_examples)) == [
+        {
+            "body": {"foo": "string0"},
+            "cookies": {"SESSION": "cookie0"},
+            "headers": {"anyKey": "header0"},
+            "media_type": "application/json",
+            "query": {"Referenced": "Ref-1", "id": "query0"},
+        },
+        {
+            "body": {"foo": "string4"},
+            "cookies": {"SESSION": "cookie2"},
+            "headers": {"anyKey": "header1"},
+            "media_type": "application/json",
+            "query": {"Referenced": "Ref-2", "id": "query1"},
+        },
+        {
+            "body": {"foo": "string1"},
+            "cookies": {"SESSION": "cookie1"},
+            "headers": {"anyKey": "header2"},
+            "media_type": "application/json",
+            "query": {"Referenced": "Ref-1", "id": "query0"},
+        },
+        {
+            "body": {"foo": "string2"},
+            "cookies": {"SESSION": "cookie3"},
+            "headers": {"anyKey": "header0"},
+            "media_type": "application/json",
+            "query": {"Referenced": "Ref-2", "id": "query1"},
+        },
+        {
+            "body": {"foo": "string3"},
+            "cookies": {"SESSION": "cookie0"},
+            "headers": {"anyKey": "header0"},
+            "media_type": "application/json",
+            "query": {"Referenced": "Ref-1", "id": "query0"},
+        },
+        {
+            "body": {"foo": "string5"},
+            "cookies": {"SESSION": "cookie2"},
+            "headers": {"anyKey": "header1"},
+            "media_type": "application/json",
+            "query": {"Referenced": "Ref-2", "id": "query1"},
+        },
+        {
+            "body": {"bar": "string0"},
+            "cookies": {"SESSION": "cookie1"},
+            "headers": {"anyKey": "header2"},
+            "media_type": "multipart/form-data",
+            "query": {"Referenced": "Ref-1", "id": "query0"},
+        },
+        {
+            "body": {"bar": "string1"},
+            "cookies": {"SESSION": "cookie3"},
+            "headers": {"anyKey": "header0"},
+            "media_type": "multipart/form-data",
+            "query": {"Referenced": "Ref-2", "id": "query1"},
+        },
+    ]
 
 
 def test_examples_from_cli(app, testdir, cli, base_url, schema_with_examples):
@@ -252,108 +306,23 @@ def test_examples_from_cli(app, testdir, cli, base_url, schema_with_examples):
     # The request body has the 3 examples defined. Because 3 is the most examples defined
     # for any parameter, we expect to generate 3 requests.
     not_a_server_line = next(filter(lambda line: "not_a_server_error" in line, result.stdout.split("\n")))
-    assert "3 / 3 passed" in not_a_server_line
+    assert "8 / 8 passed" in not_a_server_line
 
 
-def test_get_object_example_from_properties():
-    mock_object_schema: dict[str, Any] = {
-        "type": "object",
-        "properties": {
-            "prop1": {"type": "string", "example": "prop1 example string"},
-            "prop2": {
-                "type": "object",
-                "properties": {"sub_prop": {"type": "string"}},  # examples at sub_prop level not supported
-                "example": {"sub_prop": "prop2 example string"},
-            },
-        },
-    }
-    example = examples.get_object_example_from_properties(mock_object_schema)
-    assert "prop1" in example
-    assert "prop2" in example
-    assert example["prop1"] == "prop1 example string"
-    assert example["prop2"]["sub_prop"] == "prop2 example string"
-
-
-def test_get_parameter_example_from_properties():
-    schema: dict[str, Any] = {
-        "parameters": [
-            {
-                "name": "param1",
-                "in": "query",
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "prop1": {"type": "string", "example": "prop1 example string"},
-                        "prop2": {"type": "string", "example": "prop2 example string"},
-                        "noExampleProp": {"type": "string"},
-                    },
-                },
-            }
-        ]
-    }
-    example = examples.get_parameter_example_from_properties(schema)
-    assert "query" in example
-    assert example["query"] == {"param1": {"prop1": "prop1 example string", "prop2": "prop2 example string"}}
-
-
-def test_get_request_body_example_from_properties():
-    schema: dict[str, Any] = {
-        "requestBody": {
-            "content": {
-                "application/json": {
-                    "schema": {
-                        "type": "object",
-                        "properties": {"foo": {"type": "string", "example": "foo example string"}},
-                    },
-                }
-            }
-        }
-    }
-    example = examples.get_request_body_example_from_properties(schema)
-    assert "body" in example
-    assert example["body"] == {"foo": "foo example string"}
-
-
-def test_get_static_parameters_from_properties(operation_with_property_examples):
-    example = examples.get_static_parameters_from_properties(operation_with_property_examples)
-    assert "query" in example
-    assert "param1" in example["query"]
-    assert "param2" in example["query"]
-    assert example["query"]["param1"] == {
-        "param1_prop1": "prop1 example string",
-        "param1_prop2": "prop2 example string",
-    }
-    assert example["query"]["param2"] == {
-        "param2_prop1": "prop1 example string",
-        "param2_prop2": "prop2 example string",
-    }
-    assert "body" in example
-    assert example["body"] == {"foo": "foo example string"}
-
-
-def test_static_parameters_union_1():
-    sp1 = {"headers": {"header1": "example1 string"}, "body": {"foo1": "example1 string"}}
-    sp2 = {"headers": {"header2": "example2 string"}, "body": {"foo2": "example2 string"}}
-
-    full_sp1, full_sp2 = examples.static_parameters_union(sp1, sp2)
-    assert "header1" in full_sp1["headers"] and full_sp1["headers"]["header1"] == "example1 string"
-    assert "header2" in full_sp1["headers"] and full_sp1["headers"]["header2"] == "example2 string"
-    assert "header1" in full_sp2["headers"] and full_sp2["headers"]["header1"] == "example1 string"
-    assert "header2" in full_sp2["headers"] and full_sp2["headers"]["header2"] == "example2 string"
-
-    assert full_sp1["body"] == {"foo1": "example1 string"}
-    assert full_sp2["body"] == {"foo2": "example2 string"}
-
-
-def test_static_parameters_union_0():
-    sp1 = {"headers": {"header1": "example1 string"}, "body": {"foo1": "example1 string"}}
-    sp2 = {}
-
-    full_sp = examples.static_parameters_union(sp1, sp2)
-    full_sp1 = full_sp[0]
-    assert len(full_sp) == 1
-    assert "header1" in full_sp1["headers"] and full_sp1["headers"]["header1"] == "example1 string"
-    assert full_sp1["body"] == {"foo1": "example1 string"}
+def test_extract_from_schemas(operation_with_property_examples):
+    extracted = [
+        example_to_dict(example) for example in examples.extract_from_schemas(operation_with_property_examples)
+    ]
+    assert extracted == [
+        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-11", "foo-1": "foo-11"}},
+        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-11", "foo-1": "foo-12"}},
+        {"container": "query", "name": "q-2", "value": [{"bar-2": "bar-21", "foo-2": "foo-21", "spam-2": ""}]},
+        {"container": "query", "name": "q-2", "value": [{"bar-2": "bar-22", "foo-2": "foo-21", "spam-2": ""}]},
+        {"media_type": "application/json", "value": {"key": "json-key-1"}},
+        {"media_type": "application/json", "value": {"key": "json-key-2"}},
+        {"media_type": "multipart/form-data", "value": [{"key": "form-key-1"}]},
+        {"media_type": "multipart/form-data", "value": [{"key": "form-key-2"}]},
+    ]
 
 
 def test_multipart_examples():
@@ -503,67 +472,4 @@ def test_external_value_network_error(empty_open_api_3_schema):
     ),
 )
 def test_empty_example(value, expected, server):
-    assert list(get_examples(value)) == expected
-
-
-def test_shared_parameters(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/api/{dir}/{filename}/{id}": {
-            "parameters": [
-                {
-                    "name": "dir",
-                    "in": "path",
-                    "required": True,
-                    "schema": {"type": "string", "enum": ["favorite", "best", "new"]},
-                    "examples": {"favorite": {"value": "favorite"}, "best": {"value": "best"}, "new": {"value": "new"}},
-                },
-                {
-                    "name": "filename",
-                    "in": "path",
-                    "required": True,
-                    "schema": {"type": "strin"},
-                    "example": "test.mp4",
-                    "examples": {
-                        "some_file": {"value": "some_file.txt"},
-                        "other_file": {"value": "other_file.txt"},
-                        "extra_file": {"value": "extra_file.txt"},
-                    },
-                },
-            ],
-            "get": {
-                "parameters": [{"$ref": "#/components/parameters/Id"}],
-                "responses": {"200": {"description": "OK"}},
-            },
-        }
-    }
-    empty_open_api_3_schema["components"] = {
-        "parameters": {
-            "Id": {
-                "name": "Id",
-                "in": "path",
-                "required": True,
-                "schema": {
-                    "type": "string",
-                    "example": "000000120816216",
-                    "pattern": "^[0-9]{15}$",
-                },
-            }
-        }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
-    operation = schema["/api/{dir}/{filename}/{id}"]["get"]
-    from_examples = get_static_parameters_from_examples(operation, "examples")
-    assert from_examples == [
-        {"path_parameters": {"dir": "favorite", "filename": "some_file.txt"}},
-        {"path_parameters": {"dir": "best", "filename": "other_file.txt"}},
-        {"path_parameters": {"dir": "new", "filename": "extra_file.txt"}},
-    ]
-    assert get_static_parameters_from_example(operation) == {
-        "path_parameters": {"Id": "000000120816216", "filename": "test.mp4"}
-    }
-    assert [get_single_example(strategy).path_parameters for strategy in operation.get_strategies_from_examples()] == [
-        {"Id": "000000000000000", "dir": "favorite", "filename": "some_file.txt"},
-        {"Id": "000000000000000", "dir": "best", "filename": "other_file.txt"},
-        {"Id": "000000000000000", "dir": "new", "filename": "extra_file.txt"},
-        {"Id": "000000120816216", "dir": "new", "filename": "test.mp4"},
-    ]
+    assert list(extract_inner_examples(value)) == expected

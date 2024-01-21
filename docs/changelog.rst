@@ -7,10 +7,16 @@ Changelog
 **Added**
 
 - CLI options for overriding Open API parameters in test cases. :issue:`1676`
+- **Open API**: Support for the ``examples`` keyword inside individual property schemas. :issue:`1730`, :issue:`1320`
+- **Open API**: Extract explicit examples from all defined media types. :issue:`921`
 
 **Changed**
 
 - Raise an error if it is not possible to generate explicit examples. :issue:`1771`
+
+**Fixed**
+
+- **Open API**: Properly combine multiple explicit examples extracted from ``examples`` and ``example`` fields. :issue:`1360`
 
 .. _v3.23.1:
 

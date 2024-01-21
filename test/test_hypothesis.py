@@ -13,7 +13,6 @@ from schemathesis.models import APIOperation, OperationDefinition
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
 from schemathesis.serializers import Binary
 from schemathesis.specs.openapi._hypothesis import (
-    PARAMETERS,
     _get_body_strategy,
     get_case_strategy,
     is_valid_path,
@@ -22,6 +21,7 @@ from schemathesis.specs.openapi._hypothesis import (
     make_positive_strategy,
     quote_all,
 )
+from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20CompositeBody, OpenAPI20Parameter
 from schemathesis.constants import NOT_SET
 
@@ -30,42 +30,47 @@ def make_operation(schema, **kwargs) -> APIOperation:
     return APIOperation("/users", "POST", definition=OperationDefinition({}, {}, "foo", []), schema=schema, **kwargs)
 
 
-@pytest.mark.parametrize("name", sorted(PARAMETERS))
+@pytest.mark.parametrize("location", sorted(LOCATION_TO_CONTAINER))
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_get_examples(name, swagger_20):
-    if name == "body":
+def test_get_examples(location, swagger_20):
+    if location == "body":
         # In Open API 2.0, the `body` parameter has a name, which is ignored
         # But we'd like to use this object as a payload; therefore, we put one extra level of nesting
         example = expected = {"name": "John"}
         media_type = "application/json"
         cls = PayloadAlternatives
+        parameter_cls = OpenAPI20Body
+        kwargs = {"media_type": media_type}
+        definition = {
+            "in": location,
+            "name": "name",
+            "required": True,
+            "schema": {"type": "string"},
+            "x-example": example,
+        }
     else:
         example = "John"
         expected = {"name": example}
         media_type = None  # there is no payload
         cls = ParameterSet
+        parameter_cls = OpenAPI20Parameter
+        kwargs = {}
+        definition = {
+            "in": location,
+            "name": "name",
+            "required": True,
+            "type": "string",
+            "x-example": example,
+        }
+    container = LOCATION_TO_CONTAINER[location]
     operation = make_operation(
         swagger_20,
-        **{
-            name: cls(
-                [
-                    OpenAPI20Parameter(
-                        {
-                            "in": name,
-                            "name": "name",
-                            "required": True,
-                            "type": "string",
-                            "x-example": example,
-                        }
-                    )
-                ]
-            )
-        },
+        **{container: cls([parameter_cls(definition, **kwargs)])},
     )
     strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
     assert strategies[0].example() == Case(
-        operation, data_generation_method=DataGenerationMethod.positive, media_type=media_type, **{name: expected}
+        operation, data_generation_method=DataGenerationMethod.positive, media_type=media_type, **{container: expected}
     )
 
 

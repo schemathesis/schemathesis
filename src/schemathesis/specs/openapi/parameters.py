@@ -24,17 +24,6 @@ class OpenAPIParameter(Parameter):
         return self.definition.get("description")
 
     @property
-    def example(self) -> Any:
-        """The primary example defined for this parameter."""
-        if self._example:
-            return self._example
-        if self._schema_example:
-            # It is processed only if there are no `example` / `examples` in the root, overridden otherwise
-            # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#fixed-fields-10
-            # We mimic this behavior for Open API 2.0
-            return self._schema_example
-
-    @property
     def location(self) -> str:
         """Where this parameter is located.
 
@@ -59,34 +48,6 @@ class OpenAPIParameter(Parameter):
     @property
     def is_header(self) -> bool:
         raise NotImplementedError
-
-    @property
-    def _example(self) -> Any:
-        """A not-named example, defined in the parameter root.
-
-        {
-            "in": "query",
-            "name": "key",
-            "type": "string"
-            "example": "foo",   # This one
-        }
-        """
-        return self.definition.get(self.example_field)
-
-    @property
-    def _schema_example(self) -> Any:
-        """Example defined on the schema-level.
-
-        {
-            "in": "query",  (only "body" is possible for Open API 2.0)
-            "name": "key",
-            "schema": {
-                "type": "string",
-                "example": "foo",   # This one
-            }
-        }
-        """
-        return self.definition.get("schema", {}).get("example")
 
     def as_json_schema(self, operation: APIOperation) -> dict[str, Any]:
         """Convert parameter's definition to JSON Schema."""
@@ -160,11 +121,6 @@ class OpenAPI20Parameter(OpenAPIParameter):
     @property
     def is_header(self) -> bool:
         return self.location == "header"
-
-    @property
-    def _schema_example(self) -> Any:
-        # There is no "schema" in non-body parameters
-        return None
 
 
 @dataclass(eq=False)
@@ -270,12 +226,6 @@ class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
         schema = self.definition["schema"]
         return self.transform_keywords(schema)
 
-    @property
-    def _schema_example(self) -> Any:
-        # In Open API 2.0, there is the `example` keyword,
-        # so we use the default behavior of the `OpenAPIParameter` class
-        return super(OpenAPI20Parameter, self)._schema_example
-
 
 FORM_MEDIA_TYPES = ("multipart/form-data", "application/x-www-form-urlencoded")
 
@@ -336,14 +286,6 @@ class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
     def is_required(self) -> bool:
         # We generate an object for formData - it is always required.
         return bool(self.definition)
-
-    @property
-    def _example(self) -> Any:
-        return {parameter.name: parameter._example for parameter in self.definition if parameter._example}
-
-    @property
-    def _schema_example(self) -> Any:
-        return {parameter.name: parameter._schema_example for parameter in self.definition if parameter._schema_example}
 
     def as_json_schema(self, operation: APIOperation) -> dict[str, Any]:
         """The composite body is transformed into an "object" JSON Schema."""
