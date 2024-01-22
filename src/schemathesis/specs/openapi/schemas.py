@@ -651,10 +651,11 @@ class BaseOpenAPISchema(BaseSchema):
                                 SchemaErrorType.OPEN_API_INVALID_SCHEMA,
                                 message=f"Unresolvable JSON pointer in the schema: {pointer}",
                             )
-                        container = schema
-                        for key in pointer.split("/")[1:]:
-                            container = container.setdefault(key, {})
-                        container.update(resolved)
+                        if isinstance(resolved, dict):
+                            container = schema
+                            for key in pointer.split("/")[1:]:
+                                container = container.setdefault(key, {})
+                            container.update(resolved)
                         # Explore the resolved value too
                         stack.append(resolved)
                 # Still explore other values as they may have nested references in other keys

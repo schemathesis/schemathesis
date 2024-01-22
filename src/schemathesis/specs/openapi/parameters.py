@@ -344,11 +344,24 @@ MISSING_SCHEMA_OR_CONTENT_MESSAGE = (
     "It should have either `schema` or `content` keywords defined"
 )
 
+INVALID_SCHEMA_MESSAGE = (
+    'Can not generate data for {location} parameter "{name}"! ' "Its schema should be an object, got {schema}"
+)
+
 
 def get_parameter_schema(operation: APIOperation, data: dict[str, Any]) -> dict[str, Any]:
     """Extract `schema` from Open API 3.0 `Parameter`."""
     # In Open API 3.0, there could be "schema" or "content" field. They are mutually exclusive.
     if "schema" in data:
+        if not isinstance(data["schema"], dict):
+            raise OperationSchemaError(
+                INVALID_SCHEMA_MESSAGE.format(
+                    location=data.get("in", ""), name=data.get("name", "<UNKNOWN>"), schema=data["schema"]
+                ),
+                path=operation.path,
+                method=operation.method,
+                full_path=operation.full_path,
+            )
         return data["schema"]
     # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#fixed-fields-10
     # > The map MUST only contain one entry.
