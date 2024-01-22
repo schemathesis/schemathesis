@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.24.0...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Cleanup SSL error messages.
+
 **Fixed**
 
 - Internal error when an unresolvable pointer occurs during data generation.

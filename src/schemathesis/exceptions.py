@@ -457,7 +457,7 @@ def extract_requests_exception_details(exc: RequestException) -> tuple[str, list
     if isinstance(exc, SSLError):
         message = "SSL verification problem"
         reason = str(exc.args[0].reason)
-        extra = [remove_ssl_line_number(reason)]
+        extra = [remove_ssl_line_number(reason).strip()]
     elif isinstance(exc, ConnectionError):
         message = "Connection failed"
         inner = exc.args[0]
