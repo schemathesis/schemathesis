@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import enum
 from dataclasses import dataclass, field
 from difflib import get_close_matches
@@ -29,9 +30,9 @@ from ..openapi.constants import LOCATION_TO_CONTAINER
 from ... import auths
 from ...auths import AuthStorage
 from ...checks import not_a_server_error
-from ...generation import DataGenerationMethod, GenerationConfig
-from ...exceptions import OperationSchemaError
 from ...constants import NOT_SET
+from ...exceptions import OperationSchemaError
+from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import (
     GLOBAL_HOOK_DISPATCHER,
     HookContext,
@@ -39,7 +40,7 @@ from ...hooks import (
     apply_to_all_dispatchers,
     should_skip_operation,
 )
-from ...internal.result import Result, Ok
+from ...internal.result import Ok, Result
 from ...models import APIOperation, Case, CheckFunction, OperationDefinition
 from ...schemas import BaseSchema, APIOperationMap
 from ...stateful import Stateful, StatefulTest
