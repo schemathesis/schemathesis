@@ -14,6 +14,7 @@ Changelog
 - Internal errors when references lead to non-objects.
 - Missing ``schema.override`` on schemas created via the ``from_pytest_fixture`` loader.
 - Not calling hooks for ``query`` / ``cookies`` / ``headers`` in GraphQL schemas. :issue:`1978`
+- Inability to access individual operations in GraphQL schema objects. :issue:`1976`
 
 .. _v3.24.0:
 
