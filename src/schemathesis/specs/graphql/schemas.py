@@ -11,7 +11,7 @@ from typing import (
     cast,
     TYPE_CHECKING,
 )
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, unquote, urljoin, quote
 
 import graphql
 import requests
@@ -20,6 +20,7 @@ from hypothesis.strategies import SearchStrategy
 from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
+from ..openapi.constants import LOCATION_TO_CONTAINER
 from ... import auths
 from ...auths import AuthStorage
 from ...checks import not_a_server_error
@@ -55,7 +56,15 @@ class GraphQLCase(Case):
     def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         final_headers = self._get_headers(headers)
         base_url = self._get_base_url(base_url)
-        kwargs: dict[str, Any] = {"method": self.method, "url": base_url, "headers": final_headers}
+        formatted_path = self.formatted_path.lstrip("/")
+        url = unquote(urljoin(base_url, quote(formatted_path)))
+        kwargs: dict[str, Any] = {
+            "method": self.method,
+            "url": url,
+            "headers": final_headers,
+            "cookies": self.cookies,
+            "params": self.query,
+        }
         # There is no direct way to have bytes here, but it is a useful pattern to support.
         # It also unifies GraphQLCase with its Open API counterpart where bytes may come from external examples
         if isinstance(self.body, bytes):
@@ -278,13 +287,36 @@ def get_case_strategy(
     )
     strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body").map(graphql.print_ast)
     body = draw(strategy)
-    instance = GraphQLCase(body=body, operation=operation, data_generation_method=data_generation_method)  # type: ignore
+
+    path_parameters_ = _generate_parameter("path", draw, operation, hook_context, hooks)
+    headers_ = _generate_parameter("header", draw, operation, hook_context, hooks)
+    cookies_ = _generate_parameter("cookie", draw, operation, hook_context, hooks)
+    query_ = _generate_parameter("query", draw, operation, hook_context, hooks)
+
+    instance = GraphQLCase(
+        path_parameters=path_parameters_,
+        headers=headers_,
+        cookies=cookies_,
+        query=query_,
+        body=body,
+        operation=operation,
+        data_generation_method=data_generation_method,
+    )  # type: ignore
     context = auths.AuthContext(
         operation=operation,
         app=operation.app,
     )
     auths.set_on_case(instance, context, auth_storage)
     return instance
+
+
+def _generate_parameter(
+    location: str, draw: Callable, operation: APIOperation, context: HookContext, hooks: HookDispatcher | None
+) -> Any:
+    # Schemathesis does not generate anything but `body` for GraphQL, hence use `None`
+    container = LOCATION_TO_CONTAINER[location]
+    strategy = apply_to_all_dispatchers(operation, context, hooks, st.none(), container)
+    return draw(strategy)
 
 
 def _noop(node: graphql.Node) -> graphql.Node:
