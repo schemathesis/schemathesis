@@ -468,6 +468,42 @@ Unittest support
 Schemathesis supports Python's built-in ``unittest`` framework out of the box.
 You only need to specify strategies for ``hypothesis.given``:
 
+A strategy can generate data for one or more API operations.
+To refer to an operation you can use a path and method combination for Open API:
+
+.. code-block:: python
+
+    operation = schema["/pet"]["POST"]
+
+Or ``Query`` / ``Mutation`` type name and a field name for GraphQL
+
+.. code-block:: python
+
+    operation = schema["Query"]["getBooks"]
+
+.. note::
+
+    If you use custom name for these types, use them instead.
+
+Then create a strategy from an operation by using the ``as_strategy`` method and optionally combine multiple of them into a single strategy:
+
+.. code-block:: python
+
+    create_pet = schema["/pet/"]["POST"]
+    get_pet = schema["/pet/{pet_id}/"]["GET"]
+    get_books = graphql_schema["Query"]["getBooks"]
+
+    # Generates test cases for `POST /pet/`
+    create_pet_strategy = create_pet.as_strategy()
+    # Generates test cases for `POST /pet` AND `GET /pet/{pet_id}/`
+    get_or_create_pet_strategy = get_pet.as_strategy() | create_pet.as_strategy()
+    # Generates test cases for the `getBooks` query
+    get_books_strategy = get_books.as_strategy()
+
+The ``as_strategy`` method also accepts the ``data_generation_method`` argument allowing you to control whether it should generate positive or negative test cases.
+
+**NOTE**: The ``data_generation_method`` argument only affects Open API schemas at this moment.
+
 .. code-block:: python
 
     from unittest import TestCase
@@ -475,13 +511,15 @@ You only need to specify strategies for ``hypothesis.given``:
     import schemathesis
 
     schema = schemathesis.from_uri("http://0.0.0.0:8080/schema.json")
-    new_pet_strategy = schema["/v2/pet"]["POST"].as_strategy()
-
+    create_pet = schema["/pet/"]["POST"]
+    create_pet_strategy = create_pet.as_strategy()
 
     class TestAPI(TestCase):
-        @given(case=new_pet_strategy)
+        @given(case=create_pet_strategy)
         def test_pets(self, case):
             case.call_and_validate()
+
+The test above will generate test cases for the ``POST /pet/`` operation and will execute the ``test_pets`` function body with every generated test sample.
 
 Rate limiting
 -------------

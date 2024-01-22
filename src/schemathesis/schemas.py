@@ -7,10 +7,9 @@ Their responsibilities:
 They give only static definitions of paths.
 """
 from __future__ import annotations
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from contextlib import nullcontext
 from dataclasses import dataclass, field
-from difflib import get_close_matches
 from functools import lru_cache
 from typing import (
     Any,
@@ -114,15 +113,15 @@ class BaseSchema(Mapping):
     def __iter__(self) -> Iterator[str]:
         return iter(self.operations)
 
-    def __getitem__(self, item: str) -> MethodsDict:
+    def __getitem__(self, item: str) -> MutableMapping:
+        __tracebackhide__ = True
         try:
             return self.operations[item]
         except KeyError as exc:
-            matches = get_close_matches(item, list(self.operations))
-            message = f"`{item}` not found"
-            if matches:
-                message += f". Did you mean `{matches[0]}`?"
-            raise KeyError(message) from exc
+            self.on_missing_operation(item, exc)
+
+    def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
+        raise NotImplementedError
 
     def __len__(self) -> int:
         return len(self.operations)
@@ -169,11 +168,16 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     @property
-    def operations(self) -> dict[str, MethodsDict]:
+    def operations(self) -> dict[str, MutableMapping]:
         if not hasattr(self, "_operations"):
             operations = self.get_all_operations()
-            self._operations = operations_to_dict(operations)
+            self._operations = self._store_operations(operations)
         return self._operations
+
+    def _store_operations(
+        self, operations: Generator[Result[APIOperation, OperationSchemaError], None, None]
+    ) -> dict[str, MutableMapping]:
+        return operations_to_dict(operations)
 
     @property
     def operations_count(self) -> int:
@@ -441,8 +445,8 @@ class BaseSchema(Mapping):
 
 def operations_to_dict(
     operations: Generator[Result[APIOperation, OperationSchemaError], None, None],
-) -> dict[str, MethodsDict]:
-    output: dict[str, MethodsDict] = {}
+) -> dict[str, MutableMapping]:
+    output: dict[str, MutableMapping] = {}
     for result in operations:
         if isinstance(result, Ok):
             operation = result.ok()

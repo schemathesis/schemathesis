@@ -64,7 +64,7 @@ def test_custom_base_url(graphql_url, kwargs, base_path, expected):
         schema = schemathesis.graphql.from_url(graphql_url, **kwargs)
         # Then the base path is changed, in this case it is the only available path
         assert schema.base_path == base_path
-        strategy = schema[base_path]["POST"].as_strategy()
+        strategy = schema["Query"]["getBooks"].as_strategy()
         case = strategy.example()
         # And all requests should go to the specified URL
         assert case.as_requests_kwargs()["url"] == expected
@@ -72,7 +72,7 @@ def test_custom_base_url(graphql_url, kwargs, base_path, expected):
 
 @pytest.mark.parametrize("kwargs", ({"body": "SomeQuery"}, {"body": b'{"query": "SomeQuery"}'}))
 def test_make_case(graphql_schema, kwargs):
-    case = graphql_schema["/graphql"]["POST"].make_case(**kwargs)
+    case = graphql_schema["Query"]["getBooks"].make_case(**kwargs)
     assert isinstance(case, GraphQLCase)
     assert_requests_call(case)
 
@@ -115,26 +115,31 @@ def test_operations_count(graphql_url):
     assert schema.operations_count == 4
 
 
-def test_type_names():
-    # When the user gives custom names to query types
-    raw_schema = """
-    schema {
-       query: MyQuery
-       mutation: MyMutation
-    }
+CUSTOM_QUERY_NAME = "MyQuery"
+CUSTOM_MUTATION_NAME = "MyMutation"
 
-    type MyQuery {
+
+@pytest.mark.parametrize("name", (CUSTOM_QUERY_NAME, CUSTOM_MUTATION_NAME))
+def test_type_names(name):
+    # When the user gives custom names to query types
+    raw_schema = f"""
+    schema {{
+       query: {CUSTOM_QUERY_NAME}
+       mutation: {CUSTOM_MUTATION_NAME}
+    }}
+
+    type {CUSTOM_QUERY_NAME} {{
        v: String
-    }
-    type MyMutation {
+    }}
+    type {CUSTOM_MUTATION_NAME} {{
        v(i: Int): String
-    }
+    }}
     """
     # Then the schema should be loaded without errors
     schema = schemathesis.graphql.from_file(raw_schema)
     # And requests should be properly generated
 
-    @given(case=schema[b""]["POST"].as_strategy())
+    @given(case=schema[name]["v"].as_strategy())
     @settings(max_examples=1, deadline=None)
     def test(case):
         pass
@@ -164,3 +169,8 @@ type Query {
 def test_schema_error(testdir, cli, snapshot_cli, schema, extension):
     schema_file = testdir.make_graphql_schema_file(schema, extension=extension)
     assert cli.run(str(schema_file), "--dry-run") == snapshot_cli
+
+
+def test_unknown_type_name(graphql_schema):
+    with pytest.raises(KeyError, match="`Qwery` type not found. Did you mean `Query`?"):
+        graphql_schema["Qwery"]["getBooks"]

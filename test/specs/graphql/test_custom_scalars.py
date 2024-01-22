@@ -27,7 +27,7 @@ type Query {
 """
     schema = schemathesis.graphql.from_file(raw_schema)
 
-    @given(schema[b""]["POST"].as_strategy())
+    @given(schema["Query"]["getByDate"].as_strategy())
     def test(case):
         # Then scalars should be properly generated
         assert f'getByDate(value: "{expected}")' in case.body

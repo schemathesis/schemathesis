@@ -262,7 +262,7 @@ def graphql_schema(graphql_url):
 
 @pytest.fixture
 def graphql_strategy(graphql_schema):
-    return graphql_schema["/graphql"]["POST"].as_strategy()
+    return graphql_schema["Query"]["getBooks"].as_strategy()
 
 
 @contextmanager

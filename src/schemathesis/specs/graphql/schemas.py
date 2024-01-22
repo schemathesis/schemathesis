@@ -1,6 +1,7 @@
 from __future__ import annotations
 import enum
 from dataclasses import dataclass
+from difflib import get_close_matches
 from enum import unique
 from typing import (
     Any,
@@ -10,11 +11,14 @@ from typing import (
     TypeVar,
     cast,
     TYPE_CHECKING,
+    MutableMapping,
+    NoReturn,
 )
 from urllib.parse import urlsplit, unquote, urljoin, quote
 
 import graphql
 import requests
+from graphql import GraphQLNamedType
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
 from hypothesis_graphql import strategies as gql_st
@@ -129,6 +133,28 @@ class GraphQLOperationDefinition(OperationDefinition):
 
 @dataclass
 class GraphQLSchema(BaseSchema):
+    def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
+        raw_schema = self.raw_schema["__schema"]
+        type_names = [type_def["name"] for type_def in raw_schema.get("types", [])]
+        matches = get_close_matches(item, type_names)
+        message = f"`{item}` type not found"
+        if matches:
+            message += f". Did you mean `{matches[0]}`?"
+        raise KeyError(message) from exc
+
+    def _store_operations(
+        self, operations: Generator[Result[APIOperation, OperationSchemaError], None, None]
+    ) -> dict[str, MutableMapping]:
+        output: dict[str, MutableMapping] = {}
+        for result in operations:
+            if isinstance(result, Ok):
+                operation = result.ok()
+                definition = cast(GraphQLOperationDefinition, operation.definition)
+                type_name = definition.type_.name if isinstance(definition.type_, GraphQLNamedType) else "Unknown"
+                for_type = output.setdefault(type_name, {})
+                for_type[definition.field_name] = operation
+        return output
+
     def get_full_path(self, path: str) -> str:
         return self.base_path
 
