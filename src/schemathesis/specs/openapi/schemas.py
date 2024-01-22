@@ -113,6 +113,13 @@ class BaseOpenAPISchema(BaseSchema):
         info = self.raw_schema["info"]
         return f"{self.__class__.__name__} for {info['title']} ({info['version']})"
 
+    def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
+        matches = get_close_matches(item, list(self.operations))
+        message = f"`{item}` not found"
+        if matches:
+            message += f". Did you mean `{matches[0]}`?"
+        raise KeyError(message) from exc
+
     def _should_skip(self, method: str, definition: dict[str, Any]) -> bool:
         return (
             method not in HTTP_METHODS

@@ -494,7 +494,7 @@ def test_graphql_body(graphql_schema):
         node.selection_set = ()
         return body
 
-    strategy = graphql_schema["/graphql"]["POST"].as_strategy()
+    strategy = graphql_schema["Mutation"]["addBook"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, phases=[Phase.generate])
@@ -535,7 +535,7 @@ def test_graphql_query(graphql_schema, graphql_server_host):
 
         return cookies
 
-    strategy = graphql_schema["/graphql"]["POST"].as_strategy()
+    strategy = graphql_schema["Query"]["getBooks"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, phases=[Phase.generate])
