@@ -205,4 +205,6 @@ def test_ssl_error(openapi3_schema_url, server):
     with pytest.raises(SchemaError) as exc:
         schemathesis.from_uri(f"https://127.0.0.1:{server['port']}")
     assert exc.value.message == "SSL verification problem"
-    assert exc.value.extras[0].startswith("[SSL: WRONG_VERSION_NUMBER] wrong version number")
+    assert exc.value.extras[0].startswith(
+        ("[SSL: WRONG_VERSION_NUMBER] wrong version number", "[SSL] record layer failure")
+    )
