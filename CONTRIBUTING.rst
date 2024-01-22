@@ -74,7 +74,7 @@ This will install all the necessary packages for development, including those fo
 
 .. code:: bash
 
-    tox -e py39
+    tox -e py311
 
 8. **Update Changelog**: Add a corresponding entry to ``changelog.rst`` located in the ``docs`` directory.
 9. **Commit Your Changes**: Use the `Conventional Commits <https://www.conventionalcommits.org/en/>`_ format. For example, features could be ``feat: add new validation feature`` and bug fixes could be ``fix: resolve issue with validation``.
