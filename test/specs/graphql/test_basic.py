@@ -7,8 +7,9 @@ import requests
 from hypothesis import HealthCheck, given, settings, find
 
 import schemathesis
+from schemathesis.checks import not_a_server_error
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
-from schemathesis.exceptions import SchemaError
+from schemathesis.exceptions import CheckFailed, SchemaError
 from schemathesis.specs.graphql.loaders import get_introspection_query, extract_schema_from_response
 from schemathesis.specs.graphql.schemas import GraphQLCase
 
@@ -75,6 +76,13 @@ def test_make_case(graphql_schema, kwargs):
     case = graphql_schema["Query"]["getBooks"].make_case(**kwargs)
     assert isinstance(case, GraphQLCase)
     assert_requests_call(case)
+
+
+def test_non_json_response(graphql_schema, response_factory):
+    response = response_factory.requests(status_code=200, content=b"INTERNAL SERVER ERROR", content_type="text/plain")
+    case = graphql_schema["Query"]["getBooks"].make_case(body="Q")
+    with pytest.raises(CheckFailed, match="JSON deserialization error"):
+        not_a_server_error(response, case)
 
 
 def test_no_query(graphql_url):
