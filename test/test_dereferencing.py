@@ -1,3 +1,4 @@
+import json
 import platform
 from pathlib import Path
 
@@ -7,6 +8,7 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.validators import Draft4Validator
 
 import schemathesis
+from schemathesis.exceptions import SchemaError
 
 from .utils import as_param, get_schema, integer
 
@@ -661,3 +663,40 @@ def test_unique_objects_after_inlining(empty_open_api_3_schema):
     schema = schemathesis.from_dict(empty_open_api_3_schema)
     # Then inlined objects should be unique
     assert_unique_objects(schema["/test"]["post"].body[0].definition)
+
+
+def test_unresolvable_reference_during_generation(empty_open_api_3_schema, testdir):
+    # When there is a reference that can't be resolved during generation
+    # Then it should be properly reported
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "get": {
+                "parameters": [
+                    {
+                        "schema": {"$ref": "#/components/parameters/key"},
+                        "in": "query",
+                        "name": "key",
+                        "required": True,
+                    }
+                ],
+                "responses": {"default": {"description": "Success"}},
+            }
+        }
+    }
+    empty_open_api_3_schema["components"] = {
+        "parameters": {"key": {"$ref": "#/components/schemas/Key0"}},
+        "schemas": {
+            # The last key does not point anywhere
+            **{f"Key{idx}": {"$ref": f"#/components/schemas/Key{idx + 1}"} for idx in range(8)},
+        },
+    }
+    main = testdir.mkdir("root") / "main.json"
+    main.write_text(json.dumps(empty_open_api_3_schema), "utf8")
+    schema = schemathesis.from_path(str(main))
+
+    @given(case=schema["/test"]["GET"].as_strategy())
+    def test(case):
+        pass
+
+    with pytest.raises(SchemaError, match="Unresolvable JSON pointer in the schema: /components/schemas/Key8"):
+        test()
