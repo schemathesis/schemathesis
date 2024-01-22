@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.24.0...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Internal error when an unresolvable pointer occurs during data generation.
+
 .. _v3.24.0:
 
 :version:`3.24.0 <v3.23.1...v3.24.0>` - 2024-01-21

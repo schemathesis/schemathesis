@@ -10,7 +10,7 @@ from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.lexer import Token
-from schemathesis.specs.openapi.references import resolve_pointer
+from schemathesis.specs.openapi.references import resolve_pointer, UNRESOLVABLE
 
 DOCUMENT = {"foo": ["bar", "baz"], "": 0, "a/b": 1, "c%d": 2, "e^f": 3, "g|h": 4, "i\\j": 5, 'k"l': 6, " ": 7, "m~n": 8}
 
@@ -145,14 +145,14 @@ def test_lexer(expr, expected):
     "pointer, expected",
     (
         ("", DOCUMENT),
-        ("abc", None),
-        ("/foo/123", None),
+        ("abc", UNRESOLVABLE),
+        ("/foo/123", UNRESOLVABLE),
         ("/foo", ["bar", "baz"]),
         ("/foo/0", "bar"),
         ("/", 0),
         ("/a~1b", 1),
         ("/c%d", 2),
-        ("/c%d/foo", None),
+        ("/c%d/foo", UNRESOLVABLE),
         ("/e^f", 3),
         ("/g|h", 4),
         ("/i\\j", 5),

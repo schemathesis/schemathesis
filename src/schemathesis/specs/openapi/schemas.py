@@ -40,6 +40,8 @@ from ...exceptions import (
     get_missing_content_type_error,
     get_response_parsing_error,
     get_schema_validation_error,
+    SchemaError,
+    SchemaErrorType,
 )
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, should_skip_operation
 from ...internal.copy import fast_deepcopy
@@ -71,7 +73,7 @@ from .parameters import (
     OpenAPI30Parameter,
     OpenAPIParameter,
 )
-from .references import RECURSION_DEPTH_LIMIT, ConvertingResolver, InliningResolver, resolve_pointer
+from .references import RECURSION_DEPTH_LIMIT, ConvertingResolver, InliningResolver, resolve_pointer, UNRESOLVABLE
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
@@ -644,6 +646,11 @@ class BaseOpenAPISchema(BaseSchema):
                         # Resolve the component and add it to the proper place in the schema
                         pointer = reference[1:]
                         resolved = resolve_pointer(self.rewritten_components, pointer)
+                        if resolved is UNRESOLVABLE:
+                            raise SchemaError(
+                                SchemaErrorType.OPEN_API_INVALID_SCHEMA,
+                                message=f"Unresolvable JSON pointer in the schema: {pointer}",
+                            )
                         container = schema
                         for key in pointer.split("/")[1:]:
                             container = container.setdefault(key, {})

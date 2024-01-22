@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, Callable, Dict, Union, overload
 from urllib.request import urlopen
@@ -204,7 +206,15 @@ def remove_optional_references(schema: dict[str, Any]) -> None:
             del definition[k]
 
 
-def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | float | None:
+@dataclass
+class Unresolvable:
+    pass
+
+
+UNRESOLVABLE = Unresolvable()
+
+
+def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | float | None | Unresolvable:
     """Implementation is adapted from Rust's `serde-json` crate.
 
     Ref: https://github.com/serde-rs/json/blob/master/src/value/mod.rs#L751
@@ -212,7 +222,7 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
     if not pointer:
         return document
     if not pointer.startswith("/"):
-        return None
+        return UNRESOLVABLE
 
     def replace(value: str) -> str:
         return value.replace("~1", "/").replace("~0", "~")
@@ -221,12 +231,14 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
     target = document
     for token in tokens:
         if isinstance(target, dict):
-            target = target.get(token)
+            target = target.get(token, UNRESOLVABLE)
+            if target is UNRESOLVABLE:
+                return UNRESOLVABLE
         elif isinstance(target, list):
             try:
                 target = target[int(token)]
             except IndexError:
-                return None
+                return UNRESOLVABLE
         else:
-            return None
+            return UNRESOLVABLE
     return target
