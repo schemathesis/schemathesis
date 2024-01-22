@@ -914,3 +914,28 @@ def test_(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+
+
+@pytest.mark.operations("path_variable", "custom_format")
+def test_override(testdir, openapi3_base_url, openapi3_schema_url):
+    testdir.make_test(
+        f"""
+@pytest.fixture
+def api_schema():
+    return schemathesis.from_uri('{openapi3_schema_url}')
+
+lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+
+@lazy_schema.parametrize(endpoint=["path_variable", "custom_format"])
+@lazy_schema.override(path_parameters={{"key": "foo"}}, query={{"id": "bar"}})
+def test(case):
+    if case.operation.path_parameters.contains("key"):
+        assert case.path_parameters["key"] == "foo"
+        assert "id" not in (case.query or {{}}), "`id` is present"
+    if case.operation.query.contains("id"):
+        assert case.query["id"] == "bar"
+        assert "key" not in (case.path_parameters or {{}}), "`key` is present"
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
