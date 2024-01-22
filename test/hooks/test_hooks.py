@@ -1,10 +1,14 @@
+from unittest.mock import ANY
+
 import pytest
 from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.constants import USER_AGENT
 from schemathesis.hooks import HookContext, HookDispatcher, HookScope
 from schemathesis.utils import PARAMETRIZE_MARKER
+from test.utils import assert_requests_call
 
 
 def integer_id(query):
@@ -481,7 +485,7 @@ def test_a(case):
     result.assert_outcomes(passed=1)
 
 
-def test_graphql(graphql_schema):
+def test_graphql_body(graphql_schema):
     @graphql_schema.hook
     def map_body(context, body):
         node = body.definitions[0].selection_set.selections[0]
@@ -497,5 +501,57 @@ def test_graphql(graphql_schema):
     def test(case):
         # Not necessarily valid GraphQL, but it is simpler to check the hook this way
         assert case.body == "mutation {\n  addedViaHook\n}"
+
+    test()
+
+
+def test_graphql_query(graphql_schema, graphql_server_host):
+    query = {"q": 1}
+    path_parameters = {"p": 2}
+    headers = {"h": "3"}
+    cookies = {"c": "4"}
+
+    @graphql_schema.hook
+    def map_query(_, __):
+        nonlocal query
+
+        return query
+
+    @graphql_schema.hook
+    def map_path_parameters(_, __):
+        nonlocal path_parameters
+
+        return path_parameters
+
+    @graphql_schema.hook
+    def map_headers(_, __):
+        nonlocal headers
+
+        return headers
+
+    @graphql_schema.hook
+    def map_cookies(_, __):
+        nonlocal cookies
+
+        return cookies
+
+    strategy = graphql_schema["/graphql"]["POST"].as_strategy()
+
+    @given(case=strategy)
+    @settings(max_examples=3, phases=[Phase.generate])
+    def test(case):
+        assert case.query == query
+        assert case.path_parameters == path_parameters
+        assert case.headers == headers
+        assert case.cookies == cookies
+        assert case.as_requests_kwargs() == {
+            "cookies": {"c": "4"},
+            "headers": {"User-Agent": USER_AGENT, "X-Schemathesis-TestCaseId": ANY, "h": "3"},
+            "json": {"query": ANY},
+            "method": "POST",
+            "params": {"q": 1},
+            "url": f"http://{graphql_server_host}/graphql",
+        }
+        assert_requests_call(case)
 
     test()

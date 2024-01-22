@@ -191,7 +191,6 @@ GraphQL hooks
 ~~~~~~~~~~~~~
 
 Hooks in Schemathesis can be applied to GraphQL schemas for customizing test data.
-For each hook type — ``map``, ``filter``, ``flatmap``, and ``before_generate`` — you have the option to target either the ``body`` of the GraphQL query or the entire ``case``.
 These hooks allow you to manipulate, filter, or generate dependent data, providing greater flexibility in how your tests interact with the GraphQL API.
 
 In these hooks, the ``body`` parameter refers to a ``graphql.DocumentNode`` object from Python's ``graphql`` library that represents the GraphQL query,
@@ -213,6 +212,17 @@ Here's an example using ``map_body`` to modify the GraphQL query:
         return body
 
 In this example, the ``map_body`` function modifies the GraphQL query by changing one of the field names to "addedViaHook".
+
+For other request parts like ``query``, Schemathesis does not generate anything, but you can use hooks to provide some data yourself:
+
+.. code:: python
+
+    @schema.hook
+    def map_query(context, query):
+        return {"q": "42"}
+
+The hook above always returns ``{"q": "42"}`` for the query value.
+Note that the ``query`` argument to this function will always be ``None`` as Schemathesis does not generate query parameters for GraphQL requests.
 
 You can also filter out certain queries:
 
