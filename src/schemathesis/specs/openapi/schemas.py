@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import itertools
-import json
 from collections import defaultdict
 from contextlib import ExitStack, contextmanager, suppress
 from dataclasses import dataclass, field
@@ -22,9 +21,7 @@ from typing import (
 )
 from urllib.parse import urlsplit
 
-import httpx
 import jsonschema
-import requests
 from hypothesis.strategies import SearchStrategy
 from requests.structures import CaseInsensitiveDict
 
@@ -52,6 +49,7 @@ from ...schemas import BaseSchema, APIOperationMap
 from ...stateful import Stateful, StatefulTest
 from ...stateful.state_machine import APIStateMachine
 from ...transports.content_types import is_json_media_type
+from ...transports.responses import get_json
 from ...types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query, GenericTest
 from . import links, serialization
 from ._hypothesis import get_case_strategy
@@ -579,10 +577,7 @@ class BaseOpenAPISchema(BaseSchema):
             _maybe_raise_one_or_more(errors)
             return None
         try:
-            if isinstance(response, (requests.Response, httpx.Response)):
-                data = json.loads(response.text)
-            else:
-                data = response.json
+            data = get_json(response)
         except JSONDecodeError as exc:
             exc_class = get_response_parsing_error(exc)
             context = failures.JSONDecodeErrorContext.from_exception(exc)
