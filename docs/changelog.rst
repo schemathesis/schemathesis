@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Internal error when an unresolvable pointer occurs during data generation.
+- Internal errors when references lead to non-objects.
 
 .. _v3.24.0:
 

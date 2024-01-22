@@ -193,17 +193,18 @@ def remove_optional_references(schema: dict[str, Any]) -> None:
     stack = [schema]
     while stack:
         definition = stack.pop()
-        # Optional properties
-        if "properties" in definition:
-            clean_properties(definition)
-        # Optional items
-        if "items" in definition:
-            clean_items(definition)
-        # Not required additional properties
-        if "additionalProperties" in definition:
-            clean_additional_properties(definition)
-        for k in on_single_item_combinators(definition):
-            del definition[k]
+        if isinstance(definition, dict):
+            # Optional properties
+            if "properties" in definition:
+                clean_properties(definition)
+            # Optional items
+            if "items" in definition:
+                clean_items(definition)
+            # Not required additional properties
+            if "additionalProperties" in definition:
+                clean_additional_properties(definition)
+            for k in on_single_item_combinators(definition):
+                del definition[k]
 
 
 @dataclass
