@@ -152,9 +152,9 @@ class BaseRunner:
         def as_strategy_kwargs(_operation: APIOperation) -> dict[str, Any]:
             kw = {}
             if self.override is not None:
-                for location, override in self.override.for_operation(_operation).items():
-                    if override:
-                        kw[location] = override
+                for location, entry in self.override.for_operation(_operation).items():
+                    if entry:
+                        kw[location] = entry
             if headers:
                 kw["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
             return kw

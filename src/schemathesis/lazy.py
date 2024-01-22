@@ -13,6 +13,7 @@ from pyrate_limiter import Limiter
 from pytest_subtests import SubTests, nullcontext
 
 from ._compat import MultipleFailures, get_interesting_origin
+from ._override import check_no_override_mark, CaseOverride, set_override_mark, get_override_from_mark
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import FLAKY_FAILURE_MESSAGE, NOT_SET
@@ -129,7 +130,28 @@ class LazySchema:
                 # Changing the node id is required for better reporting - the method and path will appear there
                 node_id = request.node._nodeid
                 settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
-                tests = list(schema.get_all_tests(test, settings, hooks=self.hooks, _given_kwargs=given_kwargs))
+
+                as_strategy_kwargs: Callable[[APIOperation], dict[str, Any]] | None = None
+
+                override = get_override_from_mark(test)
+                if override is not None:
+
+                    def as_strategy_kwargs(_operation: APIOperation) -> dict[str, Any]:
+                        nonlocal override
+
+                        return {
+                            location: entry for location, entry in override.for_operation(_operation).items() if entry
+                        }
+
+                tests = list(
+                    schema.get_all_tests(
+                        test,
+                        settings,
+                        hooks=self.hooks,
+                        as_strategy_kwargs=as_strategy_kwargs,
+                        _given_kwargs=given_kwargs,
+                    )
+                )
                 if not tests:
                     fail_on_no_matches(node_id)
                 request.session.testscollected += len(tests)
@@ -157,6 +179,26 @@ class LazySchema:
 
     def given(self, *args: GivenInput, **kwargs: GivenInput) -> Callable:
         return given_proxy(*args, **kwargs)
+
+    def override(
+        self,
+        *,
+        query: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
+        cookies: dict[str, str] | None = None,
+        path_parameters: dict[str, str] | None = None,
+    ) -> Callable[[GenericTest], GenericTest]:
+        """Override Open API parameters with fixed values."""
+
+        def _add_override(test: GenericTest) -> GenericTest:
+            check_no_override_mark(test)
+            override = CaseOverride(
+                query=query or {}, headers=headers or {}, cookies=cookies or {}, path_parameters=path_parameters or {}
+            )
+            set_override_mark(test, override)
+            return test
+
+        return _add_override
 
 
 def _copy_marks(source: Callable, target: Callable) -> None:
