@@ -30,7 +30,7 @@ from requests.structures import CaseInsensitiveDict
 
 from ... import experimental, failures
 from ..._compat import MultipleFailures
-from ..._override import CaseOverride, set_override_mark, has_override_mark
+from ..._override import CaseOverride, set_override_mark, check_no_override_mark
 from ...auths import AuthStorage
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...constants import HTTP_METHODS, NOT_SET
@@ -177,8 +177,7 @@ class BaseOpenAPISchema(BaseSchema):
         """Override Open API parameters with fixed values."""
 
         def _add_override(test: GenericTest) -> GenericTest:
-            if has_override_mark(test):
-                raise UsageError(f"`{test.__name__}` has already been decorated with `override`.")
+            check_no_override_mark(test)
             override = CaseOverride(
                 query=query or {}, headers=headers or {}, cookies=cookies or {}, path_parameters=path_parameters or {}
             )
