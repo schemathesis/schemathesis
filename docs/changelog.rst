@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.24.1...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- **Python**: Shortcut to create strategies for all operations or a subset of them via ``schema.as_strategy()`` and ``schema["/path/"].as_strategy()``. :issue:`1982`
+
 **Changed**
 
 - **Python**: Cleaner ``repr`` for GraphQL & Open API schemas.

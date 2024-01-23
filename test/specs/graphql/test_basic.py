@@ -4,7 +4,7 @@ from unittest.mock import ANY
 
 import pytest
 import requests
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, given, settings, find
 
 import schemathesis
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
@@ -197,3 +197,20 @@ def test_field_map_operations(graphql_schema):
 
 def test_repr(graphql_schema):
     assert repr(graphql_schema) == "<GraphQLSchema>"
+
+
+@pytest.mark.parametrize("type_name", ("Query", "Mutation"))
+def test_type_as_strategy(graphql_schema, type_name):
+    operations = graphql_schema[type_name]
+    strategy = operations.as_strategy()
+    for operation in operations.values():
+        # All fields should be possible to generate
+        find(strategy, lambda x, op=operation: op.definition.field_name in x.body)
+
+
+def test_schema_as_strategy(graphql_schema):
+    strategy = graphql_schema.as_strategy()
+    for operations in graphql_schema.values():
+        for operation in operations.values():
+            # All fields should be possible to generate
+            find(strategy, lambda x, op=operation: op.definition.field_name in x.body)
