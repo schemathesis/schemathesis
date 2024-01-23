@@ -174,3 +174,7 @@ def test_schema_error(testdir, cli, snapshot_cli, schema, extension):
 def test_unknown_type_name(graphql_schema):
     with pytest.raises(KeyError, match="`Qwery` type not found. Did you mean `Query`?"):
         graphql_schema["Qwery"]["getBooks"]
+
+
+def test_repr(graphql_schema):
+    assert repr(graphql_schema) == "<GraphQLSchema>"
