@@ -485,7 +485,8 @@ Or ``Query`` / ``Mutation`` type name and a field name for GraphQL
 
     If you use custom name for these types, use them instead.
 
-Then create a strategy from an operation by using the ``as_strategy`` method and optionally combine multiple of them into a single strategy:
+Then create a strategy from an operation by using the ``as_strategy`` method and optionally combine multiple of them into a single strategy.
+You can also create a strategy for all operations or a wider subset of them:
 
 .. code-block:: python
 
@@ -493,12 +494,21 @@ Then create a strategy from an operation by using the ``as_strategy`` method and
     get_pet = schema["/pet/{pet_id}/"]["GET"]
     get_books = graphql_schema["Query"]["getBooks"]
 
-    # Generates test cases for `POST /pet/`
+    # The following strategies generate test cases for different sub-sets of API operations
+    # For `POST /pet/`
     create_pet_strategy = create_pet.as_strategy()
-    # Generates test cases for `POST /pet` AND `GET /pet/{pet_id}/`
+    # For `POST /pet` AND `GET /pet/{pet_id}/`
     get_or_create_pet_strategy = get_pet.as_strategy() | create_pet.as_strategy()
-    # Generates test cases for the `getBooks` query
+    # For the `getBooks` query
     get_books_strategy = get_books.as_strategy()
+    # For all methods in the `/pet/` path
+    all_pet_strategy = schema["/pet/"].as_strategy()
+    # For all operations
+    all_operations_strategy = schema.as_strategy()
+    # For all queries
+    queries_strategy = graphql_schema["Query"].as_strategy()
+    # For all mutations & queries
+    mutations_and_queries_strategy = graphql_schema.as_strategy()
 
 The ``as_strategy`` method also accepts the ``data_generation_method`` argument allowing you to control whether it should generate positive or negative test cases.
 
