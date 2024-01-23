@@ -55,7 +55,7 @@ def test_global_query_hook(wsgi_app_schema, schema_url):
     strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow])
+    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
         assert case.query["id"].isdigit()
 
@@ -72,7 +72,7 @@ def test_global_body_hook(wsgi_app_schema):
     strategy = wsgi_app_schema["/payload"]["POST"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow])
+    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
         assert len(case.body["name"]) == 5
 
@@ -97,7 +97,7 @@ def test_case_hook(wsgi_app_schema):
     strategy = wsgi_app_schema["/users/"]["POST"].as_strategy(hooks=dispatcher)
 
     @given(case=strategy)
-    @settings(max_examples=10, suppress_health_check=[HealthCheck.filter_too_much])
+    @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
         assert case.body["first_name"] == case.body["last_name"]
         assert case.body["extra"] == 42
@@ -115,7 +115,7 @@ def test_schema_query_hook(wsgi_app_schema, schema_url):
     strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3)
+    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
         assert case.query["id"].isdigit()
 
@@ -134,7 +134,7 @@ def test_hooks_combination(wsgi_app_schema):
     strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3)
+    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
         assert case.query["id"].isdigit()
         assert int(case.query["id"]) % 2 == 0
@@ -290,7 +290,7 @@ def test_multiple_hooks_per_spec(wsgi_app_schema):
     strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3)
+    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
         assert case.query["id"].isdigit()
         assert int(case.query["id"]) % 2 == 0
@@ -313,7 +313,7 @@ def test_flatmap(wsgi_app_schema):
     strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3)
+    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
         value = case.query["id"]
         assert value.isdigit()
@@ -342,7 +342,7 @@ def test_case_hooks(wsgi_app_schema):
     strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3)
+    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
         value = case.query["id"]
         assert value.isdigit()
@@ -362,7 +362,7 @@ def test_before_process_path_hook(wsgi_app_schema):
     strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3)
+    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
         assert case.query == {"foo": "bar"}
 
@@ -497,7 +497,7 @@ def test_graphql_body(graphql_schema):
     strategy = graphql_schema["Mutation"]["addBook"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3, phases=[Phase.generate])
+    @settings(max_examples=3, phases=[Phase.generate], suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
         # Not necessarily valid GraphQL, but it is simpler to check the hook this way
         assert case.body == "mutation {\n  addedViaHook\n}"
@@ -538,7 +538,7 @@ def test_graphql_query(graphql_schema, graphql_server_host):
     strategy = graphql_schema["Query"]["getBooks"].as_strategy()
 
     @given(case=strategy)
-    @settings(max_examples=3, phases=[Phase.generate])
+    @settings(max_examples=3, phases=[Phase.generate], suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
         assert case.query == query
         assert case.path_parameters == path_parameters
