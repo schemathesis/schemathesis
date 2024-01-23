@@ -1,6 +1,6 @@
 from __future__ import annotations
 import enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from difflib import get_close_matches
 from enum import unique
 from typing import (
@@ -11,8 +11,9 @@ from typing import (
     TypeVar,
     cast,
     TYPE_CHECKING,
-    MutableMapping,
     NoReturn,
+    MutableMapping,
+    Iterator,
 )
 from urllib.parse import urlsplit, unquote, urljoin, quote
 
@@ -40,7 +41,7 @@ from ...hooks import (
 )
 from ...internal.result import Result, Ok
 from ...models import APIOperation, Case, CheckFunction, OperationDefinition
-from ...schemas import BaseSchema
+from ...schemas import BaseSchema, APIOperationMap
 from ...stateful import Stateful, StatefulTest
 from ...types import Body, Cookies, Headers, NotSet, PathParameters, Query
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
@@ -147,14 +148,14 @@ class GraphQLSchema(BaseSchema):
 
     def _store_operations(
         self, operations: Generator[Result[APIOperation, OperationSchemaError], None, None]
-    ) -> dict[str, MutableMapping]:
-        output: dict[str, MutableMapping] = {}
+    ) -> dict[str, APIOperationMap]:
+        output: dict[str, APIOperationMap] = {}
         for result in operations:
             if isinstance(result, Ok):
                 operation = result.ok()
                 definition = cast(GraphQLOperationDefinition, operation.definition)
                 type_name = definition.type_.name if isinstance(definition.type_, GraphQLNamedType) else "Unknown"
-                for_type = output.setdefault(type_name, {})
+                for_type = output.setdefault(type_name, APIOperationMap(FieldMap()))
                 for_type[definition.field_name] = operation
         return output
 
@@ -285,6 +286,39 @@ class GraphQLSchema(BaseSchema):
             body=body,
             media_type=media_type,
         )
+
+
+@dataclass
+class FieldMap(MutableMapping):
+    """Container for accessing API operations.
+
+    Provides a more specific error message if API operation is not found.
+    """
+
+    data: dict[str, APIOperation] = field(default_factory=dict)
+
+    def __setitem__(self, key: str, value: APIOperation) -> None:
+        self.data[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.data[key]
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.data)
+
+    def __getitem__(self, item: str) -> APIOperation:
+        try:
+            return self.data[item]
+        except KeyError as exc:
+            field_names = [operation.definition.field_name for operation in self.data.values()]  # type: ignore[attr-defined]
+            matches = get_close_matches(item, field_names)
+            message = f"`{item}` field not found"
+            if matches:
+                message += f". Did you mean `{matches[0]}`?"
+            raise KeyError(message) from exc
 
 
 @st.composite  # type: ignore

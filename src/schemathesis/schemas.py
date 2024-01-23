@@ -28,7 +28,6 @@ from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 import hypothesis
 from hypothesis.strategies import SearchStrategy
 from pyrate_limiter import Limiter
-from requests.structures import CaseInsensitiveDict
 
 from .constants import NOT_SET
 from ._hypothesis import create_test
@@ -62,21 +61,6 @@ from .utils import PARAMETRIZE_MARKER, GivenInput, given_proxy
 
 if TYPE_CHECKING:
     from .transports.responses import GenericResponse
-
-
-class MethodsDict(CaseInsensitiveDict):
-    """Container for accessing API operations.
-
-    Provides a more specific error message if API operation is not found.
-    """
-
-    def __getitem__(self, item: Any) -> Any:
-        try:
-            return super().__getitem__(item)
-        except KeyError as exc:
-            available_methods = ", ".join(map(str.upper, self))
-            message = f"Method `{item}` not found. Available methods: {available_methods}"
-            raise KeyError(message) from exc
 
 
 C = TypeVar("C", bound=Case)
@@ -113,7 +97,7 @@ class BaseSchema(Mapping):
     def __iter__(self) -> Iterator[str]:
         return iter(self.operations)
 
-    def __getitem__(self, item: str) -> MutableMapping:
+    def __getitem__(self, item: str) -> APIOperationMap:
         __tracebackhide__ = True
         try:
             return self.operations[item]
@@ -168,7 +152,7 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     @property
-    def operations(self) -> dict[str, MutableMapping]:
+    def operations(self) -> dict[str, APIOperationMap]:
         if not hasattr(self, "_operations"):
             operations = self.get_all_operations()
             self._operations = self._store_operations(operations)
@@ -176,8 +160,8 @@ class BaseSchema(Mapping):
 
     def _store_operations(
         self, operations: Generator[Result[APIOperation, OperationSchemaError], None, None]
-    ) -> dict[str, MutableMapping]:
-        return operations_to_dict(operations)
+    ) -> dict[str, APIOperationMap]:
+        raise NotImplementedError
 
     @property
     def operations_count(self) -> int:
@@ -443,13 +427,21 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
 
-def operations_to_dict(
-    operations: Generator[Result[APIOperation, OperationSchemaError], None, None],
-) -> dict[str, MutableMapping]:
-    output: dict[str, MutableMapping] = {}
-    for result in operations:
-        if isinstance(result, Ok):
-            operation = result.ok()
-            output.setdefault(operation.path, MethodsDict())
-            output[operation.path][operation.method] = operation
-    return output
+@dataclass
+class APIOperationMap(MutableMapping):
+    data: MutableMapping
+
+    def __setitem__(self, key: str, value: APIOperation) -> None:
+        self.data[key] = value
+
+    def __getitem__(self, item: str) -> APIOperation:
+        return self.data[item]
+
+    def __delitem__(self, key: str) -> None:
+        del self.data[key]
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.data)

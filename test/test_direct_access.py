@@ -1,11 +1,11 @@
 import pytest
 from hypothesis import strategies as st
-from requests.structures import CaseInsensitiveDict
 
 import schemathesis
 from schemathesis import DataGenerationMethod
 from schemathesis.models import APIOperation, Case
-from schemathesis.schemas import operations_to_dict
+from schemathesis.schemas import APIOperationMap
+from schemathesis.specs.openapi.schemas import operations_to_dict
 
 
 def test_contains(swagger_20):
@@ -14,13 +14,13 @@ def test_contains(swagger_20):
 
 def test_getitem(simple_schema, mocker):
     swagger = schemathesis.from_dict(simple_schema)
-    mocked = mocker.patch("schemathesis.schemas.operations_to_dict", wraps=operations_to_dict)
+    mocked = mocker.patch("schemathesis.specs.openapi.schemas.operations_to_dict", wraps=operations_to_dict)
     assert "_operations" not in swagger.__dict__
-    assert isinstance(swagger["/users"], CaseInsensitiveDict)
+    assert isinstance(swagger["/users"], APIOperationMap)
     assert mocked.call_count == 1
     # Check cached access
     assert "_operations" in swagger.__dict__
-    assert isinstance(swagger["/users"], CaseInsensitiveDict)
+    assert isinstance(swagger["/users"], APIOperationMap)
     assert mocked.call_count == 1
 
 
