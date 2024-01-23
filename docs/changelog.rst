@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.24.2...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Incorrect base URL handing for GraphQL schemas. :issue:`1987`
+
 .. _v3.24.2:
 
 :version:`3.24.2 <v3.24.1...v3.24.2>` - 2024-01-23

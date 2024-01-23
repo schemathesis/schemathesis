@@ -15,7 +15,7 @@ from typing import (
     MutableMapping,
     Iterator,
 )
-from urllib.parse import urlsplit, unquote, urljoin, quote
+from urllib.parse import urlsplit, urlunsplit
 
 import graphql
 import requests
@@ -61,11 +61,12 @@ class GraphQLCase(Case):
     def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         final_headers = self._get_headers(headers)
         base_url = self._get_base_url(base_url)
-        formatted_path = self.formatted_path.lstrip("/")
-        url = unquote(urljoin(base_url, quote(formatted_path)))
+        # Replace the path, in case if the user provided any path parameters via hooks
+        parts = list(urlsplit(base_url))
+        parts[2] = self.formatted_path
         kwargs: dict[str, Any] = {
             "method": self.method,
-            "url": url,
+            "url": urlunsplit(parts),
             "headers": final_headers,
             "cookies": self.cookies,
             "params": self.query,

@@ -2,6 +2,7 @@
 from io import StringIO
 
 import pytest
+from hypothesis import given, settings
 
 from schemathesis.specs.graphql import loaders
 
@@ -36,6 +37,20 @@ def test_graphql_wsgi_loader(graphql_path, graphql_app, run_wsgi_test):
     strategy = schema["Query"]["getBooks"].as_strategy()
     # Then it should successfully make calls via `call_wsgi`
     run_wsgi_test(strategy)
+
+
+def test_graphql_url(graphql_path, fastapi_graphql_app, run_asgi_test):
+    # See GH-1987
+    schema = loaders.from_asgi(graphql_path, fastapi_graphql_app)
+    schema.location = "/graphql/"
+    strategy = schema["Query"]["getBooks"].as_strategy()
+
+    @given(case=strategy)
+    @settings(max_examples=1, deadline=None)
+    def test(case):
+        assert case.as_requests_kwargs(base_url=case.get_full_base_url())["url"] == "http://localhost/graphql/"
+
+    test()
 
 
 def defines_type(parsed, name):
