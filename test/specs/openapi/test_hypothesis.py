@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from hypothesis import assume, given, settings
+from hypothesis import assume, given, settings, Phase
 from hypothesis import strategies as st
 
 import schemathesis
@@ -9,6 +9,7 @@ from schemathesis.generation import GenerationConfig
 from schemathesis.specs.openapi import _hypothesis, formats
 from schemathesis.specs.openapi._hypothesis import get_case_strategy, is_valid_header, make_positive_strategy
 from schemathesis.specs.openapi.references import load_file
+from test.utils import assert_requests_call
 
 
 @pytest.fixture
@@ -355,6 +356,50 @@ def test_missing_header_filter(empty_open_api_3_schema, mocker):
 
     # Then header filter should be used
     mocked.assert_called()
+
+
+def test_filter_urlencoded(empty_open_api_3_schema):
+    # When API schema allows for inputs that can't be serialized to `application/x-www-form-urlencoded`
+    # Then such examples should be filtered out during generation
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "value": {
+                                            "enum": ["A"],
+                                        },
+                                        "key": {
+                                            "enum": ["B"],
+                                        },
+                                    },
+                                    "required": ["key", "value"],
+                                    # Additional properties are allowed
+                                },
+                                "maxItems": 3,
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    @given(schema["/test"]["POST"].as_strategy())
+    @settings(phases=[Phase.generate], max_examples=15, deadline=None)
+    def test(case):
+        assert_requests_call(case)
+
+    test()
 
 
 @pytest.mark.parametrize(
