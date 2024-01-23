@@ -48,7 +48,7 @@ from ...internal.copy import fast_deepcopy
 from ...internal.jsonschema import traverse_schema
 from ...internal.result import Err, Ok, Result
 from ...models import APIOperation, Case, OperationDefinition
-from ...schemas import BaseSchema
+from ...schemas import BaseSchema, APIOperationMap
 from ...stateful import Stateful, StatefulTest
 from ...stateful.state_machine import APIStateMachine
 from ...transports.content_types import is_json_media_type
@@ -112,6 +112,11 @@ class BaseOpenAPISchema(BaseSchema):
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
         return f"<{self.__class__.__name__} for {info['title']} {info['version']}>"
+
+    def _store_operations(
+        self, operations: Generator[Result[APIOperation, OperationSchemaError], None, None]
+    ) -> dict[str, APIOperationMap]:
+        return operations_to_dict(operations)
 
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
         matches = get_close_matches(item, list(self.operations))
@@ -742,6 +747,33 @@ def in_scopes(resolver: jsonschema.RefResolver, scopes: list[str]) -> Generator[
         for scope in scopes:
             stack.enter_context(in_scope(resolver, scope))
         yield
+
+
+def operations_to_dict(
+    operations: Generator[Result[APIOperation, OperationSchemaError], None, None],
+) -> dict[str, APIOperationMap]:
+    output: dict[str, APIOperationMap] = {}
+    for result in operations:
+        if isinstance(result, Ok):
+            operation = result.ok()
+            output.setdefault(operation.path, APIOperationMap(MethodMap()))
+            output[operation.path][operation.method] = operation
+    return output
+
+
+class MethodMap(CaseInsensitiveDict):
+    """Container for accessing API operations.
+
+    Provides a more specific error message if API operation is not found.
+    """
+
+    def __getitem__(self, item: str) -> APIOperation:
+        try:
+            return super().__getitem__(item)
+        except KeyError as exc:
+            available_methods = ", ".join(map(str.upper, self))
+            message = f"Method `{item}` not found. Available methods: {available_methods}"
+            raise KeyError(message) from exc
 
 
 OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE = "application/json"
