@@ -56,8 +56,7 @@ from .types import (
     PathParameters,
     Query,
 )
-from .utils import PARAMETRIZE_MARKER, GivenInput, given_proxy
-
+from .utils import PARAMETRIZE_MARKER, GivenInput, given_proxy, combine_strategies
 
 if TYPE_CHECKING:
     from .transports.responses import GenericResponse
@@ -426,6 +425,29 @@ class BaseSchema(Mapping):
     def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:
         raise NotImplementedError
 
+    def as_strategy(
+        self,
+        hooks: HookDispatcher | None = None,
+        auth_storage: AuthStorage | None = None,
+        data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        generation_config: GenerationConfig | None = None,
+        **kwargs: Any,
+    ) -> SearchStrategy:
+        """Build a strategy for generating test cases for all defined API operations."""
+        assert len(self.operations) > 0, "No API operations found"
+        strategies = [
+            operation.as_strategy(
+                hooks=hooks,
+                auth_storage=auth_storage,
+                data_generation_method=data_generation_method,
+                generation_config=generation_config,
+                **kwargs,
+            )
+            for operations in self.operations.values()
+            for operation in operations.values()
+        ]
+        return combine_strategies(strategies)
+
 
 @dataclass
 class APIOperationMap(MutableMapping):
@@ -445,3 +467,25 @@ class APIOperationMap(MutableMapping):
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.data)
+
+    def as_strategy(
+        self,
+        hooks: HookDispatcher | None = None,
+        auth_storage: AuthStorage | None = None,
+        data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        generation_config: GenerationConfig | None = None,
+        **kwargs: Any,
+    ) -> SearchStrategy:
+        """Build a strategy for generating test cases for all API operations defined in this subset."""
+        assert len(self.data) > 0, "No API operations found"
+        strategies = [
+            operation.as_strategy(
+                hooks=hooks,
+                auth_storage=auth_storage,
+                data_generation_method=data_generation_method,
+                generation_config=generation_config,
+                **kwargs,
+            )
+            for operation in self.data.values()
+        ]
+        return combine_strategies(strategies)
