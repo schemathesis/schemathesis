@@ -12,6 +12,7 @@ from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from requests.auth import _basic_auth_str
 from requests.structures import CaseInsensitiveDict
+from requests.utils import to_key_val_list
 
 from ...constants import NOT_SET
 from .formats import STRING_FORMATS
@@ -22,6 +23,7 @@ from ...exceptions import SerializationNotPossible, BodyInGetRequestError
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...internal.validation import is_illegal_surrogate
 from ...models import APIOperation, Case, cant_serialize
+from ...transports.content_types import parse_content_type
 from ...transports.headers import has_invalid_characters, is_latin_1_encodable
 from ...types import NotSet
 from ...serializers import Binary
@@ -82,6 +84,17 @@ def is_valid_query(query: dict[str, Any]) -> bool:
         if is_illegal_surrogate(name) or is_illegal_surrogate(value):
             return False
     return True
+
+
+def is_valid_urlencoded(data: Any) -> bool:
+    if data is NOT_SET:
+        return True
+    try:
+        for _, __ in to_key_val_list(data):  # type: ignore[no-untyped-call]
+            pass
+        return True
+    except ValueError:
+        return False
 
 
 @st.composite  # type: ignore
@@ -150,6 +163,8 @@ def get_case_strategy(
                 # Other media types are possible - avoid choosing this media type in the future
                 cant_serialize(parameter.media_type)
             media_type = draw(st.sampled_from(possible_media_types))
+            if media_type is not None and parse_content_type(media_type) == ("application", "x-www-form-urlencoded"):
+                strategy = strategy.filter(is_valid_urlencoded)
             body_ = ValueContainer(value=draw(strategy), location="body", generator=body_generator)
         else:
             body_ = ValueContainer(value=body, location="body", generator=None)

@@ -13,6 +13,10 @@ Changelog
 - **Python**: Cleaner ``repr`` for GraphQL & Open API schemas.
 - **GraphQL**: Show suggestion when a field is not found in ``schema["Query"][field_name]``.
 
+**Fixed**
+
+- Filter out test cases that can not be serialized when the API operation requires ``application/x-www-form-urlencoded``. :issue:`1306`
+
 .. _v3.24.1:
 
 :version:`3.24.1 <v3.24.0...v3.24.1>` - 2024-01-22
