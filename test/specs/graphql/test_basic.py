@@ -176,5 +176,24 @@ def test_unknown_type_name(graphql_schema):
         graphql_schema["Qwery"]["getBooks"]
 
 
+@pytest.mark.parametrize(
+    "name, expected",
+    (
+        ("getBookz", "`getBookz` field not found. Did you mean `getBooks`?"),
+        ("abcdef", "`abcdef` field not found"),
+    ),
+)
+def test_unknown_field_name(graphql_schema, name, expected):
+    with pytest.raises(KeyError, match=expected):
+        graphql_schema["Query"][name]
+
+
+def test_field_map_operations(graphql_schema):
+    assert len(graphql_schema["Query"]) == 2
+    assert list(iter(graphql_schema["Query"])) == ["getBooks", "getAuthors"]
+    del graphql_schema["Query"]["getBooks"]
+    assert len(graphql_schema["Query"]) == 1
+
+
 def test_repr(graphql_schema):
     assert repr(graphql_schema) == "<GraphQLSchema>"

@@ -7,6 +7,7 @@ Changelog
 **Changed**
 
 - **Python**: Cleaner ``repr`` for GraphQL & Open API schemas.
+- **GraphQL**: Show suggestion when a field is not found in ``schema["Query"][field_name]``.
 
 .. _v3.24.1:
 
