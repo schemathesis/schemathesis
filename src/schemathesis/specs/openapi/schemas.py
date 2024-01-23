@@ -111,7 +111,7 @@ class BaseOpenAPISchema(BaseSchema):
 
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
-        return f"{self.__class__.__name__} for {info['title']} ({info['version']})"
+        return f"<{self.__class__.__name__} for {info['title']} {info['version']}>"
 
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
         matches = get_close_matches(item, list(self.operations))

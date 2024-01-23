@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.24.1...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- **Python**: Cleaner ``repr`` for GraphQL & Open API schemas.
+
 .. _v3.24.1:
 
 :version:`3.24.1 <v3.24.0...v3.24.1>` - 2024-01-22

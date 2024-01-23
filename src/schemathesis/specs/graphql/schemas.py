@@ -133,6 +133,9 @@ class GraphQLOperationDefinition(OperationDefinition):
 
 @dataclass
 class GraphQLSchema(BaseSchema):
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}>"
+
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
         raw_schema = self.raw_schema["__schema"]
         type_names = [type_def["name"] for type_def in raw_schema.get("types", [])]
