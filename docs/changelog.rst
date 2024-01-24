@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.24.3...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- ``--hypothesis-no-phases`` CLI option to disable Hypothesis testing phases. :issue:`1324`
+
 .. _v3.24.3:
 
 :version:`3.24.3 <v3.24.2...v3.24.3>` - 2024-01-23
