@@ -26,6 +26,12 @@ class Phase(IntEnum):
 
         return Phase[self.name]
 
+    @staticmethod
+    def filter_from_all(variants: list[Phase]) -> list[hypothesis.Phase]:
+        from hypothesis import Phase
+
+        return list(set(Phase) - {Phase.explain} - set(variants))
+
 
 @unique
 class HealthCheck(IntEnum):
