@@ -67,6 +67,9 @@ Hypothesis engine:
                                   method/path pair.  [x>=1]
   --hypothesis-phases [explicit|reuse|generate|target|shrink]
                                   Specifies which testing phases to execute.
+  --hypothesis-no-phases [explicit|reuse|generate|target|shrink]
+                                  Specifies which testing phases to exclude from
+                                  execution.
   --hypothesis-report-multiple-bugs BOOLEAN
                                   If set, only the most easily reproducible
                                   exception will be reported when multiple

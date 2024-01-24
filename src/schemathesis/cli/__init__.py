@@ -97,6 +97,7 @@ DEPRECATED_SHOW_ERROR_TRACEBACKS_OPTION_WARNING = (
 )
 CASSETTES_PATH_INVALID_USAGE_MESSAGE = "Can't use `--store-network-log` and `--cassette-path` simultaneously"
 COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
+PHASES_INVALID_USAGE_MESSAGE = "Can't use `--hypothesis-phases` and `--hypothesis-no-phases` simultaneously"
 
 
 def reset_checks() -> None:
@@ -633,6 +634,13 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     group=ParameterGroup.hypothesis,
 )
 @click.option(
+    "--hypothesis-no-phases",
+    help="Specifies which testing phases to exclude from execution.",
+    type=CsvEnumChoice(Phase),
+    cls=GroupedOption,
+    group=ParameterGroup.hypothesis,
+)
+@click.option(
     "--hypothesis-report-multiple-bugs",
     help="If set, only the most easily reproducible exception will be reported when multiple issues are found.",
     type=bool,
@@ -768,6 +776,7 @@ def run(
     hypothesis_derandomize: bool | None = None,
     hypothesis_max_examples: int | None = None,
     hypothesis_phases: list[Phase] | None = None,
+    hypothesis_no_phases: list[Phase] | None = None,
     hypothesis_report_multiple_bugs: bool | None = None,
     hypothesis_suppress_health_check: list[HealthCheck] | None = None,
     hypothesis_seed: int | None = None,
@@ -792,6 +801,10 @@ def run(
     _hypothesis_phases: list[hypothesis.Phase] | None = None
     if hypothesis_phases is not None:
         _hypothesis_phases = [phase.as_hypothesis() for phase in hypothesis_phases]
+        if hypothesis_no_phases is not None:
+            raise click.UsageError(PHASES_INVALID_USAGE_MESSAGE)
+    if hypothesis_no_phases is not None:
+        _hypothesis_phases = Phase.filter_from_all(hypothesis_no_phases)
     _hypothesis_suppress_health_check: list[hypothesis.HealthCheck] | None = None
     if hypothesis_suppress_health_check is not None:
         _hypothesis_suppress_health_check = [

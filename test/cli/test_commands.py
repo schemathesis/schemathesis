@@ -36,7 +36,12 @@ from schemathesis.cli import (
 from schemathesis.cli.constants import Phase, HealthCheck
 from schemathesis.code_samples import CodeSampleStyle
 from schemathesis._dependency_versions import IS_PYTEST_ABOVE_54
-from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT, FLAKY_FAILURE_MESSAGE, REPORT_SUGGESTION_ENV_VAR
+from schemathesis.constants import (
+    DEFAULT_RESPONSE_TIMEOUT,
+    FLAKY_FAILURE_MESSAGE,
+    REPORT_SUGGESTION_ENV_VAR,
+    DEFAULT_DEADLINE,
+)
 from schemathesis.extra._flask import run_server
 from schemathesis.models import APIOperation
 from schemathesis.runner import from_schema, CaseOverride
@@ -99,6 +104,8 @@ def test_run_subprocess(testdir):
         ("http://127.0.0.1", "--set-query", "key=value", "--set-query", "key=value"),
         ("http://127.0.0.1", "--set-header", "Authorization=value", "--auth", "foo:bar"),
         ("http://127.0.0.1", "--set-header", "Authorization=value", "-H", "Authorization: value"),
+        ("http://127.0.0.1", "--hypothesis-no-phases=unknown"),
+        ("http://127.0.0.1", "--hypothesis-no-phases=explicit", "--hypothesis-phases=explicit"),
     ),
 )
 def test_run_output(cli, args, snapshot_cli):
@@ -248,6 +255,15 @@ SCHEMA_URI = "https://example.schemathesis.io/openapi.json"
             },
         ),
         (["--hypothesis-deadline=None"], {"hypothesis_settings": hypothesis.settings(deadline=None)}),
+        (
+            ["--hypothesis-no-phases=explicit"],
+            {
+                "hypothesis_settings": hypothesis.settings(
+                    deadline=DEFAULT_DEADLINE,
+                    phases=list(set(hypothesis.Phase) - {hypothesis.Phase.explicit, hypothesis.Phase.explain}),
+                )
+            },
+        ),
         (["--max-response-time=10"], {"max_response_time": 10}),
     ),
 )
