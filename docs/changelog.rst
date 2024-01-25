@@ -7,15 +7,12 @@ Changelog
 **Added**
 
 - ``--hypothesis-no-phases`` CLI option to disable Hypothesis testing phases. :issue:`1324`
+- Support for loading GraphQL schemas from JSON files that contain the ``__schema`` key.
 
 .. _v3.24.3:
 
 :version:`3.24.3 <v3.24.2...v3.24.3>` - 2024-01-23
 --------------------------------------------------
-
-**Added**
-
-- Support for loading GraphQL schemas from JSON files that contain the ``__schema`` key.
 
 **Fixed**
 
