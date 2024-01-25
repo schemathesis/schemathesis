@@ -209,6 +209,39 @@ def test(case):
     result.stdout.re_match_lines([".+given must be called with at least one argument"])
 
 
+def test_given_with_explicit_examples(testdir):
+    # When `schema.given` is used for a schema with explicit examples
+    testdir.make_test(
+        """
+@schema.parametrize(method="get")
+@schema.given(data=st.data())
+def test(case, data):
+    pass
+        """,
+        paths={
+            "/users": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "anyKey",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string"},
+                            "example": "header0",
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    # Then the wrapped test should fail with an error
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(failed=1)
+    result.stdout.re_match_lines([".+Unsupported test setup"])
+
+
 def test_given_no_override(testdir):
     # When `schema.given` is used multiple times on the same test
     testdir.make_test(
