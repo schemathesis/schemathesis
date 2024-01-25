@@ -17,9 +17,9 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
 from .._hypothesis import create_test, get_unsatisfied_example_mark
 from .._override import get_override_from_mark
-from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
+from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE
 from .._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54
-from ..exceptions import OperationSchemaError, SkipTest
+from ..exceptions import OperationSchemaError, SkipTest, UsageError
 from ..internal.result import Result, Ok
 from ..models import APIOperation
 from ..utils import (
@@ -254,6 +254,8 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
         try:
             outcome.get_result()
         except InvalidArgument as exc:
+            if "Inconsistent args" in str(exc) and "@example()" in str(exc):
+                raise UsageError(GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE) from None
             raise OperationSchemaError(exc.args[0]) from None
         except HypothesisRefResolutionError:
             pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)

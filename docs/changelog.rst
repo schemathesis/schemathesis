@@ -10,6 +10,10 @@ Changelog
 - Support for loading GraphQL schemas from JSON files that contain the ``__schema`` key.
 - Response validation for GraphQL APIs.
 
+**Changed**
+
+- **Python**: Explicitly note that combining ``@schema.given`` with explicit examples from the spec is not supported. :issue:`1217`
+
 .. _v3.24.3:
 
 :version:`3.24.3 <v3.24.2...v3.24.3>` - 2024-01-23

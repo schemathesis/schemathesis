@@ -412,6 +412,43 @@ This trick allows the test to cover three different situations where the input t
 
 Using custom Hypothesis strategies allows you to expand the testing surface significantly.
 
+Note that tests that use custom Hypothesis examples won't work if your schema contains explicit examples. 
+They are incompatible because Schemathesis only builds the ``case`` argument from the examples and does not know
+what values to provide for other arguments you define for your test function.
+
+Be aware of a key limitation when integrating Schemathesis with Hypothesis and pytest for testing.
+Schemathesis is unable to simultaneously support custom Hypothesis strategies and explicit examples defined in your API schema. 
+This limitation arises because Schemathesis generates ``hypothesis.example`` instances from schema-defined examples, but it 
+doesn't have the capability to infer or assign appropriate values for additional custom arguments in your test functions.
+To effectively manage this, you should consider structuring your tests differently. 
+For tests involving custom Hypothesis strategies, you need to exclude ``Phase.explicit`` to avoid conflicts. 
+
+.. code-block:: python
+
+    from hypothesis import strategies as st, settings, Phase
+
+    ...
+
+    @schema.parametrize()
+    @schema.given(data=st.data())
+    @settings(phases=set(Phase) - {Phase.explicit})
+    def test_api(data, case, user):
+        ...
+
+In contrast, if you intend to test schema-provided explicit examples, create a separate test function without the ``schema.given`` decorator. 
+This approach ensures that both types of tests can be executed, albeit in separate contexts.
+
+.. code-block:: python
+
+    from hypothesis import settings, Phase
+
+    ...
+
+    @schema.parametrize()
+    @settings(phases=[Phase.explicit])
+    def test_explicit_examples(data, case, user):
+        ...
+
 ASGI / WSGI support
 -------------------
 

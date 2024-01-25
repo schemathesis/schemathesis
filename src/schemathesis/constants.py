@@ -23,6 +23,10 @@ RECURSIVE_REFERENCE_ERROR_MESSAGE = (
     "recursive references in the operation definition. See more information in "
     "this issue - https://github.com/schemathesis/schemathesis/issues/947"
 )
+GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE = (
+    "Unsupported test setup. Tests using `@schema.given` cannot be combined with explicit schema examples in the same "
+    "function. Separate these tests into distinct functions to avoid conflicts."
+)
 SERIALIZERS_SUGGESTION_MESSAGE = (
     "You can register your own serializer with `schemathesis.serializer` "
     "and Schemathesis will be able to make API calls with this media type. \n"
