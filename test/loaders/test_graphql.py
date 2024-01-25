@@ -1,10 +1,13 @@
 """GraphQL specific loader behavior."""
 from io import StringIO
+import json
 
+import graphql
 import pytest
 from hypothesis import given, settings
 
 from schemathesis.specs.graphql import loaders
+from schemathesis.exceptions import SchemaError
 
 RAW_SCHEMA = """
 type Book {
@@ -75,3 +78,20 @@ def test_graphql_path_loader(tmp_path):
     path.write_text(RAW_SCHEMA)
     schema = loaders.from_path(path)
     assert_schema(schema)
+
+
+def test_from_json_file(tmp_path):
+    document = graphql.build_schema(RAW_SCHEMA)
+    result = graphql.execute(document, loaders.get_introspection_query_ast())
+    path = tmp_path / "schema.json"
+    path.write_text(json.dumps(result.data))
+    schema = loaders.from_path(str(path))
+    assert_schema(schema)
+
+
+@pytest.mark.parametrize("data", ("{}", "[]", "--"))
+def test_from_invalid_json_file(tmp_path, data):
+    path = tmp_path / "schema.json"
+    path.write_text(data)
+    with pytest.raises(SchemaError, match="The provided API schema does not appear to be a valid GraphQL schema"):
+        loaders.from_path(str(path))
