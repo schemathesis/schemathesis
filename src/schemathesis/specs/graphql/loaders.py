@@ -1,8 +1,10 @@
 from __future__ import annotations
+
+import json
 import pathlib
 from functools import lru_cache
 from json import JSONDecodeError
-from typing import IO, Any, Callable, Dict, cast, TYPE_CHECKING
+from typing import IO, Any, Callable, Dict, cast, TYPE_CHECKING, NoReturn
 
 from ...code_samples import CodeSampleStyle
 from ...generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod, DataGenerationMethodInput
@@ -167,20 +169,21 @@ def from_file(
         data = file.read()
     try:
         document = graphql.build_schema(data)
+        result = graphql.execute(document, get_introspection_query_ast())
+        # TYPES: We don't pass `is_awaitable` above, therefore `result` is of the `ExecutionResult` type
+        result = cast(graphql.ExecutionResult, result)
+        # TYPES:
+        #  - `document` is a valid schema, because otherwise `build_schema` will rise an error;
+        #  - `INTROSPECTION_QUERY` is a valid query - it is known upfront;
+        # Therefore the execution result is always valid at this point and `result.data` is not `None`
+        raw_schema = cast(Dict[str, Any], result.data)
     except Exception as exc:
-        raise SchemaError(
-            SchemaErrorType.GRAPHQL_INVALID_SCHEMA,
-            "The provided API schema does not appear to be a valid GraphQL schema",
-            extras=[entry for entry in str(exc).splitlines() if entry],
-        ) from exc
-    result = graphql.execute(document, get_introspection_query_ast())
-    # TYPES: We don't pass `is_awaitable` above, therefore `result` is of the `ExecutionResult` type
-    result = cast(graphql.ExecutionResult, result)
-    # TYPES:
-    #  - `document` is a valid schema, because otherwise `build_schema` will rise an error;
-    #  - `INTROSPECTION_QUERY` is a valid query - it is known upfront;
-    # Therefore the execution result is always valid at this point and `result.data` is not `None`
-    raw_schema = cast(Dict[str, Any], result.data)
+        try:
+            raw_schema = json.loads(data)
+            if not isinstance(raw_schema, dict) or "__schema" not in raw_schema:
+                _on_invalid_schema(exc)
+        except json.JSONDecodeError:
+            _on_invalid_schema(exc, extras=[entry for entry in str(exc).splitlines() if entry])
     return from_dict(
         raw_schema,
         app=app,
@@ -191,6 +194,14 @@ def from_file(
         rate_limit=rate_limit,
         sanitize_output=sanitize_output,
     )
+
+
+def _on_invalid_schema(exc: Exception, extras: list[str] | None = None) -> NoReturn:
+    raise SchemaError(
+        SchemaErrorType.GRAPHQL_INVALID_SCHEMA,
+        "The provided API schema does not appear to be a valid GraphQL schema",
+        extras=extras or [],
+    ) from exc
 
 
 def from_dict(

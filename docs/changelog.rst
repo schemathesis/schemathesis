@@ -13,9 +13,13 @@ Changelog
 :version:`3.24.3 <v3.24.2...v3.24.3>` - 2024-01-23
 --------------------------------------------------
 
+**Added**
+
+- Support for loading GraphQL schemas from JSON files that contain the ``__schema`` key.
+
 **Fixed**
 
-- Incorrect base URL handing for GraphQL schemas. :issue:`1987`
+- Incorrect base URL handling for GraphQL schemas. :issue:`1987`
 
 .. _v3.24.2:
 
