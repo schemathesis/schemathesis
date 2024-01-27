@@ -6,6 +6,7 @@ Schemathesis provides capabilities for testing GraphQL-based applications:
 - Generating conforming queries & mutations
 - Using default values in generated queries
 - Customizing scalars generation
+- Validating responses based on the presence of the ``errors`` field
 
 Usage
 ~~~~~
@@ -68,4 +69,4 @@ They exist because classes like ``graphql.StringValueNode`` can't be directly us
 Limitations
 ~~~~~~~~~~~
 
-At the moment it is only possible to select API operations to test via hooks.
+At the moment, in CLI it is only possible to select API operations to test via hooks.

@@ -5,6 +5,7 @@ from json import JSONDecodeError
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from graphql.error import GraphQLFormattedError
     from jsonschema import ValidationError
 
 
@@ -177,3 +178,32 @@ class RequestTimeout(FailureContext):
     message: str
     title: str = "Response timeout"
     type: str = "request_timeout"
+
+
+@dataclass(repr=False)
+class UnexpectedGraphQLResponse(FailureContext):
+    """GraphQL response is not a JSON object."""
+
+    message: str
+    title: str = "Unexpected GraphQL Response"
+    type: str = "graphql_unexpected_response"
+
+
+@dataclass(repr=False)
+class GraphQLClientError(FailureContext):
+    """GraphQL query has not been executed."""
+
+    message: str
+    errors: list[GraphQLFormattedError]
+    title: str = "GraphQL client error"
+    type: str = "graphql_client_error"
+
+
+@dataclass(repr=False)
+class GraphQLServerError(FailureContext):
+    """GraphQL response indicates at least one server error."""
+
+    message: str
+    errors: list[GraphQLFormattedError]
+    title: str = "GraphQL server error"
+    type: str = "graphql_server_error"

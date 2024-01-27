@@ -8,7 +8,7 @@ Changelog
 
 - ``--hypothesis-no-phases`` CLI option to disable Hypothesis testing phases. :issue:`1324`
 - Support for loading GraphQL schemas from JSON files that contain the ``__schema`` key.
-- Basic GraphQL response checking that only covers whether the response payload is valid JSON.
+- Response validation for GraphQL APIs.
 
 .. _v3.24.3:
 

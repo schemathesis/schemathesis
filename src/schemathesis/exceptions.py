@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     import hypothesis.errors
     from jsonschema import RefResolutionError, ValidationError
     from .transports.responses import GenericResponse
+    from graphql.error import GraphQLFormattedError
     from requests import RequestException
 
 
@@ -142,6 +143,29 @@ def get_headers_error(message: str) -> type[CheckFailed]:
 def get_timeout_error(deadline: float | int) -> type[CheckFailed]:
     """Request took too long."""
     return _get_hashed_exception("TimeoutError", str(deadline))
+
+
+def get_unexpected_graphql_response_error(type_: type) -> type[CheckFailed]:
+    """When GraphQL response is not a JSON object."""
+    return get_exception(f"UnexpectedGraphQLResponseError:{type_}")
+
+
+def get_grouped_graphql_error(errors: list[GraphQLFormattedError]) -> type[CheckFailed]:
+    # Canonicalize GraphQL errors by serializing them uniformly and sorting the outcomes
+    entries = []
+    for error in errors:
+        message = error["message"]
+        if "locations" in error:
+            message += ";locations:"
+            for location in sorted(error["locations"]):
+                message += f"({location['line'],location['column']})"
+        if "path" in error:
+            message += ";path:"
+            for chunk in error["path"]:
+                message += str(chunk)
+        entries.append(message)
+    entries.sort()
+    return _get_hashed_exception("GraphQLErrors", "".join(entries))
 
 
 SCHEMA_ERROR_SUGGESTION = "Ensure that the definition complies with the OpenAPI specification"

@@ -1,17 +1,24 @@
 import platform
+
+import strawberry
+
+from test.apps._graphql.schema import Author
 from test.utils import assert_requests_call
 from unittest.mock import ANY
 
 import pytest
 import requests
-from hypothesis import HealthCheck, given, settings, find
+from hypothesis import HealthCheck, given, settings, find, Phase
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.exceptions import CheckFailed, SchemaError
+from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.specs.graphql.loaders import get_introspection_query, extract_schema_from_response
 from schemathesis.specs.graphql.schemas import GraphQLCase
+from schemathesis.specs.graphql.validation import validate_graphql_response
+from test.apps import _graphql as graphql
 
 
 def test_raw_schema(graphql_schema):
@@ -78,11 +85,67 @@ def test_make_case(graphql_schema, kwargs):
     assert_requests_call(case)
 
 
-def test_non_json_response(graphql_schema, response_factory):
-    response = response_factory.requests(status_code=200, content=b"INTERNAL SERVER ERROR", content_type="text/plain")
+@pytest.mark.parametrize(
+    "kwargs, expected",
+    (
+        ({"content": b"INTERNAL SERVER ERROR", "content_type": "text/plain"}, "JSON deserialization error"),
+        ({"content": b"[]"}, "Unexpected GraphQL Response"),
+    ),
+)
+def test_response_validation(graphql_schema, response_factory, kwargs, expected):
+    response = response_factory.requests(status_code=200, **kwargs)
     case = graphql_schema["Query"]["getBooks"].make_case(body="Q")
-    with pytest.raises(CheckFailed, match="JSON deserialization error"):
+    with pytest.raises(CheckFailed, match=expected):
         not_a_server_error(response, case)
+
+
+def test_client_error(graphql_schema):
+    case = graphql_schema["Query"]["getBooks"].make_case(body="invalid query")
+    with pytest.raises(CheckFailed, match="Syntax Error: Unexpected Name 'invalid'"):
+        case.call_and_validate()
+
+
+def test_server_error(graphql_path):
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def showBug1(self, name: str) -> Author:
+            raise ZeroDivisionError("Hidden 1 / 0 bug")
+
+        @strawberry.field
+        def showBug2(self, name: str) -> Author:
+            raise AssertionError("Another bug")
+
+    gql_schema = strawberry.Schema(Query)
+
+    app = graphql._flask.create_app(graphql_path, schema=gql_schema)
+    port = run_flask_server(app)
+    graphql_url = f"http://127.0.0.1:{port}{graphql_path}"
+    graphql_schema = schemathesis.graphql.from_url(graphql_url)
+
+    @given(case=graphql_schema["Query"]["showBug1"].as_strategy())
+    @settings(max_examples=1, deadline=None, phases=[Phase.generate])
+    def test(case):
+        case.call_and_validate()
+
+    with pytest.raises(CheckFailed, match="Hidden 1 / 0 bug"):
+        test()
+
+
+def test_multiple_server_error():
+    payload = {
+        "data": None,
+        "errors": [
+            {"message": "Hidden 1 / 0 bug", "locations": [{"line": 2, "column": 3}], "path": ["showBug1"]},
+            {"message": "Another bug", "locations": [{"line": 2, "column": 3}], "path": ["showBug2"]},
+            {"message": "Third bug", "path": ["showBug2"]},
+        ],
+    }
+
+    with pytest.raises(CheckFailed, match="GraphQL server error") as exc:
+        validate_graphql_response(payload)
+
+    assert exc.value.context.message == "1. Hidden 1 / 0 bug\n\n2. Another bug\n\n3. Third bug"
 
 
 def test_no_query(graphql_url):
