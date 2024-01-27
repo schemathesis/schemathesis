@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 def not_a_server_error(response: GenericResponse, case: Case) -> bool | None:
     """A check to verify that the response is not a server-side error."""
     from .specs.graphql.schemas import GraphQLCase
+    from .specs.graphql.validation import validate_graphql_response
     from .transports.responses import get_json
 
     status_code = response.status_code
@@ -27,7 +28,8 @@ def not_a_server_error(response: GenericResponse, case: Case) -> bool | None:
         raise exc_class(failures.ServerError.title, context=failures.ServerError(status_code=status_code))
     if isinstance(case, GraphQLCase):
         try:
-            _ = get_json(response)
+            data = get_json(response)
+            validate_graphql_response(data)
         except json.JSONDecodeError as exc:
             exc_class = get_response_parsing_error(exc)
             context = failures.JSONDecodeErrorContext.from_exception(exc)
