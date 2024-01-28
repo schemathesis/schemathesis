@@ -347,6 +347,7 @@ class CliSnapshotConfig:
                 data.replace("Errno 111", "Error NUM")
                 .replace("Errno 61", "Error NUM")
                 .replace("WinError 10061", "Error NUM")
+                .replace("Cannot connect to proxy.", "Unable to connect to proxy")
             )
             data = data.replace(
                 "No connection could be made because the target machine actively refused it", "Connection refused"
