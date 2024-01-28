@@ -3,6 +3,7 @@ import functools
 import operator
 from contextlib import contextmanager
 from inspect import getfullargspec
+from pathlib import Path
 from typing import (
     Any,
     Callable,
@@ -22,7 +23,7 @@ from ._compat import InferType, get_signature
 # Backward-compat
 from .constants import NOT_SET  # noqa: F401
 from .exceptions import SkipTest, UsageError
-from .types import GenericTest
+from .types import GenericTest, PathLike
 
 
 def is_schemathesis_test(func: Callable) -> bool:
@@ -157,3 +158,12 @@ def combine_strategies(strategies: list[st.SearchStrategy]) -> st.SearchStrategy
 
 def skip(operation_name: str) -> NoReturn:
     raise SkipTest(f"It is not possible to generate negative test cases for `{operation_name}`")
+
+
+def _ensure_parent(path: PathLike, fail_silently: bool = True) -> None:
+    # Try to create the parent dir
+    try:
+        Path(path).parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    except OSError:
+        if not fail_silently:
+            raise

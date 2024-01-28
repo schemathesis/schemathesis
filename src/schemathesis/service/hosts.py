@@ -49,23 +49,16 @@ def load(path: PathLike) -> dict[str, Any]:
 
     Return an empty dict if it doesn't exist.
     """
+    from ..utils import _ensure_parent
+
     try:
         with open(path, "rb") as fd:
             return tomli.load(fd)
     except FileNotFoundError:
-        _try_make_config_directory(path)
+        _ensure_parent(path)
         return {}
     except tomli.TOMLDecodeError:
         return {}
-
-
-def _try_make_config_directory(path: PathLike) -> None:
-    # Try to create the parent dir - it could be the first run, when the config dir doesn't exist yet
-    try:
-        Path(path).parent.mkdir(mode=0o755, parents=True, exist_ok=True)
-    except OSError:
-        # Ignore permission errors, etc
-        pass
 
 
 def load_for_host(hostname: str = DEFAULT_HOSTNAME, hosts_file: PathLike = DEFAULT_HOSTS_PATH) -> dict[str, Any]:

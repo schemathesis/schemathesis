@@ -22,9 +22,10 @@ def test_junitxml_option(cli, schema_url, hypothesis_max_examples, tmp_path):
     ElementTree.parse(xml_path)
 
 
+@pytest.mark.parametrize("path", ("junit.xml", "does-not-exist/junit.xml"))
 @pytest.mark.operations("success", "failure", "unsatisfiable")
-def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path):
-    xml_path = tmp_path / "junit.xml"
+def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path):
+    xml_path = tmp_path / path
     cli.run(
         schema_url,
         f"--junit-xml={xml_path}",
