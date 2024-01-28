@@ -711,7 +711,7 @@ def test_remote_disconnected_error(mocker, cli, schema_url, app, snapshot_cli):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 @pytest.mark.skipif(platform.system() == "Windows", reason="Linux specific error")
-def test_proxy_error(cli, schema_url, app, snapshot_cli):
+def test_proxy_error(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url, "--request-proxy=http://127.0.0.1") == snapshot_cli
 
 
