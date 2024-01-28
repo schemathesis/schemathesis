@@ -1343,6 +1343,8 @@ def execute(
     started_at: str,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
+    from ..utils import _ensure_parent
+
     handlers: list[EventHandler] = []
     report_context: ServiceReportContext | FileReportContext | None = None
     report_queue: Queue
@@ -1363,6 +1365,7 @@ def execute(
             )
         )
     elif isinstance(report, click.utils.LazyFile):
+        _ensure_parent(report.name, fail_silently=False)
         report_queue = Queue()
         report_context = FileReportContext(queue=report_queue, filename=report.name)
         handlers.append(
@@ -1377,11 +1380,14 @@ def execute(
             )
         )
     if junit_xml is not None:
+        _ensure_parent(junit_xml.name, fail_silently=False)
         handlers.append(JunitXMLHandler(junit_xml))
     if debug_output_file is not None:
+        _ensure_parent(debug_output_file.name, fail_silently=False)
         handlers.append(DebugOutputHandler(debug_output_file))
     if cassette_path is not None:
         # This handler should be first to have logs writing completed when the output handler will display statistic
+        _ensure_parent(cassette_path.name, fail_silently=False)
         handlers.append(
             cassettes.CassetteWriter(cassette_path, preserve_exact_body_bytes=cassette_preserve_exact_body_bytes)
         )

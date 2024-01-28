@@ -14,6 +14,10 @@ Changelog
 
 - **Python**: Explicitly note that combining ``@schema.given`` with explicit examples from the spec is not supported. :issue:`1217`
 
+**Fixed**
+
+- Create parent directories when saving JUnit XML reports and other file-based output. :issue:`1995`
+
 .. _v3.24.3:
 
 :version:`3.24.3 <v3.24.2...v3.24.3>` - 2024-01-23
