@@ -7,6 +7,10 @@ It works great when you need to quickly verify that your operations properly val
 
 With stateful testing, Schemathesis combines multiple API calls into a single test scenario and tries to find call sequences that fail.
 
+Stateful tests in Schemathesis rely on Open API links to function, as they are designed to target stateful transitions between API endpoints.
+Unlike stateless tests, which verify individual endpoints in isolation, stateful tests require these links to sequence API calls logically. 
+Ensure your schema includes Open API links to leverage stateful testing effectively.
+
 Why is it useful?
 -----------------
 
