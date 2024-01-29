@@ -1,3 +1,4 @@
+import platform
 from xml.etree import ElementTree
 
 import pytest
@@ -63,3 +64,15 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path)
     assert testcases[2][0].tag == "error"
     assert testcases[2][0].attrib["type"] == "error"
     assert "Failed to generate test cases for this API operation" in testcases[2][0].attrib["message"]
+
+
+@pytest.mark.parametrize("path", ("junit.xml", "does-not-exist/junit.xml"))
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.skipif(platform.system() == "Windows", reason="Unclear how to trigger the permission error on Windows")
+def test_permission_denied(cli, tmp_path, schema_url, path):
+    dir_path = tmp_path / "output"
+    dir_path.mkdir(mode=0o555)
+    xml_path = dir_path / path
+    result = cli.run(schema_url, f"--junit-xml={xml_path}")
+    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
+    assert "Permission denied" in result.stdout

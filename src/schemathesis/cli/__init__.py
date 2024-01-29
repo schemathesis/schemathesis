@@ -1343,8 +1343,6 @@ def execute(
     started_at: str,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
-    from ..utils import _ensure_parent
-
     handlers: list[EventHandler] = []
     report_context: ServiceReportContext | FileReportContext | None = None
     report_queue: Queue
@@ -1365,7 +1363,7 @@ def execute(
             )
         )
     elif isinstance(report, click.utils.LazyFile):
-        _ensure_parent(report.name, fail_silently=False)
+        _open_file(report)
         report_queue = Queue()
         report_context = FileReportContext(queue=report_queue, filename=report.name)
         handlers.append(
@@ -1380,14 +1378,14 @@ def execute(
             )
         )
     if junit_xml is not None:
-        _ensure_parent(junit_xml.name, fail_silently=False)
+        _open_file(junit_xml)
         handlers.append(JunitXMLHandler(junit_xml))
     if debug_output_file is not None:
-        _ensure_parent(debug_output_file.name, fail_silently=False)
+        _open_file(debug_output_file)
         handlers.append(DebugOutputHandler(debug_output_file))
     if cassette_path is not None:
         # This handler should be first to have logs writing completed when the output handler will display statistic
-        _ensure_parent(cassette_path.name, fail_silently=False)
+        _open_file(cassette_path)
         handlers.append(
             cassettes.CassetteWriter(cassette_path, preserve_exact_body_bytes=cassette_preserve_exact_body_bytes)
         )
@@ -1437,6 +1435,19 @@ def execute(
     # Event stream did not finish with a terminal event. Only possible if the handler is broken
     click.secho("Unexpected error", fg="red")
     sys.exit(1)
+
+
+def _open_file(file: click.utils.LazyFile) -> None:
+    from ..utils import _ensure_parent
+
+    try:
+        _ensure_parent(file.name, fail_silently=False)
+    except OSError as exc:
+        raise click.BadParameter(f"'{file.name}': {exc.strerror}") from exc
+    try:
+        file.open()
+    except click.FileError as exc:
+        raise click.BadParameter(exc.format_message()) from exc
 
 
 def is_built_in_handler(handler: EventHandler) -> bool:

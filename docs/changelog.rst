@@ -12,6 +12,7 @@ Changelog
 
 **Changed**
 
+- **CLI**: Eagerly check for permissions when writing output to a file, including JUnit XML and other reports.
 - **Python**: Explicitly note that combining ``@schema.given`` with explicit examples from the spec is not supported. :issue:`1217`
 - Clarify error message when a state machine has no transitions. :issue:`1992`
 
