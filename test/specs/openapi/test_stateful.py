@@ -1,8 +1,10 @@
 import pytest
 from hypothesis import HealthCheck, Phase, settings
+from hypothesis.errors import InvalidDefinition
 
 import schemathesis
-from schemathesis.exceptions import CheckFailed
+from schemathesis.constants import NO_LINKS_ERROR_MESSAGE
+from schemathesis.exceptions import CheckFailed, UsageError
 from schemathesis.specs.openapi.stateful.links import make_response_filter, match_status_code
 from schemathesis.stateful.state_machine import StepResult
 from src.schemathesis.models import CaseSource, Check, Status
@@ -279,3 +281,25 @@ def test_history(testdir, app_schema, base_url, response_factory, method):
     # Then they should store all history
     assert serialized.history[0].case.verbose_name == "PATCH /api/users/{user_id}"
     assert serialized.history[1].case.verbose_name == "POST /api/users/"
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_no_transitions_error(app_schema):
+    schema = schemathesis.from_dict(app_schema)
+    state_machine_cls = schema.as_state_machine()
+
+    with pytest.raises(UsageError, match=NO_LINKS_ERROR_MESSAGE):
+        state_machine_cls()
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user", "update_user")
+def test_settings_error(app_schema):
+    schema = schemathesis.from_dict(app_schema)
+
+    class Workflow(schema.as_state_machine()):
+        settings = settings(max_examples=5)
+
+    with pytest.raises(InvalidDefinition):
+        Workflow()

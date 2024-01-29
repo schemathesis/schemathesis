@@ -5,8 +5,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, ClassVar
 
 from hypothesis.stateful import RuleBasedStateMachine
+from hypothesis.errors import InvalidDefinition
 
-from ..constants import NOT_SET
+from ..constants import NOT_SET, NO_LINKS_ERROR_MESSAGE
+from ..exceptions import UsageError
 from ..models import Case, APIOperation, CheckFunction
 
 if TYPE_CHECKING:
@@ -38,7 +40,12 @@ class APIStateMachine(RuleBasedStateMachine):
     schema: BaseSchema
 
     def __init__(self) -> None:
-        super().__init__()  # type: ignore
+        try:
+            super().__init__()  # type: ignore
+        except InvalidDefinition as exc:
+            if "defines no rules" in str(exc):
+                raise UsageError(NO_LINKS_ERROR_MESSAGE) from None
+            raise
         self.setup()
 
     def _pretty_print(self, value: Any) -> str:
