@@ -32,6 +32,11 @@ SERIALIZERS_SUGGESTION_MESSAGE = (
     "and Schemathesis will be able to make API calls with this media type. \n"
     "See https://schemathesis.readthedocs.io/en/stable/how.html#payload-serialization for more information."
 )
+NO_LINKS_ERROR_MESSAGE = (
+    "Stateful testing requires at least one OpenAPI link in the schema, but no links detected. "
+    "Please add OpenAPI links to enable stateful testing or use stateless tests instead. \n"
+    "See https://schemathesis.readthedocs.io/en/stable/stateful.html#how-to-specify-connections for more information."
+)
 EXTENSIONS_DOCUMENTATION_URL = "https://schemathesis.readthedocs.io/en/stable/extending.html"
 ISSUE_TRACKER_URL = (
     "https://github.com/schemathesis/schemathesis/issues/new?"
