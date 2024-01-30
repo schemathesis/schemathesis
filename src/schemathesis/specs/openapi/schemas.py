@@ -546,6 +546,9 @@ class BaseOpenAPISchema(BaseSchema):
             result[status_code][link.name] = link
         return result
 
+    def get_tags(self, operation: APIOperation) -> list[str] | None:
+        return operation.definition.resolved.get("tags")
+
     def validate_response(self, operation: APIOperation, response: GenericResponse) -> bool | None:
         responses = {str(key): value for key, value in operation.definition.raw.get("responses", {}).items()}
         status_code = str(response.status_code)

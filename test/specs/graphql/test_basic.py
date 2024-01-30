@@ -25,6 +25,10 @@ def test_raw_schema(graphql_schema):
     assert graphql_schema.verbose_name == "GraphQL"
 
 
+def test_tags(graphql_schema):
+    assert graphql_schema["Query"]["getBooks"].tags is None
+
+
 @pytest.mark.hypothesis_nested
 def test_operation_strategy(graphql_strategy):
     @given(case=graphql_strategy)

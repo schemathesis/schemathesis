@@ -409,6 +409,9 @@ class BaseSchema(Mapping):
     def get_links(self, operation: APIOperation) -> dict[str, dict[str, Any]]:
         raise NotImplementedError
 
+    def get_tags(self, operation: APIOperation) -> list[str] | None:
+        raise NotImplementedError
+
     def validate_response(self, operation: APIOperation, response: GenericResponse) -> bool | None:
         raise NotImplementedError
 
