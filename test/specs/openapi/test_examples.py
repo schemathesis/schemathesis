@@ -492,5 +492,41 @@ def test_external_value_network_error(empty_open_api_3_schema):
         ({"foo": {}}, []),
     ),
 )
-def test_empty_example(value, expected, server):
+def test_empty_example(value, expected):
     assert list(extract_inner_examples(value, value)) == expected
+
+
+def test_example_override():
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "servers": [{"url": "http://127.0.0.1:8081/{basePath}", "variables": {"basePath": {"default": "api"}}}],
+        "paths": {
+            "/success": {
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "query",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    },
+                ],
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "key",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string"},
+                            "examples": {"query1": {"value": "query1"}},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                },
+            }
+        },
+    }
+    schema = schemathesis.from_dict(raw_schema)
+    operation = schema["/success"]["GET"]
+    extracted = [example_to_dict(example) for example in examples.extract_top_level(operation)]
+    assert extracted == [{"container": "query", "name": "key", "value": "query1"}]

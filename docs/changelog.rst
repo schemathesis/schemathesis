@@ -20,6 +20,7 @@ Changelog
 **Fixed**
 
 - Create parent directories when saving JUnit XML reports and other file-based output. :issue:`1995`
+- Internal error when an API operation contains multiple parameters with the same name and some of them contain the ``examples`` keyword. 
 
 .. _v3.24.3:
 
