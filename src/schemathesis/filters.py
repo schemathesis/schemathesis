@@ -66,7 +66,9 @@ class Matcher:
         return self.func(ctx)
 
 
-def get_operation_attribute(operation: APIOperation, attribute: str) -> str:
+def get_operation_attribute(operation: APIOperation, attribute: str) -> str | list[str] | None:
+    if attribute == "tag":
+        return operation.tags
     # Just uppercase `method`
     value = getattr(operation, attribute)
     if attribute == "method":
@@ -75,15 +77,29 @@ def get_operation_attribute(operation: APIOperation, attribute: str) -> str:
 
 
 def by_value(ctx: HasAPIOperation, attribute: str, expected: str) -> bool:
-    return get_operation_attribute(ctx.operation, attribute) == expected
+    value = get_operation_attribute(ctx.operation, attribute)
+    if value is None:
+        return False
+    if isinstance(value, list):
+        return any(entry == expected for entry in value)
+    return value == expected
 
 
 def by_value_list(ctx: HasAPIOperation, attribute: str, expected: list[str]) -> bool:
-    return get_operation_attribute(ctx.operation, attribute) in expected
+    value = get_operation_attribute(ctx.operation, attribute)
+    if value is None:
+        return False
+    if isinstance(value, list):
+        return any(entry in expected for entry in value)
+    return value in expected
 
 
 def by_regex(ctx: HasAPIOperation, attribute: str, regex: re.Pattern) -> bool:
     value = get_operation_attribute(ctx.operation, attribute)
+    if value is None:
+        return False
+    if isinstance(value, list):
+        return any(bool(regex.match(entry)) for entry in value)
     return bool(regex.match(value))
 
 
@@ -148,6 +164,8 @@ class FilterSet:
         method_regex: RegexValue | None = None,
         path: FilterValue | None = None,
         path_regex: RegexValue | None = None,
+        tag: FilterValue | None = None,
+        tag_regex: RegexValue | None = None,
     ) -> None:
         """Add a new INCLUDE filter."""
         self._add_filter(
@@ -159,6 +177,8 @@ class FilterSet:
             method_regex=method_regex,
             path=path,
             path_regex=path_regex,
+            tag=tag,
+            tag_regex=tag_regex,
         )
 
     def exclude(
@@ -171,6 +191,8 @@ class FilterSet:
         method_regex: RegexValue | None = None,
         path: FilterValue | None = None,
         path_regex: RegexValue | None = None,
+        tag: FilterValue | None = None,
+        tag_regex: RegexValue | None = None,
     ) -> None:
         """Add a new EXCLUDE filter."""
         self._add_filter(
@@ -182,6 +204,8 @@ class FilterSet:
             method_regex=method_regex,
             path=path,
             path_regex=path_regex,
+            tag=tag,
+            tag_regex=tag_regex,
         )
 
     def _add_filter(
@@ -195,6 +219,8 @@ class FilterSet:
         method_regex: RegexValue | None = None,
         path: FilterValue | None = None,
         path_regex: RegexValue | None = None,
+        tag: FilterValue | None = None,
+        tag_regex: RegexValue | None = None,
     ) -> None:
         matchers = []
         if func is not None:
@@ -203,6 +229,7 @@ class FilterSet:
             ("verbose_name", name, name_regex),
             ("method", method, method_regex),
             ("path", path, path_regex),
+            ("tag", tag, tag_regex),
         ):
             if expected is not None and regex is not None:
                 # To match anything the regex should match the expected value, hence passing them together is useless
