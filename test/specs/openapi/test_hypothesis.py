@@ -371,7 +371,6 @@ def test_filter_urlencoded(empty_open_api_3_schema):
                             "schema": {
                                 "type": "array",
                                 "items": {
-                                    "type": "object",
                                     "properties": {
                                         "value": {
                                             "enum": ["A"],
