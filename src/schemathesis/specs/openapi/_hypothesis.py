@@ -93,7 +93,7 @@ def is_valid_urlencoded(data: Any) -> bool:
         for _, __ in to_key_val_list(data):  # type: ignore[no-untyped-call]
             pass
         return True
-    except ValueError:
+    except (TypeError, ValueError):
         return False
 
 
