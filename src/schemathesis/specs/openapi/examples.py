@@ -132,7 +132,7 @@ def _find_parameter_examples_definition(
     schema = cast(BaseOpenAPISchema, operation.schema)
     raw_schema = schema.raw_schema
     path_data = raw_schema["paths"][operation.path]
-    parameters = chain(path_data.get("parameters", []), path_data[operation.method].get("parameters", []))
+    parameters = chain(path_data[operation.method].get("parameters", []), path_data.get("parameters", []))
     for parameter in parameters:
         if "$ref" in parameter:
             _, parameter = schema.resolver.resolve(parameter["$ref"])
