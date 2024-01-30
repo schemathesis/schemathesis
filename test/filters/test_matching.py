@@ -14,11 +14,9 @@ RAW_SCHEMA = {
         "/users/": {
             "get": {
                 "responses": {"200": {"description": "OK"}},
+                "tags": ["Users"],
             },
-            "post": {
-                "deprecated": True,
-                "responses": {"200": {"description": "OK"}},
-            },
+            "post": {"deprecated": True, "responses": {"200": {"description": "OK"}}, "tags": ["Users"]},
         },
         "/users/{user_id}/": {
             "patch": {
@@ -26,12 +24,8 @@ RAW_SCHEMA = {
             },
         },
         "/orders/": {
-            "get": {
-                "responses": {"200": {"description": "OK"}},
-            },
-            "post": {
-                "responses": {"200": {"description": "OK"}},
-            },
+            "get": {"responses": {"200": {"description": "OK"}}, "tags": ["Orders", "SomeOther"]},
+            "post": {"responses": {"200": {"description": "OK"}}, "tags": []},
         },
     },
 }
@@ -47,6 +41,9 @@ SINGLE_INCLUDE_CASES = (
     ({"path": "/users/"}, [USERS_GET, USERS_POST]),
     ({"path": ["/users/", "/orders/"]}, NO_PATCH),
     ({"path_regex": "^/users/"}, [USERS_GET, USERS_POST, USER_ID_PATCH]),
+    ({"tag": "Users"}, [USERS_GET, USERS_POST]),
+    ({"tag": ["Users", "Orders"]}, [USERS_GET, USERS_POST, ORDERS_GET]),
+    ({"tag_regex": ".+rs"}, [USERS_GET, USERS_POST, ORDERS_GET]),
     ({"method": "GET"}, [USERS_GET, ORDERS_GET]),
     ({"method": ["GET", "PATCH"]}, [USERS_GET, USER_ID_PATCH, ORDERS_GET]),
     ({"method_regex": "^P"}, [USERS_POST, USER_ID_PATCH, ORDERS_POST]),

@@ -234,6 +234,7 @@ Conditions:
 - ``path``: the path of the API operation without its ``basePath``.
 - ``method``: the upper-cased HTTP method of the API operation
 - ``name``: the name of the API operation, such as ``GET /users/`` or ``Query.getUsers``
+- ``tag``: the tag assigned to the API operation. For Open API it comes from the ``tags`` field.
 - Each condition can take either a single string or a list of options as input
 - You can also use a regular expression to match the conditions by adding ``_regex`` to the end of the condition and passing a string or a compiled regex.
 

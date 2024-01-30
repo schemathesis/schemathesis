@@ -289,6 +289,9 @@ class GraphQLSchema(BaseSchema):
             media_type=media_type,
         )
 
+    def get_tags(self, operation: APIOperation) -> list[str] | None:
+        return None
+
 
 @dataclass
 class FieldMap(MutableMapping):

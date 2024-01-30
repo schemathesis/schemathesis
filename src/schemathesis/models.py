@@ -677,6 +677,10 @@ class APIOperation(Generic[P, C]):
     def links(self) -> dict[str, dict[str, Any]]:
         return self.schema.get_links(self)
 
+    @property
+    def tags(self) -> list[str] | None:
+        return self.schema.get_tags(self)
+
     def iter_parameters(self) -> Iterator[P]:
         """Iterate over all operation's parameters."""
         return chain(self.path_parameters, self.headers, self.cookies, self.query)
