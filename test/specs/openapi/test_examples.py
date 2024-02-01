@@ -401,6 +401,29 @@ def test_invalid_x_examples(empty_open_api_2_schema):
     assert schema["/test"]["POST"].get_strategies_from_examples() == []
 
 
+def test_shared_examples_openapi_2(empty_open_api_2_schema):
+    empty_open_api_2_schema["paths"] = {
+        "/test": {
+            "parameters": [
+                {
+                    "name": "any",
+                    "in": "body",
+                    "required": True,
+                    "schema": {},
+                },
+            ],
+            "post": {
+                "parameters": [{"name": "body", "in": "body", "schema": {}, "x-examples": {"foo": {"value": "value"}}}],
+                "responses": {"default": {"description": "OK"}},
+            },
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_2_schema)
+    strategies = schema["/test"]["POST"].get_strategies_from_examples()
+    assert len(strategies) == 1
+    assert find(strategies[0], lambda case: case.body == "value")
+
+
 def test_partial_examples(empty_open_api_3_schema):
     # When the API schema contains multiple parameters in the same location
     # And some of them don't have explicit examples and others do
