@@ -153,6 +153,8 @@ def _find_request_body_examples_definition(
         path_data = raw_schema["paths"][operation.path]
         parameters = chain(path_data[operation.method].get("parameters", []), path_data.get("parameters", []))
         for parameter in parameters:
+            if "$ref" in parameter:
+                _, parameter = schema.resolver.resolve(parameter["$ref"])
             if parameter["in"] == "body":
                 return parameter[alternative.examples_field]
         raise RuntimeError("Example definition is not found. It should not happen")

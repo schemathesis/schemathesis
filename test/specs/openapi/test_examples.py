@@ -424,6 +424,32 @@ def test_shared_examples_openapi_2(empty_open_api_2_schema):
     assert find(strategies[0], lambda case: case.body == "value")
 
 
+def test_examples_ref_openapi_2(empty_open_api_2_schema):
+    empty_open_api_2_schema["paths"] = {
+        "/test": {
+            "post": {
+                "parameters": [{"$ref": "#/components/parameters/Referenced"}],
+                "responses": {"default": {"description": "OK"}},
+            },
+        }
+    }
+    empty_open_api_2_schema["components"] = {
+        "parameters": {
+            "Referenced": {
+                "name": "Referenced",
+                "in": "body",
+                "required": True,
+                "schema": {},
+                "x-examples": {"example1": {"value": "value"}},
+            }
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_2_schema)
+    strategies = schema["/test"]["POST"].get_strategies_from_examples()
+    assert len(strategies) == 1
+    assert find(strategies[0], lambda case: case.body == "value")
+
+
 def test_partial_examples(empty_open_api_3_schema):
     # When the API schema contains multiple parameters in the same location
     # And some of them don't have explicit examples and others do
