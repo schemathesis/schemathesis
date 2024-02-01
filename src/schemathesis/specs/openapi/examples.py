@@ -158,7 +158,10 @@ def _find_request_body_examples_definition(
             if parameter["in"] == "body":
                 return parameter[alternative.examples_field]
         raise RuntimeError("Example definition is not found. It should not happen")
-    return operation.definition.raw["requestBody"]["content"][alternative.media_type][alternative.examples_field]
+    request_body = operation.definition.raw["requestBody"]
+    if "$ref" in request_body:
+        _, request_body = schema.resolver.resolve(request_body["$ref"])
+    return request_body["content"][alternative.media_type][alternative.examples_field]
 
 
 def extract_inner_examples(
