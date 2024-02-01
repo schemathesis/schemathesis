@@ -477,6 +477,45 @@ def test_examples_ref_openapi_3(empty_open_api_3_schema):
     assert find(strategies[0], lambda case: case.body == "value")
 
 
+def test_examples_ref_missing_components(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "foo-1": {"type": "string", "example": "foo-11"},
+                                "spam-1": {"$ref": "#/components/schemas/Referenced"},
+                            },
+                            "required": ["foo-1", "spam-1"],
+                        },
+                    }
+                ],
+                "responses": {"default": {"description": "OK"}},
+            },
+        }
+    }
+    empty_open_api_3_schema["components"] = {
+        "schemas": {
+            "Referenced": {
+                "type": "object",
+                "properties": {"inner": {"$ref": "#/components/schemas/Key0"}},
+                "required": ["inner"],
+            },
+            **{f"Key{idx}": {"$ref": f"#/components/schemas/Key{idx + 1}"} for idx in range(8)},
+            "Key8": {"enum": ["example"]},
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    strategy = schema["/test"]["POST"].get_strategies_from_examples()[0]
+    example = get_single_example(strategy)
+    assert example.query == {"q": {"foo-1": "foo-11", "spam-1": {"inner": "example"}}}
+
+
 def test_partial_examples(empty_open_api_3_schema):
     # When the API schema contains multiple parameters in the same location
     # And some of them don't have explicit examples and others do
