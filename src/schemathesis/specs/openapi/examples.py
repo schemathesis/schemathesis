@@ -193,19 +193,22 @@ def extract_from_schemas(operation: APIOperation[OpenAPIParameter, Case]) -> Gen
     """Extract examples from parameters' schema definitions."""
     for parameter in operation.iter_parameters():
         schema = parameter.as_json_schema(operation)
-        for value in extract_from_schema(schema, parameter.example_field, parameter.examples_field):
+        for value in extract_from_schema(operation, schema, parameter.example_field, parameter.examples_field):
             yield ParameterExample(
                 container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
             )
     for alternative in operation.body:
         alternative = cast(OpenAPIBody, alternative)
         schema = alternative.as_json_schema(operation)
-        for value in extract_from_schema(schema, alternative.example_field, alternative.examples_field):
+        for value in extract_from_schema(operation, schema, alternative.example_field, alternative.examples_field):
             yield BodyExample(value=value, media_type=alternative.media_type)
 
 
 def extract_from_schema(
-    schema: dict[str, Any], example_field_name: str, examples_field_name: str
+    operation: APIOperation[OpenAPIParameter, Case],
+    schema: dict[str, Any],
+    example_field_name: str,
+    examples_field_name: str,
 ) -> Generator[Any, None, None]:
     """Extract all examples from a single schema definition."""
     # This implementation supports only `properties` and `items`
@@ -228,6 +231,7 @@ def extract_from_schema(
             variants[name] = values
         if variants:
             for name, subschema in to_generate.items():
+                subschema = operation.schema.prepare_schema(subschema)
                 generated = _generate_single_example(subschema)
                 variants[name] = [generated]
             # Calculate the maximum number of examples any property has
@@ -240,7 +244,7 @@ def extract_from_schema(
                 }
     elif "items" in schema and isinstance(schema["items"], dict):
         # Each inner value should be wrapped in an array
-        for value in extract_from_schema(schema["items"], example_field_name, examples_field_name):
+        for value in extract_from_schema(operation, schema["items"], example_field_name, examples_field_name):
             yield [value]
 
 
