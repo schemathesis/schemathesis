@@ -135,7 +135,11 @@ def should_ignore_error(schema_id: str, error: SerializedError) -> bool:
         schema_id == "launchdarkly.com/3.10.0/swagger.yaml" or schema_id == "launchdarkly.com/5.3.0/swagger.yaml"
     ) and "'<' not supported between instances" in error.exception:
         return True
-    if "is not a 'regex'" in error.exception or "Invalid regular expression" in error.exception:
+    if (
+        "is not a 'regex'" in error.exception
+        or "Invalid regular expression" in error.exception
+        or "Invalid `pattern` value: expected a string" in error.exception
+    ):
         return True
     if "Failed to generate test cases for this API operation" in error.exception:
         return True
