@@ -237,7 +237,9 @@ class BodyInGetRequestError(OperationSchemaError):
     __module__ = "builtins"
 
 
+@dataclass
 class InvalidRegularExpression(OperationSchemaError):
+    is_valid_type: bool = True
     __module__ = "builtins"
 
     @classmethod
