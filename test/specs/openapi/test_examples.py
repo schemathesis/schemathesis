@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+from unittest.mock import ANY
+
 from test.utils import assert_requests_call
 from typing import Any
 
@@ -475,6 +478,31 @@ def test_examples_ref_openapi_3(empty_open_api_3_schema):
     strategies = schema["/test"]["POST"].get_strategies_from_examples()
     assert len(strategies) == 1
     assert find(strategies[0], lambda case: case.body == "value")
+
+
+def test_boolean_subschema(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"foo": {"type": "string", "example": "foo-value"}, "bar": True},
+                                "required": ["foo", "bar"],
+                            },
+                        }
+                    }
+                },
+                "responses": {"default": {"description": "OK"}},
+            },
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    strategy = schema["/test"]["POST"].get_strategies_from_examples()[0]
+    example = get_single_example(strategy)
+    assert example.body == {"bar": ANY, "foo": "foo-value"}
 
 
 def test_examples_ref_missing_components(empty_open_api_3_schema):
