@@ -26,6 +26,8 @@ Changelog
 - Generating examples for properties that have deeply nested ``$ref``. 
 - Generating examples for properties with boolean sub-schemas.
 - Validating responses with boolean sub-schemas on Open API 3.1.
+- ``TypeError`` on non-string ``pattern`` values. This could happen on values in YAML, such that when not quoted, they are parsed
+  as non-strings. 
 
 .. _v3.24.3:
 

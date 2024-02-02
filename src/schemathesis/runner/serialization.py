@@ -263,7 +263,7 @@ class SerializedError:
         elif isinstance(exception, OperationSchemaError):
             if isinstance(exception, BodyInGetRequestError):
                 type_ = RuntimeErrorType.SCHEMA_BODY_IN_GET_REQUEST
-            elif isinstance(exception, InvalidRegularExpression):
+            elif isinstance(exception, InvalidRegularExpression) and exception.is_valid_type:
                 type_ = RuntimeErrorType.SCHEMA_INVALID_REGULAR_EXPRESSION
             else:
                 type_ = RuntimeErrorType.SCHEMA_GENERIC

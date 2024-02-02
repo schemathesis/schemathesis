@@ -1,0 +1,32 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+
+GET /api/test E                                                           [100%]
+
+==================================== ERRORS ====================================
+________________________________ GET /api/test _________________________________
+Schema Error
+
+Invalid `pattern` value: expected a string. If your schema is in YAML, ensure `pattern` values are quoted
+
+Add this option to your command line parameters to see full tracebacks: --show-trace
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 errored in 1.00s ==============================

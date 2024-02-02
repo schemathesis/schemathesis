@@ -1422,6 +1422,29 @@ def test_get_request_with_body(testdir, cli, base_url, hypothesis_max_examples, 
     )
 
 
+@pytest.mark.openapi_version("3.0")
+def test_yaml_parsing_of_floats(cli, testdir, base_url, snapshot_cli):
+    schema = """info:
+  description: Test
+  title: Test
+  version: 0.1.0
+openapi: 3.0.2
+paths:
+  /test:
+    get:
+      parameters:
+      - in: query
+        name: q
+        schema:
+          pattern: 00:00:00.00
+          type: string
+      responses:
+        '200':
+          description: OK"""
+    schema_file = testdir.makefile(".yaml", schema=schema)
+    assert cli.run(str(schema_file), f"--base-url={base_url}", "--dry-run") == snapshot_cli
+
+
 @pytest.mark.operations("slow")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_max_response_time_invalid(cli, server, schema_url, workers, snapshot_cli):

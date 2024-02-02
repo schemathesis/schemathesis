@@ -400,7 +400,17 @@ def run_test(
         result.add_error(DeadlineExceeded.from_exc(error))
     except Exception as error:
         status = Status.error
-        result.add_error(error)
+        # Likely a YAML parsing issue. E.g. `00:00:00.00` (without quotes) is parsed as float `0.0`
+        if str(error) == "first argument must be string or compiled pattern":
+            result.add_error(
+                InvalidRegularExpression(
+                    "Invalid `pattern` value: expected a string. "
+                    "If your schema is in YAML, ensure `pattern` values are quoted",
+                    is_valid_type=False,
+                )
+            )
+        else:
+            result.add_error(error)
     if has_unsatisfied_example_mark(test):
         status = Status.error
         result.add_error(
