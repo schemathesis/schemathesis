@@ -5,6 +5,7 @@ import hypothesis
 import pytest
 from hypothesis import HealthCheck, Phase, Verbosity
 
+import schemathesis
 from schemathesis.exceptions import SchemaError
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.runner import events, from_schema
@@ -13,6 +14,7 @@ from schemathesis.specs.openapi import loaders
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 CATALOG_DIR = CURRENT_DIR / "openapi-directory/APIs/"
+schemathesis.experimental.OPEN_API_3_1.enable()
 
 
 def get_id(path):
