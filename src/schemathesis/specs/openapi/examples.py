@@ -218,6 +218,9 @@ def extract_from_schema(
         to_generate = {}
         for name, subschema in schema["properties"].items():
             values = []
+            if isinstance(subschema, bool):
+                to_generate[name] = subschema
+                continue
             if example_field_name in subschema:
                 values.append(subschema[example_field_name])
             if examples_field_name in subschema and isinstance(subschema[examples_field_name], list):

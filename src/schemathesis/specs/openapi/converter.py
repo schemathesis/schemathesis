@@ -62,7 +62,9 @@ def is_write_only(schema: dict[str, Any]) -> bool:
     return schema.get("writeOnly", False) or schema.get("x-writeOnly", False)
 
 
-def is_read_only(schema: dict[str, Any]) -> bool:
+def is_read_only(schema: dict[str, Any] | bool) -> bool:
+    if isinstance(schema, bool):
+        return False
     return schema.get("readOnly", False)
 
 
