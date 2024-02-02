@@ -58,7 +58,9 @@ def forbid_properties(schema: dict[str, Any], forbidden: list[str]) -> None:
     not_schema["required"] = list(set(chain(already_forbidden, forbidden)))
 
 
-def is_write_only(schema: dict[str, Any]) -> bool:
+def is_write_only(schema: dict[str, Any] | bool) -> bool:
+    if isinstance(schema, bool):
+        return False
     return schema.get("writeOnly", False) or schema.get("x-writeOnly", False)
 
 

@@ -24,7 +24,8 @@ Changelog
 - Internal error during query parameter generation on schemas that do not contain the ``type`` keyword.
 - Example generation for request body parameters using ``$ref``.
 - Generating examples for properties that have deeply nested ``$ref``. 
-- Internal error on boolean sub-schema during example generation.
+- Generating examples for properties with boolean sub-schemas.
+- Validating responses with boolean sub-schemas on Open API 3.1.
 
 .. _v3.24.3:
 

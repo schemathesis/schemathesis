@@ -16,6 +16,7 @@ from schemathesis.checks import (
 )
 from schemathesis._compat import MultipleFailures
 from schemathesis.exceptions import CheckFailed, OperationSchemaError
+from schemathesis.experimental import OPEN_API_3_1
 from schemathesis.models import OperationDefinition, TestResult
 from schemathesis.runner.impl.core import run_checks
 from schemathesis.runner.serialization import deduplicate_failures
@@ -330,6 +331,29 @@ def test_response_schema_conformance_swagger(swagger_20, content, definition, re
 def test_response_schema_conformance_openapi(openapi_30, content, definition, response_factory):
     response = response_factory.requests(content=content)
     case = make_case(openapi_30, definition)
+    assert response_schema_conformance(response, case) is None
+    assert case.operation.is_response_valid(response)
+
+
+def test_response_schema_conformance_openapi_31_boolean(openapi_30, response_factory):
+    response = response_factory.requests(content=b'{"success": true}')
+    case = make_case(
+        openapi_30,
+        {
+            "responses": {
+                "default": {
+                    "description": "text",
+                    "content": {
+                        "application/json": {
+                            "schema": {"type": "object", "properties": {"success": True}, "required": ["success"]}
+                        }
+                    },
+                }
+            }
+        },
+    )
+    OPEN_API_3_1.enable()
+    openapi_30.raw_schema["openapi"] = "3.1.0"
     assert response_schema_conformance(response, case) is None
     assert case.operation.is_response_valid(response)
 
