@@ -131,7 +131,9 @@ def check_no_errors(schema_id: str, event: events.AfterExecution) -> None:
 
 
 def should_ignore_error(schema_id: str, error: SerializedError) -> bool:
-    if schema_id == "launchdarkly.com/3.10.0/swagger.yaml" and "'<' not supported between instances" in error.exception:
+    if (
+        schema_id == "launchdarkly.com/3.10.0/swagger.yaml" or schema_id == "launchdarkly.com/5.3.0/swagger.yaml"
+    ) and "'<' not supported between instances" in error.exception:
         return True
     if "is not a 'regex'" in error.exception or "Invalid regular expression" in error.exception:
         return True
