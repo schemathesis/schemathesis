@@ -22,10 +22,15 @@ from requests.auth import HTTPDigestAuth, _basic_auth_str
 from ..._override import CaseOverride
 from ... import failures, hooks
 from ..._compat import MultipleFailures
-from ..._hypothesis import has_unsatisfied_example_mark
+from ..._hypothesis import has_unsatisfied_example_mark, has_non_serializable_mark
 from ...auths import unregister as unregister_auth
 from ...generation import DataGenerationMethod, GenerationConfig
-from ...constants import DEFAULT_STATEFUL_RECURSION_LIMIT, RECURSIVE_REFERENCE_ERROR_MESSAGE, USER_AGENT
+from ...constants import (
+    DEFAULT_STATEFUL_RECURSION_LIMIT,
+    RECURSIVE_REFERENCE_ERROR_MESSAGE,
+    USER_AGENT,
+    SERIALIZERS_SUGGESTION_MESSAGE,
+)
 from ...exceptions import (
     CheckFailed,
     DeadlineExceeded,
@@ -36,6 +41,7 @@ from ...exceptions import (
     get_grouped_exception,
     maybe_set_assertion_message,
     format_exception,
+    SerializationNotPossible,
 )
 from ...hooks import HookContext, get_all_by_name
 from ...internal.result import Ok
@@ -415,6 +421,14 @@ def run_test(
         status = Status.error
         result.add_error(
             hypothesis.errors.Unsatisfiable("Failed to generate test cases from examples for this API operation")
+        )
+    if has_non_serializable_mark(test) and status != Status.error:
+        status = Status.error
+        result.add_error(
+            SerializationNotPossible(
+                "Failed to generate test cases from examples for this API operation because of"
+                f" unsupported payload media types.\n{SERIALIZERS_SUGGESTION_MESSAGE}"
+            )
         )
     test_elapsed_time = time.monotonic() - test_start_time
     # DEPRECATED: Seed is the same per test run

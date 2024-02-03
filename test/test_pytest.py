@@ -732,6 +732,45 @@ def test(case):
     )
 
 
+def test_non_serializable_example(testdir, openapi3_base_url):
+    testdir.make_test(
+        f"""
+
+schema.base_url = "{openapi3_base_url}"
+
+@schema.parametrize(endpoint="success")
+@settings(phases=[Phase.explicit])
+def test(case):
+    case.validate_response(response)
+""",
+        paths={
+            "/success": {
+                "post": {
+                    "parameters": [
+                        {"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 42}
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "image/jpeg": {
+                                "schema": {"format": "base64", "type": "string"},
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest()
+    # We should skip checking for a server error
+    result.assert_outcomes(failed=1)
+    assert (
+        "Failed to generate test cases from examples for this API operation because of unsupported payload media types"
+        in result.stdout.str()
+    )
+
+
 @pytest.mark.operations("path_variable", "custom_format")
 def test_override(testdir, openapi3_base_url, openapi3_schema_url):
     testdir.make_test(
