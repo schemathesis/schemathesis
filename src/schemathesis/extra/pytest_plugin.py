@@ -15,11 +15,15 @@ from hypothesis import reporting
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
-from .._hypothesis import create_test, get_unsatisfied_example_mark
+from .._hypothesis import create_test, has_unsatisfied_example_mark, has_non_serializable_mark
 from .._override import get_override_from_mark
-from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE
+from ..constants import (
+    RECURSIVE_REFERENCE_ERROR_MESSAGE,
+    GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE,
+    SERIALIZERS_SUGGESTION_MESSAGE,
+)
 from .._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54
-from ..exceptions import OperationSchemaError, SkipTest, UsageError
+from ..exceptions import OperationSchemaError, SkipTest, UsageError, SerializationNotPossible
 from ..internal.result import Result, Ok
 from ..models import APIOperation
 from ..utils import (
@@ -260,11 +264,14 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
         except HypothesisRefResolutionError:
             pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)
         except (SkipTest, unittest.SkipTest) as exc:
-            unsatisfiable = get_unsatisfied_example_mark(pyfuncitem.obj)
-            if unsatisfiable is not None:
+            if has_unsatisfied_example_mark(pyfuncitem.obj):
                 raise Unsatisfiable("Failed to generate test cases from examples for this API operation") from None
-            else:
-                pytest.skip(exc.args[0])
+            if has_non_serializable_mark(pyfuncitem.obj):
+                raise SerializationNotPossible(
+                    "Failed to generate test cases from examples for this API operation because of"
+                    f" unsupported payload media types.\n{SERIALIZERS_SUGGESTION_MESSAGE}"
+                ) from None
+            pytest.skip(exc.args[0])
         except Exception as exc:
             if hasattr(exc, "__notes__"):
                 exc.__notes__ = [note for note in exc.__notes__ if not _should_ignore_entry(note)]  # type: ignore

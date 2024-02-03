@@ -28,7 +28,8 @@ Changelog
 - Generating examples for properties with boolean sub-schemas.
 - Validating responses with boolean sub-schemas on Open API 3.1.
 - ``TypeError`` on non-string ``pattern`` values. This could happen on values in YAML, such that when not quoted, they are parsed
-  as non-strings. 
+  as non-strings.
+- Testing examples requiring unsupported payload media types resulted in an internal error. These are now correctly reported as errors 
 
 .. _v3.24.3:
 
