@@ -23,6 +23,7 @@ from urllib.parse import urlsplit
 
 import jsonschema
 from hypothesis.strategies import SearchStrategy
+from packaging import version
 from requests.structures import CaseInsensitiveDict
 
 from ... import experimental, failures
@@ -218,6 +219,9 @@ class BaseOpenAPISchema(BaseSchema):
         try:
             paths = self.raw_schema["paths"]
         except KeyError as exc:
+            # This field is optional in Open API 3.1
+            if version.parse(self.spec_version) >= version.parse("3.1"):
+                return
             # Missing `paths` is not recoverable
             self._raise_invalid_schema(exc)
 
