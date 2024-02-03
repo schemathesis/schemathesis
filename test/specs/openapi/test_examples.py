@@ -453,25 +453,27 @@ def test_examples_ref_openapi_2(empty_open_api_2_schema):
     assert find(strategies[0], lambda case: case.body == "value")
 
 
-def test_examples_ref_openapi_3(empty_open_api_3_schema):
+@pytest.mark.parametrize("body", ("BodyDirect", "BodyRef"))
+def test_examples_ref_openapi_3(empty_open_api_3_schema, body):
     empty_open_api_3_schema["paths"] = {
         "/test": {
             "post": {
-                "requestBody": {"$ref": "#/components/requestBodies/Body1"},
+                "requestBody": {"$ref": f"#/components/requestBodies/{body}"},
                 "responses": {"default": {"description": "OK"}},
             },
         }
     }
     empty_open_api_3_schema["components"] = {
         "requestBodies": {
-            "Body1": {
+            "BodyDirect": {
                 "content": {
                     "application/json": {
                         "schema": {},
                         "examples": {"example1": {"value": "value"}},
                     }
                 }
-            }
+            },
+            "BodyRef": {"$ref": "#/components/requestBodies/BodyDirect"},
         }
     }
     schema = schemathesis.from_dict(empty_open_api_3_schema)
