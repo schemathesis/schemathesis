@@ -68,11 +68,14 @@ SLOW = {
     "azure.com/devtestlabs-DTL/2018-09-15/swagger.yaml",
     "amazonaws.com/resource-groups/2017-11-27/openapi.yaml",
     "amazonaws.com/ivs/2020-07-14/openapi.yaml",
+    "amazonaws.com/workspaces-web/2020-07-08/openapi.yaml",
     "presalytics.io/ooxml/0.1.0/openapi.yaml",
     "kubernetes.io/v1.10.0/swagger.yaml",
     "kubernetes.io/unversioned/swagger.yaml",
     "microsoft.com/graph/1.0.1/openapi.yaml",
+    "microsoft.com/graph-beta/1.0.1/openapi.yaml",
     "wedpax.com/v1/swagger.yaml",
+    "stripe.com/2022-11-15/openapi.yaml",
 }
 
 
