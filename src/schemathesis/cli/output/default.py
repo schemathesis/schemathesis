@@ -234,7 +234,7 @@ def _display_error(context: ExecutionContext, error: SerializedError) -> bool:
         click.echo(error.exception)
     if error.extras:
         extras = error.extras
-    elif context.show_trace:
+    elif context.show_trace and error.type.has_useful_traceback:
         extras = _split_traceback(error.exception_with_traceback)
     else:
         extras = []

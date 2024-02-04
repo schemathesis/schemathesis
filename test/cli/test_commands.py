@@ -1133,6 +1133,59 @@ def test_wsgi_app_exception(testdir, cli):
     assert "ZeroDivisionError: division by zero" in result.stdout
 
 
+def test_no_useless_traceback(testdir, cli, empty_open_api_3_schema, snapshot_cli):
+    empty_open_api_3_schema["paths"] = {
+        "/success": {
+            "post": {
+                "parameters": [
+                    {"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 42}
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "region": {
+                                        "nullable": True,
+                                        "pattern": "^[\\w\\s\\-\\/\\pL,.#;:()']+$",
+                                        "type": "string",
+                                    },
+                                },
+                                "required": ["region"],
+                                "type": "object",
+                            }
+                        }
+                    },
+                    "required": True,
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    assert cli.run(str(schema_file), "--show-trace", "--dry-run") == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+@pytest.mark.skipif(
+    sys.version_info < (3, 11) or platform.system() == "Windows",
+    reason="Cover only tracebacks that highlight error positions in every line",
+)
+def test_useful_traceback(testdir, cli, schema_url, snapshot_cli):
+    module = testdir.make_importable_pyfile(
+        hook="""
+import schemathesis
+
+
+@schemathesis.check
+def with_error(response, case):
+    1 / 0
+"""
+    )
+    assert cli.main("run", schema_url, "-c", "with_error", "--show-trace", hooks=module.purebasename) == snapshot_cli
+
+
 def test_wsgi_app_missing(testdir, cli):
     module = testdir.make_importable_pyfile(
         location="""

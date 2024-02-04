@@ -1,0 +1,33 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/schema.json
+Base URL: file:///
+Specification version: Open API 3.0.2
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+
+POST /success E                                                           [100%]
+
+==================================== ERRORS ====================================
+________________________________ POST /success _________________________________
+Schema Error
+
+Failed to generate test cases for this API operation because of unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`
+
+Tip: Ensure your regex is compatible with Python's syntax.
+For guidance, visit: https://docs.python.org/3/library/re.html
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 errored in 1.00s ==============================
