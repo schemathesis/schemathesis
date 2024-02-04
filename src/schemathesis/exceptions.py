@@ -337,6 +337,14 @@ class RuntimeErrorType(str, enum.Enum):
     # Unclassified
     UNCLASSIFIED = "unclassified"
 
+    @property
+    def has_useful_traceback(self) -> bool:
+        return self not in (
+            RuntimeErrorType.SCHEMA_BODY_IN_GET_REQUEST,
+            RuntimeErrorType.SCHEMA_INVALID_REGULAR_EXPRESSION,
+            RuntimeErrorType.SCHEMA_GENERIC,
+        )
+
 
 @enum.unique
 class SchemaErrorType(str, enum.Enum):

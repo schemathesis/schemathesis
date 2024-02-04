@@ -1,0 +1,44 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+
+GET /api/success E                                                        [100%]
+
+==================================== ERRORS ====================================
+_______________________________ GET /api/success _______________________________
+Runtime Error
+
+division by zero
+
+    Traceback (most recent call last):
+      File "/package-root/runner/impl/core.py", line 700, in network_test
+        response = _network_test(case, *args)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/package-root/runner/impl/core.py", line 747, in _network_test
+        run_checks(
+      File "/package-root/runner/impl/core.py", line 573, in run_checks
+        skip_check = check(response, copied_case)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      File "/tmp/hook.py", line 6, in with_error
+        1 / 0
+        ~~^~~
+    ZeroDivisionError: division by zero
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 errored in 1.00s ==============================
