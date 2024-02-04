@@ -20,6 +20,7 @@ Changelog
 
 **Fixed**
 
+- **CLI**: Do not duplicate the error message in the output when the error has no traceback and the ``--show-trace`` option is provided.
 - Create parent directories when saving JUnit XML reports and other file-based output. :issue:`1995`
 - Internal error when an API operation contains multiple parameters with the same name and some of them contain the ``examples`` keyword.
 - Internal error during query parameter generation on schemas that do not contain the ``type`` keyword.
