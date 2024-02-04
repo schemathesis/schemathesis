@@ -546,6 +546,161 @@ def test_examples_ref_missing_components(empty_open_api_3_schema):
     assert example.query == {"q": {"foo-1": "foo-11", "spam-1": {"inner": "example"}}}
 
 
+@pytest.mark.parametrize("key", ("anyOf", "oneOf", "allOf"))
+def test_examples_in_any_of_top_level(empty_open_api_3_schema, key):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            key: [
+                                {
+                                    "example": "foo-1-1",
+                                    "examples": ["foo-1-2"],
+                                    "type": "string",
+                                },
+                                {
+                                    "example": "foo-2-1",
+                                    "examples": ["foo-2-2"],
+                                    "type": "string",
+                                },
+                                True,
+                            ]
+                        },
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                key: [
+                                    {
+                                        "example": "body-1-1",
+                                        "examples": ["body-1-2"],
+                                        "type": "string",
+                                    },
+                                    {
+                                        "example": "body-2-1",
+                                        "examples": ["body-2-2"],
+                                        "type": "string",
+                                    },
+                                    True,
+                                ]
+                            }
+                        },
+                    }
+                },
+                "responses": {"default": {"description": "OK"}},
+            },
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    extracted = [example_to_dict(example) for example in examples.extract_top_level(schema["/test"]["POST"])]
+    assert extracted == [
+        {"container": "query", "name": "q", "value": "foo-1-1"},
+        {"container": "query", "name": "q", "value": "foo-2-1"},
+        {"container": "query", "name": "q", "value": "foo-1-2"},
+        {"container": "query", "name": "q", "value": "foo-2-2"},
+        {"media_type": "application/json", "value": "body-1-1"},
+        {"media_type": "application/json", "value": "body-2-1"},
+        {"media_type": "application/json", "value": "body-1-2"},
+        {"media_type": "application/json", "value": "body-2-2"},
+    ]
+
+
+@pytest.mark.parametrize("key", ("anyOf", "oneOf", "allOf"))
+def test_examples_in_any_of_in_schemas(empty_open_api_3_schema, key):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "parameters": [
+                    {
+                        "name": "q-1",
+                        "in": "query",
+                        "schema": {
+                            "type": "object",
+                            "properties": {
+                                "foo-1": {
+                                    key: [
+                                        {
+                                            "example": "foo-1-1-1",
+                                            "examples": ["foo-1-1-2"],
+                                            "type": "string",
+                                        },
+                                        {
+                                            "example": "foo-1-2-1",
+                                            "examples": ["foo-1-2-2"],
+                                            "type": "string",
+                                        },
+                                        True,
+                                    ]
+                                },
+                                "bar-1": {
+                                    key: [
+                                        {
+                                            "example": "bar-1-1-1",
+                                            "type": "string",
+                                        },
+                                        {
+                                            "example": "bar-1-2-1",
+                                            "type": "string",
+                                        },
+                                        True,
+                                    ]
+                                },
+                                "spam-1": {"type": "string"},
+                            },
+                            "required": ["foo-1", "bar-1"],
+                        },
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "key": {
+                                        key: [
+                                            {
+                                                "example": "json-key-1-1",
+                                                "examples": ["json-key-1-2"],
+                                                "type": "string",
+                                            },
+                                            {
+                                                "example": "json-key-2-1",
+                                                "examples": ["json-key-2-2"],
+                                                "type": "string",
+                                            },
+                                            True,
+                                        ]
+                                    }
+                                },
+                            }
+                        },
+                    }
+                },
+                "responses": {"default": {"description": "OK"}},
+            },
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    extracted = [example_to_dict(example) for example in examples.extract_from_schemas(schema["/test"]["POST"])]
+    assert extracted == [
+        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-1-1", "foo-1": "foo-1-1-1"}},
+        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-2-1", "foo-1": "foo-1-1-2"}},
+        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-1-1", "foo-1": "foo-1-2-1"}},
+        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-2-1", "foo-1": "foo-1-2-2"}},
+        {"media_type": "application/json", "value": {"key": "json-key-1-1"}},
+        {"media_type": "application/json", "value": {"key": "json-key-1-2"}},
+        {"media_type": "application/json", "value": {"key": "json-key-2-1"}},
+        {"media_type": "application/json", "value": {"key": "json-key-2-2"}},
+    ]
+
+
 def test_partial_examples(empty_open_api_3_schema):
     # When the API schema contains multiple parameters in the same location
     # And some of them don't have explicit examples and others do
