@@ -14,7 +14,7 @@ from .failures import FailureContext
 
 if TYPE_CHECKING:
     import hypothesis.errors
-    from jsonschema import RefResolutionError, ValidationError
+    from jsonschema import RefResolutionError, ValidationError, SchemaError as JsonSchemaError
     from .transports.responses import GenericResponse
     from graphql.error import GraphQLFormattedError
     from requests import RequestException
@@ -247,6 +247,20 @@ class InvalidRegularExpression(OperationSchemaError):
         match = re.search(r"pattern='(.*?)'.*?\((.*?)\)", message)
         if match:
             message = f"Invalid regular expression. Pattern `{match.group(1)}` is not recognized - `{match.group(2)}`"
+        return cls(message)
+
+    @classmethod
+    def from_schema_error(cls, error: JsonSchemaError, *, from_examples: bool) -> InvalidRegularExpression:
+        if from_examples:
+            message = (
+                "Failed to generate test cases from examples for this API operation because of "
+                f"unsupported regular expression `{error.instance}`"
+            )
+        else:
+            message = (
+                "Failed to generate test cases for this API operation because of "
+                f"unsupported regular expression `{error.instance}`"
+            )
         return cls(message)
 
 

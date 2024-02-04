@@ -30,6 +30,7 @@ Changelog
 - ``TypeError`` on non-string ``pattern`` values. This could happen on values in YAML, such that when not quoted, they are parsed
   as non-strings.
 - Testing examples requiring unsupported payload media types resulted in an internal error. These are now correctly reported as errors 
+- Internal error on unsupported regular expressions in inside properties during example generation.
 
 .. _v3.24.3:
 

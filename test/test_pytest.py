@@ -732,6 +732,68 @@ def test(case):
     )
 
 
+@pytest.mark.parametrize(
+    "phases, expected",
+    (
+        (
+            "Phase.explicit",
+            "Failed to generate test cases from examples for this API operation because of "
+            r"unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`",
+        ),
+        (
+            "Phase.explicit, Phase.generate",
+            "Failed to generate test cases for this API operation because of "
+            r"unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`",
+        ),
+    ),
+)
+def test_invalid_regex_example(testdir, openapi3_base_url, phases, expected):
+    testdir.make_test(
+        f"""
+
+schema.base_url = "{openapi3_base_url}"
+
+@schema.parametrize(endpoint="success")
+@settings(phases=[{phases}])
+def test(case):
+    case.validate_response(response)
+""",
+        paths={
+            "/success": {
+                "post": {
+                    "parameters": [
+                        {"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 42}
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "region": {
+                                            "nullable": True,
+                                            "pattern": "^[\\w\\s\\-\\/\\pL,.#;:()']+$",
+                                            "type": "string",
+                                        },
+                                    },
+                                    "required": ["region"],
+                                    "type": "object",
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest()
+    # We should skip checking for a server error
+    result.assert_outcomes(failed=1)
+    assert expected in result.stdout.str()
+
+
 def test_non_serializable_example(testdir, openapi3_base_url):
     testdir.make_test(
         f"""
