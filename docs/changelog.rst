@@ -10,6 +10,7 @@ Changelog
 - Support for loading GraphQL schemas from JSON files that contain the ``__schema`` key.
 - Response validation for GraphQL APIs.
 - Support ``tag`` in filters for custom auth.
+- Support for testing examples inside ``anyOf`` / ``oneOf`` / ``allOf`` keywords.
 
 **Changed**
 

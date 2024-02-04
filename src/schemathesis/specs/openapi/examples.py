@@ -72,13 +72,13 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter, Case]) -> Genera
     """Extract top-level parameter examples from `examples` & `example` fields."""
     for parameter in operation.iter_parameters():
         if "schema" in parameter.definition:
-            definitions = [parameter.definition, parameter.definition["schema"]]
+            definitions = [parameter.definition, *_expand_subschemas(parameter.definition["schema"])]
         else:
             definitions = [parameter.definition]
         for definition in definitions:
             # Open API 2 also supports `example`
             for example_field in {"example", parameter.example_field}:
-                if example_field in definition:
+                if isinstance(definition, dict) and example_field in definition:
                     yield ParameterExample(
                         container=LOCATION_TO_CONTAINER[parameter.location],
                         name=parameter.name,
@@ -93,22 +93,22 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter, Case]) -> Genera
                     container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
                 )
         if "schema" in parameter.definition:
-            schema = parameter.definition["schema"]
-            if parameter.examples_field in schema:
-                for value in schema[parameter.examples_field]:
-                    yield ParameterExample(
-                        container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
-                    )
+            for schema in _expand_subschemas(parameter.definition["schema"]):
+                if isinstance(schema, dict) and parameter.examples_field in schema:
+                    for value in schema[parameter.examples_field]:
+                        yield ParameterExample(
+                            container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
+                        )
     for alternative in operation.body:
         alternative = cast(OpenAPIBody, alternative)
         if "schema" in alternative.definition:
-            definitions = [alternative.definition, alternative.definition["schema"]]
+            definitions = [alternative.definition, *_expand_subschemas(alternative.definition["schema"])]
         else:
             definitions = [alternative.definition]
         for definition in definitions:
             # Open API 2 also supports `example`
             for example_field in {"example", alternative.example_field}:
-                if example_field in definition:
+                if isinstance(definition, dict) and example_field in definition:
                     yield BodyExample(value=definition[example_field], media_type=alternative.media_type)
         if alternative.examples_field in alternative.definition:
             unresolved_definition = _find_request_body_examples_definition(operation, alternative)
@@ -117,10 +117,19 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter, Case]) -> Genera
             ):
                 yield BodyExample(value=value, media_type=alternative.media_type)
         if "schema" in alternative.definition:
-            schema = alternative.definition["schema"]
-            if alternative.examples_field in schema:
-                for value in schema[alternative.examples_field]:
-                    yield BodyExample(value=value, media_type=alternative.media_type)
+            for schema in _expand_subschemas(alternative.definition["schema"]):
+                if isinstance(schema, dict) and alternative.examples_field in schema:
+                    for value in schema[alternative.examples_field]:
+                        yield BodyExample(value=value, media_type=alternative.media_type)
+
+
+def _expand_subschemas(schema: dict[str, Any] | bool) -> Generator[dict[str, Any] | bool, None, None]:
+    yield schema
+    if isinstance(schema, dict):
+        for key in ("anyOf", "oneOf", "allOf"):
+            if key in schema:
+                for subschema in schema[key]:
+                    yield subschema
 
 
 def _find_parameter_examples_definition(
@@ -215,25 +224,29 @@ def extract_from_schema(
     if "properties" in schema:
         variants = {}
         required = schema.get("required", [])
-        to_generate = {}
+        to_generate: dict[str, Any] = {}
         for name, subschema in schema["properties"].items():
             values = []
-            if isinstance(subschema, bool):
-                to_generate[name] = subschema
-                continue
-            if example_field_name in subschema:
-                values.append(subschema[example_field_name])
-            if examples_field_name in subschema and isinstance(subschema[examples_field_name], list):
-                # These are JSON Schema examples, which is an array of values
-                values.extend(subschema[examples_field_name])
-            if not values:
-                if name in required:
-                    # Defer generation to only generate these variants if at least one property has examples
-                    to_generate[name] = subschema
-                continue
-            variants[name] = values
+            for subsubschema in _expand_subschemas(subschema):
+                if isinstance(subsubschema, bool):
+                    to_generate[name] = subsubschema
+                    continue
+                if example_field_name in subsubschema:
+                    values.append(subsubschema[example_field_name])
+                if examples_field_name in subsubschema and isinstance(subsubschema[examples_field_name], list):
+                    # These are JSON Schema examples, which is an array of values
+                    values.extend(subsubschema[examples_field_name])
+                if not values:
+                    if name in required:
+                        # Defer generation to only generate these variants if at least one property has examples
+                        to_generate[name] = subsubschema
+                    continue
+                variants[name] = values
         if variants:
             for name, subschema in to_generate.items():
+                if name in variants:
+                    # Generated by one of `anyOf` or similar sub-schemas
+                    continue
                 subschema = operation.schema.prepare_schema(subschema)
                 generated = _generate_single_example(subschema)
                 variants[name] = [generated]
