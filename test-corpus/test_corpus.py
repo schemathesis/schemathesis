@@ -76,6 +76,12 @@ SLOW = {
     "microsoft.com/graph-beta/1.0.1/openapi.yaml",
     "wedpax.com/v1/swagger.yaml",
     "stripe.com/2022-11-15/openapi.yaml",
+    "xero.com/xero-payroll-au/2.9.4/openapi.yaml",
+    "xero.com/xero_accounting/2.9.4/openapi.yaml",
+    "portfoliooptimizer.io/1.0.9/openapi.yaml",
+    "amazonaws.com/proton/2020-07-20/openapi.yaml",
+    "bungie.net/2.18.0/openapi.yaml",
+    "amazonaws.com/sagemaker-geospatial/2020-05-27/openapi.yaml",
 }
 
 
