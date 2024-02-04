@@ -2,8 +2,8 @@ name: Scheduled jobs
 
 on:
   schedule:
-    # Every Monday at 00:00
-    - cron: "0 0 * * 1"
+    # Every day at 00:00
+    - cron: "0 0 * * *"
   workflow_dispatch:
 
 jobs:
