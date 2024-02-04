@@ -83,6 +83,11 @@ SLOW = {
     "bungie.net/2.18.0/openapi.yaml",
     "amazonaws.com/sagemaker-geospatial/2020-05-27/openapi.yaml",
 }
+KNOWN_ISSUES = {
+    # Regex that includes surrogates which is incompatible with the default alphabet for regex in Hypothesis (UTF-8)
+    ("amazonaws.com/cleanrooms/2022-02-17/openapi.yaml", "POST /collaborations"),
+    ("amazonaws.com/cleanrooms/2022-02-17/openapi.yaml", "POST /configuredTables"),
+}
 
 
 def test_runner(schema_path):
@@ -134,12 +139,12 @@ def assert_event(schema_id: str, event: events.ExecutionEvent) -> None:
 
 def check_no_errors(schema_id: str, event: events.AfterExecution) -> None:
     for error in event.result.errors:
-        if should_ignore_error(schema_id, error):
+        if should_ignore_error(schema_id, error, event):
             continue
         raise AssertionError(f"{event.current_operation}: {error.exception_with_traceback}")
 
 
-def should_ignore_error(schema_id: str, error: SerializedError) -> bool:
+def should_ignore_error(schema_id: str, error: SerializedError, event: events.AfterExecution) -> bool:
     if (
         schema_id == "launchdarkly.com/3.10.0/swagger.yaml" or schema_id == "launchdarkly.com/5.3.0/swagger.yaml"
     ) and "'<' not supported between instances" in error.exception:
@@ -163,5 +168,7 @@ def should_ignore_error(schema_id: str, error: SerializedError) -> bool:
     if "Unresolvable JSON pointer in the schema" in error.exception:
         return True
     if RECURSIVE_REFERENCE_ERROR_MESSAGE in error.exception:
+        return True
+    if (schema_id, event.current_operation) in KNOWN_ISSUES:
         return True
     return False
