@@ -123,6 +123,9 @@ exclude_lines = [
 
 [tool.ruff]
 line-length = 120
+target-version = "py38"
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -146,16 +149,15 @@ ignore = [
     "D213",  # Multiline summary second line
     "D401",  # Imperative mood
 ]
-target-version = "py38"
+
+[tool.ruff.lint.isort]
+known-first-party = ["schemathesis"]
+known-third-party = ["_pytest", "aiohttp", "click", "fastapi", "flask", "graphene", "graphql", "graphql_server", "hypothesis", "hypothesis_graphql", "hypothesis_jsonschema", "jsonschema", "junit_xml", "packaging", "pydantic", "pytest", "pytest_subtests", "requests", "starlette", "urllib3", "werkzeug", "yaml", "yarl"]
 
 # Ignore `F401` (unused import) in all `__init__.py` & `_compat.py` files.
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "_compat.py" = ["F401"]
 
 [tool.ruff.format]
 skip-magic-trailing-comma = false
-
-[tool.ruff.isort]
-known-first-party = ["schemathesis"]
-known-third-party = ["_pytest", "aiohttp", "click", "fastapi", "flask", "graphene", "graphql", "graphql_server", "hypothesis", "hypothesis_graphql", "hypothesis_jsonschema", "jsonschema", "junit_xml", "packaging", "pydantic", "pytest", "pytest_subtests", "requests", "starlette", "urllib3", "werkzeug", "yaml", "yarl"]
