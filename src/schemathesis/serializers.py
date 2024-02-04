@@ -170,7 +170,7 @@ class YAMLSerializer:
         return _to_yaml(value)
 
 
-@register("application/xml")
+@register("application/xml", aliases=("text/xml",))
 class XMLSerializer:
     def as_requests(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         return _to_xml(value, context.get_raw_payload_schema(), context.get_resolved_payload_schema())

@@ -11,6 +11,7 @@ Changelog
 - Response validation for GraphQL APIs.
 - Support ``tag`` in filters for custom auth.
 - Support for testing examples inside ``anyOf`` / ``oneOf`` / ``allOf`` keywords.
+- Support for the ``text/xml`` media type in ``XMLSerializer``.
 
 **Changed**
 
