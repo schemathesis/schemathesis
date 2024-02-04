@@ -14,8 +14,9 @@ from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module
 from hypothesis import reporting
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
+from jsonschema.exceptions import SchemaError
 
-from .._hypothesis import create_test, has_unsatisfied_example_mark, has_non_serializable_mark
+from .._hypothesis import create_test, has_unsatisfied_example_mark, has_non_serializable_mark, get_invalid_regex_mark
 from .._override import get_override_from_mark
 from ..constants import (
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
@@ -23,7 +24,7 @@ from ..constants import (
     SERIALIZERS_SUGGESTION_MESSAGE,
 )
 from .._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54
-from ..exceptions import OperationSchemaError, SkipTest, UsageError, SerializationNotPossible
+from ..exceptions import OperationSchemaError, SkipTest, UsageError, SerializationNotPossible, InvalidRegularExpression
 from ..internal.result import Result, Ok
 from ..models import APIOperation
 from ..utils import (
@@ -271,7 +272,12 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
                     "Failed to generate test cases from examples for this API operation because of"
                     f" unsupported payload media types.\n{SERIALIZERS_SUGGESTION_MESSAGE}"
                 ) from None
+            invalid_regex = get_invalid_regex_mark(pyfuncitem.obj)
+            if invalid_regex is not None:
+                raise InvalidRegularExpression.from_schema_error(invalid_regex, from_examples=True) from None
             pytest.skip(exc.args[0])
+        except SchemaError as exc:
+            raise InvalidRegularExpression.from_schema_error(exc, from_examples=False) from exc
         except Exception as exc:
             if hasattr(exc, "__notes__"):
                 exc.__notes__ = [note for note in exc.__notes__ if not _should_ignore_entry(note)]  # type: ignore

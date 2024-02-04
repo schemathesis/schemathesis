@@ -2,7 +2,7 @@
 from __future__ import annotations
 import asyncio
 import warnings
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 import hypothesis
 from hypothesis import Phase
@@ -10,6 +10,7 @@ from hypothesis import strategies as st
 from hypothesis.errors import HypothesisWarning, Unsatisfiable
 from hypothesis.internal.reflection import proxies
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
+from jsonschema.exceptions import SchemaError
 
 from .auths import get_auth_storage_from_test
 from .generation import DataGenerationMethod, GenerationConfig
@@ -113,7 +114,13 @@ def add_examples(test: Callable, operation: APIOperation, hook_dispatcher: HookD
     """Add examples to the Hypothesis test, if they are specified in the schema."""
     try:
         examples: list[Case] = [get_single_example(strategy) for strategy in operation.get_strategies_from_examples()]
-    except (OperationSchemaError, HypothesisRefResolutionError, Unsatisfiable, SerializationNotPossible) as exc:
+    except (
+        OperationSchemaError,
+        HypothesisRefResolutionError,
+        Unsatisfiable,
+        SerializationNotPossible,
+        SchemaError,
+    ) as exc:
         # Invalid schema:
         # In this case, the user didn't pass `--validate-schema=false` and see an error in the output anyway,
         # and no tests will be executed. For this reason, examples can be skipped
@@ -127,6 +134,8 @@ def add_examples(test: Callable, operation: APIOperation, hook_dispatcher: HookD
             add_unsatisfied_example_mark(test, exc)
         if isinstance(exc, SerializationNotPossible):
             add_non_serializable_mark(test, exc)
+        if isinstance(exc, SchemaError):
+            add_invalid_regex_mark(test, exc)
     context = HookContext(operation)  # context should be passed here instead
     GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, examples)
     operation.schema.hooks.dispatch("before_add_examples", context, examples)
@@ -147,6 +156,14 @@ def has_unsatisfied_example_mark(test: Callable) -> bool:
 
 def add_non_serializable_mark(test: Callable, exc: SerializationNotPossible) -> None:
     test._schemathesis_non_serializable = exc  # type: ignore
+
+
+def get_invalid_regex_mark(test: Callable) -> Optional[SchemaError]:
+    return getattr(test, "_schemathesis_invalid_regex", None)
+
+
+def add_invalid_regex_mark(test: Callable, exc: SchemaError) -> None:
+    test._schemathesis_invalid_regex = exc  # type: ignore
 
 
 def has_non_serializable_mark(test: Callable) -> bool:

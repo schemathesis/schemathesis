@@ -16,13 +16,13 @@ import requests
 from _pytest.logging import LogCaptureHandler, catching_logs
 from hypothesis.errors import HypothesisException, InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
-from jsonschema.exceptions import ValidationError
+from jsonschema.exceptions import ValidationError, SchemaError as JsonSchemaError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
 from ..._override import CaseOverride
 from ... import failures, hooks
 from ..._compat import MultipleFailures
-from ..._hypothesis import has_unsatisfied_example_mark, has_non_serializable_mark
+from ..._hypothesis import has_unsatisfied_example_mark, has_non_serializable_mark, get_invalid_regex_mark
 from ...auths import unregister as unregister_auth
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...constants import (
@@ -404,6 +404,9 @@ def run_test(
     except hypothesis.errors.DeadlineExceeded as error:
         status = Status.error
         result.add_error(DeadlineExceeded.from_exc(error))
+    except JsonSchemaError as error:
+        status = Status.error
+        result.add_error(InvalidRegularExpression.from_schema_error(error, from_examples=False))
     except Exception as error:
         status = Status.error
         # Likely a YAML parsing issue. E.g. `00:00:00.00` (without quotes) is parsed as float `0.0`
@@ -430,6 +433,10 @@ def run_test(
                 f" unsupported payload media types.\n{SERIALIZERS_SUGGESTION_MESSAGE}"
             )
         )
+    invalid_regex = get_invalid_regex_mark(test)
+    if invalid_regex is not None and status != Status.error:
+        status = Status.error
+        result.add_error(InvalidRegularExpression.from_schema_error(invalid_regex, from_examples=True))
     test_elapsed_time = time.monotonic() - test_start_time
     # DEPRECATED: Seed is the same per test run
     # Fetch seed value, hypothesis generates it during test execution

@@ -833,6 +833,65 @@ def test_non_serializable_example(empty_open_api_3_schema, phases, expected):
     assert len(after.result.errors) == 1
 
 
+@pytest.mark.parametrize(
+    "phases, expected",
+    (
+        (
+            [Phase.explicit, Phase.generate],
+            "Failed to generate test cases for this API operation because of "
+            r"unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`",
+        ),
+        (
+            [Phase.explicit],
+            (
+                "Failed to generate test cases from examples for this API operation because of "
+                r"unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`"
+            ),
+        ),
+    ),
+)
+def test_invalid_regex_example(empty_open_api_3_schema, phases, expected):
+    # When filling missing properties during examples generation contains invalid regex
+    empty_open_api_3_schema["paths"] = {
+        "/success": {
+            "post": {
+                "parameters": [
+                    {"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 42}
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "region": {
+                                        "nullable": True,
+                                        "pattern": "^[\\w\\s\\-\\/\\pL,.#;:()']+$",
+                                        "type": "string",
+                                    },
+                                },
+                                "required": ["region"],
+                                "type": "object",
+                            }
+                        }
+                    },
+                    "required": True,
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    # Then the testing process should not raise an internal error
+    schema = oas_loaders.from_dict(empty_open_api_3_schema)
+    *_, after, finished = from_schema(
+        schema,
+        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=phases),
+    ).execute()
+    # And the tests are failing because of the invalid regex error
+    assert finished.has_errors
+    assert expected in after.result.errors[0].exception
+    assert len(after.result.errors) == 1
+
+
 @pytest.mark.operations("success")
 def test_dry_run(any_app_schema):
     called = False
