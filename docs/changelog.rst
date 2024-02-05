@@ -36,6 +36,7 @@ Changelog
 - Internal error on unsupported regular expressions in inside properties during example generation.
 - **Open API**: Internal error on path templates that contain ``.`` inside path parameters.
 - **Open API**: YAML serialization of data generated for schemas with ``format: binary``.
+- Missing XML definitions when the media type contains options like ``application/xml; charset=utf-8``.
 
 .. _v3.24.3:
 
