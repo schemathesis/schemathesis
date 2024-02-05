@@ -3,9 +3,11 @@ from typing import NoReturn
 
 import hypothesis
 import pytest
+from flask import Flask
 from hypothesis import HealthCheck, Phase, Verbosity
 
 import schemathesis
+from schemathesis.extra._flask import run_server
 from schemathesis.exceptions import SchemaError
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.runner import events, from_schema
@@ -15,6 +17,14 @@ from schemathesis.specs.openapi import loaders
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 CATALOG_DIR = CURRENT_DIR / "openapi-directory/APIs/"
 schemathesis.experimental.OPEN_API_3_1.enable()
+
+
+app = Flask("test_app")
+
+
+@app.route("/")
+def default():
+    return '{"success": true}'
 
 
 def get_id(path):
@@ -90,20 +100,25 @@ KNOWN_ISSUES = {
 }
 
 
-def test_runner(schema_path):
+@pytest.fixture(scope="session")
+def app_port():
+    return run_server(app)
+
+
+def test_corpus(schema_path, app_port):
     schema_id = get_id(schema_path)
     if schema_id in SLOW:
         pytest.skip("Data generation is extremely slow for this schema")
     try:
-        schema = loaders.from_path(schema_path, validate_schema=False)
+        schema = loaders.from_path(schema_path, validate_schema=False, base_url=f"http://127.0.0.1:{app_port}/")
     except SchemaError as exc:
         assert_invalid_schema(exc)
     runner = from_schema(
         schema,
-        dry_run=True,
         count_operations=False,
         count_links=False,
         hypothesis_settings=hypothesis.settings(
+            deadline=None,
             database=None,
             max_examples=1,
             suppress_health_check=list(HealthCheck),
