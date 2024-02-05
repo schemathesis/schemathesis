@@ -6,6 +6,13 @@ Schemathesis ships a set of optional features that could help to tune your tests
 Unique data generation
 ~~~~~~~~~~~~~~~~~~~~~~
 
+.. important::
+
+    The ``--contrib-unique-data`` CLI option and the corresponding ``schemathesis.contrib.unique_data`` hook are **DEPRECATED**. The concept of this feature
+    does not fit the core principles of Hypothesis where strategies are configurable on per-example basis but this feature implies
+    uniqueness across examples. This lead to cryptic error messages about external state and flaky test runs, therefore it will be removed in
+    Schemathesis 4.0
+
 By default, Schemathesis may generate the same test cases as all data is randomized. If this behavior does not match your expectations, or
 your test budges, you can force Schemathesis to generate unique test cases.
 
