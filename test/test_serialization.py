@@ -6,7 +6,7 @@ from test.utils import assert_requests_call
 from xml.etree import ElementTree
 
 import pytest
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, given, settings, Phase
 from hypothesis import strategies as st
 
 import schemathesis
@@ -423,9 +423,10 @@ SCHEMA_OBJECT_STRATEGY = st.deferred(
 )
 
 
+@pytest.mark.parametrize("media_type", ("application/xml", "application/xml; charset=utf-8"))
 @given(data=st.data(), schema_object=SCHEMA_OBJECT_STRATEGY)
-@settings(suppress_health_check=list(HealthCheck), deadline=None, max_examples=25)
-def test_serialize_xml_hypothesis(data, schema_object):
+@settings(suppress_health_check=list(HealthCheck), deadline=None, max_examples=25, phases=[Phase.generate])
+def test_serialize_xml_hypothesis(data, schema_object, media_type):
     raw_schema = {
         "openapi": "3.0.2",
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -433,7 +434,7 @@ def test_serialize_xml_hypothesis(data, schema_object):
             "/test": {
                 "post": {
                     "requestBody": {
-                        "content": {"application/xml": {"schema": {"$ref": "#/components/schemas/Main"}}},
+                        "content": {media_type: {"schema": {"$ref": "#/components/schemas/Main"}}},
                         "required": True,
                     },
                     "responses": {"200": {"description": "OK"}},

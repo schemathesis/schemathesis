@@ -13,7 +13,7 @@ DEFAULT_TAG_NAME = "data"
 NAMESPACE_URL = "http://example.com/schema"
 
 
-def _to_xml(value: Any, raw_schema: dict[str, Any], resolved_schema: dict[str, Any]) -> dict[str, Any]:
+def _to_xml(value: Any, raw_schema: dict[str, Any] | None, resolved_schema: dict[str, Any] | None) -> dict[str, Any]:
     """Serialize a generated Python object as an XML string.
 
     Schemas may contain additional information for fine-tuned XML serialization.
@@ -48,20 +48,22 @@ def is_valid_xml(data: str) -> bool:
         return False
 
 
-def _get_xml_tag(raw_schema: dict[str, Any], resolved_schema: dict[str, Any]) -> str:
+def _get_xml_tag(raw_schema: dict[str, Any] | None, resolved_schema: dict[str, Any] | None) -> str:
     # On the top level we need to detect the proper XML tag, in other cases it is known from object properties
-    if resolved_schema.get("xml", {}).get("name"):
-        return resolved_schema["xml"]["name"]
+    if (resolved_schema or {}).get("xml", {}).get("name"):
+        return (resolved_schema or {})["xml"]["name"]
 
     # Check if the name can be derived from a reference in the raw schema
-    if "$ref" in raw_schema:
-        return _get_tag_name_from_reference(raw_schema["$ref"])
+    if "$ref" in (raw_schema or {}):
+        return _get_tag_name_from_reference((raw_schema or {})["$ref"])
 
     # Here we don't have any name for the payload schema - no reference or the `xml` property
     return DEFAULT_TAG_NAME
 
 
-def _write_xml(buffer: StringIO, value: JSON, tag: str, schema: dict[str, Any], namespace_stack: list[str]) -> None:
+def _write_xml(
+    buffer: StringIO, value: JSON, tag: str, schema: dict[str, Any] | None, namespace_stack: list[str]
+) -> None:
     if isinstance(value, dict):
         _write_object(buffer, value, tag, schema, namespace_stack)
     elif isinstance(value, list):
@@ -89,8 +91,10 @@ def pop_namespace_if_any(namespace_stack: list[str], options: dict[str, Any]) ->
         namespace_stack.pop()
 
 
-def _write_object(buffer: StringIO, obj: dict[str, JSON], tag: str, schema: dict[str, Any], stack: list[str]) -> None:
-    options = schema.get("xml", {})
+def _write_object(
+    buffer: StringIO, obj: dict[str, JSON], tag: str, schema: dict[str, Any] | None, stack: list[str]
+) -> None:
+    options = (schema or {}).get("xml", {})
     push_namespace_if_any(stack, options)
     if "prefix" in options:
         tag = f"{options['prefix']}:{tag}"
@@ -99,7 +103,7 @@ def _write_object(buffer: StringIO, obj: dict[str, JSON], tag: str, schema: dict
         _write_namespace(buffer, options)
     attributes = []
     children_buffer = StringIO()
-    properties = schema.get("properties", {})
+    properties = (schema or {}).get("properties", {})
     for child_name, value in obj.items():
         property_schema = properties.get(child_name, {})
         child_options = property_schema.get("xml", {})
@@ -123,8 +127,8 @@ def _write_object(buffer: StringIO, obj: dict[str, JSON], tag: str, schema: dict
     pop_namespace_if_any(stack, options)
 
 
-def _write_array(buffer: StringIO, obj: list[JSON], tag: str, schema: dict[str, Any], stack: list[str]) -> None:
-    options = schema.get("xml", {})
+def _write_array(buffer: StringIO, obj: list[JSON], tag: str, schema: dict[str, Any] | None, stack: list[str]) -> None:
+    options = (schema or {}).get("xml", {})
     push_namespace_if_any(stack, options)
     if options.get("prefix"):
         tag = f"{options['prefix']}:{tag}"
@@ -137,7 +141,7 @@ def _write_array(buffer: StringIO, obj: list[JSON], tag: str, schema: dict[str, 
             _write_namespace(buffer, options)
         buffer.write(">")
     # In Open API `items` value should be an object and not an array
-    items = fast_deepcopy(schema.get("items", {}))
+    items = fast_deepcopy((schema or {}).get("items", {}))
     child_options = items.get("xml", {})
     child_tag = child_options.get("name", tag)
     if not is_namespace_specified and "namespace" in options:
@@ -154,9 +158,9 @@ def _write_array(buffer: StringIO, obj: list[JSON], tag: str, schema: dict[str, 
 
 
 def _write_primitive(
-    buffer: StringIO, obj: Primitive, tag: str, schema: dict[str, Any], namespace_stack: list[str]
+    buffer: StringIO, obj: Primitive, tag: str, schema: dict[str, Any] | None, namespace_stack: list[str]
 ) -> None:
-    xml_options = schema.get("xml", {})
+    xml_options = (schema or {}).get("xml", {})
     # There is no need for modifying the namespace stack, as we know that this function is terminal - it do not recurse
     # and this element don't have any children. Therefore, checking the prefix is enough
     _validate_prefix(xml_options, namespace_stack)

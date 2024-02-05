@@ -49,7 +49,7 @@ from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import BaseSchema, APIOperationMap
 from ...stateful import Stateful, StatefulTest
 from ...stateful.state_machine import APIStateMachine
-from ...transports.content_types import is_json_media_type
+from ...transports.content_types import is_json_media_type, parse_content_type
 from ...transports.responses import get_json
 from ...types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query, GenericTest
 from . import links, serialization
@@ -1065,6 +1065,9 @@ class OpenApi30(SwaggerV20):
                 body = self.resolver.resolve_all(definition["requestBody"], RECURSION_DEPTH_LIMIT)
             else:
                 body = definition["requestBody"]
-            if "content" in body and media_type in body["content"]:
-                return body["content"][media_type]["schema"]
+            if "content" in body:
+                main, sub = parse_content_type(media_type)
+                for defined_media_type, item in body["content"].items():
+                    if parse_content_type(defined_media_type) == (main, sub):
+                        return item["schema"]
         return None
