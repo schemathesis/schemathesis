@@ -20,6 +20,13 @@ Changelog
 - Clarify error message when a state machine has no transitions. :issue:`1992`
 - Do not consider missing ``paths`` key an error for Open API 3.1.
 
+**Deprecated**
+
+- The ``--contrib-unique-data`` CLI option and the corresponding ``schemathesis.contrib.unique_data`` hook. The concept of this feature
+  does not fit the core principles of Hypothesis where strategies are configurable on per-example basis but this feature implies
+  uniqueness across examples. This lead to cryptic error messages about external state and flaky test runs, therefore it will be removed in
+  Schemathesis 4.0
+
 **Fixed**
 
 - **CLI**: Do not duplicate the error message in the output when the error has no traceback and the ``--show-trace`` option is provided.
