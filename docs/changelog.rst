@@ -35,6 +35,7 @@ Changelog
 - Testing examples requiring unsupported payload media types resulted in an internal error. These are now correctly reported as errors 
 - Internal error on unsupported regular expressions in inside properties during example generation.
 - **Open API**: Internal error on path templates that contain ``.`` inside path parameters.
+- **Open API**: YAML serialization of data generated for schemas with ``format: binary``.
 
 .. _v3.24.3:
 
