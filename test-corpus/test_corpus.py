@@ -167,6 +167,8 @@ def should_ignore_error(schema_id: str, error: SerializedError, event: events.Af
         return True
     if "Path parameter" in error.exception and error.exception.endswith("is not defined"):
         return True
+    if "Malformed path template" in error.exception:
+        return True
     if "Unresolvable JSON pointer in the schema" in error.exception:
         return True
     if RECURSIVE_REFERENCE_ERROR_MESSAGE in error.exception:
