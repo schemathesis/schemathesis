@@ -45,6 +45,7 @@ Changelog
 - Internal error on unsupported regular expressions in inside properties during example generation.
 - Missing XML definitions when the media type contains options like ``application/xml; charset=utf-8``.
 - Unhandled timeout during reading the response payload.
+- Internal error when the header example in the schema is not a valid header.
 
 .. _v3.24.3:
 
