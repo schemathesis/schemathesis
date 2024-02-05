@@ -756,7 +756,7 @@ schema.base_url = "{openapi3_base_url}"
 @schema.parametrize(endpoint="success")
 @settings(phases=[{phases}])
 def test(case):
-    case.validate_response(response)
+    pass
 """,
         paths={
             "/success": {
@@ -789,9 +789,45 @@ def test(case):
         schema_name="simple_openapi.yaml",
     )
     result = testdir.runpytest()
-    # We should skip checking for a server error
     result.assert_outcomes(failed=1)
     assert expected in result.stdout.str()
+
+
+@pytest.mark.parametrize(
+    "phases",
+    ("Phase.explicit", "Phase.explicit, Phase.generate"),
+)
+def test_invalid_header_in_example(testdir, openapi3_base_url, phases):
+    testdir.make_test(
+        f"""
+schema.base_url = "{openapi3_base_url}"
+
+@schema.parametrize(endpoint="success")
+@settings(phases=[{phases}])
+def test(case):
+    pass
+""",
+        paths={
+            "/success": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "SESSION",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "integer"},
+                            "example": "test\ntest",
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    assert "Failed to generate test cases from examples for this API" in result.stdout.str()
 
 
 def test_non_serializable_example(testdir, openapi3_base_url):
