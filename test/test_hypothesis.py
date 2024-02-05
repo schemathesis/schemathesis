@@ -24,6 +24,7 @@ from schemathesis.specs.openapi._hypothesis import (
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20CompositeBody, OpenAPI20Parameter
 from schemathesis.constants import NOT_SET
+from test.utils import assert_requests_call
 
 
 def make_operation(schema, **kwargs) -> APIOperation:
@@ -194,6 +195,32 @@ def test_default_strategies_binary(swagger_20):
     assert isinstance(result.body["upfile"], Binary)
     kwargs = result.as_requests_kwargs(base_url="http://127.0.0.1")
     assert kwargs["files"] == [("upfile", result.body["upfile"].data)]
+
+
+@pytest.mark.parametrize("media_type", ("application/json", "text/yaml"))
+def test_binary_is_serializable(empty_open_api_3_schema, media_type):
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {media_type: {"schema": {"type": "string", "format": "binary"}}},
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    operation = schema["/data"]["POST"]
+
+    @given(operation.as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        assert_requests_call(case)
+        assert case.as_requests_kwargs()["data"] == case.body.data
+
+    test()
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
