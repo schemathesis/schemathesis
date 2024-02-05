@@ -83,4 +83,4 @@ jobs:
         run: python -m tox
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3.1.5
+        uses: codecov/codecov-action@v4.0.1
