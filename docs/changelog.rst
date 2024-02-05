@@ -34,6 +34,7 @@ Changelog
   as non-strings.
 - Testing examples requiring unsupported payload media types resulted in an internal error. These are now correctly reported as errors 
 - Internal error on unsupported regular expressions in inside properties during example generation.
+- **Open API**: Internal error on path templates that contain ``.`` inside path parameters.
 
 .. _v3.24.3:
 

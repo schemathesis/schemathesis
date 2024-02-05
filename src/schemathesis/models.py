@@ -192,7 +192,7 @@ class Case:
             # in the parameters list.
             # When `exc` is formatted, it is the missing key name in quotes. E.g. 'id'
             raise OperationSchemaError(f"Path parameter {exc} is not defined") from exc
-        except ValueError as exc:
+        except (IndexError, ValueError) as exc:
             # A single unmatched `}` inside the path template may cause this
             raise OperationSchemaError(f"Malformed path template: `{self.path}`\n\n  {exc}") from exc
 

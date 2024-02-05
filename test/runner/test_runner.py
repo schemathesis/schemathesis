@@ -1129,9 +1129,15 @@ def test_case_mutation(real_app_schema):
     assert event.result.checks[1].example.headers["Foo"] == "BAZ"
 
 
-def test_malformed_path_template(empty_open_api_3_schema):
+@pytest.mark.parametrize(
+    "path, expected",
+    (
+        ("/foo}/", "Single '}' encountered in format string"),
+        ("/{.format}/", "Replacement index 0 out of range for positional args tuple"),
+    ),
+)
+def test_malformed_path_template(empty_open_api_3_schema, path, expected):
     # When schema contains a malformed path template
-    path = "/foo}/"
     empty_open_api_3_schema["paths"] = {path: {"get": {"responses": {"200": {"description": "OK"}}}}}
     schema = schemathesis.from_dict(empty_open_api_3_schema)
     # Then it should not cause a fatal error
@@ -1139,8 +1145,7 @@ def test_malformed_path_template(empty_open_api_3_schema):
     assert event.status == Status.error
     # And should produce the proper error message
     assert (
-        event.result.errors[0].exception == f"OperationSchemaError: Malformed path template: `{path}`\n\n  "
-        f"Single '}}' encountered in format string"
+        event.result.errors[0].exception == f"OperationSchemaError: Malformed path template: `{path}`\n\n  {expected}"
     )
 
 
