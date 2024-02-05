@@ -264,6 +264,21 @@ class InvalidRegularExpression(OperationSchemaError):
         return cls(message)
 
 
+class InvalidHeadersExample(OperationSchemaError):
+    __module__ = "builtins"
+
+    @classmethod
+    def from_headers(cls, headers: dict[str, str]) -> InvalidHeadersExample:
+        message = (
+            "Failed to generate test cases from examples for this API operation because of "
+            "some header examples are invalid:\n"
+        )
+        for key, value in headers.items():
+            message += f"\n  - {key!r}={value!r}"
+        message += "\n\nEnsure the header examples comply with RFC 7230, Section 3.2"
+        return cls(message)
+
+
 def truncated_json(data: Any, max_lines: int = 10, max_width: int = 80) -> str:
     # Convert JSON to string with indentation
     indent = 4

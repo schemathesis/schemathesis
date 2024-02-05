@@ -2,7 +2,7 @@
 from __future__ import annotations
 import asyncio
 import warnings
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Mapping, Generator, Tuple
 
 import hypothesis
 from hypothesis import Phase
@@ -18,6 +18,7 @@ from .constants import DEFAULT_DEADLINE
 from .exceptions import OperationSchemaError, SerializationNotPossible
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import APIOperation, Case
+from .transports.headers import is_latin_1_encodable, has_invalid_characters
 from .utils import GivenInput, combine_strategies
 
 
@@ -141,9 +142,21 @@ def add_examples(test: Callable, operation: APIOperation, hook_dispatcher: HookD
     operation.schema.hooks.dispatch("before_add_examples", context, examples)
     if hook_dispatcher:
         hook_dispatcher.dispatch("before_add_examples", context, examples)
+    original_test = test
     for example in examples:
+        if example.headers is not None:
+            invalid_headers = dict(find_invalid_headers(example.headers))
+            if invalid_headers:
+                add_invalid_example_header_mark(original_test, invalid_headers)
+                continue
         test = hypothesis.example(case=example)(test)
     return test
+
+
+def find_invalid_headers(headers: Mapping) -> Generator[Tuple[str, str], None, None]:
+    for name, value in headers.items():
+        if not is_latin_1_encodable(value) or has_invalid_characters(name, value):
+            yield name, value
 
 
 def add_unsatisfied_example_mark(test: Callable, exc: Unsatisfiable) -> None:
@@ -164,6 +177,14 @@ def get_invalid_regex_mark(test: Callable) -> Optional[SchemaError]:
 
 def add_invalid_regex_mark(test: Callable, exc: SchemaError) -> None:
     test._schemathesis_invalid_regex = exc  # type: ignore
+
+
+def get_invalid_example_headers_mark(test: Callable) -> Optional[dict[str, str]]:
+    return getattr(test, "_schemathesis_invalid_example_headers", None)
+
+
+def add_invalid_example_header_mark(test: Callable, headers: dict[str, str]) -> None:
+    test._schemathesis_invalid_example_headers = headers  # type: ignore
 
 
 def has_non_serializable_mark(test: Callable) -> bool:

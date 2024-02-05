@@ -892,6 +892,39 @@ def test_invalid_regex_example(empty_open_api_3_schema, phases, expected):
     assert len(after.result.errors) == 1
 
 
+def test_invalid_header_in_example(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/success": {
+            "post": {
+                "parameters": [
+                    {
+                        "name": "SESSION",
+                        "in": "header",
+                        "required": True,
+                        "schema": {"type": "integer"},
+                        "example": "test\ntest",
+                    }
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    # Then the testing process should not raise an internal error
+    schema = oas_loaders.from_dict(empty_open_api_3_schema)
+    *_, after, finished = from_schema(
+        schema,
+        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
+        dry_run=True,
+    ).execute()
+    # And the tests are failing because of the invalid regex error
+    assert finished.has_errors
+    assert (
+        "Failed to generate test cases from examples for this API operation because of some header examples are invalid"
+        in after.result.errors[0].exception
+    )
+    assert len(after.result.errors) == 1
+
+
 @pytest.mark.operations("success")
 def test_dry_run(any_app_schema):
     called = False

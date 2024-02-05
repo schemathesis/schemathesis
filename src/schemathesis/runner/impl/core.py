@@ -22,7 +22,12 @@ from requests.auth import HTTPDigestAuth, _basic_auth_str
 from ..._override import CaseOverride
 from ... import failures, hooks
 from ..._compat import MultipleFailures
-from ..._hypothesis import has_unsatisfied_example_mark, has_non_serializable_mark, get_invalid_regex_mark
+from ..._hypothesis import (
+    has_unsatisfied_example_mark,
+    has_non_serializable_mark,
+    get_invalid_regex_mark,
+    get_invalid_example_headers_mark,
+)
 from ...auths import unregister as unregister_auth
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...constants import (
@@ -42,6 +47,7 @@ from ...exceptions import (
     maybe_set_assertion_message,
     format_exception,
     SerializationNotPossible,
+    InvalidHeadersExample,
 )
 from ...hooks import HookContext, get_all_by_name
 from ...internal.result import Ok
@@ -437,6 +443,10 @@ def run_test(
     if invalid_regex is not None and status != Status.error:
         status = Status.error
         result.add_error(InvalidRegularExpression.from_schema_error(invalid_regex, from_examples=True))
+    invalid_headers = get_invalid_example_headers_mark(test)
+    if invalid_headers:
+        status = Status.error
+        result.add_error(InvalidHeadersExample.from_headers(invalid_headers))
     test_elapsed_time = time.monotonic() - test_start_time
     # DEPRECATED: Seed is the same per test run
     # Fetch seed value, hypothesis generates it during test execution

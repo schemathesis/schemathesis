@@ -19,12 +19,12 @@ Runtime Error
 division by zero
 
     Traceback (most recent call last):
-      File "/package-root/runner/impl/core.py", line 700, in network_test
+      File "/package-root/runner/impl/core.py", line 710, in network_test
         response = _network_test(case, *args)
                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
-      File "/package-root/runner/impl/core.py", line 747, in _network_test
+      File "/package-root/runner/impl/core.py", line 757, in _network_test
         run_checks(
-      File "/package-root/runner/impl/core.py", line 573, in run_checks
+      File "/package-root/runner/impl/core.py", line 583, in run_checks
         skip_check = check(response, copied_case)
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       File "/tmp/hook.py", line 6, in with_error
