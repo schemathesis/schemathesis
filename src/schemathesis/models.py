@@ -351,7 +351,6 @@ class Case:
             with self.operation.schema.ratelimit():
                 response = session.request(**data)  # type: ignore
         except (requests.Timeout, requests.ConnectionError) as exc:
-            timeout = 1000 * data["timeout"]  # It is defined and not empty, since the exception happened
             if isinstance(exc, requests.ConnectionError):
                 if not isinstance(exc.args[0], ReadTimeoutError):
                     raise
@@ -370,6 +369,7 @@ class Case:
                 request = session.prepare_request(req)
             else:
                 request = cast(requests.PreparedRequest, exc.request)
+            timeout = 1000 * data["timeout"]  # It is defined and not empty, since the exception happened
             code_message = self._get_code_message(self.operation.schema.code_sample_style, request, verify=verify)
             message = f"The server failed to respond within the specified limit of {timeout:.2f}ms"
             raise get_timeout_error(timeout)(
