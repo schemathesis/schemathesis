@@ -916,7 +916,7 @@ def test_invalid_header_in_example(empty_open_api_3_schema):
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
         dry_run=True,
     ).execute()
-    # And the tests are failing because of the invalid regex error
+    # And the tests are failing
     assert finished.has_errors
     assert (
         "Failed to generate test cases from examples for this API operation because of some header examples are invalid"
@@ -952,6 +952,19 @@ def test_dry_run_asgi(fastapi_app):
     execute(schema, checks=(check,), dry_run=True)
     # Then no requests should be sent & no responses checked
     assert not called
+
+
+def test_connection_error(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {"/success": {"post": {"responses": {"200": {"description": "OK"}}}}}
+    schema = oas_loaders.from_dict(empty_open_api_3_schema, base_url="http://127.0.0.1:1")
+    *_, after, finished = from_schema(
+        schema,
+        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
+    ).execute()
+    # And the tests are failing
+    assert finished.has_errors
+    assert "Max retries exceeded with url" in after.result.errors[0].exception
+    assert len(after.result.errors) == 1
 
 
 @pytest.mark.operations("reserved")
