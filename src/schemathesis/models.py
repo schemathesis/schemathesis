@@ -25,6 +25,8 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
+from urllib3.exceptions import ReadTimeoutError
+
 from . import failures, serializers
 from ._dependency_versions import IS_WERKZEUG_ABOVE_3
 from .auths import AuthStorage
@@ -348,9 +350,26 @@ class Case:
         try:
             with self.operation.schema.ratelimit():
                 response = session.request(**data)  # type: ignore
-        except requests.Timeout as exc:
+        except (requests.Timeout, requests.ConnectionError) as exc:
             timeout = 1000 * data["timeout"]  # It is defined and not empty, since the exception happened
-            request = cast(requests.PreparedRequest, exc.request)
+            if isinstance(exc, requests.ConnectionError):
+                if not isinstance(exc.args[0], ReadTimeoutError):
+                    raise
+                req = requests.Request(
+                    method=data["method"].upper(),
+                    url=data["url"],
+                    headers=data["headers"],
+                    files=data.get("files"),
+                    data=data.get("data") or {},
+                    json=data.get("json"),
+                    params=data.get("params") or {},
+                    auth=data.get("auth"),
+                    cookies=data["cookies"],
+                    hooks=data.get("hooks"),
+                )
+                request = session.prepare_request(req)
+            else:
+                request = cast(requests.PreparedRequest, exc.request)
             code_message = self._get_code_message(self.operation.schema.code_sample_style, request, verify=verify)
             message = f"The server failed to respond within the specified limit of {timeout:.2f}ms"
             raise get_timeout_error(timeout)(

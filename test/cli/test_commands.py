@@ -555,6 +555,24 @@ def test_connection_timeout(cli, server, schema_url, workers, snapshot_cli):
     assert cli.run(schema_url, "--request-timeout=80", f"--workers={workers}") == snapshot_cli
 
 
+@pytest.mark.operations("success")
+@pytest.mark.openapi_version("3.0")
+def test_read_content_timeout(cli, mocker, schema_url, snapshot_cli):
+    original = urllib3.response.HTTPResponse.stream
+    count = 0
+
+    def stream(self, *args, **kwargs):
+        nonlocal count
+
+        count += 1
+        if count > 1:
+            raise urllib3.exceptions.ReadTimeoutError(self._pool, None, "Read timed out.")
+        return original(self, *args, **kwargs)
+
+    mocker.patch("urllib3.response.HTTPResponse.stream", stream)
+    assert cli.run(schema_url) == snapshot_cli
+
+
 @pytest.mark.operations("success", "slow")
 @pytest.mark.parametrize("workers", (1, 2))
 def test_default_hypothesis_settings(cli, cli_args, workers):
