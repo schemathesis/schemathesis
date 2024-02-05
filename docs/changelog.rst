@@ -30,6 +30,8 @@ Changelog
 **Fixed**
 
 - **CLI**: Do not duplicate the error message in the output when the error has no traceback and the ``--show-trace`` option is provided.
+- **Open API**: Internal error on path templates that contain ``.`` inside path parameters.
+- **Open API**: YAML serialization of data generated for schemas with ``format: binary``.
 - Create parent directories when saving JUnit XML reports and other file-based output. :issue:`1995`
 - Internal error when an API operation contains multiple parameters with the same name and some of them contain the ``examples`` keyword.
 - Internal error during query parameter generation on schemas that do not contain the ``type`` keyword.
@@ -41,9 +43,8 @@ Changelog
   as non-strings.
 - Testing examples requiring unsupported payload media types resulted in an internal error. These are now correctly reported as errors 
 - Internal error on unsupported regular expressions in inside properties during example generation.
-- **Open API**: Internal error on path templates that contain ``.`` inside path parameters.
-- **Open API**: YAML serialization of data generated for schemas with ``format: binary``.
 - Missing XML definitions when the media type contains options like ``application/xml; charset=utf-8``.
+- Unhandled timeout during reading the response payload.
 
 .. _v3.24.3:
 
