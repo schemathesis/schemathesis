@@ -4,11 +4,13 @@ from typing import NoReturn
 import hypothesis
 import pytest
 from flask import Flask
+from jsonschema import RefResolutionError
 from hypothesis import HealthCheck, Phase, Verbosity
 
 import schemathesis
+from schemathesis.checks import ALL_CHECKS
 from schemathesis.extra._flask import run_server
-from schemathesis.exceptions import SchemaError
+from schemathesis.exceptions import SchemaError, CheckFailed, UsageError
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.serialization import SerializedError
@@ -105,6 +107,16 @@ def app_port():
     return run_server(app)
 
 
+def combined_check(response, case):
+    case.get_code_to_reproduce()
+    case.as_curl_command()
+    for check in ALL_CHECKS:
+        try:
+            check(response, case)
+        except CheckFailed:
+            pass
+
+
 def test_corpus(schema_path, app_port):
     schema_id = get_id(schema_path)
     if schema_id in SLOW:
@@ -113,8 +125,13 @@ def test_corpus(schema_path, app_port):
         schema = loaders.from_path(schema_path, validate_schema=False, base_url=f"http://127.0.0.1:{app_port}/")
     except SchemaError as exc:
         assert_invalid_schema(exc)
+    try:
+        schema.as_state_machine()()
+    except (RefResolutionError, UsageError):
+        pass
     runner = from_schema(
         schema,
+        checks=(combined_check,),
         count_operations=False,
         count_links=False,
         hypothesis_settings=hypothesis.settings(
