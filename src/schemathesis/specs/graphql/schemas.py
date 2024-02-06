@@ -31,7 +31,7 @@ from ... import auths
 from ...auths import AuthStorage
 from ...checks import not_a_server_error
 from ...constants import NOT_SET
-from ...exceptions import OperationSchemaError
+from ...exceptions import OperationSchemaError, OperationNotFound
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import (
     GLOBAL_HOOK_DISPATCHER,
@@ -146,7 +146,7 @@ class GraphQLSchema(BaseSchema):
         message = f"`{item}` type not found"
         if matches:
             message += f". Did you mean `{matches[0]}`?"
-        raise KeyError(message) from exc
+        raise OperationNotFound(message=message, item=item) from exc
 
     def _store_operations(
         self, operations: Generator[Result[APIOperation, OperationSchemaError], None, None]

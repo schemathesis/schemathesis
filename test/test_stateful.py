@@ -3,6 +3,7 @@ import re
 import pytest
 
 import schemathesis
+from schemathesis.exceptions import SchemaError
 from schemathesis.specs.openapi import expressions
 from schemathesis.stateful import ParsedData
 from schemathesis.constants import NOT_SET
@@ -222,3 +223,39 @@ def test_link_override(empty_open_api_3_schema, schema_code, link_code):
         source=schema["/foo"]["GET"], target=schema["/foo"]["GET"], status_code=link_code, parameters={"key": "42"}
     )
     assert "links" in schema.raw_schema["paths"]["/foo"]["get"]["responses"][schema_code]
+
+
+@pytest.mark.parametrize(
+    "operation_id, expected",
+    (
+        ("get_User", "`get_User` not found. Did you mean `getUser`?"),
+        ("unknown", "`unknown` not found"),
+    ),
+)
+def test_missing_operation(operation_id, expected, empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/users/": {
+            "post": {
+                "responses": {
+                    "201": {
+                        "description": "OK",
+                        "links": {
+                            "GetUserByUserId": {
+                                "operationId": operation_id,
+                                "parameters": {"path.user_id": "$response.body#/id"},
+                            },
+                        },
+                    }
+                },
+            }
+        },
+        "/users/{user_id}": {
+            "get": {"operationId": "getUser", "responses": {"200": {"description": "OK"}}},
+        },
+    }
+
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+
+    with pytest.raises(SchemaError) as exc:
+        schema.as_state_machine()
+    assert str(exc.value.__cause__) == expected

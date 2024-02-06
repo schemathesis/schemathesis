@@ -40,6 +40,7 @@ from ...exceptions import (
     get_schema_validation_error,
     SchemaError,
     SchemaErrorType,
+    OperationNotFound,
 )
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, should_skip_operation
 from ...internal.copy import fast_deepcopy
@@ -119,10 +120,13 @@ class BaseOpenAPISchema(BaseSchema):
 
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
         matches = get_close_matches(item, list(self.operations))
+        self._on_missing_operation(item, exc, matches)
+
+    def _on_missing_operation(self, item: str, exc: KeyError, matches: list[str]) -> NoReturn:
         message = f"`{item}` not found"
         if matches:
             message += f". Did you mean `{matches[0]}`?"
-        raise KeyError(message) from exc
+        raise OperationNotFound(message=message, item=item) from exc
 
     def _should_skip(self, method: str, definition: dict[str, Any]) -> bool:
         return (
@@ -373,7 +377,11 @@ class BaseOpenAPISchema(BaseSchema):
         """Get an `APIOperation` instance by its `operationId`."""
         if not hasattr(self, "_operations_by_id"):
             self._operations_by_id = dict(self._group_operations_by_id())
-        return self._operations_by_id[operation_id]
+        try:
+            return self._operations_by_id[operation_id]
+        except KeyError as exc:
+            matches = get_close_matches(operation_id, list(self._operations_by_id))
+            self._on_missing_operation(operation_id, exc, matches)
 
     def _group_operations_by_id(self) -> Generator[tuple[str, APIOperation], None, None]:
         for path, methods in self.raw_schema["paths"].items():
@@ -466,7 +474,13 @@ class BaseOpenAPISchema(BaseSchema):
         return definitions.get("headers")
 
     def as_state_machine(self) -> type[APIStateMachine]:
-        return create_state_machine(self)
+        try:
+            return create_state_machine(self)
+        except OperationNotFound as exc:
+            raise SchemaError(
+                type=SchemaErrorType.OPEN_API_INVALID_SCHEMA,
+                message=f"Invalid Open API link definition: Operation `{exc.item}` not found",
+            ) from exc
 
     def add_link(
         self,

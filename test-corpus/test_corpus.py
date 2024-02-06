@@ -127,7 +127,7 @@ def test_corpus(schema_path, app_port):
         assert_invalid_schema(exc)
     try:
         schema.as_state_machine()()
-    except (RefResolutionError, UsageError):
+    except (RefResolutionError, UsageError, SchemaError):
         pass
     runner = from_schema(
         schema,

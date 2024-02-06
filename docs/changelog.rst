@@ -46,6 +46,7 @@ Changelog
 - Missing XML definitions when the media type contains options like ``application/xml; charset=utf-8``.
 - Unhandled timeout during reading the response payload.
 - Internal error when the header example in the schema is not a valid header.
+- Handle ``KeyError`` during state machine creation.
 
 .. _v3.24.3:
 
