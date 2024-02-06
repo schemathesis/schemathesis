@@ -238,6 +238,16 @@ class BodyInGetRequestError(OperationSchemaError):
 
 
 @dataclass
+class OperationNotFound(KeyError):
+    message: str
+    item: str
+    __module__ = "builtins"
+
+    def __str__(self) -> str:
+        return self.message
+
+
+@dataclass
 class InvalidRegularExpression(OperationSchemaError):
     is_valid_type: bool = True
     __module__ = "builtins"
