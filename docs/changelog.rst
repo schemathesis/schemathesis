@@ -19,6 +19,7 @@ Changelog
 - **Python**: Explicitly note that combining ``@schema.given`` with explicit examples from the spec is not supported. :issue:`1217`
 - Clarify error message when a state machine has no transitions. :issue:`1992`
 - Do not consider missing ``paths`` key an error for Open API 3.1.
+- Improved formatting of multiple errors withing the same API operation.
 
 **Deprecated**
 
@@ -48,6 +49,7 @@ Changelog
 - Internal error when the header example in the schema is not a valid header.
 - Handle ``KeyError`` during state machine creation.
 - Deduplicate network errors that contain unique URL in their messages.
+- Not reporting multiple errors of different kind at the same API operation.
 
 .. _v3.24.3:
 

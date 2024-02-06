@@ -374,7 +374,12 @@ def run_test(
     except MultipleFailures:
         # Schemathesis may detect multiple errors that come from different check results
         # They raise different "grouped" exceptions
-        status = Status.failure
+        if errors:
+            status = Status.error
+            for error in deduplicate_errors(errors):
+                result.add_error(error)
+        else:
+            status = Status.failure
     except hypothesis.errors.Flaky as exc:
         if isinstance(exc.__cause__, hypothesis.errors.DeadlineExceeded):
             status = Status.error

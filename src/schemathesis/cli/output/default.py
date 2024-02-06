@@ -161,7 +161,12 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
 def display_single_error(context: ExecutionContext, result: SerializedTestResult) -> bool:
     display_subsection(result)
     should_display_full_traceback_message = False
+    first = True
     for error in result.errors:
+        if first:
+            first = False
+        else:
+            click.echo()
         should_display_full_traceback_message |= _display_error(context, error)
     return should_display_full_traceback_message
 
