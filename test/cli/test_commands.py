@@ -35,7 +35,7 @@ from schemathesis.cli import (
 )
 from schemathesis.cli.constants import Phase, HealthCheck
 from schemathesis.code_samples import CodeSampleStyle
-from schemathesis._dependency_versions import IS_PYTEST_ABOVE_54
+from schemathesis._dependency_versions import IS_PYTEST_ABOVE_54, IS_PYTEST_ABOVE_7
 from schemathesis.constants import (
     DEFAULT_RESPONSE_TIMEOUT,
     FLAKY_FAILURE_MESSAGE,
@@ -2102,6 +2102,40 @@ def test_long_payload(testdir, cli, empty_open_api_3_schema, snapshot_cli, opena
     }
     schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--checks=all") == snapshot_cli
+
+
+@pytest.mark.skipif(not IS_PYTEST_ABOVE_7, reason="Multiple errors are not caught on older pytest versions")
+def test_multiple_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli, openapi3_base_url):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/octet-stream": {
+                            "examples": {
+                                "first": {
+                                    "value": "FIRST",
+                                }
+                            },
+                            "schema": {"format": "binary", "type": "string"},
+                        },
+                        "application/zip": {
+                            "examples": {
+                                "second": {
+                                    "value": "SECOND",
+                                }
+                            },
+                            "schema": {"format": "binary", "type": "string"},
+                        },
+                    },
+                    "required": True,
+                },
+                "responses": {"204": {"description": "Success."}},
+            }
+        }
+    }
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    assert cli.run(str(schema_file), "--base-url=http://127.0.0.1:1") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
