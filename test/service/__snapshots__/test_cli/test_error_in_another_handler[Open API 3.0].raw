@@ -15,7 +15,7 @@ CLI Handler Error
 An error occurred within your custom CLI handler `FailingHandler`.
 
 Traceback (most recent call last):
-  File "/tmp/hook.py", line 9, in handle_event
+  File "/tmp/hook.py", line XXX, in handle_event
     raise ZeroDivisionError
 ZeroDivisionError
 
