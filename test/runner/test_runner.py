@@ -24,7 +24,7 @@ from schemathesis.transports.auth import get_requests_auth
 from schemathesis.models import Check, Status, TestResult
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.impl import threadpool
-from schemathesis.runner.impl.core import get_wsgi_auth, has_too_many_responses_with_status, reraise
+from schemathesis.runner.impl.core import get_wsgi_auth, has_too_many_responses_with_status, reraise, deduplicate_errors
 from schemathesis.specs.graphql import loaders as gql_loaders
 from schemathesis.specs.openapi import loaders as oas_loaders
 
@@ -1297,3 +1297,15 @@ def test_use_the_same_seed(empty_open_api_3_schema, derandomize):
     ]
     seed = after_execution[0].result.seed
     assert all(event.result.seed == seed for event in after_execution)
+
+
+def test_deduplicate_errors():
+    errors = [
+        requests.exceptions.ConnectionError(
+            "HTTPConnectionPool(host='127.0.0.1', port=808): Max retries exceeded with url: /snapshots/uploads/%5Dw2y%C3%9D (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x795a23db4ce0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+        ),
+        requests.exceptions.ConnectionError(
+            "HTTPConnectionPool(host='127.0.0.1', port=808): Max retries exceeded with url: /snapshots/uploads/%C3%8BEK (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x795a23e2a6c0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+        ),
+    ]
+    assert len(list(deduplicate_errors(errors))) == 1

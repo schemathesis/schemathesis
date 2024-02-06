@@ -47,6 +47,7 @@ Changelog
 - Unhandled timeout during reading the response payload.
 - Internal error when the header example in the schema is not a valid header.
 - Handle ``KeyError`` during state machine creation.
+- Deduplicate network errors that contain unique URL in their messages.
 
 .. _v3.24.3:
 
