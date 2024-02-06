@@ -540,6 +540,7 @@ def reraise(operation: APIOperation) -> OperationSchemaError:
 
 
 MEMORY_ADDRESS_RE = re.compile("0x[0-9a-fA-F]+")
+URL_IN_ERROR_MESSAGE_RE = re.compile(r"Max retries exceeded with url: .*? \(Caused by")
 
 
 def deduplicate_errors(errors: list[Exception]) -> Generator[Exception, None, None]:
@@ -549,6 +550,7 @@ def deduplicate_errors(errors: list[Exception]) -> Generator[Exception, None, No
         message = format_exception(error, True)
         # Replace memory addresses with a fixed string
         message = MEMORY_ADDRESS_RE.sub("0xbaaaaaaaaaad", message)
+        message = URL_IN_ERROR_MESSAGE_RE.sub("", message)
         if message in seen:
             continue
         seen.add(message)
