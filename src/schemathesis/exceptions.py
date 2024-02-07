@@ -368,6 +368,7 @@ class RuntimeErrorType(str, enum.Enum):
             RuntimeErrorType.SCHEMA_BODY_IN_GET_REQUEST,
             RuntimeErrorType.SCHEMA_INVALID_REGULAR_EXPRESSION,
             RuntimeErrorType.SCHEMA_GENERIC,
+            RuntimeErrorType.SERIALIZATION_NOT_POSSIBLE,
         )
 
 
@@ -469,6 +470,7 @@ class UnboundPrefixError(SerializationError):
         super().__init__(UNBOUND_PREFIX_MESSAGE_TEMPLATE.format(prefix=prefix))
 
 
+@dataclass
 class SerializationNotPossible(SerializationError):
     """Not possible to serialize to any of the media types defined for some API operation.
 
@@ -476,15 +478,21 @@ class SerializationNotPossible(SerializationError):
     media type that Schemathesis knows how to serialize data to.
     """
 
+    message: str
+    media_types: list[str]
+
     __module__ = "builtins"
+
+    def __str__(self) -> str:
+        return self.message
 
     @classmethod
     def from_media_types(cls, *media_types: str) -> SerializationNotPossible:
-        return cls(SERIALIZATION_NOT_POSSIBLE_MESSAGE.format(", ".join(media_types)))
+        return cls(SERIALIZATION_NOT_POSSIBLE_MESSAGE.format(", ".join(media_types)), media_types=list(media_types))
 
     @classmethod
     def for_media_type(cls, media_type: str) -> SerializationNotPossible:
-        return cls(SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE.format(media_type))
+        return cls(SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE.format(media_type), media_types=[media_type])
 
 
 class UsageError(Exception):

@@ -19,7 +19,7 @@ from jsonschema.exceptions import SchemaError
 from .._hypothesis import (
     create_test,
     has_unsatisfied_example_mark,
-    has_non_serializable_mark,
+    get_non_serializable_mark,
     get_invalid_regex_mark,
     get_invalid_example_headers_mark,
 )
@@ -281,10 +281,13 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
         except (SkipTest, unittest.SkipTest) as exc:
             if has_unsatisfied_example_mark(pyfuncitem.obj):
                 raise Unsatisfiable("Failed to generate test cases from examples for this API operation") from None
-            if has_non_serializable_mark(pyfuncitem.obj):
+            non_serializable = get_non_serializable_mark(pyfuncitem.obj)
+            if non_serializable is not None:
+                media_types = ", ".join(non_serializable.media_types)
                 raise SerializationNotPossible(
                     "Failed to generate test cases from examples for this API operation because of"
-                    f" unsupported payload media types.\n{SERIALIZERS_SUGGESTION_MESSAGE}"
+                    f" unsupported payload media types: {media_types}\n{SERIALIZERS_SUGGESTION_MESSAGE}",
+                    media_types=non_serializable.media_types,
                 ) from None
             invalid_regex = get_invalid_regex_mark(pyfuncitem.obj)
             if invalid_regex is not None:
