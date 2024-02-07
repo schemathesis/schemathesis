@@ -18,6 +18,7 @@ from .constants import DEFAULT_DEADLINE
 from .exceptions import OperationSchemaError, SerializationNotPossible
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import APIOperation, Case
+from .transports.content_types import parse_content_type
 from .transports.headers import is_latin_1_encodable, has_invalid_characters
 from .utils import GivenInput, combine_strategies
 
@@ -149,6 +150,11 @@ def add_examples(test: Callable, operation: APIOperation, hook_dispatcher: HookD
             if invalid_headers:
                 add_invalid_example_header_mark(original_test, invalid_headers)
                 continue
+        if example.media_type is not None and parse_content_type(example.media_type) == (
+            "application",
+            "x-www-form-urlencoded",
+        ):
+            example.body = prepare_urlencoded(example.body)
         test = hypothesis.example(case=example)(test)
     return test
 
@@ -157,6 +163,19 @@ def find_invalid_headers(headers: Mapping) -> Generator[Tuple[str, str], None, N
     for name, value in headers.items():
         if not is_latin_1_encodable(value) or has_invalid_characters(name, value):
             yield name, value
+
+
+def prepare_urlencoded(data: Any) -> Any:
+    if isinstance(data, list):
+        output = []
+        for item in data:
+            if isinstance(item, dict):
+                for key, value in item.items():
+                    output.append((key, value))
+            else:
+                output.append(item)
+        return output
+    return data
 
 
 def add_unsatisfied_example_mark(test: Callable, exc: Unsatisfiable) -> None:

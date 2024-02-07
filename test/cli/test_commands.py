@@ -2105,7 +2105,7 @@ def test_long_payload(testdir, cli, empty_open_api_3_schema, snapshot_cli, opena
 
 
 @pytest.mark.skipif(not IS_PYTEST_ABOVE_7, reason="Multiple errors are not caught on older pytest versions")
-def test_multiple_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli, openapi3_base_url):
+def test_multiple_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli):
     empty_open_api_3_schema["paths"] = {
         "/test": {
             "post": {
@@ -2139,7 +2139,7 @@ def test_multiple_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli, op
 
 
 @pytest.mark.skipif(not IS_PYTEST_ABOVE_7, reason="Multiple errors are not caught on older pytest versions")
-def test_group_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli, openapi3_base_url):
+def test_group_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli):
     empty_open_api_3_schema["paths"] = {
         "/test": {
             "post": {
@@ -2175,6 +2175,53 @@ def test_group_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli, opena
     }
     schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
     assert cli.run(str(schema_file), "--base-url=http://127.0.0.1:1") == snapshot_cli
+
+
+def test_complex_urlencoded_example(testdir, cli, empty_open_api_3_schema, snapshot_cli, openapi3_base_url):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "example": [
+                                    {"tag": "0", "timestamp": "2016-04-07T19:39:18Z", "url": "http://127.0.0.1:8001"},
+                                    {"tag": "1", "url": "http://127.0.0.1:8002"},
+                                    {
+                                        "tag": "2",
+                                        "timestamp": "2016-04-07T19:39:18Z",
+                                        "url": "http://127.0.0.1:8003",
+                                    },
+                                ],
+                                "items": {
+                                    "properties": {
+                                        "closest": {
+                                            "enum": ["either", "after", "before"],
+                                            "type": "string",
+                                        },
+                                        "tag": {
+                                            "type": "string",
+                                        },
+                                        "timestamp": {
+                                            "type": "string",
+                                        },
+                                        "url": {"type": "string"},
+                                    },
+                                    "required": ["url"],
+                                    "type": "object",
+                                },
+                                "type": "array",
+                            }
+                        },
+                    }
+                },
+                "responses": {"204": {"description": "Success."}},
+            }
+        }
+    }
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--hypothesis-phases=explicit") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
