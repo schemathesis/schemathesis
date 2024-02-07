@@ -14,8 +14,8 @@ def install() -> None:
     warnings.warn(
         "The `--contrib-unique-data` CLI option and the corresponding `schemathesis.contrib.unique_data` hook "
         "are **DEPRECATED**. The concept of this feature does not fit the core principles of Hypothesis where "
-        "strategies are configurable on per-example basis but this feature implies uniqueness across examples. "
-        "This lead to cryptic error messages about external state and flaky test runs, "
+        "strategies are configurable on a per-example basis but this feature implies uniqueness across examples. "
+        "This leads to cryptic error messages about external state and flaky test runs, "
         "therefore it will be removed in Schemathesis 4.0",
         DeprecationWarning,
         stacklevel=1,

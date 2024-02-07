@@ -25,15 +25,15 @@ Changelog
 - **CLI**: Eagerly check for permissions when writing output to a file, including JUnit XML and other reports.
 - **Python**: Explicitly note that combining ``@schema.given`` with explicit examples from the spec is not supported. :issue:`1217`
 - Clarify error message when a state machine has no transitions. :issue:`1992`
-- Do not consider missing ``paths`` key an error for Open API 3.1.
-- Improved formatting of multiple errors withing the same API operation.
+- Do not consider missing the ``paths`` key an error for Open API 3.1.
+- Improved formatting of multiple errors within the same API operation.
 - Allow arbitrary objects in array for ``application/x-www-form-urlencoded`` payloads.
 
 **Deprecated**
 
 - The ``--contrib-unique-data`` CLI option and the corresponding ``schemathesis.contrib.unique_data`` hook. The concept of this feature
-  does not fit the core principles of Hypothesis where strategies are configurable on per-example basis but this feature implies
-  uniqueness across examples. This lead to cryptic error messages about external state and flaky test runs, therefore it will be removed in
+  does not fit the core principles of Hypothesis where strategies are configurable on a per-example basis but this feature implies
+  uniqueness across examples. This leads to cryptic error messages about external state and flaky test runs, therefore it will be removed in
   Schemathesis 4.0
 
 **Fixed**
@@ -53,11 +53,11 @@ Changelog
 - Testing examples requiring unsupported payload media types resulted in an internal error. These are now correctly reported as errors 
 - Internal error on unsupported regular expressions in inside properties during example generation.
 - Missing XML definitions when the media type contains options like ``application/xml; charset=utf-8``.
-- Unhandled timeout during reading the response payload.
+- Unhandled timeout while reading the response payload.
 - Internal error when the header example in the schema is not a valid header.
 - Handle ``KeyError`` during state machine creation.
-- Deduplicate network errors that contain unique URL in their messages.
-- Not reporting multiple errors of different kind at the same API operation.
+- Deduplicate network errors that contain unique URLs in their messages.
+- Not reporting multiple errors of different kinds at the same API operation.
 - Group similar errors within the same API operation.
 
 .. _v3.24.3:
