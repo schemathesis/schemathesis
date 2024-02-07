@@ -12,6 +12,7 @@ from schemathesis.checks import ALL_CHECKS
 from schemathesis.extra._flask import run_server
 from schemathesis.exceptions import SchemaError, CheckFailed, UsageError
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
+from schemathesis.models import Status
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.serialization import SerializedError
 from schemathesis.specs.openapi import loaders
@@ -165,6 +166,8 @@ def assert_event(schema_id: str, event: events.ExecutionEvent) -> None:
     if isinstance(event, events.AfterExecution):
         assert not event.result.has_failures, event.current_operation
         check_no_errors(schema_id, event)
+        # Errors are checked above and unknown ones cause a test failure earlier
+        assert event.status in (Status.success, Status.skip, Status.error)
     if isinstance(event, events.InternalError):
         raise AssertionError(f"Internal Error: {event.exception_with_traceback}")
 
