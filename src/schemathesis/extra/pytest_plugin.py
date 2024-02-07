@@ -29,7 +29,7 @@ from ..constants import (
     GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE,
     SERIALIZERS_SUGGESTION_MESSAGE,
 )
-from .._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54
+from .._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54, IS_PYTEST_ABOVE_8
 from ..exceptions import (
     OperationSchemaError,
     SkipTest,
@@ -175,7 +175,8 @@ class SchemathesisCase(PyCollector):
                 originalname=self.name,
             )
         else:
-            fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)  # type: ignore[arg-type]
+            if not IS_PYTEST_ABOVE_8:
+                fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)  # type: ignore[arg-type]
             fixtureinfo.prune_dependency_tree()
             for callspec in metafunc._calls:
                 subname = f"{name}[{callspec.id}]"

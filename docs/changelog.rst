@@ -12,6 +12,7 @@ Changelog
 - Support ``tag`` in filters for custom auth.
 - Support for testing examples inside ``anyOf`` / ``oneOf`` / ``allOf`` keywords.
 - Support for the ``text/xml`` media type in ``XMLSerializer``.
+- Support for pytest 8.
 
 **Changed**
 
