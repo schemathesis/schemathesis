@@ -2183,6 +2183,7 @@ def test_complex_urlencoded_example(testdir, cli, empty_open_api_3_schema, snaps
             "post": {
                 "requestBody": {
                     "content": {
+                        "invalid": {"schema": {"example": 1}},
                         "application/x-www-form-urlencoded": {
                             "schema": {
                                 "example": [

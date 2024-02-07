@@ -150,11 +150,13 @@ def add_examples(test: Callable, operation: APIOperation, hook_dispatcher: HookD
             if invalid_headers:
                 add_invalid_example_header_mark(original_test, invalid_headers)
                 continue
-        if example.media_type is not None and parse_content_type(example.media_type) == (
-            "application",
-            "x-www-form-urlencoded",
-        ):
-            example.body = prepare_urlencoded(example.body)
+        if example.media_type is not None:
+            try:
+                media_type = parse_content_type(example.media_type)
+                if media_type == ("application", "x-www-form-urlencoded"):
+                    example.body = prepare_urlencoded(example.body)
+            except ValueError:
+                pass
         test = hypothesis.example(case=example)(test)
     return test
 
