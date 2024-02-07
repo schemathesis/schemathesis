@@ -1,4 +1,4 @@
-Exit code: 0
+Exit code: 1
 ---
 Stdout:
 ======================= Schemathesis test session starts =======================
@@ -10,8 +10,18 @@ Workers: 1
 Collected API operations: 1
 Collected API links: 0
 
-POST /api/test .                                                          [100%]
+POST /api/test E                                                          [100%]
 
+==================================== ERRORS ====================================
+________________________________ POST /api/test ________________________________
+Runtime Error
+
+Malformed media type: `invalid`
+
+Add this option to your command line parameters to see full tracebacks: --show-trace
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
 
 Performed checks:
@@ -22,4 +32,4 @@ WARNING: All API responses have a 404 status code. Did you specify the proper AP
 Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
 We run additional conformance checks on reports from public repos.
 
-============================== 1 passed in 1.00s ===============================
+============================== 1 errored in 1.00s ==============================
