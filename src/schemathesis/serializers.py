@@ -141,7 +141,7 @@ def _to_json(value: Any) -> dict[str, Any]:
     return {"json": value}
 
 
-@register("application/json")
+@register("application/json", aliases=("text/json",))
 class JSONSerializer:
     def as_requests(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         return _to_json(value)
