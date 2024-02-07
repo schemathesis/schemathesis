@@ -14,6 +14,7 @@ from requests.auth import _basic_auth_str
 from requests.structures import CaseInsensitiveDict
 from requests.utils import to_key_val_list
 
+from ..._hypothesis import prepare_urlencoded
 from ...constants import NOT_SET
 from .formats import STRING_FORMATS
 from ... import auths, serializers
@@ -164,7 +165,7 @@ def get_case_strategy(
                 cant_serialize(parameter.media_type)
             media_type = draw(st.sampled_from(possible_media_types))
             if media_type is not None and parse_content_type(media_type) == ("application", "x-www-form-urlencoded"):
-                strategy = strategy.filter(is_valid_urlencoded)
+                strategy = strategy.map(prepare_urlencoded).filter(is_valid_urlencoded)
             body_ = ValueContainer(value=draw(strategy), location="body", generator=body_generator)
         else:
             body_ = ValueContainer(value=body, location="body", generator=None)
