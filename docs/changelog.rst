@@ -22,6 +22,7 @@ Changelog
 - Clarify error message when a state machine has no transitions. :issue:`1992`
 - Do not consider missing ``paths`` key an error for Open API 3.1.
 - Improved formatting of multiple errors withing the same API operation.
+- Allow arbitrary objects in array for ``application/x-www-form-urlencoded`` payloads.
 
 **Deprecated**
 
