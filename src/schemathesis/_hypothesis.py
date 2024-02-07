@@ -171,6 +171,10 @@ def add_non_serializable_mark(test: Callable, exc: SerializationNotPossible) -> 
     test._schemathesis_non_serializable = exc  # type: ignore
 
 
+def get_non_serializable_mark(test: Callable) -> Optional[SerializationNotPossible]:
+    return getattr(test, "_schemathesis_non_serializable", None)
+
+
 def get_invalid_regex_mark(test: Callable) -> Optional[SchemaError]:
     return getattr(test, "_schemathesis_invalid_regex", None)
 
@@ -185,10 +189,6 @@ def get_invalid_example_headers_mark(test: Callable) -> Optional[dict[str, str]]
 
 def add_invalid_example_header_mark(test: Callable, headers: dict[str, str]) -> None:
     test._schemathesis_invalid_example_headers = headers  # type: ignore
-
-
-def has_non_serializable_mark(test: Callable) -> bool:
-    return hasattr(test, "_schemathesis_non_serializable")
 
 
 def get_single_example(strategy: st.SearchStrategy[Case]) -> Case:
