@@ -51,6 +51,7 @@ Changelog
 - Handle ``KeyError`` during state machine creation.
 - Deduplicate network errors that contain unique URL in their messages.
 - Not reporting multiple errors of different kind at the same API operation.
+- Group similar errors within the same API operation.
 
 .. _v3.24.3:
 

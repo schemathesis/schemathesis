@@ -24,7 +24,7 @@ from ... import failures, hooks
 from ..._compat import MultipleFailures
 from ..._hypothesis import (
     has_unsatisfied_example_mark,
-    has_non_serializable_mark,
+    get_non_serializable_mark,
     get_invalid_regex_mark,
     get_invalid_example_headers_mark,
 )
@@ -376,6 +376,7 @@ def run_test(
         # They raise different "grouped" exceptions
         if errors:
             status = Status.error
+            group_errors(errors)
             for error in deduplicate_errors(errors):
                 result.add_error(error)
         else:
@@ -436,12 +437,15 @@ def run_test(
         result.add_error(
             hypothesis.errors.Unsatisfiable("Failed to generate test cases from examples for this API operation")
         )
-    if has_non_serializable_mark(test) and status != Status.error:
+    non_serializable = get_non_serializable_mark(test)
+    if non_serializable is not None and status != Status.error:
         status = Status.error
+        media_types = ", ".join(non_serializable.media_types)
         result.add_error(
             SerializationNotPossible(
                 "Failed to generate test cases from examples for this API operation because of"
-                f" unsupported payload media types.\n{SERIALIZERS_SUGGESTION_MESSAGE}"
+                f" unsupported payload media types: {media_types}\n{SERIALIZERS_SUGGESTION_MESSAGE}",
+                media_types=non_serializable.media_types,
             )
         )
     invalid_regex = get_invalid_regex_mark(test)
@@ -546,6 +550,15 @@ def reraise(operation: APIOperation) -> OperationSchemaError:
 
 MEMORY_ADDRESS_RE = re.compile("0x[0-9a-fA-F]+")
 URL_IN_ERROR_MESSAGE_RE = re.compile(r"Max retries exceeded with url: .*? \(Caused by")
+
+
+def group_errors(errors: list[Exception]) -> None:
+    """Group errors of the same kind info a single one, avoiding duplicate error messages."""
+    serialization_errors = [error for error in errors if isinstance(error, SerializationNotPossible)]
+    if len(serialization_errors) > 1:
+        errors[:] = [error for error in errors if not isinstance(error, SerializationNotPossible)]
+        media_types = sum((entry.media_types for entry in serialization_errors), [])
+        errors.append(SerializationNotPossible.from_media_types(*media_types))
 
 
 def deduplicate_errors(errors: list[Exception]) -> Generator[Exception, None, None]:

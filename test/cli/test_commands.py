@@ -2138,6 +2138,45 @@ def test_multiple_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli, op
     assert cli.run(str(schema_file), "--base-url=http://127.0.0.1:1") == snapshot_cli
 
 
+@pytest.mark.skipif(not IS_PYTEST_ABOVE_7, reason="Multiple errors are not caught on older pytest versions")
+def test_group_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli, openapi3_base_url):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/x-json-smile": {
+                            "schema": {
+                                "properties": {
+                                    "user_id": {
+                                        "example": 1,
+                                        "type": "integer",
+                                    },
+                                },
+                                "required": ["user_id"],
+                            }
+                        },
+                        "text/csv": {
+                            "schema": {
+                                "properties": {
+                                    "user_id": {
+                                        "example": 1,
+                                        "type": "integer",
+                                    },
+                                },
+                                "required": ["user_id"],
+                            }
+                        },
+                    }
+                },
+                "responses": {"204": {"description": "Success."}},
+            }
+        }
+    }
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    assert cli.run(str(schema_file), "--base-url=http://127.0.0.1:1") == snapshot_cli
+
+
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("plain_text_body")
 def test_custom_strings(testdir, cli, hypothesis_max_examples, schema_url):
