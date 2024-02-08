@@ -1,0 +1,28 @@
+name: Run corpus tests
+
+on:
+  schedule:
+    # Every day at 00:00
+    - cron: "0 0 * * *"
+  push:
+    paths:
+      - "test-corpus/openapi-directory"
+  workflow_dispatch:
+
+jobs:
+
+  test-corpus:
+    name: Corpus tests
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 1
+          submodules: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install ".[tests]"
+      - run: pytest test-corpus -n auto
