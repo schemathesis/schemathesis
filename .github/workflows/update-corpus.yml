@@ -15,7 +15,7 @@ jobs:
           fetch-depth: 1
           submodules: true
 
-      - run: git submodule update --remote --merge
+      - run: git submodule update --remote
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@v6
