@@ -1,4 +1,4 @@
-name: Scheduled jobs
+name: Hypothesis tests
 
 on:
   schedule:
@@ -21,19 +21,3 @@ jobs:
 
       - run: pip install ".[tests]"
       - run: pytest -m hypothesis -m hypothesis_nested --hypothesis-profile CI test
-
-  test-corpus:
-    name: Corpus tests
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4.1.1
-        with:
-          fetch-depth: 1
-          submodules: true
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - run: pip install ".[tests]"
-      - run: pytest test-corpus -n auto
