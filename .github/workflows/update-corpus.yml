@@ -1,0 +1,29 @@
+name: Update test corpus
+
+on:
+  schedule:
+    - cron: 0 0 * * 0
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: Update test corpus
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 1
+          submodules: true
+
+      - run: git submodule update --remote --merge
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          delete-branch: true
+          title: Update test corpus
+          body: Automatically update test corpus
+          commit-message: 'chore: Update test corpus'
+          committer: 'CI on behalf of the Schemathesis team <team@schemathesis.io>'
+          author: 'CI on behalf of the Schemathesis team <team@schemathesis.io>'
