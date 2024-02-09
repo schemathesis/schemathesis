@@ -1,0 +1,32 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/schema.yaml
+Base URL: http://127.0.0.1:1
+Specification version: Open API 3.0.2
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+
+POST /success E                                                           [100%]
+
+==================================== ERRORS ====================================
+________________________________ POST /success _________________________________
+Network Error
+
+Connection failed
+
+    Failed to establish a new connection: [Error NUM] Connection refused
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 errored in 1.00s ==============================
