@@ -333,6 +333,42 @@ def test_examples_from_cli(app, testdir, cli, base_url, schema_with_examples):
     assert "9 / 9 passed" in not_a_server_line
 
 
+def test_network_error_with_flaky_generation(testdir, cli, snapshot_cli, schema_with_examples):
+    # Assume that there is a user-defined hook that makes data generation flaky
+    module = testdir.make_importable_pyfile(
+        hook="""
+import schemathesis
+
+
+@schemathesis.hook
+def before_generate_case(context, strategy):
+    seen = set()
+
+    def is_not_seen(case) -> bool:
+        hashed = hash(case)
+        if hashed not in seen:
+            seen.add(hashed)
+            return True
+        return False
+
+    return strategy.filter(is_not_seen)
+"""
+    )
+
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema_with_examples.raw_schema))
+    assert (
+        cli.main(
+            "run",
+            str(schema_file),
+            "--base-url=http://127.0.0.1:1",
+            "--hypothesis-seed=23",
+            "--hypothesis-phases=generate",
+            hooks=module.purebasename,
+        )
+        == snapshot_cli
+    )
+
+
 def test_extract_from_schemas(operation_with_property_examples):
     extracted = [
         example_to_dict(example) for example in examples.extract_from_schemas(operation_with_property_examples)
