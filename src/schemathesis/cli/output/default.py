@@ -608,6 +608,7 @@ SCHEMA_ERROR_SUGGESTIONS = {
     # OpenAPI specification issues
     SchemaErrorType.OPEN_API_UNSPECIFIED_VERSION: f"Include the version in the schema or manually set it with {bold('`--force-schema-version`')}.",
     SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION: f"Proceed with {bold('`--force-schema-version`')}. Caution: May not be fully supported.",
+    SchemaErrorType.OPEN_API_EXPERIMENTAL_VERSION: f"Proceed with {bold('`--experimental=openapi-3.1`. Caution: May not be fully supported.')}",
     SchemaErrorType.OPEN_API_INVALID_SCHEMA: DISABLE_SCHEMA_VALIDATION_SUGGESTION,
     # YAML specific issues
     SchemaErrorType.YAML_NUMERIC_STATUS_CODES: "Convert numeric status codes to strings.",

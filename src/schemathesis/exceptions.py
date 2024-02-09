@@ -395,6 +395,7 @@ class SchemaErrorType(str, enum.Enum):
     OPEN_API_INVALID_SCHEMA = "open_api_invalid_schema"
     OPEN_API_UNSPECIFIED_VERSION = "open_api_unspecified_version"
     OPEN_API_UNSUPPORTED_VERSION = "open_api_unsupported_version"
+    OPEN_API_EXPERIMENTAL_VERSION = "open_api_experimental_version"
 
     # GraphQL validation
     GRAPHQL_INVALID_SCHEMA = "graphql_invalid_schema"
