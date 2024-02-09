@@ -6,7 +6,11 @@ Changelog
 
 **Changed**
 
-- **CLI**: Enhanced Open API 3.1.0 support messaging, now suggesting ``--experimental=openapi-3.1`` option for partial compatibility. 
+- **CLI**: Enhanced Open API 3.1.0 support messaging, now suggesting ``--experimental=openapi-3.1`` option for partial compatibility.
+
+**Fixed**
+
+- Not reporting errors during testing of explicit examples when data generation is flaky.
 
 .. _v3.25.0:
 

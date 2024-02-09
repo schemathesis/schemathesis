@@ -376,15 +376,16 @@ def run_test(
         # They raise different "grouped" exceptions
         if errors:
             status = Status.error
-            group_errors(errors)
-            for error in deduplicate_errors(errors):
-                result.add_error(error)
+            add_errors(result, errors)
         else:
             status = Status.failure
     except hypothesis.errors.Flaky as exc:
         if isinstance(exc.__cause__, hypothesis.errors.DeadlineExceeded):
             status = Status.error
             result.add_error(DeadlineExceeded.from_exc(exc.__cause__))
+        elif errors:
+            status = Status.error
+            add_errors(result, errors)
         else:
             status = Status.failure
             result.mark_flaky()
@@ -550,6 +551,12 @@ def reraise(operation: APIOperation) -> OperationSchemaError:
 
 MEMORY_ADDRESS_RE = re.compile("0x[0-9a-fA-F]+")
 URL_IN_ERROR_MESSAGE_RE = re.compile(r"Max retries exceeded with url: .*? \(Caused by")
+
+
+def add_errors(result: TestResult, errors: list[Exception]) -> None:
+    group_errors(errors)
+    for error in deduplicate_errors(errors):
+        result.add_error(error)
 
 
 def group_errors(errors: list[Exception]) -> None:
