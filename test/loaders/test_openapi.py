@@ -42,11 +42,15 @@ def test_force_open_api_version(version, schema, expected):
     assert isinstance(loaded, expected)
 
 
-def test_unsupported_openapi_version():
-    version = "3.1.0"
-    with pytest.raises(
-        SchemaError, match=f"The provided schema uses Open API {version}, which is currently not supported."
-    ):
+@pytest.mark.parametrize(
+    "version, expected",
+    (
+        ("3.1.0", "The provided schema uses Open API 3.1.0, which is currently not fully supported."),
+        ("3.2.0", "The provided schema uses Open API 3.2.0, which is currently not supported."),
+    ),
+)
+def test_unsupported_openapi_version(version, expected):
+    with pytest.raises(SchemaError, match=expected):
         loaders.from_dict({"openapi": version}, validate_schema=False)
 
 

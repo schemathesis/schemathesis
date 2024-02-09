@@ -348,6 +348,11 @@ def from_dict(
             and not forced
             and not OPENAPI_30_VERSION_RE.match(version)
         ):
+            if is_openapi_31:
+                raise SchemaError(
+                    SchemaErrorType.OPEN_API_EXPERIMENTAL_VERSION,
+                    f"The provided schema uses Open API {version}, which is currently not fully supported.",
+                )
             raise SchemaError(
                 SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION,
                 f"The provided schema uses Open API {version}, which is currently not supported.",
