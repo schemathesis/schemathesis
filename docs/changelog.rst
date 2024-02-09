@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.25.0...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- **CLI**: Enhanced Open API 3.1.0 support messaging, now suggesting ``--experimental=openapi-3.1`` option for partial compatibility. 
+
 .. _v3.25.0:
 
 :version:`3.25.0 <v3.24.3...v3.25.0>` - 2024-02-07
