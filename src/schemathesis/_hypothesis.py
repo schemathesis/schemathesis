@@ -9,7 +9,6 @@ from hypothesis import Phase
 from hypothesis import strategies as st
 from hypothesis.errors import HypothesisWarning, Unsatisfiable
 from hypothesis.internal.reflection import proxies
-from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.exceptions import SchemaError
 
 from .auths import get_auth_storage_from_test
@@ -114,6 +113,8 @@ def make_async_test(test: Callable) -> Callable:
 
 def add_examples(test: Callable, operation: APIOperation, hook_dispatcher: HookDispatcher | None = None) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
+    from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
+
     try:
         examples: list[Case] = [get_single_example(strategy) for strategy in operation.get_strategies_from_examples()]
     except (

@@ -13,32 +13,24 @@ from _pytest.nodes import Node
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from hypothesis import reporting
 from hypothesis.errors import InvalidArgument, Unsatisfiable
-from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.exceptions import SchemaError
 
-from .._hypothesis import (
-    create_test,
-    has_unsatisfied_example_mark,
-    get_non_serializable_mark,
-    get_invalid_regex_mark,
-    get_invalid_example_headers_mark,
-)
+from .._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_8, IS_PYTEST_ABOVE_54
 from .._override import get_override_from_mark
 from ..constants import (
-    RECURSIVE_REFERENCE_ERROR_MESSAGE,
     GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE,
+    RECURSIVE_REFERENCE_ERROR_MESSAGE,
     SERIALIZERS_SUGGESTION_MESSAGE,
 )
-from .._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54, IS_PYTEST_ABOVE_8
 from ..exceptions import (
+    InvalidHeadersExample,
+    InvalidRegularExpression,
     OperationSchemaError,
+    SerializationNotPossible,
     SkipTest,
     UsageError,
-    SerializationNotPossible,
-    InvalidRegularExpression,
-    InvalidHeadersExample,
 )
-from ..internal.result import Result, Ok
+from ..internal.result import Ok, Result
 from ..models import APIOperation
 from ..utils import (
     PARAMETRIZE_MARKER,
@@ -120,6 +112,8 @@ class SchemathesisCase(PyCollector):
         This implementation is based on the original one in pytest, but with slight adjustments
         to produce tests out of hypothesis ones.
         """
+        from .._hypothesis import create_test
+
         if isinstance(result, Ok):
             operation = result.ok()
             if self.is_invalid_test:
@@ -266,6 +260,15 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
 
     For example - kwargs validation is failed for some strategy.
     """
+    from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
+
+    from .._hypothesis import (
+        get_invalid_example_headers_mark,
+        get_invalid_regex_mark,
+        get_non_serializable_mark,
+        has_unsatisfied_example_mark,
+    )
+
     __tracebackhide__ = True
     if isinstance(pyfuncitem, SchemathesisFunction):
         with skip_unnecessary_hypothesis_output():
