@@ -3,8 +3,11 @@ from __future__ import annotations
 import asyncio
 import warnings
 from typing import Any, Callable, Optional, Mapping, Generator, Tuple
+from functools import partial
 
+import anyio
 import hypothesis
+import sniffio
 from hypothesis import Phase
 from hypothesis import strategies as st
 from hypothesis.errors import HypothesisWarning, Unsatisfiable
@@ -103,10 +106,21 @@ def _get_hypothesis_settings(test: Callable) -> hypothesis.settings | None:
 
 def make_async_test(test: Callable) -> Callable:
     def async_run(*args: Any, **kwargs: Any) -> None:
-        loop = asyncio.get_event_loop()
-        coro = test(*args, **kwargs)
-        future = asyncio.ensure_future(coro, loop=loop)
-        loop.run_until_complete(future)
+        try:
+            current_async_library = sniffio.current_async_library()
+        except sniffio.AsyncLibraryNotFoundError:
+            current_async_library = None
+
+        if current_async_library == "trio":
+            anyio.run(partial(test, *args, **kwargs))
+        else:
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+            coro = test(*args, **kwargs)
+            future = asyncio.ensure_future(coro, loop=loop)
+            loop.run_until_complete(future)
 
     return async_run
 

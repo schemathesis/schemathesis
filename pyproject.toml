@@ -46,6 +46,7 @@ dependencies = [
     "pytest>=4.6.4,<9",
     "PyYAML>=5.1,<7.0",
     "requests>=2.22,<3",
+    "sniffio>=1.2,<2.0",
     "starlette>=0.13,<1",
     "starlette-testclient<1",
     "tomli-w>=1.0.0,<2.0",
