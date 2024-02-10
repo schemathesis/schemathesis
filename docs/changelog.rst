@@ -4,6 +4,11 @@ Changelog
 :version:`Unreleased <v3.25.1...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Run automatic probes to detect the application capabilities before testing.
+  They allow for more accurate data generation, reducing false positive test failures. :issue:`1840`
+
 .. _v3.25.1:
 
 :version:`3.25.1 <v3.25.0...v3.25.1>` - 2024-02-10

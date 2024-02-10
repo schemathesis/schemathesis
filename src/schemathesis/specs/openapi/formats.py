@@ -31,3 +31,7 @@ def unregister_string_format(name: str) -> None:
         del STRING_FORMATS[name]
     except KeyError as exc:
         raise ValueError(f"Unknown Open API format: {name}") from exc
+
+
+register = register_string_format
+unregister = unregister_string_format

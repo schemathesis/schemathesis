@@ -2292,3 +2292,36 @@ def test_parameter_overrides(testdir, cli, schema_url):
         hooks=module.purebasename,
     )
     assert result.exit_code == ExitCode.OK, result.stdout
+
+
+def test_null_byte_in_header_probe(testdir, cli, empty_open_api_3_schema, snapshot_cli, openapi3_base_url):
+    empty_open_api_3_schema["paths"] = {
+        "/success": {
+            "get": {
+                "parameters": [{"name": "X-KEY", "in": "header", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    module = testdir.make_importable_pyfile(
+        hook=r"""
+            import schemathesis
+
+            @schemathesis.check
+            def no_null_bytes(response, case):
+                assert "\x00" not in case.headers["X-KEY"]
+            """
+    )
+    assert (
+        cli.main(
+            "run",
+            str(schema_file),
+            "-c",
+            "no_null_bytes",
+            f"--base-url={openapi3_base_url}",
+            "--hypothesis-max-examples=1",
+            hooks=module.purebasename,
+        )
+        == snapshot_cli
+    )
