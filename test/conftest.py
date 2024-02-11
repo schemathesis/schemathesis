@@ -389,7 +389,7 @@ EXAMPLE_UUID = "e32ab85ed4634c38a320eb0b22460da9"
 
 
 @pytest.fixture
-def snapshot_cli(request, snapshot, tmp_path):
+def snapshot_cli(request, snapshot):
     config = CliSnapshotConfig.from_request(request)
 
     class CliSnapshotExtension(SingleFileSnapshotExtension):
@@ -410,7 +410,12 @@ def snapshot_cli(request, snapshot, tmp_path):
                 serialized += f"\n---\nStderr:\n{data.stderr}"
             return config.serialize(serialized).replace("\r\n", "\n").replace("\r", "\n")
 
-    return snapshot.use_extension(extension_class=CliSnapshotExtension)
+    class SnapshotAssertion(snapshot.__class__):
+        def rebuild(self):
+            return self.use_extension(extension_class=CliSnapshotExtension)
+
+    snapshot.__class__ = SnapshotAssertion
+    return snapshot.rebuild()
 
 
 @pytest.fixture()
