@@ -413,11 +413,11 @@ def snapshot_cli(request, snapshot, tmp_path):
     return snapshot.use_extension(extension_class=CliSnapshotExtension)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def cli():
     """CLI runner helper.
 
-    Provides in-process execution via `click.CliRunner` and sub-process execution via `pytest.pytester.Testdir`.
+    Provides in-process execution via `click.CliRunner`.
     """
     cli_runner = CliRunner()
 
