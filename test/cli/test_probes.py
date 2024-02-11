@@ -1,5 +1,6 @@
-from unittest.mock import ANY
+import platform
 from pathlib import Path
+from unittest.mock import ANY
 
 import pytest
 
@@ -91,12 +92,16 @@ def test_detect_null_byte_error(openapi_30, config_factory):
     ]
     serialized = results[0].serialize()
     serialized["error"] = canonicalize_error_message(results[0].error, False)
+    if platform.system() == "Windows":
+        inner_error = "[WinError 10061] No connection could be made because the target machine actively refused it"
+    else:
+        inner_error = "[Errno 111] Connection refused"
     assert serialized == {
-        "error": "requests.exceptions.ConnectionError: "
-        "HTTPConnectionPool(host='127.0.0.1', port=1):  "
-        "NewConnectionError('<urllib3.connection.HTTPConnection object at "
-        "0xbaaaaaaaaaad>: Failed to establish a new connection: [Errno 111] "
-        "Connection refused'))",
+        "error": (
+            "requests.exceptions.ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=1):  "
+            "NewConnectionError('<urllib3.connection.HTTPConnection object at 0xbaaaaaaaaaad>: "
+            f"Failed to establish a new connection: {inner_error}'))"
+        ),
         "name": "NULL_BYTE_IN_HEADER",
         "request": {
             "body": None,
