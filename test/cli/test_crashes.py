@@ -133,7 +133,11 @@ def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params
     check_result(result)
 
 
-@settings(deadline=None, phases=[Phase.explicit, Phase.generate])
+@settings(
+    deadline=None,
+    phases=[Phase.explicit, Phase.generate],
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture],
+)
 @given(schema=urls() | paths() | st.text(), base_url=urls() | paths() | st.text() | st.none())
 @example(schema="//bla", base_url=None)
 @example(schema="/\x00", base_url=None)
