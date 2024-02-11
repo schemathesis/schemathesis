@@ -9,6 +9,10 @@ Changelog
 - Run automatic probes to detect the application capabilities before testing.
   They allow for more accurate data generation, reducing false positive test failures. :issue:`1840`
 
+**Fixed**
+
+- Invalid spec detection if the experimental support for Open API 3.1 is not explicit explicitly enabled.
+
 .. _v3.25.1:
 
 :version:`3.25.1 <v3.25.0...v3.25.1>` - 2024-02-10
