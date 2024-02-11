@@ -1163,7 +1163,12 @@ def should_try_more(exc: SchemaError) -> bool:
     import requests
 
     # We should not try other loaders for cases when we can't even establish connection
-    return not isinstance(exc.__cause__, requests.exceptions.ConnectionError)
+    return not isinstance(exc.__cause__, requests.exceptions.ConnectionError) and exc.type not in (
+        SchemaErrorType.OPEN_API_INVALID_SCHEMA,
+        SchemaErrorType.OPEN_API_UNSPECIFIED_VERSION,
+        SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION,
+        SchemaErrorType.OPEN_API_EXPERIMENTAL_VERSION,
+    )
 
 
 Loader = Callable[[LoaderConfig], "BaseSchema"]

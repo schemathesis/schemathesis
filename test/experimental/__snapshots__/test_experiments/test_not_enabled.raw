@@ -1,0 +1,8 @@
+Exit code: 1
+---
+Stdout:
+Schema Loading Error
+
+The provided schema uses Open API 3.1.0, which is currently not fully supported.
+
+Tip: Proceed with `--experimental=openapi-3.1`. Caution: May not be fully supported.

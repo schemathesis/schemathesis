@@ -33,6 +33,26 @@ def test_enable_via_cli(cli, schema_url, args, kwargs):
     assert OPEN_API_3_1.is_enabled
 
 
+def test_not_enabled(cli, testdir, snapshot_cli):
+    raw_schema = {
+        "openapi": "3.1.0",
+        "info": {"title": "test", "version": "0.1.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "summary": "Root",
+                    "operationId": "root_users_get",
+                    "responses": {
+                        "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
+                    },
+                }
+            }
+        },
+    }
+    schema_file = testdir.make_openapi_schema_file(raw_schema)
+    assert cli.run(str(schema_file), "--base-url=http://127.0.0.1:1") == snapshot_cli
+
+
 def test_enable_via_env_var(monkeypatch):
     env_var = "FOO"
     monkeypatch.setenv(f"{ENV_PREFIX}_{env_var}", "true")
