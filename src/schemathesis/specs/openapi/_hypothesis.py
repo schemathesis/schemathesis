@@ -40,6 +40,10 @@ SLASH = "/"
 StrategyFactory = Callable[[Dict[str, Any], str, str, Optional[str], GenerationConfig], st.SearchStrategy]
 
 
+def header_values(blacklist_characters: str = "\n\r") -> st.SearchStrategy[str]:
+    return st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255, blacklist_characters="\n\r"))
+
+
 @lru_cache
 def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
     """Get all default "format" strategies."""
@@ -50,7 +54,7 @@ def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
     latin1_text = st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255))
 
     # Define valid characters here to avoid filtering them out in `is_valid_header` later
-    header_value = st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255, blacklist_characters="\n\r"))
+    header_value = header_values()
 
     return {
         "binary": st.binary().map(Binary),
