@@ -114,6 +114,12 @@ class SchemathesisCase(PyCollector):
         """
         from .._hypothesis import create_test
 
+        is_trio_test = False
+        for mark in getattr(self.test_function, "pytestmark", []):
+            if mark.name == "trio":
+                is_trio_test = True
+                break
+
         if isinstance(result, Ok):
             operation = result.ok()
             if self.is_invalid_test:
@@ -135,6 +141,7 @@ class SchemathesisCase(PyCollector):
                     data_generation_methods=self.schemathesis_case.data_generation_methods,
                     generation_config=self.schemathesis_case.generation_config,
                     as_strategy_kwargs=as_strategy_kwargs,
+                    keep_async_fn=is_trio_test,
                 )
             name = self._get_test_name(operation)
         else:

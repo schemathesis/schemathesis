@@ -499,6 +499,25 @@ If you don't supply the ``app`` argument to the loader, make sure you pass your 
         # The `session` argument must be supplied.
         case.call_and_validate(session=client)
 
+Async support
+-------------
+
+Schemathesis supports asynchronous test functions executed via ``asyncio`` or ``trio``.
+They work the same way as regular async tests and don't require any additional configuration beyond
+installing ``pytest-asyncio`` or ``pytest-trio`` and follwing their usage guidelines.
+
+.. code:: python
+
+    import pytest
+    import schemathesis
+
+    schema = ...
+
+    @pytest.mark.trio
+    @schema.parametrize()
+    async def test_api(case):
+        ...
+
 Unittest support
 ----------------
 
