@@ -1,13 +1,11 @@
 """High-level API for creating Hypothesis tests."""
 from __future__ import annotations
+
 import asyncio
 import warnings
-from typing import Any, Callable, Optional, Mapping, Generator, Tuple
-from functools import partial
+from typing import Any, Callable, Generator, Mapping, Optional, Tuple
 
-import anyio
 import hypothesis
-import sniffio
 from hypothesis import Phase
 from hypothesis import strategies as st
 from hypothesis.errors import HypothesisWarning, Unsatisfiable
@@ -15,13 +13,13 @@ from hypothesis.internal.reflection import proxies
 from jsonschema.exceptions import SchemaError
 
 from .auths import get_auth_storage_from_test
-from .generation import DataGenerationMethod, GenerationConfig
 from .constants import DEFAULT_DEADLINE
 from .exceptions import OperationSchemaError, SerializationNotPossible
+from .generation import DataGenerationMethod, GenerationConfig
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import APIOperation, Case
 from .transports.content_types import parse_content_type
-from .transports.headers import is_latin_1_encodable, has_invalid_characters
+from .transports.headers import has_invalid_characters, is_latin_1_encodable
 from .utils import GivenInput, combine_strategies
 
 
@@ -34,6 +32,7 @@ def create_test(
     data_generation_methods: list[DataGenerationMethod],
     generation_config: GenerationConfig | None = None,
     as_strategy_kwargs: dict[str, Any] | None = None,
+    keep_async_fn: bool = False,
     _given_args: tuple[GivenInput, ...] = (),
     _given_kwargs: dict[str, GivenInput] | None = None,
 ) -> Callable:
@@ -68,7 +67,11 @@ def create_test(
     if seed is not None:
         wrapped_test = hypothesis.seed(seed)(wrapped_test)
     if asyncio.iscoroutinefunction(test):
-        wrapped_test.hypothesis.inner_test = make_async_test(test)  # type: ignore
+        # `pytest-trio` expects a coroutine function
+        if keep_async_fn:
+            wrapped_test.hypothesis.inner_test = test  # type: ignore
+        else:
+            wrapped_test.hypothesis.inner_test = make_async_test(test)  # type: ignore
     setup_default_deadline(wrapped_test)
     if settings is not None:
         wrapped_test = settings(wrapped_test)
@@ -107,20 +110,12 @@ def _get_hypothesis_settings(test: Callable) -> hypothesis.settings | None:
 def make_async_test(test: Callable) -> Callable:
     def async_run(*args: Any, **kwargs: Any) -> None:
         try:
-            current_async_library = sniffio.current_async_library()
-        except sniffio.AsyncLibraryNotFoundError:
-            current_async_library = None
-
-        if current_async_library == "trio":
-            anyio.run(partial(test, *args, **kwargs))
-        else:
-            try:
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-            coro = test(*args, **kwargs)
-            future = asyncio.ensure_future(coro, loop=loop)
-            loop.run_until_complete(future)
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+        coro = test(*args, **kwargs)
+        future = asyncio.ensure_future(coro, loop=loop)
+        loop.run_until_complete(future)
 
     return async_run
 
