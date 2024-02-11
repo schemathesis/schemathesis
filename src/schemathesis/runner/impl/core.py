@@ -568,14 +568,18 @@ def group_errors(errors: list[Exception]) -> None:
         errors.append(SerializationNotPossible.from_media_types(*media_types))
 
 
+def canonicalize_error_message(error: Exception, include_traceback: bool = True) -> str:
+    message = format_exception(error, include_traceback)
+    # Replace memory addresses with a fixed string
+    message = MEMORY_ADDRESS_RE.sub("0xbaaaaaaaaaad", message)
+    return URL_IN_ERROR_MESSAGE_RE.sub("", message)
+
+
 def deduplicate_errors(errors: list[Exception]) -> Generator[Exception, None, None]:
     """Deduplicate errors by their messages + tracebacks."""
     seen = set()
     for error in errors:
-        message = format_exception(error, True)
-        # Replace memory addresses with a fixed string
-        message = MEMORY_ADDRESS_RE.sub("0xbaaaaaaaaaad", message)
-        message = URL_IN_ERROR_MESSAGE_RE.sub("", message)
+        message = canonicalize_error_message(error)
         if message in seen:
             continue
         seen.add(message)
