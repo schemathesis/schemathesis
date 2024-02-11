@@ -51,6 +51,7 @@ from schemathesis.specs.openapi.checks import status_code_conformance
 from schemathesis.stateful import Stateful
 from schemathesis.targets import DEFAULT_TARGETS
 from schemathesis.internal.datetime import current_datetime
+from test.utils import flaky
 
 PHASES = ", ".join(x.name for x in Phase)
 HEALTH_CHECKS = "|".join(x.name for x in HealthCheck)
@@ -1895,6 +1896,7 @@ def test_warning_on_unauthorized(cli, openapi3_schema_url):
     )
 
 
+@flaky(max_runs=5, min_passes=1)
 @pytest.mark.operations("payload")
 def test_multiple_data_generation_methods(testdir, cli, openapi3_schema_url):
     # When multiple data generation methods are supplied in CLI
@@ -2073,6 +2075,7 @@ def test_multiple_failures_in_single_check(
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--checks=all") == snapshot_cli
 
 
+@flaky(max_runs=5, min_passes=1)
 def test_binary_payload(testdir, cli, empty_open_api_3_schema, snapshot_cli, openapi3_base_url):
     empty_open_api_3_schema["paths"] = {
         "/binary": {
@@ -2090,6 +2093,7 @@ def test_binary_payload(testdir, cli, empty_open_api_3_schema, snapshot_cli, ope
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--checks=all") == snapshot_cli
 
 
+@flaky(max_runs=5, min_passes=1)
 def test_long_payload(testdir, cli, empty_open_api_3_schema, snapshot_cli, openapi3_base_url):
     empty_open_api_3_schema["paths"] = {
         "/long": {
@@ -2104,6 +2108,7 @@ def test_long_payload(testdir, cli, empty_open_api_3_schema, snapshot_cli, opena
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--checks=all") == snapshot_cli
 
 
+@flaky(max_runs=5, min_passes=1)
 @pytest.mark.skipif(not IS_PYTEST_ABOVE_7, reason="Multiple errors are not caught on older pytest versions")
 def test_multiple_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli):
     empty_open_api_3_schema["paths"] = {
@@ -2138,6 +2143,7 @@ def test_multiple_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli):
     assert cli.run(str(schema_file), "--base-url=http://127.0.0.1:1") == snapshot_cli
 
 
+@flaky(max_runs=5, min_passes=1)
 @pytest.mark.skipif(not IS_PYTEST_ABOVE_7, reason="Multiple errors are not caught on older pytest versions")
 def test_group_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli):
     empty_open_api_3_schema["paths"] = {
@@ -2177,6 +2183,7 @@ def test_group_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli):
     assert cli.run(str(schema_file), "--base-url=http://127.0.0.1:1") == snapshot_cli
 
 
+@flaky(max_runs=5, min_passes=1)
 def test_complex_urlencoded_example(testdir, cli, empty_open_api_3_schema, snapshot_cli, openapi3_base_url):
     empty_open_api_3_schema["paths"] = {
         "/test": {

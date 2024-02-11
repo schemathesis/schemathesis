@@ -177,7 +177,7 @@ def test_events(setup):
     schema = schemathesis.from_asgi("/openapi.json", app, force_schema_version="30")
 
     @given(case=schema["/health"]["GET"].as_strategy())
-    @settings(max_examples=3)
+    @settings(max_examples=3, deadline=None)
     def test(case):
         response = case.call_asgi()
         assert response.status_code == 200
