@@ -82,6 +82,44 @@ def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url
     }
 
 
+def test_detect_null_byte_with_response(openapi_30, config_factory, openapi3_base_url, response_factory):
+    config = config_factory(base_url=openapi3_base_url)
+    result = probes.run(openapi_30, config)[0]
+    result.response = response_factory.requests(content=b'{"success": true}')
+    assert result.serialize() == {
+        "error": None,
+        "name": "NULL_BYTE_IN_HEADER",
+        "request": {
+            "body": None,
+            "headers": {
+                "X-Schemathesis-Probe": ["NULL_BYTE_IN_HEADER"],
+                "X-Schemathesis-Probe-Null": ["\x00"],
+                **DEFAULT_HEADERS,
+            },
+            "method": "GET",
+            "uri": openapi3_base_url,
+        },
+        "response": {
+            "body": "eyJzdWNjZXNzIjogdHJ1ZX0=",
+            "elapsed": 0.0,
+            "encoding": None,
+            "headers": {
+                "Content-Length": [
+                    "17",
+                ],
+                "Content-Type": [
+                    "application/json",
+                ],
+            },
+            "http_version": "1.1",
+            "message": None,
+            "status_code": 200,
+            "verify": True,
+        },
+        "type": "failure",
+    }
+
+
 def test_detect_null_byte_error(openapi_30, config_factory):
     config = config_factory(base_url="http://127.0.0.1:1")
     results = probes.run(openapi_30, config)

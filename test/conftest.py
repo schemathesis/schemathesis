@@ -1111,6 +1111,7 @@ def response_factory():
         headers = headers or {}
         if content_type:
             headers.setdefault("Content-Type", content_type)
+        headers.setdefault("Content-Length", str(len(content)))
         response.headers.update(headers)
         response.raw = HTTPResponse(body=io.BytesIO(content), status=status_code, headers=response.headers)
         response.request = requests.PreparedRequest()
