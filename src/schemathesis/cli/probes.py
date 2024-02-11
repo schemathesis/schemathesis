@@ -29,6 +29,8 @@ HEADER_NAME = "X-Schemathesis-Probe"
 
 @dataclass
 class Probe:
+    """A request to determine the capabilities of the application under test."""
+
     name: str
 
     def prepare_request(
@@ -66,6 +68,7 @@ class ProbeResult:
         return self.type == ProbeResultType.FAILURE
 
     def serialize(self) -> dict[str, Any]:
+        """Serialize probe results so it can be sent over the network."""
         if self.request:
             _request = Request.from_prepared_request(self.request)
             sanitize_request(_request)
@@ -124,6 +127,8 @@ def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: Lo
         request.headers["User-Agent"] = USER_AGENT
         response = session.send(request)
     except MissingSchema:
+        # In-process ASGI/WSGI testing will have local URLs and requires extra handling
+        # which is not currently implemented
         return ProbeResult(probe, ProbeResultType.SKIP, None, None, None)
     except RequestException as exc:
         req = exc.request if isinstance(exc.request, PreparedRequest) else None

@@ -1134,17 +1134,15 @@ def into_event_stream(
 
 
 def run_probes(schema: BaseSchema, config: LoaderConfig) -> None:
+    """Discover capabilities of the tested app."""
     probe_results = probes.run(schema, config)
     for result in probe_results:
         if isinstance(result.probe, probes.NullByteInHeader) and result.is_failure:
-            from hypothesis import strategies as st
-            from ..specs.openapi._hypothesis import HEADER_FORMAT
+            from ..specs.openapi._hypothesis import HEADER_FORMAT, header_values
 
             formats.register(
                 HEADER_FORMAT,
-                st.text(
-                    alphabet=st.characters(min_codepoint=0, max_codepoint=255, blacklist_characters="\n\r\x00")
-                ).map(str.lstrip),
+                header_values(blacklist_characters="\n\r\x00").map(str.lstrip),
             )
 
 
