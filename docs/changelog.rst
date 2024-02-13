@@ -9,6 +9,7 @@ Changelog
 - Run automatic probes to detect the application capabilities before testing.
   They allow for more accurate data generation, reducing false positive test failures. :issue:`1840`
 - Support running async Python tests with ``trio``. :issue:`1872`
+- Run automatic schema optimization & format inference if CLI is authenticated in Schemathesis.io.
 
 **Fixed**
 

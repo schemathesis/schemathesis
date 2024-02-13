@@ -1,57 +1,57 @@
 from __future__ import annotations
+
 import base64
 import enum
 import io
 import os
 import sys
 import traceback
+import uuid
 import warnings
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from queue import Queue
-from typing import Any, Callable, Generator, Iterable, NoReturn, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, NoReturn, cast
 from urllib.parse import urlparse
 
 import click
 
 from .. import checks as checks_module
-from .. import contrib, experimental, generation
+from .. import contrib, experimental, generation, runner, service
 from .. import fixups as _fixups
-from .. import runner, service
 from .. import targets as targets_module
+from .._override import CaseOverride
 from ..code_samples import CodeSampleStyle
-from .constants import HealthCheck, Phase, Verbosity
-from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from ..constants import (
     API_NAME_ENV_VAR,
     BASE_URL_ENV_VAR,
     DEFAULT_RESPONSE_TIMEOUT,
     DEFAULT_STATEFUL_RECURSION_LIMIT,
+    EXTENSIONS_DOCUMENTATION_URL,
     HOOKS_MODULE_ENV_VAR,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
-    WAIT_FOR_SCHEMA_ENV_VAR,
-    EXTENSIONS_DOCUMENTATION_URL,
     ISSUE_TRACKER_URL,
+    WAIT_FOR_SCHEMA_ENV_VAR,
 )
-from ..exceptions import SchemaError, extract_nth_traceback, SchemaErrorType
+from ..exceptions import SchemaError, SchemaErrorType, extract_nth_traceback
 from ..fixups import ALL_FIXUPS
-from ..loaders import load_app, load_yaml
-from .._override import CaseOverride
-from ..transports.auth import get_requests_auth
+from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
+from ..internal.datetime import current_datetime
+from ..internal.validation import file_exists
+from ..loaders import load_app, load_yaml
 from ..models import Case, CheckFunction
 from ..runner import events, prepare_hypothesis_settings
 from ..specs.graphql import loaders as gql_loaders
-from ..specs.openapi import loaders as oas_loaders
 from ..specs.openapi import formats
+from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import Target
+from ..transports.auth import get_requests_auth
 from ..types import Filter, PathLike, RequestCert
-from ..internal.datetime import current_datetime
-from ..internal.validation import file_exists
 from . import callbacks, cassettes, output, probes
-from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
+from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
 from .context import ExecutionContext, FileReportContext, ServiceReportContext
 from .debug import DebugOutputHandler
 from .junitxml import JunitXMLHandler
@@ -61,8 +61,9 @@ from .sanitization import SanitizationHandler
 if TYPE_CHECKING:
     import hypothesis
     import requests
-    from ..service.client import ServiceClient
+
     from ..schemas import BaseSchema
+    from ..service.client import ServiceClient
     from ..specs.graphql.schemas import GraphQLSchema
     from .handlers import EventHandler
 
@@ -935,6 +936,7 @@ def run(
         suppress_health_check=_hypothesis_suppress_health_check,
         verbosity=hypothesis_verbosity,
     )
+    correlation_id = uuid.uuid4()
     event_stream = into_event_stream(
         schema_or_location,
         app=app,
@@ -971,6 +973,8 @@ def run(
         stateful_recursion_limit=stateful_recursion_limit,
         hypothesis_settings=hypothesis_settings,
         generation_config=generation_config,
+        client=client,
+        correlation_id=correlation_id,
     )
     execute(
         event_stream,
@@ -996,6 +1000,7 @@ def run(
         location=schema,
         base_url=base_url,
         started_at=started_at,
+        correlation_id=correlation_id,
     )
 
 
@@ -1075,7 +1080,12 @@ def into_event_stream(
     store_interactions: bool,
     stateful: Stateful | None,
     stateful_recursion_limit: int,
+    client: ServiceClient | None,
+    correlation_id: uuid.UUID,
 ) -> Generator[events.ExecutionEvent, None, None]:
+    from ..service import extensions
+    from requests import RequestException
+
     try:
         if app is not None:
             app = load_app(app)
@@ -1100,10 +1110,17 @@ def into_event_stream(
             tag=tag or None,
             operation_id=operation_id or None,
         )
-        loaded_schema = load_schema(config)
-        run_probes(loaded_schema, config)
+        schema = load_schema(config)
+        probes = run_probes(schema, config)
+        if client is not None:
+            try:
+                analysis = client.analyze_schema(probes, schema.raw_schema, correlation_id)
+                extensions.apply(analysis.extensions)
+            except RequestException:
+                # TODO: emit a message
+                pass
         yield from runner.from_schema(
-            loaded_schema,
+            schema,
             auth=auth,
             auth_type=auth_type,
             override=override,
@@ -1133,10 +1150,10 @@ def into_event_stream(
         yield events.InternalError.from_exc(exc)
 
 
-def run_probes(schema: BaseSchema, config: LoaderConfig) -> None:
+def run_probes(schema: BaseSchema, config: LoaderConfig) -> list[probes.ProbeRun]:
     """Discover capabilities of the tested app."""
-    probe_results = probes.run(schema, config)
-    for result in probe_results:
+    results = probes.run(schema, config)
+    for result in results:
         if isinstance(result.probe, probes.NullByteInHeader) and result.is_failure:
             from ..specs.openapi._hypothesis import HEADER_FORMAT, header_values
 
@@ -1144,6 +1161,7 @@ def run_probes(schema: BaseSchema, config: LoaderConfig) -> None:
                 HEADER_FORMAT,
                 header_values(blacklist_characters="\n\r\x00").map(str.lstrip),
             )
+    return results
 
 
 def load_schema(config: LoaderConfig) -> BaseSchema:
@@ -1371,6 +1389,7 @@ def execute(
     location: str,
     base_url: str | None,
     started_at: str,
+    correlation_id: uuid.UUID,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handlers: list[EventHandler] = []
@@ -1390,6 +1409,7 @@ def execute(
                 started_at=started_at,
                 out_queue=report_queue,
                 telemetry=telemetry,
+                correlation_id=correlation_id,
             )
         )
     elif isinstance(report, click.utils.LazyFile):
@@ -1405,6 +1425,7 @@ def execute(
                 started_at=started_at,
                 out_queue=report_queue,
                 telemetry=telemetry,
+                correlation_id=correlation_id,
             )
         )
     if junit_xml is not None:

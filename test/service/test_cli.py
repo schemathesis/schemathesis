@@ -38,12 +38,13 @@ def test_no_failures(cli, schema_url, service, next_url, upload_message):
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then it should receive requests
-    assert len(service.server.log) == 2, service.server.log
+    assert len(service.server.log) == 3, service.server.log
     # And all requests should have the proper User-Agent
     for request, _ in service.server.log:
         assert request.headers["User-Agent"] == USER_AGENT
     service.assert_call(0, "/cli/projects/my-api/", 200)
-    service.assert_call(1, "/reports/upload/", 202)
+    service.assert_call(1, "/cli/analysis/", 200)
+    service.assert_call(2, "/reports/upload/", 202)
     # And it should be noted in the output
     lines = get_stdout_lines(result.stdout)
     # This output contains all temporary lines with a spinner - regular terminals handle `\r` and display everything
@@ -74,8 +75,8 @@ def test_server_error(cli, schema_url, service):
     ]
     result = cli.run(*args)
     assert result.exit_code == ExitCode.OK, result.stdout
-    assert len(service.server.log) == 1
-    service.assert_call(0, "/reports/upload/", 500)
+    assert len(service.server.log) == 2
+    service.assert_call(1, "/reports/upload/", 500)
     # And it should be noted in the output
     lines = get_stdout_lines(result.stdout)
     assert "Upload: ERROR" in lines
@@ -360,12 +361,12 @@ def test_anonymous_upload(cli, schema_url, service, hosts_file, correlation_id):
     # Then it is successful
     assert result.exit_code == ExitCode.OK, result.stdout
     assert SERVICE_ERROR_MESSAGE not in result.stdout
-    service.assert_call(0, "/reports/upload/", 202)
+    service.assert_call(1, "/reports/upload/", 202)
     # And the returned correlation id should be properly stored
     assert load_for_host(service.hostname, hosts_file)["correlation_id"] == correlation_id
     # And the same correlation id is used for the next upload
     cli.run(schema_url, f"--schemathesis-io-url={service.base_url}", f"--hosts-file={hosts_file}", "--report")
-    assert service.server.log[1][0].headers[REPORT_CORRELATION_ID_HEADER] == correlation_id
+    assert service.server.log[3][0].headers[REPORT_CORRELATION_ID_HEADER] == correlation_id
     # And later auth should not override existing correlation_id
     result = cli.auth.login(
         "sample_token", f"--hosts-file={hosts_file}", f"--hostname={service.hostname}", "--protocol=http"
@@ -419,7 +420,7 @@ def test_report_via_env_var(cli, schema_url, tmp_path, read_report, service, mon
     # Then the report should be processed according to the env var value
     if kind == "service":
         assert service.server.log
-        payload = service.server.log[0][0].data
+        payload = service.server.log[1][0].data
     else:
         payload = report_file.read_bytes()
         # And should not be sent to the SaaS
@@ -507,7 +508,7 @@ def test_send_provider_header(monkeypatch, cli, schema_url, service):
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then send CI provider name in a header
-    assert service.server.log[0][0].headers[CI_PROVIDER_HEADER] == "github"
+    assert service.server.log[1][0].headers[CI_PROVIDER_HEADER] == "github"
 
 
 PAYLOAD_TOO_LARGE_MESSAGE = "Your report is too large. The limit is 100 KB, but your report is 101 KB."

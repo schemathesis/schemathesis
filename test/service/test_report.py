@@ -1,6 +1,7 @@
 import json
 import os
 import tarfile
+import uuid
 from dataclasses import asdict
 from io import BytesIO
 from unittest import mock
@@ -9,9 +10,9 @@ import pytest
 
 import schemathesis
 from schemathesis.cli import ExecutionContext
+from schemathesis.internal.datetime import current_datetime
 from schemathesis.runner import events
 from schemathesis.service import ci, metadata, report
-from schemathesis.internal.datetime import current_datetime
 
 
 def test_add_events(openapi3_schema_url, read_report):
@@ -50,6 +51,7 @@ def test_metadata(read_report):
             started_at=current_datetime(),
             ci_environment=ci.environment(),
             usage_data=None,
+            correlation_id=uuid.uuid4(),
         )
     data = payload.getvalue()
     with read_report(data) as tar:

@@ -5,6 +5,7 @@ import pathlib
 import platform
 import sys
 import time
+import uuid
 
 import urllib3.exceptions
 
@@ -1786,6 +1787,7 @@ def assert_exit_code(event_stream, code):
             report=None,
             telemetry=False,
             sanitize_output=False,
+            correlation_id=uuid.uuid4(),
         )
     assert exc.value.code == code
 
