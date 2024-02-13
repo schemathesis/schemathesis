@@ -2,8 +2,9 @@ from __future__ import annotations
 import hashlib
 import http
 from dataclasses import asdict
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from urllib.parse import urljoin
+import uuid
 
 import requests
 from requests.adapters import HTTPAdapter, Retry
@@ -13,6 +14,7 @@ from .ci import CIProvider
 from .constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT, UPLOAD_SOURCE_HEADER
 from .metadata import Metadata
 from .models import (
+    AnalysisResult,
     ProjectDetails,
     AuthResponse,
     FailedUploadResponse,
@@ -21,6 +23,10 @@ from .models import (
     ProjectEnvironment,
     Specification,
 )
+
+
+if TYPE_CHECKING:
+    from ..cli import probes
 
 
 def response_hook(response: requests.Response, **_kwargs: Any) -> None:
@@ -98,3 +104,13 @@ class ServiceClient(requests.Session):
         if response.status_code == http.HTTPStatus.REQUEST_ENTITY_TOO_LARGE:
             return FailedUploadResponse(detail=data["detail"])
         return UploadResponse(message=data["message"], next_url=data["next"], correlation_id=data["correlation_id"])
+
+    def analyze_schema(
+        self, probes: list[probes.ProbeRun], schema: dict[str, Any], run_id: uuid.UUID
+    ) -> AnalysisResult:
+        """Analyze the API schema."""
+        response = self.post(
+            "/cli/analysis/",
+            json={"probes": [probe.serialize() for probe in probes], "schema": schema, "run_id": str(run_id)},
+        )
+        return AnalysisResult.from_dict(response.json())
