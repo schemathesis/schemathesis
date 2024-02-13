@@ -1,5 +1,6 @@
 import re
 import tarfile
+import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from io import BytesIO
@@ -109,6 +110,18 @@ def report_upload(setup_server, next_url, upload_message, correlation_id):
     )
 
 
+@pytest.fixture
+def analyze_schema(setup_server):
+    return setup_server(
+        lambda h: h.respond_with_json(
+            {"message": "Success", "extensions": [], "errors": []},
+            status=200,
+        ),
+        "POST",
+        "/cli/analysis/",
+    )
+
+
 @dataclass
 class Service:
     server: PluginHTTPServer
@@ -131,7 +144,7 @@ def hostname(httpserver):
 
 
 @pytest.fixture
-def service(httpserver, hostname, service_setup, get_project_details, report_upload, service_token):
+def service(httpserver, hostname, service_setup, get_project_details, report_upload, analyze_schema, service_token):
     return Service(server=httpserver, hostname=hostname, token=service_token)
 
 
@@ -157,6 +170,7 @@ def service_report_handler(service_client, hostname, hosts_file, openapi3_schema
         telemetry=False,
         out_queue=Queue(),
         in_queue=Queue(),
+        correlation_id=uuid.uuid4(),
     )
     yield handler
     handler.shutdown()
@@ -174,6 +188,7 @@ def file_report_handler(service_client, hostname, hosts_file, openapi3_schema_ur
         telemetry=False,
         in_queue=Queue(),
         out_queue=Queue(),
+        correlation_id=uuid.uuid4(),
     )
     yield handler
     handler.shutdown()
