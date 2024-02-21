@@ -1,0 +1,29 @@
+name: Update pre-commit
+
+on:
+  schedule:
+    - cron: 0 0 * * 0
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: Update pre-commit
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 1
+          submodules: true
+
+      - run: pre-commit autoupdate
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          delete-branch: true
+          title: Update pre-commit
+          body: Automatically update pre-commit
+          commit-message: 'chore: Update pre-commit'
+          committer: 'CI on behalf of the Schemathesis team <team@schemathesis.io>'
+          author: 'CI on behalf of the Schemathesis team <team@schemathesis.io>'
