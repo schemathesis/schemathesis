@@ -1161,6 +1161,10 @@ def load_schema(config: LoaderConfig) -> BaseSchema:
 
 def should_try_more(exc: SchemaError) -> bool:
     import requests
+    from yaml.reader import ReaderError
+
+    if isinstance(exc.__cause__, ReaderError) and "characters are not allowed" in str(exc.__cause__):
+        return False
 
     # We should not try other loaders for cases when we can't even establish connection
     return not isinstance(exc.__cause__, requests.exceptions.ConnectionError) and exc.type not in (
