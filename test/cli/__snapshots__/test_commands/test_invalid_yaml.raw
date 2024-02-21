@@ -1,0 +1,9 @@
+Exit code: 1
+---
+Stdout:
+Schema Loading Error
+
+API schema does not appear syntactically valid
+
+    unacceptable character #x0000: control characters are not allowed
+      in "<unicode string>", position 395

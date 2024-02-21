@@ -1185,6 +1185,13 @@ def test_no_useless_traceback(testdir, cli, empty_open_api_3_schema, snapshot_cl
     assert cli.run(str(schema_file), "--show-trace", "--dry-run") == snapshot_cli
 
 
+def test_invalid_yaml(testdir, cli, simple_openapi, snapshot_cli):
+    schema = yaml.dump(simple_openapi)
+    schema += "\x00"
+    schema_file = testdir.makefile(".yaml", schema=schema)
+    assert cli.run(str(schema_file), "--show-trace", "--dry-run") == snapshot_cli
+
+
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 @pytest.mark.skipif(
