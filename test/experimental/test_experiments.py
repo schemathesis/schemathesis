@@ -1,3 +1,5 @@
+import threading
+
 import pytest
 from pytest import ExitCode
 
@@ -59,3 +61,24 @@ def test_enable_via_env_var(monkeypatch):
     experiments = ExperimentSet()
     example = experiments.create_experiment("Example", "", env_var, "", "")
     assert example.is_enabled
+
+
+@pytest.mark.parametrize("is_enabled", (True, False))
+def test_multiple_threads(is_enabled):
+    experiments = ExperimentSet()
+    example = experiments.create_experiment("Example", "", "FOO", "", "")
+    if is_enabled:
+        example.enable()
+    error = None
+
+    def check_enabled():
+        nonlocal error
+        try:
+            assert example.is_enabled == is_enabled
+        except Exception as exc:
+            error = exc
+
+    thread = threading.Thread(target=check_enabled)
+    thread.start()
+    thread.join()
+    assert error is None
