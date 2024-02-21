@@ -15,6 +15,7 @@ Changelog
 - Invalid spec detection if the experimental support for Open API 3.1 is not explicit explicitly enabled.
 - Invalid spec detection if the input YAML contains not allowed characters.
 - ``AttributeError`` when using the experimental support for Open API 3.1 with multiple workers.
+- Do not skip API operation if it is still possible to generate positive tests when ``-D all`` is passed.  
 
 .. _v3.25.1:
 
