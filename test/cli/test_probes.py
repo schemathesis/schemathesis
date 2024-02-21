@@ -130,8 +130,11 @@ def test_detect_null_byte_error(openapi_30, config_factory):
     ]
     serialized = results[0].serialize()
     serialized["error"] = canonicalize_error_message(results[0].error, False)
-    if platform.system() == "Windows":
+    system = platform.system()
+    if system == "Windows":
         inner_error = "[WinError 10061] No connection could be made because the target machine actively refused it"
+    elif system == "Darwin":
+        inner_error = "[Errno 61] Connection refused"
     else:
         inner_error = "[Errno 111] Connection refused"
     assert serialized == {
