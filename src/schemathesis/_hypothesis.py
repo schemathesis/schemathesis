@@ -40,6 +40,7 @@ def create_test(
     hook_dispatcher = getattr(test, "_schemathesis_hooks", None)
     auth_storage = get_auth_storage_from_test(test)
     strategies = []
+    skip_on_not_negated = len(data_generation_methods) == 1 and DataGenerationMethod.negative in data_generation_methods
     for data_generation_method in data_generation_methods:
         strategies.append(
             operation.as_strategy(
@@ -47,6 +48,7 @@ def create_test(
                 auth_storage=auth_storage,
                 data_generation_method=data_generation_method,
                 generation_config=generation_config,
+                skip_on_not_negated=skip_on_not_negated,
                 **(as_strategy_kwargs or {}),
             )
         )
