@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, Iterable, Optional
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
 
-from hypothesis import strategies as st
+from hypothesis import strategies as st, reject
 from hypothesis_jsonschema import from_schema
 from requests.auth import _basic_auth_str
 from requests.structures import CaseInsensitiveDict
@@ -116,6 +116,7 @@ def get_case_strategy(
     query: NotSet | dict[str, Any] = NOT_SET,
     body: Any = NOT_SET,
     media_type: str | None = None,
+    skip_on_not_negated: bool = True,
 ) -> Any:
     """A strategy that creates `Case` instances.
 
@@ -180,7 +181,10 @@ def get_case_strategy(
         raise BodyInGetRequestError("GET requests should not contain body parameters.")
     # If we need to generate negative cases but no generated values were negated, then skip the whole test
     if generator.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
-        skip(operation.verbose_name)
+        if skip_on_not_negated:
+            skip(operation.verbose_name)
+        else:
+            reject()
     instance = Case(
         operation=operation,
         media_type=media_type,

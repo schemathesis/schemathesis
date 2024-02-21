@@ -1853,6 +1853,15 @@ def test_skip_not_negated_tests(cli, schema_url):
     assert "1 skipped in" in lines[-1]
 
 
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_dont_skip_when_generation_is_possible(cli, schema_url):
+    result = cli.run(schema_url, "-D", "all")
+    assert result.exit_code == ExitCode.OK, result.stdout
+    lines = result.stdout.splitlines()
+    assert "1 passed in" in lines[-1]
+
+
 @pytest.mark.operations("failure")
 def test_explicit_example_failure_output(testdir, cli, openapi3_base_url, snapshot_cli):
     # When an explicit example fails
