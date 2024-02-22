@@ -8,6 +8,7 @@ will not reach the tested application at all.
 from __future__ import annotations
 
 import enum
+import warnings
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -120,12 +121,15 @@ def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: Lo
     """Send the probe to the application."""
     from requests import Request, RequestException, PreparedRequest
     from requests.exceptions import MissingSchema
+    from urllib3.exceptions import InsecureRequestWarning
 
     try:
         request = probe.prepare_request(session, Request(), schema, config)
         request.headers[HEADER_NAME] = probe.name
         request.headers["User-Agent"] = USER_AGENT
-        response = session.send(request)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", InsecureRequestWarning)
+            response = session.send(request)
     except MissingSchema:
         # In-process ASGI/WSGI testing will have local URLs and requires extra handling
         # which is not currently implemented
