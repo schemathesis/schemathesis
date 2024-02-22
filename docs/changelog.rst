@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.25.2...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Added ``__contains__`` method to ``ParameterSet`` for easier parameter checks in hooks.
+
 .. _v3.25.2:
 
 :version:`3.25.2 <v3.25.1...v3.25.2>` - 2024-02-21

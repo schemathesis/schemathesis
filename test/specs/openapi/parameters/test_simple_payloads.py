@@ -70,5 +70,7 @@ def test_parameter_set_get(make_openapi_3_schema):
     raw_schema = make_openapi_3_schema(parameters=[header])
     schema = schemathesis.from_dict(raw_schema)
     headers = schema["/users"]["POST"].headers
+    assert "id" in headers
     assert headers.contains("id")
     assert not headers.contains("foo")
+    assert "foo" not in headers
