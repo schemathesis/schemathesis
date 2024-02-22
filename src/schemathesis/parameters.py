@@ -66,6 +66,9 @@ class ParameterSet(Generic[P]):
     def contains(self, name: str) -> bool:
         return self.get(name) is not None
 
+    def __contains__(self, item: str) -> bool:
+        return self.contains(item)
+
     def __bool__(self) -> bool:
         return bool(self.items)
 
