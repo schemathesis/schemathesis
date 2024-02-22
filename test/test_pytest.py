@@ -878,10 +878,10 @@ schema = schemathesis.from_uri('{openapi3_schema_url}')
 @schema.parametrize(endpoint=["path_variable", "custom_format"])
 @schema.override(path_parameters={{"key": "foo"}}, query={{"id": "bar"}})
 def test(case):
-    if case.operation.path_parameters.contains("key"):
+    if "key" in case.operation.path_parameters:
         assert case.path_parameters["key"] == "foo"
         assert "id" not in (case.query or {{}}), "`id` is present"
-    if case.operation.query.contains("id"):
+    if "id" in case.operation.query:
         assert case.query["id"] == "bar"
         assert "key" not in (case.path_parameters or {{}}), "`key` is present"
 """
