@@ -187,6 +187,7 @@ def display_full_traceback_message(error: SerializedError) -> bool:
             "SerializationNotPossible",
             "hypothesis.errors.FailedHealthCheck",
             "hypothesis.errors.InvalidArgument: Scalar ",
+            "hypothesis.errors.InvalidArgument: min_size=",
         )
     )
 
