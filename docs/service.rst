@@ -7,6 +7,20 @@ Schemathesis as a Service on `Schemathesis.io <https://app.schemathesis.io/auth/
 
     For a step-by-step guide on getting started with Schemathesis.io, visit our `Quick Start Guide <https://docs.schemathesis.io/quick-start/>`_.
 
+API Schema Analysis
+-------------------
+
+Schemathesis CLI uses Schemathesis.io to improve the efficiency and realism of the generated test cases for better bug detection.
+This feature is currently in its experimental phase and by using it, you automatically agree to Schemathesis.io's `Terms of Service <https://schemathesis.io/legal/terms>`_ and `Privacy Policy`_.
+
+By using this feature, you can expect to see higher coverage of edge cases to be avhieved faster, as well as tests reaching deeper into your API implementation.
+
+.. note::
+
+    Schema analysis is available free of charge and does not require signup during the experimental phase.
+
+To enable schema analysis, use the ``--experimental=schema-analysis`` CLI option. It is also automatically enabled when the ``--report`` CLI option is used.
+
 Uploading Reports to Schemathesis.io
 ------------------------------------
 

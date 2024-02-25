@@ -1,11 +1,14 @@
 from __future__ import annotations
+
 from dataclasses import asdict
 from typing import Any, Callable, Dict, Optional, TypeVar, cast
 
+from ..exceptions import format_exception
+from ..internal.result import Err, Ok
+from ..internal.transformation import merge_recursively
 from ..models import Response
 from ..runner import events
 from ..runner.serialization import SerializedCase
-from ..internal.transformation import merge_recursively
 
 S = TypeVar("S", bound=events.ExecutionEvent)
 SerializeFunc = Callable[[S], Optional[Dict[str, Any]]]
@@ -26,6 +29,19 @@ def serialize_before_probing(_: events.BeforeProbing) -> None:
 def serialize_after_probing(event: events.AfterProbing) -> dict[str, Any] | None:
     probes = event.probes or []
     return {"probes": [probe.serialize() for probe in probes]}
+
+
+def serialize_before_analysis(_: events.BeforeAnalysis) -> None:
+    return None
+
+
+def serialize_after_analysis(event: events.AfterAnalysis) -> dict[str, Any] | None:
+    data = {}
+    if isinstance(event.analysis, Ok):
+        data["analysis_id"] = event.analysis.ok().id
+    elif isinstance(event.analysis, Err):
+        data["error"] = format_exception(event.analysis.err())
+    return data
 
 
 def serialize_before_execution(event: events.BeforeExecution) -> dict[str, Any] | None:
@@ -127,6 +143,8 @@ SERIALIZER_MAP = {
     events.Initialized: serialize_initialized,
     events.BeforeProbing: serialize_before_probing,
     events.AfterProbing: serialize_after_probing,
+    events.BeforeAnalysis: serialize_before_analysis,
+    events.AfterAnalysis: serialize_after_analysis,
     events.BeforeExecution: serialize_before_execution,
     events.AfterExecution: serialize_after_execution,
     events.Interrupted: serialize_interrupted,
@@ -141,6 +159,8 @@ def serialize_event(
     on_initialized: SerializeFunc | None = None,
     on_before_probing: SerializeFunc | None = None,
     on_after_probing: SerializeFunc | None = None,
+    on_before_analysis: SerializeFunc | None = None,
+    on_after_analysis: SerializeFunc | None = None,
     on_before_execution: SerializeFunc | None = None,
     on_after_execution: SerializeFunc | None = None,
     on_interrupted: SerializeFunc | None = None,
@@ -154,6 +174,8 @@ def serialize_event(
         events.Initialized: on_initialized,
         events.BeforeProbing: on_before_probing,
         events.AfterProbing: on_after_probing,
+        events.BeforeAnalysis: on_before_analysis,
+        events.AfterAnalysis: on_after_analysis,
         events.BeforeExecution: on_before_execution,
         events.AfterExecution: on_after_execution,
         events.Interrupted: on_interrupted,

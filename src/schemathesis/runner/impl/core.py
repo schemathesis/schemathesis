@@ -53,10 +53,12 @@ from ...exceptions import (
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, get_all_by_name
 from ...internal.datetime import current_datetime
-from ...internal.result import Ok
+from ...internal.result import Err, Ok, Result
 from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResult, TestResultSet
 from ...runner import events
 from ...schemas import BaseSchema
+from ...service import extensions
+from ...service.models import AnalysisResult
 from ...specs.openapi import formats
 from ...stateful import Feedback, Stateful
 from ...targets import Target, TargetContext
@@ -66,6 +68,7 @@ from .. import probes
 from ..serialization import SerializedTestResult
 
 if TYPE_CHECKING:
+    from ...service.client import ServiceClient
     from ...transports.responses import GenericResponse, WSGIResponse
 
 
@@ -97,6 +100,7 @@ class BaseRunner:
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT
     count_operations: bool = True
     count_links: bool = True
+    service_client: ServiceClient | None = None
     _failures_counter: int = 0
 
     def execute(self) -> EventStream:
@@ -110,8 +114,9 @@ class BaseRunner:
             unregister_auth()
         results = TestResultSet(seed=self.seed)
         initialized = None
-        __probes = None
         start_time = time.monotonic()
+        __probes = None
+        __analysis: Result[AnalysisResult, Exception] | None = None
 
         def _initialize() -> events.Initialized:
             nonlocal initialized
@@ -142,6 +147,25 @@ class BaseRunner:
             _probes = cast(List[probes.ProbeRun], __probes)
             return events.AfterProbing(probes=_probes)
 
+        def _before_analysis() -> events.BeforeAnalysis:
+            return events.BeforeAnalysis()
+
+        def _run_analysis() -> None:
+            nonlocal __analysis, __probes
+
+            if self.service_client is not None:
+                try:
+                    _probes = cast(list[probes.ProbeRun], __probes)
+                    result = self.service_client.analyze_schema(_probes, self.schema.raw_schema)
+                    extensions.apply(result.extensions, self.schema)
+                    __analysis = Ok(result)
+                except Exception as exc:
+                    __analysis = Err(exc)
+
+        def _after_analysis() -> events.AfterAnalysis:
+            _analysis = cast(Result[AnalysisResult, Exception], __analysis)
+            return events.AfterAnalysis(analysis=_analysis)
+
         if stop_event.is_set():
             yield _finish()
             return
@@ -151,8 +175,27 @@ class BaseRunner:
             _before_probes,
             _run_probes,
             _after_probes,
+            _before_analysis,
+            _run_analysis,
+            _after_analysis,
         ):
             event = event_factory()
+            if event is not None:
+                yield event
+            if stop_event.is_set():
+                yield _finish()
+                return
+
+        for func in (
+            _initialize,
+            _before_probes,
+            _run_probes,
+            _after_probes,
+            _before_analysis,
+            _run_analysis,
+            _after_analysis,
+        ):
+            event = func()
             if event is not None:
                 yield event
             if stop_event.is_set():

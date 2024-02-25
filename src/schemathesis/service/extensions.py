@@ -10,16 +10,16 @@ from .models import Extension, StringFormatsExtension, SchemaOptimizationExtensi
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
+    from ..schemas import BaseSchema
 
 
-def apply(extensions: list[Extension]) -> None:
+def apply(extensions: list[Extension], schema: BaseSchema) -> None:
     """Apply the given extensions."""
     for extension in extensions:
         if isinstance(extension, StringFormatsExtension):
             _apply_string_formats_extension(extension)
         elif isinstance(extension, SchemaOptimizationExtension):
-            # TODO:Update schema
-            pass
+            _apply_schema_optimization_extension(extension, schema)
 
 
 def _apply_string_formats_extension(extension: StringFormatsExtension) -> None:
@@ -77,3 +77,9 @@ def _find_built_in_strategy(name: str) -> Optional[st.SearchStrategy]:
         if hasattr(module, name):
             return getattr(module, name)
     return None
+
+
+def _apply_schema_optimization_extension(extension: SchemaOptimizationExtension, schema: BaseSchema) -> None:
+    """Update the schema with its optimized version."""
+    schema.raw_schema = extension.schema
+    extension.set_state(Success())

@@ -2,7 +2,7 @@ import uuid
 from hypothesis import find
 import pytest
 from schemathesis.service.extensions import apply
-from schemathesis.service.models import extension_from_dict
+from schemathesis.service.models import extension_from_dict, UnknownExtension
 from schemathesis.specs.openapi.formats import unregister_string_format, STRING_FORMATS
 
 
@@ -36,8 +36,9 @@ def is_uuid(value):
         return False
 
 
-def test_string_formats_success(string_formats):
-    apply([string_formats])
+def test_string_formats_success(string_formats, openapi_30):
+    assert str(string_formats.state) == "Not Applied"
+    apply([string_formats], openapi_30)
     find(STRING_FORMATS["_payment_card_regex"], "42".__eq__)
     find(STRING_FORMATS["_payment_card_regex_with_samples"], "42".__eq__)
     find(STRING_FORMATS["_payment_card_regex_with_samples"], "1234-5678-1234-5678".__eq__)
@@ -56,14 +57,29 @@ def test_string_formats_success(string_formats):
         ({"unknown": 42}, "Unsupported string format extension"),
     ),
 )
-def test_invalid_regex(format, message):
+def test_invalid_regex(format, message, openapi_30):
     extension = extension_from_dict(
         {
             "type": "string_formats",
             "formats": {"_invalid": format},
         }
     )
-    apply([extension])
+    apply([extension], openapi_30)
     assert str(extension.state) == "Error"
     assert extension.state.message == message
     assert "_invalid" not in STRING_FORMATS
+
+
+def test_unknown_extension(openapi_30):
+    extension = extension_from_dict({"type": "unknown", "custom": 42})
+    assert isinstance(extension, UnknownExtension)
+    apply([extension], openapi_30)
+    assert str(extension.state) == "Not Applied"
+
+
+def test_schema_extension(openapi_30):
+    custom_schema = {"custom": 42}
+    extension = extension_from_dict({"type": "schema", "schema": custom_schema})
+    apply([extension], openapi_30)
+    assert str(extension.state) == "Success"
+    assert openapi_30.raw_schema == custom_schema

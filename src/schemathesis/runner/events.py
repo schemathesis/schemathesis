@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, TYPE_CHECKING
 
 from ..internal.datetime import current_datetime
+from ..internal.result import Result
 from ..generation import DataGenerationMethod
 from ..exceptions import SchemaError, SchemaErrorType, format_exception, RuntimeErrorType
 from .serialization import SerializedError, SerializedTestResult
@@ -14,6 +15,7 @@ from .serialization import SerializedError, SerializedTestResult
 if TYPE_CHECKING:
     from ..models import APIOperation, Status, TestResult, TestResultSet
     from ..schemas import BaseSchema
+    from ..service.models import AnalysisResult
     from . import probes
 
 
@@ -91,6 +93,16 @@ class AfterProbing(ExecutionEvent):
     def asdict(self, **kwargs: Any) -> dict[str, Any]:
         probes = self.probes or []
         return {"probes": [probe.serialize() for probe in probes], "events_type": self.__class__.__name__}
+
+
+@dataclass
+class BeforeAnalysis(ExecutionEvent):
+    pass
+
+
+@dataclass
+class AfterAnalysis(ExecutionEvent):
+    analysis: Result[AnalysisResult, Exception]
 
 
 class CurrentOperationMixin:

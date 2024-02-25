@@ -683,7 +683,7 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 @click.option(
     "--experimental",
     help="Enable experimental support for specific features.",
-    type=click.Choice([experimental.OPEN_API_3_1.name]),
+    type=click.Choice([experimental.OPEN_API_3_1.name, experimental.SCHEMA_ANALYSIS.name]),
     callback=callbacks.convert_experimental,
     multiple=True,
 )
@@ -903,6 +903,8 @@ def run(
 
         # Upload without connecting data to a certain API
         client = ServiceClient(base_url=schemathesis_io_url, token=token)
+    # TODO: Init service client if experimental schema analysis is enabled
+    # TODO: Consider forward compatibility, as service may start requiring authentication, display such an error
     host_data = service.hosts.HostData(schemathesis_io_hostname, hosts_file)
 
     if "all" in checks:
@@ -935,7 +937,6 @@ def run(
         suppress_health_check=_hypothesis_suppress_health_check,
         verbosity=hypothesis_verbosity,
     )
-    correlation_id = uuid.uuid4()
     event_stream = into_event_stream(
         schema_or_location,
         app=app,
@@ -972,8 +973,7 @@ def run(
         stateful_recursion_limit=stateful_recursion_limit,
         hypothesis_settings=hypothesis_settings,
         generation_config=generation_config,
-        client=client,
-        correlation_id=correlation_id,
+        service_client=client,
     )
     execute(
         event_stream,
@@ -999,7 +999,6 @@ def run(
         location=schema,
         base_url=base_url,
         started_at=started_at,
-        correlation_id=correlation_id,
     )
 
 
@@ -1079,12 +1078,10 @@ def into_event_stream(
     store_interactions: bool,
     stateful: Stateful | None,
     stateful_recursion_limit: int,
-    client: ServiceClient | None,
-    correlation_id: uuid.UUID,
+    service_client: ServiceClient | None,
 ) -> Generator[events.ExecutionEvent, None, None]:
-    from requests import RequestException
-
     from ..service import extensions
+    from requests import RequestException
 
     try:
         if app is not None:
@@ -1144,6 +1141,7 @@ def into_event_stream(
                 auth_type=config.auth_type,
                 headers=config.headers,
             ),
+            service_client=service_client,
         ).execute()
     except SchemaError as error:
         yield events.InternalError.from_schema_error(error)
@@ -1380,7 +1378,6 @@ def execute(
     location: str,
     base_url: str | None,
     started_at: str,
-    correlation_id: uuid.UUID,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handlers: list[EventHandler] = []
@@ -1400,7 +1397,6 @@ def execute(
                 started_at=started_at,
                 out_queue=report_queue,
                 telemetry=telemetry,
-                correlation_id=correlation_id,
             )
         )
     elif isinstance(report, click.utils.LazyFile):
@@ -1416,7 +1412,6 @@ def execute(
                 started_at=started_at,
                 out_queue=report_queue,
                 telemetry=telemetry,
-                correlation_id=correlation_id,
             )
         )
     if junit_xml is not None:

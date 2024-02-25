@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Union
@@ -50,14 +51,14 @@ class FailedUploadResponse:
 
 
 @dataclass
-class ValidationError:
+class SchemaValidationError:
     title: str
     message: str
     extras: list[str]
     suggestion: str | None
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ValidationError:
+    def from_dict(cls, data: dict[str, Any]) -> SchemaValidationError:
         return cls(
             title=data["title"],
             message=data["message"],
@@ -112,6 +113,10 @@ class UnknownExtension(BaseExtension):
     type: str
     state: ExtensionState = field(default_factory=NotApplied)
 
+    @property
+    def details(self) -> list[str]:
+        return [self.type]
+
 
 @dataclass
 class SchemaOptimizationExtension(BaseExtension):
@@ -120,6 +125,10 @@ class SchemaOptimizationExtension(BaseExtension):
     schema: dict[str, Any]
     state: ExtensionState = field(default_factory=NotApplied)
 
+    @property
+    def details(self) -> list[str]:
+        return []
+
 
 @dataclass
 class StringFormatsExtension(BaseExtension):
@@ -127,6 +136,16 @@ class StringFormatsExtension(BaseExtension):
 
     formats: dict[str, dict[str, Any]]
     state: ExtensionState = field(default_factory=NotApplied)
+
+    @property
+    def details(self) -> list[str]:
+        counter: dict[str, int] = Counter()
+        for format_definition in self.formats.values():
+            if "regex" in format_definition:
+                counter["format"] += 1
+            if "samples" in format_definition:
+                counter["example"] += len(format_definition["samples"])
+        return [f"{count} {key}" if count == 1 else f"{count} {key}s" for key, count in counter.items()]
 
 
 # A CLI extension that can be used to adjust the behavior of Schemathesis.
@@ -143,14 +162,16 @@ def extension_from_dict(data: dict[str, Any]) -> Extension:
 
 @dataclass
 class AnalysisResult:
+    id: str
     message: str
     extensions: list[Extension]
-    errors: list[ValidationError]
+    validation_errors: list[SchemaValidationError]
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AnalysisResult:
         return cls(
+            id=data["id"],
             message=data["message"],
             extensions=[extension_from_dict(ext) for ext in data["extensions"]],
-            errors=[ValidationError.from_dict(error) for error in data["errors"]],
+            validation_errors=[SchemaValidationError.from_dict(error) for error in data["validation_errors"]],
         )
