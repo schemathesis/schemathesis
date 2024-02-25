@@ -15,6 +15,7 @@ jobs:
           fetch-depth: 1
           submodules: true
 
+      - run: pip install pre-commit
       - run: pre-commit autoupdate
 
       - name: Open pull request
