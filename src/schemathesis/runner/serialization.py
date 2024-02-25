@@ -226,6 +226,13 @@ class SerializedError:
             message = f"Scalar type '{scalar_name}' is not recognized"
             extras = []
             title = "Unknown GraphQL Scalar"
+        elif isinstance(exception, hypothesis.errors.InvalidArgument) and str(exception).endswith(
+            "larger than Hypothesis is designed to handle"
+        ):
+            type_ = RuntimeErrorType.HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE
+            message = HEALTH_CHECK_MESSAGE_LARGE_BASE_EXAMPLE
+            extras = []
+            title = "Failed Health Check"
         elif isinstance(exception, hypothesis.errors.Unsatisfiable):
             type_ = RuntimeErrorType.HYPOTHESIS_UNSATISFIABLE
             message = f"{exception}. Possible reasons:"
